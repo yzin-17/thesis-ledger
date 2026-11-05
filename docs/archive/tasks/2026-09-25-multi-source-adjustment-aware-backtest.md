@@ -28,11 +28,11 @@
 - [x] C04-common-chart-fallback：按 Spec §1.1 收敛固定快照纯价格整窗备用要求，核对 Server 选择和实际来源，完成目标图表口径、缓存隔离、失败切回及运行配置不变的交互验收。标的目录复用现有行情弹窗提供只读入口，无持仓时隐藏数量、成本和盈亏。先处理读取接缝，再做 UI；高级语义转换不纳入整窗替换。
 - [x] C05-common-regression-docs：受影响测试、类型/构建、边界/依赖与目标验证完成；父叶、部署/UI、M2/M3 和 AC 已按新范围对账，用户/运维、版本、架构及三仓说明同步。14 份修改文档的相对文件链接检查通过，既有尺寸门禁失败已由 C06 修复，未执行层级分别披露。
 
-C01–C05 已完成。此次源码、配置、四条真实 Run、重放、图表与恢复操作统一见[共同价格验收](../../tasks/evidence/2026-10-03-common-price-baseline.md)。此前失败、单次预算、人工准入及兼容证书要求属于历史实现，不能重新阻断用户已确认的共同价格路径。
+C01–C05 已完成。此次源码、配置、四条真实 Run、重放、图表与恢复操作统一见[共同价格验收](../../evidence/2026-10-03-common-price-baseline.md)。此前失败、单次预算、人工准入及兼容证书要求属于历史实现，不能重新阻断用户已确认的共同价格路径。
 
 ### 0.0 收尾维护
 
-- [x] C06-Ledger 测试职责拆分：基线观察批次的 4 项测试独立到 `baseline-observation-batch.service.test.ts`，导入草稿的 15 项留在原文件，当前 Ledger 事件及持久化夹具由 `baseline-import-ledger.fixture.ts` 复用。V3 版本字段及原断言保留；定向 19 passed、Server typecheck/lint、全包 2074 passed / 125 skipped、边界/依赖及文件尺寸门禁通过。原文件 1550→1358 行；测试调整未改变部署输入，未重复同步容器。命令和日志见[验收记录](../../tasks/evidence/2026-10-03-common-price-baseline.md)。
+- [x] C06-Ledger 测试职责拆分：基线观察批次的 4 项测试独立到 `baseline-observation-batch.service.test.ts`，导入草稿的 15 项留在原文件，当前 Ledger 事件及持久化夹具由 `baseline-import-ledger.fixture.ts` 复用。V3 版本字段及原断言保留；定向 19 passed、Server typecheck/lint、全包 2074 passed / 125 skipped、边界/依赖及文件尺寸门禁通过。原文件 1550→1358 行；测试调整未改变部署输入，未重复同步容器。命令和日志见[验收记录](../../evidence/2026-10-03-common-price-baseline.md)。
 
 ### 0.1 遗留任务对账
 
@@ -46,7 +46,7 @@ C01–C05 已完成。此次源码、配置、四条真实 Run、重放、图表
 | G-M2-Price | hfq 归一化回测完成，none 图表完成；真实 raw-events 回测仍属公司行动/真实份额扩展，未伪记通过 |
 | F02、G-Deploy | 用户/运维、架构、三仓能力与契约说明完成；官方代码同步、目标健康、业务路径通过。本轮无依赖或结构变化，不新增迁移验收 |
 | F01 | 已精简：保留当前镜像固化、关键备份、可用恢复入口和必要核验；当前待办由后继 Task 唯一维护。取消复杂多版本／组件组合回退及强制异地长期制品交付，原 P01～P04 成功和失败记录保留 |
-| R01.5-pagination、R01.5-real-source | 已被 [2026-10-02 第一优先级证据](../../tasks/evidence/2026-10-02-priority1-catalog-ui.md)完成：真实基金排行 20481 条/21 页，目录正式同步 35278 条，历史超时不再是当前阻塞 |
+| R01.5-pagination、R01.5-real-source | 已被 [2026-10-02 第一优先级证据](../../evidence/2026-10-02-priority1-catalog-ui.md)完成：真实基金排行 20481 条/21 页，目录正式同步 35278 条，历史超时不再是当前阻塞 |
 | S05 及 reconstruction 子叶 | 严格历史 PIT 剩余交付义务已取消，不计通过；固定快照研究与基础时序保护保留 |
 | 旧 HiThink M31、M32；其他事件／份额历史叶 | 取消旧 HiThink 分红和 M32 自主派生剩余义务；已完成实现及原未通过记录保留。后继公告现金分红 M31-r1～r5 已独立验收，P6 实际单位 E1／F3 保持活动；其余已跳过来源不重启 |
 | M24/M25/M26 | Tushare 当前免费权限不足，按用户要求跳过；保留前端凭据配置及 40203 记录 |
@@ -74,7 +74,7 @@ C01–C05 已完成。此次源码、配置、四条真实 Run、重放、图表
 
 ## 1. 基线、执行约束与证据
 
-2026-09-30，关联 `E01-I1.5` 已完成固定来源 CN 日线的稀疏获取、逐来源窗口证据、身份事实组合冻结及 Runner 消费；包级与隔离 PostgreSQL/Redis/生产 Worker 验收通过，见[缺日冻结与执行证据](../../tasks/evidence/2026-09-30-e01-i1-5-sparse-window-runner.md)。随后 `E01-I1.6` 完成当前目标的真实 HiThink qfq 准备、创建、独立 Worker 成功、冻结重放、缺路由/撤销拒绝和浏览器客户端验收，见[目标验收证据](../../tasks/evidence/2026-09-30-e01-i1-6-target-acceptance.md)。本次仅覆盖既有精确范围的固定来源归一化研究基线，未新增严格 PIT、独立备用或真实费用证据；本 Task 的其余 M1/M2/M3 门禁保持各自状态。
+2026-09-30，关联 `E01-I1.5` 已完成固定来源 CN 日线的稀疏获取、逐来源窗口证据、身份事实组合冻结及 Runner 消费；包级与隔离 PostgreSQL/Redis/生产 Worker 验收通过，见[缺日冻结与执行证据](../../evidence/2026-09-30-e01-i1-5-sparse-window-runner.md)。随后 `E01-I1.6` 完成当前目标的真实 HiThink qfq 准备、创建、独立 Worker 成功、冻结重放、缺路由/撤销拒绝和浏览器客户端验收，见[目标验收证据](../../evidence/2026-09-30-e01-i1-6-target-acceptance.md)。本次仅覆盖既有精确范围的固定来源归一化研究基线，未新增严格 PIT、独立备用或真实费用证据；本 Task 的其余 M1/M2/M3 门禁保持各自状态。
 
 需求以对应 Spec 全文为准，AC01–AC20 是验收索引，不替代正文中的约束。本次原样收录用户提供的 Spec；其中远端代码和供应商能力描述仍是原文基线，不代表本地实现或账号实测。
 
@@ -119,7 +119,7 @@ C01–C05 已完成。此次源码、配置、四条真实 Run、重放、图表
 | K-UI | `apps/desktop/src/features/providers/`、`strategy/BacktestSetupDialog.tsx`、`strategy/BacktestModelConfiguration.tsx`、`strategy/BacktestModelDisclosure.tsx`、`market-detail/` | 现有设置、图表与回测界面 |
 | K-DSA | 相邻 DSA 的 `src/services/thesis_ledger_provider_runtime.py`、`data_provider/`、`tests/test_thesis_ledger_contract.py`、`docs/thesis-ledger-contract-v1.md` | 实际上游访问与能力事实 |
 | K-Infra | 相邻 infra 的 `scripts/sync-code.sh`、`scripts/update.sh`、`scripts/check-compatibility.mjs`、`compatibility.json` | 部署与兼容 |
-| K-Docs | Spec §2 所列基线、`docs/architecture/version-matrix.md`、`docs/DOCUMENTATION-GUIDE.md` | 契约冲突消解和发布说明 |
+| K-Docs | Spec §2 所列基线、`docs/design/version-matrix.md`、`docs/DOCUMENTATION-GUIDE.md` | 契约冲突消解和发布说明 |
 
 ### 1.4 子代理执行台账（2026-09-25）
 
@@ -263,7 +263,7 @@ C01–C05 已完成。此次源码、配置、四条真实 Run、重放、图表
 
 执行顺序先核对第 2 步已有证据是否适用于本次配置，并处理第 1 步的真实来源阻断；第 2 步必要检查满足后才推进第 3 步目标更新。可独立验证的窄叶继续实施，但不以增加无关来源能力替代目标门禁。第 4 步通过后立即记录普通回测里程碑，再执行第 5 步。首个交付仅在 `G-Run` 与 `G-UI-159516` 对同一真实 Run 均有适当证据后记录为通过；完整 `G0-H`、`G-Deploy`、`G-UI`、M1、AI、M2/M3、严格 PIT 正向资格及 AC01–AC20 总验收仍按原任务开放。固定快照研究必须如实披露，缺历史资格的严格 PIT 请求继续失败关闭。
 
-2026-09-28 首个交付里程碑：同一[界面创建的完整结果 Run](../../tasks/evidence/2026-09-28-cont-159516-versioned-benchmark.md) `e2195b91-4cff-4dc5-9db2-0df01cf43d83` 已满足 `G-Run` 与 `G-UI-159516`，目标四叶完成。旧 Runner 的 partial 历史结果保持可重放，新版本的 Snapshot 与业务结果均 complete；其余父项及 AC 总验收仍开放。
+2026-09-28 首个交付里程碑：同一[界面创建的完整结果 Run](../../evidence/2026-09-28-cont-159516-versioned-benchmark.md) `e2195b91-4cff-4dc5-9db2-0df01cf43d83` 已满足 `G-Run` 与 `G-UI-159516`，目标四叶完成。旧 Runner 的 partial 历史结果保持可重放，新版本的 Snapshot 与业务结果均 complete；其余父项及 AC 总验收仍开放。
 
 规划预检结论：本次仅调整 Task 的执行顺序与目标验收所有权，Spec 合同和 AC 不变。来源资格、目标运行态、业务 Run、用户交互分别由独立门禁负责，新增依赖无环；顺序与责任已就绪，真实目标执行仍因 `G0-H-target` 证据缺口和 DSA 完整门禁失败而阻塞。本文档调整不构成新的来源、部署或产品验收证据。
 
@@ -295,13 +295,13 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - [x] G0-H-target：只验收首条 `159516.SZ` 前复权普通回测所需的真实目标数据，不代替本父项其他 ETF/股票样本。
     - 启动依赖：P01、已选定的现有策略版本及其指标预热范围；执行面为 HiThink 只读取数与目标能力/准入核对，沿用 D01 的精确路由和多窗口合同。
     - 完成：原始响应指纹、目标及预热完整交易日、口径/基准/单位、分页或窗口边界、账号权限和签发精确来源准入所需的事实均可核验；结合独立公告与实际价格坐标说明 7 月拆分的记账方式，缺失事实保留未知，不从当前抓取时间补造历史可见性。无事件信号的归一化运行按需检查事件，但不能遗漏或重复处理目标拆分。
-    - 验证：[目标来源准入证据](../../tasks/evidence/2026-09-28-cont-g0-h-159516-target-admission.md)固定脱敏请求范围与指纹、独立日历/上市/拆分/单位事实；DSA 内部内容寻址证据和精确 RouteAdmission 仅覆盖该标的 68 日及预热，正式 Control V3 单一路由生效。目标 Data V3 真实读取 HTTP 200、68 Bar、`fund-unit/CNY`、前复权拆分两日数值与独立对账一致；超界请求返回 422。供应商算法与历史修订流未公开，按 Spec §5.2 只将该已验证序列用于 `normalized-series`、`fixed-provider-snapshot`，`dividendMeaning=provider-defined`；严格 PIT 和逆变换不授予资格。目标 Server/Worker 的实际配置、冻结与重放另由 `G-Deploy-159516` 验证。
-    - [x] G0-H-units-scope：将上条独立单位证据实现为 DSA 的精确来源字段合同。仅在 `159516.SZ`、`2026-04-30..2026-08-09` 内、当前 HiThink ETF 历史端点和来源修订下报告 `fund-unit/CNY`；请求超界、不同标的、不同修订继续报告 `unknown`。HTTP 投影复核证据 ID 与请求身份，量额数值不转换；适配修订升至 `v3`。[实施、定向验证和目标快更](../../tasks/evidence/2026-09-28-cont-g0-h-159516-scoped-units.md)记录 97 项通过、官方 `sync-code.sh dsa` 后目标健康、精确路由仍拒绝；扩展套件另有 1 项与现存 HiThink Quote manifest 断言不一致的失败。此叶未签发 RouteAdmission，不放开 `G0-H-target`。
+    - 验证：[目标来源准入证据](../../evidence/2026-09-28-cont-g0-h-159516-target-admission.md)固定脱敏请求范围与指纹、独立日历/上市/拆分/单位事实；DSA 内部内容寻址证据和精确 RouteAdmission 仅覆盖该标的 68 日及预热，正式 Control V3 单一路由生效。目标 Data V3 真实读取 HTTP 200、68 Bar、`fund-unit/CNY`、前复权拆分两日数值与独立对账一致；超界请求返回 422。供应商算法与历史修订流未公开，按 Spec §5.2 只将该已验证序列用于 `normalized-series`、`fixed-provider-snapshot`，`dividendMeaning=provider-defined`；严格 PIT 和逆变换不授予资格。目标 Server/Worker 的实际配置、冻结与重放另由 `G-Deploy-159516` 验证。
+    - [x] G0-H-units-scope：将上条独立单位证据实现为 DSA 的精确来源字段合同。仅在 `159516.SZ`、`2026-04-30..2026-08-09` 内、当前 HiThink ETF 历史端点和来源修订下报告 `fund-unit/CNY`；请求超界、不同标的、不同修订继续报告 `unknown`。HTTP 投影复核证据 ID 与请求身份，量额数值不转换；适配修订升至 `v3`。[实施、定向验证和目标快更](../../evidence/2026-09-28-cont-g0-h-159516-scoped-units.md)记录 97 项通过、官方 `sync-code.sh dsa` 后目标健康、精确路由仍拒绝；扩展套件另有 1 项与现存 HiThink Quote manifest 断言不一致的失败。此叶未签发 RouteAdmission，不放开 `G0-H-target`。
   - 阶段证据（2026-09-25，门禁未完成）：用户确认 Key 在 `~/.zshrc`；交互式 zsh 子进程只核对导出存在性，未输出值。官方 ETF 历史接口两次只读请求均 HTTP 200/业务 0，首次以 UTC 午夜传参取得 60 行，重叠 5/5 行一致且 `adjust:null`，但日期边界不代表精确目标范围。随后按 Asia/Shanghai 午夜边界对 `159516.SZ` 的 2026-05-16..08-09 单次请求取得 59 行，上海日期 05-18..08-07，与本地 `exchange_calendars 4.13.2` XSHG 的 59 个交易日逐日一致，缺口/重复/越界均 0；脱敏响应 SHA-256 为 `151c5af524b0b526fea181f63d4e8e8beccfa8c0f53a8e740586372a09a9d2f2`。[深交所 2026 休市公告](https://www.szse.cn/disclosure/notice/t20251222_618087.html)另核实该目标窗口深市也是 59 个交易日；不能据此推断 XSHG 与深市全历史等价。官方文档定义 `adjust:null` 仍为 ETF 固定前复权，价格按原始货币计；成交量/成交额数值单位仍未确认。预热及无事件窗口尚未验证，故 G0-H 保持未勾选。
   - 长窗口阶段证据（2026-09-25，门禁未完成）：按[官方场内基金历史日线接口](https://github.com/HiThink-Tech/Financial-API/blob/main/docs/api/fund/fund-market.md)对 `159516.SZ` 请求五年窗一次和重叠分段两次，均 HTTP 200/业务 0。五年窗 2021-09-25..2026-09-25 返回 769 行，上海日期 2023-07-27..2026-09-24；两分段并集同为 769 个唯一日，7 个重叠交易日全字段一致，未观察到分页字段或响应截断。三份脱敏响应 SHA-256 分别为 `411358307f622c2d51bf95324a6017417a8745adf1b20d97449232463cb1d1af`、`dd11747c5c763270191621f1e86b0d9dccf6ec53b98d80b6f0537052dda6b5a4`、`415fec13cbd04f7a870c9c0768631feeaee380feba74577147482c0e3b8f8e4e`。[深交所上市公告](https://www.szse.cn/disclosure/notice/fund/t20230724_602100.html)独立核实 `159516` 于 2023-07-27 起在深交所上市；是否有隐式行数上限仍未证实，不能把这次一致性当作全历史完整性保证。
   - 股票阶段证据（2026-09-25，门禁未完成）：对 `000001.SZ` 在相同上海日期边界分别请求 `none/forward/backward`，各 HTTP 200/业务 0、59 行、响应口径一致，三套价格序列彼此不同、重复/越界 0；响应体 SHA-256 分别为 `c3823c0d5d20f660acad97a00b3910349ee2ed8b5ccf46073e710ddf43a8ab8e`、`ae07c11fb069f01758768c8d4f7be0fb188c04ec6d79ef46df44ad0f345e4a85`、`974941840ed31319a781a6a80bfca3707f5623158a0139dac5d295ca06043a6e`。官方股票接口说明价格与成交额为 CNY、成交量为股；响应没有可核实的算法版本与复权基准。该探针环境没有独立 XSHG 日历，因此股票窗口交易日完整性待其他证据。无原始响应和 Key 输出。
   - 分红阶段证据（2026-09-25，门禁未完成）：[上交所托管的基金管理人公告](https://www.sse.com.cn/disclosure/fund/announcement/c/new/2025-06-11/510300_20250611_ZAU4.pdf)核实 `510300.SH` 于 2025-06-18 除息、登记日 06-17、发放日 06-27，税前现金 0.880 元/10 份。HiThink 官方 ETF 日线事件窗 2025-06-13..06-30 一次只读请求 HTTP 200/业务 0、12 行、`adjust:null`，响应 SHA-256 `09972bbf1a0a820c074511bf9e3cba463de6930dcfb176b028af26384316193d`；官方分红 REST endpoint 一次请求 HTTP 200/业务 0、14 条，其中一条的日期和每十份税前/税后金额与公告一致，响应 SHA-256 `c12b43153a3227269203eec002d5d4b067b7d615d595ca748d3b2039a6f479bf`。此证据证明样本接口可访问和事件字段匹配，不证明事件历史覆盖完整、DSA 归一化或回测接入。2025-07 的公开无事件对照窗口另见下条；预热、接口隐式上限和其余门禁仍未完成。
-  - 无事件窗口核查（2026-09-28，来源完整性未完成）：[一手资料与只读探针对账](../../tasks/evidence/2026-09-28-cont-g0-h-510300-no-event-window.md)结合上交所托管的基金 2025 年年度报告与 6 月分红公告，确认全年每 10 份分红 `0.8800` 元全部对应 6 月事件、全年基金拆分变动份额为无；年报重大事件表中 7 月只有关联交易公告。HiThink 分红端点当前返回 14 条，7 月除息日 0 条，但 `historyComplete=false`，不是精确窗口完整空集证明；`G0-H` 父项仍开放。
+  - 无事件窗口核查（2026-09-28，来源完整性未完成）：[一手资料与只读探针对账](../../evidence/2026-09-28-cont-g0-h-510300-no-event-window.md)结合上交所托管的基金 2025 年年度报告与 6 月分红公告，确认全年每 10 份分红 `0.8800` 元全部对应 6 月事件、全年基金拆分变动份额为无；年报重大事件表中 7 月只有关联交易公告。HiThink 分红端点当前返回 14 条，7 月除息日 0 条，但 `historyComplete=false`，不是精确窗口完整空集证明；`G0-H` 父项仍开放。
 
 - [x] G0-M：固定 M2 各来源的独立准入包。
   - 依赖：P02；执行所有者：DSA 接入执行者；范围：只建立逐单元探针任务与证据入口。
@@ -313,7 +313,7 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 依赖：P02；执行所有者：DSA 接入执行者；范围：a-stock-data 可复用实现的版本/来源审查、free-stockdb 镜像位置/许可/可访问性、问财等底层接口身份。
   - 产出/验证：每个候选记录采用、不可用或明确待验证及依据；free-stockdb 未提供可信镜像时不开放。第三方 SDK 不登记成官方 HiThink，自然语言答案不登记成行情事实。
   - 停止边界：本任务不下载未知数据集、不安装全部 SDK，也不采购授权；需要实现的单元进入对应 R 子任务。
-  - 2026-09-29 只读进展：[固定版辅助来源审查](../../tasks/evidence/2026-09-29-cont-g0-r-auxiliary-source-audit.md)锁定 `a-stock-data v3.10.0` 提交、代码许可和腾讯/通达信/巨潮实际 endpoint；R07.14 腾讯报价与现有 Consumer 同源，选择不新增 Provider；通达信盘后包缺现存 Consumer，巨潮公告与既有 AKShare 链同源且缺精确发布时间。问财仅第三方代码声称服务与鉴权，官方合同未核；free-stockdb 不内置镜像地址，R08.1 unavailable。真实数据条款、响应、单位/时点和目标准入均未通过，本门禁仍开放。
+  - 2026-09-29 只读进展：[固定版辅助来源审查](../../evidence/2026-09-29-cont-g0-r-auxiliary-source-audit.md)锁定 `a-stock-data v3.10.0` 提交、代码许可和腾讯/通达信/巨潮实际 endpoint；R07.14 腾讯报价与现有 Consumer 同源，选择不新增 Provider；通达信盘后包缺现存 Consumer，巨潮公告与既有 AKShare 链同源且缺精确发布时间。问财仅第三方代码声称服务与鉴权，官方合同未核；free-stockdb 不内置镜像地址，R08.1 unavailable。真实数据条款、响应、单位/时点和目标准入均未通过，本门禁仍开放。
 
 ## 3. M1：状态与契约阶段
 
@@ -337,7 +337,7 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
 
 - [x] C03：冻结新运行/快照格式与旧版本解码规则。
   - 2026-09-27 收口：完整 Schema 330 项与 V3 创建/冻结重试 18 项通过，写入链按显式 V3 写新格式，旧 raw 请求保留 §13 兼容语义；官方同步 Server/Worker 成功，两容器实际加载器拒绝未来版本且产物摘要一致。详细证据见下述记录。本项仅关闭契约格式与解码义务，不关闭 S09/I01 或真实来源门禁。
-  - 2026-09-27 续核：[快照版本证据](../../tasks/evidence/2026-09-27-c03-snapshot-contract.md)记录 Schema 15 项和实际重放 12 项通过；发现并修复旧 Store 加载未知版本未拒绝的遗漏，新增文件级边界回归，相关 20 项、类型与 lint 通过。目标尚未同步，新运行写入链及完整 V-Schema 对账待完成，父项保持开放。
+  - 2026-09-27 续核：[快照版本证据](../../evidence/2026-09-27-c03-snapshot-contract.md)记录 Schema 15 项和实际重放 12 项通过；发现并修复旧 Store 加载未知版本未拒绝的遗漏，新增文件级边界回归，相关 20 项、类型与 lint 通过。目标尚未同步，新运行写入链及完整 V-Schema 对账待完成，父项保持开放。
   - 覆盖：Spec §11、§13，AC12–AC15；依赖：C01、C02。
   - 写入：K-Contract 的 backtest/strategy-optimization schema 及旧快照 fixture 测试。
   - 完成：在现有版本机制明确递增；价格协议、比较指纹、来源和历史语义进入冻结格式；新运行只写新格式，旧快照按旧引擎语义解码，历史 adjusted=true 不猜成 qfq。
@@ -345,7 +345,7 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
 
 - [x] C04：落实 DSA wire/handshake 的跨仓一致性。
   - 2026-09-27 收口：C03 前置项通过，补跑 DSA 旧契约/Control、事件与目标 pin 70 项通过，结合未变的 DSA 36 项、消费侧 13 项和完整 Schema 330 项完成 wire 范围对账。具体断言与限制见下述证据；未据此关闭 Provider、部署或纵向运行门禁。
-  - 2026-09-27 续核：[跨仓契约证据](../../tasks/evidence/2026-09-27-c04-wire-contract.md)记录消费侧 13、Schema 42、DSA 36 项通过；修复目录测试遗漏未准入 SPLIT_EVENT 的完整列表预期，未弱化断言或修改生产代码。旧版本和安全错误边界已有本地证据；C03 前置项仍开放，继续核验其冻结/解码与封存条件后再判断父项完成。
+  - 2026-09-27 续核：[跨仓契约证据](../../evidence/2026-09-27-c04-wire-contract.md)记录消费侧 13、Schema 42、DSA 36 项通过；修复目录测试遗漏未准入 SPLIT_EVENT 的完整列表预期，未弱化断言或修改生产代码。旧版本和安全错误边界已有本地证据；C03 前置项仍开放，继续核验其冻结/解码与封存条件后再判断父项完成。
   - 覆盖：Spec §10、§13，AC01、AC02、AC11、AC15；依赖：C01、C02、C03。
   - 写入：DSA 对应消费契约实现/测试与主仓 DSA 消费边界；按 P01 固定的共享 fixture 核对，主仓协调者维护共享契约。
   - 完成：两端解析同一格式、版本和错误；不兼容版本保留旧可用功能并拒绝新能力，DSA 不选择回测记账方式。
@@ -354,8 +354,8 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
 ## 4. M1：数据执行面
 
 - [x] D01：HiThink ETF qfq 基础适配器完成；已有多窗口合同与回归保留，真实基础路径见本轮验收。
-  - 2026-09-27 补验：[适配与路由核对](../../tasks/evidence/2026-09-27-d01-d03-adapter-audit.md)记录 D01–D03 相关 134 项本地测试通过；跨窗口冲突及完整目标隔离仍待核对，真实 G0-H 不由 fixture 替代。
-  - 2026-09-28 当前源码核对：单次 ETF 请求限五个日历年；生产 V3 API 已接入受预算约束的多窗口采集与重叠比对，Server 已接协议读取及本地文件冻结重放。局部状态和数据库/目标剩余条件见下文与[对账证据](../../tasks/evidence/2026-09-28-cont-d01-window-verification.md)；单窗口覆盖测试不替代真实跨窗来源验收。
+  - 2026-09-27 补验：[适配与路由核对](../../evidence/2026-09-27-d01-d03-adapter-audit.md)记录 D01–D03 相关 134 项本地测试通过；跨窗口冲突及完整目标隔离仍待核对，真实 G0-H 不由 fixture 替代。
+  - 2026-09-28 当前源码核对：单次 ETF 请求限五个日历年；生产 V3 API 已接入受预算约束的多窗口采集与重叠比对，Server 已接协议读取及本地文件冻结重放。局部状态和数据库/目标剩余条件见下文与[对账证据](../../evidence/2026-09-28-cont-d01-window-verification.md)；单窗口覆盖测试不替代真实跨窗来源验收。
   - [x] D01-window-contract：先明确多窗口观测的输入和输出合同。重叠必须包含真实交易日；保留每窗请求范围、响应指纹、观测时间和原始口径事实；重叠一致只证明已观测交集，不提升未知上游方法版本或锚点，不把窗口局部性质改为全局序列。
     - 2026-09-27：Spec §8.3、两端完整非递归观测合同、跨语言指纹与父子时间边界已建立；最新 Schema 14 项、Python 组合/API 14 项及 Server 消费/冻结重放 13 项通过。证据见适配与路由核对；仅关闭合同定义，不关闭下述数据库和真实运行门禁。
   - [x] D01-window-execution：在 HiThink 适配边界加入受预算约束的多窗口采集与比较，并接入实际调用方；窗口分割、重叠范围和总调用上限必须可验证，任何子窗失败、无有效交集或 OHLC 冲突均拒绝生成合并成功结果；不新增隐藏重试或绕过准入。
@@ -363,31 +363,31 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 当前接入拆分（2026-09-27）：
     - [x] D01-wire：依据 Spec §8.3 定义非递归 `windowObservations`，复用单窗口响应校验；校验父子身份、窗口并集、全部交集和最终 Bars，明确协议能力及适配修订。不在分页页数中夹带子窗口事实。
     - [x] D01-execution：DSA 将已实现采集器接入受准入和总预算约束的实际读取入口；生成完整子响应及父响应，保留未知方法和窗口作用域，计算覆盖全部观测的指纹。
-    - [x] D01-consumption：Server 能力读取、协议解析与本地文件冻结已由既有定向测试覆盖；新增[隔离 PostgreSQL 到 Snapshot 证据闭环](../../tasks/evidence/2026-09-28-cont-d01-pg-consumption.md)证明父响应与两份子观测经真实仓库回读后原样进入 artifact、离线重放，改写子观测后数据库读取拒绝，旧单窗口相邻回归通过。此勾选仅表示受控 fixture 的本地/隔离数据库消费，不替代 D01-runtime 或真实 HiThink 准入。
-    - [x] D01-runtime：受控 HTTP、隔离冻结/重放及独立 Worker 纵向链已有[本地证据](../../tasks/evidence/2026-09-28-cont-d01-controlled-http-worker.md)；官方更新后的目标 V3 协议 smoke、DSA 多窗口/运行时源码及 Server/Worker Reader/Snapshot/Runner 编译产物均与当前已验证输入一致，且精确 HiThink 路由仍 `not_admitted`，见[目标运行态核对](../../tasks/evidence/2026-09-28-cont-d01-target-runtime.md)。本项只关闭目标运行代码一致性，不替代 `G0-H-target` 或 `G-Deploy-159516` 的真实正向读取/冻结/重放门禁。
-  - 2026-09-28 局部状态对账：[D01 多窗口证据](../../tasks/evidence/2026-09-28-cont-d01-window-verification.md)核对生产 V3 API、预算/准入读取、全部交集组合、协议能力、父子指纹与 Server 本地文件冻结重放；补单位/口径及实际无交集拒绝反例。此前 DSA 多窗口 20 项、准入 14 项、Schemas 14 项、Server 9 项通过；I01 JSONB 修复后新增[数据库消费证据](../../tasks/evidence/2026-09-28-cont-d01-pg-consumption.md)，关闭受控 D01-consumption。随后[目标运行态核对](../../tasks/evidence/2026-09-28-cont-d01-target-runtime.md)确认官方更新后的 V3 协议及 DSA/Server/Worker 关键运行代码与已验证输入一致，因此 `D01-runtime` 已收口；G0-H、真实目标正向读取、单位/价格基准与父 D01 继续开放，不重置真实请求预算。
+    - [x] D01-consumption：Server 能力读取、协议解析与本地文件冻结已由既有定向测试覆盖；新增[隔离 PostgreSQL 到 Snapshot 证据闭环](../../evidence/2026-09-28-cont-d01-pg-consumption.md)证明父响应与两份子观测经真实仓库回读后原样进入 artifact、离线重放，改写子观测后数据库读取拒绝，旧单窗口相邻回归通过。此勾选仅表示受控 fixture 的本地/隔离数据库消费，不替代 D01-runtime 或真实 HiThink 准入。
+    - [x] D01-runtime：受控 HTTP、隔离冻结/重放及独立 Worker 纵向链已有[本地证据](../../evidence/2026-09-28-cont-d01-controlled-http-worker.md)；官方更新后的目标 V3 协议 smoke、DSA 多窗口/运行时源码及 Server/Worker Reader/Snapshot/Runner 编译产物均与当前已验证输入一致，且精确 HiThink 路由仍 `not_admitted`，见[目标运行态核对](../../evidence/2026-09-28-cont-d01-target-runtime.md)。本项只关闭目标运行代码一致性，不替代 `G0-H-target` 或 `G-Deploy-159516` 的真实正向读取/冻结/重放门禁。
+  - 2026-09-28 局部状态对账：[D01 多窗口证据](../../evidence/2026-09-28-cont-d01-window-verification.md)核对生产 V3 API、预算/准入读取、全部交集组合、协议能力、父子指纹与 Server 本地文件冻结重放；补单位/口径及实际无交集拒绝反例。此前 DSA 多窗口 20 项、准入 14 项、Schemas 14 项、Server 9 项通过；I01 JSONB 修复后新增[数据库消费证据](../../evidence/2026-09-28-cont-d01-pg-consumption.md)，关闭受控 D01-consumption。随后[目标运行态核对](../../evidence/2026-09-28-cont-d01-target-runtime.md)确认官方更新后的 V3 协议及 DSA/Server/Worker 关键运行代码与已验证输入一致，因此 `D01-runtime` 已收口；G0-H、真实目标正向读取、单位/价格基准与父 D01 继续开放，不重置真实请求预算。
   - 覆盖：Spec §4、§8，AC01、AC09、AC10；依赖：C04；真实启用依赖 G0-H。
   - 写入：K-DSA 的 ETF 历史适配器、manifest 对应单元及测试。
   - 完成：adjust:null 标为 qfq；none/hfq 拒绝；完整窗口/分页、重叠一致性、单位与观测版本保留；未公开公式用 provider-defined 表达。
   - 验证：V-DSA，覆盖缺页、重复日期、非法价格、多窗口一致/冲突及请求失败；fixture 不作为账号就绪证明。
 
 - [x] D02：HiThink 股票三口径适配器。
-  - 2026-09-27 收口：[适配与路由核对](../../tasks/evidence/2026-09-27-d01-d03-adapter-audit.md)记录三口径及分页修复相关 87 项、准入相关 22 项测试通过；官方 DSA 同步和容器内分页拒绝探针通过。仅收口适配器实现，真实启用仍受 G0-H 约束。
+  - 2026-09-27 收口：[适配与路由核对](../../evidence/2026-09-27-d01-d03-adapter-audit.md)记录三口径及分页修复相关 87 项、准入相关 22 项测试通过；官方 DSA 同步和容器内分页拒绝探针通过。仅收口适配器实现，真实启用仍受 G0-H 约束。
   - 覆盖：Spec §4，AC02、AC09；依赖：C04；真实启用依赖 G0-H。
   - 写入：K-DSA 的股票历史适配器、对应 manifest 及测试。
   - 完成：none/forward/backward 精确映射 none/qfq/hfq，价格和单位不串口径，不复用 ETF 固定口径假设。
   - 验证：V-DSA，三口径请求/响应、未知标签、权限/额度与缺页分类。
 
 - [x] D03：DSA 精确策略应用与目标隔离。
-  - 2026-09-27 收口：[适配与路由核对](../../tasks/evidence/2026-09-27-d01-d03-adapter-audit.md)补齐可重试错误的主备 pin、真实来源熔断/健康隔离与重建保持、第三目标拒绝及适配器内部调用边界。目标/准入四文件 45 项和精确适配/熔断三文件 29 项通过；数量约束此前已通过官方同步及容器探针。仅关闭本地精确路由实现范围，真实来源准入和 I01 联通仍独立开放。
-  - 2026-09-27 补验：[适配与路由核对](../../tasks/evidence/2026-09-27-d01-d03-adapter-audit.md)新增 4 项共用执行面回归，确认来源熔断、健康更新及运行时重建后的隔离；完整 V3 准入链与限流预算尚未据此收口。
+  - 2026-09-27 收口：[适配与路由核对](../../evidence/2026-09-27-d01-d03-adapter-audit.md)补齐可重试错误的主备 pin、真实来源熔断/健康隔离与重建保持、第三目标拒绝及适配器内部调用边界。目标/准入四文件 45 项和精确适配/熔断三文件 29 项通过；数量约束此前已通过官方同步及容器探针。仅关闭本地精确路由实现范围，真实来源准入和 I01 联通仍独立开放。
+  - 2026-09-27 补验：[适配与路由核对](../../evidence/2026-09-27-d01-d03-adapter-audit.md)新增 4 项共用执行面回归，确认来源熔断、健康更新及运行时重建后的隔离；完整 V3 准入链与限流预算尚未据此收口。
   - 覆盖：Spec §7–§8，AC11、AC19；依赖：C04。
   - 写入：K-DSA 的策略解析/Effective Policy/目标执行及定向测试。
   - 完成：按新维度应用策略；只调用指定主备，无隐藏源切换，健康/限流/熔断按真实目标隔离，返回实际命中与 revision。
   - 验证：V-DSA；不支持口径拒绝、未应用策略、同 Provider 不同 upstreamSource 隔离、不得遍历第三源。
 
 - [x] S01：Server 路由配置持久化。
-  - 2026-09-27 收口：[路由持久化证据](../../tasks/evidence/2026-09-27-s01-policy-persistence.md)记录 19 项服务测试及源码事务/读回核对，C02/C04 和 S02 前置已完成。验证范围为服务端受控测试，不代替真实数据库并发或目标 UI 验收。
+  - 2026-09-27 收口：[路由持久化证据](../../evidence/2026-09-27-s01-policy-persistence.md)记录 19 项服务测试及源码事务/读回核对，C02/C04 和 S02 前置已完成。验证范围为服务端受控测试，不代替真实数据库并发或目标 UI 验收。
   - 覆盖：Spec §7，AC02、AC11、AC19；依赖：C02、C04。
   - 写入：P01 定位的 providers/路由持久化与 API、必要定向测试；若需 SQL 字段，结构交付由 S02 统一负责。
   - 完成：各口径独立保存主备；服务端校验能力与账号状态；Desired/Effective 未一致时明确显示状态；旧 raw 配置和用户选择不被覆盖。
@@ -402,9 +402,9 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 验证：占位 `DATABASE_URL` 的 `prisma validate`、`rtk pnpm migration:matrix`（16 迁移、66 SQL 表、59 Prisma model、7 raw-owned）、runtime 输入检查、结构定向 10 测试通过。隔离 `postgres:17-alpine` 全量建库脚本 7 项断言通过；另一隔离库从前 15 条 migration 建旧行后应用新 migration，验证 Fact/Coverage 的 ID/值保留、`legacy` 回填、版本区分共存与重复完整键冲突、索引定义和 app role 表/序列权限。临时容器已确认并销毁。目标开发数据库、Docker 应用服务和正式保留数据发布流程均未执行；S03 仍须更新消费者 selector 与显式版本写入。
 
 - [x] S03：版本隔离的行情缓存读写。
-  - 2026-09-28 收口：[父项对账证据](../../tasks/evidence/2026-09-28-cont-s03-parent-reconciliation.md)将原 I01 完整响应 JSONB 位模式卡点的修复与版本事实/日期覆盖缓存合同合并核对。当前定向 36 passed、默认 10 skipped；隔离 PostgreSQL 全 19 migration/68 表、独立应用角色实际 10 passed，临时容器清理。仅关闭 S03 本地和隔离数据库义务；S04/S05 的来源与 PIT 条件、当前目标源码及全局验收不随之关闭。
-  - [x] S03-date-cache：独立事实覆盖判定已接入实际 repository，只有已登记完整交易日、本地日终相等及实际完整末 Bar 一致时接受日期末端；保持原事实/覆盖时间和精确窗口。新增 17 项本地及 4 项 PostgreSQL 场景，相关 134 项、独立应用角色数据库 10 项通过；类型/构建/门禁通过，官方同步后两端各 14 个生产 repository/Reader 受控场景、两份摘要一致且 healthy。Reader 减少 5 行，见 [日期缓存证据](../../tasks/evidence/2026-09-27-s03-date-cache.md)。不关闭 I01 完整响应往返或父项。
-  - [x] S03-pg-facts：独立 PostgreSQL 应用全部 19 份 migration 后，真实 Prisma/事实缓存 4 项通过：版本共存、来源隔离、裁剪不改基准、legacy 回读和不相交窗口不扩大覆盖。另 13 项身份/Reader 回归、类型检查/lint 通过；临时容器已清理。V3 完整响应往返的 I01 阻塞保持跳过，不关闭父项，见 [隔离缓存证据](../../tasks/evidence/2026-09-27-s03-cache-postgres.md)。
+  - 2026-09-28 收口：[父项对账证据](../../evidence/2026-09-28-cont-s03-parent-reconciliation.md)将原 I01 完整响应 JSONB 位模式卡点的修复与版本事实/日期覆盖缓存合同合并核对。当前定向 36 passed、默认 10 skipped；隔离 PostgreSQL 全 19 migration/68 表、独立应用角色实际 10 passed，临时容器清理。仅关闭 S03 本地和隔离数据库义务；S04/S05 的来源与 PIT 条件、当前目标源码及全局验收不随之关闭。
+  - [x] S03-date-cache：独立事实覆盖判定已接入实际 repository，只有已登记完整交易日、本地日终相等及实际完整末 Bar 一致时接受日期末端；保持原事实/覆盖时间和精确窗口。新增 17 项本地及 4 项 PostgreSQL 场景，相关 134 项、独立应用角色数据库 10 项通过；类型/构建/门禁通过，官方同步后两端各 14 个生产 repository/Reader 受控场景、两份摘要一致且 healthy。Reader 减少 5 行，见 [日期缓存证据](../../evidence/2026-09-27-s03-date-cache.md)。不关闭 I01 完整响应往返或父项。
+  - [x] S03-pg-facts：独立 PostgreSQL 应用全部 19 份 migration 后，真实 Prisma/事实缓存 4 项通过：版本共存、来源隔离、裁剪不改基准、legacy 回读和不相交窗口不扩大覆盖。另 13 项身份/Reader 回归、类型检查/lint 通过；临时容器已清理。V3 完整响应往返的 I01 阻塞保持跳过，不关闭父项，见 [隔离缓存证据](../../evidence/2026-09-27-s03-cache-postgres.md)。
   - 当前隔离验证叶：实际 Prisma/PostgreSQL 验证同日期多基准/修订共存、来源隔离、limit 视图不改变原始价格及版本、legacy 回读和不相交窗口不扩大覆盖。临时数据库独立名称/容器标签/localhost 端口；应用完整 migration 链，测试后清理本轮容器，不访问目标业务库。V3 完整 JSON 响应往返的 I01 卡点保持原跳过状态，本叶不重试或替代该门禁。
   - 覆盖：Spec §8.3，AC02、AC09、AC10；依赖：S02。
   - 写入：K-Market 的事实 repository/coverage 及测试。
@@ -412,27 +412,27 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 验证：V-Server 与隔离 DB 读写测试；同日期不同基准共存、limit 裁剪不重定基、旧事实读取、不同来源不串数据。
 
 - [x] S04：Reader 的整窗口主备选择。
-  - 2026-09-28 收口：[父项对账证据](../../tasks/evidence/2026-09-28-cont-s04-parent-reconciliation.md)确认 S03/C04 前置已完成，当前 Selector/Reader/委派/旧边界 28 项通过；仅有显式同口径证明才请求完整备用窗口，缺页、无证明、错目标、预热不足及第三源边界保持拒绝。I01/D01 受控 HTTP/数据库/Worker 覆盖实际主源 Reader 路径；真实 HiThink、备用准入、目标部署及 S05 PIT 分别开放。
-  - 2026-09-27 补验：Reader/selector/冻结窗口及委派共 27 项通过，见 [S06 及 Reader 补验记录](../../tasks/evidence/2026-09-27-s06-dependency-plan.md)；S03 隔离数据库前置未关闭，不以夹具测试关闭本项。
+  - 2026-09-28 收口：[父项对账证据](../../evidence/2026-09-28-cont-s04-parent-reconciliation.md)确认 S03/C04 前置已完成，当前 Selector/Reader/委派/旧边界 28 项通过；仅有显式同口径证明才请求完整备用窗口，缺页、无证明、错目标、预热不足及第三源边界保持拒绝。I01/D01 受控 HTTP/数据库/Worker 覆盖实际主源 Reader 路径；真实 HiThink、备用准入、目标部署及 S05 PIT 分别开放。
+  - 2026-09-27 补验：Reader/selector/冻结窗口及委派共 27 项通过，见 [S06 及 Reader 补验记录](../../evidence/2026-09-27-s06-dependency-plan.md)；S03 隔离数据库前置未关闭，不以夹具测试关闭本项。
   - 覆盖：Spec §8.1，AC09–AC11；依赖：S03、C04。
   - 写入：K-Market 的 Reader/窗口选择及测试。
   - 完成：按能力、覆盖、算法/基准兼容选择一个完整窗口，拒绝逐 Bar 混源和未经证明的跨源替换；provenance 指向实际目标。
   - 验证：V-Server；主源缺窗、兼容备用、不兼容备用、窗口重叠冲突、上市前/预热不足及没有第三源请求；DSA 真实联通由 I01 验证。
 
 - **已取消（2026-10-08，不计通过）** S05：以下保留原计划与未通过原因，不再执行。Reader 区分固定快照研究与严格 PIT。
-  - [x] S05-v3-preflight：实际 V3 执行窗口预检统一拒绝晚于 `dataAsOf` 的来源观察、Bar 时间及逐 Bar 可用时间；原始响应不改写。严格 PIT 身份/供应商修订/锚点继续受限。26 项定向、相关 87 项、类型/构建/lint/边界通过，官方同步后两端各 10 个生产入口受控场景与两份摘要通过；预检文件减少 71 行。见 [历史预检证据](../../tasks/evidence/2026-09-27-s05-history-preflight.md)。
+  - [x] S05-v3-preflight：实际 V3 执行窗口预检统一拒绝晚于 `dataAsOf` 的来源观察、Bar 时间及逐 Bar 可用时间；原始响应不改写。严格 PIT 身份/供应商修订/锚点继续受限。26 项定向、相关 87 项、类型/构建/lint/边界通过，官方同步后两端各 10 个生产入口受控场景与两份摘要通过；预检文件减少 71 行。见 [历史预检证据](../../evidence/2026-09-27-s05-history-preflight.md)。
   - **已取消（2026-10-08，不计通过）** S05-reconstruction：以下保留原计划与未通过原因，不再执行。明确实际重建证据所有权和严格内容合同；读取并绑定来源、序列版本、窗口、修订及历史可见性，贯通预检/冻结。当前非空引用不等于已核验重建证据；受控时间/身份正向测试不得关闭本叶。
-    - [x] S05-reconstruction-contract：共享严格清单合同绑定精确输入、来源价格事实与逐 Bar 不可变窗口/响应摘要，拒绝自报抓取时刻或内联行情；只输出引用绑定结果，不声明 PIT 已核验。新增 28 项定向包含于全包 41 文件/395 项，Schemas 类型/构建、Server 类型、定向 lint、边界/依赖与 diff check 通过；13 项既有无基线尺寸警告保留。见 [合同证据](../../tasks/evidence/2026-09-27-s05-reconstruction-contract.md)。实际归档/时点和生产接线继续开放。
-    - **已取消（2026-10-08，不计通过）** S05-reconstruction-market：以下保留原计划与未通过原因，不再执行。Market 从可信只读清单读取原文，并解析实际不可变窗口；核对原响应摘要、来源/版本/坐标、逐 Bar 原值及抓取/观察可见时间，缺失或不一致失败关闭。`findFrozen` 的 I01 JSONB 位模式失配已修复并经隔离 PostgreSQL 与受控 Worker 闭环验证，见[修复证据](../../tasks/evidence/2026-09-28-cont-i01-jsonb-orm-fix.md)；受控归档仍不构成真实历史可见性证明，历史来源门禁继续开放。
-      - [x] S05-reconstruction-market-content：只读文件以配置摘要绑定原文，实际 `findFrozen` 读取归档，重新核对摘要、来源/序列身份/价格坐标、逐 Bar 完整内容及冻结截点。去重读取并保留原文和完整归档，只输出 `archives-bound`；40 项新增包含于相关 104 项，类型/构建/lint/边界/依赖通过，编译模块注册与注入元数据通过。13 项既有无基线尺寸警告保留；没有实际 PostgreSQL、目标容器或 Provider 验收，生产 PIT 资格/消费仍开放，见 [内容证据](../../tasks/evidence/2026-09-27-s05-reconstruction-content.md)。
+    - [x] S05-reconstruction-contract：共享严格清单合同绑定精确输入、来源价格事实与逐 Bar 不可变窗口/响应摘要，拒绝自报抓取时刻或内联行情；只输出引用绑定结果，不声明 PIT 已核验。新增 28 项定向包含于全包 41 文件/395 项，Schemas 类型/构建、Server 类型、定向 lint、边界/依赖与 diff check 通过；13 项既有无基线尺寸警告保留。见 [合同证据](../../evidence/2026-09-27-s05-reconstruction-contract.md)。实际归档/时点和生产接线继续开放。
+    - **已取消（2026-10-08，不计通过）** S05-reconstruction-market：以下保留原计划与未通过原因，不再执行。Market 从可信只读清单读取原文，并解析实际不可变窗口；核对原响应摘要、来源/版本/坐标、逐 Bar 原值及抓取/观察可见时间，缺失或不一致失败关闭。`findFrozen` 的 I01 JSONB 位模式失配已修复并经隔离 PostgreSQL 与受控 Worker 闭环验证，见[修复证据](../../evidence/2026-09-28-cont-i01-jsonb-orm-fix.md)；受控归档仍不构成真实历史可见性证明，历史来源门禁继续开放。
+      - [x] S05-reconstruction-market-content：只读文件以配置摘要绑定原文，实际 `findFrozen` 读取归档，重新核对摘要、来源/序列身份/价格坐标、逐 Bar 完整内容及冻结截点。去重读取并保留原文和完整归档，只输出 `archives-bound`；40 项新增包含于相关 104 项，类型/构建/lint/边界/依赖通过，编译模块注册与注入元数据通过。13 项既有无基线尺寸警告保留；没有实际 PostgreSQL、目标容器或 Provider 验收，生产 PIT 资格/消费仍开放，见 [内容证据](../../evidence/2026-09-27-s05-reconstruction-content.md)。
       - **已取消（2026-10-08，不计通过）** S05-reconstruction-market-time：以下保留原计划与未通过原因，不再执行。分别验证每根 Bar 所用修订在历史决策时点的可见性，区分来源观察与 Server 抓取时钟；供应商历史版本证据与实际同期归档须有可执行依据，研究时冻结不能补造历史时间。通过后才允许返回可用于严格 PIT 的已核验结果。
-        - [x] S05-reconstruction-source-times：实际内容绑定之后，逐归档核对行情/可见事实不晚于来源观察、抓取不早于观察，再核对逐 Bar 所用观察不晚于决策可见时间；不修改原始时间，只输出必要条件已绑定。新增 12 项，包含于相关 214 项；目标两端各 6 个受控时钟场景通过，迟观察和未来事实拒绝，晚 10 毫秒传输抓取保留。最终历史窗口仍开放，见 [预检与冻结门禁证据](../../tasks/evidence/2026-09-28-s05-reconstruction-guards.md)。
+        - [x] S05-reconstruction-source-times：实际内容绑定之后，逐归档核对行情/可见事实不晚于来源观察、抓取不早于观察，再核对逐 Bar 所用观察不晚于决策可见时间；不修改原始时间，只输出必要条件已绑定。新增 12 项，包含于相关 214 项；目标两端各 6 个受控时钟场景通过，迟观察和未来事实拒绝，晚 10 毫秒传输抓取保留。最终历史窗口仍开放，见 [预检与冻结门禁证据](../../evidence/2026-09-28-s05-reconstruction-guards.md)。
         - **已取消（2026-10-08，不计通过）** S05-reconstruction-decision-window：以下保留原计划与未通过原因，不再执行。以独立历史日历/来源版本证据绑定原始历史决策窗口；研究时可见的旧 Bar 不能依靠当前 availableAt 取得历史资格。保留供应商历史版本 API 与真实同期归档的来源准入义务。
     - **已取消（2026-10-08，不计通过）** S05-reconstruction-consumers：以下保留原计划与未通过原因，不再执行。生产预检及 Snapshot 冻结均消费实际 Market 核验结果，缺证据不能 ready；冻结保存原清单与完整归档、离线重验，真实 Provider/历史归档独立验收。
-      - [x] S05-reconstruction-preflight-guard：联合生产预检已注入实际 Market 清单/归档及来源时钟绑定。未提供实际证据、内容不符或只有必要条件均拒绝 ready；固定快照沿用真实冻结时钟。实际 repository 消费 7 项、完整执行预检 28 项、联合入口 7 项包含于相关 214 项，目标每端 12 个受控完整预检场景通过。最终历史时点及合格证据封存/离线链仍开放，见 [门禁证据](../../tasks/evidence/2026-09-28-s05-reconstruction-guards.md)。
-      - [x] S05-reconstruction-freeze-guard：新 Snapshot 写入前消费相同历史门禁，非空引用不能绕过预检直接冻结；稳定错误在 startBuild/Artifact 写入前抛出。新增 3 项包含于相关 214 项，固定快照仍可实际本地冻结与重放；官方同步后两端实际构造器注入、编译摘要和健康通过。目标没有执行 Snapshot 写入，最终合格证据冻结格式及旧 V3 严格快照离线重验继续开放，不替代 V2 兼容语义，见 [门禁证据](../../tasks/evidence/2026-09-28-s05-reconstruction-guards.md)。
-  - [x] S05-legacy-clock：旧 Reader 显式冻结截点与完整固定研究验收已实施，来源/Bar 实际时间不改写；新增 22 项本地与 2 项 PostgreSQL 场景，相关 127 项、独立应用角色实际数据库 6 项通过。类型/构建/lint/门禁通过，官方同步后两端各 11 个实际 Reader 受控场景及两份摘要一致。旧 HTTP 与无重建依据的 V2 调用边界明确，真实重建仍归独立叶，见 [旧读取证据](../../tasks/evidence/2026-09-27-s05-legacy-clock.md)。首次数据库探针发现的日期窗口缓存问题已独立登记 `S03-date-cache`，本叶未宣称修复。
-    - [x] S05-legacy-clock-precision：旧 Reader 的显式 `asOf` 在读取前用精确证据瞬时验证；固定快照和严格 PIT 的观察、Bar 原时间及可用时间按完整小数秒比较，保留既有失败类别。[微秒边界证据](../../tasks/evidence/2026-09-28-cont-s05-reader-asof-precision.md)记录修前红例、修后测试及目标源码同步。此局部修复不授予严格 PIT 历史来源资格，S05 父项仍开放。
+      - [x] S05-reconstruction-preflight-guard：联合生产预检已注入实际 Market 清单/归档及来源时钟绑定。未提供实际证据、内容不符或只有必要条件均拒绝 ready；固定快照沿用真实冻结时钟。实际 repository 消费 7 项、完整执行预检 28 项、联合入口 7 项包含于相关 214 项，目标每端 12 个受控完整预检场景通过。最终历史时点及合格证据封存/离线链仍开放，见 [门禁证据](../../evidence/2026-09-28-s05-reconstruction-guards.md)。
+      - [x] S05-reconstruction-freeze-guard：新 Snapshot 写入前消费相同历史门禁，非空引用不能绕过预检直接冻结；稳定错误在 startBuild/Artifact 写入前抛出。新增 3 项包含于相关 214 项，固定快照仍可实际本地冻结与重放；官方同步后两端实际构造器注入、编译摘要和健康通过。目标没有执行 Snapshot 写入，最终合格证据冻结格式及旧 V3 严格快照离线重验继续开放，不替代 V2 兼容语义，见 [门禁证据](../../evidence/2026-09-28-s05-reconstruction-guards.md)。
+  - [x] S05-legacy-clock：旧 Reader 显式冻结截点与完整固定研究验收已实施，来源/Bar 实际时间不改写；新增 22 项本地与 2 项 PostgreSQL 场景，相关 127 项、独立应用角色实际数据库 6 项通过。类型/构建/lint/门禁通过，官方同步后两端各 11 个实际 Reader 受控场景及两份摘要一致。旧 HTTP 与无重建依据的 V2 调用边界明确，真实重建仍归独立叶，见 [旧读取证据](../../evidence/2026-09-27-s05-legacy-clock.md)。首次数据库探针发现的日期窗口缓存问题已独立登记 `S03-date-cache`，本叶未宣称修复。
+    - [x] S05-legacy-clock-precision：旧 Reader 的显式 `asOf` 在读取前用精确证据瞬时验证；固定快照和严格 PIT 的观察、Bar 原时间及可用时间按完整小数秒比较，保留既有失败类别。[微秒边界证据](../../evidence/2026-09-28-cont-s05-reader-asof-precision.md)记录修前红例、修后测试及目标源码同步。此局部修复不授予严格 PIT 历史来源资格，S05 父项仍开放。
   - 覆盖：Spec §6、§9，AC09、AC12；依赖：S03、C01。
   - 写入：K-Market 的读取模式及测试。
   - 完成：固定序列保留真实 observedAt/原行情时间/修订，不伪造历史 availableAt；严格模式要求可重建依据，不自动降级、不前填冒充成交或推断停牌。
@@ -462,62 +462,62 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 执行记录（2026-09-25）：`backtest-sizing.ts` 用精确整数向下取整 lot；sizing/risk adapter 按成交及完整费用计划寻找可负担的最大 lot，整单接受或拒绝；exchange 显式处理买卖滑点、比例/最低佣金、舍入和未知费用字段，并传递现金预留 ID。定向 5 文件/57 测试、Domain 包级 typecheck、目标格式与 diff check、完整 28 文件/257 测试及 build 通过；目标 ESLint 无错误，三条警告来自既有复杂度项。B04 仍须把统一口径 lot、可用结算现金、预留 ID 消费与成交时序接入真实执行链。
 
 - [x] B04：现有引擎接入归一化成交时序。
-  - 2026-09-27 收口：[领域与装配证据](../../tasks/evidence/2026-09-27-b04-b05-domain-integration.md)核对现有模拟链、下一有效开盘、DAY/全成或拒绝/只做多、尾日未成交与一次发布；Domain 全包 313 项及对应 Server 装配通过，不代替真实运行门禁。
+  - 2026-09-27 收口：[领域与装配证据](../../evidence/2026-09-27-b04-b05-domain-integration.md)核对现有模拟链、下一有效开盘、DAY/全成或拒绝/只做多、尾日未成交与一次发布；Domain 全包 313 项及对应 Server 装配通过，不代替真实运行门禁。
   - 覆盖：Spec §3.1、§6、§10，AC05、AC06、AC15；依赖：B01、B02、B03。
   - 写入：K-Domain 与 K-Run 的必要执行调用接缝；Server 只装配领域行为，不重复计算。
   - 完成：Signal→TargetIntent→Order→Fill 复用现有链路，单标的/只做多/无杠杆/DAY/下一有效开盘；末尾订单保持未成交；不新增通用插件框架。
   - 验证：V-Domain 加 V-Server 定向装配测试；禁止同收盘无条件成交、未来 Bar、部分成交和重复发布模拟事实。
 
 - [x] B05：一致语义的 Benchmark 与绩效指纹。
-  - 2026-09-27 收口：[领域与装配证据](../../tasks/evidence/2026-09-27-b04-b05-domain-integration.md)核对同源买入持有、冻结成本及逐项舍入、缺失/不兼容拒绝、尺度敏感策略和比较指纹；前置 C03/B02/B03 已完成。独立 G-Math 与真实验收保持原状态。
+  - 2026-09-27 收口：[领域与装配证据](../../evidence/2026-09-27-b04-b05-domain-integration.md)核对同源买入持有、冻结成本及逐项舍入、缺失/不兼容拒绝、尺度敏感策略和比较指纹；前置 C03/B02/B03 已完成。独立 G-Math 与真实验收保持原状态。
   - 覆盖：Spec §5.4、§8.3、§11，AC13；依赖：C03、B02、B03。
   - 写入：K-Domain 的 backtest analytics 及 K-Run 对应结果投影。
   - 完成：同标的默认买入持有；Benchmark 成本假设明确；同价格/收益/历史协议才计算超额与进入评价组；指标与比较指纹绑定实际输入。
   - 验证：V-Domain/V-Server；缺兼容基准、尺度敏感策略、不同成本/来源/分红协议不能混排，不用零值假装有效结果。
 
 - [x] S06：统一计算依赖计划。
-  - 2026-09-27 收口：[统一依赖计划证据](../../tasks/evidence/2026-09-27-s06-dependency-plan.md)核对纯计划器、普通/AI 共用路径、价格/事件/预热/身份/FX/历史与转换义务；10 项计划测试及相关装配测试通过，C03/B01 前置项已完成。来源和事件缺证据仍保留 pending/blocked。
+  - 2026-09-27 收口：[统一依赖计划证据](../../evidence/2026-09-27-s06-dependency-plan.md)核对纯计划器、普通/AI 共用路径、价格/事件/预热/身份/FX/历史与转换义务；10 项计划测试及相关装配测试通过，C03/B01 前置项已完成。来源和事件缺证据仍保留 pending/blocked。
   - 覆盖：Spec §9，AC07–AC09、AC12；依赖：C03、B01。
   - 写入：Server backtest 的无网络依赖计划 helper 及测试，供普通运行和 AI 共用。
   - 完成：按策略/模型推导信号、执行、Benchmark、预热、身份/会话、事件、PIT 和真实单位转换依赖；事件按影响窗口区分生效事实与提前可见信号。
   - 验证：V-Server；无事件策略的 normalized 不索取完整事件表；raw/事件策略缺所需事实仍阻断；除权日不能冒充公告可用时间。
 
 - [x] S07：服务端预检 API 与失效规则。
-  - 2026-09-28 父项收口：三个子项均已完成；本轮联合预检/准备定向回归再次通过，缺失或不合格的严格历史事实继续诊断并拒绝，不因 S05 未取得最终资格而绕过预检。见 [S07–S09/I01 父项对账](../../tasks/evidence/2026-09-28-cont-s07-s09-i01-parent-reconciliation.md)。
-  - [x] S07-dependencies：复用既有非价格依赖请求/验证及事件能力读取，增加只读逐项诊断入口；覆盖日历/证券事实/按需事件、多项失败、未来事实和传输失败脱敏。写入限定 Backtest 依赖收集器、预检 helper 与定向测试；不生成快照或运行引擎。前置使用 S06 已完成的依赖计划合同及 S08 现有收集验证接缝，不声明 S04/S05 真实门禁完成。新增 6 项回归，组合 34 项、Server 类型检查和定向 lint 通过，见 [非价格预检证据](../../tasks/evidence/2026-09-27-s07-dependency-preflight.md)。HTTP/API 消费及整体验收另由 S07-api 承接。
-  - [x] S07-api：在只读非价格预检完成后接入服务端 API 与消费契约，联合执行行情修订失效结果；保留创建/冻结重新校验，不能将局部检查提升为整体就绪。2026-09-28 当前复验 Server/API Client 7 文件 75 项通过，目标非法请求继续 HTTP 400，结合既有目标任务数不变证据收口本子项；S05 真实资格、有效依赖 ready 与浏览器/Electron 仍独立开放，见[当前实现对账](../../tasks/evidence/2026-09-28-cont-s07-api-reconciliation.md)。
-    - 目标续验：官方 `sync-code.sh thesis-ledger` 完成，Server/Worker 产物摘要一致且 healthy；真实 HTTP 的非法合同、缺失策略及缺价格绑定拒绝通过，任务数未变。浏览器初次及两次重试被客户端拦截，本轮跳过；Desktop 未由此入口部署，详见 [目标同步记录](../../tasks/evidence/2026-09-27-s07-target-sync.md)。
+  - 2026-09-28 父项收口：三个子项均已完成；本轮联合预检/准备定向回归再次通过，缺失或不合格的严格历史事实继续诊断并拒绝，不因 S05 未取得最终资格而绕过预检。见 [S07–S09/I01 父项对账](../../evidence/2026-09-28-cont-s07-s09-i01-parent-reconciliation.md)。
+  - [x] S07-dependencies：复用既有非价格依赖请求/验证及事件能力读取，增加只读逐项诊断入口；覆盖日历/证券事实/按需事件、多项失败、未来事实和传输失败脱敏。写入限定 Backtest 依赖收集器、预检 helper 与定向测试；不生成快照或运行引擎。前置使用 S06 已完成的依赖计划合同及 S08 现有收集验证接缝，不声明 S04/S05 真实门禁完成。新增 6 项回归，组合 34 项、Server 类型检查和定向 lint 通过，见 [非价格预检证据](../../evidence/2026-09-27-s07-dependency-preflight.md)。HTTP/API 消费及整体验收另由 S07-api 承接。
+  - [x] S07-api：在只读非价格预检完成后接入服务端 API 与消费契约，联合执行行情修订失效结果；保留创建/冻结重新校验，不能将局部检查提升为整体就绪。2026-09-28 当前复验 Server/API Client 7 文件 75 项通过，目标非法请求继续 HTTP 400，结合既有目标任务数不变证据收口本子项；S05 真实资格、有效依赖 ready 与浏览器/Electron 仍独立开放，见[当前实现对账](../../evidence/2026-09-28-cont-s07-api-reconciliation.md)。
+    - 目标续验：官方 `sync-code.sh thesis-ledger` 完成，Server/Worker 产物摘要一致且 healthy；真实 HTTP 的非法合同、缺失策略及缺价格绑定拒绝通过，任务数未变。浏览器初次及两次重试被客户端拦截，本轮跳过；Desktop 未由此入口部署，详见 [目标同步记录](../../evidence/2026-09-27-s07-target-sync.md)。
     - U03 联合消费叶：普通复权回测的既有准备操作顺序执行准备→联合预检，仅两步通过且修订一致才向父表单发布可提交配置。复用 TanStack Query 的配置键/取消信号/路由失效规则，显示诊断能力、窗口和已知目标；写入 Desktop 准备请求接缝、诊断组件与测试，不改旧 raw 路径或 AI 实验合同。浏览器/目标运行态独立保留。
-      - 本地实现完成：组合 21 项及补充取消场景后请求链 8 项通过，类型检查/lint/Desktop 构建通过。更高路由修订不再因早于请求完成时间而被忽略；证据见 [U03 消费记录](../../tasks/evidence/2026-09-27-u03-preflight-consumption.md)。目标部署、浏览器/Electron 未执行。
+      - 本地实现完成：组合 21 项及补充取消场景后请求链 8 项通过，类型检查/lint/Desktop 构建通过。更高路由修订不再因早于请求完成时间而被忽略；证据见 [U03 消费记录](../../evidence/2026-09-27-u03-preflight-consumption.md)。目标部署、浏览器/Electron 未执行。
     - 当前诊断叶：保留事件能力逐项观测失败及已固定请求；将已知能力、精确范围、实际请求目标和稳定失败原因转为诊断。写入 Market 事件选择结果（不改变选择策略）、Backtest 事件失败载体/诊断及定向测试；未确定目标时保持空来源，不推断或额外重试。
-    - 事件诊断叶本地完成：逐能力失败、已知请求目标、精确范围、覆盖缺口和异常脱敏已接通；修复新增错误继承触发的初始化循环后首次重试 35 项通过，补充组合 32 项通过，类型/lint/边界检查通过，见 [事件诊断证据](../../tasks/evidence/2026-09-27-s07-event-diagnostics.md)。U03 与目标验收继续开放。
-    - 本地接线已完成：`POST /backtests/run-config/preflight` 与 `backtests.preflightRunConfig`，返回前重新核对策略/路由；Server 59 项、客户端 11 项、三包构建、类型检查/lint 与架构边界通过。事件精确能力/来源诊断、U03 消费和目标运行态仍未完成，详见 [API 实施证据](../../tasks/evidence/2026-09-27-s07-preflight-api.md)。
-  - [x] S07-revision：执行行情预检的策略/配置摘要及 Desired/Effective/Catalog 修订失效回归完成；14 项预检、37 项诊断/HTTP 准备/创建组合测试和 Server 类型检查通过。生产逻辑已有拒绝门禁，本轮新增 5 项回归；全依赖预检和真实运行态不在此叶完成范围，见 [失效验证记录](../../tasks/evidence/2026-09-27-s07-revision-invalidation.md)。
+    - 事件诊断叶本地完成：逐能力失败、已知请求目标、精确范围、覆盖缺口和异常脱敏已接通；修复新增错误继承触发的初始化循环后首次重试 35 项通过，补充组合 32 项通过，类型/lint/边界检查通过，见 [事件诊断证据](../../evidence/2026-09-27-s07-event-diagnostics.md)。U03 与目标验收继续开放。
+    - 本地接线已完成：`POST /backtests/run-config/preflight` 与 `backtests.preflightRunConfig`，返回前重新核对策略/路由；Server 59 项、客户端 11 项、三包构建、类型检查/lint 与架构边界通过。事件精确能力/来源诊断、U03 消费和目标运行态仍未完成，详见 [API 实施证据](../../evidence/2026-09-27-s07-preflight-api.md)。
+  - [x] S07-revision：执行行情预检的策略/配置摘要及 Desired/Effective/Catalog 修订失效回归完成；14 项预检、37 项诊断/HTTP 准备/创建组合测试和 Server 类型检查通过。生产逻辑已有拒绝门禁，本轮新增 5 项回归；全依赖预检和真实运行态不在此叶完成范围，见 [失效验证记录](../../evidence/2026-09-27-s07-revision-invalidation.md)。
   - 覆盖：Spec §7.4、§9，AC08、AC09、AC12、AC19；依赖：S06、S04、S05、S01。
   - 写入：Server backtest 的预检/API 及必要 api-client 消费契约测试。
   - 完成：诊断包含标的/能力/用途/区间/缺失字段或规则/目标来源/行动建议；复用现有错误体系；配置/策略/路由 revision 改变即失效。
   - 验证：V-Server；预检不调用模型、不计算绩效、不生成另一快照；非法直接提交也拒绝；网络检查可复用但不掩盖真实缺口。
 
 - [x] S08：冻结统一价格协议与实际输入。
-  - 2026-09-28 父项收口：当前完整 Snapshot、多窗口、来源/依赖、原子 finalize 与离线重放定向共纳入 124 项回归；固定 V3 可重放，严格 PIT 在最终来源资格缺失或伪证据时继续失败关闭。冻结实现完成，S05 真实历史资格仍独立开放，见 [父项对账](../../tasks/evidence/2026-09-28-cont-s07-s09-i01-parent-reconciliation.md)。
+  - 2026-09-28 父项收口：当前完整 Snapshot、多窗口、来源/依赖、原子 finalize 与离线重放定向共纳入 124 项回归；固定 V3 可重放，严格 PIT 在最终来源资格缺失或伪证据时继续失败关闭。冻结实现完成，S05 真实历史资格仍独立开放，见 [父项对账](../../evidence/2026-09-28-cont-s07-s09-i01-parent-reconciliation.md)。
   - 覆盖：Spec §8–§11、§13，AC02、AC10–AC15；依赖：C03、S04、S05、S06。
   - 写入：K-Run 的 Snapshot Builder/数据快照及测试。
   - 完成：替换固定 none 的接缝；冻结信号/执行/Benchmark 的实际价格计划、版本、主备命中、规则/成本/事件；冻结前重新核对 revision 和真实数据，Run-owned 身份不共享写入。
   - 验证：V-Server；预检后配置变化、源恢复、观测修订、分段请求不会偷换已冻结输入；完整/非法 Snapshot 的原子发布行为。
 
 - [x] S09：Run 执行、持久终态与离线重放。
-  - [x] S09-benchmark-clock-precision：V3 Benchmark 的严格 PIT 估值对齐按完整小数秒比较，不把同毫秒晚到的收盘事实计入收益；冻结快照、V2 旧路径及来源准入不因本叶改变。受控完整快照修前红例、修后相等/晚到边界及 Benchmark/Runner/Run 31 项通过；Server 类型/构建、限定 lint/边界通过，官方快更后两容器健康且编译摘要一致。源码文件仅存一处既有 Prettier 格式差异，见[精确时钟证据](../../tasks/evidence/2026-09-28-cont-s09-benchmark-clock-precision.md)。
-  - 2026-09-28 父项收口：S08 已完成；V3 执行/生命周期、configured run 与 legacy 边界当前回归通过，结合真实隔离 PostgreSQL/Redis、BullMQ、独立 Worker 的 I01 组合，覆盖 attempt CAS、持久终态、查询与离线重放。真实 HiThink 产品 Run 仍归 G-Run，见 [父项对账](../../tasks/evidence/2026-09-28-cont-s07-s09-i01-parent-reconciliation.md)。
-  - 2026-09-27 续核：[执行与终态证据](../../tasks/evidence/2026-09-27-s09-execution-audit.md)记录 51 项定向通过；完整 backtest 首轮 308 通过、1 文案断言失败、5 跳过，修正为错误类型断言后所在文件 4 项通过。真实 Worker 门禁与前置 S08/B04/B05 未关闭，父项继续开放。
+  - [x] S09-benchmark-clock-precision：V3 Benchmark 的严格 PIT 估值对齐按完整小数秒比较，不把同毫秒晚到的收盘事实计入收益；冻结快照、V2 旧路径及来源准入不因本叶改变。受控完整快照修前红例、修后相等/晚到边界及 Benchmark/Runner/Run 31 项通过；Server 类型/构建、限定 lint/边界通过，官方快更后两容器健康且编译摘要一致。源码文件仅存一处既有 Prettier 格式差异，见[精确时钟证据](../../evidence/2026-09-28-cont-s09-benchmark-clock-precision.md)。
+  - 2026-09-28 父项收口：S08 已完成；V3 执行/生命周期、configured run 与 legacy 边界当前回归通过，结合真实隔离 PostgreSQL/Redis、BullMQ、独立 Worker 的 I01 组合，覆盖 attempt CAS、持久终态、查询与离线重放。真实 HiThink 产品 Run 仍归 G-Run，见 [父项对账](../../evidence/2026-09-28-cont-s07-s09-i01-parent-reconciliation.md)。
+  - 2026-09-27 续核：[执行与终态证据](../../evidence/2026-09-27-s09-execution-audit.md)记录 51 项定向通过；完整 backtest 首轮 308 通过、1 文案断言失败、5 跳过，修正为错误类型断言后所在文件 4 项通过。真实 Worker 门禁与前置 S08/B04/B05 未关闭，父项继续开放。
   - 覆盖：Spec §10、§13，AC05、AC11、AC15、AC17；依赖：S08、B04、B05。
   - 写入：K-Run 的 runner/artifact 与已有 Worker 接缝及测试。
   - 完成：新格式进入现有队列执行，持久化结果后查询可读；重放只用冻结输入；旧快照调用旧解码/已冻结语义。
   - 验证：V-Server；领取/成功/失败提交保留 status+attempt 原子约束，队列查询失败不当作缺失，重复投递/晚到结果不覆盖；本任务不重写重试系统。
 
 - [x] I01：最早可执行的真实领域语义联通。
-  - 2026-09-28 父项收口：ORM JSONB 位模式问题修复后，受控 DSA HTTP → 实际 Reader/证据仓库 → 普通 HTTP 创建 → BullMQ → 独立生产 Worker → 数据库终态/结果查询/离线重放的隔离组合已重新通过；S07–S09 父项现均满足。该门禁按定义使用 fixture 来源，不签发 HiThink 在线资格，见 [父项对账](../../tasks/evidence/2026-09-28-cont-s07-s09-i01-parent-reconciliation.md)。
-  - [x] I01-reader-pg：修复 Prisma ORM JSON 参数使完整响应中 22 个合成浮点数发生 1 ULP 改变的存储失配。参数化 JSON 文本写入在隔离 PostgreSQL 全 migration 后新行/空载荷填充均保持原位模式和摘要；使用当前源码重新执行实际 Reader/选择器/证据仓库、受控 DSA HTTP、普通创建、队列和独立 Worker 组合 1 项通过。见 [ORM 根因与恢复证据](../../tasks/evidence/2026-09-28-cont-i01-jsonb-orm-fix.md)。旧完整载荷失配仍拒绝，不在读取时重算/覆盖历史。
-  - [x] I01-worker-success：独立 PostgreSQL/Redis、实际 Controller HTTP 创建、DsaClient 受控 HTTP 获取、BullMQ 投递及生产 Worker 子进程成功执行，严格 V3 结果持久化和离线重放校验和一致；扩展组合 1 项通过，另含篡改快照失败终态、HTTP 结果查询及 16 张真实域表隔离。Reader 来源选择/准入/修订仍使用 fixture，生产选择器及父项依赖仍需对账。见 [Worker 联通记录](../../tasks/evidence/2026-09-27-worker-runtime-integration.md)。
+  - 2026-09-28 父项收口：ORM JSONB 位模式问题修复后，受控 DSA HTTP → 实际 Reader/证据仓库 → 普通 HTTP 创建 → BullMQ → 独立生产 Worker → 数据库终态/结果查询/离线重放的隔离组合已重新通过；S07–S09 父项现均满足。该门禁按定义使用 fixture 来源，不签发 HiThink 在线资格，见 [父项对账](../../evidence/2026-09-28-cont-s07-s09-i01-parent-reconciliation.md)。
+  - [x] I01-reader-pg：修复 Prisma ORM JSON 参数使完整响应中 22 个合成浮点数发生 1 ULP 改变的存储失配。参数化 JSON 文本写入在隔离 PostgreSQL 全 migration 后新行/空载荷填充均保持原位模式和摘要；使用当前源码重新执行实际 Reader/选择器/证据仓库、受控 DSA HTTP、普通创建、队列和独立 Worker 组合 1 项通过。见 [ORM 根因与恢复证据](../../evidence/2026-09-28-cont-i01-jsonb-orm-fix.md)。旧完整载荷失配仍拒绝，不在读取时重算/覆盖历史。
+  - [x] I01-worker-success：独立 PostgreSQL/Redis、实际 Controller HTTP 创建、DsaClient 受控 HTTP 获取、BullMQ 投递及生产 Worker 子进程成功执行，严格 V3 结果持久化和离线重放校验和一致；扩展组合 1 项通过，另含篡改快照失败终态、HTTP 结果查询及 16 张真实域表隔离。Reader 来源选择/准入/修订仍使用 fixture，生产选择器及父项依赖仍需对账。见 [Worker 联通记录](../../evidence/2026-09-27-worker-runtime-integration.md)。
   - 依赖：D01、D03、S01、S07–S09；所有者：Server 集成执行者。
   - 环境/入口：隔离数据库、现有队列/Worker、受控 DSA 响应，经普通 Run 创建入口→投递→领取→冻结→真实引擎→数据库终态→结果查询→离线重放。
   - 通过：fixture 来源的完整回测与失败结果正确，真实账户表无模拟写入，候选/界面尚未完成也不阻止此门禁；修复仅限已交付接缝。
@@ -526,8 +526,8 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
 ## 6. M1：AI 与真实监控消费面
 
 - [x] A01：实验与候选共享冻结比较协议。
-  - 2026-09-28 父项收口：S08 前置已完成；候选绑定、版本化运行与父窗口离线比较当前 16 项通过，跨标的/周期和经济假设变更继续拒绝。见 [A01/A02 父项对账](../../tasks/evidence/2026-09-28-cont-a01-a02-parent-reconciliation.md)。
-  - 2026-09-27 补验：[候选绑定记录](../../tasks/evidence/2026-09-27-a01-candidate-binding.md)新增信号更名回归，配置绑定与版本化运行共 12 项通过；不修改输入配置、不提前创建任务或申请预算。父窗口复用沿用既有独立测试，S08 前置仍开放，父项不勾选。
+  - 2026-09-28 父项收口：S08 前置已完成；候选绑定、版本化运行与父窗口离线比较当前 16 项通过，跨标的/周期和经济假设变更继续拒绝。见 [A01/A02 父项对账](../../evidence/2026-09-28-cont-a01-a02-parent-reconciliation.md)。
+  - 2026-09-27 补验：[候选绑定记录](../../evidence/2026-09-27-a01-candidate-binding.md)新增信号更名回归，配置绑定与版本化运行共 12 项通过；不修改输入配置、不提前创建任务或申请预算。父窗口复用沿用既有独立测试，S08 前置仍开放，父项不勾选。
   - 当前执行叶 A01-cfg-bind：候选移除或更名信号时，在 Backtest 所有权内按候选实际依赖重建同坐标价格别名；保留父窗口、协议、预算及冻结时间，跨标的/周期仍拒绝。先验证完整输入计划，再进行在线预检；已有幂等任务按重建后的配置匹配并离线返回。普通配置预检仍要求提交的绑定完全准确。
   - 覆盖：Spec §11.1，AC13、AC14；依赖：C03、S06、S08。
   - 写入：K-AI 的实验配置/候选校验及测试。
@@ -535,9 +535,9 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 验证：V-Server；候选改来源/口径/经济假设拒绝或新建对照实验；不能用相同 Run ID 代替可比性。
 
 - [x] A02：AI 封存隔离与失败分层。
-  - 2026-09-28 父项收口：A01、S07、S08 前置现已满足；模型反馈/评价/失败分类/SDK HTTP 当前 22 项通过，结合既有独立 PostgreSQL 封存访问与揭示生命周期证据完成本父项。真实模型 Provider 与完整实验仍由 G-AI 独立验收，见 [A01/A02 父项对账](../../tasks/evidence/2026-09-28-cont-a01-a02-parent-reconciliation.md)。
-  - [x] A02-sealed-pg：专用 PostgreSQL 使用项目显式重建入口应用 19 份 migration、68 张表及独立 app role；SDK 2 项、封存访问/揭示生命周期 3 项通过。实际 JSONB baseline/prior candidate 的封存收益、未来日期、事件/行情、自由诊断与未知字段没有进入实收 HTTP messages，合法负收益及固定序列性质保留；部分失败、取消、缺 Run、过期 lease、晚到结果与统一揭示均验证。另 22 项定向及类型/lint 通过；临时容器清理。V2 生命周期与 V3 投影分别记录，真实 Provider/V3 Worker 与父项前置仍开放，见 [隔离数据库证据](../../tasks/evidence/2026-09-27-a02-sealed-postgres.md)。
-  - 2026-09-27 补验：[模型反馈与失败分类记录](../../tasks/evidence/2026-09-27-a02-feedback-audit.md)中 22 项定向检查通过，含 SDK 本地 HTTP 实际请求；后续 `A02-sealed-pg` 已补齐隔离数据库生命周期及 JSONB 到 SDK 请求的 5 项。未调用真实模型；A01/S07 与真实来源/Worker 前置仍开放。
+  - 2026-09-28 父项收口：A01、S07、S08 前置现已满足；模型反馈/评价/失败分类/SDK HTTP 当前 22 项通过，结合既有独立 PostgreSQL 封存访问与揭示生命周期证据完成本父项。真实模型 Provider 与完整实验仍由 G-AI 独立验收，见 [A01/A02 父项对账](../../evidence/2026-09-28-cont-a01-a02-parent-reconciliation.md)。
+  - [x] A02-sealed-pg：专用 PostgreSQL 使用项目显式重建入口应用 19 份 migration、68 张表及独立 app role；SDK 2 项、封存访问/揭示生命周期 3 项通过。实际 JSONB baseline/prior candidate 的封存收益、未来日期、事件/行情、自由诊断与未知字段没有进入实收 HTTP messages，合法负收益及固定序列性质保留；部分失败、取消、缺 Run、过期 lease、晚到结果与统一揭示均验证。另 22 项定向及类型/lint 通过；临时容器清理。V2 生命周期与 V3 投影分别记录，真实 Provider/V3 Worker 与父项前置仍开放，见 [隔离数据库证据](../../evidence/2026-09-27-a02-sealed-postgres.md)。
+  - 2026-09-27 补验：[模型反馈与失败分类记录](../../evidence/2026-09-27-a02-feedback-audit.md)中 22 项定向检查通过，含 SDK 本地 HTTP 实际请求；后续 `A02-sealed-pg` 已补齐隔离数据库生命周期及 JSONB 到 SDK 请求的 5 项。未调用真实模型；A01/S07 与真实来源/Worker 前置仍开放。
   - 覆盖：Spec §11.1，AC12、AC14；依赖：A01、S07、B05。
   - 写入：K-AI 的模型输入/反馈投影、排名和失败分类及测试。
   - 完成：只暴露允许的开发/验证数据；全区间未来极值/事件数/日期不泄漏；数据缺口、协议不兼容、模型格式错误与策略亏损分开。
@@ -553,30 +553,30 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 验证：V-Server；可转换百分比、不可转换价格/数量、直接绕过 UI 提交和已存在真实规则回归。
   - 当前执行叶A03-r：复核已落盘真实成本和直接API拒绝测试，提取风险编译/策略结构验证至本feature的独立纯接缝，使618行风险应用Service收回原尺寸基线；补绝对价离场与模拟数量只显示覆盖限制、不变成真实规则的组合证据。仅风险编译helper、Service接线与预览测试，保留真实上下文读取及持久化边界；真实数据库回归仍另验。
   - A03-r完成本地编译接缝提取；真实成本百分比、绝对价/模拟仓位不映射、直接API非法风险拒绝及既有更新/身份共11项通过，类型与边界通过。Service缩至595行，尺寸违规由原8项减为7项。
-  - A03-pg：独立 PostgreSQL 的实际持仓成本读取、百分比评价、停用及启用应用和冻结规则落库、成本变化使预览失效、三类非法风险拒绝共 6 项通过；actual/shadow 持仓及 Portfolio/Journal 非空哨兵、16 张事实表摘要不变，既有风险规则未被拒绝请求覆盖。类型与 ESLint 通过。行情为显式 fixture，不声称后台定时评价或外部通知验收。C01/B01 依赖已核对，Server 全包复核 1353 项通过、68 项环境条件跳过，A03 所需隔离数据库另行实际执行通过，父项关闭。见 [组合验证记录](../../tasks/evidence/2026-09-27-legacy-replay-isolation.md)。
+  - A03-pg：独立 PostgreSQL 的实际持仓成本读取、百分比评价、停用及启用应用和冻结规则落库、成本变化使预览失效、三类非法风险拒绝共 6 项通过；actual/shadow 持仓及 Portfolio/Journal 非空哨兵、16 张事实表摘要不变，既有风险规则未被拒绝请求覆盖。类型与 ESLint 通过。行情为显式 fixture，不声称后台定时评价或外部通知验收。C01/B01 依赖已核对，Server 全包复核 1353 项通过、68 项环境条件跳过，A03 所需隔离数据库另行实际执行通过，父项关闭。见 [组合验证记录](../../evidence/2026-09-27-legacy-replay-isolation.md)。
 
 ## 7. M1：Desktop 消费面
 
 实现时必须使用 shadcn skill，核对当前 components.json、组件与锁定 CLI；沿用 TanStack Query、原子类及中文标签映射，不添加重复保存入口。共享组件与当前用户 WIP 冲突时先缩小写入范围。
 
 - [x] U01：按口径保存路由与不可用原因。
-  - 2026-09-28 父项收口：U01-a/b 的精确 V3 目录与 Desktop 三口径路由消费已完成；当前路由 UI 定向 11 项和 Desktop typecheck 通过，历史优化表单类型阻塞已解除。真实 Catalog/API 保存联通仍归 G-UI，见 [Desktop 父项对账](../../tasks/evidence/2026-09-28-cont-u01-u05-parent-reconciliation.md)。
+  - 2026-09-28 父项收口：U01-a/b 的精确 V3 目录与 Desktop 三口径路由消费已完成；当前路由 UI 定向 11 项和 Desktop typecheck 通过，历史优化表单类型阻塞已解除。真实 Catalog/API 保存联通仍归 G-UI，见 [Desktop 父项对账](../../evidence/2026-09-28-cont-u01-u05-parent-reconciliation.md)。
   - 覆盖：Spec §7.1–§7.2，AC19；依赖：C02、C04。
   - 写入：K-UI 的现有数据源路由行及请求 hooks/组件测试。
   - 完成：三个口径保持各自主备、单一保存语义；非价格行没有复权选项；未应用/无凭据/不支持/范围不足可读，触发器与选项复用中文标签。
   - 验证：V-Desktop，口径往返切换、保存恢复、失败重试、能力变化；实际联通由 G-UI 验证。
 
 - [x] U02：可预览的 HiThink 优先预设。
-  - 2026-09-28 父项收口：U01 前置已完成；预览/取消/应用、目录失效及唯一保存入口已有本地浏览器证据，当前预设 7 项继续通过。真实服务端保存仍归 G-UI，见 [Desktop 父项对账](../../tasks/evidence/2026-09-28-cont-u01-u05-parent-reconciliation.md)。
+  - 2026-09-28 父项收口：U01 前置已完成；预览/取消/应用、目录失效及唯一保存入口已有本地浏览器证据，当前预设 7 项继续通过。真实服务端保存仍归 G-UI，见 [Desktop 父项对账](../../evidence/2026-09-28-cont-u01-u05-parent-reconciliation.md)。
   - 覆盖：Spec §7.3，AC11、AC19；依赖：U01。
   - 写入：现有路由设置的预设投影与组件测试。
   - 完成：预览只涉及已支持、已配置能力，由用户明确应用；不覆盖其他路由或自动注册付费授权。
   - 验证：V-Desktop；已有选择保留、取消预览无修改、缺凭据/不支持能力不纳入、最终保存仍遵从现有 API。
   - 执行叶U02-a：独立纯投影仅选择complete目录中ready且Provider已启用/配置的HiThink精确能力，补充未选择的路由，保留已有主备；多个同能力HiThink目标不猜选。叶U02-b：现有Panel嵌入小型预览组件，明确应用才修改父草稿，取消无修改，依赖变化使预览失效；继续复用唯一保存按钮。写入限定新helper/组件、Panel挂接及定向测试，shadcn现有Alert/Button，浏览器验收另列。
-  - U02-a/b本地18项测试、Desktop类型及目标lint通过。真实浏览器合成页面已核对预览/取消/应用/目录失效/能力恢复，修复旧预览复活；不访问真实服务端，证据见[evidence/2026-09-26-hithink-preset-browser.md](../../tasks/evidence/2026-09-26-hithink-preset-browser.md)。真实Catalog及API保存仍由G-UI验收。
+  - U02-a/b本地18项测试、Desktop类型及目标lint通过。真实浏览器合成页面已核对预览/取消/应用/目录失效/能力恢复，修复旧预览复活；不访问真实服务端，证据见[evidence/2026-09-26-hithink-preset-browser.md](../../evidence/2026-09-26-hithink-preset-browser.md)。真实Catalog及API保存仍由G-UI验收。
 
 - [x] U03：回测配置与预检展示。
-  - 2026-09-28 父项收口：S07 已完成；准备→联合预检、取消/晚到隔离、修订失效和诊断展示当前相关 19 项通过，Desktop typecheck 通过。目标浏览器/Electron 仍归 G-UI，见 [Desktop 父项对账](../../tasks/evidence/2026-09-28-cont-u01-u05-parent-reconciliation.md)。
+  - 2026-09-28 父项收口：S07 已完成；准备→联合预检、取消/晚到隔离、修订失效和诊断展示当前相关 19 项通过，Desktop typecheck 通过。目标浏览器/Electron 仍归 G-UI，见 [Desktop 父项对账](../../evidence/2026-09-28-cont-u01-u05-parent-reconciliation.md)。
   - 覆盖：Spec §7.4、§9，AC07、AC12、AC19；依赖：C03、S07。
   - 写入：K-UI 的 BacktestSetupDialog/ModelConfiguration 及请求、测试。
   - 完成：展示价格口径、实际数据计划、主备、记账、历史性质、成本和不兼容规则；新复权研究可预选兼容模型；改变旧 raw 模型须显式确认影响。
@@ -589,11 +589,11 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 验证：V-Desktop；图表切换后已运行配置不变、独立缓存、错误/切回状态和 NAV 回归。
   - 当前执行叶U04-a：先修复请求协调器缺adjustment导致不同口径共享in-flight的问题，补并发/取消隔离测试；随后U04-b将图表查询、历史分页、刷新与重试全部纳入口径身份。U04-c需Server图表读取接入精确V3路由及来源能力再开放选择，不能只有下拉框而仍读旧Control V2。保留既有图表刷新WIP及NAV。
   - U04-a/b 本地记录：协调器隔离口径，Dialog 请求世代、查询键、历史补页、最新检查和分段重试传递 adjustment；三口径挂载及并发取消测试共 20 项通过，Desktop 类型检查通过。尚未开放选择器。U04-c 拆分前提：现有 V3 完整窗口 wire 明确拒绝未收盘日线，不能直接替换图表交互读取或放松回测完整性；需独立交互读取契约及 DSA/Server 适配，并保留未收盘、刷新及 NAV 行为。
-  - 2026-09-29 NAV 首次读取回归修复：基金详情首次请求显式选择净值能力，避免误进股票/ETF 图表计划门禁；Desktop 全包 509 项、类型与构建通过，目标浏览器和真实 NAV 仍待验收，详见[本地证据](../../tasks/evidence/2026-09-29-cont-u04-nav-opening.md)。
+  - 2026-09-29 NAV 首次读取回归修复：基金详情首次请求显式选择净值能力，避免误进股票/ETF 图表计划门禁；Desktop 全包 509 项、类型与构建通过，目标浏览器和真实 NAV 仍待验收，详见[本地证据](../../evidence/2026-09-29-cont-u04-nav-opening.md)。
 
 - [x] U05：结果语义与重放信息。
-  - 2026-09-28 父项收口：当前结果/模型披露、详情与诊断相关回归通过，实际来源、口径、记账/分红/历史性质、成本、重放版本及不可比较评价组均有明确展示。真实目标 Run 页面验收仍归 G-UI-159516，见 [Desktop 父项对账](../../tasks/evidence/2026-09-28-cont-u01-u05-parent-reconciliation.md)。
-  - 2026-09-27 补验：[结果披露记录](../../tasks/evidence/2026-09-27-u05-disclosure-audit.md)中 Desktop 18 项通过，确认实际备用来源、分红未知、旧响应、损坏合同与固定快照限制。不同评价组和基准状态覆盖、目标浏览器/Electron 未在本轮验证，继续保持开放。
+  - 2026-09-28 父项收口：当前结果/模型披露、详情与诊断相关回归通过，实际来源、口径、记账/分红/历史性质、成本、重放版本及不可比较评价组均有明确展示。真实目标 Run 页面验收仍归 G-UI-159516，见 [Desktop 父项对账](../../evidence/2026-09-28-cont-u01-u05-parent-reconciliation.md)。
+  - 2026-09-27 补验：[结果披露记录](../../evidence/2026-09-27-u05-disclosure-audit.md)中 Desktop 18 项通过，确认实际备用来源、分红未知、旧响应、损坏合同与固定快照限制。不同评价组和基准状态覆盖、目标浏览器/Electron 未在本轮验证，继续保持开放。
   - 当前执行叶 U05-ai：候选对比页消费服务端已返回的实验 runConfig，严格校验 V3 后展示口径、份额、分红、冻结时间和历史性质；固定供应商快照明确不构成严格无前视样本外验证。旧记录或无效配置显示无法确认，不推断成严格历史输入。各次运行实际来源仍以具体回测结果为准。
   - 覆盖：Spec §11.3，AC12、AC13、AC19；依赖：C03、B05。
   - 写入：K-UI 的回测结果与 ModelDisclosure、AI 结果摘要及测试。
@@ -610,21 +610,21 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 证据：测试预先固定误差阈值（浮点净值相对误差 ≤ 1e-8，现金按明确分币舍入），Decimal golden 精确相等；另保留拆分/分红 golden，不拿外部工具输出替代经济语义证明。
 
 - [x] G-Legacy：旧路径与真实域回归。
-  - 2026-09-28 父项收口：S09/A03 前置已完成；当前旧快照/旧运行 5 文件 29 项通过，结合既有独立 PostgreSQL、CN/HK/US/NAV Parquet 与真实域摘要不变证据，旧路径回归条件满足。真实外部 Provider 仍由各自门禁验收，见 [父项对账](../../tasks/evidence/2026-09-28-cont-g-legacy-parent-reconciliation.md)。
-  - [x] G-Legacy-pg：独立 PostgreSQL 的真实 Prisma 创建/幂等/领取/终态/冻结重试 3 项通过，账户、账本、持仓及交易摘要不变；队列端口和行情使用明确 fixture，不替代真实 Provider/Redis。目标部署 8 份历史 CN ETF V2 快照重放校验和一致，14 张真实域表摘要未变。另有 Server 19 项、Domain 36 项回归通过。其他市场/NAV 完整冻结重放和父项依赖仍需核对，见 [验证记录](../../tasks/evidence/2026-09-27-legacy-replay-isolation.md)。
-  - [x] G-Legacy-nav-disk-replay：复用 V2 NAV Schema/执行合同，以新测试将合成 CN 基金 NAV 信号、正式净值事实、冻结日历与元数据实际写入 `LocalSnapshotStore`，完成 `finalize`→`LocalSnapshotRunner`→重新打开本地仓库重放；NAV 申购成交、无交易配对与结果校验和一致。新测试 1 passed，相邻 V2 exchange/NAV 共 6 passed，Server typecheck、目标 ESLint/Prettier 通过；详见 [本地重放证据](../../tasks/evidence/2026-09-28-cont-legacy-nav-disk-replay.md)。只证明新建合成 V2 NAV Snapshot 的旧语义，不证明历史线上 NAV 工件、目标容器或真实 Provider；G-Legacy 父项继续开放。
-  - [x] G-Legacy-frozen：CN/HK/US 原始价格及 NAV 的实际 Parquet 落盘、新建 Store/Runner 完整重放和 NAV 篡改拒绝共 5 项通过；合成市场规则不代表真实来源验收。见 [验证记录](../../tasks/evidence/2026-09-27-legacy-replay-isolation.md)。父项仍待 S09/A03 依赖核对。
+  - 2026-09-28 父项收口：S09/A03 前置已完成；当前旧快照/旧运行 5 文件 29 项通过，结合既有独立 PostgreSQL、CN/HK/US/NAV Parquet 与真实域摘要不变证据，旧路径回归条件满足。真实外部 Provider 仍由各自门禁验收，见 [父项对账](../../evidence/2026-09-28-cont-g-legacy-parent-reconciliation.md)。
+  - [x] G-Legacy-pg：独立 PostgreSQL 的真实 Prisma 创建/幂等/领取/终态/冻结重试 3 项通过，账户、账本、持仓及交易摘要不变；队列端口和行情使用明确 fixture，不替代真实 Provider/Redis。目标部署 8 份历史 CN ETF V2 快照重放校验和一致，14 张真实域表摘要未变。另有 Server 19 项、Domain 36 项回归通过。其他市场/NAV 完整冻结重放和父项依赖仍需核对，见 [验证记录](../../evidence/2026-09-27-legacy-replay-isolation.md)。
+  - [x] G-Legacy-nav-disk-replay：复用 V2 NAV Schema/执行合同，以新测试将合成 CN 基金 NAV 信号、正式净值事实、冻结日历与元数据实际写入 `LocalSnapshotStore`，完成 `finalize`→`LocalSnapshotRunner`→重新打开本地仓库重放；NAV 申购成交、无交易配对与结果校验和一致。新测试 1 passed，相邻 V2 exchange/NAV 共 6 passed，Server typecheck、目标 ESLint/Prettier 通过；详见 [本地重放证据](../../evidence/2026-09-28-cont-legacy-nav-disk-replay.md)。只证明新建合成 V2 NAV Snapshot 的旧语义，不证明历史线上 NAV 工件、目标容器或真实 Provider；G-Legacy 父项继续开放。
+  - [x] G-Legacy-frozen：CN/HK/US 原始价格及 NAV 的实际 Parquet 落盘、新建 Store/Runner 完整重放和 NAV 篡改拒绝共 5 项通过；合成市场规则不代表真实来源验收。见 [验证记录](../../evidence/2026-09-27-legacy-replay-isolation.md)。父项仍待 S09/A03 依赖核对。
   - 依赖：S09、A03；所有者：Server 集成执行者；环境：隔离数据库及旧快照样本。
   - 覆盖 AC15：旧 raw、其他市场、NAV、新旧快照读取/重放、真实域不写入；对照基线行为及真实事实表前后状态。
   - 证据：定向回归和数据库断言；不是仅凭静态 import 扫描判定隔离。
 
 - **F01：已精简，由后继 Task 维护唯一活动待办**。当前只保留[最小部署与恢复收尾](2026-10-03-multi-source-remaining-acceptance.md#minimal-release-closeout)；以下为历史记录，旧复杂回退和异地长期制品要求已取消，不计通过，不恢复执行。
   - [x] F01-local-recovery-artifact：2026-10-03 当前四份镜像及同批 PostgreSQL/DSA/冻结状态已形成 Git 忽略的权限受限本地包，约 0.93 GiB；压缩包导入、包文件隔离恢复及四条冻结重放通过，源数据卷集合不变。旧 Server/Worker 的重放校验值不一致，旧 DSA 改变目录身份，组件候选均拒绝；现有历史备份只有 PostgreSQL，缺同批 DSA/冻结状态。异地长期制品和合格旧状态回退仍未完成，详见[当前 P03/P04 验收](2026-10-03-multi-source-remaining-acceptance.md)。
-  - [x] F01-image-retention：官方 infra 完整更新已在构建前固定 DSA、Server、Worker 当前实际镜像 ID；Compose 查询、镜像检查/标签失败或身份冲突均停止。9 个模拟场景、Shell 语法、infra 组合门禁和当前运行镜像标签/ID 核对通过。旧候选镜像已从本机消失；当前标签只为下一次更新保留本地候选，非长期制品或完整回退。另以 SQLite 在线备份与 PostgreSQL 只读 dump 核对同 generation 28，临时数据清理；尚未恢复或启动旧镜像。详见[保留与双库快照证据](../../tasks/evidence/2026-09-29-cont-f01-image-retention-state-snapshot.md)，F01 父项继续开放。
-  - 2026-09-29 Quote 续接：官方 `sync-code.sh all` 将当前源码同步到三容器可写层，镜像 ID 与保留标签均未变化；现有镜像不能作为这次 Quote 代码的可取回制品。目标临时 V2 策略已恢复，详见[目标窗口证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-target-window.md)。完整回退仍需与对应数据状态相容的镜像制品和隔离演练，F01 不关闭。
+  - [x] F01-image-retention：官方 infra 完整更新已在构建前固定 DSA、Server、Worker 当前实际镜像 ID；Compose 查询、镜像检查/标签失败或身份冲突均停止。9 个模拟场景、Shell 语法、infra 组合门禁和当前运行镜像标签/ID 核对通过。旧候选镜像已从本机消失；当前标签只为下一次更新保留本地候选，非长期制品或完整回退。另以 SQLite 在线备份与 PostgreSQL 只读 dump 核对同 generation 28，临时数据清理；尚未恢复或启动旧镜像。详见[保留与双库快照证据](../../evidence/2026-09-29-cont-f01-image-retention-state-snapshot.md)，F01 父项继续开放。
+  - 2026-09-29 Quote 续接：官方 `sync-code.sh all` 将当前源码同步到三容器可写层，镜像 ID 与保留标签均未变化；现有镜像不能作为这次 Quote 代码的可取回制品。目标临时 V2 策略已恢复，详见[目标窗口证据](../../evidence/2026-09-29-cont-r02-hithink-quote-target-window.md)。完整回退仍需与对应数据状态相容的镜像制品和隔离演练，F01 不关闭。
   - 2026-10-03 剩余验收续接：清理 Docker 缓存后，官方 `update.sh all` 已构建并启动当前内容寻址镜像；当前镜像在隔离双库/DSA/冻结制品副本中完成协议、账户/目录/策略和 4 条冻结重放，源状态保持一致。旧 Server/DSA 候选虽启动健康，但目录状态改变，未取得当前状态回退资格；长期制品和合格旧状态回退仍保留未完成。精确镜像、备份、空间和结果见[剩余验收 Task](2026-10-03-multi-source-remaining-acceptance.md)。
-  - 2026-09-28 隔离回退演练：上一版 Server/Worker/DSA 在当前 68 表结构上均能启动，Server 容器内健康 200、Worker ready、DSA V1 200；但临时 DSA 未恢复与数据库同批次的 SQLite 状态，Server 正确拒绝 Catalog generation 倒退，随后宿主端口黑盒出现空响应。按一次修正重试预算停止，不做第三次演练；候选结构兼容已证明，状态保真的完整回退仍未通过，见 [隔离回退记录](../../tasks/evidence/2026-09-28-cont-f01-rollback-rehearsal.md)。
-  - 2026-09-27 续核：[发布准备证据](../../tasks/evidence/2026-09-27-f01-release-preparation.md)记录 infra 兼容检查、9 项协议探针通过；更新 infra 部署顺序和禁用/回退步骤，区分已完成数据库升级与未执行镜像回退。未操作目标策略或业务取消，完整发布准备条件仍待核验，保持开放。
+  - 2026-09-28 隔离回退演练：上一版 Server/Worker/DSA 在当前 68 表结构上均能启动，Server 容器内健康 200、Worker ready、DSA V1 200；但临时 DSA 未恢复与数据库同批次的 SQLite 状态，Server 正确拒绝 Catalog generation 倒退，随后宿主端口黑盒出现空响应。按一次修正重试预算停止，不做第三次演练；候选结构兼容已证明，状态保真的完整回退仍未通过，见 [隔离回退记录](../../evidence/2026-09-28-cont-f01-rollback-rehearsal.md)。
+  - 2026-09-27 续核：[发布准备证据](../../evidence/2026-09-27-f01-release-preparation.md)记录 infra 兼容检查、9 项协议探针通过；更新 infra 部署顺序和禁用/回退步骤，区分已完成数据库升级与未执行镜像回退。未操作目标策略或业务取消，完整发布准备条件仍待核验，保持开放。
   - 历史执行叶 F01-a（非当前待办）：保留 V1 发布基线，单列 V3 所需 Data/Control 版本与独立协议 smoke。新增只读能力/握手/精确目录探针及无凭据拒绝验证，错误不输出响应体或 Token；使用本地夹具验证旧版本、串 requestId、partial 目录与鉴权旁路拒绝。infra 提供明确的 V3 验收入口，真实运行态尚不可用时不标记通过。
   - 支持：Spec §13，AC15、AC17；依赖：C04、P01。
   - 写入：K-Infra 的必要配置、Secret 注入说明、兼容矩阵及测试；仅确有必要时增加 SDK/系统依赖。
@@ -632,13 +632,13 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 验证：infra 兼容检查、Secret 不进入输出、版本不匹配拒绝新运行且旧功能保留；如果没有运行依赖变更，用事实记录该部分不适用。
 
 - [x] F02：按当前共同价格范围完成用户/运维、架构、版本与三仓能力说明；发布扩展状态分别披露。
-  - 2026-09-29 复核：C04、S09、A03、U05 已完成；[版本矩阵](../../architecture/version-matrix.md)已补当前 `BIGINT` 结构、首条 Run/AI 局部门禁及目标目录阻断，避免继续把历史 19 migration head 当当前结构。F01 的隔离状态保真回退仍开放，故 F02 父项暂不勾选；见[文档一致性证据](../../tasks/evidence/2026-09-27-f02-document-consistency.md)。
-  - 2026-09-27 文档范围复核已记录于 [F02 一致性证据](../../tasks/evidence/2026-09-27-f02-document-consistency.md)：12 份受影响文档相对链接无缺失，逐项核对记账、历史性质、来源、图表与部署边界；C04/S09/U05/F01 依赖仍开放，父项不勾选。下一执行面转回 C04 契约验证，不以文档修订代替运行验收。
+  - 2026-09-29 复核：C04、S09、A03、U05 已完成；[版本矩阵](../../design/version-matrix.md)已补当前 `BIGINT` 结构、首条 Run/AI 局部门禁及目标目录阻断，避免继续把历史 19 migration head 当当前结构。F01 的隔离状态保真回退仍开放，故 F02 父项暂不勾选；见[文档一致性证据](../../evidence/2026-09-27-f02-document-consistency.md)。
+  - 2026-09-27 文档范围复核已记录于 [F02 一致性证据](../../evidence/2026-09-27-f02-document-consistency.md)：12 份受影响文档相对链接无缺失，逐项核对记账、历史性质、来源、图表与部署边界；C04/S09/U05/F01 依赖仍开放，父项不勾选。下一执行面转回 C04 契约验证，不以文档修订代替运行验收。
   - 2026-09-27 F02-d 领域说明对账完成：移除“当前 V1 为主”的过时现状，将所有决策必须历史可见的泛化表述限定到严格历史时点；补固定供应商快照的真实观测时间、可复现与无前视的区别，以及原始实际份额/归一化序列的事件义务。同步 `CONTEXT.md` 四项领域术语，仅定义概念，不写实现细节。依据主 Spec、`market-price-protocol.ts`、`backtest-execution-model.ts`、`backtest-v3-research-clock.ts` 和执行分支核对；领域页相对链接通过。纯文档修改，无运行态变更。下一步为 F02 范围内最终一致性复核及依赖核对，不能以各文档已写入代替父项验收。
   - 2026-09-27 F02-c 用户/运维说明已修订：用户指南移除 V1 为主的过时状态，说明精确路由、原始/归一化记账、固定供应商快照、候选比较和真实风险采纳边界；运维指南以官方 update/sync 入口替换直接 compose 更新，补显式保留数据升级引用、Control URL/鉴权、准入失败、冻结重放与业务状态排查。已核对两份 infra 脚本的目标参数及预检约束、前述源码接线和现有验收证据，两文件相对链接均有效。本次纯文档修改，不增加真实验收结论。领域说明页仍有 V1 现状与普遍 PIT 表述，下一叶须按领域建模规则对账，F02 保持开放。
   - 2026-09-27 F02-a 续核：§2 六份基线 Spec 已有原始/归一化记账、事件依赖、固定快照与真实风险边界的增量条款，本轮保留。修正架构页仍称图表需迁移的过时说明，按实际 `MarketChartReaderV3` 与 DsaClient 独立 chart-bars 接线记录已实现范围及 U04 开放门禁；修正版本矩阵仍称目标数据库/协议未验收的过时状态，引用已完成保留数据升级和协议证据，保留不可变镜像与产品验收边界。两份修改文档的相对链接检查通过；未重新运行部署或真实来源。完整 F02 用户/运维说明、逐条终审仍待对账，父项不勾选。
   - 2026-09-27 F02-b（DSA 版本入口说明）已完成：修订 DSA `docs/thesis-ledger-contract-v1.md`，保留文件路径与 V1 兼容行为，明确 Data V1/V2/V3 路由、Control V3 沿用 V1 URL 并按信封分派、独立鉴权、infra 兼容基线与 marketV3 smoke 的区别；补持仓未知披露时间说明。已对照 `api/app.py` 挂载、各 router 装饰器 AST、handshake 严格字段及实际 `compatibility.json` 核验。纯文档变更，无需重新部署；不是重新执行真实门禁的证据。F02-a 基线文档与其余用户/运维说明仍需逐项对账，父项保持开放。
-  - 2026-09-29 当前替换进展：上述 F02-b 是当时版本记录。DSA 文档已更新为独立 V3 URL，infra `compatibility.json` 与检查脚本收敛为唯一 Data/Control V3 组合；主仓与 infra 的 README、运维说明和合同矩阵同步当前协议/业务 smoke 边界。详见[现行合同入口](../../tasks/evidence/2026-09-29-canonical-contract-smoke-entry.md)与[兼容矩阵证据](../../tasks/evidence/2026-09-29-canonical-infra-compatibility-matrix.md)。当前目标更新仍未完成，F02 全文与三仓说明终审保持开放。
+  - 2026-09-29 当前替换进展：上述 F02-b 是当时版本记录。DSA 文档已更新为独立 V3 URL，infra `compatibility.json` 与检查脚本收敛为唯一 Data/Control V3 组合；主仓与 infra 的 README、运维说明和合同矩阵同步当前协议/业务 smoke 边界。详见[现行合同入口](../../evidence/2026-09-29-canonical-contract-smoke-entry.md)与[兼容矩阵证据](../../evidence/2026-09-29-canonical-infra-compatibility-matrix.md)。当前目标更新仍未完成，F02 全文与三仓说明终审保持开放。
   - 当前执行叶 F02-a：修订 §2 列出的 V2 基线文档，将 raw/公司行动要求限定至原始记账路径；补 V3 精确路由、完整窗口冻结、固定快照研究及 AI/真实风险边界。版本矩阵分开记录源码协议和现有 infra 发布基线，不把本地实现宣称为目标运行态验收。
   - 支持：Spec §2、§14，AC12、AC15、AC19；依赖：C04、S09、A03、U05、F01。
   - 写入：K-Docs 中受影响的原始记账限定、按需事件、固定快照研究、比较/采纳条款与必要交叉引用；DSA/infra 明细留在各自仓库。
@@ -646,75 +646,75 @@ G0 先于相应来源的生产集成；允许缺凭据时完成已知契约和 f
   - 验证：逐条核对 Spec §2，Markdown 链接、术语、版本与源码一致；不重开旧项目任务、不提前归档本主题。
 
 - [x] G-Deploy：目标开发运行态共同价格路径完成：官方 sync-code.sh、兼容性预检、健康、真实 Worker 与重放通过；本轮无结构变化。
-  - 2026-09-30 现行策略存储衔接：目标旧双字段 Policy 与 DSA SQLite 旧当前策略均被现行合同拒绝。显式备份/归档后，主仓官方更新已将目标结构升到 `20260930100000_rebase_legacy_market_policy`，Server→DSA revision 31 重新 Apply 且精确目标 eligible；当前 V3 Run 准备通过，但创建被 `historicalTradability` 的 raw 路由缺失阻断，retry 409。DSA 官方完整构建失败也单独保留。见[策略状态转换证据](../../tasks/evidence/2026-09-30-canonical-policy-state-rebase.md)。
-  - 2026-09-29 当前结构保数据升级：官方 `update.sh thesis-ledger` 先因旧行情缓存 6/1899 行与直接删表冲突而由隔离演练拒绝；未部署的新迁移改为同事务归档原行后，隔离旧列摘要及目标结构、权限门禁通过。目标 head 为 `20260929221000_ledger_envelope_version`，Server/Worker 同一新镜像且健康，旧 Run 详情 409、旧 `jobs` 与 Market V2 URL 404。见[目标升级证据](../../tasks/evidence/2026-09-29-canonical-target-database-upgrade.md)。DSA 当前镜像更新、真实来源、现行 Run 纵向链及客户端仍单独验收，父项保持未勾选。
-  - 2026-09-30 DSA 目标运行层：官方 `update.sh dsa` 构建并以宿主进程环境注入 HiThink Key，`sync-code.sh dsa` 补入构建启动后的旧 URL 修复。容器关键源码摘要与宿主一致，三服务健康；目标 V3 鉴权/握手及旧 V1 POST 404 已核对。该补丁仍位于容器可写层，镜像重建会失去它；真实 RouteAdmission、运行/客户端与不可变镜像验收继续开放，见[DSA 目标证据](../../tasks/evidence/2026-09-30-canonical-dsa-target-runtime.md)。
-  - 2026-09-29 本次三仓源码更新尝试在官方 `update.sh all` 的主仓镜像构建阶段遇到宿主磁盘耗尽，DSA 镜像虽构建完成，数据库升级与服务启动均未发生；[失败边界](../../tasks/evidence/2026-09-29-canonical-update-all-disk-blocked.md)不能计作当前代码的目标运行态验收。
+  - 2026-09-30 现行策略存储衔接：目标旧双字段 Policy 与 DSA SQLite 旧当前策略均被现行合同拒绝。显式备份/归档后，主仓官方更新已将目标结构升到 `20260930100000_rebase_legacy_market_policy`，Server→DSA revision 31 重新 Apply 且精确目标 eligible；当前 V3 Run 准备通过，但创建被 `historicalTradability` 的 raw 路由缺失阻断，retry 409。DSA 官方完整构建失败也单独保留。见[策略状态转换证据](../../evidence/2026-09-30-canonical-policy-state-rebase.md)。
+  - 2026-09-29 当前结构保数据升级：官方 `update.sh thesis-ledger` 先因旧行情缓存 6/1899 行与直接删表冲突而由隔离演练拒绝；未部署的新迁移改为同事务归档原行后，隔离旧列摘要及目标结构、权限门禁通过。目标 head 为 `20260929221000_ledger_envelope_version`，Server/Worker 同一新镜像且健康，旧 Run 详情 409、旧 `jobs` 与 Market V2 URL 404。见[目标升级证据](../../evidence/2026-09-29-canonical-target-database-upgrade.md)。DSA 当前镜像更新、真实来源、现行 Run 纵向链及客户端仍单独验收，父项保持未勾选。
+  - 2026-09-30 DSA 目标运行层：官方 `update.sh dsa` 构建并以宿主进程环境注入 HiThink Key，`sync-code.sh dsa` 补入构建启动后的旧 URL 修复。容器关键源码摘要与宿主一致，三服务健康；目标 V3 鉴权/握手及旧 V1 POST 404 已核对。该补丁仍位于容器可写层，镜像重建会失去它；真实 RouteAdmission、运行/客户端与不可变镜像验收继续开放，见[DSA 目标证据](../../evidence/2026-09-30-canonical-dsa-target-runtime.md)。
+  - 2026-09-29 本次三仓源码更新尝试在官方 `update.sh all` 的主仓镜像构建阶段遇到宿主磁盘耗尽，DSA 镜像虽构建完成，数据库升级与服务启动均未发生；[失败边界](../../evidence/2026-09-29-canonical-update-all-disk-blocked.md)不能计作当前代码的目标运行态验收。
   - 2026-09-27 数据库前置阻塞已解除：官方保留数据升级完成，真实备份恢复演练、四项增量事务、68 表与权限检查通过；Server/Worker/DSA/Redis healthy，健康 API 与 DSA V3 协议检查通过。见 [升级任务与证据](2026-09-27-preserve-data-database-upgrade.md)。完整 G-Deploy 的其余依赖及业务验收仍需独立核对，保持未勾选。
   - [x] G-Deploy-159516：首条真实普通回测的目标运行态门禁；仅验收该精确路由所需版本、结构、策略与准入，父项其余范围继续开放。
-    - [x] G-Deploy-catalog-revision-64：真实目标 Catalog revision 超过 32 位，Server `MarketBarWindowEvidenceV3.catalogRevision` 的 Prisma `Int` 与 PostgreSQL `INTEGER` 使 68 日行情读后无法冻结。新增保留数据 migration 将该列升为 `BIGINT`，Prisma 保持精确读写、HTTP 仍使用安全整数；同步 migration matrix、runtime 打包输入与部署门禁。定向持久化测试、Schema validate、隔离 PostgreSQL 升级及本地 Server 构建通过；infra 官方入口保留数据升级和相同准备请求通过。[修复与部署证据](../../tasks/evidence/2026-09-28-cont-159516-catalog-revision-bigint.md)。原 migration 未改，旧数据保留。
+    - [x] G-Deploy-catalog-revision-64：真实目标 Catalog revision 超过 32 位，Server `MarketBarWindowEvidenceV3.catalogRevision` 的 Prisma `Int` 与 PostgreSQL `INTEGER` 使 68 日行情读后无法冻结。新增保留数据 migration 将该列升为 `BIGINT`，Prisma 保持精确读写、HTTP 仍使用安全整数；同步 migration matrix、runtime 打包输入与部署门禁。定向持久化测试、Schema validate、隔离 PostgreSQL 升级及本地 Server 构建通过；infra 官方入口保留数据升级和相同准备请求通过。[修复与部署证据](../../evidence/2026-09-28-cont-159516-catalog-revision-bigint.md)。原 migration 未改，旧数据保留。
     - 启动依赖：D01-window-contract/execution/verification/wire/consumption 与本次配置所用 S07/S08/S09/I01 的局部接线证据有效，F01 兼容组合已核对，受影响源码/包级及 DSA 官方离线门禁满足项目升级前置；若输入未变，复用已通过的高成本检查。
     - 验收依赖：`G0-H-target` 的来源事实已经成立；目标策略只授权该事实所证明的精确目标、窗口和口径。
     - 执行与完成：按 infra 官方入口及实际依赖变化选择最小更新目标；核对目标 Server、全部 Worker、DSA 的运行源码与协议，全部 migration、预期表和 app role，以及 `159516.SZ` 的当前 Desired/Effective/Catalog、授权目标、价格口径和读取前后准入。实际请求按五年分窗规则规划为一个窗口，故本目标验收真实单窗口读取/冻结/重放；`D01-runtime` 的两窗口受控合同在同版本另行验证。不得把真实单窗口说成真实多窗口或把快更说成镜像更新。
-    - 验证：旧 DSA 离线失败的历史记录保留；新完整 Schemas 隔离输入的当前源码官方门禁已通过，见[续验](../../tasks/evidence/2026-09-28-cont-dsa-schemas-isolated-gate.md)。目标 Server/Worker 由[官方保留数据更新](../../tasks/evidence/2026-09-28-cont-159516-catalog-revision-bigint.md)启动，DSA 经官方 `sync-code.sh dsa` 更新运行层，三者健康；[D01 同版本核对](../../tasks/evidence/2026-09-28-cont-d01-target-runtime.md)、[精确准入](../../tasks/evidence/2026-09-28-cont-g0-h-159516-target-admission.md)及[真实冻结/重放](../../tasks/evidence/2026-09-28-cont-159516-first-real-run.md)共同覆盖本目标。Server Desired/Effective revision 29 已应用且不 stale，目标 Catalog 有效；DSA 镜像仍需后续正式更新，不作为本次运行层验收之外的发布证据。
+    - 验证：旧 DSA 离线失败的历史记录保留；新完整 Schemas 隔离输入的当前源码官方门禁已通过，见[续验](../../evidence/2026-09-28-cont-dsa-schemas-isolated-gate.md)。目标 Server/Worker 由[官方保留数据更新](../../evidence/2026-09-28-cont-159516-catalog-revision-bigint.md)启动，DSA 经官方 `sync-code.sh dsa` 更新运行层，三者健康；[D01 同版本核对](../../evidence/2026-09-28-cont-d01-target-runtime.md)、[精确准入](../../evidence/2026-09-28-cont-g0-h-159516-target-admission.md)及[真实冻结/重放](../../evidence/2026-09-28-cont-159516-first-real-run.md)共同覆盖本目标。Server Desired/Effective revision 29 已应用且不 stale，目标 Catalog 有效；DSA 镜像仍需后续正式更新，不作为本次运行层验收之外的发布证据。
   - 依赖：I01、G-Math、G-Legacy、D02、F01、F02、受影响包与仓库门禁通过；所有者：部署执行者。
   - 环境/入口：K-Infra 的受支持更新脚本，先记录容器/代码/Schema head，再选择最小目标与正确更新路径；新 Schema 需先通过 S02 的隔离升级。
   - 通过：实际 Server/全部 Worker/DSA 版本兼容、结构完整与 app role 正确、无缺表/入口错误；schema marker 单独相等不能代替完整检查。
   - 阻塞：默认保留数据；若当前入口不能安全完成升级，保留未勾选并制定保留数据路径，不自行清库或删除 volume。
 
 - [x] G-Run：HiThink 159516 普通回测与重放。
-  - 2026-09-27：目标服务已恢复健康，Data/Control V3 及独立鉴权通过；原标的/区间的 HiThink qfq 读取首次及两次重试均因 `NO_ELIGIBLE_PROVIDER` 拒绝，真实目录尚未准入。本轮跳过正向回测，门禁保持未通过，见 [目标运行态验收](../../tasks/evidence/2026-09-27-target-runtime-gates.md)。
-  - 2026-09-28：管理人公告与公开源目标行核对出 07-09 登记、07-10 除权的 1:2 拆分，可能预热的 03-27/30 另有 1:2 拆分。真实运行须证明拆分事件覆盖、策略时钟可见性及实际 HiThink 价格坐标上的不漏记/不重复调整；当前证据不关闭 G-Run，见 [事件交叉核对](../../tasks/evidence/2026-09-28-cont-m22-159516-splits.md)。
+  - 2026-09-27：目标服务已恢复健康，Data/Control V3 及独立鉴权通过；原标的/区间的 HiThink qfq 读取首次及两次重试均因 `NO_ELIGIBLE_PROVIDER` 拒绝，真实目录尚未准入。本轮跳过正向回测，门禁保持未通过，见 [目标运行态验收](../../evidence/2026-09-27-target-runtime-gates.md)。
+  - 2026-09-28：管理人公告与公开源目标行核对出 07-09 登记、07-10 除权的 1:2 拆分，可能预热的 03-27/30 另有 1:2 拆分。真实运行须证明拆分事件覆盖、策略时钟可见性及实际 HiThink 价格坐标上的不漏记/不重复调整；当前证据不关闭 G-Run，见 [事件交叉核对](../../evidence/2026-09-28-cont-m22-159516-splits.md)。
   - 首条回测启动依赖：`G0-H-target`、`G-Deploy-159516`、本次配置所需的 S07/S08/S09/I01 证据；原 `G0-H` 与 `G-Deploy` 父项继续承担全部既定范围的验收，不以本次 Run 勾选。
   - 所有者：普通回测验收执行者；环境：目标运行态与真实已授权 HiThink。
   - 覆盖 AC17：159516.SZ、2026-05-16..2026-08-09、按实际策略确定预热，从正式 API 创建到成功终态、查询交易明细和重放。
   - 证据：真实响应指纹/请求范围、Run ID、Snapshot/价格协议/来源与版本、结果/交易、离线重放一致性；保留不调用独立事件表也能完成适用归一化运行的证据。
-  - 验证：[首条真实普通回测证据](../../tasks/evidence/2026-09-28-cont-159516-first-real-run.md)记录 v1 绝对价格规则被拒绝、普通 draft v2 的同坐标规则、正式 API 与目标界面两条旧版成功 Run、完整冻结 Snapshot、11 笔交易和 22 次成交、独立重放校验值一致。[新版本完整结果](../../tasks/evidence/2026-09-28-cont-159516-versioned-benchmark.md)使基准和超额收益可用；严格 PIT、真实收费与实际份额没有验收。
-  - [x] G-Run-benchmark-calendar-alignment：日线 Bar 时间戳与收盘估值时点按交易日对齐。真实目标 Bar 的 `occurredAt` 为 UTC 午夜，权益估值为上海 16:00；同日且来源可决策时间不晚于估值时才配对，重复/缺失/晚到继续拒绝。Benchmark/Runner 引入新约定及 ID，旧 Snapshot 仍由旧 Runner 得到原校验值；新 Run `e2195b91-4cff-4dc5-9db2-0df01cf43d83` 使用新 Runner，基准/超额收益可用，业务结果 complete 且重放校验一致。[版本化修复与目标证据](../../tasks/evidence/2026-09-28-cont-159516-versioned-benchmark.md)。
+  - 验证：[首条真实普通回测证据](../../evidence/2026-09-28-cont-159516-first-real-run.md)记录 v1 绝对价格规则被拒绝、普通 draft v2 的同坐标规则、正式 API 与目标界面两条旧版成功 Run、完整冻结 Snapshot、11 笔交易和 22 次成交、独立重放校验值一致。[新版本完整结果](../../evidence/2026-09-28-cont-159516-versioned-benchmark.md)使基准和超额收益可用；严格 PIT、真实收费与实际份额没有验收。
+  - [x] G-Run-benchmark-calendar-alignment：日线 Bar 时间戳与收盘估值时点按交易日对齐。真实目标 Bar 的 `occurredAt` 为 UTC 午夜，权益估值为上海 16:00；同日且来源可决策时间不晚于估值时才配对，重复/缺失/晚到继续拒绝。Benchmark/Runner 引入新约定及 ID，旧 Snapshot 仍由旧 Runner 得到原校验值；新 Run `e2195b91-4cff-4dc5-9db2-0df01cf43d83` 使用新 Runner，基准/超额收益可用，业务结果 complete 且重放校验一致。[版本化修复与目标证据](../../evidence/2026-09-28-cont-159516-versioned-benchmark.md)。
   - 阻塞：目标覆盖、凭据或有效价格失败保持原标的/区间未通过，不换标签或 fixture 补齐。
 
 - [x] G-UI：共同价格目标 Web 界面验收完成；沿用既有非法提交验收和当前回归。Electron、原始 CDP 网络采集不计作通过。
   - [x] G-UI-159516：以 `G-Run` 已成功的同一真实 Run 验收首个交付的界面路径；其余口径、主备和市场组合仍由本父项验收。
     - 启动依赖：`G-Run` 已通过，本次交互所需的 U01/U03/U05、S01/S07 接线已有适用证据；实际目标浏览器或 Electron 可访问同一运行态。
     - 完成：用户从现有界面选择 HiThink ETF qfq 与适用模型，看到来源、预检、归一化单位、固定快照研究及拆分/分红处理说明，创建并查询该 Run 的成功终态、交易明细与重放标识；保存/取消、失败和晚到状态符合本次路径，直接 API 非法提交被服务端拒绝。
-    - 验证：[真实界面路径](../../tasks/evidence/2026-09-28-cont-159516-first-real-run.md)记录目标 Web 配置、预检、来源/冻结时间、创建、成功终态、交易/来源/重放标识；[最终完整结果与截图](../../tasks/evidence/2026-09-28-cont-159516-versioned-benchmark.md)中的界面 Run `e2195b91-4cff-4dc5-9db2-0df01cf43d83` 与 `G-Run` 同一条。取消不落新任务、保留的 v1 失败状态可见、篡改准备配置在同环境 HTTP 409 且不落库；Desktop 相邻 23 项、typecheck/build 与目标浏览器展示通过。
+    - 验证：[真实界面路径](../../evidence/2026-09-28-cont-159516-first-real-run.md)记录目标 Web 配置、预检、来源/冻结时间、创建、成功终态、交易/来源/重放标识；[最终完整结果与截图](../../evidence/2026-09-28-cont-159516-versioned-benchmark.md)中的界面 Run `e2195b91-4cff-4dc5-9db2-0df01cf43d83` 与 `G-Run` 同一条。取消不落新任务、保留的 v1 失败状态可见、篡改准备配置在同环境 HTTP 409 且不落库；Desktop 相邻 23 项、typecheck/build 与目标浏览器展示通过。
   - 依赖：U01–U05、S01、S07、G-Run；所有者：Desktop 验收执行者。
   - 环境/入口：实际浏览器或 Electron 的既有路由、行情及回测页。
   - 覆盖 AC19：三口径各自主备、HiThink 限制/缺凭据原因、预设预览、旧 raw 模型变更确认、图表不改 frozen Run、结果实际来源；同环境直接请求验证服务端拒绝非法配置。
   - 证据：页面操作与网络/API 结果；组件测试或前端 build 不代替此门禁。
-  - 2026-09-29 图表入口仍受目标目录身份阻断：`159516/SZ/ETF` 旧记录 inactive，目录 stale、真实同步 Job `catalog_all_providers_unavailable`，搜索为空且 chart-options HTTP 400。普通 Run 与 AI 实验成功不替代 U04 图表验收；见[目录阻断证据](../../tasks/evidence/2026-09-29-cont-159516-chart-catalog-blocker.md)。
+  - 2026-09-29 图表入口仍受目标目录身份阻断：`159516/SZ/ETF` 旧记录 inactive，目录 stale、真实同步 Job `catalog_all_providers_unavailable`，搜索为空且 chart-options HTTP 400。普通 Run 与 AI 实验成功不替代 U04 图表验收；见[目录阻断证据](../../evidence/2026-09-29-cont-159516-chart-catalog-blocker.md)。
 
-- [x] G-AI：真实 AI 实验全链路。真实 LMStudio 成功实验、封存比较与冻结重放，目标格式失败反例，以及目标 Server 至真实 LMStudio 的脱敏出站请求边界均已核对；见[成功与重放](../../tasks/evidence/2026-09-28-cont-159516-ai-sealed-experiment.md)、[格式失败](../../tasks/evidence/2026-09-29-cont-159516-ai-format-failure-target.md)和[真实请求边界](../../tasks/evidence/2026-09-29-cont-159516-ai-lmstudio-request-boundary.md)。此门禁只覆盖 AC14 的 AI 全链路，不代替严格 PIT 或全局 AC01–AC20。
+- [x] G-AI：真实 AI 实验全链路。真实 LMStudio 成功实验、封存比较与冻结重放，目标格式失败反例，以及目标 Server 至真实 LMStudio 的脱敏出站请求边界均已核对；见[成功与重放](../../evidence/2026-09-28-cont-159516-ai-sealed-experiment.md)、[格式失败](../../evidence/2026-09-29-cont-159516-ai-format-failure-target.md)和[真实请求边界](../../evidence/2026-09-29-cont-159516-ai-lmstudio-request-boundary.md)。此门禁只覆盖 AC14 的 AI 全链路，不代替严格 PIT 或全局 AC01–AC20。
   - 依赖：A01、A02、G-Run；所有者：AI 验收执行者；环境：目标运行态、已授权可用模型、冻结市场输入。
   - 覆盖 AC14：基线→候选→服务端计算→比较→封存阶段，模型不可更改数据协议；核对无封存反馈泄漏、格式失败独立分类、重放版本一致。
   - 证据：实验/候选/Run 引用、脱敏模型输入边界与结果分类；模型失败记录在本门禁，不把普通回测改为失败，也不把 AI 宣称通过。
-  - [x] G-AI-selection-visibility：目标实验 `0830412c-6aa6-4608-b0fd-3a59c7c50763` 的候选读模型在揭示前将编码测试终态的 `validationStatus` 投影为 `restricted`；界面现依公开的开发／验证有效性显示锁定操作，服务端仍按持久化状态复核。真实锁定和封存测试完成，未测试候选状态文案已更正；定向 5 项、Lint/格式、Desktop build 与目标页面通过。候选、基线、8 个 Run 和剩余门禁见[真实 AI 实验证据](../../tasks/evidence/2026-09-28-cont-159516-ai-sealed-experiment.md)，不将此叶视为 `G-AI` 总验收。
-  - [x] G-AI-target-success-replay：同一真实实验在目标 LMStudio 上 2 次模型调用成功，基线／两候选开发与验证、单候选封存测试共 8 个 Run 成功；逐 split 数据协议、可比较指纹与执行版本一致，目标 Worker 从冻结 Snapshot 只读重放 8/8 校验值相同。候选测试收益及回撤弱于基线，未采纳。见[真实 AI 实验证据](../../tasks/evidence/2026-09-28-cont-159516-ai-sealed-experiment.md)。
-  - [x] G-AI-format-failure：目标受控 Provider 返回完整但不符合 schema 的响应；持久化 `optimization_schema_invalid`、1 次调用和 13/5 token，终态 `model_format_failure`，无候选回测；开发／验证基线和既有普通 Run 保持成功，目标界面正确显示。见[目标格式失败证据](../../tasks/evidence/2026-09-29-cont-159516-ai-format-failure-target.md)。
-  - [x] G-AI-real-request-boundary：目标 Server 经临时透传 Provider 向真实 LMStudio 发起优化调用，代理对实际请求只保存脱敏结构与 SHA256；负载只有授权参数及开发／验证摘要，无封存行情、事件、测试结果或未来元数据。模型返回后实验完成 1 个候选、6 条完整 Run 和封存比较。见[真实请求边界](../../tasks/evidence/2026-09-29-cont-159516-ai-lmstudio-request-boundary.md)。
+  - [x] G-AI-selection-visibility：目标实验 `0830412c-6aa6-4608-b0fd-3a59c7c50763` 的候选读模型在揭示前将编码测试终态的 `validationStatus` 投影为 `restricted`；界面现依公开的开发／验证有效性显示锁定操作，服务端仍按持久化状态复核。真实锁定和封存测试完成，未测试候选状态文案已更正；定向 5 项、Lint/格式、Desktop build 与目标页面通过。候选、基线、8 个 Run 和剩余门禁见[真实 AI 实验证据](../../evidence/2026-09-28-cont-159516-ai-sealed-experiment.md)，不将此叶视为 `G-AI` 总验收。
+  - [x] G-AI-target-success-replay：同一真实实验在目标 LMStudio 上 2 次模型调用成功，基线／两候选开发与验证、单候选封存测试共 8 个 Run 成功；逐 split 数据协议、可比较指纹与执行版本一致，目标 Worker 从冻结 Snapshot 只读重放 8/8 校验值相同。候选测试收益及回撤弱于基线，未采纳。见[真实 AI 实验证据](../../evidence/2026-09-28-cont-159516-ai-sealed-experiment.md)。
+  - [x] G-AI-format-failure：目标受控 Provider 返回完整但不符合 schema 的响应；持久化 `optimization_schema_invalid`、1 次调用和 13/5 token，终态 `model_format_failure`，无候选回测；开发／验证基线和既有普通 Run 保持成功，目标界面正确显示。见[目标格式失败证据](../../evidence/2026-09-29-cont-159516-ai-format-failure-target.md)。
+  - [x] G-AI-real-request-boundary：目标 Server 经临时透传 Provider 向真实 LMStudio 发起优化调用，代理对实际请求只保存脱敏结构与 SHA256；负载只有授权参数及开发／验证摘要，无封存行情、事件、测试结果或未来元数据。模型返回后实验完成 1 个候选、6 条完整 Run 和封存比较。见[真实请求边界](../../evidence/2026-09-29-cont-159516-ai-lmstudio-request-boundary.md)。
 
 ## 9. M2：其他行情口径与事件能力
 
-- [x] M2-source-prerequisite-review-1002：完成跳过 AKShare/EastMoney 后的剩余来源前置盘点：首次核对时 Tushare/RQData 目标凭据未配置，已有本地接线不重做；HiThink 进度码、因子基准和事件覆盖仍缺。通达信候选 wheel 下载超时，M34-sdk-preflight 未完成。Tushare 后续已按用户要求完成页面配置 API 保存，见下一叶；只有本次盘点勾选，第二优先级真实来源和父项保持开放。见[剩余来源前置证据](../../tasks/evidence/2026-10-02-priority2-provider-prerequisites.md)。
-- [x] M2-tushare-page-config-target-1002：按用户授权把 zsh 已有 Token 经前端同一 Server 配置接口保存到目标 DSA；HTTP 201，registry 读回 source=control/configured=true、configVersion=3，目标密文存在且实际快照可读。三个基金接口用目标保存的凭据各一次 HTTPS 请求，均 HTTP 200/40203，未取得数据行；完成配置 API 与权限诊断，不完成浏览器验收或来源准入。见[配置与权限证据](../../tasks/evidence/2026-10-02-tushare-page-credentials-target.md)。
-- [x] M2-tdx-free-package-probe-1002：完成无需 Key 的官网盘后包两日可行性验证，支持 Spec §4/AC09/AC20 的前置调查。目标 DSA（Linux ARM64）匿名直连 `g4day/20260709.zip`、`g4day/20260710.zip` 各一次，均 HTTP 200，约 2.7 MB/包；ZIP CRC、市场结构、代码/序号唯一性、有限数和目标 OHLC 检查通过，两包均命中 `159516.SZ`/`510300.SH`。请求预算为单次 35 秒、8 MiB，ZIP 单项 32 MiB/合计 96 MiB/最多 32 项，无重试、重定向或代理轮换，内存解析且不执行第三方代码。日期仅到包级，ETF 量额单位、完整长窗、复权因子和公司行动未准入。仅完成调查叶，未改生产代码或部署，父项及真实回测门禁保持开放；见[实际验证](../../tasks/evidence/2026-10-02-tdx-free-access-validation.md)。
-- [x] M2-tdx-client-preflight-1002：完成官方条件与实际环境只读核验。标准应用目录和 Spotlight 未发现宿主通达信终端，目标缺 `tqcenter` 和对应进程；官方文档未明确客户端模式的 macOS/Linux aarch64 支持或目标数据免费资格。当前路径缺运行前提，未安装、登录或取数。此勾选仅表示前置调查完成，不能替代客户端运行或行情验收；见[实际验证](../../tasks/evidence/2026-10-02-tdx-free-access-validation.md#客户端路径前置核验)。
-- [x] M2-astockdata-free-probe-1002：完成固定版的三次匿名来源验证及现有合同核对。目标 `159516.SZ`、`2026-04-30..2026-08-09` 的腾讯 none/hfq 各取到 68 行，拆分前后 hfq/raw 为 2→4，两日 raw OHLC 与既有盘后包一致；但旧 `fqkline/get` 六列缺原生成交额，现有精确路由/分页证明要求 `newfqkline/get` 九列，ETF 清单尚无 hfq，因此本轮不能直接接入。新浪因子算法取到拆分前后 `f=1`，同样不适用。按用户条件，**本次 a-stock-data ETF 回测接入为 TODO／合同不满足／当前跳过**，保留成功取样，不关闭来源父项或改变生产接线；见[免费接口实测与停止点](../../tasks/evidence/2026-10-02-astockdata-free-path-validation.md)。
+- [x] M2-source-prerequisite-review-1002：完成跳过 AKShare/EastMoney 后的剩余来源前置盘点：首次核对时 Tushare/RQData 目标凭据未配置，已有本地接线不重做；HiThink 进度码、因子基准和事件覆盖仍缺。通达信候选 wheel 下载超时，M34-sdk-preflight 未完成。Tushare 后续已按用户要求完成页面配置 API 保存，见下一叶；只有本次盘点勾选，第二优先级真实来源和父项保持开放。见[剩余来源前置证据](../../evidence/2026-10-02-priority2-provider-prerequisites.md)。
+- [x] M2-tushare-page-config-target-1002：按用户授权把 zsh 已有 Token 经前端同一 Server 配置接口保存到目标 DSA；HTTP 201，registry 读回 source=control/configured=true、configVersion=3，目标密文存在且实际快照可读。三个基金接口用目标保存的凭据各一次 HTTPS 请求，均 HTTP 200/40203，未取得数据行；完成配置 API 与权限诊断，不完成浏览器验收或来源准入。见[配置与权限证据](../../evidence/2026-10-02-tushare-page-credentials-target.md)。
+- [x] M2-tdx-free-package-probe-1002：完成无需 Key 的官网盘后包两日可行性验证，支持 Spec §4/AC09/AC20 的前置调查。目标 DSA（Linux ARM64）匿名直连 `g4day/20260709.zip`、`g4day/20260710.zip` 各一次，均 HTTP 200，约 2.7 MB/包；ZIP CRC、市场结构、代码/序号唯一性、有限数和目标 OHLC 检查通过，两包均命中 `159516.SZ`/`510300.SH`。请求预算为单次 35 秒、8 MiB，ZIP 单项 32 MiB/合计 96 MiB/最多 32 项，无重试、重定向或代理轮换，内存解析且不执行第三方代码。日期仅到包级，ETF 量额单位、完整长窗、复权因子和公司行动未准入。仅完成调查叶，未改生产代码或部署，父项及真实回测门禁保持开放；见[实际验证](../../evidence/2026-10-02-tdx-free-access-validation.md)。
+- [x] M2-tdx-client-preflight-1002：完成官方条件与实际环境只读核验。标准应用目录和 Spotlight 未发现宿主通达信终端，目标缺 `tqcenter` 和对应进程；官方文档未明确客户端模式的 macOS/Linux aarch64 支持或目标数据免费资格。当前路径缺运行前提，未安装、登录或取数。此勾选仅表示前置调查完成，不能替代客户端运行或行情验收；见[实际验证](../../evidence/2026-10-02-tdx-free-access-validation.md#客户端路径前置核验)。
+- [x] M2-astockdata-free-probe-1002：完成固定版的三次匿名来源验证及现有合同核对。目标 `159516.SZ`、`2026-04-30..2026-08-09` 的腾讯 none/hfq 各取到 68 行，拆分前后 hfq/raw 为 2→4，两日 raw OHLC 与既有盘后包一致；但旧 `fqkline/get` 六列缺原生成交额，现有精确路由/分页证明要求 `newfqkline/get` 九列，ETF 清单尚无 hfq，因此本轮不能直接接入。新浪因子算法取到拆分前后 `f=1`，同样不适用。按用户条件，**本次 a-stock-data ETF 回测接入为 TODO／合同不满足／当前跳过**，保留成功取样，不关闭来源父项或改变生产接线；见[免费接口实测与停止点](../../evidence/2026-10-02-astockdata-free-path-validation.md)。
 
 2026-10-03 接续：用户追问改造后，腾讯十列原生 HFQ 已恢复推进并完成下述适配叶；上面的旧六列接口停止记录保留为历史证据。通达信付费后台、其他已暂停来源与第二优先级父项状态不变。
 
 2026-10-03 用户决策：若候选来源完成合理验证后仍只有 HiThink 能适配，判定现行准入限制过严并减少限制；按策略实际需要区分基础价格研究与事件、真实份额、量价混合及严格 PIT 能力。此判断已写入 Spec §5.2，不能以当前只有一个 ready 直接宣布其他来源永久不适配。
 
-- [x] M2-tencent-hfq-admission-review-1003：继续腾讯 HFQ，先核对现行拒绝条件是否属于基础价格回测的必要条件，再对目标窗口、跨窗价格基准和可复用量额证据作有界验证。目标只读请求限 `159516.SZ`、hfq 的 `2026-04-30..2026-08-09` 与 `2026-07-06..2026-07-17` 两窗，各一次、25 秒、1 MiB，无重试或切源；同次内核对独立交易日集合、有效 OHLC/量额、分页证明、重叠行与已记录拆分两日样本。输出明确可满足的条件、真正阻塞及需要收敛的通用门槛；不把“完整供应商能力”作为单一价格路径的前置。本叶为来源准入准备审查，真实准入写入和目标回测另立依赖就绪的叶。 完成证据见[本轮准入与目标验收](../../tasks/evidence/2026-10-03-tencent-hfq-price-research.md)。
+- [x] M2-tencent-hfq-admission-review-1003：继续腾讯 HFQ，先核对现行拒绝条件是否属于基础价格回测的必要条件，再对目标窗口、跨窗价格基准和可复用量额证据作有界验证。目标只读请求限 `159516.SZ`、hfq 的 `2026-04-30..2026-08-09` 与 `2026-07-06..2026-07-17` 两窗，各一次、25 秒、1 MiB，无重试或切源；同次内核对独立交易日集合、有效 OHLC/量额、分页证明、重叠行与已记录拆分两日样本。输出明确可满足的条件、真正阻塞及需要收敛的通用门槛；不把“完整供应商能力”作为单一价格路径的前置。本叶为来源准入准备审查，真实准入写入和目标回测另立依赖就绪的叶。 完成证据见[本轮准入与目标验收](../../evidence/2026-10-03-tencent-hfq-price-research.md)。
 - [x] M2-admission-design-calibration：以 HiThink/腾讯共同能力收敛门槛，取消基础价格人工窗口准入、专用日级元数据和算法等价证明前置；真实双源路径已完成。
-- [x] M2-tencent-hfq-price-research-admission-1003：依赖本次窗口/口径审查；仅签发 `tencent/tencent × CN ETF DAILY_BAR 1d hfq`、`159516.SZ`、`2026-04-30..2026-08-09` 的短期价格研究准入。内容寻址证据先写入并读回校验，再绑定当前适配/来源修订与无凭据事实，最多有效 7 日。沿用已有 Control V3 路由流程，保留原策略并追加精确 HFQ 目标；真实 Data V3 正向仅一次、越界反例一次，不切源或自动重试。保留 `volumeBasis=unknown`、未声明量额单位、供应商定义的分红语义与不可逆转换，其他依赖这些事实的功能继续使用既有兼容检查。目标来源 HTTP 验收与 Server 回测正向验收分开记录。 完成证据见[本轮准入与目标验收](../../tasks/evidence/2026-10-03-tencent-hfq-price-research.md)。
-- [x] M2-policy-retained-unavailable-routes-1003：腾讯来源准入后发现 Server 原 Desired revision 32 含尚未就绪的净值路由，整份配置校验会阻止保留它并新增 HFQ；DSA 已按本轮验证临时推进至 revision 33，需经 Server 正式入口完成一致性收敛。对应 Spec §5.2，仅对上一份成功 Effective 中保持原 RouteKey/目标顺序的既有路由允许保留暂不可用配置；新增/改变、全局重新启用、目录不完整和适配缺失仍拒绝。写入限 Server market 的目录验证 helper/调用接缝及专属测试；先定向和包级检查，再按官方入口同步 Server，最后通过正式 policy API 保留原两条路由并追加 HFQ，核对 Server/DSA revision、旧不可用目标及新就绪目标。不得删除原净值配置或绕过执行端准入。 完成证据见[本轮准入与目标验收](../../tasks/evidence/2026-10-03-tencent-hfq-price-research.md)。
+- [x] M2-tencent-hfq-price-research-admission-1003：依赖本次窗口/口径审查；仅签发 `tencent/tencent × CN ETF DAILY_BAR 1d hfq`、`159516.SZ`、`2026-04-30..2026-08-09` 的短期价格研究准入。内容寻址证据先写入并读回校验，再绑定当前适配/来源修订与无凭据事实，最多有效 7 日。沿用已有 Control V3 路由流程，保留原策略并追加精确 HFQ 目标；真实 Data V3 正向仅一次、越界反例一次，不切源或自动重试。保留 `volumeBasis=unknown`、未声明量额单位、供应商定义的分红语义与不可逆转换，其他依赖这些事实的功能继续使用既有兼容检查。目标来源 HTTP 验收与 Server 回测正向验收分开记录。 完成证据见[本轮准入与目标验收](../../evidence/2026-10-03-tencent-hfq-price-research.md)。
+- [x] M2-policy-retained-unavailable-routes-1003：腾讯来源准入后发现 Server 原 Desired revision 32 含尚未就绪的净值路由，整份配置校验会阻止保留它并新增 HFQ；DSA 已按本轮验证临时推进至 revision 33，需经 Server 正式入口完成一致性收敛。对应 Spec §5.2，仅对上一份成功 Effective 中保持原 RouteKey/目标顺序的既有路由允许保留暂不可用配置；新增/改变、全局重新启用、目录不完整和适配缺失仍拒绝。写入限 Server market 的目录验证 helper/调用接缝及专属测试；先定向和包级检查，再按官方入口同步 Server，最后通过正式 policy API 保留原两条路由并追加 HFQ，核对 Server/DSA revision、旧不可用目标及新就绪目标。不得删除原净值配置或绕过执行端准入。 完成证据见[本轮准入与目标验收](../../evidence/2026-10-03-tencent-hfq-price-research.md)。
 - [x] M2-tencent-hfq-server-run-replay-1003：修复后腾讯 HFQ 正常准备、创建、Worker 成功及冻结重放完成，Run f66b82b3-ac55-4046-b8a2-2da33b823af4；旧失败和预算由本轮新实现接续。
 - [x] M2-tencent-complete-bar-tradability-adapter：公共日级状态适配完成，完整/缺日/分页/重复/价格回归及腾讯真实 qfq/hfq 回测通过；见 C01–C03。
 
-- [x] M2-tencent-native-hfq-feasibility-1003：完成 DSA、公共 Bar、Server 与 Desktop 消费合同核对，以及目标 `newfqkline/get` 匿名 HFQ 验证。首次探针窗口检查过严，按既有解析器筛掉窗外行后仅补验一次；两次各限 25 秒/1 MiB，无自动重试或切源。补验原生 `hfqday` 在固定 159516 窗口有 68 行，均十列并含原生成交额。可以只扩 DSA ETF HFQ 适配，不需改公共 Schema 或主仓消费者；来源准入、单位、覆盖及回测验收仍开放。对应 Spec §4–5、AC09/AC20，见[可行性与实测](../../tasks/evidence/2026-10-03-tencent-hfq-adapter.md)。
+- [x] M2-tencent-native-hfq-feasibility-1003：完成 DSA、公共 Bar、Server 与 Desktop 消费合同核对，以及目标 `newfqkline/get` 匿名 HFQ 验证。首次探针窗口检查过严，按既有解析器筛掉窗外行后仅补验一次；两次各限 25 秒/1 MiB，无自动重试或切源。补验原生 `hfqday` 在固定 159516 窗口有 68 行，均十列并含原生成交额。可以只扩 DSA ETF HFQ 适配，不需改公共 Schema 或主仓消费者；来源准入、单位、覆盖及回测验收仍开放。对应 Spec §4–5、AC09/AC20，见[可行性与实测](../../evidence/2026-10-03-tencent-hfq-adapter.md)。
 
-- [x] M2-tencent-native-hfq-adapter-1003：腾讯 ETF hfq 最小适配与目标读取已完成，对应 Spec §4.1、§5、AC09/AC20；仅扩 DSA 精确入口、库存/独立修订与测试文档。未新增 Provider、公共 Schema 或主仓消费者改动，未授予真实来源准入。见[实施与验证证据](../../tasks/evidence/2026-10-03-tencent-hfq-adapter.md)。
+- [x] M2-tencent-native-hfq-adapter-1003：腾讯 ETF hfq 最小适配与目标读取已完成，对应 Spec §4.1、§5、AC09/AC20；仅扩 DSA 精确入口、库存/独立修订与测试文档。未新增 Provider、公共 Schema 或主仓消费者改动，未授予真实来源准入。见[实施与验证证据](../../evidence/2026-10-03-tencent-hfq-adapter.md)。
   - [x] 解析与执行：ETF 精确入口接受 hfq，只读原生 `hfqday`；缺量额、错误口径或来源仍拒绝。STOCK HFQ 不开放，年度分段、预算与 none/qfq 行为保持。
   - [x] 消费与回归：Control/adapter inventory/revision 一致登记独立 hfq，none/qfq 准入不能满足 HFQ。定向 120 项、局部编译/lint 通过；官方 `ci_gate.sh all` 为 7732 passed、1 skipped、4 deselected，626 subtests passed。首次因 PATH 未包含 `.venv/bin` 停在 flake8，修正环境后完整通过，未安装依赖。
   - [x] 目标运行态：官方 `sync-code.sh dsa` 兼容性预检与同步通过，五个生产文件摘要一致，目标 healthy；Control 目录 complete、唯一 ETF HFQ 条目为 `not_admitted`。目标当前未配置精确路由，执行以 `NO_ELIGIBLE_PROVIDER` 拒绝且来源调用为 0；新 Fetcher 独立一次实际读取固定窗口 68 行、原生量额与分页摘要通过。仅同步容器可写层，镜像不变；真实 G0-M 和回测正向验收仍开放。
@@ -729,7 +729,7 @@ M2 与 M1 共用契约，可在契约就绪后开展；无需等待 M1 全部界
 | [x] M21-a | 精确端点及原生字段单位随 DataFrame 保留：股票手/元、ETF 未知，三口径独立、同源身份 eastmoney，数值不隐式转换；8 项定向及相关回归合计 36 项通过。后续单位消费/ETF 证据与真实准入仍开放，见 DSA 来源门禁 2026-09-27 补充 | §4、§8 / AC02、AC11、AC20 |
 | [x] M21-b | 来源事实可选 fieldUnits 契约、DSA 完整窗口/图表同源字段投影及 Server 冻结消费；旧缺省不补单位、ETF 未知不外推、单位改变影响身份。DSA 54 项、Server 完整快照及身份 10 项与单位落盘重放 1 项通过；先消费者契约再生产者，目标部署另验，见来源字段单位证据 | §5、§8 / AC02、AC11、AC20 |
 | [ ] M21-c-target-window | 2026-10-02 第二优先级首叶：目标安装版AKShare 1.19.1的精确 `fund_etf_hist_em` 请求合同已核对；固定159516.SZ、2026-04-30..2026-08-09，逐口径核对完整68个交易日、原响应身份、量额与独立深交所来源。每口径首次至多一次、20秒外层硬期限；首次网络失败时暂停同端点后续口径，不重复旧四日样本的盲重试预算。只读来源及运行态，不改策略/准入/Run；来源条件满足后再建立必要适配修复叶 | §4、§8 / AC02、AC11、AC20 |
-| [x] M21-c1-target-observation | 目标159516.SZ长窗的none/qfq/hfq首次均HTTP200，各68条唯一日期，原文代码159516/market0与请求0.159516及fqt0/1/2匹配；三口径量额总和相同。深交所独立68日日期集合与日历一致，量总和完全匹配、额相差1.74元。完成本次来源观测，不授予逐日单位、算法、稳定性或准入；见[第二优先级首叶证据](../../tasks/evidence/2026-10-02-priority2-m21-source-window.md) | §4、§8 / AC02、AC11、AC20 |
+| [x] M21-c1-target-observation | 目标159516.SZ长窗的none/qfq/hfq首次均HTTP200，各68条唯一日期，原文代码159516/market0与请求0.159516及fqt0/1/2匹配；三口径量额总和相同。深交所独立68日日期集合与日历一致，量总和完全匹配、额相差1.74元。完成本次来源观测，不授予逐日单位、算法、稳定性或准入；见[第二优先级首叶证据](../../evidence/2026-10-02-priority2-m21-source-window.md) | §4、§8 / AC02、AC11、AC20 |
 | [ ] M21-c2-unit-basis-verification | 三口径逐日原文与独立来源对账、完整日期集合比较、长/短窗重叠价格坐标及修订验证；2026-10-02有依据的核对请求在首次none处ConnectionError，同端点qfq/hfq暂停，不再请求。网络稳定后须先固定原文和期限预算；聚合总和不能替代逐日单位、复权锚点或连续来源证明 | §4、§8 / AC02、AC11、AC20 |
 | [ ] M21-c3-scoped-consumption | 依赖c2合格事实；单位断言绑定精确标的、窗口、来源/适配修订，并核验实际响应身份。只在必要接缝实施且先定向验证，再按官方infra入口做目标HTTP、准入和冻结消费；现有ETF fieldUnits仍unknown、三口径not_admitted | §5、§8 / AC02、AC11、AC20 |
 
@@ -737,7 +737,7 @@ M2 与 M1 共用契约，可在契约就绪后开展；无需等待 M1 全部界
 
 M21-c2本轮结果：新探针明确在 `eastmoney_http`、尚无原响应时ConnectionError，剩余价格请求全部暂停；宿主独立深交所原文已固定到 `/private/tmp/priority2-m21-c2-capture.json`，SHA-256与前轮一致。旧组合异常的失败端点仍无法反推，本次只确认新请求的失败阶段。接续转到独立事件前沿：M22-c3原文及映射复核，预算与交付如下。
 
-- [x] M22-c3-source-revalidation：目标DSA固定159516.SZ、2026-01-01..08-09，现有Reader首次完整读取成功：1页/83行、两条目标观测，分页及providerRevision与既有证据一致；两份独立管理人实施PDF首次读取均200，原字节摘要匹配。已形成[精确映射草案](../../tasks/evidence/2026-10-02-m22-159516-split-mapping.json)，原文SHA-256 `b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e`；真实观测在隔离离线审核上下文中经现有resolver输出正确除权日期，不生成历史可见性，31项相邻守卫通过。未写生产准入，完整覆盖/目标事件HTTP/冻结门禁继续开放，见[续接证据](../../tasks/evidence/2026-10-02-priority2-m21-m22-continuation.md)。
+- [x] M22-c3-source-revalidation：目标DSA固定159516.SZ、2026-01-01..08-09，现有Reader首次完整读取成功：1页/83行、两条目标观测，分页及providerRevision与既有证据一致；两份独立管理人实施PDF首次读取均200，原字节摘要匹配。已形成[精确映射草案](../../evidence/2026-10-02-m22-159516-split-mapping.json)，原文SHA-256 `b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e`；真实观测在隔离离线审核上下文中经现有resolver输出正确除权日期，不生成历史可见性，31项相邻守卫通过。未写生产准入，完整覆盖/目标事件HTTP/冻结门禁继续开放，见[续接证据](../../evidence/2026-10-02-priority2-m21-m22-continuation.md)。
 | [ ] M22 | **TODO／暂不可用／当前跳过**：AKShare/EastMoney ETF 拆分：折算日与生效日有明确映射依据；无法核实则缺失，不猜测 | §4、§9 / AC08、AC20 |
 | [x] M22-a | 从独立管理人公告固定 159596.SZ 的 2025-10-17 日终 1:2 拆分正样本；登记日终与开盘生效不能等同，来源行和价格坐标映射待验，见 ETF 拆分日期独立正样本证据 | §4、§9 / AC08、AC20 |
 | [x] M22-b | 标准化 fund_cf_em 结构化观测，保留源日期、类型、十进制比例及观测时间；未知生效阶段不生成执行事实，不把空集当完整覆盖；16 项测试及 lint 通过，有界读取与真实日期映射后续独立验收 | §4、§9 / AC08、AC20 |
@@ -764,26 +764,26 @@ M21-c2本轮结果：新探针明确在 `eastmoney_http`、尚无原响应时Con
 
 M31 拆分执行：
 
-- **已取消（2026-10-08，不计通过）** M31-a：以下保留原计划与未通过原因，不再执行。每 10 份金额换算、独立日期及不完整覆盖的离线映射已实现；原官方示例 `progress="实施"` 下测试通过。真实 `510300.SH` 14 条均返回字符串 `"2"`，官方未提供该枚举含义；标准化器已改为对未知进度失败关闭，不能把本地示例通过计作真实字段映射完成。当前含反例与相邻分红 77 项通过，剩余需可信进度码字典或逐事件可审核的等价证据；见 [离线证据](../../tasks/evidence/2026-09-28-cont-m31-hithink-dividend-normalization.md)与[真实字段差异](../../tasks/evidence/2026-09-28-cont-m31-live-progress-drift.md)。
-  - 2026-09-29 一次显式 `fund_type=exchange` 对照仍为 14 条 `progress="2"`；请求参数差异不能解释数字码，M31-a 不因此勾选，详见[真实字段差异](../../tasks/evidence/2026-09-28-cont-m31-live-progress-drift.md)。
+- **已取消（2026-10-08，不计通过）** M31-a：以下保留原计划与未通过原因，不再执行。每 10 份金额换算、独立日期及不完整覆盖的离线映射已实现；原官方示例 `progress="实施"` 下测试通过。真实 `510300.SH` 14 条均返回字符串 `"2"`，官方未提供该枚举含义；标准化器已改为对未知进度失败关闭，不能把本地示例通过计作真实字段映射完成。当前含反例与相邻分红 77 项通过，剩余需可信进度码字典或逐事件可审核的等价证据；见 [离线证据](../../evidence/2026-09-28-cont-m31-hithink-dividend-normalization.md)与[真实字段差异](../../evidence/2026-09-28-cont-m31-live-progress-drift.md)。
+  - 2026-09-29 一次显式 `fund_type=exchange` 对照仍为 14 条 `progress="2"`；请求参数差异不能解释数字码，M31-a 不因此勾选，详见[真实字段差异](../../evidence/2026-09-28-cont-m31-live-progress-drift.md)。
 - **已取消（2026-10-08，不计通过）** M31-b：以下保留原计划与未通过原因，不再执行。精确端点读取、真实权限、标的与币种核验、完整历史覆盖和事件 V3 准入/冻结消费；目标环境及独立公告验收另按 G0-H/G-M2-Events 执行。M31-a 的离线标准化不能完成本叶。
-  - [x] M31-b1：DSA 已为单个完整 `thscode` 增加有界分红端点读取；凭据仅写请求头，禁止重定向和隐式重试，限制响应字节与条数，校验 HTTP/业务状态、JSON 重复键和返回计数，保存实际响应摘要与观测时间。注入 HTTP 响应与标准化接缝离线测试新增 16 项，随后真实 `510300.SH` 两次只读响应均为 14 条且计数相符；当前相邻分红合计 77 项通过，限定 flake8、py_compile 通过。只证明单次请求的传输合同，不提升为历史全量覆盖；见 [M31-b1 读取证据](../../tasks/evidence/2026-09-28-cont-m31-hithink-dividend-read.md)与[真实字段差异](../../tasks/evidence/2026-09-28-cont-m31-live-progress-drift.md)。
-    - 2026-09-29 按官方当前合同增加显式 `fund_type`，出站前拒绝与完整代码后缀不匹配的基金类型；带 `exchange` 的一次真实只读对照仍返回 14 条 `progress="2"`。本地传输/标准化/候选合同验证见[后续证据](../../tasks/evidence/2026-09-29-cont-m31-hithink-dividend-contract.md)，M31-b1 的历史覆盖和真实事件门禁边界不变。
+  - [x] M31-b1：DSA 已为单个完整 `thscode` 增加有界分红端点读取；凭据仅写请求头，禁止重定向和隐式重试，限制响应字节与条数，校验 HTTP/业务状态、JSON 重复键和返回计数，保存实际响应摘要与观测时间。注入 HTTP 响应与标准化接缝离线测试新增 16 项，随后真实 `510300.SH` 两次只读响应均为 14 条且计数相符；当前相邻分红合计 77 项通过，限定 flake8、py_compile 通过。只证明单次请求的传输合同，不提升为历史全量覆盖；见 [M31-b1 读取证据](../../evidence/2026-09-28-cont-m31-hithink-dividend-read.md)与[真实字段差异](../../evidence/2026-09-28-cont-m31-live-progress-drift.md)。
+    - 2026-09-29 按官方当前合同增加显式 `fund_type`，出站前拒绝与完整代码后缀不匹配的基金类型；带 `exchange` 的一次真实只读对照仍返回 14 条 `progress="2"`。本地传输/标准化/候选合同验证见[后续证据](../../evidence/2026-09-29-cont-m31-hithink-dividend-contract.md)，M31-b1 的历史覆盖和真实事件门禁边界不变。
   - **已取消（2026-10-08，不计通过）** M31-b2：以下保留原计划与未通过原因，不再执行。调用 M31-a/b1 并接入精确来源库存、实际准入、币种/标的核验和事件 V3 冻结消费；真实权限、历史覆盖、公告对照仍归 G0-H/G-M2-Events。
     - [x] M31-b2-contract：固定 HiThink `CN/ETF/CASH_DISTRIBUTION` 单一精确来源 ID、真实凭据 HMAC 修订、来源/适配版本与 manifest；先建立不可执行合同及拒绝测试，随后在 M31-b2-runtime 接线时同步开放库存、Control/目录与生产执行，避免“目录 ready 但回落其他来源”。
-      - 2026-09-29 前置合同已落地：精确身份、修订和 HMAC 拒绝 13 项通过；此阶段未登记 manifest/库存，生产路由保持不可选；见[候选合同证据](../../tasks/evidence/2026-09-29-cont-m31-hithink-dividend-contract.md)。随后完成的 DSA 接线见[事件路径证据](../../tasks/evidence/2026-09-29-cont-m31-hithink-dividend-dsa-runtime.md)。
-      - 2026-09-29 增加独立 ETF 身份/币种原文的纯校验：准入绑定原始字节摘要、精确标的与日期、观察时刻、HTTPS 文件地址及文件 SHA-256，重复或越界拒绝；21 项定向测试通过，详见[身份原文证据](../../tasks/evidence/2026-09-29-cont-m31-hithink-dividend-identity-evidence.md)。随后接通运行时当前凭据和 Server 冻结消费；真实来源准入仍需审定原文。
+      - 2026-09-29 前置合同已落地：精确身份、修订和 HMAC 拒绝 13 项通过；此阶段未登记 manifest/库存，生产路由保持不可选；见[候选合同证据](../../evidence/2026-09-29-cont-m31-hithink-dividend-contract.md)。随后完成的 DSA 接线见[事件路径证据](../../evidence/2026-09-29-cont-m31-hithink-dividend-dsa-runtime.md)。
+      - 2026-09-29 增加独立 ETF 身份/币种原文的纯校验：准入绑定原始字节摘要、精确标的与日期、观察时刻、HTTPS 文件地址及文件 SHA-256，重复或越界拒绝；21 项定向测试通过，详见[身份原文证据](../../evidence/2026-09-29-cont-m31-hithink-dividend-identity-evidence.md)。随后接通运行时当前凭据和 Server 冻结消费；真实来源准入仍需审定原文。
     - [x] M31-b2-runtime：从当前准入和同一凭据快照读取前后复核策略、目录、准入与撤销；调用有界 HiThink 读取器和严格进度标准化，核对完整标的、ETF 身份及独立币种依据。未知 `progress="2"`、缺身份/币种、历史覆盖不明时失败关闭或返回不完整覆盖，不生成可消费的伪完整事件；Server 冻结保留来源、日期与实际观测时刻。本叶的勾选仅代表本地执行和消费合同，目标验收另见 M31-b2-target。
-      - 2026-09-29 新增内部读取编排：身份原文先于凭据，环境 Key 与主密钥 HMAC 固定为单次不可变快照，读后复核准入、原文、凭据与冻结时刻；调用有界读取器及严格标准化，保留内容指纹和不完整覆盖。10 项合成正反例通过，见[内部读取证据](../../tasks/evidence/2026-09-29-cont-m31-hithink-dividend-mapped-read.md)。随后接通 DSA 事件入口与策略/目录。
-      - 2026-09-29 Server 已加入独立 `hithinkIdentityEvidence` 协议校验，并在在线选择、离线 Snapshot 复核原始字节摘要、精确时刻、ETF 身份和分红币种；合成 Parquet 冻结读回通过，未知完整覆盖继续拒绝。见[Server wire 证据](../../tasks/evidence/2026-09-29-cont-m31-hithink-dividend-server-wire.md)。DSA 事件库存、策略/目录及鉴权执行入口随后接通，86 项相邻定向测试及 DSA→Schemas/Server 合成协议验证通过；隔离 DSA 官方离线门禁 7527 passed、1 skipped、4 deselected、626 subtests passed，见[事件路径证据](../../tasks/evidence/2026-09-29-cont-m31-hithink-dividend-dsa-runtime.md)。
+      - 2026-09-29 新增内部读取编排：身份原文先于凭据，环境 Key 与主密钥 HMAC 固定为单次不可变快照，读后复核准入、原文、凭据与冻结时刻；调用有界读取器及严格标准化，保留内容指纹和不完整覆盖。10 项合成正反例通过，见[内部读取证据](../../evidence/2026-09-29-cont-m31-hithink-dividend-mapped-read.md)。随后接通 DSA 事件入口与策略/目录。
+      - 2026-09-29 Server 已加入独立 `hithinkIdentityEvidence` 协议校验，并在在线选择、离线 Snapshot 复核原始字节摘要、精确时刻、ETF 身份和分红币种；合成 Parquet 冻结读回通过，未知完整覆盖继续拒绝。见[Server wire 证据](../../evidence/2026-09-29-cont-m31-hithink-dividend-server-wire.md)。DSA 事件库存、策略/目录及鉴权执行入口随后接通，86 项相邻定向测试及 DSA→Schemas/Server 合成协议验证通过；隔离 DSA 官方离线门禁 7527 passed、1 skipped、4 deselected、626 subtests passed，见[事件路径证据](../../evidence/2026-09-29-cont-m31-hithink-dividend-dsa-runtime.md)。
     - **已取消（2026-10-08，不计通过）** M31-b2-target：以下保留原计划与未通过原因，不再执行。真实权限、目标 ETF 身份/币种、独立公告与历史覆盖证据齐备后，执行 DSA 鉴权 HTTP→Server 事件选择→冻结/重放的正反例；分别核对撤销、晚到和无事件依赖的 qfq 普通 Run。目标证据未齐时不准入，不用离线测试或单次响应代替 G0-H/G-M2-Events。
-      - 2026-09-29 上交所 2025-06-11 分红公告和 2025-11-24 产品概要核对了 `510300.SH` 的 ETF/上交所身份、人民币交易与当次现金分红币种；两份 PDF 原字节摘要已记录，生成仅覆盖 2025-06 月的候选原文并以合成准入通过 DSA 结构校验。未写目标 Control 或准入；后出的产品概要不能回写 6 月策略可见性。真实进度码、全历史及正路径仍缺，见[独立身份与币种证据](../../tasks/evidence/2026-09-29-cont-m31-510300-public-identity-currency.md)。
+      - 2026-09-29 上交所 2025-06-11 分红公告和 2025-11-24 产品概要核对了 `510300.SH` 的 ETF/上交所身份、人民币交易与当次现金分红币种；两份 PDF 原字节摘要已记录，生成仅覆盖 2025-06 月的候选原文并以合成准入通过 DSA 结构校验。未写目标 Control 或准入；后出的产品概要不能回写 6 月策略可见性。真实进度码、全历史及正路径仍缺，见[独立身份与币种证据](../../evidence/2026-09-29-cont-m31-510300-public-identity-currency.md)。
 
-M31-b2 续接边界：DSA 事件库存、HiThink manifest、策略/目录和鉴权执行入口已接通，内部读取编排及 Server wire/冻结校验由合成证据覆盖。目标通过 `sync-code.sh all` 同步后 DSA、Server、Worker 均 healthy；精确 HiThink 分红目录条目为 `not_admitted`，鉴权 HTTP 返回 422 / `not_admitted`，见[事件路径证据](../../tasks/evidence/2026-09-29-cont-m31-hithink-dividend-dsa-runtime.md)。本次仅容器可写层更新，镜像未变。下一步在真实身份/币种原文、数字进度语义和历史覆盖证据齐备后执行 M31-b2-target。缺证据时精确路由继续不可准入；M31-a、M31-b2-target 与 G0-H/G-M2-Events 不因本地接线勾选。
+M31-b2 续接边界：DSA 事件库存、HiThink manifest、策略/目录和鉴权执行入口已接通，内部读取编排及 Server wire/冻结校验由合成证据覆盖。目标通过 `sync-code.sh all` 同步后 DSA、Server、Worker 均 healthy；精确 HiThink 分红目录条目为 `not_admitted`，鉴权 HTTP 返回 422 / `not_admitted`，见[事件路径证据](../../evidence/2026-09-29-cont-m31-hithink-dividend-dsa-runtime.md)。本次仅容器可写层更新，镜像未变。下一步在真实身份/币种原文、数字进度语义和历史覆盖证据齐备后执行 M31-b2-target。缺证据时精确路由继续不可准入；M31-a、M31-b2-target 与 G0-H/G-M2-Events 不因本地接线勾选。
 
 M21 接续证据（2026-09-27）：DSA 精确 EastMoney 的股票/ETF × 三口径参数、窗口、来源保留与两种资产失败不切源共 8 项本地测试通过，测试文件 `tests/test_akshare_exact_eastmoney_contract.py`。官方 ETF 文档未明确量额单位；没有猜测换算、生成兼容证明或发起 Provider 请求，M21/G0 仍未完成。细节见 DSA `docs/thesis-ledger-m2-source-gates.md`。
 
-2026-09-29 无 Tushare/RQData 账号后的公开来源续查：[目标窗口只读证据](../../tasks/evidence/2026-09-29-cont-m2-public-source-window.md)。AKShare/EastMoney ETF raw/hfq 对 159516 目标 59 日窗在宿主与目标 DSA 容器均连接失败，停止本组重试；此前四日 raw/hfq 和 59 日 qfq 观察不能互相补齐。Tencent `newfqkline/get` raw 在宿主及目标容器均返回 59 根，短窗 10/10 重叠一致。深交所 2026 年 7 月官方 ETF 月报与腾讯 23 日线的量额合计不一致，不能确认腾讯现有单位换算。该结果只推进 `EX-TX-ETF-N` 的目标窗口读取，原生单位、币种、许可、历史可见性和真实准入仍缺；腾讯没有已登记 hfq 能力。M21、G0-M、G-M2-Price、兼容独立备用及 AC20 继续开放。
+2026-09-29 无 Tushare/RQData 账号后的公开来源续查：[目标窗口只读证据](../../evidence/2026-09-29-cont-m2-public-source-window.md)。AKShare/EastMoney ETF raw/hfq 对 159516 目标 59 日窗在宿主与目标 DSA 容器均连接失败，停止本组重试；此前四日 raw/hfq 和 59 日 qfq 观察不能互相补齐。Tencent `newfqkline/get` raw 在宿主及目标容器均返回 59 根，短窗 10/10 重叠一致。深交所 2026 年 7 月官方 ETF 月报与腾讯 23 日线的量额合计不一致，不能确认腾讯现有单位换算。该结果只推进 `EX-TX-ETF-N` 的目标窗口读取，原生单位、币种、许可、历史可见性和真实准入仍缺；腾讯没有已登记 hfq 能力。M21、G0-M、G-M2-Price、兼容独立备用及 AC20 继续开放。
 
 2026-10-02 用户确认当前使用的 Tushare 免费版本不提供 fund_daily、fund_adj、fund_div 所需能力，要求记录并跳过。M24/M25/M26 及未完成子叶统一保留为 **TODO／当前免费版本不支持／当前跳过**，依赖这些接口的 M32 Tushare 派生路径一并暂停。保留已保存的页面凭据、已完成接线和目标 40203 证据，不勾选父项、不再同条件请求。此版本限制来自用户确认，目标请求直接证明的是权限拒绝，不外推所有免费账号或其他 Tushare 接口。版本或权限明确改变后重新核验；当前顺序跳过上述路径，继续其他来源的独立就绪叶。
 
@@ -793,8 +793,8 @@ M24 拆分执行：
 - [ ] M24-b：**扩展/当前跳过**。接入精确 V3 raw 目录、权限/凭据修订准入和冻结日历覆盖证明；分段传输完成不等于来源或历史交易日覆盖完整，真实 G0 单独验收。
 - [x] M24-b1：提供 Tushare 精确 ETF/none 来源读取入口，显式窗口、独立客户端超时预算、限流拒绝及真实分段数证明；失败不重试、不切源、不返回部分结果。16 项新增及既有回归合计 67 项通过。
 - [x] M24-b2：完成精确入口的 V3 库存/manifest、本地适配/来源/安全凭据修订、分段证明与独立冻结日历覆盖接线；通过隔离 SQLite 到 V3 HTTP 的离线验收，未准入时拒绝。真实权限与来源验收另列 M24-b3。
-- [ ] M24-b3：**扩展/当前跳过**。在目标运行环境核实 fund_daily 的真实权限、目标窗口覆盖和原生单位，按证据写入准入，再执行真实 G0/G-M2-Price；2026-09-29 用户提供的宿主 Token 已经真实探测，`fund_daily` 返回业务码 `40203` 权限拒绝，未向目标写入准入，见[逐接口权限证据](../../tasks/evidence/2026-09-29-cont-m2-tushare-token-permissions.md)。
-  - 2026-10-02 已完成页面配置路径保存及目标实际凭据读取；目标 fund_daily 159516.SZ 限定短窗单次仍为 200/40203，无数据，权限与来源准入仍开放，见[目标配置与权限证据](../../tasks/evidence/2026-10-02-tushare-page-credentials-target.md)。
+- [ ] M24-b3：**扩展/当前跳过**。在目标运行环境核实 fund_daily 的真实权限、目标窗口覆盖和原生单位，按证据写入准入，再执行真实 G0/G-M2-Price；2026-09-29 用户提供的宿主 Token 已经真实探测，`fund_daily` 返回业务码 `40203` 权限拒绝，未向目标写入准入，见[逐接口权限证据](../../evidence/2026-09-29-cont-m2-tushare-token-permissions.md)。
+  - 2026-10-02 已完成页面配置路径保存及目标实际凭据读取；目标 fund_daily 159516.SZ 限定短窗单次仍为 200/40203，无数据，权限与来源准入仍开放，见[目标配置与权限证据](../../evidence/2026-10-02-tushare-page-credentials-target.md)。
 
 M24-b2 验证：已提取并接通 API 分页证明校验，Tushare 独立协议验证最多 32 段、每段最多 366 日的连续窗口、实际段数、行数及摘要，原单页来源仍严格要求一页。目录仅增加 CN ETF/none；内部 HMAC 绑定 Token 与接入地址，执行期间轮换/撤销拒绝结果，同一修订复用限流计数。214 项接线回归与 81 项旧路径/凭据兼容测试通过，主 Task 的真实门禁未通过。日志 `/private/tmp/goal-m24-integrated-final.log`、`/private/tmp/goal-m24-compatibility-retry1.log`。
 
@@ -802,8 +802,8 @@ M25 拆分执行：
 
 - [x] M25-a：实现 fund_adj 有界分段读取与精确 Fetcher 入口；固定标的/窗口，拒绝重复或越界日期、缺字段和非正有限因子，保留十进制文本、观测时间、分段和内容指纹；因子不变造成的常值序列不能自动授予转换资格。25 项新增及既有 raw/V3/凭据/分页回归合计 152 项通过，flake8、py_compile 通过。
 - [ ] M25-b：**扩展/当前跳过**。以独立可靠证据确认基金因子锚点、方向、算法与基础价格的可转换关系，建立精确因子合同、准入和冻结消费。官方接口说明仅确认数值字段时，anchor/upstreamDataRevision 保持未知，不推导历史可见时间；与 M32 的派生序列接线独立验证。
-- [ ] M25-c：**扩展/当前跳过**。逐接口验证真实账号权限、目标因子完整覆盖与同源 raw 对齐；2026-09-29 宿主真实 `fund_adj` 请求返回 `40203` 权限拒绝，未取得因子行，见[逐接口权限证据](../../tasks/evidence/2026-09-29-cont-m2-tushare-token-permissions.md)。
-  - 2026-10-02 目标用已保存页面凭据单次 fund_adj 仍为 200/40203；配置缺口已解除，真实因子权限、锚点/覆盖及同源 raw 对齐未通过，见[目标配置与权限证据](../../tasks/evidence/2026-10-02-tushare-page-credentials-target.md)。
+- [ ] M25-c：**扩展/当前跳过**。逐接口验证真实账号权限、目标因子完整覆盖与同源 raw 对齐；2026-09-29 宿主真实 `fund_adj` 请求返回 `40203` 权限拒绝，未取得因子行，见[逐接口权限证据](../../evidence/2026-09-29-cont-m2-tushare-token-permissions.md)。
+  - 2026-10-02 目标用已保存页面凭据单次 fund_adj 仍为 200/40203；配置缺口已解除，真实因子权限、锚点/覆盖及同源 raw 对齐未通过，见[目标配置与权限证据](../../evidence/2026-10-02-tushare-page-credentials-target.md)。
 
 M29 拆分执行：
 
@@ -819,13 +819,13 @@ M30 子叶：
 - [ ] M29-b：**扩展/当前跳过**。目标 ETF 映射、精确有界读取与准入/冻结消费；不能以净值基金样本证明 ETF 可用。
   - [x] M29-b1：单基金 `fund.get_split` 精确读取、响应行数预算、包含日期索引的原始内容版本、调用前后预算回调与冲突拒绝；读取和标准化合计 36 项离线测试通过。调用方仍须提供已核验代码映射及已配置客户端。
   - [ ] M29-b2：**扩展/当前跳过**。SDK 传输超时、账号身份/凭据修订、目标 ETF 映射、历史覆盖及事件 V3 准入/冻结接线；调用前后预算检查不能替代 SDK 内部阻塞控制。
-    - [x] M29-b2-process：以 spawn 子进程内客户端工厂隔离初始化及精确读取，总期限届满终止子进程；完整标准化结果通过私有临时文件传回，错误文本不跨进程传播。复用 M30 分红读取；真实 SDK 工厂配置、凭据修订和事件路由接入仍独立保留。真实 spawn 13 项通过，含初始化/读取阻塞、崩溃、启动失败、分红结果和子进程清理；见 [进程隔离证据](../../tasks/evidence/2026-09-27-rqdata-process-isolation.md)。
-    - [x] M29-b2-credentials：RQData 已注册到既有 Control 加密配置入口，复用账号清除与版本合同、保留密码原值、公共结果脱敏；实际 SQLite Store 快照进入读取前后 HMAC 校验。新增 13 项、读取/修订组合 30 项及旧 Provider/Control 组合 121 项通过，lint/编译通过；原 12 个 manifest 摘要不变，Control 减少 45 行。官方 DSA 同步、目标 registry HTTP 200、四份源码摘要一致且 healthy；可路由事件能力仍为空。真实证券映射、币种、历史覆盖和事件 V3 接线另验，见 [账号配置证据](../../tasks/evidence/2026-09-27-rqdata-control-credentials.md)。
-    - [x] M29-b2-identity：DSA 已解析当前准入摘要绑定的 ETF 直接映射与独立分红币种证据，并接入账号隔离读取；读前核对身份/能力/范围/冻结截点，读后复核准入、文件及账号修订。新增 46 项、RQData/证据存储组合 193 项及 lint/编译通过；官方 DSA 同步后两份模块导入/源码摘要一致，缺准入拒绝且未读取账号，服务 healthy。准入与 SDK 响应为明确 fixture，真实映射未审核；没有登记事件路由或改变公开 wire。见 [身份证据记录](../../tasks/evidence/2026-09-27-rqdata-identity-evidence.md)。
-    - [x] M29-b2-identity-wire：Schemas 已交付严格映射 bundle、原文引用及事件响应关联合同，绑定准入摘要、精确来源/证券/能力/范围/观察截点，缺原文、重复 JSON 及币种不匹配拒绝。新增 23 项、事件合同合计 52 项，Schemas 最终全包 367 项及构建通过；见 [原文合同与消费证据](../../tasks/evidence/2026-09-27-rqdata-identity-wire-consumer.md)。
-    - [x] M29-b2-identity-consumer：Server Market 原 UTF-8 字节摘要及 1 MiB 预算校验已接入在线选择和离线 Snapshot；实际 Parquet/新 Store 读回、篡改及缺覆盖拒绝通过。新增 9 项、事件/冻结/传输组合 57 项、类型/构建/lint/依赖门禁通过；官方同步后 Server 与 Worker 各五份运行代码摘要一致、受控拒绝探针通过且 healthy。真实来源仍另验，见 [消费证据](../../tasks/evidence/2026-09-27-rqdata-identity-wire-consumer.md)。
+    - [x] M29-b2-process：以 spawn 子进程内客户端工厂隔离初始化及精确读取，总期限届满终止子进程；完整标准化结果通过私有临时文件传回，错误文本不跨进程传播。复用 M30 分红读取；真实 SDK 工厂配置、凭据修订和事件路由接入仍独立保留。真实 spawn 13 项通过，含初始化/读取阻塞、崩溃、启动失败、分红结果和子进程清理；见 [进程隔离证据](../../evidence/2026-09-27-rqdata-process-isolation.md)。
+    - [x] M29-b2-credentials：RQData 已注册到既有 Control 加密配置入口，复用账号清除与版本合同、保留密码原值、公共结果脱敏；实际 SQLite Store 快照进入读取前后 HMAC 校验。新增 13 项、读取/修订组合 30 项及旧 Provider/Control 组合 121 项通过，lint/编译通过；原 12 个 manifest 摘要不变，Control 减少 45 行。官方 DSA 同步、目标 registry HTTP 200、四份源码摘要一致且 healthy；可路由事件能力仍为空。真实证券映射、币种、历史覆盖和事件 V3 接线另验，见 [账号配置证据](../../evidence/2026-09-27-rqdata-control-credentials.md)。
+    - [x] M29-b2-identity：DSA 已解析当前准入摘要绑定的 ETF 直接映射与独立分红币种证据，并接入账号隔离读取；读前核对身份/能力/范围/冻结截点，读后复核准入、文件及账号修订。新增 46 项、RQData/证据存储组合 193 项及 lint/编译通过；官方 DSA 同步后两份模块导入/源码摘要一致，缺准入拒绝且未读取账号，服务 healthy。准入与 SDK 响应为明确 fixture，真实映射未审核；没有登记事件路由或改变公开 wire。见 [身份证据记录](../../evidence/2026-09-27-rqdata-identity-evidence.md)。
+    - [x] M29-b2-identity-wire：Schemas 已交付严格映射 bundle、原文引用及事件响应关联合同，绑定准入摘要、精确来源/证券/能力/范围/观察截点，缺原文、重复 JSON 及币种不匹配拒绝。新增 23 项、事件合同合计 52 项，Schemas 最终全包 367 项及构建通过；见 [原文合同与消费证据](../../evidence/2026-09-27-rqdata-identity-wire-consumer.md)。
+    - [x] M29-b2-identity-consumer：Server Market 原 UTF-8 字节摘要及 1 MiB 预算校验已接入在线选择和离线 Snapshot；实际 Parquet/新 Store 读回、篡改及缺覆盖拒绝通过。新增 9 项、事件/冻结/传输组合 57 项、类型/构建/lint/依赖门禁通过；官方同步后 Server 与 Worker 各五份运行代码摘要一致、受控拒绝探针通过且 healthy。真实来源仍另验，见 [消费证据](../../evidence/2026-09-27-rqdata-identity-wire-consumer.md)。
     - [ ] M29-b2-event-runtime：**扩展/当前跳过**。将 RQData 的精确 cash/split 事件库存、当前 policy/catalog/admission 与已完成身份/账号隔离读取接缝接入 DSA 生产入口；缺准入在读取凭据前拒绝，读后撤销及版本变化拒绝晚到结果。响应携带公开身份原文，历史覆盖保持不完整；本地 HTTP/真实 spawn、目标入口与消费者验证独立于真实账号权限和覆盖准入。
-      - [x] M29-b2-event-runtime-local：生产编排、精确库存、当前 HMAC/SDK 修订、原文与账号隔离接线完成；合并事件亦可读取。新增 11 项、事件组合 33 项、相关回归 166 项及两份 DSA 到 Server 严格合同/摘要验证通过。官方同步后六份源码摘要一致且 healthy；目标两路由未就绪，缺当前准入不读账号，实际 HTTP 均因未应用 V3 策略返回 422。运行时大文件减少 29 行；见 [生产接线证据](../../tasks/evidence/2026-09-27-rqdata-event-runtime.md)。
+      - [x] M29-b2-event-runtime-local：生产编排、精确库存、当前 HMAC/SDK 修订、原文与账号隔离接线完成；合并事件亦可读取。新增 11 项、事件组合 33 项、相关回归 166 项及两份 DSA 到 Server 严格合同/摘要验证通过。官方同步后六份源码摘要一致且 healthy；目标两路由未就绪，缺当前准入不读账号，实际 HTTP 均因未应用 V3 策略返回 422。运行时大文件减少 29 行；见 [生产接线证据](../../evidence/2026-09-27-rqdata-event-runtime.md)。
       - [ ] M29-b2-event-runtime-target：**扩展/当前跳过**。真实审核 ETF 身份/分红币种及逐接口账号权限就绪后，应用匹配目标 V3 策略与当前准入，验证生产鉴权 HTTP 到 Server 消费者的正向 exchange、原字节证据和晚到拒绝。当前目标无 V3 策略/准入，未进行正向请求；目标拒绝测试和本地受控 SDK 不能替代。
 - [ ] M29-c：**扩展/当前跳过**。真实账号权限与独立公告交叉核验，并验证记账与信号边界。
 
@@ -835,8 +835,8 @@ M26 拆分执行：
 - [ ] M26-b：**扩展/当前跳过**。精确有界读取、分页/历史覆盖证明、ETF 与基金代码身份以及事件 V3 准入/冻结消费接线；不能把单次按标的返回当作完整历史。
 - [x] M26-b1：精确 Fetcher 读取入口、共享限流/超时预算、原始金额精度及内容指纹；只按明确基金代码请求，不用公告窗口排除记录；本地行数预算独立于未知上游分页。精确历史请求拒绝 HTTP 重定向，10 项读取测试及标准化/raw/因子/凭据/V3 回归合计 123 项通过。
 - [ ] M26-b2：**扩展/当前跳过**。核实目标 ETF/基金代码对应、上游分页/历史覆盖；接入事件 V3 准入、撤销/修订复核和冻结消费，完整性未知时维持不完整覆盖。读取结果已补齐空响应/窗外事件的内容版本；本批已建立当前准入绑定的精确 ETF 身份/独立分红币种原文合同、Tushare 精确事件库存与 DSA/Server 本地消费，详见 §12.9。公共覆盖仍为 `complete=false`；真实身份审核、账号权限、分页/历史完整性和目标冻结消费未通过，故父叶保持未勾选。
-- [ ] M26-c：**扩展/当前跳过**。真实账号 fund_div 权限、目标事件/日期/金额与独立公告交叉核验；2026-09-29 宿主 `510300.SH` 单基金请求返回 `40203` 权限拒绝，未取得事件行，见[逐接口权限证据](../../tasks/evidence/2026-09-29-cont-m2-tushare-token-permissions.md)。单独验证 M33 记账和信号，不借股票日线权限推断基金事件可用。
-  - 2026-10-02 页面配置保存后目标单次 fund_div 510300.SH 仍为 200/40203，没有事件行；未签发事件准入，不重复同条件请求，见[目标配置与权限证据](../../tasks/evidence/2026-10-02-tushare-page-credentials-target.md)。
+- [ ] M26-c：**扩展/当前跳过**。真实账号 fund_div 权限、目标事件/日期/金额与独立公告交叉核验；2026-09-29 宿主 `510300.SH` 单基金请求返回 `40203` 权限拒绝，未取得事件行，见[逐接口权限证据](../../evidence/2026-09-29-cont-m2-tushare-token-permissions.md)。单独验证 M33 记账和信号，不借股票日线权限推断基金事件可用。
+  - 2026-10-02 页面配置保存后目标单次 fund_div 510300.SH 仍为 200/40203，没有事件行；未签发事件准入，不重复同条件请求，见[目标配置与权限证据](../../evidence/2026-10-02-tushare-page-credentials-target.md)。
 
 M22/M23 接续修复（2026-09-27）：修正 ETF 公告索引误判完整空事件窗口的问题；窗口前公告/窗口内生效及缺少分页完整性均不能由公告日期排除。索引入口保持不完整覆盖，结构化事件适配仍待实施。V2 依赖与行情回归 28 项通过；代码编译、关键错误 lint 和 diff check 通过，未更新目标容器。
 
@@ -868,7 +868,7 @@ M23 拆分执行：
       - [x] M32-b2-store：新增独立完整输入表和 Prisma 仓储，创建/同内容幂等，冲突不覆盖；读取重算并核对算法列。仓储及结构定向 15 项、typecheck/lint、Prisma validate、迁移矩阵和运行时输入检查通过。隔离 PostgreSQL 17 顺序执行全部 19 个迁移得到 68 张表，新表重复键/JSON 身份/缺字段约束测试通过；目标运行态及真实 Provider 消费仍未验收。
       - [x] M32-b2-basis：派生结果转换为现有 SourcePriceBasis，独立记录完整输入/因子指纹及算法版本，显式声明基准范围和分红语义，已验证分红必须附证据。新增 3 项测试，派生模块共 34 项通过；完整输入仓储尚未落地。
       - [x] M32-b2-raw：复用冻结窗口仓储返回契约构造派生输入，核对完整响应哈希、请求关联、原生 raw/原始量语义及读取截点；因子转换必须绑定同一 raw 响应哈希。6 项新增测试，派生模块合计 31 项通过；尚未注册实际 Reader 或持久化派生结果。
-      - [x] M32-b2-clock：修复 raw 观测、Bar、因子和锚点时钟按毫秒比较及输出丢失微秒的问题；新冻结使用 `binary64-v2` 精确时钟修订，旧 `v1` 仍按原指纹/结果读取。[微秒边界证据](../../tasks/evidence/2026-09-28-cont-m32-derived-instant-precision.md)记录修前红例、修后定向及 Server 全包。此项不接入真实因子 Reader、不授予来源或历史 PIT 准入，M32-b2 与父项继续开放。
+      - [x] M32-b2-clock：修复 raw 观测、Bar、因子和锚点时钟按毫秒比较及输出丢失微秒的问题；新冻结使用 `binary64-v2` 精确时钟修订，旧 `v1` 仍按原指纹/结果读取。[微秒边界证据](../../evidence/2026-09-28-cont-m32-derived-instant-precision.md)记录修前红例、修后定向及 Server 全包。此项不接入真实因子 Reader、不授予来源或历史 PIT 准入，M32-b2 与父项继续开放。
   - 覆盖：Spec §5、§8，AC02、AC10、AC20；依赖：C01、S03、M24、M25。
   - 写入：Server Market 的派生序列模块及纯计算测试，不新增虚构 Provider。
   - 完成：从已冻结 raw 与可靠因子/事件得到验证后的 qfq/hfq；记录算法版本、输入引用、基准、因子/事件指纹。转换不成立则拒绝，不能从无因子 qfq 猜 raw 或叠乘跨源复权价格。
@@ -877,20 +877,20 @@ M23 拆分执行：
 - [ ] M33：**扩展/当前跳过**。所需公司行动进入原始记账和事件信号。
   - [x] M33-a：运行时转换保留 effectiveDate/strategyVisibility，事件表达式按冻结交易日与独立可见性求值；信号输入与记账队列分离，归一化可读取信号事实。事件/引擎/归一化回归 30 项、Server 字段转换与快照回归 7 项通过；类型检查、lint、尺寸 ratchet 通过。真实 Provider 与目标运行验收未执行。
   - [x] M33-b：raw 记账按明确 effectiveDate 对应冻结开盘调度，内部 accountingAt 与源 occurredAt/availableAt 分离，预热事件不计入期初持仓。沿用事件严格可用性：晚观测事实拒绝，不移动到窗口外或回填历史时间。缺可见性本身允许记账，信号仍拒绝；冻结派息假设不变。领域定向 16 项、Server 12 项通过，类型检查、lint、边界、尺寸 ratchet 通过；真实事件与目标运行证据仍待 G-M2-Events。
-  - [x] M33-clock-precision：V3 事件依赖计划与原始记账改用完整小数秒比较事实、公告、冻结截点及开盘；非法时间失败关闭，同毫秒晚到的事件不再通过。定向 18 项、Server 类型/构建、lint/格式/边界通过；官方 `sync-code.sh thesis-ledger` 后 Server/Worker healthy 且两份编译模块摘要与宿主一致。仅更新容器可写层，镜像及真实来源门禁未完成，见[精确时间证据](../../tasks/evidence/2026-09-28-cont-m33-event-clock-precision.md)。
-  - [x] M33-signal-clock-precision：V3 执行入口对事件策略信号按实际决策 tick 精确比较事实可用时间和公告时间；同毫秒晚到、非法时间均失败关闭，V2 冻结路径保持原语义。Server/Domain 定向及相邻回归共 41 项、Server 类型/构建、限定 lint/格式、边界通过；官方快更后两目标容器健康、编译摘要一致且各自受控晚到拒绝/相等接受，见[信号时钟证据](../../tasks/evidence/2026-09-28-cont-m33-signal-clock-precision.md)。真实来源与 159516 准入仍未通过。
+  - [x] M33-clock-precision：V3 事件依赖计划与原始记账改用完整小数秒比较事实、公告、冻结截点及开盘；非法时间失败关闭，同毫秒晚到的事件不再通过。定向 18 项、Server 类型/构建、lint/格式/边界通过；官方 `sync-code.sh thesis-ledger` 后 Server/Worker healthy 且两份编译模块摘要与宿主一致。仅更新容器可写层，镜像及真实来源门禁未完成，见[精确时间证据](../../evidence/2026-09-28-cont-m33-event-clock-precision.md)。
+  - [x] M33-signal-clock-precision：V3 执行入口对事件策略信号按实际决策 tick 精确比较事实可用时间和公告时间；同毫秒晚到、非法时间均失败关闭，V2 冻结路径保持原语义。Server/Domain 定向及相邻回归共 41 项、Server 类型/构建、限定 lint/格式、边界通过；官方快更后两目标容器健康、编译摘要一致且各自受控晚到拒绝/相等接受，见[信号时钟证据](../../evidence/2026-09-28-cont-m33-signal-clock-precision.md)。真实来源与 159516 准入仍未通过。
   - 覆盖：Spec §5.1、§9，AC03、AC04、AC08、AC12、AC15；依赖：S06、M22、M23，其他来源按通过单元增加契约样本。
   - 写入：Server Market 事件消费/依赖计划接缝及测试。
   - 完成：按影响窗口请求必要事件，生效记账与策略可用时间分离；沿用冻结派息假设，不声称新建真实结算模型。
   - 验证：V-Server；窗口前公告/窗口内生效、缺可见日期的记账允许但信号拒绝、归一化不重复加现金/数量；PIT 严格性不变。
 
 - [ ] M34：**扩展/当前跳过**。**TODO／当前跳过**：TdxAiData 运行依赖集成。按用户免费优先、否则尝试 a-stock-data 的顺序，后台免费资格未确认且当前原生库不适配；保留已完成核验及剩余验收要求。匿名盘后包和腾讯候选分别记录，不适用本 SDK 阻塞。
-  - [x] M34-sdk-artifact-header：目标 DSA 固定 tdxaidata 1.2.2 的元数据/wheel 各一次读取成功，wheel 摘要匹配；默认 libTdxAiData.so 为 ELF64/e_machine=62（x86_64），目标 aarch64/64位不匹配。只读原字节/加载器核验完成，未安装、导入、执行 SDK；见[固定包架构证据](../../tasks/evidence/2026-10-02-tdxaidata-sdk-architecture.md)。账号申请按用户最新要求独立推进，不替代 SDK/ABI 与真实来源验收。
+  - [x] M34-sdk-artifact-header：目标 DSA 固定 tdxaidata 1.2.2 的元数据/wheel 各一次读取成功，wheel 摘要匹配；默认 libTdxAiData.so 为 ELF64/e_machine=62（x86_64），目标 aarch64/64位不匹配。只读原字节/加载器核验完成，未安装、导入、执行 SDK；见[固定包架构证据](../../evidence/2026-10-02-tdxaidata-sdk-architecture.md)。账号申请按用户最新要求独立推进，不替代 SDK/ABI 与真实来源验收。
   - [ ] M34-sdk-artifact-architecture：**扩展/当前跳过**。剩余 ELF 依赖与加载前核验。原定目标读取、摘要和 ELF 头部分已在 M34-sdk-artifact-header 完成；固定 1.2.2 默认 Linux 库因 CPU 不匹配停止，不再重复下载同一候选。继续条件为厂商提供 CPU 匹配的固定候选，或另行明确目标架构方案；确定新输入后登记 URL、摘要及请求/展开预算，再核对 DT_NEEDED、符号版本和系统库。未完成部分保持开放，不以原字节读取成功授予 ABI、授权或真实行情准入。
-  - [ ] M34-account-key：**扩展/当前跳过**。**当前跳过**。官方后台需付费订阅，未确认免费资格；按用户顺序不继续账号申请。a-stock-data 匿名取样已完成，其本次 ETF 回测接入因合同缺口也暂跳过，见[免费接口实测](../../tasks/evidence/2026-10-02-astockdata-free-path-validation.md)。未创建账号、Key 或购买积分；历史操作见[申请进度](../../tasks/evidence/2026-10-02-tdxaidata-sdk-architecture.md#账号申请进度)。
+  - [ ] M34-account-key：**扩展/当前跳过**。**当前跳过**。官方后台需付费订阅，未确认免费资格；按用户顺序不继续账号申请。a-stock-data 匿名取样已完成，其本次 ETF 回测接入因合同缺口也暂跳过，见[免费接口实测](../../evidence/2026-10-02-astockdata-free-path-validation.md)。未创建账号、Key 或购买积分；历史操作见[申请进度](../../evidence/2026-10-02-tdxaidata-sdk-architecture.md#账号申请进度)。
   - [ ] M34-sdk-preflight：**扩展/当前跳过**。2026-10-02 独立只读核对官方 `tdxaidata` 候选及目标平台。输入限官方 TdxAiData 说明、PyPI 固定版本元数据和一个 wheel、目标 DSA 公开运行时信息；PyPI 元数据一次、wheel 一次，各 15 秒且上限分别 1 MiB/8 MiB。在内存中核验 wheel 摘要、包内 Linux 原生库 ELF 架构及许可说明，不安装、导入或执行下载内容、不调用行情、不读取数据服务 Key、不改镜像或配置。交付为专属来源前置证据；CPU/SDK 不兼容或授权未核实时停止集成，父项和 M27/M28 保持开放。
   - 支持：Spec §4、§14，AC20；依赖：G0-M 中通达信前提已核实、M27、M28。
-  - M34-sdk-preflight 本轮结果：官方后台入口 tdxaidata 已查明，固定候选 1.2.2；目标 Linux aarch64/Python 3.11.16/glibc 2.36，SDK 未安装。固定版本元数据读取成功，唯一 wheel 下载在 TLS 握手阶段超时，原字节/摘要/ELF 架构未核验。停止下载，不以 py3-none-any 标签或 pytdx 替代兼容证明；许可/授权及目标集成仍开放。见[剩余来源前置证据](../../tasks/evidence/2026-10-02-priority2-provider-prerequisites.md)。
+  - M34-sdk-preflight 本轮结果：官方后台入口 tdxaidata 已查明，固定候选 1.2.2；目标 Linux aarch64/Python 3.11.16/glibc 2.36，SDK 未安装。固定版本元数据读取成功，唯一 wheel 下载在 TLS 握手阶段超时，原字节/摘要/ELF 架构未核验。停止下载，不以 py3-none-any 标签或 pytdx 替代兼容证明；许可/授权及目标集成仍开放。见[剩余来源前置证据](../../evidence/2026-10-02-priority2-provider-prerequisites.md)。
   - 写入：K-Infra 的该 SDK 镜像/架构依赖与隔离配置。
   - 完成：固定 SDK、授权方式、CPU/系统库及部署检查；其他来源不依赖 Windows 客户端或通达信进程。
   - 验证：相应目标镜像 SDK 加载和只读请求；依赖未满足保留阻塞，不能用宿主机成功替代目标容器。
@@ -911,7 +911,7 @@ M23 拆分执行：
 
 ## 10. M3：研究辅助能力任务组
 
-本节是必须保留的实施分组，**不是可一次派发或直接勾选的叶子**。P02 已在 DSA [`docs/thesis-ledger-source-capabilities.md`](../../../../daily-stock-analysis/docs/thesis-ledger-source-capabilities.md) §5 为各组建立稳定子编号，并逐叶记录来源、消费者、owner、输入、输出及门禁；该组全部子任务通过后才收敛。盘点完成不能替代适配器和消费者实现。
+本节是必须保留的实施分组，**不是可一次派发或直接勾选的叶子**。P02 已在 DSA [`docs/thesis-ledger-source-capabilities.md`](../../../../daily-stock-analysis/docs/design/thesis-ledger-source-capabilities.md) §5 为各组建立稳定子编号，并逐叶记录来源、消费者、owner、输入、输出及门禁；该组全部子任务通过后才收敛。盘点完成不能替代适配器和消费者实现。
 
 | 分组 | 必须保留的交付范围 | 子任务拆分与完成边界 |
 | --- | --- | --- |
@@ -927,33 +927,33 @@ M23 拆分执行：
 R01–R07 的具体单元依赖 P02、C04、对应来源 G0；涉及价格能力还依赖 S03–S05，涉及界面遵循 §7 共同约束。DSA 只拥有来源适配与测试，主仓消费者只通过现有 Reader/API 读取；同一子任务不包揽 DSA、Server、Desktop 和部署。
 
 - [x] R01.5-pagination：真实基金排行分页与目录消费已由 2026-10-02 第一优先级完成，见 §0.1；历史身份与长期连续可用不属于当前目录成功声明。
-  - [x] R01.5-catalog-consumer：当前 EastMoney 页面与安装版 AKShare 将目标接口限定为开放基金排行，Reader 显式固定 `dt=kf,ft=all`，只投影 `MUTUAL_FUND/OF`；Efinance 0.5.9 缺原生基金目录方法时接入既有有界 Reader，坏分页/超时使该 Provider 原子失败。红例 5 failed/1 passed 后修复，最终 parser/Reader/Catalog/Job 68 项通过，完整 lint/编译及关键门禁通过，见 [本地消费证据](../../tasks/evidence/2026-09-28-cont-r01-5-catalog-consumer.md)。
+  - [x] R01.5-catalog-consumer：当前 EastMoney 页面与安装版 AKShare 将目标接口限定为开放基金排行，Reader 显式固定 `dt=kf,ft=all`，只投影 `MUTUAL_FUND/OF`；Efinance 0.5.9 缺原生基金目录方法时接入既有有界 Reader，坏分页/超时使该 Provider 原子失败。红例 5 failed/1 passed 后修复，最终 parser/Reader/Catalog/Job 68 项通过，完整 lint/编译及关键门禁通过，见 [本地消费证据](../../evidence/2026-09-28-cont-r01-5-catalog-consumer.md)。
   - [x] R01.5-real-source：2026-10-02 修复固定查询后完整基金排行 20481 条/21 页、正式目录 35278 条成功；旧超时记录保留在此前证据。
-2026-09-29 `R02.1/R02.3` 来源选择：依据当前官方股票/基金快照接口和 DSA 现有 Quote Reader，分别固定 HiThink 股票 `a-share-prices-snapshot` 与 ETF `fund-market-snapshot`，并同步 DSA 能力目录；本地适配器及 `not_admitted` 门禁 14 项通过。目标 DSA 对 `600519.SH` 与 `510300.SH` 各一次单标只读请求均 HTTP 200，原响应摘要及独立时钟已记录；只证明该账号当次端点权限。生产 `_realtime_quote` 尚未调用该适配器，ETF 量额单位、长期可用性与目标消费者未验，不关闭 `R02.2/R02.4` 或 G0-H；见[选择证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-selection.md)。
+2026-09-29 `R02.1/R02.3` 来源选择：依据当前官方股票/基金快照接口和 DSA 现有 Quote Reader，分别固定 HiThink 股票 `a-share-prices-snapshot` 与 ETF `fund-market-snapshot`，并同步 DSA 能力目录；本地适配器及 `not_admitted` 门禁 14 项通过。目标 DSA 对 `600519.SH` 与 `510300.SH` 各一次单标只读请求均 HTTP 200，原响应摘要及独立时钟已记录；只证明该账号当次端点权限。生产 `_realtime_quote` 尚未调用该适配器，ETF 量额单位、长期可用性与目标消费者未验，不关闭 `R02.2/R02.4` 或 G0-H；见[选择证据](../../evidence/2026-09-29-cont-r02-hithink-quote-selection.md)。
 
 R02.2/R02.4 按 Spec §3.3 分阶段执行；当前目标 V2 revision 28 与 V3 revision 29 均无 HiThink Quote 路由，生产接通仍需以下独立门禁。现有 Quote 执行会先将完整代码转换为裸代码，不能直接复用给要求完整 `thscode` 的适配器。
 
-- [x] R02-quote-state：DSA Control V2 已用精确 Quote RouteAdmissionV3、当前来源目录、环境凭据 HMAC 与上海日期范围重算 eligible；Runtime 读前读后复核策略、目录、准入版本和凭据，缺证据仍 `not_admitted`。隔离 SQLite 已验证缺证据、范围、撤销、凭据/策略轮换及目录移除；见[本地接线证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。目标准入尚未签发。
-  - [x] R02-quote-state-contract：纯函数已固定两种报价 RouteKey/Target、请求合同与适配器修订，检查证券身份、证据摘要/版本、上海日期范围、有效期、撤销和凭据 HMAC；新增 18 项、相邻共 32 项通过，限定 lint/编译/空白通过。该阶段尚未接入 Control/Runtime，后续接线见本节父项；[准入接缝证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-admission-core.md)。
-- [x] R02.2-runtime：股票精确目标传完整 `thscode`，现有其他 Provider 裸代码合同回归通过；保留来源/双时钟，限流分类、单目标一次调用与读后修订拒绝已验证，见[本地接线证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。
-- [x] R02.4-runtime：ETF 精确目标独立接线，持久 600 秒单标预算与晚到撤销已验证；Quote HTTP 显式保留 `volume=unknown`、`turnoverCurrency=unknown`，错用股票单位返回 502，见[本地接线证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。
-- 2026-09-29 当前 Quote 接线输入的 DSA 官方隔离 `offline-tests` 复试 **7608 passed、1 skipped、4 deselected、626 subtests passed**；首次副本误排除 `src/data/` 造成收集失败，已在唯一输入修复后通过。该结果仅证明离线全包，目标准入和消费者仍开放；见[隔离门禁证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-isolated-offline-gate.md)。
-- [x] R02-quote-consumer：鉴权 DSA V1 Quote HTTP 到 Server 现有 Quote Reader 分别验证股票/ETF 身份、来源、新鲜度、缓存与错误语义。2026-09-29 目标临时窗口中两类精确标的均经真实 Server→DSA HTTP 返回 HiThink 来源、双时钟、单位及非缓存结果，不带令牌的 DSA 请求为 401；撤销后原 Efinance 备用接管。缓存、last-valid、`marketTime=null` 与错误合同另由本地定向测试覆盖，合并证据见[目标窗口](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-target-window.md)和[本地接线](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。持续目标准入、真实凭据修订及晚到并发演练仍归 `R02-quote-target`。
-  - [x] R02-quote-consumer-local：隔离 DSA HTTP 鉴权/真实 Runtime、Server 模拟 DsaClient 的 Quote Reader 正向/缓存/last-valid 错误语义均已验证；`marketTime=null` 与精确来源、ETF 未知单位在两侧保留，见[本地接线证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。真实 Server→目标 DSA 正向链路另见下述临时窗口；目标缓存/错误与持续运行仍需单独验收。
+- [x] R02-quote-state：DSA Control V2 已用精确 Quote RouteAdmissionV3、当前来源目录、环境凭据 HMAC 与上海日期范围重算 eligible；Runtime 读前读后复核策略、目录、准入版本和凭据，缺证据仍 `not_admitted`。隔离 SQLite 已验证缺证据、范围、撤销、凭据/策略轮换及目录移除；见[本地接线证据](../../evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。目标准入尚未签发。
+  - [x] R02-quote-state-contract：纯函数已固定两种报价 RouteKey/Target、请求合同与适配器修订，检查证券身份、证据摘要/版本、上海日期范围、有效期、撤销和凭据 HMAC；新增 18 项、相邻共 32 项通过，限定 lint/编译/空白通过。该阶段尚未接入 Control/Runtime，后续接线见本节父项；[准入接缝证据](../../evidence/2026-09-29-cont-r02-hithink-quote-admission-core.md)。
+- [x] R02.2-runtime：股票精确目标传完整 `thscode`，现有其他 Provider 裸代码合同回归通过；保留来源/双时钟，限流分类、单目标一次调用与读后修订拒绝已验证，见[本地接线证据](../../evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。
+- [x] R02.4-runtime：ETF 精确目标独立接线，持久 600 秒单标预算与晚到撤销已验证；Quote HTTP 显式保留 `volume=unknown`、`turnoverCurrency=unknown`，错用股票单位返回 502，见[本地接线证据](../../evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。
+- 2026-09-29 当前 Quote 接线输入的 DSA 官方隔离 `offline-tests` 复试 **7608 passed、1 skipped、4 deselected、626 subtests passed**；首次副本误排除 `src/data/` 造成收集失败，已在唯一输入修复后通过。该结果仅证明离线全包，目标准入和消费者仍开放；见[隔离门禁证据](../../evidence/2026-09-29-cont-r02-hithink-quote-isolated-offline-gate.md)。
+- [x] R02-quote-consumer：鉴权 DSA V1 Quote HTTP 到 Server 现有 Quote Reader 分别验证股票/ETF 身份、来源、新鲜度、缓存与错误语义。2026-09-29 目标临时窗口中两类精确标的均经真实 Server→DSA HTTP 返回 HiThink 来源、双时钟、单位及非缓存结果，不带令牌的 DSA 请求为 401；撤销后原 Efinance 备用接管。缓存、last-valid、`marketTime=null` 与错误合同另由本地定向测试覆盖，合并证据见[目标窗口](../../evidence/2026-09-29-cont-r02-hithink-quote-target-window.md)和[本地接线](../../evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。持续目标准入、真实凭据修订及晚到并发演练仍归 `R02-quote-target`。
+  - [x] R02-quote-consumer-local：隔离 DSA HTTP 鉴权/真实 Runtime、Server 模拟 DsaClient 的 Quote Reader 正向/缓存/last-valid 错误语义均已验证；`marketTime=null` 与精确来源、ETF 未知单位在两侧保留，见[本地接线证据](../../evidence/2026-09-29-cont-r02-hithink-quote-runtime-local.md)。真实 Server→目标 DSA 正向链路另见下述临时窗口；目标缓存/错误与持续运行仍需单独验收。
 - **已取消（2026-10-08，不计通过）** R02-quote-target：以下保留原计划与未通过原因，不再执行。按官方 infra 入口更新目标代码后，使用各自已审核准入分别验证真实正向请求、撤销/凭据修订及目标消费者；来源时钟、ETF 量额单位和持续可用性分别报告，未核证则保持对应来源不可用。
-  - 2026-09-29 临时窗口：官方 `sync-code.sh all` 后三容器健康、关键源码摘要一致；经用户指定临时替换 AKShare，两个精确标的分别取得 Server→DSA HiThink Quote HTTP 200，撤销后转到原 Efinance 备用，随后 V2 路由恢复且临时准入撤销，详见[目标窗口证据](../../tasks/evidence/2026-09-29-cont-r02-hithink-quote-target-window.md)。真实 Key 修订故障注入、晚到并发撤销、长期可用性和 ETF 原生量额单位未核；本叶及 G0-H 保持开放。
+  - 2026-09-29 临时窗口：官方 `sync-code.sh all` 后三容器健康、关键源码摘要一致；经用户指定临时替换 AKShare，两个精确标的分别取得 Server→DSA HiThink Quote HTTP 200，撤销后转到原 Efinance 备用，随后 V2 路由恢复且临时准入撤销，详见[目标窗口证据](../../evidence/2026-09-29-cont-r02-hithink-quote-target-window.md)。真实 Key 修订故障注入、晚到并发撤销、长期可用性和 ETF 原生量额单位未核；本叶及 G0-H 保持开放。
 
-2026-09-29 `R02.17` 只读候选核对：官方通用 `get_price` 可作为 CN ETF/1d/none 的单一历史 Bar 候选，消费现有 `MarketBarWindowReaderV3`；[证据](../../tasks/evidence/2026-09-29-cont-r02-17-rqdata-etf-bar-selection.md)已同步 DSA 能力目录。真实行情权限、证券身份、原生量额单位和历史覆盖未核，`R02.17`/`R02.18` 均未完成，不开放生产路由或目标准入。
+2026-09-29 `R02.17` 只读候选核对：官方通用 `get_price` 可作为 CN ETF/1d/none 的单一历史 Bar 候选，消费现有 `MarketBarWindowReaderV3`；[证据](../../evidence/2026-09-29-cont-r02-17-rqdata-etf-bar-selection.md)已同步 DSA 能力目录。真实行情权限、证券身份、原生量额单位和历史覆盖未核，`R02.17`/`R02.18` 均未完成，不开放生产路由或目标准入。
 
-- [x] R02.18-contract：DSA 纯 `get_price` CN ETF/1d/none 请求与 DataFrame 校验合同已实现；严格身份形状、日期/重复、OHLC、行预算、十进制精度及请求与全行指纹，量额单位未知、覆盖不完整。专属 14 项通过，限定 flake8/语法通过；未调用 SDK/账号、注册库存或准入。见[本地合同证据](../../tasks/evidence/2026-09-29-cont-r02-18-rqdata-etf-daily-contract.md)。
-- [x] R02.18-process：DSA 已抽取原事件 `spawn` 传输并复用到 ETF 日线单窗口读取；初始化、SDK、标准化与解码共用总期限，超时清理、失败脱敏与 8 MiB 响应预算已验证。新真实 `spawn` 16 项、原事件 13 项及相邻组合 85 项通过，限定 flake8/语法通过；不接账号、准入或生产入口。见[隔离进程证据](../../tasks/evidence/2026-09-29-cont-r02-18-rqdata-etf-process.md)。
+- [x] R02.18-contract：DSA 纯 `get_price` CN ETF/1d/none 请求与 DataFrame 校验合同已实现；严格身份形状、日期/重复、OHLC、行预算、十进制精度及请求与全行指纹，量额单位未知、覆盖不完整。专属 14 项通过，限定 flake8/语法通过；未调用 SDK/账号、注册库存或准入。见[本地合同证据](../../evidence/2026-09-29-cont-r02-18-rqdata-etf-daily-contract.md)。
+- [x] R02.18-process：DSA 已抽取原事件 `spawn` 传输并复用到 ETF 日线单窗口读取；初始化、SDK、标准化与解码共用总期限，超时清理、失败脱敏与 8 MiB 响应预算已验证。新真实 `spawn` 16 项、原事件 13 项及相邻组合 85 项通过，限定 flake8/语法通过；不接账号、准入或生产入口。见[隔离进程证据](../../evidence/2026-09-29-cont-r02-18-rqdata-etf-process.md)。
 - [ ] R02.18-runtime：**扩展/当前跳过**。在真实账号修订、证券映射与单位证据具备后，消费 R02.18-process，接入精确 Bar 库存、当前准入及现有 Reader；生产读取前后复核账号/准入/来源修订，整窗拒绝部分结果。依赖 R02.18-process 与相应 G0-M，不借事件权限推断行情权限。
 - [ ] R02.18-target：**扩展/当前跳过**。目标环境核对真实账号 `get_price` 权限、ETF 身份、原生量额单位、交易日覆盖与修订，再按官方 infra 入口验证鉴权 Data V3→Server Reader→冻结重放；严格 PIT 另验。依赖 R02.18-runtime 与真实 G0-M。
 
 2026-09-29 目标状态只读核对：DSA Control 的 `rqdata` 投影为 `configured=false`、`credentialConfigured=false`、`capabilities={}`；容器健康不能替代账号与逐接口权限。`RQ-HIST` 门禁已将旧“接口/Consumer 待选”改为官方 `get_price × CN ETF × 1d/none` 候选，仍不执行真实请求、不接生产 Bar 路由。
 
-- [x] R02-Tencent-amount：DSA 精确腾讯日 Bar 路径在缺原生成交额时整窗拒绝，不再把 `close × volume` 补值当作真实金额。公开 `510300.SH` 同一短窗 `none/qfq` 各一次返回 12 行六字段；红例修前 1 failed，修后相邻 58 passed、限定 lint/编译和官方 syntax/critical flake8 通过。官方离线全包首次 1 项无关 PID 文件竞态失败，定向复核通过，唯一全包复试 7557 passed/1 skipped/4 deselected；官方 `sync-code.sh dsa` 目标健康、源码摘要一致，容器同窗实际拒绝。完整范围见[原生成交额证据](../../tasks/evidence/2026-09-29-cont-r02-tencent-native-amount.md)。只关闭本精确失败语义叶，腾讯真实来源准入仍开放。
-- [x] R02-Tencent-native：既有腾讯精确 Bar 入口消费 `newfqkline/get` 的原生成交额字段，普通 `fqkline/get` 路径保留。单标、`none/qfq`、逐年分段、量额与状态校验及总期限已实现，适配/分页修订升至 v2；相邻 119 项、官方离线全包 7574 项、官方 DSA 快更及容器短窗实读通过。详见[原生成交额接线证据](../../tasks/evidence/2026-09-29-cont-r02-tencent-newfqkline-native-amount.md)。真实来源单位、完整覆盖、使用条款与准入归 G0-M，未因本叶完成而通过。
+- [x] R02-Tencent-amount：DSA 精确腾讯日 Bar 路径在缺原生成交额时整窗拒绝，不再把 `close × volume` 补值当作真实金额。公开 `510300.SH` 同一短窗 `none/qfq` 各一次返回 12 行六字段；红例修前 1 failed，修后相邻 58 passed、限定 lint/编译和官方 syntax/critical flake8 通过。官方离线全包首次 1 项无关 PID 文件竞态失败，定向复核通过，唯一全包复试 7557 passed/1 skipped/4 deselected；官方 `sync-code.sh dsa` 目标健康、源码摘要一致，容器同窗实际拒绝。完整范围见[原生成交额证据](../../evidence/2026-09-29-cont-r02-tencent-native-amount.md)。只关闭本精确失败语义叶，腾讯真实来源准入仍开放。
+- [x] R02-Tencent-native：既有腾讯精确 Bar 入口消费 `newfqkline/get` 的原生成交额字段，普通 `fqkline/get` 路径保留。单标、`none/qfq`、逐年分段、量额与状态校验及总期限已实现，适配/分页修订升至 v2；相邻 119 项、官方离线全包 7574 项、官方 DSA 快更及容器短窗实读通过。详见[原生成交额接线证据](../../evidence/2026-09-29-cont-r02-tencent-newfqkline-native-amount.md)。真实来源单位、完整覆盖、使用条款与准入归 G0-M，未因本叶完成而通过。
 
 - [x] G-M3：基础价格变更及其余登记单元的扩展/待验证状态已对账，见 §0.1 和 DSA 能力目录；未宣称全部在线。
   - 依赖：P02、G0-R、R01–R07 的全部实施子任务；R08 按明确激活条件；所有者：能力目录验收执行者。
@@ -1296,7 +1296,7 @@ F01-a 本地完成：主仓新增 `scripts/market-v3-contract-probe.mjs` 与独�
 - A01-cfg-bind：候选按实际引用信号重建同坐标别名，保留冻结协议；移除信号可运行，跨标的及超预热预算仍在 Market 读取前拒绝。幂等重放按候选配置匹配，原实验配置不变。相关 15 项定向测试通过。
 - A02：提示词只投影开发/验证允许指标，封存与未知字段不透传；失败类别区分数据、协议、策略适用性及真实亏损；SDK 本地 HTTP 捕获实际请求。真实 Provider/封存数据库生命周期仍待验收。
 - A03-r：风险编译职责提取，真实成本预览及非法绝对价格/模拟数量约束保留；风险 Service 从 618 行收至 595 行，11 项定向测试通过。
-- U02：HiThink 预设只填充无目标路由，显式预览/应用，沿用唯一保存入口。浏览器内存夹具验证取消、目录变化、凭据可用性变化及重新预览；详情见[浏览器证据](../../tasks/evidence/2026-09-26-hithink-preset-browser.md)。不是目标 API 保存或真实 Provider 验收。
+- U02：HiThink 预设只填充无目标路由，显式预览/应用，沿用唯一保存入口。浏览器内存夹具验证取消、目录变化、凭据可用性变化及重新预览；详情见[浏览器证据](../../evidence/2026-09-26-hithink-preset-browser.md)。不是目标 API 保存或真实 Provider 验收。
 - U04-a/b：请求合并、查询键、请求世代、历史补页、最新检查和分段重试按口径隔离。三口径挂载及并发取消相关 20 项测试通过。交互 V3 协议、Server 图表路由与可用性选择器尚未完成。
 - U05-ai：候选对比页展示实验冻结研究协议，固定快照明确不构成严格无前视样本外验证；旧/无效配置不推断历史性质。4 项定向测试通过；目标界面验收仍开放。
 - G-Math：固定阈值策略的独立参考对照及事件 golden 达标，见该门禁记录。
@@ -1324,15 +1324,15 @@ F01-a 本地完成：主仓新增 `scripts/market-v3-contract-probe.mjs` 与独�
 
 用户授权完成目录恢复、U04 与 G-UI；保留三仓 dirty WIP，不提交、推送或发布。Canonical 已完成范围与有效高成本证据复用。本轮来源请求只在合同或失败前提有依据变化后执行明确预算，不重置历史盲重试额度。
 
-- [x] R01.5-request-contract：开放基金排行改为已核实的 `op=ph` 与整次固定上海日期窗口，保留查询及逐页原文摘要；完整真实 Reader 20481条/21页、33.41秒成功。定向组合88项及限定 lint、官方 syntax/critical 通过；历史失败预算与历史目录门禁保留。见[本轮证据](../../tasks/evidence/2026-10-02-priority1-catalog-ui.md)。
-- [x] R01.2-sina-catalog：新增新浪精确 ETF 节点的有界 Reader，AKShare Catalog 显式消费该集合；普通计数→完整列表→普通计数均1693，包含 `sz159516`。HTTP、期限、重复字段/身份、错场所/代码、截断、计数变化及来源级失败语义已验证；固定 JSONP 包装不执行脚本。见[本轮证据](../../tasks/evidence/2026-10-02-priority1-catalog-ui.md)。
-- [x] R01-catalog-target：官方 `sync-code.sh dsa` 成功，目标连续两次正式 Job 发布 generation29/30；最新 Job 已由 Server 投影并 ACK，目录35278条、159516.SZ活跃且可确认。Efinance股票失败仍记录 `catalog_provider_unavailable`；无手工数据库修补。仅证明本次连续恢复，不提升为长期来源或历史目录验收。见[本轮证据](../../tasks/evidence/2026-10-02-priority1-catalog-ui.md)。
+- [x] R01.5-request-contract：开放基金排行改为已核实的 `op=ph` 与整次固定上海日期窗口，保留查询及逐页原文摘要；完整真实 Reader 20481条/21页、33.41秒成功。定向组合88项及限定 lint、官方 syntax/critical 通过；历史失败预算与历史目录门禁保留。见[本轮证据](../../evidence/2026-10-02-priority1-catalog-ui.md)。
+- [x] R01.2-sina-catalog：新增新浪精确 ETF 节点的有界 Reader，AKShare Catalog 显式消费该集合；普通计数→完整列表→普通计数均1693，包含 `sz159516`。HTTP、期限、重复字段/身份、错场所/代码、截断、计数变化及来源级失败语义已验证；固定 JSONP 包装不执行脚本。见[本轮证据](../../evidence/2026-10-02-priority1-catalog-ui.md)。
+- [x] R01-catalog-target：官方 `sync-code.sh dsa` 成功，目标连续两次正式 Job 发布 generation29/30；最新 Job 已由 Server 投影并 ACK，目录35278条、159516.SZ活跃且可确认。Efinance股票失败仍记录 `catalog_provider_unavailable`；无手工数据库修补。仅证明本次连续恢复，不提升为长期来源或历史目录验收。见[本轮证据](../../evidence/2026-10-02-priority1-catalog-ui.md)。
 - [x] U04-target-interactions：按 Spec §1.1 完成真实三口径、扩窗、失败恢复、备源披露及配置不变；NAV 分段隔离通过，当前不可用净值未计作正向验收。
 - [x] G-UI-priority1：共同价格 Browser/Console 与独立目标 API 验收完成；CDP 网络采集权限被拒绝，停止该项且不作为基础功能阻塞。
 
 规划预检：两条本地来源叶可实施；目标刷新依赖真实完整读取，U04 实际交互依赖行情窗口准入，备用依赖真实兼容证明。没有将来源恢复与全部 UI 验收合并为一个实施叶。
 
-执行结果：前三叶已完成；Server 对159516.SZ准入短窗返回59条真实qfq，默认较大窗口及none/hfq不可用。浏览器现有STOCK持仓的三口径均显示中文禁用原因，Network为chart-options 200，Console无警告/错误；前后 Run 配置及结果摘要一致。真实可用口径切换、扩窗、NAV与兼容备用的完整正向矩阵仍缺有效来源/证明，U04/G-UI两叶及父项保持开放；细节和接续输入见[本轮证据](../../tasks/evidence/2026-10-02-priority1-catalog-ui.md)。
+执行结果：前三叶已完成；Server 对159516.SZ准入短窗返回59条真实qfq，默认较大窗口及none/hfq不可用。浏览器现有STOCK持仓的三口径均显示中文禁用原因，Network为chart-options 200，Console无警告/错误；前后 Run 配置及结果摘要一致。真实可用口径切换、扩窗、NAV与兼容备用的完整正向矩阵仍缺有效来源/证明，U04/G-UI两叶及父项保持开放；细节和接续输入见[本轮证据](../../evidence/2026-10-02-priority1-catalog-ui.md)。
 
 - [x] U04-wire：独立图表交互请求/响应 Schema；依赖现有 C01/C04 价格与 RouteKey 契约。schemas 新增用途、必需目标 pin、身份/日期窗口关联及实际边界验证。新旧契约定向 17 项通过、Schema build 通过；允许未收盘/未知而完整回测窗口仍拒绝。真实运行态归 G-UI/G-Deploy。
 - [x] U04-dsa：独立交互端点，复用精确 V3 runtime，保留真实观测时间；依赖 U04-wire。新模块 `api/thesis_ledger_chart_v3.py` 与 app 挂载、15 项交互测试及协议/变更文档完成；连同原 V3 与目标 pin 回归共 56 项通过。当前仅 CN 日线，不扩展其他市场收盘推断；无真实 Provider 请求，真实部署门禁仍开放。
@@ -1342,20 +1342,20 @@ F01-a 本地完成：主仓新增 `scripts/market-v3-contract-probe.mjs` 与独�
   - [x] U04-server-options：逐口径可用性与中文原因已接线；基础主源不可用时可由已配置同口径备源整窗替换，并披露实际来源。
     - [x] 逐口径可用性：独立 options 契约、Server 查询与 API Client 接入完成；校验生效配置、目录、凭据、准入和额度，定向 4 项通过。
     - [x] 备用来源：共同价格整窗备用完成；算法/坐标等价证明只用于实际依赖转换的扩展功能。
-      - [x] U04-backup-selector：图表选择器与 Reader 内部接缝完成；核对目标对、窗口、实际价格事实及有效期，只消费等价证明，策略修订变化立即终止。新增 14 项测试，连同 Reader/详情共 28 项通过；不接收 HTTP 客户端证明。详见 [备用整窗选择证据](../../tasks/evidence/2026-09-26-chart-v3-backup-selector.md)。
+      - [x] U04-backup-selector：图表选择器与 Reader 内部接缝完成；核对目标对、窗口、实际价格事实及有效期，只消费等价证明，策略修订变化立即终止。新增 14 项测试，连同 Reader/详情共 28 项通过；不接收 HTTP 客户端证明。详见 [备用整窗选择证据](../../evidence/2026-09-26-chart-v3-backup-selector.md)。
       - [ ] U04-backup-evidence：**扩展/当前跳过**。部署侧证明供给已实现，真实审核证据生产、目标挂载与撤销演练、来源验收尚未完成；不能由目录状态或响应自行签发证明。
         - [x] U04-proof-package：只读证明包 repository、成对配置、摘要固定、精确查找、限额及撤销完成，无数据库迁移，不生成真实证明。
-        - [x] U04-proof-consumer：Reader/Module 注册证明供给，备用调用前后重查；主源成功不读取文件。图表定向 50 项通过，详见 [证明供给证据](../../tasks/evidence/2026-09-26-chart-v3-proof-package.md)。
+        - [x] U04-proof-consumer：Reader/Module 注册证明供给，备用调用前后重查；主源成功不读取文件。图表定向 50 项通过，详见 [证明供给证据](../../evidence/2026-09-26-chart-v3-proof-package.md)。
         - [ ] U04-proof-runtime：**扩展/当前跳过**。准备经审核的真实来源证明包，按 infra 入口部署只读文件，验证真实备用、撤销与策略修订变化；未执行，不由合成测试替代。
         - [x] U04-backup-options：主源不可用时基础 qfq options 返回 availableVia=backup，真实腾讯备源读取和目标界面通过。
-          - [x] U04-options-window-api：成对精确获取日期、逐口径证明查询、窗口回显与备用标记已完成；API Client 传递窗口并校验标的/窗口关联。不触发行情读取，图表 Server 57 项、API Client 34 项通过，详见 [剩余任务与本轮记录](../../tasks/evidence/2026-09-26-remaining-work-current.md)。
-          - [x] U04-options-window-ui：首次读取由 Server 共用算法规划预热窗口，客户端先规划再固定日期读取并核对返回窗口；选择缓存按计划参数隔离。切换口径保留条数与指标，扩窗无证明即时禁用。Desktop 509 项、Server 1249 项、DSA 56 项及合成目录浏览器交互通过；目标全链路仍归真实门禁。见 [目标执行记录](../../tasks/evidence/2026-09-26-goal-execution.md)。
+          - [x] U04-options-window-api：成对精确获取日期、逐口径证明查询、窗口回显与备用标记已完成；API Client 传递窗口并校验标的/窗口关联。不触发行情读取，图表 Server 57 项、API Client 34 项通过，详见 [剩余任务与本轮记录](../../evidence/2026-09-26-remaining-work-current.md)。
+          - [x] U04-options-window-ui：首次读取由 Server 共用算法规划预热窗口，客户端先规划再固定日期读取并核对返回窗口；选择缓存按计划参数隔离。切换口径保留条数与指标，扩窗无证明即时禁用。Desktop 509 项、Server 1249 项、DSA 56 项及合成目录浏览器交互通过；目标全链路仍归真实门禁。见 [目标执行记录](../../evidence/2026-09-26-goal-execution.md)。
 - [x] U04-ui（已拆分）：逐口径中文选择、失败原因、只读入口与运行配置隔离完成；目标 Web 已验收。
   - [x] U04-ui-isolation：详情合并及图表页过滤按 V3 获取批次隔离；新批次替换旧价格及指标，其他分段保留；旧/V3 请求进行中去重键分开。相关定向验证通过，Desktop 类型检查通过；界面入口由逐口径能力查询驱动。
   - [x] U04-ui-window：V3 历史加载完整扩窗，刷新及分段重试重读整窗；请求键隔离协议与窗口，保留取消和请求世代。挂载测试覆盖 90→180 根、最新刷新、分段重试；扩窗显示加载状态。
   - [x] U04-ui-options：现有 Select 与 TanStack Query 接入逐口径状态和中文原因；状态读取失败禁用选择。合成目录浏览器验证切换、禁用、凭据恢复/失效及运行配置隔离；目标服务与 Electron 验收仍归 G-UI。
 
-本轮详细证据见 [图表 V3 本地实施记录](../../tasks/evidence/2026-09-26-chart-v3-local.md)。上述本地叶关闭不代表 U04 父项或完整 Task 完成；备用兼容、真实运行态及 M2/M3 继续开放。
+本轮详细证据见 [图表 V3 本地实施记录](../../evidence/2026-09-26-chart-v3-local.md)。上述本地叶关闭不代表 U04 父项或完整 Task 完成；备用兼容、真实运行态及 M2/M3 继续开放。
 
 预检：上述叶子保留 AC10/AC11/AC15/AC19，按契约→适配→消费顺序执行；本地结果不关闭真实数据与运行态门禁。主代理顺序实施，codex-cost 保持禁用。
 
@@ -1367,9 +1367,9 @@ F01-a 本地完成：主仓新增 `scripts/market-v3-contract-probe.mjs` 与独�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-window-discovery-0928 | 给出独立历史决策窗口的可实施契约和最小分叶 | 已有重建合同、内容、时钟、预检及冻结门禁 | 仅 `docs/tasks/evidence/2026-09-28-s05-window-discovery.md`；源码、日历和 Spec 只读，不构建或运行数据库 | s05_window_discovery_0928 / 主仓 | /root/s05_window_discovery_0928 | closed | worker_done | [历史窗口提案](../../tasks/evidence/2026-09-28-s05-window-discovery.md)；明确 v2 历史证据区、7 个实现叶、实际日历一致性与旧严格 V3 安全边界；无源码/运行态修改，推荐边界已写回 Spec §6 |
-| REM-frontier-discovery-0928 | 从完整剩余台账确定可独立执行的下一前沿 | 当前剩余工作清单和 DSA 能力登记 | 仅 `docs/tasks/evidence/2026-09-28-remaining-frontier.md`；三仓源码和文档只读，不运行 Provider/浏览器/数据库 | remaining_frontier_0928 / 主仓 | /root/remaining_frontier_0928 | closed | worker_done | [前沿核对](../../tasks/evidence/2026-09-28-remaining-frontier.md)；产物 56 行、空白检查通过。就绪项为 F02 目录状态文档；M26-b2 缺身份/币种，R01.5 Catalog 缺基金/ETF 分类合同；M25/M32 缺锚点/修订，现有来源和真实门禁阻塞保留 |
-| F02-capability-status-0928 | DSA 能力登记准确呈现已完成本地实现及仍待真实准入的单元 | REM-frontier-discovery-0928；既有实现/证据 | DSA `docs/thesis-ledger-source-capabilities.md`；主仓 `docs/tasks/evidence/2026-09-28-f02-capability-status.md`；无可变运行资源 | f02_capability_status_0928 / DSA 与主仓证据 | /root/f02_capability_status_0928 | closed | worker_done | [目录状态证据](../../tasks/evidence/2026-09-28-f02-capability-status.md)；摘要及 R01.5/R01.10/R07.25/R07.26 对齐现有证据，116 固定编号和四列表不变；链接/中文/空白/diff check 通过，无服务请求；F02/AC20 保持开放 |
+| S05-window-discovery-0928 | 给出独立历史决策窗口的可实施契约和最小分叶 | 已有重建合同、内容、时钟、预检及冻结门禁 | 仅 `docs/evidence/2026-09-28-s05-window-discovery.md`；源码、日历和 Spec 只读，不构建或运行数据库 | s05_window_discovery_0928 / 主仓 | /root/s05_window_discovery_0928 | closed | worker_done | [历史窗口提案](../../evidence/2026-09-28-s05-window-discovery.md)；明确 v2 历史证据区、7 个实现叶、实际日历一致性与旧严格 V3 安全边界；无源码/运行态修改，推荐边界已写回 Spec §6 |
+| REM-frontier-discovery-0928 | 从完整剩余台账确定可独立执行的下一前沿 | 当前剩余工作清单和 DSA 能力登记 | 仅 `docs/evidence/2026-09-28-remaining-frontier.md`；三仓源码和文档只读，不运行 Provider/浏览器/数据库 | remaining_frontier_0928 / 主仓 | /root/remaining_frontier_0928 | closed | worker_done | [前沿核对](../../evidence/2026-09-28-remaining-frontier.md)；产物 56 行、空白检查通过。就绪项为 F02 目录状态文档；M26-b2 缺身份/币种，R01.5 Catalog 缺基金/ETF 分类合同；M25/M32 缺锚点/修订，现有来源和真实门禁阻塞保留 |
+| F02-capability-status-0928 | DSA 能力登记准确呈现已完成本地实现及仍待真实准入的单元 | REM-frontier-discovery-0928；既有实现/证据 | DSA `docs/thesis-ledger-source-capabilities.md`；主仓 `docs/evidence/2026-09-28-f02-capability-status.md`；无可变运行资源 | f02_capability_status_0928 / DSA 与主仓证据 | /root/f02_capability_status_0928 | closed | worker_done | [目录状态证据](../../evidence/2026-09-28-f02-capability-status.md)；摘要及 R01.5/R01.10/R07.25/R07.26 对齐现有证据，116 固定编号和四列表不变；链接/中文/空白/diff check 通过，无服务请求；F02/AC20 保持开放 |
 
 恢复预检：两项均为有界发现任务，写入和可变资源互不相交，输入稳定；发现结果由协调者转为 Spec/Task 契约后才能启动依赖实现。`worker_done` 仅表示叶子局部完成；整体和目标运行态尚未验收。
 
@@ -1379,11 +1379,11 @@ F01-a 本地完成：主仓新增 `scripts/market-v3-contract-probe.mjs` 与独�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-window-schema-0928 | 重建清单 v2 及有界历史原文/日历/见证结构合同 | Spec §6 边界已确定；S05-window-discovery-0928 | Schemas 新 `src/market-pit-historical-evidence-v1.ts`、`test/market-pit-historical-evidence-v1.test.ts`；既有 `src/market-pit-reconstruction-v3.ts`、对应 test、`src/index.ts`；主仓独立 evidence；Schemas test/typecheck/build 输出独占 | s05_window_schema_0928 / 主仓 | /root/s05_window_schema_0928 | closed | worker_done | [共享合同证据](../../tasks/evidence/2026-09-28-s05-window-schema.md)；65/65 定向、Schemas typecheck/build、格式/空白通过，结构335行/重建250行，dist 导出就绪；v1 API保留、v2新增联合解析绑定，不授真实历史资格 |
-| S05-calendar-package-parser-0928 | 固定原发布及源码树复算 XSHG 日历投影 | S05-window-schema-0928；S05-calendar-parser-discovery-0928；Spec §6 首批解析器 | Market 新 `market-pit-calendar-package-v1.ts`、`market-pit-calendar-package-source-v1.ts`、`market-pit-calendar-package-projection-v1.ts`；对应三份新 test；独立 evidence；Server 定向 Vitest 资源独占 | s05_calendar_package_parser_0928 / 主仓 | /root/s05_calendar_package_parser_0928 | closed | worker_done | [原包解析证据](../../tasks/evidence/2026-09-28-s05-calendar-package-parser.md)；3文件/76项定向、实际PyPI原文/93源码与修复后Schema记录结构联合验证、213306字节wheel内存摘要、lint/格式通过；不授场所/来源/最终PIT资格，无新增fixtures |
-| S05-old-strict-v3-guard-0928 | finalized 严格 V3 在最终验证器未就绪时拒绝重放及幂等 finalize 绕过 | Spec §6 旧严格快照安全边界；现有 Store 稳定源码、Schemas dist就绪 | `apps/server/src/backtest/backtest-snapshot-v3-store.ts`；新 `backtest-snapshot-v3-validation.ts` 与 `backtest-snapshot-v3-pit-guard.ts`；新 `apps/server/test/backtest/v3-strict-snapshot-replay-guard.test.ts`；独立 evidence；Vitest cache关闭/不构建/独立临时Artifact前缀 | s05_old_strict_v3_guard_0928 / 主仓 | /root/s05_old_strict_v3_guard_0928 | closed | worker_done | [旧严格快照保护证据](../../tasks/evidence/2026-09-28-s05-old-strict-v3-guard.md)；4文件/16项定向及旧版本回归、lint/格式/空白通过；finalize/replay及persisted严格→候选降级均拒绝，load和原字节保留；Store293→274行，无真实运行态验收 |
-| S05-schema-empty-source-0928 | 真实固定包的两个零字节源码可表示，同时保持非空发布原文及全部身份约束 | parser真实93文件输入揭示缺口；schema原会话closed | Schemas `src/market-pit-historical-evidence-v1.ts`、对应test；独立evidence；Schemas定向/typecheck；build待Server定向资源释放 | s05_schema_empty_source_0928 / 主仓 | /root/s05_schema_empty_source_0928 | closed | worker_done | [空源码修复证据](../../tasks/evidence/2026-09-28-s05-schema-empty-source.md)；66项定向、Schemas typecheck/格式/空白通过；只允许制品rawBase64空串，来源原文保持非空；源码摘要1c941c3d…，dist刷新待集成 |
-| S05-calendar-parser-discovery-0928 | 选择可核验的首批真实发布资料解析器与投影绑定规则 | Spec §6；现有 R01.10 日历发布输入 | 仅 `docs/tasks/evidence/2026-09-28-s05-calendar-parser-discovery.md`；现有 DSA 日历/发布源码与官方资料只读；不读同时修改的 Schema，不测试/构建/部署 | s05_calendar_parser_discovery_0928 / 主仓 | /root/s05_calendar_parser_discovery_0928 | closed | worker_done | [解析器输入证据](../../tasks/evidence/2026-09-28-s05-calendar-parser-discovery.md)；真实 PyPI JSON/wheel/93 源码树已只读核对，首批 XSHG/2026 专用解析器可实施；场所原文和 XSHE 独立证据缺失，不赋予目标159516资格 |
+| S05-window-schema-0928 | 重建清单 v2 及有界历史原文/日历/见证结构合同 | Spec §6 边界已确定；S05-window-discovery-0928 | Schemas 新 `src/market-pit-historical-evidence-v1.ts`、`test/market-pit-historical-evidence-v1.test.ts`；既有 `src/market-pit-reconstruction-v3.ts`、对应 test、`src/index.ts`；主仓独立 evidence；Schemas test/typecheck/build 输出独占 | s05_window_schema_0928 / 主仓 | /root/s05_window_schema_0928 | closed | worker_done | [共享合同证据](../../evidence/2026-09-28-s05-window-schema.md)；65/65 定向、Schemas typecheck/build、格式/空白通过，结构335行/重建250行，dist 导出就绪；v1 API保留、v2新增联合解析绑定，不授真实历史资格 |
+| S05-calendar-package-parser-0928 | 固定原发布及源码树复算 XSHG 日历投影 | S05-window-schema-0928；S05-calendar-parser-discovery-0928；Spec §6 首批解析器 | Market 新 `market-pit-calendar-package-v1.ts`、`market-pit-calendar-package-source-v1.ts`、`market-pit-calendar-package-projection-v1.ts`；对应三份新 test；独立 evidence；Server 定向 Vitest 资源独占 | s05_calendar_package_parser_0928 / 主仓 | /root/s05_calendar_package_parser_0928 | closed | worker_done | [原包解析证据](../../evidence/2026-09-28-s05-calendar-package-parser.md)；3文件/76项定向、实际PyPI原文/93源码与修复后Schema记录结构联合验证、213306字节wheel内存摘要、lint/格式通过；不授场所/来源/最终PIT资格，无新增fixtures |
+| S05-old-strict-v3-guard-0928 | finalized 严格 V3 在最终验证器未就绪时拒绝重放及幂等 finalize 绕过 | Spec §6 旧严格快照安全边界；现有 Store 稳定源码、Schemas dist就绪 | `apps/server/src/backtest/backtest-snapshot-v3-store.ts`；新 `backtest-snapshot-v3-validation.ts` 与 `backtest-snapshot-v3-pit-guard.ts`；新 `apps/server/test/backtest/v3-strict-snapshot-replay-guard.test.ts`；独立 evidence；Vitest cache关闭/不构建/独立临时Artifact前缀 | s05_old_strict_v3_guard_0928 / 主仓 | /root/s05_old_strict_v3_guard_0928 | closed | worker_done | [旧严格快照保护证据](../../evidence/2026-09-28-s05-old-strict-v3-guard.md)；4文件/16项定向及旧版本回归、lint/格式/空白通过；finalize/replay及persisted严格→候选降级均拒绝，load和原字节保留；Store293→274行，无真实运行态验收 |
+| S05-schema-empty-source-0928 | 真实固定包的两个零字节源码可表示，同时保持非空发布原文及全部身份约束 | parser真实93文件输入揭示缺口；schema原会话closed | Schemas `src/market-pit-historical-evidence-v1.ts`、对应test；独立evidence；Schemas定向/typecheck；build待Server定向资源释放 | s05_schema_empty_source_0928 / 主仓 | /root/s05_schema_empty_source_0928 | closed | worker_done | [空源码修复证据](../../evidence/2026-09-28-s05-schema-empty-source.md)；66项定向、Schemas typecheck/格式/空白通过；只允许制品rawBase64空串，来源原文保持非空；源码摘要1c941c3d…，dist刷新待集成 |
+| S05-calendar-parser-discovery-0928 | 选择可核验的首批真实发布资料解析器与投影绑定规则 | Spec §6；现有 R01.10 日历发布输入 | 仅 `docs/evidence/2026-09-28-s05-calendar-parser-discovery.md`；现有 DSA 日历/发布源码与官方资料只读；不读同时修改的 Schema，不测试/构建/部署 | s05_calendar_parser_discovery_0928 / 主仓 | /root/s05_calendar_parser_discovery_0928 | closed | worker_done | [解析器输入证据](../../evidence/2026-09-28-s05-calendar-parser-discovery.md)；真实 PyPI JSON/wheel/93 源码树已只读核对，首批 XSHG/2026 专用解析器可实施；场所原文和 XSHE 独立证据缺失，不赋予目标159516资格 |
 
 待结构/解析器就绪后依次锁定 Market 原文核验、逐 Bar 窗口、repository、预检、冻结、离线重验的独占写入与局部检查；不提前派发依赖任务。完整依赖预检若缺实际日历投影检查，独立分叶补齐。最终将实际数据库、目标同步/摘要、合格真实来源、Worker 与浏览器验收保留为独立门禁，原卡点预算不重置。
 
@@ -1395,10 +1395,10 @@ F01-a 本地完成：主仓新增 `scripts/market-v3-contract-probe.mjs` 与独�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-window-local-integration-0928 | 稳定最终源码的Schemas/Server回归、类型/构建和受影响仓库门禁 | schema/空源码/parser/旧严格guard均worker_done；无源文件writer | 仅 `docs/tasks/evidence/2026-09-28-s05-window-local-integration.md`；Schemas/Server测试与构建输出、静态门禁资源独占；源码只读 | s05_window_local_integration_0928 / 主仓 | /root/s05_window_local_integration_0928 | closed | blocked | [集成检查点](../../tasks/evidence/2026-09-28-s05-window-local-integration.md)；Schemas42文件/433项、Server222文件/1624项通过，另23文件/81项跳过；Schemas typecheck通过，Server typecheck失败于owned parser test139/142行字面量推断过窄；未重试、未build/高层门禁，15个输入hash无漂移且资源释放；修复另用fresh会话 |
-| S05-parser-test-types-0928 | 修复负向解析器测试夹具的字符串类型推断 | local-integration发现TS2322，已停止checks；源实现不变 | 仅 `apps/server/test/market/market-pit-calendar-package-v1.test.ts` 和独立evidence；Server定向/typecheck资源 | s05_parser_test_types_0928 / 主仓 | /root/s05_parser_test_types_0928 | closed | worker_done | [测试类型证据](../../tasks/evidence/2026-09-28-s05-parser-test-types.md)；JS前后摘要同为810c06c5…，完整字节相同；定向75通过/1公开输入条件跳过，Server typecheck/lint/格式通过。script忽略文件参数意外全包1624通过/81跳过，已记录范围偏差；实际原包76通过证据因JS未变继续有效 |
-| S05-window-local-gates-0928 | 完成类型修复后的构建及仓库门禁，核对最终证据适用性 | local-integration已有包级通过；parser-test-types类型修复/JS不变/Server typecheck通过；全部source writer已停 | 仅 `docs/tasks/evidence/2026-09-28-s05-window-local-gates.md`；Server build/静态门禁输出独占，源码只读 | s05_window_local_gates_0928 / 主仓 | /root/s05_window_local_gates_0928 | closed | blocked | [门禁检查点](../../tasks/evidence/2026-09-28-s05-window-local-gates.md)；Server build、边界/8包依赖/普通lint/空白/文档链接通过，15个输入无漂移；新Schema refinement复杂度66、manifest绑定27超过20，需语义拆分；13无基线尺寸警告保留，资源已释放 |
-| S05-evidence-complexity-0928 | 按日历结构、引用关联和逐Bar/清单绑定职责拆分超限校验 | local-gates精确66/27缺口；外部合同及全部现有拒绝语义不变 | Schemas既有 `market-pit-historical-evidence-v1.ts`、`market-pit-reconstruction-v3.ts`；新 `market-pit-calendar-structure-v1.ts`、`market-pit-historical-references-v1.ts`、`market-pit-historical-bar-bindings-v1.ts`、`market-pit-reconstruction-manifest-validation-v3.ts`；独立evidence；Schemas测试/type/build、Server typecheck独占 | s05_evidence_complexity_0928 / 主仓 | /root/s05_evidence_complexity_0928 | closed | worker_done | [复杂度证据](../../tasks/evidence/2026-09-28-s05-evidence-complexity.md)；历史refinement66→2、旧v1必要binder27→7；49函数最高19/有效行最高43，严格20零warning；定向66项、Schemas433项/type/build、Server typecheck通过；13只读输入无漂移，进程停止、dist稳定；受影响Server回归/build待后续集成 |
+| S05-window-local-integration-0928 | 稳定最终源码的Schemas/Server回归、类型/构建和受影响仓库门禁 | schema/空源码/parser/旧严格guard均worker_done；无源文件writer | 仅 `docs/evidence/2026-09-28-s05-window-local-integration.md`；Schemas/Server测试与构建输出、静态门禁资源独占；源码只读 | s05_window_local_integration_0928 / 主仓 | /root/s05_window_local_integration_0928 | closed | blocked | [集成检查点](../../evidence/2026-09-28-s05-window-local-integration.md)；Schemas42文件/433项、Server222文件/1624项通过，另23文件/81项跳过；Schemas typecheck通过，Server typecheck失败于owned parser test139/142行字面量推断过窄；未重试、未build/高层门禁，15个输入hash无漂移且资源释放；修复另用fresh会话 |
+| S05-parser-test-types-0928 | 修复负向解析器测试夹具的字符串类型推断 | local-integration发现TS2322，已停止checks；源实现不变 | 仅 `apps/server/test/market/market-pit-calendar-package-v1.test.ts` 和独立evidence；Server定向/typecheck资源 | s05_parser_test_types_0928 / 主仓 | /root/s05_parser_test_types_0928 | closed | worker_done | [测试类型证据](../../evidence/2026-09-28-s05-parser-test-types.md)；JS前后摘要同为810c06c5…，完整字节相同；定向75通过/1公开输入条件跳过，Server typecheck/lint/格式通过。script忽略文件参数意外全包1624通过/81跳过，已记录范围偏差；实际原包76通过证据因JS未变继续有效 |
+| S05-window-local-gates-0928 | 完成类型修复后的构建及仓库门禁，核对最终证据适用性 | local-integration已有包级通过；parser-test-types类型修复/JS不变/Server typecheck通过；全部source writer已停 | 仅 `docs/evidence/2026-09-28-s05-window-local-gates.md`；Server build/静态门禁输出独占，源码只读 | s05_window_local_gates_0928 / 主仓 | /root/s05_window_local_gates_0928 | closed | blocked | [门禁检查点](../../evidence/2026-09-28-s05-window-local-gates.md)；Server build、边界/8包依赖/普通lint/空白/文档链接通过，15个输入无漂移；新Schema refinement复杂度66、manifest绑定27超过20，需语义拆分；13无基线尺寸警告保留，资源已释放 |
+| S05-evidence-complexity-0928 | 按日历结构、引用关联和逐Bar/清单绑定职责拆分超限校验 | local-gates精确66/27缺口；外部合同及全部现有拒绝语义不变 | Schemas既有 `market-pit-historical-evidence-v1.ts`、`market-pit-reconstruction-v3.ts`；新 `market-pit-calendar-structure-v1.ts`、`market-pit-historical-references-v1.ts`、`market-pit-historical-bar-bindings-v1.ts`、`market-pit-reconstruction-manifest-validation-v3.ts`；独立evidence；Schemas测试/type/build、Server typecheck独占 | s05_evidence_complexity_0928 / 主仓 | /root/s05_evidence_complexity_0928 | closed | worker_done | [复杂度证据](../../evidence/2026-09-28-s05-evidence-complexity.md)；历史refinement66→2、旧v1必要binder27→7；49函数最高19/有效行最高43，严格20零warning；定向66项、Schemas433项/type/build、Server typecheck通过；13只读输入无漂移，进程停止、dist稳定；受影响Server回归/build待后续集成 |
 
 ### 下一前沿发现
 
@@ -1406,8 +1406,8 @@ F01-a 本地完成：主仓新增 `scripts/market-v3-contract-probe.mjs` 与独�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-venue-parser-discovery-0928 | 确定精确证券场所原文及可登记的机器核验边界 | Spec §6；固定日历解析器发现；不读在写 Schema | 仅 `docs/tasks/evidence/2026-09-28-s05-venue-parser-discovery.md`；官方资料只读、有界网络；无构建、业务或目标请求 | s05_venue_parser_discovery_0928 / 主仓 | /root/s05_venue_parser_discovery_0928 | closed | worker_done | [场所原文证据](../../tasks/evidence/2026-09-28-s05-venue-parser-discovery.md)；两份官方原文446976字节离线摘要通过，4次查询/2候选零重试；仅证明首次上市事件，2026持续场所、日级公开真实性与XSHE日历缺口保留，不授严格资格 |
-| M3-r02-r03-frontier-0928 | 确定补充行情/报价及净值登记单元的下一可执行本地叶子 | 完整 Spec/Task 与 DSA 登记及稳定源码 | 仅 `docs/tasks/evidence/2026-09-28-m3-r02-r03-frontier.md`；三仓只读，不网络/测试/构建 | m3_r02_r03_frontier_0928 / 主仓与DSA | /root/m3_r02_r03_frontier_0928 | closed | worker_done | [38单元对账](../../tasks/evidence/2026-09-28-m3-r02-r03-frontier.md)；R02.11精确身份及R02.13行选择两个就绪叶，R03事实/合同仍阻塞；路径/ID/空白检查通过，无运行请求 |
+| S05-venue-parser-discovery-0928 | 确定精确证券场所原文及可登记的机器核验边界 | Spec §6；固定日历解析器发现；不读在写 Schema | 仅 `docs/evidence/2026-09-28-s05-venue-parser-discovery.md`；官方资料只读、有界网络；无构建、业务或目标请求 | s05_venue_parser_discovery_0928 / 主仓 | /root/s05_venue_parser_discovery_0928 | closed | worker_done | [场所原文证据](../../evidence/2026-09-28-s05-venue-parser-discovery.md)；两份官方原文446976字节离线摘要通过，4次查询/2候选零重试；仅证明首次上市事件，2026持续场所、日级公开真实性与XSHE日历缺口保留，不授严格资格 |
+| M3-r02-r03-frontier-0928 | 确定补充行情/报价及净值登记单元的下一可执行本地叶子 | 完整 Spec/Task 与 DSA 登记及稳定源码 | 仅 `docs/evidence/2026-09-28-m3-r02-r03-frontier.md`；三仓只读，不网络/测试/构建 | m3_r02_r03_frontier_0928 / 主仓与DSA | /root/m3_r02_r03_frontier_0928 | closed | worker_done | [38单元对账](../../evidence/2026-09-28-m3-r02-r03-frontier.md)；R02.11精确身份及R02.13行选择两个就绪叶，R03事实/合同仍阻塞；路径/ID/空白检查通过，无运行请求 |
 
 ### 捕获原文及指数选择实施
 
@@ -1415,9 +1415,9 @@ F01-a 本地完成：主仓新增 `scripts/market-v3-contract-probe.mjs` 与独�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-source-capture-parser-0928 | 捕获原文与真实完整归档身份/摘要/原fetchedAt绑定 | Spec §6登记合同；稳定历史Schema与content输出 | Market新 `market-pit-source-capture-v1.ts`、可选新 `market-pit-evidence-instant-v1.ts`；新 `test/market/market-pit-source-capture-v1.test.ts`；独立 evidence；Server无cache定向资源 | s05_source_capture_parser_0928 / 主仓 | /root/s05_source_capture_parser_0928 | closed | worker_done | [捕获原文证据](../../tasks/evidence/2026-09-28-s05-source-capture-parser.md)；145/62行新模块、57项定向及strict lint/格式通过，精确亚毫秒/原字节/重复键/身份绑定；所有process停止，仅source-capture-bound，生产分派与真实资格仍未接 |
-| R02-11-index-identity-0928 | 新浪指数只消费唯一精确代码行 | M3-r02-r03-frontier；既有六个映射/Consumer；Spec §3.3 | DSA新 `data_provider/sina_index_identity.py`、`tests/test_sina_index_identity.py`；既有 `data_provider/akshare_fetcher.py`仅get_main_indices；主仓独立evidence；定向Python无pycache/lint无cache | r02_11_index_identity_0928 / DSA | /root/r02_11_index_identity_0928 | closed | worker_done | [新浪身份证据](../../tasks/evidence/2026-09-28-r02-11-index-identity.md)；5离线测试含Manager/Fetcher/Analyzer接缝、AST通过；2638→2633行，局部diff仅方法；系统缺pandas改已有venv通过，ruff未安装未执行，SDK/网络封锁；真实R02.11/G0-M仍开放 |
-| R02-13-index-row-selection-0928 | Tushare指数按精确身份/窗口/唯一日期选最新原行 | M3-r02-r03-frontier；当前SDK字段核对；Spec §3.3 | DSA新 `data_provider/tushare_index_daily_rows.py`、`tests/test_tushare_index_daily_rows.py`；既有 `data_provider/tushare_fetcher.py`仅get_main_indices；主仓独立evidence；定向Python无pycache/lint无cache | r02_13_index_row_selection_0928 / DSA | /root/r02_13_index_row_selection_0928 | closed | needs_split | [前置检查点](../../tasks/evidence/2026-09-28-r02-13-index-row-selection.md)；动态SDK无本地字段声明，未实施、未测试，1354行不变、进程结束；官方字段随后由协调者补齐，接续另用新会话 |
+| S05-source-capture-parser-0928 | 捕获原文与真实完整归档身份/摘要/原fetchedAt绑定 | Spec §6登记合同；稳定历史Schema与content输出 | Market新 `market-pit-source-capture-v1.ts`、可选新 `market-pit-evidence-instant-v1.ts`；新 `test/market/market-pit-source-capture-v1.test.ts`；独立 evidence；Server无cache定向资源 | s05_source_capture_parser_0928 / 主仓 | /root/s05_source_capture_parser_0928 | closed | worker_done | [捕获原文证据](../../evidence/2026-09-28-s05-source-capture-parser.md)；145/62行新模块、57项定向及strict lint/格式通过，精确亚毫秒/原字节/重复键/身份绑定；所有process停止，仅source-capture-bound，生产分派与真实资格仍未接 |
+| R02-11-index-identity-0928 | 新浪指数只消费唯一精确代码行 | M3-r02-r03-frontier；既有六个映射/Consumer；Spec §3.3 | DSA新 `data_provider/sina_index_identity.py`、`tests/test_sina_index_identity.py`；既有 `data_provider/akshare_fetcher.py`仅get_main_indices；主仓独立evidence；定向Python无pycache/lint无cache | r02_11_index_identity_0928 / DSA | /root/r02_11_index_identity_0928 | closed | worker_done | [新浪身份证据](../../evidence/2026-09-28-r02-11-index-identity.md)；5离线测试含Manager/Fetcher/Analyzer接缝、AST通过；2638→2633行，局部diff仅方法；系统缺pandas改已有venv通过，ruff未安装未执行，SDK/网络封锁；真实R02.11/G0-M仍开放 |
+| R02-13-index-row-selection-0928 | Tushare指数按精确身份/窗口/唯一日期选最新原行 | M3-r02-r03-frontier；当前SDK字段核对；Spec §3.3 | DSA新 `data_provider/tushare_index_daily_rows.py`、`tests/test_tushare_index_daily_rows.py`；既有 `data_provider/tushare_fetcher.py`仅get_main_indices；主仓独立evidence；定向Python无pycache/lint无cache | r02_13_index_row_selection_0928 / DSA | /root/r02_13_index_row_selection_0928 | closed | needs_split | [前置检查点](../../evidence/2026-09-28-r02-13-index-row-selection.md)；动态SDK无本地字段声明，未实施、未测试，1354行不变、进程结束；官方字段随后由协调者补齐，接续另用新会话 |
 
 ### 补齐稳定合同后的接续叶子
 
@@ -1425,9 +1425,9 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| R02-13-index-row-implementation-0928 | 已确认官方字段后的精确最新行实现 | 原前置检查点结束；官方 index_daily 字段声明；Spec §3.3 | 原R02.13相同精确write set；新evidence `2026-09-28-r02-13-index-row-implementation.md`；定向Python无cache | r02_13_index_row_implementation_0928 / DSA | /root/r02_13_index_row_implementation_0928 | closed | worker_done | [行选择证据](../../tasks/evidence/2026-09-28-r02-13-index-row-implementation.md)；新10/旧5项无skip、AST/关键flake8及新文件完整lint通过；1354→1351行，仅方法接缝；未授实时/权限，无网络/部署 |
-| S05-manifest-v2-content-0928 | 既有真实归档内容门禁支持v2必要合同 | 稳定Schemas433/type/build；v1 binder行为保留 | 仅Market `market-pit-reconstruction-content-v3.ts`、新 `test/market/market-pit-reconstruction-content-v2.test.ts`；新evidence `2026-09-28-s05-manifest-v2-content.md`；无cache定向及Server typecheck | s05_manifest_v2_content_0928 / 主仓 | /root/s05_manifest_v2_content_0928 | closed | worker_done | [v2内容证据](../../tasks/evidence/2026-09-28-s05-manifest-v2-content.md)；5文件67项、Server typecheck、strict lint/格式通过，原内容行为/错误顺序保留；154行、e831152a…；v2必要链可达source-times-bound，生产仍无最终资格 |
-| S05-daily-window-math-0928 | 复算逐Bar完整收盘与真实后继开盘并核对精确源时钟 | v2内容/来源时钟和固定日历parser稳定；source-capture精确瞬时helper稳定 | Market新 `market-pit-decision-window-v3.ts`、可选新 `market-pit-decision-window-calendar-v3.ts`；新 `test/market/market-pit-decision-window-v3.test.ts`；新evidence `2026-09-28-s05-daily-window-math.md`；无cache定向/typecheck | s05_daily_window_math_0928 / 主仓 | /root/s05_daily_window_math_0928 | closed | needs_split | [窗口检查点](../../tasks/evidence/2026-09-28-s05-daily-window-math.md)；保留222/128行草稿与test，最初34项10失败，原始schema8项时段冲突；已撤回临时v1绕行，最终v2草稿未复验，ownedlint复杂度26/unused两项仍失败，旧版type结果不适用；进程停止，修复依赖后fresh接续，不算完成 |
+| R02-13-index-row-implementation-0928 | 已确认官方字段后的精确最新行实现 | 原前置检查点结束；官方 index_daily 字段声明；Spec §3.3 | 原R02.13相同精确write set；新evidence `2026-09-28-r02-13-index-row-implementation.md`；定向Python无cache | r02_13_index_row_implementation_0928 / DSA | /root/r02_13_index_row_implementation_0928 | closed | worker_done | [行选择证据](../../evidence/2026-09-28-r02-13-index-row-implementation.md)；新10/旧5项无skip、AST/关键flake8及新文件完整lint通过；1354→1351行，仅方法接缝；未授实时/权限，无网络/部署 |
+| S05-manifest-v2-content-0928 | 既有真实归档内容门禁支持v2必要合同 | 稳定Schemas433/type/build；v1 binder行为保留 | 仅Market `market-pit-reconstruction-content-v3.ts`、新 `test/market/market-pit-reconstruction-content-v2.test.ts`；新evidence `2026-09-28-s05-manifest-v2-content.md`；无cache定向及Server typecheck | s05_manifest_v2_content_0928 / 主仓 | /root/s05_manifest_v2_content_0928 | closed | worker_done | [v2内容证据](../../evidence/2026-09-28-s05-manifest-v2-content.md)；5文件67项、Server typecheck、strict lint/格式通过，原内容行为/错误顺序保留；154行、e831152a…；v2必要链可达source-times-bound，生产仍无最终资格 |
+| S05-daily-window-math-0928 | 复算逐Bar完整收盘与真实后继开盘并核对精确源时钟 | v2内容/来源时钟和固定日历parser稳定；source-capture精确瞬时helper稳定 | Market新 `market-pit-decision-window-v3.ts`、可选新 `market-pit-decision-window-calendar-v3.ts`；新 `test/market/market-pit-decision-window-v3.test.ts`；新evidence `2026-09-28-s05-daily-window-math.md`；无cache定向/typecheck | s05_daily_window_math_0928 / 主仓 | /root/s05_daily_window_math_0928 | closed | needs_split | [窗口检查点](../../evidence/2026-09-28-s05-daily-window-math.md)；保留222/128行草稿与test，最初34项10失败，原始schema8项时段冲突；已撤回临时v1绕行，最终v2草稿未复验，ownedlint复杂度26/unused两项仍失败，旧版type结果不适用；进程停止，修复依赖后fresh接续，不算完成 |
 
 ### 稳定 DSA 输出的组合验证
 
@@ -1435,14 +1435,14 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| M3-index-local-regression-0928 | 稳定指数选择修复的组合回归与适用Python门禁 | R02.11及R02.13实施worker_done，DSA source writer全部停止 | 仅主仓evidence `2026-09-28-m3-index-local-regression.md`；DSA既有venv定向/适用包级测试，禁止pycache/lintcache；源码只读 | m3_index_local_regression_0928 / DSA | /root/m3_index_local_regression_0928 | closed | worker_done | [组合回归证据](../../tasks/evidence/2026-09-28-m3-index-local-regression.md)；指数46项/扩展mock41项无skip/无网络，完整新增flake8/存量关键flake8/6AST/空白通过；6hash不变，2633/1351行；初次扩展logging验证封装错误3失败，撤销封装后同范围通过；全包/真实层未执行，进程停止 |
+| M3-index-local-regression-0928 | 稳定指数选择修复的组合回归与适用Python门禁 | R02.11及R02.13实施worker_done，DSA source writer全部停止 | 仅主仓evidence `2026-09-28-m3-index-local-regression.md`；DSA既有venv定向/适用包级测试，禁止pycache/lintcache；源码只读 | m3_index_local_regression_0928 / DSA | /root/m3_index_local_regression_0928 | closed | worker_done | [组合回归证据](../../evidence/2026-09-28-m3-index-local-regression.md)；指数46项/扩展mock41项无skip/无网络，完整新增flake8/存量关键flake8/6AST/空白通过；6hash不变，2633/1351行；初次扩展logging验证封装错误3失败，撤销封装后同范围通过；全包/真实层未执行，进程停止 |
 
 ### R04–R07 独立发现
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-| M3-r04-r07-frontier-0928 | 核对研究资料/财务/资金流/资讯各登记单元的本地可执行前沿 | 完整Spec、能力登记及稳定DSA代码；不得读在写Market文件 | 仅 `docs/tasks/evidence/2026-09-28-m3-r04-r07-frontier.md`；三仓只读，无测试/build/网络/目标资源 | m3_r04_r07_frontier_0928 / 主仓与DSA | /root/m3_r04_r07_frontier_0928 | closed | needs_split | [63项对账](../../tasks/evidence/2026-09-28-m3-r04-r07-frontier.md)；全覆盖/路径/编号/表格/空白通过，ready=0；R05.1/R06.12缺单endpoint日期/字段/单位合同，龙虎榜日期/用途也待核；持仓与RQData不重做，无运行资源 |
+| M3-r04-r07-frontier-0928 | 核对研究资料/财务/资金流/资讯各登记单元的本地可执行前沿 | 完整Spec、能力登记及稳定DSA代码；不得读在写Market文件 | 仅 `docs/evidence/2026-09-28-m3-r04-r07-frontier.md`；三仓只读，无测试/build/网络/目标资源 | m3_r04_r07_frontier_0928 / 主仓与DSA | /root/m3_r04_r07_frontier_0928 | closed | needs_split | [63项对账](../../evidence/2026-09-28-m3-r04-r07-frontier.md)；全覆盖/路径/编号/表格/空白通过，ready=0；R05.1/R06.12缺单endpoint日期/字段/单位合同，龙虎榜日期/用途也待核；持仓与RQData不重做，无运行资源 |
 
 ### 日历投影与 Schema 接缝修复
 
@@ -1450,7 +1450,7 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-calendar-schema-timezone-0928 | Schema按声明时区核对当地日期/分钟，真实UTC投影可重绑 | daily-window报告的确切producer/consumer冲突；Spec时刻语义补齐 | Schemas `src/market-pit-calendar-structure-v1.ts`、新 `test/market-pit-calendar-timezone-v1.test.ts`、既有历史证据/重建test仅合法时段fixture修正；Server新 `test/market/market-pit-calendar-schema-interoperability.test.ts`；新evidence `2026-09-28-s05-calendar-schema-timezone.md`；Schemas定向/全包/type/build、Server联合test/type独占 | s05_calendar_schema_timezone_0928 / 主仓 | /root/s05_calendar_schema_timezone_0928 | closed | worker_done | [时区联合证据](../../tasks/evidence/2026-09-28-s05-calendar-schema-timezone.md)；97行/413c3feb…，UTC/+08绝对瞬时同义，本地日期/整分钟/无损小数/排序要求保留；定向84项、Schemas451/type/build、Server真实原包联合82无skip及typecheck通过；strict lint零warning；原fixture未动，旧433证据被刷新，窗口草稿仍未完成 |
+| S05-calendar-schema-timezone-0928 | Schema按声明时区核对当地日期/分钟，真实UTC投影可重绑 | daily-window报告的确切producer/consumer冲突；Spec时刻语义补齐 | Schemas `src/market-pit-calendar-structure-v1.ts`、新 `test/market-pit-calendar-timezone-v1.test.ts`、既有历史证据/重建test仅合法时段fixture修正；Server新 `test/market/market-pit-calendar-schema-interoperability.test.ts`；新evidence `2026-09-28-s05-calendar-schema-timezone.md`；Schemas定向/全包/type/build、Server联合test/type独占 | s05_calendar_schema_timezone_0928 / 主仓 | /root/s05_calendar_schema_timezone_0928 | closed | worker_done | [时区联合证据](../../evidence/2026-09-28-s05-calendar-schema-timezone.md)；97行/413c3feb…，UTC/+08绝对瞬时同义，本地日期/整分钟/无损小数/排序要求保留；定向84项、Schemas451/type/build、Server真实原包联合82无skip及typecheck通过；strict lint零warning；原fixture未动，旧433证据被刷新，窗口草稿仍未完成 |
 
 ### 待依赖修复后的窗口收敛与验证
 
@@ -1458,8 +1458,8 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-daily-window-finish-0928 | 在正确UTC/local Schema上完成窗口草稿并消除owned lint失败 | timezone修复局部通过且输出稳定；旧window会话closed | 既有两份新窗口source、新 `market-pit-decision-window-source-v3.ts`（必要时按源时钟职责）；既有新window test；新evidence `2026-09-28-s05-daily-window-finish.md`；Server定向/type资源 | s05_daily_window_finish_0928 / 主仓 | /root/s05_daily_window_finish_0928 | closed | worker_done | [窗口计算证据](../../tasks/evidence/2026-09-28-s05-daily-window-finish.md)；172/128/147行语义模块，42项本叶及4文件87项关联、typecheck/strict lint/格式通过；完整v2绑定不绕行，归档重新hash/作用域/refs/精确clock/最后successor/不改原时间；仅decision-windows-bound，无最终PIT，进程已停止 |
-| S05-final-local-regression-0928 | 验证最终稳定Schemas/Market/Store与适用仓库门禁 | 全部本批实现/修复worker_done、无source writer；DSA组合已通过 | 仅evidence `2026-09-28-s05-final-local-regression.md`；Server全包/type/build及相关仓库门禁独占；源码只读 | s05_final_local_regression_0928 / 主仓 | /root/s05_final_local_regression_0928 | closed | blocked | [稳定回归检查点](../../tasks/evidence/2026-09-28-s05-final-local-regression.md)；Server1736通过/88跳过，50项输入无漂移；新增JSONB诊断测试165行TS2375，typecheck失败即停，build及高层门禁未执行；进程已停止 |
+| S05-daily-window-finish-0928 | 在正确UTC/local Schema上完成窗口草稿并消除owned lint失败 | timezone修复局部通过且输出稳定；旧window会话closed | 既有两份新窗口source、新 `market-pit-decision-window-source-v3.ts`（必要时按源时钟职责）；既有新window test；新evidence `2026-09-28-s05-daily-window-finish.md`；Server定向/type资源 | s05_daily_window_finish_0928 / 主仓 | /root/s05_daily_window_finish_0928 | closed | worker_done | [窗口计算证据](../../evidence/2026-09-28-s05-daily-window-finish.md)；172/128/147行语义模块，42项本叶及4文件87项关联、typecheck/strict lint/格式通过；完整v2绑定不绕行，归档重新hash/作用域/refs/精确clock/最后successor/不改原时间；仅decision-windows-bound，无最终PIT，进程已停止 |
+| S05-final-local-regression-0928 | 验证最终稳定Schemas/Market/Store与适用仓库门禁 | 全部本批实现/修复worker_done、无source writer；DSA组合已通过 | 仅evidence `2026-09-28-s05-final-local-regression.md`；Server全包/type/build及相关仓库门禁独占；源码只读 | s05_final_local_regression_0928 / 主仓 | /root/s05_final_local_regression_0928 | closed | blocked | [稳定回归检查点](../../evidence/2026-09-28-s05-final-local-regression.md)；Server1736通过/88跳过，50项输入无漂移；新增JSONB诊断测试165行TS2375，typecheck失败即停，build及高层门禁未执行；进程已停止 |
 
 ### I01 已有失败的根因发现
 
@@ -1467,13 +1467,13 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| I01-jsonb-hash-discovery-0928 | 从已有失败证据确定完整响应摘要往返失配根因 | Worker联通证据/跳过复现与稳定hash/Reader/repository源码 | 仅evidence `2026-09-28-i01-jsonb-hash-discovery.md`；源码只读，无测试/DB/Provider/网络/运行态 | i01_jsonb_hash_discovery_0928 / 主仓 | /root/i01_jsonb_hash_discovery_0928 | closed | needs_split | [静态排除证据](../../tasks/evidence/2026-09-28-i01-jsonb-hash-discovery.md)；71行，排除Schema默认/Date回填/未排序直接hash假设；保留浮点但未证实精度假设，缺字段/位模式差异；未测试/查询DB，预算未重置，无已证明修复叶 |
+| I01-jsonb-hash-discovery-0928 | 从已有失败证据确定完整响应摘要往返失配根因 | Worker联通证据/跳过复现与稳定hash/Reader/repository源码 | 仅evidence `2026-09-28-i01-jsonb-hash-discovery.md`；源码只读，无测试/DB/Provider/网络/运行态 | i01_jsonb_hash_discovery_0928 / 主仓 | /root/i01_jsonb_hash_discovery_0928 | closed | needs_split | [静态排除证据](../../evidence/2026-09-28-i01-jsonb-hash-discovery.md)；71行，排除Schema默认/Date回填/未排序直接hash假设；保留浮点但未证实精度假设，缺字段/位模式差异；未测试/查询DB，预算未重置，无已证明修复叶 |
 
 下一项是独立的合成 SQL/驱动调查：不创建业务任务、不使用 Provider、Reader、队列或 Worker，不查询目标业务库，不执行原失败 gate。只在本轮新隔离 PostgreSQL 上，通过实际 Prisma 驱动执行表无关 `SELECT`，对严格响应 fixture 的完整 JSONB 回读做字段路径/类型/IEEE 位模式比较，并与显式文本回读对照。此诊断最多一次调用、无重试；它只定位序列化接缝，不算 I01 通过，不占用或恢复原 Worker 门禁预算。调查失败或信息不足保留卡点，不沿猜测修改完整 hash。
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| I01-jsonb-driver-diagnostic-0928 | 合成完整响应精确定位SQL/Prisma往返差异 | 静态发现closed；稳定原响应Schema/hash/现有fixture；不消费在写window | 新 `apps/server/test/market/market-window-jsonb-roundtrip-diagnostic.test.ts`；新evidence `2026-09-28-i01-jsonb-driver-diagnostic.md`；独占本轮隔离PG容器/端口/临时日志；禁写业务/公共Schema/目标资源 | i01_jsonb_driver_diagnostic_0928 / 主仓与隔离PG | /root/i01_jsonb_driver_diagnostic_0928 | closed | needs_split | [单次隔离诊断](../../tasks/evidence/2026-09-28-i01-jsonb-driver-diagnostic.md)；Prisma6.19.3/PG17.11，15合成Bar的内存/nativeJSONB/text三摘要相同且字段/type/bit差异0；1次/0retry，default1pass1skip；仅该向量，未解释原失败，不选修复；新容器精确删除无volume/旧资源触碰，lint/格式通过，进程停止 |
+| I01-jsonb-driver-diagnostic-0928 | 合成完整响应精确定位SQL/Prisma往返差异 | 静态发现closed；稳定原响应Schema/hash/现有fixture；不消费在写window | 新 `apps/server/test/market/market-window-jsonb-roundtrip-diagnostic.test.ts`；新evidence `2026-09-28-i01-jsonb-driver-diagnostic.md`；独占本轮隔离PG容器/端口/临时日志；禁写业务/公共Schema/目标资源 | i01_jsonb_driver_diagnostic_0928 / 主仓与隔离PG | /root/i01_jsonb_driver_diagnostic_0928 | closed | needs_split | [单次隔离诊断](../../evidence/2026-09-28-i01-jsonb-driver-diagnostic.md)；Prisma6.19.3/PG17.11，15合成Bar的内存/nativeJSONB/text三摘要相同且字段/type/bit差异0；1次/0retry，default1pass1skip；仅该向量，未解释原失败，不选修复；新容器精确删除无volume/旧资源触碰，lint/格式通过，进程停止 |
 
 ### JSONB 诊断测试类型修复与后续门禁
 
@@ -1481,7 +1481,7 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-jsonb-diagnostic-types-gates-0928 | 收窄诊断环境变量类型，补齐稳定代码的本地门禁 | final-local-regression已closed，全部源码写入者停止 | 仅新增JSONB诊断test与新evidence `2026-09-28-s05-jsonb-diagnostic-types-gates.md`；Server type/build及相关仓库门禁独占，其他源码只读 | s05_jsonb_types_gates_0928 / 主仓 | /root/s05_jsonb_types_gates_0928 | closed | needs_split | [类型及门禁检查点](../../tasks/evidence/2026-09-28-s05-jsonb-diagnostic-types-gates.md)；仅类型断言，双转译JS字节相同；定向1pass/1skip、type/build、边界/8包依赖/普通lint/HEAD尺寸/diff通过；6文件严格complexity及16文件格式失败，资源停止，部署未执行 |
+| S05-jsonb-diagnostic-types-gates-0928 | 收窄诊断环境变量类型，补齐稳定代码的本地门禁 | final-local-regression已closed，全部源码写入者停止 | 仅新增JSONB诊断test与新evidence `2026-09-28-s05-jsonb-diagnostic-types-gates.md`；Server type/build及相关仓库门禁独占，其他源码只读 | s05_jsonb_types_gates_0928 / 主仓 | /root/s05_jsonb_types_gates_0928 | closed | needs_split | [类型及门禁检查点](../../evidence/2026-09-28-s05-jsonb-diagnostic-types-gates.md)；仅类型断言，双转译JS字节相同；定向1pass/1skip、type/build、边界/8包依赖/普通lint/HEAD尺寸/diff通过；6文件严格complexity及16文件格式失败，资源停止，部署未执行 |
 
 ### Snapshot V3 复杂度门禁收敛
 
@@ -1489,9 +1489,9 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-build-source-complexity-0928 | 收敛构建编排和来源封装复杂度 | 精确门禁失败及Spec §10合同 | `backtest-snapshot-v3-builder.ts`、`backtest-snapshot-v3-source.ts`、本职责新helper、新evidence `2026-09-28-s05-build-source-complexity.md`；对应定向测试只读 | s05_build_source_complexity_0928 / 主仓 | /root/s05_build_source_complexity_0928 | closed | worker_done | [构建职责证据](../../tasks/evidence/2026-09-28-s05-build-source-complexity.md)；builder27→20/388→375行，source25→18/184→128行；两个专属helper，13文件68项无skip及严格lint/格式/空白通过，公共API/顺序副作用/PIT拒绝保留，进程停止 |
-| S05-dependency-complexity-0928 | 收敛依赖响应、依赖证据及完整性校验复杂度 | 精确门禁失败及Spec §10合同 | `backtest-snapshot-v3-dependencies.ts`、`backtest-snapshot-v3-dependency-validation.ts`、`backtest-snapshot-v3-completeness.ts`、本职责新helper、新evidence `2026-09-28-s05-dependency-complexity.md`；对应定向测试只读 | s05_dependency_complexity_0928 / 主仓 | /root/s05_dependency_complexity_0928 | closed | worker_done | [依赖职责证据](../../tasks/evidence/2026-09-28-s05-dependency-complexity.md)；入口35→10/21→19/31→11，原文件598→291/124→108/158→97行，四个专属helper；6文件31项及owned严格lint/格式/空白通过，全部复杂度≤19/函数有效length≤92；公共接口与拒绝/副作用顺序保留，资源停止 |
-| S05-execution-evidence-complexity-0928 | 按证据类别拆分执行校验 | 精确门禁失败及Spec §10合同 | `backtest-snapshot-v3-execution-evidence.ts`、本职责新helper、新evidence `2026-09-28-s05-execution-evidence-complexity.md`；对应定向测试只读 | s05_execution_complexity_0928 / 主仓 | /root/s05_execution_complexity_0928 | closed | worker_done | [执行证据职责](../../tasks/evidence/2026-09-28-s05-execution-evidence-complexity.md)；入口299→84行，四个helper，最大复杂度18/有效函数length100/新file171；6文件15项及owned严格lint/格式/空白通过，进程停止；精确读取轨迹与复合坏输入首错缺独立现有断言，集中Review继续核对 |
+| S05-build-source-complexity-0928 | 收敛构建编排和来源封装复杂度 | 精确门禁失败及Spec §10合同 | `backtest-snapshot-v3-builder.ts`、`backtest-snapshot-v3-source.ts`、本职责新helper、新evidence `2026-09-28-s05-build-source-complexity.md`；对应定向测试只读 | s05_build_source_complexity_0928 / 主仓 | /root/s05_build_source_complexity_0928 | closed | worker_done | [构建职责证据](../../evidence/2026-09-28-s05-build-source-complexity.md)；builder27→20/388→375行，source25→18/184→128行；两个专属helper，13文件68项无skip及严格lint/格式/空白通过，公共API/顺序副作用/PIT拒绝保留，进程停止 |
+| S05-dependency-complexity-0928 | 收敛依赖响应、依赖证据及完整性校验复杂度 | 精确门禁失败及Spec §10合同 | `backtest-snapshot-v3-dependencies.ts`、`backtest-snapshot-v3-dependency-validation.ts`、`backtest-snapshot-v3-completeness.ts`、本职责新helper、新evidence `2026-09-28-s05-dependency-complexity.md`；对应定向测试只读 | s05_dependency_complexity_0928 / 主仓 | /root/s05_dependency_complexity_0928 | closed | worker_done | [依赖职责证据](../../evidence/2026-09-28-s05-dependency-complexity.md)；入口35→10/21→19/31→11，原文件598→291/124→108/158→97行，四个专属helper；6文件31项及owned严格lint/格式/空白通过，全部复杂度≤19/函数有效length≤92；公共接口与拒绝/副作用顺序保留，资源停止 |
+| S05-execution-evidence-complexity-0928 | 按证据类别拆分执行校验 | 精确门禁失败及Spec §10合同 | `backtest-snapshot-v3-execution-evidence.ts`、本职责新helper、新evidence `2026-09-28-s05-execution-evidence-complexity.md`；对应定向测试只读 | s05_execution_complexity_0928 / 主仓 | /root/s05_execution_complexity_0928 | closed | worker_done | [执行证据职责](../../evidence/2026-09-28-s05-execution-evidence-complexity.md)；入口299→84行，四个helper，最大复杂度18/有效函数length100/新file171；6文件15项及owned严格lint/格式/空白通过，进程停止；精确读取轨迹与复合坏输入首错缺独立现有断言，集中Review继续核对 |
 
 ### 剩余精确格式修复与稳定验证
 
@@ -1499,9 +1499,9 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-owned-format-0928 | 修复十个已定位S05文件的格式问题 | 三个职责拆分叶终止全部写入和测试进程 | `backtest-reconstruction-preflight-v3.ts`、`backtest-snapshot-v3-calendar-alignment.ts`、`backtest-snapshot-v3-dependency-collector.ts`、`backtest-snapshot-v3-dependency-error.ts`、`backtest-snapshot-v3-events.ts`、`backtest-snapshot-v3-multi-window.ts`、Market `market-pit-reconstruction.repository.ts`及三份对应既有test（preflight、v3-snapshot-builder、repository）；新evidence `2026-09-28-s05-owned-format.md` | s05_owned_format_0928 / 主仓 | /root/s05_owned_format_0928 | closed | blocked | [格式验证检查点](../../tasks/evidence/2026-09-28-s05-owned-format.md)；转译器保留import排版，原始字节比較失败，零源码写入；未跑后续lint/格式/测试，进程已停止；验证合同接续独立新叶 |
-| S05-owned-format-canonical-0928 | 在打印格式归一及AST一致约束下修复十个精确文件 | 原格式叶已关闭且源码未变；三个拆分输出稳定 | 原owned-format十个文件及新evidence `2026-09-28-s05-owned-format-canonical.md`；禁写其他源码/测试 | s05_format_canonical_0928 / 主仓 | /root/s05_format_canonical_0928 | closed | worker_done | [精确格式证据](../../tasks/evidence/2026-09-28-s05-owned-format-canonical.md)；10/10候选、AST、归一转译JS及printer语义一致；仅打印格式，普通/strict lint、Prettier和限定diff通过，进程停止 |
-| S05-stable-regression-gates-0928 | 验证职责拆分和精确格式后的最终稳定输入 | 三个拆分与格式叶局部通过并停止 | 仅新evidence `2026-09-28-s05-stable-regression-gates.md`；Server全包/type/build及相关仓库门禁独占，源码只读 | s05_stable_regression_gates_0928 / 主仓 | /root/s05_stable_regression_gates_0928 | closed | worker_done | [稳定门禁证据](../../tasks/evidence/2026-09-28-s05-stable-regression-gates.md)；Server1736pass/88skip及type/build、59TS严格lint20/220/格式、边界/8包依赖、HEAD尺寸ratchet（13legacy warnings）/diff/文档链接通过；70输入及21证据起终一致，Schemas103树/451与真实原包82、DSA87稳定复用；dist1935/digest195960da…，未执行真实门禁，资源已停止 |
+| S05-owned-format-0928 | 修复十个已定位S05文件的格式问题 | 三个职责拆分叶终止全部写入和测试进程 | `backtest-reconstruction-preflight-v3.ts`、`backtest-snapshot-v3-calendar-alignment.ts`、`backtest-snapshot-v3-dependency-collector.ts`、`backtest-snapshot-v3-dependency-error.ts`、`backtest-snapshot-v3-events.ts`、`backtest-snapshot-v3-multi-window.ts`、Market `market-pit-reconstruction.repository.ts`及三份对应既有test（preflight、v3-snapshot-builder、repository）；新evidence `2026-09-28-s05-owned-format.md` | s05_owned_format_0928 / 主仓 | /root/s05_owned_format_0928 | closed | blocked | [格式验证检查点](../../evidence/2026-09-28-s05-owned-format.md)；转译器保留import排版，原始字节比較失败，零源码写入；未跑后续lint/格式/测试，进程已停止；验证合同接续独立新叶 |
+| S05-owned-format-canonical-0928 | 在打印格式归一及AST一致约束下修复十个精确文件 | 原格式叶已关闭且源码未变；三个拆分输出稳定 | 原owned-format十个文件及新evidence `2026-09-28-s05-owned-format-canonical.md`；禁写其他源码/测试 | s05_format_canonical_0928 / 主仓 | /root/s05_format_canonical_0928 | closed | worker_done | [精确格式证据](../../evidence/2026-09-28-s05-owned-format-canonical.md)；10/10候选、AST、归一转译JS及printer语义一致；仅打印格式，普通/strict lint、Prettier和限定diff通过，进程停止 |
+| S05-stable-regression-gates-0928 | 验证职责拆分和精确格式后的最终稳定输入 | 三个拆分与格式叶局部通过并停止 | 仅新evidence `2026-09-28-s05-stable-regression-gates.md`；Server全包/type/build及相关仓库门禁独占，源码只读 | s05_stable_regression_gates_0928 / 主仓 | /root/s05_stable_regression_gates_0928 | closed | worker_done | [稳定门禁证据](../../evidence/2026-09-28-s05-stable-regression-gates.md)；Server1736pass/88skip及type/build、59TS严格lint20/220/格式、边界/8包依赖、HEAD尺寸ratchet（13legacy warnings）/diff/文档链接通过；70输入及21证据起终一致，Schemas103树/451与真实原包82、DSA87稳定复用；dist1935/digest195960da…，未执行真实门禁，资源已停止 |
 
 ### 本批稳定输入的最终源码 Review
 
@@ -1509,8 +1509,8 @@ Tushare 本地动态 SDK 没有字段声明，首个实施会话停在前置检�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-proof-review-0928 | 核对v2结构、真实原包parser和source capture必要证据语义 | 最终稳定验证检查点、无source writer | 源码与Spec只读；仅新evidence `2026-09-28-s05-proof-review.md` | s05_proof_review_0928 / 主仓 | /root/s05_proof_review_0928 | closed | worker_done | [证明源码Review](../../tasks/evidence/2026-09-28-s05-proof-review.md)；20源码hash稳定；发现F01来源时钟及F02新v2比较的亚毫秒截断P2，代码批准待修复；必要成功状态不等同生产资格，未运行额外门禁，资源停止 |
-| M3-index-review-0928 | 核对两个指数修复的身份/日期/单位及消费者语义 | 稳定DSA87项及最终稳定检查点 | DSA源码/测试/能力SSOT与Spec只读；仅新evidence `2026-09-28-m3-index-review.md` | m3_index_review_0928 / 主仓与DSA | /root/m3_index_review_0928 | closed | worker_done | [指数源码Review](../../tasks/evidence/2026-09-28-m3-index-review.md)；限定代码和完整现有消费者未发现代码finding，六hash与87项证据一致；无额外运行请求；目录R02.11/R02.13状态缺本轮局部完成，由协调者精确更新原两行，真实G0-M仍开放 |
+| S05-proof-review-0928 | 核对v2结构、真实原包parser和source capture必要证据语义 | 最终稳定验证检查点、无source writer | 源码与Spec只读；仅新evidence `2026-09-28-s05-proof-review.md` | s05_proof_review_0928 / 主仓 | /root/s05_proof_review_0928 | closed | worker_done | [证明源码Review](../../evidence/2026-09-28-s05-proof-review.md)；20源码hash稳定；发现F01来源时钟及F02新v2比较的亚毫秒截断P2，代码批准待修复；必要成功状态不等同生产资格，未运行额外门禁，资源停止 |
+| M3-index-review-0928 | 核对两个指数修复的身份/日期/单位及消费者语义 | 稳定DSA87项及最终稳定检查点 | DSA源码/测试/能力SSOT与Spec只读；仅新evidence `2026-09-28-m3-index-review.md` | m3_index_review_0928 / 主仓与DSA | /root/m3_index_review_0928 | closed | worker_done | [指数源码Review](../../evidence/2026-09-28-m3-index-review.md)；限定代码和完整现有消费者未发现代码finding，六hash与87项证据一致；无额外运行请求；目录R02.11/R02.13状态缺本轮局部完成，由协调者精确更新原两行，真实G0-M仍开放 |
 
 父进程负责完整 Spec/Task 对账、窗口执行器、Snapshot 构建/冻结/执行校验和严格 PIT 旧快照行为，最终结论写入集中 Review 证据；全局 §13 清单仍按整体验收条件判断。
 
@@ -1520,8 +1520,8 @@ F01/F02 的 `Date.parse` 毫秒比较会将 `.123456Z` 与 `.123455Z` 判等，�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-v2-precision-0928 | 精确比较v2决策、截点、原文获取及历史修订时钟 | proof-review已关闭；F02反例及Spec §6稳定所有权合同 | Schemas新 `market-pit-evidence-instant-v1.ts`、`market-pit-reconstruction-v3.ts`、`market-pit-historical-references-v1.ts`、`market-pit-historical-bar-bindings-v1.ts`、`market-pit-calendar-structure-v1.ts`仅非法时刻投影前保护及相关精确边界test；新evidence `2026-09-28-s05-v2-precision.md`；Schemas定向/全包/type/build独占；index由协调者 | s05_v2_precision_0928 / 主仓 | /root/s05_v2_precision_0928 | closed | worker_done | sol/high；[证据](../../tasks/evidence/2026-09-28-s05-v2-precision.md)：新增25项，定向109/全包476通过，类型/构建/严格lint/格式通过；+24:00投影保护及RTK首轮流程偏差已记录；131输入摘要6607626460bf20ddee8b93eca846eee682a25f041840c1626a4e3cf75dae98e0；未授予最终PIT资格；无后台进程，写权交还 |
-| S05-source-times-precision-0928 | Server必要来源时钟消费同一精确原语 | v2-precision输出及协调者公共export/build稳定 | Server `market-pit-evidence-instant-v1.ts`改为兼容再导出、`market-pit-reconstruction-source-times-v3.ts`、对应来源时钟test；新evidence `2026-09-28-s05-source-times-precision.md`；Server定向/type独占 | s05_source_times_precision_0928 / 主仓 | /root/s05_source_times_precision_0928 | closed | needs_split | sol/medium；[证据](../../tasks/evidence/2026-09-28-s05-source-times-precision.md)：来源23pass（新增11）；关联110pass/1非owned窗口断言fail；公开日历82/type/owned普通及strict lint/格式/diff通过，Schemas131树未变复用476；首失败未停止后续命令的流程偏差已记；进程停止、写权交还，窗口修复前禁止升级全包/部署 |
+| S05-v2-precision-0928 | 精确比较v2决策、截点、原文获取及历史修订时钟 | proof-review已关闭；F02反例及Spec §6稳定所有权合同 | Schemas新 `market-pit-evidence-instant-v1.ts`、`market-pit-reconstruction-v3.ts`、`market-pit-historical-references-v1.ts`、`market-pit-historical-bar-bindings-v1.ts`、`market-pit-calendar-structure-v1.ts`仅非法时刻投影前保护及相关精确边界test；新evidence `2026-09-28-s05-v2-precision.md`；Schemas定向/全包/type/build独占；index由协调者 | s05_v2_precision_0928 / 主仓 | /root/s05_v2_precision_0928 | closed | worker_done | sol/high；[证据](../../evidence/2026-09-28-s05-v2-precision.md)：新增25项，定向109/全包476通过，类型/构建/严格lint/格式通过；+24:00投影保护及RTK首轮流程偏差已记录；131输入摘要6607626460bf20ddee8b93eca846eee682a25f041840c1626a4e3cf75dae98e0；未授予最终PIT资格；无后台进程，写权交还 |
+| S05-source-times-precision-0928 | Server必要来源时钟消费同一精确原语 | v2-precision输出及协调者公共export/build稳定 | Server `market-pit-evidence-instant-v1.ts`改为兼容再导出、`market-pit-reconstruction-source-times-v3.ts`、对应来源时钟test；新evidence `2026-09-28-s05-source-times-precision.md`；Server定向/type独占 | s05_source_times_precision_0928 / 主仓 | /root/s05_source_times_precision_0928 | closed | needs_split | sol/medium；[证据](../../evidence/2026-09-28-s05-source-times-precision.md)：来源23pass（新增11）；关联110pass/1非owned窗口断言fail；公开日历82/type/owned普通及strict lint/格式/diff通过，Schemas131树未变复用476；首失败未停止后续命令的流程偏差已记；进程停止、写权交还，窗口修复前禁止升级全包/部署 |
 
 ### 精确截点的窗口消费断言
 
@@ -1529,7 +1529,7 @@ F01/F02 的 `Date.parse` 毫秒比较会将 `.123456Z` 与 `.123455Z` 判等，�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-window-cutoff-consumer-0928 | 对齐精确Schema前置拒绝的窗口断言 | 两个精度源码叶停止；关联失败及现有窗口源码顺序 | 仅 `apps/server/test/market/market-pit-decision-window-v3.test.ts` 的失败用例和新evidence `2026-09-28-s05-window-cutoff-consumer.md`；Server定向独占，其他源码只读 | s05_window_cutoff_consumer_0928 / 主仓 | /root/s05_window_cutoff_consumer_0928 | closed | worker_done | sol/low；[消费断言证据](../../tasks/evidence/2026-09-28-s05-window-cutoff-consumer.md)，仅标题和预期两行；窗口42/关联111通过，lint/格式/diff通过；191依赖输入未变复用公开82及type；无后台进程、资源交还 |
+| S05-window-cutoff-consumer-0928 | 对齐精确Schema前置拒绝的窗口断言 | 两个精度源码叶停止；关联失败及现有窗口源码顺序 | 仅 `apps/server/test/market/market-pit-decision-window-v3.test.ts` 的失败用例和新evidence `2026-09-28-s05-window-cutoff-consumer.md`；Server定向独占，其他源码只读 | s05_window_cutoff_consumer_0928 / 主仓 | /root/s05_window_cutoff_consumer_0928 | closed | worker_done | sol/low；[消费断言证据](../../evidence/2026-09-28-s05-window-cutoff-consumer.md)，仅标题和预期两行；窗口42/关联111通过，lint/格式/diff通过；191依赖输入未变复用公开82及type；无后台进程、资源交还 |
 
 ### 精度修复后的稳定回归与目标运行态
 
@@ -1537,8 +1537,8 @@ F01/F02 的 `Date.parse` 毫秒比较会将 `.123456Z` 与 `.123455Z` 判等，�
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S05-precision-regression-gates-0928 | 核验精度修复后最终稳定输入 | 两个精度修复叶及窗口断言局部通过并停止；集中Review受影响源码复核 | 仅新evidence `2026-09-28-s05-precision-regression-gates.md`；Server全包/type/build及受影响仓库门禁独占，源码只读 | s05_precision_regression_gates_0928 / 主仓 | /root/s05_precision_regression_gates_0928 | closed | worker_done | sol/medium；[最终精度门禁](../../tasks/evidence/2026-09-28-s05-precision-regression-gates.md)，SHA beb52ccf…；Server226文件/1747pass，24文件/88skip；type/build/63TS lint/strict20及220/格式/边界/8依赖/HEAD尺寸ratchet（13legacy warnings）/diff/34文档168links通过；872输入稳定，Schemas476/DSA87/public82稳定复用；dist1935/SHA b081f50f…；工具路径/链接行号错误已修正记录，资源停止 |
-| S05-m3-target-sync-0928 | 官方同步及必要合同目标验证 | 精度稳定回归通过；最终源码Review无未处理局部finding | 仅新evidence `2026-09-28-s05-m3-target-sync.md`与独占临时smoke；infra官方all入口、Server/Worker/DSA运行态独占；源码只读 | s05_m3_target_sync_0928 / 三仓 | /root/s05_m3_target_sync_0928 | closed | worker_done | sol/medium；[目标同步证据](../../tasks/evidence/2026-09-28-s05-m3-target-sync.md)：官方sync all兼容通过/exit0，UTC2026-09-27 19:54:45–19:56:18；三目标healthy/镜像未变，仅可写层；Server/Worker各16受控项、12编译SHA三方一致，DSA6受控项/6源SHA一致；非docs输入1466/1168/24起终无漂移；固定窗口缺表/fatal/error计数0；临时脚本路径初错已修正，无源码改动；无业务/Provider/AI/I01请求，进程停止写权交还 |
+| S05-precision-regression-gates-0928 | 核验精度修复后最终稳定输入 | 两个精度修复叶及窗口断言局部通过并停止；集中Review受影响源码复核 | 仅新evidence `2026-09-28-s05-precision-regression-gates.md`；Server全包/type/build及受影响仓库门禁独占，源码只读 | s05_precision_regression_gates_0928 / 主仓 | /root/s05_precision_regression_gates_0928 | closed | worker_done | sol/medium；[最终精度门禁](../../evidence/2026-09-28-s05-precision-regression-gates.md)，SHA beb52ccf…；Server226文件/1747pass，24文件/88skip；type/build/63TS lint/strict20及220/格式/边界/8依赖/HEAD尺寸ratchet（13legacy warnings）/diff/34文档168links通过；872输入稳定，Schemas476/DSA87/public82稳定复用；dist1935/SHA b081f50f…；工具路径/链接行号错误已修正记录，资源停止 |
+| S05-m3-target-sync-0928 | 官方同步及必要合同目标验证 | 精度稳定回归通过；最终源码Review无未处理局部finding | 仅新evidence `2026-09-28-s05-m3-target-sync.md`与独占临时smoke；infra官方all入口、Server/Worker/DSA运行态独占；源码只读 | s05_m3_target_sync_0928 / 三仓 | /root/s05_m3_target_sync_0928 | closed | worker_done | sol/medium；[目标同步证据](../../evidence/2026-09-28-s05-m3-target-sync.md)：官方sync all兼容通过/exit0，UTC2026-09-27 19:54:45–19:56:18；三目标healthy/镜像未变，仅可写层；Server/Worker各16受控项、12编译SHA三方一致，DSA6受控项/6源SHA一致；非docs输入1466/1168/24起终无漂移；固定窗口缺表/fatal/error计数0；临时脚本路径初错已修正，无源码改动；无业务/Provider/AI/I01请求，进程停止写权交还 |
 
 ### M3 财务单接口合同前置
 
@@ -1546,7 +1546,7 @@ R04–R07 发现叶确认 R05.1 尚缺唯一接口、字段、报告期与单位
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| M3-r05-single-endpoint-contract-0928 | 固定R05.1财务行选择的单接口合同 | R04–R07前沿发现完成；DSA财务源码/版本稳定 | 仅新evidence `2026-09-28-m3-r05-single-endpoint-contract.md`；DSA/主仓源码只读、官方公开文档只读；禁止Provider接口调用 | m3_r05_single_endpoint_contract_0928 / 主仓与DSA | /root/m3_r05_single_endpoint_contract_0928 | closed | needs_split | sol/medium；[合同发现](../../tasks/evidence/2026-09-28-m3-r05-single-endpoint-contract.md)，SHA52b0a971…；唯一聚焦stock_financial_abstract，指标行×报告期列；安装1.18.94而依赖仅下限、官方1.18.97；单位/完整字段/身份及原样fixture仍缺，不能派发安全源码实现；无来源请求/运行资源，写权交还 |
+| M3-r05-single-endpoint-contract-0928 | 固定R05.1财务行选择的单接口合同 | R04–R07前沿发现完成；DSA财务源码/版本稳定 | 仅新evidence `2026-09-28-m3-r05-single-endpoint-contract.md`；DSA/主仓源码只读、官方公开文档只读；禁止Provider接口调用 | m3_r05_single_endpoint_contract_0928 / 主仓与DSA | /root/m3_r05_single_endpoint_contract_0928 | closed | needs_split | sol/medium；[合同发现](../../evidence/2026-09-28-m3-r05-single-endpoint-contract.md)，SHA52b0a971…；唯一聚焦stock_financial_abstract，指标行×报告期列；安装1.18.94而依赖仅下限、官方1.18.97；单位/完整字段/身份及原样fixture仍缺，不能派发安全源码实现；无来源请求/运行资源，写权交还 |
 
 ### M3 财务原样合同采集
 
@@ -1554,7 +1554,7 @@ R04–R07 发现叶确认 R05.1 尚缺唯一接口、字段、报告期与单位
 
 | ID | 结果 | 依赖 | 独占写入路径 / 共享资源 | 所有者 / 工作区 | 子代理会话 ID | Dispatch | 状态 | 交付 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| M3-r05-abstract-raw-contract-capture-0928 | 取得单endpoint原样字段及身份/单位事实 | single-endpoint发现关闭；真实请求1/0预算及安装源摘要已记录 | 仅新evidence `2026-09-28-m3-r05-abstract-raw-contract-capture.md`、独占 `/private/tmp/m3-r05-abstract-contract-0928` 原文/生成表及采集脚本；DSA/主仓源码只读，无共享运行资源 | m3_r05_abstract_raw_contract_capture_0928 / 主仓与DSA | /root/m3_r05_abstract_raw_contract_capture_0928 | closed | worker_done | sol/medium；[原样证据](../../tasks/evidence/2026-09-28-m3-r05-abstract-raw-contract-capture.md)，SHA169c142a…；HTTP200，1/1请求/0重试，2,277,455字节/98期；离线SDK表80×100、7491有限/349NaN/0inf、无重复；原文SHA90d1cc95…，有CNY/publish_date但无证券自证/金额倍率/比例单位；实施仍needs_split，不可派发猜测实现；进程停止写权交还；协调者同步能力原行R05.1/财务源表，117唯一ID/4列/links通过，目录SHA2a34aeb6… |
+| M3-r05-abstract-raw-contract-capture-0928 | 取得单endpoint原样字段及身份/单位事实 | single-endpoint发现关闭；真实请求1/0预算及安装源摘要已记录 | 仅新evidence `2026-09-28-m3-r05-abstract-raw-contract-capture.md`、独占 `/private/tmp/m3-r05-abstract-contract-0928` 原文/生成表及采集脚本；DSA/主仓源码只读，无共享运行资源 | m3_r05_abstract_raw_contract_capture_0928 / 主仓与DSA | /root/m3_r05_abstract_raw_contract_capture_0928 | closed | worker_done | sol/medium；[原样证据](../../evidence/2026-09-28-m3-r05-abstract-raw-contract-capture.md)，SHA169c142a…；HTTP200，1/1请求/0重试，2,277,455字节/98期；离线SDK表80×100、7491有限/349NaN/0inf、无重复；原文SHA90d1cc95…，有CNY/publish_date但无证券自证/金额倍率/比例单位；实施仍needs_split，不可派发猜测实现；进程停止写权交还；协调者同步能力原行R05.1/财务源表，117唯一ID/4列/links通过，目录SHA2a34aeb6… |
 
 ## 12.9 按交接继续实施（2026-09-28）
 
@@ -1564,31 +1564,31 @@ R04–R07 发现叶确认 R05.1 尚缺唯一接口、字段、报告期与单位
 
 | ID | 结果 | 依赖 | 独占写入路径 / 资源 | 所有者 / 工作区 | 状态 | 输出 / 检查 / 阻塞 |
 | --- | --- | --- | --- | --- | --- | --- |
-| CONT-M1-frontier | 核实 S05 与其余 M1 可实施前沿及已耗尽门禁 | 最新 Review、Spec §6、Task §3–8/12.8 | 仅 `docs/tasks/evidence/2026-09-28-cont-m1-frontier.md`；源码、临时原文及运行态只读，无业务请求 | cont_m1_frontier / 主仓 | worker_done | sol/high；[发现](../../tasks/evidence/2026-09-28-cont-m1-frontier.md)；最终历史资格及I01原载荷缺失；D01实际接线存在；内容精度叶Ready，进程停止、写权交还 |
-| CONT-M2-currency | 核实 M26-b2 币种/身份合同的最小可实施叶 | 既有 Tushare 读取、RQData 原文合同及最新来源状态 | 仅 `docs/tasks/evidence/2026-09-28-cont-m2-currency-frontier.md`；两仓源码只读，无 Provider 请求 | cont_m2_currency / 主仓与 DSA | worker_done | sol/high；[发现](../../tasks/evidence/2026-09-28-cont-m2-currency-frontier.md)；纯resolver及五阶段接缝已固定；M21–M34剩余分类保留；进程停止、写权交还 |
-| CONT-M3-pagination | 核实 R01.5-pagination 严格目录读取的实施边界 | 能力目录、既有 Catalog 消费者及已有采集证据 | 仅 `docs/tasks/evidence/2026-09-28-cont-m3-pagination-frontier.md`；DSA 源码/公开文档只读，不访问数据接口 | cont_m3_pagination / 主仓与 DSA | worker_done | sol/medium；[发现](../../tasks/evidence/2026-09-28-cont-m3-pagination-frontier.md)；现有parser/reader不重做，HTTP边界测试Ready；分类/完整请求阻塞；117唯一ID无遗漏，进程停止、写权交还 |
+| CONT-M1-frontier | 核实 S05 与其余 M1 可实施前沿及已耗尽门禁 | 最新 Review、Spec §6、Task §3–8/12.8 | 仅 `docs/evidence/2026-09-28-cont-m1-frontier.md`；源码、临时原文及运行态只读，无业务请求 | cont_m1_frontier / 主仓 | worker_done | sol/high；[发现](../../evidence/2026-09-28-cont-m1-frontier.md)；最终历史资格及I01原载荷缺失；D01实际接线存在；内容精度叶Ready，进程停止、写权交还 |
+| CONT-M2-currency | 核实 M26-b2 币种/身份合同的最小可实施叶 | 既有 Tushare 读取、RQData 原文合同及最新来源状态 | 仅 `docs/evidence/2026-09-28-cont-m2-currency-frontier.md`；两仓源码只读，无 Provider 请求 | cont_m2_currency / 主仓与 DSA | worker_done | sol/high；[发现](../../evidence/2026-09-28-cont-m2-currency-frontier.md)；纯resolver及五阶段接缝已固定；M21–M34剩余分类保留；进程停止、写权交还 |
+| CONT-M3-pagination | 核实 R01.5-pagination 严格目录读取的实施边界 | 能力目录、既有 Catalog 消费者及已有采集证据 | 仅 `docs/evidence/2026-09-28-cont-m3-pagination-frontier.md`；DSA 源码/公开文档只读，不访问数据接口 | cont_m3_pagination / 主仓与 DSA | worker_done | sol/medium；[发现](../../evidence/2026-09-28-cont-m3-pagination-frontier.md)；现有parser/reader不重做，HTTP边界测试Ready；分类/完整请求阻塞；117唯一ID无遗漏，进程停止、写权交还 |
 
 ### 就绪实施叶与保留卡点
 
-三个发现叶已完成，证据分别为 [M1 前沿](../../tasks/evidence/2026-09-28-cont-m1-frontier.md)、[M2 币种/身份](../../tasks/evidence/2026-09-28-cont-m2-currency-frontier.md) 和 [M3 分页](../../tasks/evidence/2026-09-28-cont-m3-pagination-frontier.md)。源码与已有记录两次核对确认 S05 最终原发布/场所/XSHE/修订证据缺失；I01 原 ORM 回读完整载荷未保留；目录分类原文未找到且完整请求预算耗尽，分别记录跳过，原父项和真实验收不勾选。117 个 M3 唯一编号为 116 固定项加 R07.8 模板，无遗漏；能力事实仍由原 SSOT 所有。
+三个发现叶已完成，证据分别为 [M1 前沿](../../evidence/2026-09-28-cont-m1-frontier.md)、[M2 币种/身份](../../evidence/2026-09-28-cont-m2-currency-frontier.md) 和 [M3 分页](../../evidence/2026-09-28-cont-m3-pagination-frontier.md)。源码与已有记录两次核对确认 S05 最终原发布/场所/XSHE/修订证据缺失；I01 原 ORM 回读完整载荷未保留；目录分类原文未找到且完整请求预算耗尽，分别记录跳过，原父项和真实验收不勾选。117 个 M3 唯一编号为 116 固定项加 R07.8 模板，无遗漏；能力事实仍由原 SSOT 所有。
 
 | ID | 结果与合同 | 依赖 | 独占写集 / 资源 | 所有者 | 状态 | 检查与停止条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| S05-content-cutoff-precision | v2 实际归档观察/Bar/可见/抓取截点保留亚毫秒；v1独立合同保留，仅输出archives-bound | Spec §6及已建精确瞬时原语；Schemas输入稳定 | Server `market-pit-reconstruction-content-v3.ts`、新`market-pit-reconstruction-content-clock-v3.ts`、`market-pit-reconstruction-content-v2.test.ts`；专属evidence `2026-09-28-cont-s05-content-precision.md`；无共享build/DB/运行态 | cont_m1_frontier | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-s05-content-precision.md)；66项定向、Server类型、限定lint/格式/空白通过；先证明旧实现微秒越界，再修复必要绑定；qualified边界不变，无业务请求，进程停止/写权交还 |
-| R01.5-http-boundary-tests | 用现有parser/reader验证实际_fetch_page的HTTP、流式大小、解码、期限及失败关闭边界 | parser/reader已存在；不依赖缺失的分类事实 | DSA `tests/test_eastmoney_fund_catalog_reader.py`；主仓专属evidence `2026-09-28-cont-m3-pagination-http.md`；无网络/共享运行资源 | cont_m3_pagination | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-m3-pagination-http.md)；新增9项、parser/reader28项通过，限定flake8/编译/空白通过；源码无变、0网络，分类/真实覆盖未通过；进程停止、写权交还 |
+| S05-content-cutoff-precision | v2 实际归档观察/Bar/可见/抓取截点保留亚毫秒；v1独立合同保留，仅输出archives-bound | Spec §6及已建精确瞬时原语；Schemas输入稳定 | Server `market-pit-reconstruction-content-v3.ts`、新`market-pit-reconstruction-content-clock-v3.ts`、`market-pit-reconstruction-content-v2.test.ts`；专属evidence `2026-09-28-cont-s05-content-precision.md`；无共享build/DB/运行态 | cont_m1_frontier | worker_done | [证据](../../evidence/2026-09-28-cont-s05-content-precision.md)；66项定向、Server类型、限定lint/格式/空白通过；先证明旧实现微秒越界，再修复必要绑定；qualified边界不变，无业务请求，进程停止/写权交还 |
+| R01.5-http-boundary-tests | 用现有parser/reader验证实际_fetch_page的HTTP、流式大小、解码、期限及失败关闭边界 | parser/reader已存在；不依赖缺失的分类事实 | DSA `tests/test_eastmoney_fund_catalog_reader.py`；主仓专属evidence `2026-09-28-cont-m3-pagination-http.md`；无网络/共享运行资源 | cont_m3_pagination | worker_done | [证据](../../evidence/2026-09-28-cont-m3-pagination-http.md)；新增9项、parser/reader28项通过，限定flake8/编译/空白通过；源码无变、0网络，分类/真实覆盖未通过；进程停止、写权交还 |
 
 规划预检：上述两叶 Ready，输入与写集互不相交；所有共享全包/build/仓库和目标同步检查由协调者在源码稳定后统一安排。它们各自只证明必要内容绑定或离线传输边界，不授予历史资格、目录完整性或真实准入。
 
-Tushare 后继按 [币种/身份发现](../../tasks/evidence/2026-09-28-cont-m2-currency-frontier.md) 拆为纯 resolver、共享 wire、Server 消费、DSA 映射读取、事件库存/HTTP 五叶。Spec §4 已固定首版 CN ETF 同完整代码、身份与独立分红币种原文合同；NAV/OF/别名不在首版。本地合同及受控接线可实施，真实审核/账号权限/历史完整覆盖分别保留为门禁，不将外部前提用 fixture 补造。
+Tushare 后继按 [币种/身份发现](../../evidence/2026-09-28-cont-m2-currency-frontier.md) 拆为纯 resolver、共享 wire、Server 消费、DSA 映射读取、事件库存/HTTP 五叶。Spec §4 已固定首版 CN ETF 同完整代码、身份与独立分红币种原文合同；NAV/OF/别名不在首版。本地合同及受控接线可实施，真实审核/账号权限/历史完整覆盖分别保留为门禁，不将外部前提用 fixture 补造。
 
 | ID | 唯一交付 | 启动依赖 | 独占写集 / 资源 | 所有者 | 状态 | 验证 / 剩余条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| M26-b2-identity-resolver | 纯解析当前准入绑定的Tushare ETF身份/独立分红币种原字节 | Spec §4已固定、既有准入/存储原语稳定 | DSA新`src/services/tushare_fund_identity_evidence.py`及`tests/test_tushare_fund_identity_evidence.py`；主仓专属evidence `2026-09-28-cont-m26-identity-resolver.md`；无文件读取/账号/SDK/网络/DB | cont_m2_currency | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-m26-identity-resolver.md)；新增155/关联197项通过，限定lint/编译/空白通过；精确原时刻先验、旧primitive仅内部validUntil投影；原准入与bytes不改写，进程停止、写权交还 |
-| M26-b2-identity-wire | 独立原文bundle和事件关联合同 | resolver字段稳定 | 下方执行包列出的Schemas专属模块/测试/golden/事件合同及唯一出口；独占Schemas dist | cont_m26_identity_wire | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-m26-identity-wire.md)；定向122、DSA真实resolver golden13、全包546项/45文件、类型/build、限定lint/strict复杂度/格式/尺寸/边界/依赖通过；源码/dist稳定、写权交还 |
-| M26-b2-identity-consumer | Server在线/离线原字节摘要与范围/币种核验 | wire已验证并释放稳定dist | 下方已登记Market专属验证器、selector/冻结接缝及新定向测试 | cont_m26_server_consumer | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-m26-identity-consumer.md)；48项、类型、normal/strict20/220 lint、格式/尺寸/空白/边界/依赖通过，真实Parquet与新Store读回；唯一selector纯格式修复前后AST一致，进程停止/写权交还 |
-| M26-b2-mapped-read | DSA读前证据与读后准入/凭据/原文复核 | resolver验证完成；既有精确读取/凭据原语稳定，不依赖正在构建的wire | DSA新`src/services/thesis_ledger_tushare_mapped_read.py`及`tests/test_thesis_ledger_tushare_mapped_read.py`；专属evidence `2026-09-28-cont-m26-mapped-read.md`；既有reader/store/凭据只读 | cont_m2_currency | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-m26-mapped-read.md)；210项、限定lint/语法/空白通过；真实环境快照/HMAC及实际受控HTTP，原文/准入/修订前后核验；空集版本及coverage=false保留，未注册库存/公共wire，无真实请求，写权交还 |
-| M26-b2-event-registry-local | 单向登记精确CASH库存与适配/来源修订 | mapped-read及wire稳定；不执行消费者，不依赖进行中的Server叶 | DSA `src/services/thesis_ledger_event_v3_adapters.py`、`src/services/thesis_ledger_market_v3_revisions.py`、新`tests/test_thesis_ledger_tushare_event_registry_v3.py`；专属evidence `2026-09-28-cont-m26-event-registry.md` | cont_m26_event_registry | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-m26-event-registry.md)；34新/关联121项、限定lint/编译/空白通过；只精确CASH，真实SQLite/HMAC current matcher及轮换/撤销；首次import collection失败唯一修复重试后通过，输入增加后重验；没有真实ready/cover，写权交还 |
-| M26-b2-event-runtime-local | 生产前置guard与当前准入/修订/鉴权HTTP接线 | registry、Server consumer、mapped-read/wire通过且稳定 | 下方登记Tushare专属运行模块及必要event/provider runtime/HTTP接缝 | cont_m26_event_registry | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-m26-event-runtime.md)；41本叶/184关联/最终输入75项通过，受控HTTP经实际Schemas dist解析；前后原文/准入/安全检查，coverage=false；runtime净减17行，限定lint/编译/空白及critical通过，普通E302债保留；0真实请求，进程停/写权交还 |
+| M26-b2-identity-resolver | 纯解析当前准入绑定的Tushare ETF身份/独立分红币种原字节 | Spec §4已固定、既有准入/存储原语稳定 | DSA新`src/services/tushare_fund_identity_evidence.py`及`tests/test_tushare_fund_identity_evidence.py`；主仓专属evidence `2026-09-28-cont-m26-identity-resolver.md`；无文件读取/账号/SDK/网络/DB | cont_m2_currency | worker_done | [证据](../../evidence/2026-09-28-cont-m26-identity-resolver.md)；新增155/关联197项通过，限定lint/编译/空白通过；精确原时刻先验、旧primitive仅内部validUntil投影；原准入与bytes不改写，进程停止、写权交还 |
+| M26-b2-identity-wire | 独立原文bundle和事件关联合同 | resolver字段稳定 | 下方执行包列出的Schemas专属模块/测试/golden/事件合同及唯一出口；独占Schemas dist | cont_m26_identity_wire | worker_done | [证据](../../evidence/2026-09-28-cont-m26-identity-wire.md)；定向122、DSA真实resolver golden13、全包546项/45文件、类型/build、限定lint/strict复杂度/格式/尺寸/边界/依赖通过；源码/dist稳定、写权交还 |
+| M26-b2-identity-consumer | Server在线/离线原字节摘要与范围/币种核验 | wire已验证并释放稳定dist | 下方已登记Market专属验证器、selector/冻结接缝及新定向测试 | cont_m26_server_consumer | worker_done | [证据](../../evidence/2026-09-28-cont-m26-identity-consumer.md)；48项、类型、normal/strict20/220 lint、格式/尺寸/空白/边界/依赖通过，真实Parquet与新Store读回；唯一selector纯格式修复前后AST一致，进程停止/写权交还 |
+| M26-b2-mapped-read | DSA读前证据与读后准入/凭据/原文复核 | resolver验证完成；既有精确读取/凭据原语稳定，不依赖正在构建的wire | DSA新`src/services/thesis_ledger_tushare_mapped_read.py`及`tests/test_thesis_ledger_tushare_mapped_read.py`；专属evidence `2026-09-28-cont-m26-mapped-read.md`；既有reader/store/凭据只读 | cont_m2_currency | worker_done | [证据](../../evidence/2026-09-28-cont-m26-mapped-read.md)；210项、限定lint/语法/空白通过；真实环境快照/HMAC及实际受控HTTP，原文/准入/修订前后核验；空集版本及coverage=false保留，未注册库存/公共wire，无真实请求，写权交还 |
+| M26-b2-event-registry-local | 单向登记精确CASH库存与适配/来源修订 | mapped-read及wire稳定；不执行消费者，不依赖进行中的Server叶 | DSA `src/services/thesis_ledger_event_v3_adapters.py`、`src/services/thesis_ledger_market_v3_revisions.py`、新`tests/test_thesis_ledger_tushare_event_registry_v3.py`；专属evidence `2026-09-28-cont-m26-event-registry.md` | cont_m26_event_registry | worker_done | [证据](../../evidence/2026-09-28-cont-m26-event-registry.md)；34新/关联121项、限定lint/编译/空白通过；只精确CASH，真实SQLite/HMAC current matcher及轮换/撤销；首次import collection失败唯一修复重试后通过，输入增加后重验；没有真实ready/cover，写权交还 |
+| M26-b2-event-runtime-local | 生产前置guard与当前准入/修订/鉴权HTTP接线 | registry、Server consumer、mapped-read/wire通过且稳定 | 下方登记Tushare专属运行模块及必要event/provider runtime/HTTP接缝 | cont_m26_event_registry | worker_done | [证据](../../evidence/2026-09-28-cont-m26-event-runtime.md)；41本叶/184关联/最终输入75项通过，受控HTTP经实际Schemas dist解析；前后原文/准入/安全检查，coverage=false；runtime净减17行，限定lint/编译/空白及critical通过，普通E302债保留；0真实请求，进程停/写权交还 |
 
 第一源码叶规划预检 Ready；其余是保留义务，尚未派发，须按上游结果固定精确写集后实施。任何局部失败按用户要求只重试一次，仍失败记录并跳过该阻塞与依赖路径，继续独立就绪任务。
 
@@ -1598,33 +1598,33 @@ mapped-read 的依赖已按实际接口收敛：只返回内部读取结果与�
 
 | ID | 唯一交付 | 依赖 / 稳定输入 | 独占写集 / 资源 | 所有者 | 状态 | 检查与停止条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| CONT-M3-flow-contract | 固定R06.12单endpoint日期/金额字段及现存消费者的最小合同 | 原能力目录及R04–R07发现；只读实际SDK源码与官方文档 | 仅evidence `2026-09-28-cont-m3-flow-contract.md`；DSA源码只读，官方公开文档可读，无业务接口/账号/DB/测试 | cont_m3_flow_contract | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-m3-flow-contract.md)；两次官方核对仍缺金额单位/完整样本，完整数值合同skip；独立请求作用域修复已拆出，无真实请求 |
+| CONT-M3-flow-contract | 固定R06.12单endpoint日期/金额字段及现存消费者的最小合同 | 原能力目录及R04–R07发现；只读实际SDK源码与官方文档 | 仅evidence `2026-09-28-cont-m3-flow-contract.md`；DSA源码只读，官方公开文档可读，无业务接口/账号/DB/测试 | cont_m3_flow_contract | worker_done | [证据](../../evidence/2026-09-28-cont-m3-flow-contract.md)；两次官方核对仍缺金额单位/完整样本，完整数值合同skip；独立请求作用域修复已拆出，无真实请求 |
 
 该发现叶只解决已保留的单接口选择前提，不新建资金流产品；已存在通用资金流fallback与外层Consumer保持其既有边界。与三个实施写集不相交，规划Ready。
 
-R06.12 最新日完整数值合同经两次官方核对仍缺金额单位及完整金额样本，[单接口证据](../../tasks/evidence/2026-09-28-cont-m3-flow-contract.md)记录跳过该阻塞。独立的默认 `sh` / 无参默认标的风险需拆开核对：`CONT-M3-flow-request-scope` 仅检查是否可向已确认 SDK 显式传递 stock/market 并拒绝未知场所，禁止无参默认目标回退；不依赖金额单位、不改数值选行/单位或授予准入。唯一写集仍为该专属发现 evidence 的补充段落，源码只读；所有者 cont_m3_flow_contract，pending。确认精确参数接缝后再派独立源码叶，缺市场身份则失败关闭而不猜测。
+R06.12 最新日完整数值合同经两次官方核对仍缺金额单位及完整金额样本，[单接口证据](../../evidence/2026-09-28-cont-m3-flow-contract.md)记录跳过该阻塞。独立的默认 `sh` / 无参默认标的风险需拆开核对：`CONT-M3-flow-request-scope` 仅检查是否可向已确认 SDK 显式传递 stock/market 并拒绝未知场所，禁止无参默认目标回退；不依赖金额单位、不改数值选行/单位或授予准入。唯一写集仍为该专属发现 evidence 的补充段落，源码只读；所有者 cont_m3_flow_contract，pending。确认精确参数接缝后再派独立源码叶，缺市场身份则失败关闭而不猜测。
 
-请求作用域发现完成：[证据 §7](../../tasks/evidence/2026-09-28-cont-m3-flow-contract.md)确认实际 SDK stock/market 参数和 Manager 预归一化剥离场所。`R06.12-request-scope-guard` 规划 Ready；对应 Spec §3.3 已固定，金额合同 skip 保留。独占写集：DSA 新 `data_provider/eastmoney_individual_fund_flow_request.py`、新 `tests/test_eastmoney_individual_fund_flow_request.py`、`data_provider/fundamental_adapter.py` 的 import/get_capital_flow 狭窄接缝；专属主仓 evidence `2026-09-28-cont-m3-flow-request-scope.md`。所有者 cont_m3_flow_contract，pending。原大文件净行数不得增加；其他 getter、全局行选择、数值/日期与 metadata 不在写集。用伪 AKShare 经真实候选调用证明显式 SH/SZ 精确 kwargs、缺场所零股票调用、失败/空表零股票回退及行业独立；定向→既有fundamental消费者回归→限定lint/编译。无真实来源或运行资源；失败只重试一次后记录。当前裸代码消费者将按已知缺失安全拒绝股票能力，未将此宣称为股票资金流成功或全面 Consumer 修复。
+请求作用域发现完成：[证据 §7](../../evidence/2026-09-28-cont-m3-flow-contract.md)确认实际 SDK stock/market 参数和 Manager 预归一化剥离场所。`R06.12-request-scope-guard` 规划 Ready；对应 Spec §3.3 已固定，金额合同 skip 保留。独占写集：DSA 新 `data_provider/eastmoney_individual_fund_flow_request.py`、新 `tests/test_eastmoney_individual_fund_flow_request.py`、`data_provider/fundamental_adapter.py` 的 import/get_capital_flow 狭窄接缝；专属主仓 evidence `2026-09-28-cont-m3-flow-request-scope.md`。所有者 cont_m3_flow_contract，pending。原大文件净行数不得增加；其他 getter、全局行选择、数值/日期与 metadata 不在写集。用伪 AKShare 经真实候选调用证明显式 SH/SZ 精确 kwargs、缺场所零股票调用、失败/空表零股票回退及行业独立；定向→既有fundamental消费者回归→限定lint/编译。无真实来源或运行资源；失败只重试一次后记录。当前裸代码消费者将按已知缺失安全拒绝股票能力，未将此宣称为股票资金流成功或全面 Consumer 修复。
 
 | ID | 唯一问题 / 结果 | 依赖与边界 | 独占写集 / 资源 | 所有者 | 状态 | 检查与停止条件 |
 | --- | --- | --- | --- | --- | --- | --- |
-| CONT-I01-request-identity | 核实同事实两次请求的传输requestId是否进入不可变完整响应身份并造成I01入参冲突 | 现有单窗口hash、repository和失败fixture；仅静态源码/原fixture离线内存比较，不复跑Worker/DB/DSA/来源门禁 | 仅evidence `2026-09-28-cont-i01-request-identity.md`；无生产源码写权或共享运行资源 | cont_i01_request_identity | worker_done | [证据](../../tasks/evidence/2026-09-28-cont-i01-request-identity.md)；实际生产先规范化requestId，同fixture只改requestId得到hashEqual=true，二次静态核对一致，排除此假设；原ORM响应未保留，根因与真实门禁仍未通过 |
+| CONT-I01-request-identity | 核实同事实两次请求的传输requestId是否进入不可变完整响应身份并造成I01入参冲突 | 现有单窗口hash、repository和失败fixture；仅静态源码/原fixture离线内存比较，不复跑Worker/DB/DSA/来源门禁 | 仅evidence `2026-09-28-cont-i01-request-identity.md`；无生产源码写权或共享运行资源 | cont_i01_request_identity | worker_done | [证据](../../evidence/2026-09-28-cont-i01-request-identity.md)；实际生产先规范化requestId，同fixture只改requestId得到hashEqual=true，二次静态核对一致，排除此假设；原ORM响应未保留，根因与真实门禁仍未通过 |
 
-R06.12 请求 guard 已交付：[实施证据](../../tasks/evidence/2026-09-28-cont-m3-flow-request-scope.md)；新5项及相关33项通过，限定lint/编译/空白通过，adapter 715→715行，无来源请求，进程停止/写权交还。独立后继 `R06.12-explicit-scope-consumer` 只恢复调用方原有完整 `.SH/.SZ` 向股票资金流 adapter 的传递，不把裸码推定为场所。独占候选写集 DSA `data_provider/base.py` 的 `get_capital_flow_context` / `get_fundamental_context` 两个调用接缝、新 `tests/test_capital_flow_request_scope_context.py`、专属主仓 evidence `2026-09-28-cont-m3-flow-scope-consumer.md`；其他价格/财务 getter 和参数规范化合同保持其已有逻辑，不增加原大文件规模。所有者 cont_m3_flow_contract，pending；先在只读原函数确认原完整参数尚可保存且没有跨 getter 语义改动后才实施，否则记录 needs_split。完成检查：实际 Manager→adapter 受控请求保留显式场所、裸码拒绝、未知格式拒绝、资金流为空不被行业聚合掩盖、其他调用仍收到原规范代码；定向与既有context回归、限定lint/语法/净规模检查。单位/最新日期/原响应身份/真实准入门禁继续未通过。
+R06.12 请求 guard 已交付：[实施证据](../../evidence/2026-09-28-cont-m3-flow-request-scope.md)；新5项及相关33项通过，限定lint/编译/空白通过，adapter 715→715行，无来源请求，进程停止/写权交还。独立后继 `R06.12-explicit-scope-consumer` 只恢复调用方原有完整 `.SH/.SZ` 向股票资金流 adapter 的传递，不把裸码推定为场所。独占候选写集 DSA `data_provider/base.py` 的 `get_capital_flow_context` / `get_fundamental_context` 两个调用接缝、新 `tests/test_capital_flow_request_scope_context.py`、专属主仓 evidence `2026-09-28-cont-m3-flow-scope-consumer.md`；其他价格/财务 getter 和参数规范化合同保持其已有逻辑，不增加原大文件规模。所有者 cont_m3_flow_contract，pending；先在只读原函数确认原完整参数尚可保存且没有跨 getter 语义改动后才实施，否则记录 needs_split。完成检查：实际 Manager→adapter 受控请求保留显式场所、裸码拒绝、未知格式拒绝、资金流为空不被行业聚合掩盖、其他调用仍收到原规范代码；定向与既有context回归、限定lint/语法/净规模检查。单位/最新日期/原响应身份/真实准入门禁继续未通过。
 
 consumer 执行包补充：在 `get_fundamental_context` 自身的 CN cache_key 接缝纳入作用域约束版本及规范化前原始请求身份；公共 `_get_fundamental_cache_key` 和其他 getter 只读。该变更防止 `.SH/.SZ` 成功资金流经裸码缓存读取绕过缺身份拒绝，也拒绝旧无scope缓存复用；只读发现已证实旧公共key会剥离后缀。对应 Spec §3.3 已先更新，授权在原独占函数内实施此必要隔离。新增正反顺序缓存用例（显式→裸码、裸码→显式、不同场所、旧无scope seed）及同scope复用，其他市场/调用保持原合同。大文件净规模 ratchet 不放宽；失败一次重试后记录跳过。
 
-R06.12 consumer 已交付：[证据](../../tasks/evidence/2026-09-28-cont-m3-flow-scope-consumer.md)；两个入口仅向资金流保留原场所，CN cache 以 `capital-scope-v1` 和原身份隔离，其他getter/非CN行为保持。consumer+guard 9项与关联33项通过，项目关键lint/编译/空白通过，`base.py` 3774→3774行。整文件风格lint仍有95项未触及债务，owned范围0项，不计为整文件lint通过；无真实请求，进程停止/写权交还。完整金额、日期选行、原响应身份和真实准入仍skip。
+R06.12 consumer 已交付：[证据](../../evidence/2026-09-28-cont-m3-flow-scope-consumer.md)；两个入口仅向资金流保留原场所，CN cache 以 `capital-scope-v1` 和原身份隔离，其他getter/非CN行为保持。consumer+guard 9项与关联33项通过，项目关键lint/编译/空白通过，`base.py` 3774→3774行。整文件风格lint仍有95项未触及债务，owned范围0项，不计为整文件lint通过；无真实请求，进程停止/写权交还。完整金额、日期选行、原响应身份和真实准入仍skip。
 
-`CONT-M26-event-runtime-seams` 只读发现叶 Ready：确认现有事件库存、修订、Provider runtime、鉴权HTTP与受控测试的精确接缝及独占生产写集，不消费正在修改的Schemas/DSA mapped模块、不运行来源请求。所有者 cont_m26_runtime_seams；唯一写集 `docs/tasks/evidence/2026-09-28-cont-m26-runtime-seams.md`，源码只读。输出一份可派发执行包，明确当前安全修订和入场前/返回前检查、共享资源与测试命令；源事实未知则保留覆盖/准入阻塞，不扩大到其他来源。
+`CONT-M26-event-runtime-seams` 只读发现叶 Ready：确认现有事件库存、修订、Provider runtime、鉴权HTTP与受控测试的精确接缝及独占生产写集，不消费正在修改的Schemas/DSA mapped模块、不运行来源请求。所有者 cont_m26_runtime_seams；唯一写集 `docs/evidence/2026-09-28-cont-m26-runtime-seams.md`，源码只读。输出一份可派发执行包，明确当前安全修订和入场前/返回前检查、共享资源与测试命令；源事实未知则保留覆盖/准入阻塞，不扩大到其他来源。
 
-`CONT-acceptance-frontier` 只读对账 Ready：按完整 Spec AC01–AC20、主Task未完成叶及唯一117单元目录，区分已有局部完成、外部前提/预算阻塞、未实施但可独立就绪项。所有者 cont_acceptance_frontier；仅写专属 `docs/tasks/evidence/2026-09-28-cont-acceptance-frontier.md`，不写主台账/Spec/SSOT，不读取进行中的wire，不运行测试/来源/账号/DB。输出可继续推进的最小叶执行包或证据支持的跳过理由，历史失败预算不重置；至少核对M1/M2/M3和真实/AI/UI，避免仅关闭本批便冒充全文完成。
+`CONT-acceptance-frontier` 只读对账 Ready：按完整 Spec AC01–AC20、主Task未完成叶及唯一117单元目录，区分已有局部完成、外部前提/预算阻塞、未实施但可独立就绪项。所有者 cont_acceptance_frontier；仅写专属 `docs/evidence/2026-09-28-cont-acceptance-frontier.md`，不写主台账/Spec/SSOT，不读取进行中的wire，不运行测试/来源/账号/DB。输出可继续推进的最小叶执行包或证据支持的跳过理由，历史失败预算不重置；至少核对M1/M2/M3和真实/AI/UI，避免仅关闭本批便冒充全文完成。
 
 `M26-b2-identity-consumer` 待 wire 稳定build释放后 Ready，执行包已固定：新 `apps/server/src/market/market-tushare-identity-v3.ts`，狭窄 `market/market-event-selector-v3.ts` 与 `backtest/backtest-snapshot-v3-events.ts` 的验证器调用；新 `apps/server/test/market/tushare-event-fixtures.ts`、`market-tushare-identity-v3.test.ts`、`test/backtest/backtest-tushare-identity-replay-v3.test.ts`；仅专属 evidence `2026-09-28-cont-m26-identity-consumer.md`。Schemas、既有RQData/EastMoney及Store实现只读；复用共享golden，真实UTF-8摘要独立重算，验证bundle范围/币种/准入，在线失败不重试/切源，离线实际Parquet及新Store读回重验。合成coverage=true只测试既有完整覆盖路径，原读取coverage=false仍拒绝冻结，不授予实际历史资格。定向自身/既有event/RQData/split→Server类型→限定lint/strict复杂度/格式/尺寸/边界；全包和Server dist待所有源码稳定后由唯一验证所有者处理。无网络/DB/账号/目标请求；失败重试一次仍失败记录，扩大写集前返回needs_split。
 
-`CONT-M26-event-runtime-seams` 已完成并返回拆分：[证据](../../tasks/evidence/2026-09-28-cont-m26-runtime-seams.md)。现有事件policy/目录/通用Tushare准入检查可能在证据前读取账号，生产叶必须parse后先做不读取凭据的当前准入/原文guard；通过不等于ready，后续HMAC与policy/catalog/security前后完整复核仍必要。库存与runtime两叶串行，源码所有权不重叠；registry叶独占上述两源/新test，无共享build/目标/真实配置，定向event控制/修订回归后限定lint/编译/空白，失败重试一次后记录。Server消费者可独立并行；生产wire输出须待消费者通过。
+`CONT-M26-event-runtime-seams` 已完成并返回拆分：[证据](../../evidence/2026-09-28-cont-m26-runtime-seams.md)。现有事件policy/目录/通用Tushare准入检查可能在证据前读取账号，生产叶必须parse后先做不读取凭据的当前准入/原文guard；通过不等于ready，后续HMAC与policy/catalog/security前后完整复核仍必要。库存与runtime两叶串行，源码所有权不重叠；registry叶独占上述两源/新test，无共享build/目标/真实配置，定向event控制/修订回归后限定lint/编译/空白，失败重试一次后记录。Server消费者可独立并行；生产wire输出须待消费者通过。
 
-`CONT-acceptance-frontier` 已完成：[全文对账](../../tasks/evidence/2026-09-28-cont-acceptance-frontier.md)覆盖AC01–AC20、M1/M21–M34及117目录单元分组，既有完成项不重做，卡点按实际尝试/缺失输入保留，没有将每项虚构成两次失败。下一独立 Ready 为 `R02.5/R02.6-eastmoney-quote-unique-row`：新 DSA `data_provider/eastmoney_quote_identity.py`、新`tests/test_eastmoney_quote_identity.py`，既有`data_provider/akshare_fetcher.py` 股票/ETF EM报价两处行选择接缝；专属 evidence `2026-09-28-cont-m3-eastmoney-quote-identity.md`。所有者待派；Spec §3.3已先补唯一精确目标行约束。缺代码列/无目标/重复目标拒绝原来源；保持endpoint/单位/时间/回退，原大文件净不增。不新增真实请求；实际Fetcher伪SDK正反例→现存报价/日志/回退回归→限定lint/语法/规模/空白，失败重试一次记录，其他源码只读。
+`CONT-acceptance-frontier` 已完成：[全文对账](../../evidence/2026-09-28-cont-acceptance-frontier.md)覆盖AC01–AC20、M1/M21–M34及117目录单元分组，既有完成项不重做，卡点按实际尝试/缺失输入保留，没有将每项虚构成两次失败。下一独立 Ready 为 `R02.5/R02.6-eastmoney-quote-unique-row`：新 DSA `data_provider/eastmoney_quote_identity.py`、新`tests/test_eastmoney_quote_identity.py`，既有`data_provider/akshare_fetcher.py` 股票/ETF EM报价两处行选择接缝；专属 evidence `2026-09-28-cont-m3-eastmoney-quote-identity.md`。所有者待派；Spec §3.3已先补唯一精确目标行约束。缺代码列/无目标/重复目标拒绝原来源；保持endpoint/单位/时间/回退，原大文件净不增。不新增真实请求；实际Fetcher伪SDK正反例→现存报价/日志/回退回归→限定lint/语法/规模/空白，失败重试一次记录，其他源码只读。
 
 调度卡点：报价唯一行叶两次新会话派发均返回 `agent thread limit reached`，未启动worker/测试、未修改报价源码。按用户规则记录本次调度跳过，不计为已完成或源码失败；执行包和真实准入义务仍保留。旧runtime发现会话续派也两次同类失败，已以可用新registry会话承接相同独占范围，不重置任何源码或来源请求预算。Schemas已完成会话未占源码/dist写权，不能为了工具调度复用其不相关上下文实施报价。
 
@@ -1632,7 +1632,7 @@ Server consumer限定格式检查发现原 `market-event-selector-v3.ts` 已有�
 
 `M26-b2-event-runtime-local` 执行包已固定，等待Server consumer通过后释放：新 DSA `src/services/thesis_ledger_tushare_event_v3.py`、新 `tests/test_thesis_ledger_tushare_events_v3.py`；既有 `src/services/thesis_ledger_event_v3.py` 请求解析/前置guard/读返回接缝、`src/services/thesis_ledger_provider_runtime.py` 当前事件准入/目录修订分流及可信同快照Fetcher构造接缝、`api/thesis_ledger_events_v3.py` 鉴权安全配置读前/读后复核；仅专属 evidence `2026-09-28-cont-m26-event-runtime.md`。库存/修订、mapped/resolver、Schemas/Server、Control凭据实现均只读。大文件净规模ratchet不放宽，新增职责放Tushare专属服务；需要额外职责模块先返回needs_split。先真实runtime临时SQLite/原文/底层HTTP mock闭环，再实际TestClient HTTP/Bearer安全配置轮换闭环，公共成功保留原文、事实精度/源日期/空集版本/coverage=false，错误脱敏且零自动重试。验证缺原文在policy/catalog前零凭据读取（涵盖Control账号解密，不只snapshot spy），生产current matcher、读后撤销/修订/凭据/策略/目录/安全轮换、跨仓严格wire消费。定向→既有event/RQData/bar安全相关回归→限定lint/编译/规模/空白；只一次修复重试，未通过不升级目标。没有真实来源/账号/目标准入或DB请求。
 
-`CONT-Server-stable-gates` Ready：Server/Schemas所有本批源码及局部检查已稳定，DSA生产叶只写相邻repo，不影响Server构建输入。所有者 cont_m26_server_consumer；唯一写集主仓专属 `docs/tasks/evidence/2026-09-28-cont-server-stable-gates.md`、独占 `apps/server/dist` 构建产物及 `/private/tmp/cont-server-stable-*` 日志/输入清单；所有源码/测试/manifest/lock/Schema dist只读。按稳定输入先Server全包（真实DB/公开原包默认skip独立统计）→类型/build→本批Server/Schemas限定normal/strict20/220 lint及格式→全仓边界/包依赖/真实HEAD尺寸ratchet及限定空白，失败不升级、一次重试后记录；不借旧无基线尺寸通过。保留起终源码/config输入摘要和实际dist清单，DSA/runtime/目标/Provider/AI/DB不在本叶，目标同步仍等待DSA低层门禁通过。
+`CONT-Server-stable-gates` Ready：Server/Schemas所有本批源码及局部检查已稳定，DSA生产叶只写相邻repo，不影响Server构建输入。所有者 cont_m26_server_consumer；唯一写集主仓专属 `docs/evidence/2026-09-28-cont-server-stable-gates.md`、独占 `apps/server/dist` 构建产物及 `/private/tmp/cont-server-stable-*` 日志/输入清单；所有源码/测试/manifest/lock/Schema dist只读。按稳定输入先Server全包（真实DB/公开原包默认skip独立统计）→类型/build→本批Server/Schemas限定normal/strict20/220 lint及格式→全仓边界/包依赖/真实HEAD尺寸ratchet及限定空白，失败不升级、一次重试后记录；不借旧无基线尺寸通过。保留起终源码/config输入摘要和实际dist清单，DSA/runtime/目标/Provider/AI/DB不在本叶，目标同步仍等待DSA低层门禁通过。
 
 生产叶合同澄清：HTTP当前安全配置仅现有 `THESIS_LEDGER_DSA_TOKEN`/Bearer，策略enabled/targets名单按既有policy前后快照复查，不新造HTTP安全开关。事件公共响应仅使用既有strict wire字段；内部reader的retrieval/observations及全部独立源日期保留并验证，不新增公共顶层字段，public只投影协议已定义的facts/recordDate/paymentDate/strategyVisibility等。内部内容指纹不是供应商历史数据版本；原始其他日期未进入public不能声称公共完整封存。
 
@@ -1642,13 +1642,13 @@ Server consumer限定格式检查发现原 `market-event-selector-v3.ts` 已有�
 
 资源条件变化后的调度恢复：Server稳定门禁与DSA生产会话已结束，报价唯一行叶 `R02.5/R02.6-eastmoney-quote-unique-row` 新鲜会话派发成功，所有者 cont_quote_final，running；精确原写集/合同不变。先前两次thread limit是历史工具失败，不计源码已完成/失败，也不重置任何已耗尽来源预算；DSA最终共享检查等待本叶源码稳定，Server/Schemas输入不受这条Python报价修改影响，其已通过结果可复用。
 
-`CONT-Server-stable-gates` 专属[最终证据](../../tasks/evidence/2026-09-28-cont-server-stable-gates.md)已完成，所有命令结束、Server dist正式交还；逐文件1950项SHA清单位于 `/private/tmp/cont-server-stable-dist.json`。此前“worker仍收尾”属于历史进度，不是当前假running。
+`CONT-Server-stable-gates` 专属[最终证据](../../evidence/2026-09-28-cont-server-stable-gates.md)已完成，所有命令结束、Server dist正式交还；逐文件1950项SHA清单位于 `/private/tmp/cont-server-stable-dist.json`。此前“worker仍收尾”属于历史进度，不是当前假running。
 
 报价叶局部结果已回报：59新增及45关联项通过，helper/test限定lint、全仓projectcritical E9/F63/F7/F82通过；`akshare_fetcher.py` 2633→2630行，整文件200条存量style债仍在核对基线不增，不能计作整文件风格通过。worker仍补专属evidence，不启动共享DSA检查或目标同步；真实单位/时点/来源准入仍开放。
 
-`CONT-DSA-stable-gates` 待报价最终交付后Ready：所有本批Python源码暂停修改；唯一执行者 cont_m26_event_registry，独占 `/private/tmp/cont-dsa-stable-*` 日志/必要隔离临时测试文件和专属 `docs/tasks/evidence/2026-09-28-cont-dsa-stable-gates.md`，全部源码/测试/配置只读。先已有定向证据核对及官方 `scripts/ci_gate.sh syntax`/`flake8` critical，再官方 `offline-tests`（`-m 'not network'`、真实timeout插件/线程watchdog保留，不降低门禁）。预检测试环境/默认DB路径与凭据隔离，不读取真实账号、不调用真实来源/目标，不因测试失败自动安装依赖或修改源；不得把单测临时SQLite叫目标结构验收。缺环境/必需检查失败只一次补查或重试后记录，暂停目标升级；成功记录实际pass/skip/deselected、起终输入摘要与路径，复用未变输入结果。前述普通style基线债单独保留，不冒充fullstyle通过；文档/Frontend/Native未改源码，不额外构建。root在稳定门禁后安排官方目标同步与一次最终集中Review。
+`CONT-DSA-stable-gates` 待报价最终交付后Ready：所有本批Python源码暂停修改；唯一执行者 cont_m26_event_registry，独占 `/private/tmp/cont-dsa-stable-*` 日志/必要隔离临时测试文件和专属 `docs/evidence/2026-09-28-cont-dsa-stable-gates.md`，全部源码/测试/配置只读。先已有定向证据核对及官方 `scripts/ci_gate.sh syntax`/`flake8` critical，再官方 `offline-tests`（`-m 'not network'`、真实timeout插件/线程watchdog保留，不降低门禁）。预检测试环境/默认DB路径与凭据隔离，不读取真实账号、不调用真实来源/目标，不因测试失败自动安装依赖或修改源；不得把单测临时SQLite叫目标结构验收。缺环境/必需检查失败只一次补查或重试后记录，暂停目标升级；成功记录实际pass/skip/deselected、起终输入摘要与路径，复用未变输入结果。前述普通style基线债单独保留，不冒充fullstyle通过；文档/Frontend/Native未改源码，不额外构建。root在稳定门禁后安排官方目标同步与一次最终集中Review。
 
-报价叶 `R02.5/R02.6-eastmoney-quote-unique-row` 已worker_done：[证据](../../tasks/evidence/2026-09-28-cont-m3-eastmoney-quote-identity.md)。`unique_quote_row(frame, stock_code)` 只返回唯一精确原行；59新/45关联通过，新文件lint/编译、全仓critical、owned接缝/空白通过。精确反向恢复本叶前字节并匹配派发SHA，整文件style原202→当前200，新增诊断0；2633→2630行。所有进程停、写权交还；此前派发skip已在资源改变后恢复完成，不是当前未实施义务。原R02.5/.6父单元的其他候选、单位/时点/真实准入依旧开放。
+报价叶 `R02.5/R02.6-eastmoney-quote-unique-row` 已worker_done：[证据](../../evidence/2026-09-28-cont-m3-eastmoney-quote-identity.md)。`unique_quote_row(frame, stock_code)` 只返回唯一精确原行；59新/45关联通过，新文件lint/编译、全仓critical、owned接缝/空白通过。精确反向恢复本叶前字节并匹配派发SHA，整文件style原202→当前200，新增诊断0；2633→2630行。所有进程停、写权交还；此前派发skip已在资源改变后恢复完成，不是当前未实施义务。原R02.5/.6父单元的其他候选、单位/时点/真实准入依旧开放。
 
 `CONT-DSA-stable-gates` 上游全部稳定，现Ready并派cont_m26_event_registry执行；唯一共享Python检查所有者。全部三仓源码冻结，root仅对齐说明文档；Server/Schemas门禁输入未变，已通过高成本结果复用。
 
@@ -1658,177 +1658,177 @@ DSA隔离官方门禁首失败保留：syntax/critical退出0，offline收集225
 
 DSA稳定门禁唯一重试已完整结束：7229 collected、7225 selected，7208 passed、16 failed、1 skipped、4 deselected，594 subtests passed。首轮副本遗漏源码、第二轮隔离native子进程及Node PATH存在限制，同时保留实际断言失败；不能计为全包通过。第二轮启动前最终完整输入critical未先完成，随后syntax/critical均退出0，但顺序偏差保留；HOME只从继承环境删除，未显式指向临时目录，SDK fallback账号读取全覆盖未知，不能声称OS-wide隔离或已证明零真实账号读取。原工作树完整预期1347输入与副本missing/extra/hash mismatch均0；本叶进程精确清理结束。详见即将归档的专属证据，禁止第三次同前提全包重跑，依赖本门禁的目标同步记录跳过，不用Server/Schemas通过替代DSA结果。
 
-集中源码Review修复叶 `CONT-M26-url-authority` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-m26-url-authority.md)。Python resolver的`urlsplit`原接受authority中反斜杠，共享wire拒绝；新测试先证明两证据角色/生产入口旧错误放行，再在`_document`拒绝该authority，不改原文bytes、路径/查询及正常Unicode URL。纯resolver159项、生产入口43项、限定lint/compile/空白通过；实际入口对非法证明在policy/catalog/环境snapshot/Control解密/adapter/来源前零调用，Schema稳定dist亦拒绝。DSA源码输入因此较失败全包快照变化；不能把该修复或定向通过倒填为全包通过，无第三次全包/目标/真实请求。
+集中源码Review修复叶 `CONT-M26-url-authority` worker_done：[证据](../../evidence/2026-09-28-cont-m26-url-authority.md)。Python resolver的`urlsplit`原接受authority中反斜杠，共享wire拒绝；新测试先证明两证据角色/生产入口旧错误放行，再在`_document`拒绝该authority，不改原文bytes、路径/查询及正常Unicode URL。纯resolver159项、生产入口43项、限定lint/compile/空白通过；实际入口对非法证明在policy/catalog/环境snapshot/Control解密/adapter/来源前零调用，Schema稳定dist亦拒绝。DSA源码输入因此较失败全包快照变化；不能把该修复或定向通过倒填为全包通过，无第三次全包/目标/真实请求。
 
-集中Review只读分类叶 `CONT-DSA-inventory-regression` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-inventory-regression.md)。V3事件目录多Tushare精确CASH、Provider注册多空宽能力RQData、V2 HiThink provider资产并集分属两个独立source；三项失败均为旧测试固定假设，不是目前已证明的生产回归。旧V2错配拒绝、正确配对未准入仍需保持；原全包失败数不变。
+集中Review只读分类叶 `CONT-DSA-inventory-regression` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-inventory-regression.md)。V3事件目录多Tushare精确CASH、Provider注册多空宽能力RQData、V2 HiThink provider资产并集分属两个独立source；三项失败均为旧测试固定假设，不是目前已证明的生产回归。旧V2错配拒绝、正确配对未准入仍需保持；原全包失败数不变。
 
-`CONT-DSA-inventory-assertions` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-inventory-assertions.md)。仅三个旧测试合同修正，原三项定向3失败→3通过，Tushare/RQData/HiThink/V2关联60通过、限定lint/编译/空白通过；生产manifest/适配器未改，旧V2错配拒绝及正确配对未准入保留。其余13项失败以及完整门禁结论不变。
+`CONT-DSA-inventory-assertions` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-inventory-assertions.md)。仅三个旧测试合同修正，原三项定向3失败→3通过，Tushare/RQData/HiThink/V2关联60通过、限定lint/编译/空白通过；生产manifest/适配器未改，旧V2错配拒绝及正确配对未准入保留。其余13项失败以及完整门禁结论不变。
 
-全包其余实际断言只读分诊叶 `CONT-DSA-residual-gate-triage` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-residual-gate-triage.md)。仅requirements中文注释是本批格式回归；两个无key测试与源码空串合同失配、`.env.example`两项服务器配置缺隐藏登记、LiteLLM直调prompt_cache_key透传、Yfinance两个固定日期fixture过期均为已有状态。后四类不能一律归因本批、也不能改断言就宣称安全或真实Provider通过。全包16失败原统计保持。
+全包其余实际断言只读分诊叶 `CONT-DSA-residual-gate-triage` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-residual-gate-triage.md)。仅requirements中文注释是本批格式回归；两个无key测试与源码空串合同失配、`.env.example`两项服务器配置缺隐藏登记、LiteLLM直调prompt_cache_key透传、Yfinance两个固定日期fixture过期均为已有状态。后四类不能一律归因本批、也不能改断言就宣称安全或真实Provider通过。全包16失败原统计保持。
 
-`CONT-DSA-requirements-ascii` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-requirements-ascii.md)。仅两处注释改为ASCII，原byte402失败→定向1通过；44条依赖声明、版本和顺序逐条不变，全文件ASCII及限定空白通过。未安装依赖、改锁/镜像/目标，也未第三次全包。
+`CONT-DSA-requirements-ascii` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-requirements-ascii.md)。仅两处注释改为ASCII，原byte402失败→定向1通过；44条依赖声明、版本和顺序逐条不变，全文件ASCII及限定空白通过。未安装依赖、改锁/镜像/目标，也未第三次全包。
 
-`CONT-DSA-yfinance-clock-fixture` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-yfinance-clock-fixture.md)。原两个断言在真实时钟均3≠4；仅测试固定观察时刻并增加刚越365天边界反例，原4次/1.05金额/收益率断言保留，本文件13通过、限定lint/compile/空白通过，生产365天逻辑未改。
+`CONT-DSA-yfinance-clock-fixture` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-yfinance-clock-fixture.md)。原两个断言在真实时钟均3≠4；仅测试固定观察时刻并增加刚越365天边界反例，原4次/1.05金额/收益率断言保留，本文件13通过、限定lint/compile/空白通过，生产365天逻辑未改。
 
-集中Review新增 `CONT-M26-url-host-proof` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-m26-url-host-proof.md)。`urlsplit`原接受畸形百分号、非法解码及代理项主机名；共享wire拒绝的14个纯解析/生产入口反例先失败，修复后相关两文件217项通过，合法百分编码/Unicode路径/前一反斜杠回归保持；非法证据在policy/catalog/环境/Control解密/adapter/来源前零调用。限定lint/compile/空白通过，原文字节与Schema dist未改；全包、真实来源与目标仍不通过/未执行。
+集中Review新增 `CONT-M26-url-host-proof` worker_done：[证据](../../evidence/2026-09-28-cont-m26-url-host-proof.md)。`urlsplit`原接受畸形百分号、非法解码及代理项主机名；共享wire拒绝的14个纯解析/生产入口反例先失败，修复后相关两文件217项通过，合法百分编码/Unicode路径/前一反斜杠回归保持；非法证据在policy/catalog/环境/Control解密/adapter/来源前零调用。限定lint/compile/空白通过，原文字节与Schema dist未改；全包、真实来源与目标仍不通过/未执行。
 
-`CONT-DSA-settings-visibility` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-settings-visibility.md)。原配置覆盖断言1失败→配置文件59通过；两服务内部键纳入有意隐藏集合并显式断言不在注册字段/Schema投影。该集合仅用于测试，未改变生产UI或鉴权/fixture运行行为；编译/空白通过，整文件常规flake8仍有存量E302，排除存量E302/E501的限定检查通过，不称fullstyle通过。无真实凭据、目标或第三次全包。
+`CONT-DSA-settings-visibility` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-settings-visibility.md)。原配置覆盖断言1失败→配置文件59通过；两服务内部键纳入有意隐藏集合并显式断言不在注册字段/Schema投影。该集合仅用于测试，未改变生产UI或鉴权/fixture运行行为；编译/空白通过，整文件常规flake8仍有存量E302，排除存量E302/E501的限定检查通过，不称fullstyle通过。无真实凭据、目标或第三次全包。
 
-本次[集中 Review](../../tasks/evidence/2026-09-28-cont-final-review.md)已覆盖当时实际改动、跨仓合同、局部回归与全部 AC01–AC20 剩余条件。Review 发现的两类 Tushare URL 原文先验差异已由定向修复关闭；`CONT-DSA-stable-gates` 状态仍为 blocked/skipped：完整门禁历史两轮失败且未第三次重跑。Server/Schemas 已通过输入逐文件复核可复用。目标同步跳过；如未来满足门禁并获准目标更新，本批同时有 Server+DSA 源码且 `requirements.txt` 已改，须先按 infra 官方 `update.sh all` 预检，不把 `sync-code.sh` 或旧容器当本批验收。该 Review 是当时检查点，后续独立叶见下文；§13 仍不勾选。
+本次[集中 Review](../../evidence/2026-09-28-cont-final-review.md)已覆盖当时实际改动、跨仓合同、局部回归与全部 AC01–AC20 剩余条件。Review 发现的两类 Tushare URL 原文先验差异已由定向修复关闭；`CONT-DSA-stable-gates` 状态仍为 blocked/skipped：完整门禁历史两轮失败且未第三次重跑。Server/Schemas 已通过输入逐文件复核可复用。目标同步跳过；如未来满足门禁并获准目标更新，本批同时有 Server+DSA 源码且 `requirements.txt` 已改，须先按 infra 官方 `update.sh all` 预检，不把 `sync-code.sh` 或旧容器当本批验收。该 Review 是当时检查点，后续独立叶见下文；§13 仍不勾选。
 
 续接后的独立就绪叶 `CONT-DSA-empty-key-regression`：DSA `AlphaVantageFetcher`、`FinnhubFetcher` 早已将缺失 API key 规范化为`''`并在调用 HTTP 前拒绝，旧两个测试仍断言`None`。只修改DSA `tests/test_alphavantage_fetcher.py` 与`tests/test_finnhub_fetcher.py`的无key断言及同用例零来源调用验证，生产抓取器/凭据/配置只读；专属证据 `evidence/2026-09-28-cont-dsa-empty-key-regression.md`。先复现两断言，再修复测试并核对缺key仍拒绝实际来源；定向→两文件回归→限定lint/编译/空白，失败一次修复重试。无真实账号/网络、无第三次DSA全包或目标同步；本叶只能关闭两个定向失败，不能改变原完整门禁统计。
 
-`CONT-DSA-empty-key-regression` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-empty-key-regression.md)。原两个精确用例复现 2 failed，修后 2 passed、两文件 31 passed；缺 key 抛 `DataFetchError` 且 HTTP mock 零调用。限定 flake8、编译、空白通过；仅两测试文件改变，两个生产抓取器 SHA 未变。原完整离线全包仍为 7208 passed/16 failed 的历史结果，未第三次重跑。
+`CONT-DSA-empty-key-regression` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-empty-key-regression.md)。原两个精确用例复现 2 failed，修后 2 passed、两文件 31 passed；缺 key 抛 `DataFetchError` 且 HTTP mock 零调用。限定 flake8、编译、空白通过；仅两测试文件改变，两个生产抓取器 SHA 未变。原完整离线全包仍为 7208 passed/16 failed 的历史结果，未第三次重跑。
 
 `CONT-DSA-prompt-cache-boundary` 只读发现Ready：旧完整离线门禁的LiteLLM直调测试证明当前依赖会透传`prompt_cache_key`，但尚未证明DSA应用派发在未验证能力时发出该键。唯一写集专属 `evidence/2026-09-28-cont-dsa-prompt-cache-boundary.md`，DSA生产源码/tests/配置只读；追`apply_prompt_cache_hints`、`src/analyzer.py`所有派发与参数恢复、`extra_litellm_params`和Router/Hermes路径，查明是否存在可到达的未验证提示及测试层级错配。只用本地源码/已安装依赖与现有合成证据，不访问真实AI/账号/目标；输出可修复的精确owner、前置与定向闭环，或者在不能证明时记录待证而不删断言。
 
-`CONT-DSA-prompt-cache-boundary` worker_done：[只读证据](../../tasks/evidence/2026-09-28-cont-dsa-prompt-cache-boundary.md)。LiteLLM 1.100.0 的直调透传是第三方行为；但 DSA `LITELLM_CONFIG` 的 `model_list[].litellm_params.prompt_cache_key` 经 Analyzer、Agent、screening Router 可达最终请求，且 helper 在 hints 关闭或 `doc_only` 时保留预置请求键。已用不触网合成探针确认 helper 行为；完整应用到 localhost wire 的捕获仍待修复叶验证。未读取账号或请求真实来源。
+`CONT-DSA-prompt-cache-boundary` worker_done：[只读证据](../../evidence/2026-09-28-cont-dsa-prompt-cache-boundary.md)。LiteLLM 1.100.0 的直调透传是第三方行为；但 DSA `LITELLM_CONFIG` 的 `model_list[].litellm_params.prompt_cache_key` 经 Analyzer、Agent、screening Router 可达最终请求，且 helper 在 hints 关闭或 `doc_only` 时保留预置请求键。已用不触网合成探针确认 helper 行为；完整应用到 localhost wire 的捕获仍待修复叶验证。未读取账号或请求真实来源。
 
 `CONT-DSA-prompt-cache-core` Ready：仅修改 DSA `src/llm/provider_cache.py`、新增有明确请求边界职责的净化 helper 模块、`src/analyzer.py` 与本叶独立测试文件，改写 `tests/test_provider_cache.py` 中错误依赖第三方自动过滤的断言为应用边界断言，另写主仓专属证据 `evidence/2026-09-28-cont-dsa-prompt-cache-core.md`。合同：预置请求 key 在 hint 关闭或能力未验证时移除；Analyzer 的 Router deployment 入站先复制并移除预置 key，不变异原配置及其他参数；只有已验证且主动启用的 HMAC 派生 key 可到达请求。先用本地合成配置/localhost 捕获复现，再修复并跑定向测试、限定质量检查。不得以删除原失败断言代替应用 wire 验证，不触真实 Provider/账号/目标；本叶不改 Agent/screening 文件。
 
-`CONT-DSA-prompt-cache-core` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-prompt-cache-core.md)。Analyzer Router 的 localhost wire 修前收到合成配置 key，修后关闭 hints、`doc_only` 和 streaming 均无键；模拟 verified 且开启时只发派生 HMAC，第三方 LiteLLM 直调透传保留为对照。定向 136 passed，限定 lint/编译/空白通过；`analyzer.py` 4804→4803 行、`provider_cache.py` 842→842 行。真实 Provider 接受、命中与计费未验证。
+`CONT-DSA-prompt-cache-core` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-prompt-cache-core.md)。Analyzer Router 的 localhost wire 修前收到合成配置 key，修后关闭 hints、`doc_only` 和 streaming 均无键；模拟 verified 且开启时只发派生 HMAC，第三方 LiteLLM 直调透传保留为对照。定向 136 passed，限定 lint/编译/空白通过；`analyzer.py` 4804→4803 行、`provider_cache.py` 842→842 行。真实 Provider 接受、命中与计费未验证。
 
 `CONT-DSA-prompt-cache-consumers` Ready，依赖上一叶统一净化 helper 的导出合同：仅修改 DSA `src/agent/llm_adapter.py`、`src/services/screening/ranker.py` 与各自独立测试文件，另写主仓专属证据 `evidence/2026-09-28-cont-dsa-prompt-cache-consumers.md`。所有 Router 初始化点使用复制净化后的 deployment 列表，保持原配置和非缓存参数；以合成配置、Mock/localhost capture 验证两个消费面未验证 key 不到请求。限定定向测试、lint/编译/空白；不改 helper/Analyzer/其他 WIP，不触真实 Provider/账号/目标。任一叶遇到卡点只重试一次，仍不行则如实记录并跳过；不得把局部通过折算为 DSA 第三次全包通过。
 
-`CONT-DSA-prompt-cache-consumers` worker_done：[证据](../../tasks/evidence/2026-09-28-cont-dsa-prompt-cache-consumers.md)。Agent 两处和 screening 一处 Router 构造均接统一净化 helper；合成 Router 合并捕获中预置 key 不到请求，非缓存参数及原配置保留。专属与相邻检查 50 passed，限定 lint/编译/空白通过；真实 LiteLLM HTTP wire 只由上一核心叶覆盖，两个消费面本叶为模拟捕获，不能扩大宣称。
+`CONT-DSA-prompt-cache-consumers` worker_done：[证据](../../evidence/2026-09-28-cont-dsa-prompt-cache-consumers.md)。Agent 两处和 screening 一处 Router 构造均接统一净化 helper；合成 Router 合并捕获中预置 key 不到请求，非缓存参数及原配置保留。专属与相邻检查 50 passed，限定 lint/编译/空白通过；真实 LiteLLM HTTP wire 只由上一核心叶覆盖，两个消费面本叶为模拟捕获，不能扩大宣称。
 
 续接合并审阅：DSA 同一输入的九个相关测试文件 **202 passed、2 条第三方弃用 warning**，覆盖上述三个新叶与相邻 Analyzer/Router 回归。此为定向合并测试，原官方离线全包的 7208 passed/16 failed 历史结果不变，未第三次同前提运行；native/Node 隔离、真实来源、AI、目标、UI 及完整 Spec AC01–AC20 仍按原未完成状态，§13 不勾选。
 
 `CONT-D01-window-verification` Ready，依赖现有 D01 多窗口生产入口与 Spec §8.3；仅修改 DSA `tests/test_thesis_ledger_multi_window_response.py` 的参数化拒绝矩阵，主仓新增专属证据 `evidence/2026-09-28-cont-d01-window-verification.md` 并在精确核对后更新 §4 对应局部状态。补充不同量单位/口径及已观测交易日无交集反例；已有 API 测试覆盖预算、跨五年窗口、来源失败、漏 Bar、未完成分页、晚到与价格冲突，Schema/Server 测试覆盖 wire、冻结及离线重放。先运行新反例，再跑 DSA 多窗口定向、Schema/Server 对应测试和限定质量门禁；若发现实际合同缺口，限一次修复重试，不放宽单窗口/多窗口准入，也不触真实 HiThink、目标或 DSA 第三次全包。
 
-`CONT-D01-window-verification` done：[证据](../../tasks/evidence/2026-09-28-cont-d01-window-verification.md)。三条新增拒绝反例 3 passed；DSA 多窗口 20、Market V3 准入 14、Schemas 14、Server 9 项定向通过，测试文件 flake8/编译/空白通过。§4 中 D01 的 wire、执行与本地验证子项按当前源码和证据对账；数据库原样回读未由本地 Parquet 重放证明，`D01-consumption`、真实目标、G0-H、`D01-runtime` 与父 D01 继续开放。
+`CONT-D01-window-verification` done：[证据](../../evidence/2026-09-28-cont-d01-window-verification.md)。三条新增拒绝反例 3 passed；DSA 多窗口 20、Market V3 准入 14、Schemas 14、Server 9 项定向通过，测试文件 flake8/编译/空白通过。§4 中 D01 的 wire、执行与本地验证子项按当前源码和证据对账；数据库原样回读未由本地 Parquet 重放证明，`D01-consumption`、真实目标、G0-H、`D01-runtime` 与父 D01 继续开放。
 
 `CONT-R02.12-efinance-index-unique-row` Ready：R02.12 仅在已有 `get_main_indices` 读取接缝补指数代码目标行唯一性。写集限 DSA `data_provider/efinance_fetcher.py` 的该 getter、`tests/test_efinance_main_indices.py`，以及本叶主仓证据 `evidence/2026-09-28-cont-r02-12-efinance-index-identity.md`；能力目录及本 Task 仅作状态对账。先用合成 DataFrame 证明重复目标会被静默取首行，再修复并验证唯一目标、重复目标拒绝、错误/缺失代码与其他唯一指数保留。无真实来源调用，不改变 endpoint、字段单位、来源时点或 Consumer；P02、G0-M 和 R02.12 父项继续开放。卡点按用户要求仅重试一次，仍失败则记录跳过。
 
-`CONT-R02.12-efinance-index-unique-row` done：[本地证据](../../tasks/evidence/2026-09-28-cont-r02-12-efinance-index-identity.md)。重复目标修前 1 failed，修后本文件 5 passed、相邻指数/报价合并 32 passed；测试 flake8、编译和改动空白通过。生产大文件全文件 flake8 的存量告警仍存在，未作无关清理。R02.12 只收敛代码行唯一性，实际 endpoint/同源、时点/单位/覆盖、P02/G0-M、Consumer 和真实目标均开放。
+`CONT-R02.12-efinance-index-unique-row` done：[本地证据](../../evidence/2026-09-28-cont-r02-12-efinance-index-identity.md)。重复目标修前 1 failed，修后本文件 5 passed、相邻指数/报价合并 32 passed；测试 flake8、编译和改动空白通过。生产大文件全文件 flake8 的存量告警仍存在，未作无关清理。R02.12 只收敛代码行唯一性，实际 endpoint/同源、时点/单位/覆盖、P02/G0-M、Consumer 和真实目标均开放。
 
 `CONT-R02.12-efinance-full-identity` Ready：本地 `efinance 0.5.9` 的 `get_realtime_quotes('沪深系列指数')` 将 `fs=m:1 s:2,m:0 t:5` 传给 EastMoney `clist/get`，并用市场编号与六位代码生成 `行情ID`；当前 DSA getter 仅按六位代码选行，单条错市场记录可被错配。先在现有 `tests/test_efinance_main_indices.py` 补红例，再限改 DSA `data_provider/efinance_fetcher.py` 的该 getter，要求六位代码及完整 `行情ID` 同时匹配且唯一；Spec §3.3、能力目录、主仓证据 `evidence/2026-09-28-cont-r02-12-efinance-upstream-identity.md` 与交接记录只作合同/状态对账。保留现有价格字段映射与 Consumer，缺身份失败关闭；本地包源码不证明目标版本，HTTP 端点和单位/时点均不授真实准入。不请求真实来源或目标，不重跑已耗尽的 DSA 全包。
 
-`CONT-R02.12-efinance-full-identity` done：[来源与身份分层证据](../../tasks/evidence/2026-09-28-cont-r02-12-efinance-upstream-identity.md)。本地及当前 DSA 容器均装 `efinance 0.5.9`，三份相关包源码哈希一致；静态链确认该指数入口指向 EastMoney `http://push2.eastmoney.com/api/qt/clist/get`，并生成市场加代码的 `行情ID`，不是独立备用。错市场/缺完整身份的反例先失败，修后 getter 7 passed、相邻合并 34 passed；限定 lint/编译/空白通过。容器应用源码未同步，依赖只限定 `>=0.5.5`，未来构建版本、实际 HTTP 传输、真实来源时点/单位/权限/G0-M 未核，R02.12 父项保持开放。
+`CONT-R02.12-efinance-full-identity` done：[来源与身份分层证据](../../evidence/2026-09-28-cont-r02-12-efinance-upstream-identity.md)。本地及当前 DSA 容器均装 `efinance 0.5.9`，三份相关包源码哈希一致；静态链确认该指数入口指向 EastMoney `http://push2.eastmoney.com/api/qt/clist/get`，并生成市场加代码的 `行情ID`，不是独立备用。错市场/缺完整身份的反例先失败，修后 getter 7 passed、相邻合并 34 passed；限定 lint/编译/空白通过。容器应用源码未同步，依赖只限定 `>=0.5.5`，未来构建版本、实际 HTTP 传输、真实来源时点/单位/权限/G0-M 未核，R02.12 父项保持开放。
 
 `CONT-R02.7-efinance-stock-fallback-unique-row` Ready：股票 `get_realtime_quote` 在单标 `SHSZQuoteSnapshot` 失败后仍按原合同回退全市场 `get_realtime_quotes()`，目前对目标重复行取首条。写集限 DSA `data_provider/efinance_fetcher.py` 的此回退判断、`tests/test_efinance_realtime_quote.py`、Spec §3.3、能力目录及主仓证据 `evidence/2026-09-28-cont-r02-7-efinance-fallback-identity.md`。先用合成缓存反例证明重复目标取首条，再改成恰好一条；ETF 不触全市场、其他报价映射与回退范围不变。同步以当前本地及目标安装包静态源码记录单标 HTTPS `SHSZQuoteSnapshot` 与全市场 EastMoney HTTP `clist/get`，但不作真实调用、单位/时点/传输安全或 G0-M 准入推断；卡点仅重试一次。
 
-`CONT-R02.7-efinance-stock-fallback-unique-row` done：[本地证据](../../tasks/evidence/2026-09-28-cont-r02-7-efinance-fallback-identity.md)。重复目标修前 1 failed，修后四文件合并 35 passed；编译/改动空白通过，测试文件整文件 flake8 的既有 `E731` 和生产大文件存量告警保留。当前安装包源码证明单标 HTTPS 与全市场 HTTP 均属 EastMoney，行业板块也走全市场函数；实际回退请求、单位/时点/权限/G0-M 未通过，R02.7 父项继续开放。
+`CONT-R02.7-efinance-stock-fallback-unique-row` done：[本地证据](../../evidence/2026-09-28-cont-r02-7-efinance-fallback-identity.md)。重复目标修前 1 failed，修后四文件合并 35 passed；编译/改动空白通过，测试文件整文件 flake8 的既有 `E731` 和生产大文件存量告警保留。当前安装包源码证明单标 HTTPS 与全市场 HTTP 均属 EastMoney，行业板块也走全市场函数；实际回退请求、单位/时点/权限/G0-M 未通过，R02.7 父项继续开放。
 
-`CONT-R03-nav-ssot-reconcile` done：按现有 `EfinanceFetcher.get_fund_nav_history` → `eastmoney_fund_nav.read_fund_nav`、ProviderRuntime 对 `FUND_NAV`/`FUND_NAV_HISTORY` 的共同入口，以及[既有目标来源证据](../../../../daily-stock-analysis/docs/thesis-ledger-nav-source-evidence.md)，修正 DSA 能力目录 §3/§5 和旧证据开头的历史语义；生产归一化 docstring 去掉旧 SDK 归属。DSA 净值分页与 Efinance 相关两文件 25 passed，未发真实请求或更新目标。R03.1–R03.4 的披露时间、源端修订、成立以来覆盖和 G0-M 仍开放；此前目标样本不等于本次目标验收。
+`CONT-R03-nav-ssot-reconcile` done：按现有 `EfinanceFetcher.get_fund_nav_history` → `eastmoney_fund_nav.read_fund_nav`、ProviderRuntime 对 `FUND_NAV`/`FUND_NAV_HISTORY` 的共同入口，以及[既有目标来源证据](../../../../daily-stock-analysis/docs/evidence/thesis-ledger-nav-source-evidence.md)，修正 DSA 能力目录 §3/§5 和旧证据开头的历史语义；生产归一化 docstring 去掉旧 SDK 归属。DSA 净值分页与 Efinance 相关两文件 25 passed，未发真实请求或更新目标。R03.1–R03.4 的披露时间、源端修订、成立以来覆盖和 G0-M 仍开放；此前目标样本不等于本次目标验收。
 
-`CONT-R02-efinance-source-alias-migration` needs_contract：[R02.7 证据](../../tasks/evidence/2026-09-28-cont-r02-7-efinance-fallback-identity.md)发现 Control manifest 同时允许 `efinance`/`eastmoney` source，报价执行实际同一 EastMoney adapter，`ProviderExecution` 却原样记录选中 alias。[只读库存](../../tasks/evidence/2026-09-28-cont-source-alias-inventory.md)已确认目标当前/历史 V2 Policy 与旧健康/预算键仍有 alias、V3 证据为空；ETF 预算与健康/熔断安全前置均已独立完成。仍须在 Spec 固定逐能力真实上游、其他能力/Provider 准入与健康兼容、旧冻结/工件保真，再按“路由状态、执行面、消费/重放、目标验收”拆叶；不得仅删 manifest alias、静默重写既有路由或把两标签计为独立备用。完整迁移合同和目标验收未完成，G-M2-Fallback/G0-M 对此组合继续开放。
+`CONT-R02-efinance-source-alias-migration` needs_contract：[R02.7 证据](../../evidence/2026-09-28-cont-r02-7-efinance-fallback-identity.md)发现 Control manifest 同时允许 `efinance`/`eastmoney` source，报价执行实际同一 EastMoney adapter，`ProviderExecution` 却原样记录选中 alias。[只读库存](../../evidence/2026-09-28-cont-source-alias-inventory.md)已确认目标当前/历史 V2 Policy 与旧健康/预算键仍有 alias、V3 证据为空；ETF 预算与健康/熔断安全前置均已独立完成。仍须在 Spec 固定逐能力真实上游、其他能力/Provider 准入与健康兼容、旧冻结/工件保真，再按“路由状态、执行面、消费/重放、目标验收”拆叶；不得仅删 manifest alias、静默重写既有路由或把两标签计为独立备用。完整迁移合同和目标验收未完成，G-M2-Fallback/G0-M 对此组合继续开放。
 
 `CONT-R02-efinance-default-source` Ready：按 Spec §4.1 修**新建默认 V2 Desired Policy** 的 Efinance `REALTIME_QUOTE/STOCK+ETF` 与 `FUND_NAV/FUND_NAV_HISTORY/MUTUAL_FUND` RouteTarget 为 `eastmoney`，并在 DSA manifest 中只给该精确 source 登记已能分发的四组能力。写集为主仓 `apps/server/src/market/market-policy-storage.ts`、`apps/server/test/market-control.service.test.ts`；DSA `src/services/thesis_ledger_control.py` 的 Efinance manifest 构造接点、独立 Efinance manifest 模块、`tests/test_thesis_ledger_provider_route_v2.py`；主仓专属证据 `evidence/2026-09-28-cont-r02-efinance-default-source.md`。现有 DSA Runtime、既有持久化策略和版本化冻结只读。先红后绿验证新默认、精确 source Control 准入、显式旧路由字节不变；Server/DSA 各跑定向测试、类型/编译及限定质量检查。此阶段不完成旧 alias 迁移，也不触目标或真实来源；失败一次修复重试后仍失败则记录跳过。
 
-`CONT-R02-efinance-default-source` done：[跨仓证据](../../tasks/evidence/2026-09-28-cont-r02-efinance-default-source.md)。Server 旧默认断言 1 failed 后 20 passed；DSA EastMoney source 缺报价能力断言 1 failed 后 Control/V2/V3 合并 36 passed。Efinance manifest version 提至 2，原 `efinance` alias 保留；Server typecheck/build、限定 lint/格式、DSA 新模块 flake8/编译与 import 边界通过。只影响新建默认路由，旧策略/冻结与目标应用未迁移，G0-M 和 alias 后继仍开放。
+`CONT-R02-efinance-default-source` done：[跨仓证据](../../evidence/2026-09-28-cont-r02-efinance-default-source.md)。Server 旧默认断言 1 failed 后 20 passed；DSA EastMoney source 缺报价能力断言 1 failed 后 Control/V2/V3 合并 36 passed。Efinance manifest version 提至 2，原 `efinance` alias 保留；Server typecheck/build、限定 lint/格式、DSA 新模块 flake8/编译与 import 边界通过。只影响新建默认路由，旧策略/冻结与目标应用未迁移，G0-M 和 alias 后继仍开放。
 
 `CONT-R03-akshare-nav-default-source` Ready：按 Spec §4.1 将**新建默认 V2 Desired Policy** 的 AKShare `FUND_NAV/FUND_NAV_HISTORY/MUTUAL_FUND` 两条 RouteTarget 改为 `eastmoney`，DSA AKShare manifest 的该精确 source 同步登记对应净值能力并提升 manifest version。写集为主仓 `apps/server/src/market/market-policy-storage.ts`、`apps/server/test/market-control.service.test.ts`、专属证据 `evidence/2026-09-28-cont-r03-akshare-nav-default-source.md`；DSA `src/services/thesis_ledger_control.py` 的 AKShare manifest 接点、独立 AKShare manifest 模块、`tests/test_thesis_ledger_provider_route_v2.py` 及能力目录。旧显式/持久化 alias、报价回退、冻结与目标只读；先红后绿验证 Server 默认、DSA 精确 source 和旧路由保真，再跑定向测试/类型/编译/限定质量。真实来源预算与失败的 DSA 全包不重置。
 
-`CONT-R03-akshare-nav-default-source` done：[跨仓证据](../../tasks/evidence/2026-09-28-cont-r03-akshare-nav-default-source.md)。Server 旧默认 1 failed 后 20 passed，DSA 精确 source 1 failed 后 Control/V2/V3/净值分页 49 passed；AKShare manifest version 提至 2，旧 alias 与其他能力原样保留。Server typecheck/build、限定 lint/格式及边界，DSA 新模块 flake8/编译/空白通过。新默认两条净值 RouteTarget 均标记 EastMoney，不计独立备用；历史策略/冻结与目标未迁移，R03/G0-M 继续开放。
+`CONT-R03-akshare-nav-default-source` done：[跨仓证据](../../evidence/2026-09-28-cont-r03-akshare-nav-default-source.md)。Server 旧默认 1 failed 后 20 passed，DSA 精确 source 1 failed 后 Control/V2/V3/净值分页 49 passed；AKShare manifest version 提至 2，旧 alias 与其他能力原样保留。Server typecheck/build、限定 lint/格式及边界，DSA 新模块 flake8/编译/空白通过。新默认两条净值 RouteTarget 均标记 EastMoney，不计独立备用；历史策略/冻结与目标未迁移，R03/G0-M 继续开放。
 
-`CONT-R02-akshare-stock-quote-default-source` done：[跨仓定向证据](../../tasks/evidence/2026-09-28-cont-r02-akshare-stock-quote-default-source.md)。AKShare 股票报价默认调用东财 `stock_zh_a_spot_em`，新建 V2 Desired Policy 的 `REALTIME_QUOTE/STOCK` 已改为 `akshare/eastmoney`；DSA manifest version 3 对精确 source 补 `STOCK` 报价能力，Runtime 将该键转换为 adapter 的 `em` 参数，执行 provenance 仍为选中 RouteTarget。Server 默认先红后 20 项通过；DSA 能力先红，修正测试接线后 V2 路由、Runtime、Control、V3 合并 66 项通过。显式旧 alias 的 Desired/Effective 原文、ETF、冻结及健康/预算键不改；两家默认股票报价同源，不算独立备用。Server 类型/build/限定质量、DSA 限定质量与编译通过；真实来源/目标及失败的 DSA 全包继续开放。
+`CONT-R02-akshare-stock-quote-default-source` done：[跨仓定向证据](../../evidence/2026-09-28-cont-r02-akshare-stock-quote-default-source.md)。AKShare 股票报价默认调用东财 `stock_zh_a_spot_em`，新建 V2 Desired Policy 的 `REALTIME_QUOTE/STOCK` 已改为 `akshare/eastmoney`；DSA manifest version 3 对精确 source 补 `STOCK` 报价能力，Runtime 将该键转换为 adapter 的 `em` 参数，执行 provenance 仍为选中 RouteTarget。Server 默认先红后 20 项通过；DSA 能力先红，修正测试接线后 V2 路由、Runtime、Control、V3 合并 66 项通过。显式旧 alias 的 Desired/Effective 原文、ETF、冻结及健康/预算键不改；两家默认股票报价同源，不算独立备用。Server 类型/build/限定质量、DSA 限定质量与编译通过；真实来源/目标及失败的 DSA 全包继续开放。
 
-`CONT-R03-akshare-source-alias-migration` needs_contract：旧 `akshare/akshare` 股票报价及场外基金净值路由仍可显式或历史持久化，执行标签不能直接当作独立实际上游。[目标只读库存](../../tasks/evidence/2026-09-28-cont-source-alias-inventory.md)已确认旧 V2 Desired/Effective、历史修订及健康行；股票东财双 alias 的健康/熔断安全前置另已完成，但 V1 新浪及持仓/筹码是不同来源/能力，不可整 Provider 改名。与 Efinance alias 共用版本化迁移合同，继续确定逐能力实际上游、其他能力准入/健康兼容、旧冻结与审计保真，再分路由状态、执行面、消费/重放和目标验收；跳过破坏性改名，G0-M 与独立备用门禁继续开放。
+`CONT-R03-akshare-source-alias-migration` needs_contract：旧 `akshare/akshare` 股票报价及场外基金净值路由仍可显式或历史持久化，执行标签不能直接当作独立实际上游。[目标只读库存](../../evidence/2026-09-28-cont-source-alias-inventory.md)已确认旧 V2 Desired/Effective、历史修订及健康行；股票东财双 alias 的健康/熔断安全前置另已完成，但 V1 新浪及持仓/筹码是不同来源/能力，不可整 Provider 改名。与 Efinance alias 共用版本化迁移合同，继续确定逐能力实际上游、其他能力准入/健康兼容、旧冻结与审计保真，再分路由状态、执行面、消费/重放和目标验收；跳过破坏性改名，G0-M 与独立备用门禁继续开放。
 
-`CONT-I01-jsonb-orm-roundtrip` done：[ORM 根因与恢复证据](../../tasks/evidence/2026-09-28-cont-i01-jsonb-orm-fix.md)。新隔离调查固定 15 条合成 Bar、严格 V3 响应与项目全部 migration，实际仓库 `record -> findUnique` 修前发现 22 个数值位模式各相差 1 ULP，完整摘要失配；此前仅经 `$queryRaw` SELECT 的零差异诊断不覆盖 ORM 写入。修复为参数化 JSON 文本的原子 INSERT/条件 UPDATE，不舍入或放宽摘要；修后隔离数据库中新行、同身份重记和空载荷填充全部零差异，旧损坏完整载荷仍拒绝。原 Worker 组合在源码变化后的新前提下受控运行 1 项通过，资源精确清理。Server 相邻 83 项、包级退出 0、类型/build/限定质量/边界与带 HEAD 基线尺寸门禁通过；真实 Provider、目标运行态、DSA 官方失败全包和 I01 父依赖仍开放。
+`CONT-I01-jsonb-orm-roundtrip` done：[ORM 根因与恢复证据](../../evidence/2026-09-28-cont-i01-jsonb-orm-fix.md)。新隔离调查固定 15 条合成 Bar、严格 V3 响应与项目全部 migration，实际仓库 `record -> findUnique` 修前发现 22 个数值位模式各相差 1 ULP，完整摘要失配；此前仅经 `$queryRaw` SELECT 的零差异诊断不覆盖 ORM 写入。修复为参数化 JSON 文本的原子 INSERT/条件 UPDATE，不舍入或放宽摘要；修后隔离数据库中新行、同身份重记和空载荷填充全部零差异，旧损坏完整载荷仍拒绝。原 Worker 组合在源码变化后的新前提下受控运行 1 项通过，资源精确清理。Server 相邻 83 项、包级退出 0、类型/build/限定质量/边界与带 HEAD 基线尺寸门禁通过；真实 Provider、目标运行态、DSA 官方失败全包和 I01 父依赖仍开放。
 
 `CONT-D01-multiwindow-pg-consumption` Ready：I01 原响应 JSONB 写读已修复，D01 仍缺真实数据库到 Snapshot artifact 的多窗口证据闭环。用显式命名、loopback/非默认端口的独立 PostgreSQL 应用全部 migration；固定 159516.SZ 合成父响应和两个有真实交易日交集的子观测，经实际 `MarketWindowEvidenceV3Repository.record/findFrozen` 后交给现有 `DsaSnapshotBuilder`，验证 artifact 原样、离线重放、父/子篡改拒绝及旧单窗口回归。只跑一次新隔离用例，失败后一次定向修复重试仍不通过则记录跳过；不发 HiThink、AI 或目标数据库请求，不替代 D01-runtime/G0-H。
-`CONT-D01-multiwindow-pg-consumption` done：[隔离数据库消费证据](../../tasks/evidence/2026-09-28-cont-d01-pg-consumption.md)。独立 loopback PostgreSQL 全 migration 后，159516.SZ 合成父响应的 19 条 Bar 与两份有交集子观测经真实证据仓库写读，完整响应进入 Snapshot 的单条证据 artifact，离线重放一致；改写数据库子观测后仓库拒绝，已发布 artifact 仍可重放。隔离测试 1 passed，默认 1 skipped；旧单窗口/冻结 Reader 与相邻 Snapshot 39 项、PIT 44 项通过。容器按精确 ID 清理；D01-runtime、真实 HiThink G0-H 和目标应用版本仍开放。
+`CONT-D01-multiwindow-pg-consumption` done：[隔离数据库消费证据](../../evidence/2026-09-28-cont-d01-pg-consumption.md)。独立 loopback PostgreSQL 全 migration 后，159516.SZ 合成父响应的 19 条 Bar 与两份有交集子观测经真实证据仓库写读，完整响应进入 Snapshot 的单条证据 artifact，离线重放一致；改写数据库子观测后仓库拒绝，已发布 artifact 仍可重放。隔离测试 1 passed，默认 1 skipped；旧单窗口/冻结 Reader 与相邻 Snapshot 39 项、PIT 44 项通过。容器按精确 ID 清理；D01-runtime、真实 HiThink G0-H 和目标应用版本仍开放。
 
 `CONT-D01-controlled-http-worker` Ready：复用当前隔离 PostgreSQL/Redis、受控 DSA HTTP 与独立生产 Worker 进程，用同一多窗口合成响应覆盖 capabilities 协商、V3 Reader、证据仓库、普通创建冻结、BullMQ 领取、成功终态和离线重放；保留既有单窗口成功及损坏快照失败反例。写集仅限 Server 测试辅助函数与集成用例、本 Task、专属证据及交接记录。先跑默认跳过和定向测试，再在显式隔离容器中执行一次；失败仅允许一次定向修复重试，仍失败就记录跳过。此叶只证明受控本地纵向链，不替代 D01-runtime 的目标部署、真实 HiThink G0-H 或 DSA 官方全包门禁。
-`CONT-D01-controlled-http-worker` done：[受控 HTTP 到 Worker 证据](../../tasks/evidence/2026-09-28-cont-d01-controlled-http-worker.md)。双窗口响应经 DSA 能力协商、Reader、PostgreSQL 仓库、Snapshot、普通 HTTP 创建和 BullMQ 后由独立生产 Worker 提交成功，离线重放 checksum 一致；同用例原单窗口成功、损坏快照失败和账本隔离仍通过。首次仅因新断言把能力读取次数误限为 1 而失败，改为验证多窗口启用后的读取增量，唯一一次修复重试 1 passed；类型、限定 lint/格式通过，专名临时容器已清理。只关闭本受控本地叶，D01-runtime 的目标阶段及真实 G0-H 继续开放。
+`CONT-D01-controlled-http-worker` done：[受控 HTTP 到 Worker 证据](../../evidence/2026-09-28-cont-d01-controlled-http-worker.md)。双窗口响应经 DSA 能力协商、Reader、PostgreSQL 仓库、Snapshot、普通 HTTP 创建和 BullMQ 后由独立生产 Worker 提交成功，离线重放 checksum 一致；同用例原单窗口成功、损坏快照失败和账本隔离仍通过。首次仅因新断言把能力读取次数误限为 1 而失败，改为验证多窗口启用后的读取增量，唯一一次修复重试 1 passed；类型、限定 lint/格式通过，专名临时容器已清理。只关闭本受控本地叶，D01-runtime 的目标阶段及真实 G0-H 继续开放。
 
-`CONT-S03-parent-reconciliation` done：[版本隔离缓存父项证据](../../tasks/evidence/2026-09-28-cont-s03-parent-reconciliation.md)。I01 完整响应失配在新前提下修复、D01 父/子响应数据库消费通过；当前 Server 事实缓存/Reader/证据仓库定向 36 passed、无隔离库时 10 skipped，随后显式隔离 PostgreSQL 10 passed，完整 migration、独立 app role 与容器清理核对通过。S03 父项只按其本地/隔离数据库完成条件勾选，S04/S05、真实来源、目标同步和整体验收不倒填。
+`CONT-S03-parent-reconciliation` done：[版本隔离缓存父项证据](../../evidence/2026-09-28-cont-s03-parent-reconciliation.md)。I01 完整响应失配在新前提下修复、D01 父/子响应数据库消费通过；当前 Server 事实缓存/Reader/证据仓库定向 36 passed、无隔离库时 10 skipped，随后显式隔离 PostgreSQL 10 passed，完整 migration、独立 app role 与容器清理核对通过。S03 父项只按其本地/隔离数据库完成条件勾选，S04/S05、真实来源、目标同步和整体验收不倒填。
 
-`CONT-S04-parent-reconciliation` done：[整窗口 Reader 父项证据](../../tasks/evidence/2026-09-28-cont-s04-parent-reconciliation.md)。S03/C04 前置收口后，当前 Selector、Reader、模块委派及相邻旧边界 28 项通过；整窗主源、受有效同口径证明保护的备用、缺页/上市前/预热、错窗口/目标/修订及无第三源请求均有定向覆盖，实际 Reader 的主源路径另经 I01/D01 受控 HTTP 与隔离数据库组合。只关闭 S04 本地实现；真实 HiThink 与备用来源资格、S05 严格 PIT、目标运行态和整体验收保留。
+`CONT-S04-parent-reconciliation` done：[整窗口 Reader 父项证据](../../evidence/2026-09-28-cont-s04-parent-reconciliation.md)。S03/C04 前置收口后，当前 Selector、Reader、模块委派及相邻旧边界 28 项通过；整窗主源、受有效同口径证明保护的备用、缺页/上市前/预热、错窗口/目标/修订及无第三源请求均有定向覆盖，实际 Reader 的主源路径另经 I01/D01 受控 HTTP 与隔离数据库组合。只关闭 S04 本地实现；真实 HiThink 与备用来源资格、S05 严格 PIT、目标运行态和整体验收保留。
 
 `CONT-efinance-etf-alias-budget` Ready：依据 Spec §4.1 已证明的同一单标 adapter 调用，仅收紧 DSA `efinance × REALTIME_QUOTE × ETF` 的持久请求冷却。新增归属 Provider 预算的纯 key helper 和专属测试，限定修改 `src/services/thesis_ledger_control.py` 的原子预留查询；旧 `efinance`、新 `eastmoney` 及无 source 的 V1 key 任一未到期都拒绝，新预留写规范 `eastmoney` key，其他 Provider/能力/source 不合并。先写旧路由切换可重复调用的受控红例，再验证修后旧→新、新→旧、V1→V2、到期和无关来源、重开 store 及实际 Runtime adapter 调用次数；运行定向测试、改动文件编译/lint/尺寸/空白。历史 Policy、准入、健康、冻结和执行 provenance 均只读；不发真实来源或目标请求，不重跑失败的 DSA 全包。失败修复一次仍不通过则记录跳过；父 alias 迁移继续 `needs_contract`。
-`CONT-efinance-etf-alias-budget` done：[预算安全证据](../../tasks/evidence/2026-09-28-cont-efinance-etf-alias-budget.md)。旧/新 source 的 ETF 单标冷却切换修前 4 failed、1 passed，修后新叶 6 项及相邻 V2/Runtime/Control/准入合并 81 passed；旧格式行到期保真测试的夹具首次错误后定向修正重试一次通过。规范键写入、旧 alias/V1 键兼容读取均在原事务；新文件 lint、编译、空白与官方 syntax 通过，官方 flake8 首次 PATH 缺失、补齐后唯一重试 critical 0。DSA 能力目录与变更记录同步；只关闭该预算叶，旧 Policy、准入、健康/熔断、冻结身份与完整 alias 迁移仍开放。
+`CONT-efinance-etf-alias-budget` done：[预算安全证据](../../evidence/2026-09-28-cont-efinance-etf-alias-budget.md)。旧/新 source 的 ETF 单标冷却切换修前 4 failed、1 passed，修后新叶 6 项及相邻 V2/Runtime/Control/准入合并 81 passed；旧格式行到期保真测试的夹具首次错误后定向修正重试一次通过。规范键写入、旧 alias/V1 键兼容读取均在原事务；新文件 lint、编译、空白与官方 syntax 通过，官方 flake8 首次 PATH 缺失、补齐后唯一重试 critical 0。DSA 能力目录与变更记录同步；只关闭该预算叶，旧 Policy、准入、健康/熔断、冻结身份与完整 alias 迁移仍开放。
 
-`CONT-source-alias-readonly-inventory` done：[目标持久状态库存](../../tasks/evidence/2026-09-28-cont-source-alias-inventory.md)。DSA SQLite `mode=ro`/`query_only`、Server 容器内 Prisma 分组及快照 manifest 结构扫描仅输出去标识计数：两侧 V2 当前/历史 Policy 均含旧 alias，DSA 旧健康/已到期预算行存在；V3 策略/准入、Server V3 完整窗口证据与事实缓存当前为空，109 份已发布旧 manifest 未见精确 RouteTarget 对象，但 Parquet/旧格式间接引用仍未排除。未改目标数据或读取原文；两组完整 alias 迁移仍 `needs_contract`，本库存不授权重写、准入或部署。
+`CONT-source-alias-readonly-inventory` done：[目标持久状态库存](../../evidence/2026-09-28-cont-source-alias-inventory.md)。DSA SQLite `mode=ro`/`query_only`、Server 容器内 Prisma 分组及快照 manifest 结构扫描仅输出去标识计数：两侧 V2 当前/历史 Policy 均含旧 alias，DSA 旧健康/已到期预算行存在；V3 策略/准入、Server V3 完整窗口证据与事实缓存当前为空，109 份已发布旧 manifest 未见精确 RouteTarget 对象，但 Parquet/旧格式间接引用仍未排除。未改目标数据或读取原文；两组完整 alias 迁移仍 `needs_contract`，本库存不授权重写、准入或部署。
 
 `CONT-efinance-etf-alias-health` Ready：只对 `efinance × REALTIME_QUOTE × ETF` 已证明同一单标 adapter 的旧 `efinance`、新 `eastmoney` 和 V1 无 source 健康作用域做兼容。DSA Provider 路由所有的纯身份 helper、Control 健康读取/写入和 Runtime 断路器接线为独占源码写集；专属测试先证明当前旧 open→新 alias、新 open→旧 alias、进程内连续失败与重开 store 可绕过，修后在原 60 秒内均拒绝，过期 open 保留一次半开探测，旧行不改写，其他来源独立。V2 Effective 状态须与 Runtime 一致；RouteTarget、执行 provenance、准入、Policy 与冻结只读。定向测试→相邻 Control/Runtime→编译/限定 lint/尺寸/空白，失败仅一次修复重试后记录跳过；不重跑耗尽的 DSA 全包或触真实来源/目标。父 alias 迁移仍 `needs_contract`。
-`CONT-efinance-etf-alias-health` done：[健康熔断兼容证据](../../tasks/evidence/2026-09-28-cont-efinance-etf-alias-health.md)。修前 4 failed、2 passed；修后旧→新、新→旧、V1→V2、过期半开、旧 open 与新 closed 并存、进程内三次失败共享及无关来源隔离均通过。专属 7 项及相邻预算/Control/Runtime/V2 合并 97 passed；官方 syntax 与 critical flake8、改动文件编译、新文件完整 lint、空白通过。新健康只写规范键，旧行保留；路由、provenance、准入、Policy、冻结均未迁移。目标和真实来源未验，DSA 失败全包未第三次运行；父 alias 迁移继续 `needs_contract`。
+`CONT-efinance-etf-alias-health` done：[健康熔断兼容证据](../../evidence/2026-09-28-cont-efinance-etf-alias-health.md)。修前 4 failed、2 passed；修后旧→新、新→旧、V1→V2、过期半开、旧 open 与新 closed 并存、进程内三次失败共享及无关来源隔离均通过。专属 7 项及相邻预算/Control/Runtime/V2 合并 97 passed；官方 syntax 与 critical flake8、改动文件编译、新文件完整 lint、空白通过。新健康只写规范键，旧行保留；路由、provenance、准入、Policy、冻结均未迁移。目标和真实来源未验，DSA 失败全包未第三次运行；父 alias 迁移继续 `needs_contract`。
 
 `CONT-akshare-stock-alias-health` Ready：只对 `akshare × REALTIME_QUOTE × STOCK` 旧 `akshare` 与新 `eastmoney` 两条已证明同 `em` adapter 调用的 V2 source 共用健康/熔断作用域；V1 无 source 实走 `sina`，必须隔离。复用 DSA 精确 source 身份和健康读取模块，新增专属旧格式 SQLite/Runtime 回归；证明最近旧 open 双向阻断、规范新写入、过期半开、旧行保留、连续失败共享及 V1/其他能力独立。RouteTarget、provenance、预算、准入、Policy、冻结均不改。先红后绿，再定向与相邻 Control/Runtime、限定 lint/编译/尺寸/空白；失败定向修复一次仍不通过则记录跳过，不触真实来源、目标或失败全包。父 AKShare alias 迁移保持 `needs_contract`。
-`CONT-akshare-stock-alias-health` done：[股票报价健康兼容证据](../../tasks/evidence/2026-09-28-cont-akshare-stock-alias-health.md)。修前 5 failed、2 passed，修后专属 7 项及相邻 ETF alias、预算、Control、Runtime、V2 路由合并 119 passed；官方 syntax/critical flake8、新文件完整 lint 通过。只合并 `akshare/eastmoney` 与 `akshare/akshare` 的健康及进程内熔断，V1 无 source 的新浪作用域不合并；旧行和执行来源原文保留。未执行真实来源、目标或已失败的 DSA 全包，完整 alias 父项仍 `needs_contract`。
+`CONT-akshare-stock-alias-health` done：[股票报价健康兼容证据](../../evidence/2026-09-28-cont-akshare-stock-alias-health.md)。修前 5 failed、2 passed，修后专属 7 项及相邻 ETF alias、预算、Control、Runtime、V2 路由合并 119 passed；官方 syntax/critical flake8、新文件完整 lint 通过。只合并 `akshare/eastmoney` 与 `akshare/akshare` 的健康及进程内熔断，V1 无 source 的新浪作用域不合并；旧行和执行来源原文保留。未执行真实来源、目标或已失败的 DSA 全包，完整 alias 父项仍 `needs_contract`。
 
 `CONT-R05.1-financial-fail-closed` Ready：依据已采集的 1.18.94 原表与 Spec §3.3，只阻止 `stock_financial_abstract` 的指标行 × 报告期列被首行财报读取并误报 `growth` 来源，移除 `stock_financial_analysis_indicator` 的无参默认 `600004` 候选。写集限 DSA `data_provider/fundamental_adapter.py` 财务候选接缝、`tests/test_fundamental_adapter.py`、DSA 能力目录 R05.1、专属证据 `evidence/2026-09-28-cont-r05-financial-fail-closed.md` 及交接记录。先用合成形状和候选参数补红例，再跑本文件及相邻研究消费者定向、限定 lint/编译/尺寸/空白；不调用来源，不修改其他候选、财务单位或报告期排序。官方说明与原响应均缺金额倍率/比例单位和响应证券自证，完整数值映射标记 `needs_contract` 并跳过，本叶完成也不授予 R05.1/G0-M/历史 PIT 准入。
 
-`CONT-R05.1-financial-fail-closed` done：[本地证据](../../tasks/evidence/2026-09-28-cont-r05-financial-fail-closed.md)。矩阵误报与默认标的候选两例修前 2 failed，修后本文件 11、相邻研究消费者合并 47 passed；编译、critical lint、测试文件完整 lint、空白均通过，生产文件 715→715 行。只有财务矩阵失败关闭及请求身份收紧，无真实来源或目标调用。R05.1 完整数值/历史合同因原响应与官方说明缺身份和单位继续 `needs_contract`，既定 1/1、0 重试预算不重置；父项和 G0-M 保持开放。
+`CONT-R05.1-financial-fail-closed` done：[本地证据](../../evidence/2026-09-28-cont-r05-financial-fail-closed.md)。矩阵误报与默认标的候选两例修前 2 failed，修后本文件 11、相邻研究消费者合并 47 passed；编译、critical lint、测试文件完整 lint、空白均通过，生产文件 715→715 行。只有财务矩阵失败关闭及请求身份收紧，无真实来源或目标调用。R05.1 完整数值/历史合同因原响应与官方说明缺身份和单位继续 `needs_contract`，既定 1/1、0 重试预算不重置；父项和 G0-M 保持开放。
 
-`CONT-DSA-current-baseline-gate` Ready：旧 [官方门禁](../../tasks/evidence/2026-09-28-cont-dsa-stable-gates.md) 属于先前隔离副本与源码输入，失败后已有多处源码/测试变更。本轮先定向核实旧 16 个失败点；若当前基线均通过，建立不含真实 `.env`、数据库、日志及账号文件的新临时副本，固定临时 HOME/XDG、合成配置和 Python 外连/敏感文件 guard，并仅对已审阅的假工具 shell 测试放行原生命令。先复核完整输入摘要、guard 自检、旧失败点在新隔离下的定向测试，再按项目顺序执行官方 `syntax`、critical `flake8`、`offline-tests`；若任一前置失败，只做一次定向修复/重试，仍失败记录并跳过目标更新。新基线运行不是旧输入的第三次重试，旧失败和隔离缺口不得抹除。唯一写集为本 Task、专属证据 `evidence/2026-09-28-cont-dsa-current-baseline-gate.md` 和 `/private/tmp/cont-dsa-current-*`；三仓生产源码与目标容器只读。完整离线门禁即使通过也不替代真实来源、目标 Docker、AI/UI 验收。
+`CONT-DSA-current-baseline-gate` Ready：旧 [官方门禁](../../evidence/2026-09-28-cont-dsa-stable-gates.md) 属于先前隔离副本与源码输入，失败后已有多处源码/测试变更。本轮先定向核实旧 16 个失败点；若当前基线均通过，建立不含真实 `.env`、数据库、日志及账号文件的新临时副本，固定临时 HOME/XDG、合成配置和 Python 外连/敏感文件 guard，并仅对已审阅的假工具 shell 测试放行原生命令。先复核完整输入摘要、guard 自检、旧失败点在新隔离下的定向测试，再按项目顺序执行官方 `syntax`、critical `flake8`、`offline-tests`；若任一前置失败，只做一次定向修复/重试，仍失败记录并跳过目标更新。新基线运行不是旧输入的第三次重试，旧失败和隔离缺口不得抹除。唯一写集为本 Task、专属证据 `evidence/2026-09-28-cont-dsa-current-baseline-gate.md` 和 `/private/tmp/cont-dsa-current-*`；三仓生产源码与目标容器只读。完整离线门禁即使通过也不替代真实来源、目标 Docker、AI/UI 验收。
 
-`CONT-DSA-current-baseline-gate` skipped_after_retry：[新基线证据](../../tasks/evidence/2026-09-28-cont-dsa-current-baseline-gate.md)。旧 16 个失败 nodeid 在普通当前工作树定向均通过；新无凭据副本中合并 15 passed / 1 failed，唯一失败先为临时 HOME 下 Volta 无 Node，一次环境修复重试后转为副本缺相邻 Schemas dist 路径，按用户规则跳过。副本受控输入差异 0，guard 自检通过；当前副本官方 syntax/critical flake8 退出 0。官方 `offline-tests` 本叶未运行，低层顺序偏差和非 OS-wide 隔离均已记载，目标更新继续跳过；旧全包 16 failed 记录不抹除。
+`CONT-DSA-current-baseline-gate` skipped_after_retry：[新基线证据](../../evidence/2026-09-28-cont-dsa-current-baseline-gate.md)。旧 16 个失败 nodeid 在普通当前工作树定向均通过；新无凭据副本中合并 15 passed / 1 failed，唯一失败先为临时 HOME 下 Volta 无 Node，一次环境修复重试后转为副本缺相邻 Schemas dist 路径，按用户规则跳过。副本受控输入差异 0，guard 自检通过；当前副本官方 syntax/critical flake8 退出 0。官方 `offline-tests` 本叶未运行，低层顺序偏差和非 OS-wide 隔离均已记载，目标更新继续跳过；旧全包 16 failed 记录不抹除。
 
 `CONT-R05.2-valuation-raw-contract` Ready：R05.2 不把当前 `get_realtime_quote` 的抓取时刻冒充来源日期；单接口候选锁定安装版 AKShare 1.18.94 `stock_value_em` 的 EastMoney `RPT_VALUEANALYSIS_DET`，只采集官方示例 `300766` 的一份公开原响应，核对响应证券身份、报告页数/总数、交易日期及字段名，并离线复放 SDK 转换。官方文档给出总/流通市值为元、PE/PB 字段但不证明披露可见时刻。请求预算为同一 endpoint/参数最多 **2 次总尝试、仅失败后 1 次重试**，不得换标的/endpoint/SDK、读取账号或顺手查其他股票；不计 G0-M 准入。仅写专属证据 `evidence/2026-09-28-cont-r05-valuation-raw-contract.md` 与 `/private/tmp/m3-r05-valuation-contract-0928` 的采集脚本/原文/派生摘要，DSA/主仓生产源码只读。只有原响应身份和字段合同足够时再分离出按日期选行/消费者实施叶；分页、历史修订、单位、披露时间缺证据则记录跳过相应准入，不用本机获取时间回填来源可见时间。
 
-`CONT-R05.2-valuation-raw-contract` done：[原样证据](../../tasks/evidence/2026-09-28-cont-r05-valuation-raw-contract.md)。固定样本请求 1/2、0 重试，HTTP 200，原响应 1,824 行/1 页且代码及完整 `300766.SZ` 自证一致，交易日期唯一；安装版离线转换 1,824×13。官方文档总/流通市值单位为元；原响应无披露/修订时间，SDK 表抛弃身份。只证明此样本当前字段合同，不授予其他证券、真实延迟、历史 PIT 或 G0-M。后继按 Spec §3.3 拆原响应核验、当前研究消费及真实准入，不修改源请求预算。
+`CONT-R05.2-valuation-raw-contract` done：[原样证据](../../evidence/2026-09-28-cont-r05-valuation-raw-contract.md)。固定样本请求 1/2、0 重试，HTTP 200，原响应 1,824 行/1 页且代码及完整 `300766.SZ` 自证一致，交易日期唯一；安装版离线转换 1,824×13。官方文档总/流通市值单位为元；原响应无披露/修订时间，SDK 表抛弃身份。只证明此样本当前字段合同，不授予其他证券、真实延迟、历史 PIT 或 G0-M。后继按 Spec §3.3 拆原响应核验、当前研究消费及真实准入，不修改源请求预算。
 
 `CONT-R05.2-valuation-reader` Ready：以已核对的 `RPT_VALUEANALYSIS_DET` 原响应建立有界读取器，只接受原文一致的六位代码、完整市场后缀、稳定市场代码、严格倒序且不重复的交易日期，以及全页计数。按原始数值映射最新一行 PE/PB 和元市值，输出原响应交易日期与本次观察时刻；不生成披露时刻、历史修订或 PIT 资格。使用合成多页/错误形状测试和已捕获原文离线复放；不再调用真实来源，不接现有消费入口。若接口字段或分页假设不能自证，一次修复后记录跳过。写集限 DSA 新读取器与专属测试、主仓 Task/证据和交接记录；当前研究消费另叶接线，避免影响报价复用的股息率。
 
-`CONT-R05.2-valuation-reader` done：[读取器证据](../../tasks/evidence/2026-09-28-cont-r05-valuation-reader.md)。DSA 独立读取器对原响应代码/完整市场、分页总量、跨页日期和原字段数值失败关闭；只返回最新交易日，明确 `sourceAvailableAt=null`、历史可见性未证。合成定向 12 passed、原采集 1,824 行离线复放成功、限定完整 flake8 通过。没有新增真实来源请求，也没有接入当前 `get_fundamental_context`；R05.2 消费和 G0-M/PIT 仍开放。
+`CONT-R05.2-valuation-reader` done：[读取器证据](../../evidence/2026-09-28-cont-r05-valuation-reader.md)。DSA 独立读取器对原响应代码/完整市场、分页总量、跨页日期和原字段数值失败关闭；只返回最新交易日，明确 `sourceAvailableAt=null`、历史可见性未证。合成定向 12 passed、原采集 1,824 行离线复放成功、限定完整 flake8 通过。没有新增真实来源请求，也没有接入当前 `get_fundamental_context`；R05.2 消费和 G0-M/PIT 仍开放。
 
 `CONT-R05.2-current-consumer` Ready：CN 股票 `get_fundamental_context` 在保留原报价与股息率价格的条件下，以短预算读取上述原响应估值；成功时估值字段/原文身份/交易日/本次观察分开返回，状态为 `partial`，不填历史来源可见时刻。失败、超时或不支持时保留旧报价估值回退，同时记录实际来源及错误，不让任何异常阻断其他研究块。ETFs 与海外路径保持原状。先合成定向测试来源成功、回退、预算、股息率复用与不新增联网，再跑相邻研究测试、限定 lint/编译/尺寸；不运行真实来源或已失败的官方全包。写集限 DSA 新编排 helper、`data_provider/base.py` 局部替换、专属/相邻测试、主仓 Task/证据及交接；大型 base 文件不得增加行数。
 
-`CONT-R05.2-current-consumer` done：[接线证据](../../tasks/evidence/2026-09-28-cont-r05-valuation-consumer.md)。CN 股票先保留原报价供股息率、剩余预算最多 1.5 秒读取东财估值；成功时估值块为 `partial` 并携原文身份、交易日、观察时刻与空历史可见时刻；失败按原报价回退并记录来源错误。显式前缀市场转换为完整后缀校验，ETFs/海外不变。读取器加流式总截止时间；新读取器/接线/相邻研究消费者 68 passed，新增文件完整 lint、旧大文件关键 lint、编译和空白通过。未发新的真实请求，未运行此前失败的官方全包或目标更新；R05.2 真实运行、披露/修订、严格 PIT 与 G0-M 仍开放。
+`CONT-R05.2-current-consumer` done：[接线证据](../../evidence/2026-09-28-cont-r05-valuation-consumer.md)。CN 股票先保留原报价供股息率、剩余预算最多 1.5 秒读取东财估值；成功时估值块为 `partial` 并携原文身份、交易日、观察时刻与空历史可见时刻；失败按原报价回退并记录来源错误。显式前缀市场转换为完整后缀校验，ETFs/海外不变。读取器加流式总截止时间；新读取器/接线/相邻研究消费者 68 passed，新增文件完整 lint、旧大文件关键 lint、编译和空白通过。未发新的真实请求，未运行此前失败的官方全包或目标更新；R05.2 真实运行、披露/修订、严格 PIT 与 G0-M 仍开放。
 
 `CONT-R05.3-yahoo-period-alignment` Ready：依据 Spec §3.3 与当前 `YfinanceFundamentalAdapter`，只修季度利润表/现金流与 `.info` 汇总混成同一财报的问题。以安装版 yfinance 1.7.0 的季度 DataFrame 公共 API 为候选合同，先加合成错期、同日期乱序、仅汇总和仅币种反例；季度值仅取同一报告日期列、缺现金流不回填汇总，只有有效季度报告期时才标季度，纯 `.info` 数值标期间/报告日未知，空数值不发布财报。写集限 DSA `data_provider/yfinance_fundamental_adapter.py`、专属测试、DSA 能力目录、主仓 Spec/Task/证据与交接；不请求真实 Yahoo，不改分红/行情/估值或其他市场。先定向、相邻上下文、编译/限定 lint/尺寸/空白；失败仅一次修复重试后记录跳过。原发布/修订/币种真实准入及 PIT 仍独立开放。
 
-`CONT-R05.3-yahoo-period-alignment` done：[本地证据](../../tasks/evidence/2026-09-28-cont-r05-yahoo-period-alignment.md)。US AAPL 合成反例 4 failed，修后扩为 6 项；Yahoo 适配/既有上下文共 40 passed，完整 flake8、编译、空白通过。季度利润/现金流只按同日列映射，不回填 `.info`；无可用季度数值时 `.info` 汇总标期间/报告日未知，只有币种不生成财报。现有研究上下文保留 `period_basis` 与空 `source_available_at`。未触真实 Yahoo；R05.3/4 底层 endpoint/条款、原发布/修订、币种实际证据、目标 Consumer/G0-R/PIT 均开放。
+`CONT-R05.3-yahoo-period-alignment` done：[本地证据](../../evidence/2026-09-28-cont-r05-yahoo-period-alignment.md)。US AAPL 合成反例 4 failed，修后扩为 6 项；Yahoo 适配/既有上下文共 40 passed，完整 flake8、编译、空白通过。季度利润/现金流只按同日列映射，不回填 `.info`；无可用季度数值时 `.info` 汇总标期间/报告日未知，只有币种不生成财报。现有研究上下文保留 `period_basis` 与空 `source_available_at`。未触真实 Yahoo；R05.3/4 底层 endpoint/条款、原发布/修订、币种实际证据、目标 Consumer/G0-R/PIT 均开放。
 
 `CONT-R05.3-yahoo-yoy-period` Ready：只修 `YfinanceFundamentalAdapter._yoy_from_row` 以 `iloc[4]` 假定去年同期的问题。合成 5 列缺去年同日、列乱序而同期在非第 5 列、重复同期及无效列日期反例；仅日期唯一且上一年同月同日确证时计算同比，否则维持现有 `.info` 增长率回退/未知。写集限 DSA Yahoo 适配器与专属测试、主仓 Spec/Task/证据及交接；不发真实请求，不改原财报字段、分红或市场路由。先红后绿、相邻研究测试、lint/编译/空白，失败一次修复重试仍不通过则记录跳过。来源访问、发布修订和 PIT 仍由 R05.3/4/G0-R 验收。
 
-`CONT-R05.3-yahoo-yoy-period` done：[同比证据](../../tasks/evidence/2026-09-28-cont-r05-yahoo-yoy-period.md)。四条合成同比反例修前失败，修后按唯一报告日期寻找去年同月同日；缺期、重复、未知日期沿 `.info` 增长率回退或未知。Yahoo 适配器/上下文组合 44 passed，完整限定 flake8、编译与空白通过。没有来源请求；R05.3/4 的真实字段与公布/修订准入、G0-R/PIT 保持开放。
+`CONT-R05.3-yahoo-yoy-period` done：[同比证据](../../evidence/2026-09-28-cont-r05-yahoo-yoy-period.md)。四条合成同比反例修前失败，修后按唯一报告日期寻找去年同月同日；缺期、重复、未知日期沿 `.info` 增长率回退或未知。Yahoo 适配器/上下文组合 44 passed，完整限定 flake8、编译与空白通过。没有来源请求；R05.3/4 的真实字段与公布/修订准入、G0-R/PIT 保持开放。
 
 `CONT-R06.12-flow-latest-day` Ready：依据 Spec §3.3 和安装版 AKShare 日表，只修 `stock_individual_fund_flow` 的日期选行与净额列精确映射。合成乱序、重复/坏日期、缺净额、比例列干扰、最新日金额无效及直接/完整 Consumer 反例；只接受唯一最新日及有限净额，不推算 5/10 日。写集限 DSA 新单源行规范化 helper、`data_provider/fundamental_adapter.py` 狭窄接缝、相关测试、能力目录，以及主仓 Spec/Task/专属证据与交接；原大文件净行数不得增加。无真实请求、不修改行业/其他 getter；先定向再相邻研究回归、限定 lint/编译/尺寸/空白。失败一次修复重试后记录跳过。金额单位、原响应身份、来源可见时刻及 G0-M/PIT 独立开放。
 
-`CONT-R06.12-flow-latest-day` done：[本地证据](../../tasks/evidence/2026-09-28-cont-r06-flow-latest-day.md)。安装版日表按唯一有效交易日选择最新行，精确读取净额而非占比；缺/重复/坏日期、缺净额及最新金额无效拒绝股票块，行业独立。新反例修前 7 处失败，修后定向及相邻 44 passed；旧作用域 fixture 缺日期导致相邻首次 2 个 subtest 失败，补齐后唯一重跑通过；另补 SDK `NaT` 反例。新增文件完整 lint、旧文件关键 lint/编译/空白、adapter 715→711 行通过。无真实来源请求、目标更新或历史 PIT 证明；单位、原响应身份及 G0-M 仍开放，R06.13/14 对此日表为 unavailable。
+`CONT-R06.12-flow-latest-day` done：[本地证据](../../evidence/2026-09-28-cont-r06-flow-latest-day.md)。安装版日表按唯一有效交易日选择最新行，精确读取净额而非占比；缺/重复/坏日期、缺净额及最新金额无效拒绝股票块，行业独立。新反例修前 7 处失败，修后定向及相邻 44 passed；旧作用域 fixture 缺日期导致相邻首次 2 个 subtest 失败，补齐后唯一重跑通过；另补 SDK `NaT` 反例。新增文件完整 lint、旧文件关键 lint/编译/空白、adapter 715→711 行通过。无真实来源请求、目标更新或历史 PIT 证明；单位、原响应身份及 G0-M 仍开放，R06.13/14 对此日表为 unavailable。
 
-`CONT-R06.15-main-flow-candidate` done（只读合同核对）：[候选失配证据](../../tasks/evidence/2026-09-28-cont-r06-main-flow-candidate.md)。当前 AKShare 1.18.94 源码与官方文档独立一致：`stock_main_fund_flow` 是市场类别排名快照，今日/5日/10日仅给净占比、排名和涨跌幅，无单股净额或日期；当前 `get_capital_flow()` 未调用。原 R06.15–17 净额候选标 unavailable 并跳过该接口接线，不把百分比冒充金额。备用来源若仍需实现，必须重新选择 endpoint 并固定身份/单位/时点，P02/G0-M 与整体验收保持开放；无真实请求/源码修改。
+`CONT-R06.15-main-flow-candidate` done（只读合同核对）：[候选失配证据](../../evidence/2026-09-28-cont-r06-main-flow-candidate.md)。当前 AKShare 1.18.94 源码与官方文档独立一致：`stock_main_fund_flow` 是市场类别排名快照，今日/5日/10日仅给净占比、排名和涨跌幅，无单股净额或日期；当前 `get_capital_flow()` 未调用。原 R06.15–17 净额候选标 unavailable 并跳过该接口接线，不把百分比冒充金额。备用来源若仍需实现，必须重新选择 endpoint 并固定身份/单位/时点，P02/G0-M 与整体验收保持开放；无真实请求/源码修改。
 
-`CONT-R06.20-dragon-consumer` done（只读消费入口核对）：[现存入口证据](../../tasks/evidence/2026-09-28-cont-r06-dragon-consumer.md)。`get_dragon_tiger_flag` 仅进入无目标日期/`dataAsOf` 的 `DataFetcherManager` 当前基本面上下文，由当前分析、Agent 工具和筛选读取；Server 回测无龙虎榜块消费。首次在 DSA/Server 搜索消费者，复核调用签名与三个实际入口结论不变，按用户“一次重试后跳过”将历史 Consumer 选择记 blocked，R06.21–23 不接线、不触来源。缺事件/披露日期和历史可见时刻，P02/G0-M 及整体验收保持开放。
+`CONT-R06.20-dragon-consumer` done（只读消费入口核对）：[现存入口证据](../../evidence/2026-09-28-cont-r06-dragon-consumer.md)。`get_dragon_tiger_flag` 仅进入无目标日期/`dataAsOf` 的 `DataFetcherManager` 当前基本面上下文，由当前分析、Agent 工具和筛选读取；Server 回测无龙虎榜块消费。首次在 DSA/Server 搜索消费者，复核调用签名与三个实际入口结论不变，按用户“一次重试后跳过”将历史 Consumer 选择记 blocked，R06.21–23 不接线、不触来源。缺事件/披露日期和历史可见时刻，P02/G0-M 及整体验收保持开放。
 
 `CONT-R06.18-sector-flow-rank` Ready：只修当前 `get_capital_flow()` 的行业 top/bottom 候选链。安装版 AKShare 1.18.94 与官方文档均区分跨行业排名和指定行业内个股汇总；请求显式“今日/行业资金流”，成功表只按唯一精确净额列与有效行业名排序，过滤官方说明的空金额，拒绝比例代净额、重复名称、缺列或无有效行；排名失败不得调用默认“电源设备”的汇总。写集限 DSA 新单源行业排名 helper、`fundamental_adapter.py` 狭窄接缝及相关测试、DSA 能力目录，主仓 Spec/Task/证据和交接；大文件净行数不得增加。先红例，再定向/相邻测试、限定 lint/编译/空白；一次修复重试仍失败记录跳过。不触真实来源、目标容器或 DSA 已失败全包；金额单位、来源时点、R06.19 独立 Consumer 及 G0-M 继续开放。
 
-`CONT-R06.18-sector-flow-rank` done：[本地证据](../../tasks/evidence/2026-09-28-cont-r06-sector-flow-rank.md)。安装版与官方接口区分后，旧“行业排名失败→默认电源设备个股汇总”回退删除；行业排名显式今日/行业参数、精确净额列、无效形状拒绝。新反例修前 7 处失败，修后相邻 48 passed；旧作用域断言无参导致首次 6 个子测试失败，改为显式参数后唯一重跑通过。新文件完整 lint 一次格式修复后通过，旧适配器关键 lint、编译、空白通过，适配器 711→704 行。无来源请求/目标部署；R06.18 金额单位、来源时点/真实覆盖与 G0-M 保持开放，R06.19 另选 Consumer。
+`CONT-R06.18-sector-flow-rank` done：[本地证据](../../evidence/2026-09-28-cont-r06-sector-flow-rank.md)。安装版与官方接口区分后，旧“行业排名失败→默认电源设备个股汇总”回退删除；行业排名显式今日/行业参数、精确净额列、无效形状拒绝。新反例修前 7 处失败，修后相邻 48 passed；旧作用域断言无参导致首次 6 个子测试失败，改为显式参数后唯一重跑通过。新文件完整 lint 一次格式修复后通过，旧适配器关键 lint、编译、空白通过，适配器 711→704 行。无来源请求/目标部署；R06.18 金额单位、来源时点/真实覆盖与 G0-M 保持开放，R06.19 另选 Consumer。
 
-`CONT-R06.19-sector-member-consumer` blocked：[只读 Consumer 核对](../../tasks/evidence/2026-09-28-cont-r06-sector-member-consumer.md)。初次调用检索与逐签名复核均确认当前研究块/Agent 工具只接股票代码和跨行业榜单，主仓无指定行业成员资金流 Consumer；没有行业标识、分类版本、成员生效日期或历史口径。按本轮一次复核后停止，R06.19 接线跳过，不沿用 SDK 默认“电源设备”，不计第二来源。待有明确 Consumer 和成员合同再立独立叶；P02/G0-M 仍开放。
+`CONT-R06.19-sector-member-consumer` blocked：[只读 Consumer 核对](../../evidence/2026-09-28-cont-r06-sector-member-consumer.md)。初次调用检索与逐签名复核均确认当前研究块/Agent 工具只接股票代码和跨行业榜单，主仓无指定行业成员资金流 Consumer；没有行业标识、分类版本、成员生效日期或历史口径。按本轮一次复核后停止，R06.19 接线跳过，不沿用 SDK 默认“电源设备”，不计第二来源。待有明确 Consumer 和成员合同再立独立叶；P02/G0-M 仍开放。
 
-`CONT-M22-159516-split-discovery` done（独立公告只读核对）：[目标拆分证据](../../tasks/evidence/2026-09-28-cont-m22-159516-splits.md)。管理人 03-24/07-06 实施公告与 03-30/07-10 结果公告核实两次 1:2 拆分的登记、除权日期；03 月事件可能覆盖预热。四份公开 PDF 已在专名临时目录保存原字节与摘要；不把公告或抓取日当历史可见时刻，不推定 HiThink 价格坐标。目标 G-Run 的事件覆盖及不重复调整为必要验证，M22-c/G0-M/G0-H 仍开放。
+`CONT-M22-159516-split-discovery` done（独立公告只读核对）：[目标拆分证据](../../evidence/2026-09-28-cont-m22-159516-splits.md)。管理人 03-24/07-06 实施公告与 03-30/07-10 结果公告核实两次 1:2 拆分的登记、除权日期；03 月事件可能覆盖预热。四份公开 PDF 已在专名临时目录保存原字节与摘要；不把公告或抓取日当历史可见时刻，不推定 HiThink 价格坐标。目标 G-Run 的事件覆盖及不重复调整为必要验证，M22-c/G0-M/G0-H 仍开放。
 
 `CONT-M22-159516-source-crosscheck` Ready：仅对公开 EastMoney `fund_cf_em` 既有有界读取器读取 `159516.SZ` 的 2026-01-01..08-09 拆分观测，`max_pages=4`，同一 endpoint/参数最多初次与失败后一次重试，不换目标/年份/Provider，不触账号和 HiThink。只保留目标行源日期、类型、十进制比例、页数/行数/摘要与安全错误，不输出整表或原响应。与上述独立公告逐事件核对；缺行、分页超预算、类型/比例或日期不一致则记录并跳过，不补造 canonical 事实。成功也只证明本次返回观测，不授予完整历史覆盖/修订、公告精确可见时刻、价格坐标或事件准入。写集限专属证据、Task/交接与只读临时输出；生产源码不动。一次定向执行失败后仅一次同参重试，仍失败停止。
-`CONT-M22-159516-source-crosscheck` done：[公开源行证据](../../tasks/evidence/2026-09-28-cont-m22-159516-splits.md)。一次成功读取 2026 年第 1 页 83 行，目标仅保留 03-27、07-09 两条“份额分拆/每份 2”观测，与公告登记日和比例相符；失败重试 0 次。源行 `effectiveDate=null`、`effectivePhase=unknown`，本次分页完成不等于历史修订完备，Reader 继续 `coverage.complete=false`；未签发 canonical 事件或 G0-M/G-Run 准入。
+`CONT-M22-159516-source-crosscheck` done：[公开源行证据](../../evidence/2026-09-28-cont-m22-159516-splits.md)。一次成功读取 2026 年第 1 页 83 行，目标仅保留 03-27、07-09 两条“份额分拆/每份 2”观测，与公告登记日和比例相符；失败重试 0 次。源行 `effectiveDate=null`、`effectivePhase=unknown`，本次分页完成不等于历史修订完备，Reader 继续 `coverage.complete=false`；未签发 canonical 事件或 G0-M/G-Run 准入。
 
 `CONT-M22-159516-mapping-fixture` Ready：只在 DSA `tests/test_thesis_ledger_split_mapping_v3.py` 增加 159516 两次拆分的受控静态观测/公告日期映射回归，沿现有映射器和合成准入 fixture 验证标的、源转换日、比例、登记/除权日、公告引用及不产生历史 `availableAt`。公告 SHA 只作合同输入，不声称测试重验原始 PDF。先定向运行新用例，再运行本测试文件与目标 lint/编译；失败一次定向修复重试，仍失败记录跳过。写集限该测试、本 Task、证据及交接；不触真实来源/账号/目标，不能关闭 M22-c、G0-M 或 G-Run。
-`CONT-M22-159516-mapping-fixture` done：[公告与映射回归证据](../../tasks/evidence/2026-09-28-cont-m22-159516-splits.md)。两次静态观测在合成准入下分别映射到 03-30、07-10 除权，保留源日期/登记日与公告 SHA，不生成历史可见时刻；新例 1 passed、文件 24 passed。限定 lint 首次仅续行缩进失败，修正后唯一重试通过；语法、空白通过。未重新验 PDF 原件、未签真实事件准入，M22-c/G0-M/G-Run 仍开放。
+`CONT-M22-159516-mapping-fixture` done：[公告与映射回归证据](../../evidence/2026-09-28-cont-m22-159516-splits.md)。两次静态观测在合成准入下分别映射到 03-30、07-10 除权，保留源日期/登记日与公告 SHA，不生成历史可见时刻；新例 1 passed、文件 24 passed。限定 lint 首次仅续行缩进失败，修正后唯一重试通过；语法、空白通过。未重新验 PDF 原件、未签真实事件准入，M22-c/G0-M/G-Run 仍开放。
 
 `CONT-M23-159516-dividend-observation` Ready：仅用现有公开 `fund_fh_em` 有界读取器观察 `159516.SZ` 的 `2026-01-01..2026-08-09`，`max_pages=4`；同 endpoint/参数最多初次及失败后一次重试，不换 Provider、标的或年份，不触账号/HiThink。仅记录目标观测的除息/登记/发放日期、元/份金额，分页页数/行数/摘要、稳定失败类别；不输出原整表或把读取器本次空集当成完整历史、无分红、PIT 或 G0-M 准入。与管理人独立公告交叉核对若有目标行；无目标行则只记“本次未观测”，不补造事件。写集限专属证据、Task/交接和临时安全输出，生产源码只读。失败一次同参重试仍失败即记录跳过；成功也不签发完整覆盖或 G-Run。
-`CONT-M23-159516-dividend-observation` skipped_after_retry：[页预算卡点](../../tasks/evidence/2026-09-28-cont-m23-159516-dividend-observation.md)。同参初次与唯一重试均在年度第 1 页元数据检查处被 `基金分红总页预算不足` 拒绝，未发布目标观测或部分覆盖。四页上限不足仅说明传输预算，不证明 159516 有/无现金分红；不扩大预算或换源继续请求。M23-b/G0-M/G-Run 仍开放。
+`CONT-M23-159516-dividend-observation` skipped_after_retry：[页预算卡点](../../evidence/2026-09-28-cont-m23-159516-dividend-observation.md)。同参初次与唯一重试均在年度第 1 页元数据检查处被 `基金分红总页预算不足` 拒绝，未发布目标观测或部分覆盖。四页上限不足仅说明传输预算，不证明 159516 有/无现金分红；不扩大预算或换源继续请求。M23-b/G0-M/G-Run 仍开放。
 
 `CONT-M21-159516-three-basis-split-window` Ready：沿 DSA 已有可终止的 AKShare 精确单源调用，仅观察 `fund_etf_hist_em` 的 `159516.SZ`、`2026-07-08..2026-07-13`，逐个请求 `none/qfq/hfq`，各最多初次与失败后一次同参重试，单次硬超时 20 秒。只保留四个交易日的日期/OHLC/成交量/成交额及请求口径、安全失败类别；不读账号、不更换标的/日期/来源、不打印整源响应。依据独立 07-09 登记、07-10 除权公告核对价格坐标是否与一次 1:2 拆分一致；若其他经济事件或基准规则影响比较，仅记观察不推断算法。结果不证明 ETF 量额单位、完整历史覆盖/修订、HiThink 口径或执行准入。写集限专属证据、Task/交接和临时安全输出，生产源码只读；任何口径两次失败即记录跳过该口径，不用其他源补齐。
-`CONT-M21-159516-three-basis-split-window` partial/skipped_after_retry：[短窗真实来源证据](../../tasks/evidence/2026-09-28-cont-m21-159516-three-basis-split-window.md)。未复权和后复权各一次成功，四交易日 OHLC 的后/未比例在 07-09 及以前为 2、07-10 起为 4，量额原值一致；与 3 月/7 月两次 1:2 拆分公告相容。前复权初次及同参唯一重试均 `ProxyError`，没有源原生 qfq 行，按用户规则跳过该口径。四日样本不证明量额单位、调整算法/锚点、全历史覆盖/修订、HiThink 坐标或任何 G0/G-Run 准入，M21/G-M2-Price 保持开放。
+`CONT-M21-159516-three-basis-split-window` partial/skipped_after_retry：[短窗真实来源证据](../../evidence/2026-09-28-cont-m21-159516-three-basis-split-window.md)。未复权和后复权各一次成功，四交易日 OHLC 的后/未比例在 07-09 及以前为 2、07-10 起为 4，量额原值一致；与 3 月/7 月两次 1:2 拆分公告相容。前复权初次及同参唯一重试均 `ProxyError`，没有源原生 qfq 行，按用户规则跳过该口径。四日样本不证明量额单位、调整算法/锚点、全历史覆盖/修订、HiThink 坐标或任何 G0/G-Run 准入，M21/G-M2-Price 保持开放。
 
 `CONT-S05-manifest-legacy-instant-precision` Ready：集中 Review 已指出共享 legacy 必要绑定仍按毫秒比较，当前 `reconstructionArchivesMatch` 与 `reconstructionFactsWithinCutoff` 确有 `Date.parse`。仅修改 Schemas `src/market-pit-reconstruction-manifest-validation-v3.ts` 与 `test/market-pit-reconstruction-v3.test.ts`：先以逐 Bar 引用相差一微秒、来源观察或 Bar 可用时间晚于截点一微秒补红例，再复用既有 `compareMarketPitEvidenceInstantStringsV1` 精确比较；非法/未知时刻失败关闭，等价时区瞬时保留。保持现有 `bar-archive-mismatch`/`future-fact` 分类和 v1/v2 合同，不新增 Schema 字段。执行新例→该文件/相邻精度测试→Schemas typecheck/build→限定 lint/格式/空白；首次失败仅一次定向修复重试，仍失败记录跳过。Server 内容映射及最终真实 PIT 资格为独立叶，本叶不触 Provider、目标或全包。
-`CONT-S05-manifest-legacy-instant-precision` done：[精度修复证据](../../tasks/evidence/2026-09-28-cont-s05-manifest-legacy-instant-precision.md)。三个晚一微秒反例修前误报 `bound`、修后拒绝；等价偏移仍通过。复用现有精确瞬时比较器，Schema 字段及失败分类不变。新例4、相邻68、当前Schema全包550、Server内容绑定43项通过；Schema/Server typecheck、Schema build、限定 lint/格式、边界/尺寸/空白通过。格式首次仅新增块换行，唯一修正重试通过。只关闭本地必要绑定叶；Server归档时钟 v1、真实来源/场所及最终 PIT 资格继续开放。
+`CONT-S05-manifest-legacy-instant-precision` done：[精度修复证据](../../evidence/2026-09-28-cont-s05-manifest-legacy-instant-precision.md)。三个晚一微秒反例修前误报 `bound`、修后拒绝；等价偏移仍通过。复用现有精确瞬时比较器，Schema 字段及失败分类不变。新例4、相邻68、当前Schema全包550、Server内容绑定43项通过；Schema/Server typecheck、Schema build、限定 lint/格式、边界/尺寸/空白通过。格式首次仅新增块换行，唯一修正重试通过。只关闭本地必要绑定叶；Server归档时钟 v1、真实来源/场所及最终 PIT 资格继续开放。
 
-`CONT-S05-archive-clock-v1-precision` 功能完成、格式门禁 `skipped_after_retry`：[本地证据](../../tasks/evidence/2026-09-28-cont-s05-archive-clock-v1-precision.md)。v1 归档观察晚一微秒红例修前误报 `archives-bound`，修后 v1/v2 共用精确比较并返回 `archive-future`；相邻旧毫秒断言已更新，44 项回归、Server typecheck、限定 lint、尺寸及空白通过。v3 测试文件全文件 Prettier 因既有排版初次及一次复试失败，未批量重排；其余两文件格式通过。Schema/内容映射/历史资格编排未改，真实 Provider、目标运行态和最终 PIT 门禁仍开放。
+`CONT-S05-archive-clock-v1-precision` 功能完成、格式门禁 `skipped_after_retry`：[本地证据](../../evidence/2026-09-28-cont-s05-archive-clock-v1-precision.md)。v1 归档观察晚一微秒红例修前误报 `archives-bound`，修后 v1/v2 共用精确比较并返回 `archive-future`；相邻旧毫秒断言已更新，44 项回归、Server typecheck、限定 lint、尺寸及空白通过。v3 测试文件全文件 Prettier 因既有排版初次及一次复试失败，未批量重排；其余两文件格式通过。Schema/内容映射/历史资格编排未改，真实 Provider、目标运行态和最终 PIT 门禁仍开放。
 
-`CONT-S05-XSHE-2026-holiday-notice` done（仅固定休市原文解析）：[原文与验证证据](../../tasks/evidence/2026-09-28-cont-s05-xshe-2026-holiday-notice.md)。当前官方 HTML 原字节 24,892 字节及摘要固定于测试 fixture；七段休市/复市、星期、署名和顺序离线核对，得到 19 个工作日休市日期。新例 13、相邻四文件 88 passed/1 原有 skipped；Server typecheck、限定 lint、格式一次修正复试、尺寸及空白通过。没有接入生产历史资格，当前捕获不能回填旧决策可见时点；XSHE 时段/临时停市、场所持续范围、真实来源与最终 PIT 仍未完成。
+`CONT-S05-XSHE-2026-holiday-notice` done（仅固定休市原文解析）：[原文与验证证据](../../evidence/2026-09-28-cont-s05-xshe-2026-holiday-notice.md)。当前官方 HTML 原字节 24,892 字节及摘要固定于测试 fixture；七段休市/复市、星期、署名和顺序离线核对，得到 19 个工作日休市日期。新例 13、相邻四文件 88 passed/1 原有 skipped；Server typecheck、限定 lint、格式一次修正复试、尺寸及空白通过。没有接入生产历史资格，当前捕获不能回填旧决策可见时点；XSHE 时段/临时停市、场所持续范围、真实来源与最终 PIT 仍未完成。
 
-`CONT-S05-XSHE-session-rule-discovery` `skipped_after_retry`：[规则版本发现卡点](../../tasks/evidence/2026-09-28-cont-s05-xshe-session-rule-discovery.md)。2026 修订规则发布页在官方 `investor` 与一次 `www` 路径重试中均获取超时；没有核实施行日期、目标窗口前段的适用版本或固定规则原字节。不得将 2026 规则 PDF 搜索摘录直接扩展为完整年度 XSHE 时段。此卡点不撤销已核的休市通知事实，完整日历及严格 PIT 仍开放。
+`CONT-S05-XSHE-session-rule-discovery` `skipped_after_retry`：[规则版本发现卡点](../../evidence/2026-09-28-cont-s05-xshe-session-rule-discovery.md)。2026 修订规则发布页在官方 `investor` 与一次 `www` 路径重试中均获取超时；没有核实施行日期、目标窗口前段的适用版本或固定规则原字节。不得将 2026 规则 PDF 搜索摘录直接扩展为完整年度 XSHE 时段。此卡点不撤销已核的休市通知事实，完整日历及严格 PIT 仍开放。
 
-`CONT-S05-shanghai-trading-date` done：[当地交易日修复证据](../../tasks/evidence/2026-09-28-cont-s05-shanghai-trading-date.md)。BarSeries V3 已按上海时区计算交易日，S05 决策窗口此前按时间字符串日期查日历，合法的 UTC 前一日 Bar 被误拒为 `missing-successor`。新反例先红后绿，决策窗口 43 passed、相邻内容绑定 22 passed，另有 6 项原环境条件 skipped；Server typecheck/build、限定 lint/格式与尺寸 ratchet 通过。只修本地必要计算，不签发历史日历、场所或来源资格；S05 父项、真实 G0-H/G-Run 与 §13 均保持开放。
+`CONT-S05-shanghai-trading-date` done：[当地交易日修复证据](../../evidence/2026-09-28-cont-s05-shanghai-trading-date.md)。BarSeries V3 已按上海时区计算交易日，S05 决策窗口此前按时间字符串日期查日历，合法的 UTC 前一日 Bar 被误拒为 `missing-successor`。新反例先红后绿，决策窗口 43 passed、相邻内容绑定 22 passed，另有 6 项原环境条件 skipped；Server typecheck/build、限定 lint/格式与尺寸 ratchet 通过。只修本地必要计算，不签发历史日历、场所或来源资格；S05 父项、真实 G0-H/G-Run 与 §13 均保持开放。
 
 `CONT-R02-efinance-stock-alias-health` Ready：依据 Spec §3.3，旧 `efinance`、新 `eastmoney` 与 V1 无 source 的 Efinance 股票报价共用实际 `get_realtime_quote`。仅修改 DSA `src/services/thesis_ledger_source_alias_identity.py`、`src/services/thesis_ledger_request_budget_keys.py`、新 `tests/test_thesis_ledger_efinance_stock_alias_health.py`、既有 `tests/test_thesis_ledger_source_alias_health.py` 的相邻旧断言及 `docs/thesis-ledger-source-capabilities.md` 对应股票行，并写专属证据；Control/Runtime/旧健康行、策略及冻结只读。先复现旧 open 被换 alias 绕开，再验证双向切换、V1 行、过期恢复、进程内熔断与无关路由独立；股票不扩展 ETF 专属持久请求预算。定向→相邻 alias/Control/Runtime 回归→限定 lint/编译/空白。若修复检查失败，只做一次定向重试，仍失败记录跳过；不请求真实来源、不运行已失败的 DSA 官方全包或目标同步。完成不关闭旧 alias 完整迁移、G0-M、AC20 或 §13。
 
-`CONT-R02-efinance-stock-alias-health` done：[本地红绿及范围证据](../../tasks/evidence/2026-09-28-cont-r02-efinance-stock-alias-health.md)。新例修前 5 failed/1 passed，修后 alias/Control/Runtime 组合 92 passed、网关 7 passed；改动 Python 文件完整 lint/编译、仓库 critical lint 和限定空白均通过。旧/新/V1 股票报价共用健康与进程内熔断，股票不扩用 ETF 持久请求预算；旧健康行、RouteTarget、执行来源、准入与冻结均保留。无真实来源、官方 DSA 全包重跑或目标同步；完整迁移、G0-M、AC20 与 §13 仍开放。
+`CONT-R02-efinance-stock-alias-health` done：[本地红绿及范围证据](../../evidence/2026-09-28-cont-r02-efinance-stock-alias-health.md)。新例修前 5 failed/1 passed，修后 alias/Control/Runtime 组合 92 passed、网关 7 passed；改动 Python 文件完整 lint/编译、仓库 critical lint 和限定空白均通过。旧/新/V1 股票报价共用健康与进程内熔断，股票不扩用 ETF 持久请求预算；旧健康行、RouteTarget、执行来源、准入与冻结均保留。无真实来源、官方 DSA 全包重跑或目标同步；完整迁移、G0-M、AC20 与 §13 仍开放。
 
-`CONT-R03-efinance-nav-alias-health` `skipped_after_retry`：[定向卡点与撤回证据](../../tasks/evidence/2026-09-28-cont-r03-efinance-nav-alias-health.md)。实际正式/历史净值 Runtime 忽略 source，旧/新/V1 健康身份仍分离；新红例 10 failed/1 passed。源码尝试后的首轮和唯一修正重试均为 6 failed/12 passed：测试先错把净值 `routeStatus` 当执行阻断，后错把公开 `NO_ELIGIBLE_PROVIDER` 当内部 `circuit_open`。按预算停止并撤回本叶未通过的源码/测试，保留上一股票报价叶和 Spec 待实现合同；无第三次测试、真实来源或目标同步。失败前提未变时不机械重启；R03.3/R03.4、完整 alias 迁移、G0-M、AC20 与 §13 均开放。
+`CONT-R03-efinance-nav-alias-health` `skipped_after_retry`：[定向卡点与撤回证据](../../evidence/2026-09-28-cont-r03-efinance-nav-alias-health.md)。实际正式/历史净值 Runtime 忽略 source，旧/新/V1 健康身份仍分离；新红例 10 failed/1 passed。源码尝试后的首轮和唯一修正重试均为 6 failed/12 passed：测试先错把净值 `routeStatus` 当执行阻断，后错把公开 `NO_ELIGIBLE_PROVIDER` 当内部 `circuit_open`。按预算停止并撤回本叶未通过的源码/测试，保留上一股票报价叶和 Spec 待实现合同；无第三次测试、真实来源或目标同步。失败前提未变时不机械重启；R03.3/R03.4、完整 alias 迁移、G0-M、AC20 与 §13 均开放。
 
 `CONT-R03-akshare-nav-alias-health` Ready：只处理 AKShare 的 `FUND_NAV` 与 `FUND_NAV_HISTORY` 两个各自隔离的健康组。当前两种能力的旧 `akshare`、新 `eastmoney` 与 V1 无 source 均调用同一 `get_fund_nav_history`；为每种能力分别合并持久健康读取、规范新写入和进程内熔断键，最近旧 open 跨 alias 阻断，过期后沿原半开路径探测。写集限 DSA `src/services/thesis_ledger_source_alias_identity.py`、专属新测试、`tests/test_thesis_ledger_akshare_stock_alias_health.py` 的相邻旧独立性断言、DSA 能力目录和本 Task/Spec/专属证据；Efinance 净值已跳过叶不重启。先红后绿，再跑相邻 alias/Control/Runtime，限定 lint/编译/空白；失败仅一次定向修复重试后记录跳过。旧路由、准入、冻结及真实来源门禁保持开放。
-`CONT-R03-akshare-nav-alias-health` done：[本地证据](../../tasks/evidence/2026-09-28-cont-r03-akshare-nav-alias-health.md)。红例 10 failed；修后新例 12 passed、相邻 8 文件 98 passed，改动 Python 的 lint/编译及文件空白通过。正式/历史净值各自合并旧/新/V1 健康与进程内熔断，过期旧 open 允许探测且旧行保留；公开 Runtime 在旧 open 时不调用读取器。DSA 目录更正当前 AKShare manifest version 3、补两条精确 source 净值行，当前 §2/§3/§4 为 35/65/38 行。未访问真实来源、未运行已失败的 DSA 全包或目标同步；Efinance 净值跳过状态、完整别名迁移、G0-M、AC20 与 §13 均开放。
+`CONT-R03-akshare-nav-alias-health` done：[本地证据](../../evidence/2026-09-28-cont-r03-akshare-nav-alias-health.md)。红例 10 failed；修后新例 12 passed、相邻 8 文件 98 passed，改动 Python 的 lint/编译及文件空白通过。正式/历史净值各自合并旧/新/V1 健康与进程内熔断，过期旧 open 允许探测且旧行保留；公开 Runtime 在旧 open 时不调用读取器。DSA 目录更正当前 AKShare manifest version 3、补两条精确 source 净值行，当前 §2/§3/§4 为 35/65/38 行。未访问真实来源、未运行已失败的 DSA 全包或目标同步；Efinance 净值跳过状态、完整别名迁移、G0-M、AC20 与 §13 均开放。
 
 `CONT-R03-efinance-nav-alias-health-resume` Ready：前叶 `skipped_after_retry` 的原始失败与撤回保留；新前提是 AKShare 同一净值 Runtime 入口已用公开请求断言验证旧 open 时零读取器调用，不再以展示层 `routeStatus` 或内部 `circuit_open` 作为公开错误合同。按现有 Spec §4.1，仅合并 Efinance 的 `FUND_NAV`、`FUND_NAV_HISTORY` 各自旧 `efinance`、新 `eastmoney` 与 V1 无 source 健康/进程内熔断身份。写集限 DSA 精确 source alias helper、新专属测试、既有无关能力独立性断言、DSA 能力目录、本 Task 与专属证据；不重试原已耗尽的任何真实来源或官方全包。先重现跨别名 open 绕过，再验证双向/V1、公开请求零读取、过期探测、旧行保留和两能力/报价隔离。定向→相邻 Control/Runtime→限定 lint/编译/空白；本次新增前提下若仍失败，仅一次定向修复重试并记录停止。完整别名迁移、G0-M 与目标门禁保持开放。
-`CONT-R03-efinance-nav-alias-health-resume` done：[续接证据](../../tasks/evidence/2026-09-28-cont-r03-efinance-nav-alias-health-resume.md)。新红例 12 failed，修后专属 12、相邻 9 文件 110 passed；改动 Python 的完整 lint/编译通过。正式/历史净值各自共用旧/新/V1 健康与进程内熔断，公开请求遇旧 open 时零 Reader 调用；旧行保留、过期允许探测、两能力及报价隔离。前叶跳过记录不抹除，真实来源和已失败的官方 DSA 全包未重试；完整 alias 迁移、G0-M、AC20、首条回测与 §13 均开放。
+`CONT-R03-efinance-nav-alias-health-resume` done：[续接证据](../../evidence/2026-09-28-cont-r03-efinance-nav-alias-health-resume.md)。新红例 12 failed，修后专属 12、相邻 9 文件 110 passed；改动 Python 的完整 lint/编译通过。正式/历史净值各自共用旧/新/V1 健康与进程内熔断，公开请求遇旧 open 时零 Reader 调用；旧行保留、过期允许探测、两能力及报价隔离。前叶跳过记录不抹除，真实来源和已失败的官方 DSA 全包未重试；完整 alias 迁移、G0-M、AC20、首条回测与 §13 均开放。
 
-`CONT-159516-draft-strategy` done：[目标策略证据](../../tasks/evidence/2026-09-28-cont-159516-draft-strategy.md)。经用户选择，正式 API 以现有 `159516.SZ` 实验种子创建独立普通 `draft` 策略；数据库和列表均核对版本 1 可见，合同仅名称与描述改变。目标 Server 生产依赖计划要求从 `2026-04-30` 保守取数以覆盖 1 个预热交易日。目标 HiThink 准入、ETF 量额单位、预热数据及运行态版本仍缺，`G0-H-target`、`G-Deploy-159516`、`G-Run`、`G-UI-159516` 保持开放。
+`CONT-159516-draft-strategy` done：[目标策略证据](../../evidence/2026-09-28-cont-159516-draft-strategy.md)。经用户选择，正式 API 以现有 `159516.SZ` 实验种子创建独立普通 `draft` 策略；数据库和列表均核对版本 1 可见，合同仅名称与描述改变。目标 Server 生产依赖计划要求从 `2026-04-30` 保守取数以覆盖 1 个预热交易日。目标 HiThink 准入、ETF 量额单位、预热数据及运行态版本仍缺，`G0-H-target`、`G-Deploy-159516`、`G-Run`、`G-UI-159516` 保持开放。
 
 `CONT-R02-efinance-daily-alias-health` Ready：仅处理当前 Efinance `DAILY_BAR` 的 `STOCK` 与 `ETF` 两个独立健康组；各组旧 `efinance`、新 `eastmoney`、V1 无 source 在无显式 adjustment 时调用同一 `get_daily_data`。写集限 DSA 精确 alias helper、新专属测试、来源能力目录、本 Task 与专属证据。先以旧 open 切换新路由的公开请求补红例，再验证双向/V1、两资产隔离、其他能力隔离、过期探测、旧行保留和执行来源原文；定向测试→相邻 Control/Runtime→限定 lint/编译/空白。请求预算、RouteTarget、V3 准入、冻结/重放及其他 Provider 不改；不访问真实来源、不运行已失败的 DSA 官方全包。本叶失败仅一次定向修复重试，仍失败记录跳过；完整 source alias 迁移和 G0-M 保持开放。
 
@@ -1836,61 +1836,61 @@ DSA稳定门禁唯一重试已完整结束：7229 collected、7225 selected，72
 
 `CONT-G0-H-env-wiring` Ready：目标 DSA 当前 `credentialConfigured=false`，宿主 `~/.zshrc` 的 Key 不进入已运行容器；DSA 当前 HiThink 凭据走环境快照，页面旧式字符串凭据不能替代环境变量。写集限 infra `compose.yml`、`.env.example`、凭据说明及成对 Spec/Task、专属证据；只添加可选 `HITHINK_API_KEY` 透传，不落真实值。用合成值验证 Compose 渲染与原有编排合同；目标容器更新仍受 DSA 官方完整离线门禁和来源准入前置约束，不能直接 `docker compose up` 或以配置接线宣称已部署。
 
-`CONT-G0-H-159516-warmup` done：[预热与接线证据](../../tasks/evidence/2026-09-28-cont-g0-h-159516-warmup-and-env.md)。新范围 1 次只读 GET 返回 68/68 日线，覆盖 `2026-04-30..08-07` 的全部独立日历交易日，无缺失/重复/越界；适配器指纹已登记。量额单位仍为 `unknown`，完整来源准入及目标运行态未通过。
+`CONT-G0-H-159516-warmup` done：[预热与接线证据](../../evidence/2026-09-28-cont-g0-h-159516-warmup-and-env.md)。新范围 1 次只读 GET 返回 68/68 日线，覆盖 `2026-04-30..08-07` 的全部独立日历交易日，无缺失/重复/越界；适配器指纹已登记。量额单位仍为 `unknown`，完整来源准入及目标运行态未通过。
 
-`CONT-G0-H-env-wiring` done（仅源码与配置合同）：同一[证据](../../tasks/evidence/2026-09-28-cont-g0-h-159516-warmup-and-env.md)记录 infra Compose 可选变量接线、合成值渲染和原编排合同通过。真实 Key 未写入仓库，当前容器未更新；本叶记录时 DSA 官方全包与精确 HiThink 准入均未通过，后续官方全包进展见 `CONT-DSA-schemas-isolated-gate`。
+`CONT-G0-H-env-wiring` done（仅源码与配置合同）：同一[证据](../../evidence/2026-09-28-cont-g0-h-159516-warmup-and-env.md)记录 infra Compose 可选变量接线、合成值渲染和原编排合同通过。真实 Key 未写入仓库，当前容器未更新；本叶记录时 DSA 官方全包与精确 HiThink 准入均未通过，后续官方全包进展见 `CONT-DSA-schemas-isolated-gate`。
 
-`CONT-R02-efinance-daily-alias-health` done：[日线别名健康证据](../../tasks/evidence/2026-09-28-cont-r02-efinance-daily-alias-health.md)。旧 open 切新日线路由修前调用读取器，修后新例 12、相邻 8 文件合计 98 passed；限定 lint/编译/空白通过。`STOCK`、`ETF` 分组独立，旧/新/V1 键兼容，过期探测及执行来源保留。无真实来源或目标同步；完整迁移、G0-M 与首条回测仍开放，后续官方 DSA 门禁进展见 `CONT-DSA-schemas-isolated-gate`。
+`CONT-R02-efinance-daily-alias-health` done：[日线别名健康证据](../../evidence/2026-09-28-cont-r02-efinance-daily-alias-health.md)。旧 open 切新日线路由修前调用读取器，修后新例 12、相邻 8 文件合计 98 passed；限定 lint/编译/空白通过。`STOCK`、`ETF` 分组独立，旧/新/V1 键兼容，过期探测及执行来源保留。无真实来源或目标同步；完整迁移、G0-M 与首条回测仍开放，后续官方 DSA 门禁进展见 `CONT-DSA-schemas-isolated-gate`。
 
 `CONT-DSA-schemas-isolated-gate` Ready：旧 `CONT-DSA-current-baseline-gate` 的 `skipped_after_retry` 保留，不重试其缺相邻 Schemas 构建目录的同一副本。当前 DSA 源码已加入日线 alias 修复、相邻定向 98 passed，主仓 Schemas `dist` 与源码时间戳一致；在**新完整工作区布局**下建立无真实 `.env`、数据库、日志、用户 HOME 和账号文件的临时副本，并只读复制相邻 Schemas `dist`、`package.json` 与所需 Zod 运行依赖。固定 Python/Node、外连防护和临时路径，记录输入摘要与隔离边界自检；先运行旧 16 个精确失败 nodeid，全部通过后按 `syntax`→critical `flake8`→官方 `offline-tests` 顺序执行。新前提失败时只做一次定向修复/重试，仍失败记录并跳过后续高成本门禁；不得修改测试以求通过、访问真实 Provider、覆盖用户工作树或以隔离通过声称目标已部署。写集仅专属临时目录、本 Task 与专属证据。
 
-`CONT-DSA-schemas-isolated-gate` done：[新隔离门禁证据](../../tasks/evidence/2026-09-28-cont-dsa-schemas-isolated-gate.md)。旧 16 点在新完整布局通过，官方 syntax/critical flake8 通过；首次全包 7368 passed / 3 failed（仅缺 Schemas 固定 fixture），一次输入修复后三项定向通过，唯一全包复试 7371 passed / 1 skipped / 4 deselected、626 subtests passed。旧失败与跳过记录保留，未接触真实账号；本叶不证明目标已更新或 HiThink 已准入。
+`CONT-DSA-schemas-isolated-gate` done：[新隔离门禁证据](../../evidence/2026-09-28-cont-dsa-schemas-isolated-gate.md)。旧 16 点在新完整布局通过，官方 syntax/critical flake8 通过；首次全包 7368 passed / 3 failed（仅缺 Schemas 固定 fixture），一次输入修复后三项定向通过，唯一全包复试 7371 passed / 1 skipped / 4 deselected、626 subtests passed。旧失败与跳过记录保留，未接触真实账号；本叶不证明目标已更新或 HiThink 已准入。
 
 `CONT-worker-runtime-recover` Ready：只读目标检查发现 `backtest-worker` 已退出（exit 255），Server/DSA/PostgreSQL/Redis 运行健康；Worker 最后日志只有 `backtest.worker.ready`，不足以将退出归因于应用故障。当前 Server 源码 typecheck 与 build 退出 0，受影响定向与先前稳定回归见各叶。依 AGENTS 的目标运行态入口要求，Worker 不运行时选择相邻 infra 官方 `./scripts/update.sh thesis-ledger`，沿默认保留数据结构检查，更新 Server 镜像并启动 Server 与独立 Worker；不直接调用 Compose build/up 或手工重启。更新后核对两个服务健康、镜像身份、数据库结构门禁结果及 API/Worker 就绪；失败仅一次定向排查/重试，保留错误与消费者状态。DSA 目标凭据/来源准入、`G-Deploy-159516` 与真实回测仍独立，不因 Worker 恢复勾选。
 
 `CONT-dsa-runtime-stage` Ready：当前源码的 DSA 官方隔离 `offline-tests` 已在完整 Schemas 输入下通过；目标 DSA 仍为旧镜像，但因 Server 官方更新时 Compose 依赖重建，现已读取宿主 HiThink Key，目录 `credentialConfigured=true`，精确 ETF `qfq` route catalog 仍为 `not_admitted`。在保持该拒绝的前提下，通过相邻 infra 官方 `./scripts/update.sh dsa` 一次性更新 DSA 源码镜像；从 `~/.zshrc` 在进程内读取 Key，仅以进程环境传给 Compose，不打印/落盘真实值。Docker CLI 使用无凭据临时配置和现有 socket，以避开沙箱对 `~/.docker/buildx/activity` 的写入拒绝；不复制 Docker 登录配置。更新后核对 DSA/Server/Worker 健康、镜像版本、目录凭据状态与精确 route 仍未准入；本叶仅为目标源码/凭据就位，不签发 G0-H-target 或 G-Deploy-159516，也不发起真实回测。失败按一次定向修复预算记录。
 
-`CONT-worker-runtime-recover` done：[目标运行态证据](../../tasks/evidence/2026-09-28-cont-target-runtime-refresh.md)。首次官方更新因沙箱拒绝 Buildx 活动目录写入而停止，临时无凭据 Docker 配置下的官方 `update.sh thesis-ledger` 成功；默认保留数据结构检查、Server/Worker 健康通过，Worker 从 exit 255 恢复。未据此勾选业务部署或回测。
+`CONT-worker-runtime-recover` done：[目标运行态证据](../../evidence/2026-09-28-cont-target-runtime-refresh.md)。首次官方更新因沙箱拒绝 Buildx 活动目录写入而停止，临时无凭据 Docker 配置下的官方 `update.sh thesis-ledger` 成功；默认保留数据结构检查、Server/Worker 健康通过，Worker 从 exit 255 恢复。未据此勾选业务部署或回测。
 
-`CONT-dsa-runtime-stage` done（目标源码与凭据就位）：同一[证据](../../tasks/evidence/2026-09-28-cont-target-runtime-refresh.md)记录官方 `update.sh dsa` 成功、DSA 新镜像与抽查源码摘要一致、环境 Key 安全匹配、三服务健康。精确 HiThink ETF qfq 能力仍 `not_admitted`；来源准入、`G-Deploy-159516`、真实回测与 UI 验收保持未通过。
+`CONT-dsa-runtime-stage` done（目标源码与凭据就位）：同一[证据](../../evidence/2026-09-28-cont-target-runtime-refresh.md)记录官方 `update.sh dsa` 成功、DSA 新镜像与抽查源码摘要一致、环境 Key 安全匹配、三服务健康。精确 HiThink ETF qfq 能力仍 `not_admitted`；来源准入、`G-Deploy-159516`、真实回测与 UI 验收保持未通过。
 
-`CONT-G0-H-159516-unit-split-crosscheck` done（短窗实测，未准入）：[交叉核对证据](../../tasks/evidence/2026-09-28-cont-g0-h-159516-unit-and-split-crosscheck.md)固定 HiThink 官方仓库提交和深交所原生单位说明，另以一次不同范围的 HiThink 拆分短窗请求取得 4/4 日及响应指纹。对既有东财未复权观测，四日 HiThink 成交量精确为其 100 倍、成交额为其按百元取整值；拆分前开/收约为未复权一半，07-10 起相同。这支持本标的短窗量为份、额为人民币元及 qfq 已纳入 7 月拆分的**实测推断**，仍非 HiThink 正式单位合同或 68 日全窗/历史修订证明。适配器继续标记 `unknown`，精确目录维持 `not_admitted`；没有发起正向回测。
+`CONT-G0-H-159516-unit-split-crosscheck` done（短窗实测，未准入）：[交叉核对证据](../../evidence/2026-09-28-cont-g0-h-159516-unit-and-split-crosscheck.md)固定 HiThink 官方仓库提交和深交所原生单位说明，另以一次不同范围的 HiThink 拆分短窗请求取得 4/4 日及响应指纹。对既有东财未复权观测，四日 HiThink 成交量精确为其 100 倍、成交额为其按百元取整值；拆分前开/收约为未复权一半，07-10 起相同。这支持本标的短窗量为份、额为人民币元及 qfq 已纳入 7 月拆分的**实测推断**，仍非 HiThink 正式单位合同或 68 日全窗/历史修订证明。适配器继续标记 `unknown`，精确目录维持 `not_admitted`；没有发起正向回测。
 
 `CONT-D01-H-admission-path` Ready：当前 DSA Data V3 已用精确准入行、适配/来源修订和 HMAC 凭据修订保护读取及目录，但 Control V3 `_v3_target_reason` 对全部 HiThink 路由无条件 `not_admitted`，即使未来有完整证据也无法形成一致的 Effective Policy。只改 DSA Control 的 HiThink V3 分支，使其仅在内部精确准入行处于有效期、准入范围自洽且当前适配/来源/凭据修订全部匹配时可成为 eligible；实际请求是否位于范围内仍由 Data V3 逐次检查。无行、过期、撤销、换 Key、缺主密钥或不匹配仍拒绝，V1/V2 保持原门禁。用合成密钥、隔离 SQLite 和无联网 Adapter 先证旧失败，再验证正向与失效；仅运行定向测试、相邻回归及限定 lint/编译。同步 DSA 能力文档/CHANGELOG 和本 Task 专属证据。此叶不写目标准入行、不更改 `volume_unit=unknown`，不签发 `G0-H-target` 或正向运行许可。
 
-`CONT-D01-H-admission-path` done：[准入接缝证据](../../tasks/evidence/2026-09-28-cont-d01-hithink-admission-path.md)。新例修前复现目录 ready 而 Control 仍拒绝，修后合成精确准入可在 V3 Effective Policy 生效；无行、旧修订、换 Key、撤销、缺主密钥均拒绝，轮换后 Data V3 未调用 Adapter。新增 6、相邻六文件 37 passed；新完整隔离输入的官方 syntax/critical flake8 与 `offline-tests` 7377 passed、1 skipped、4 deselected、626 subtests passed。目标经官方 `sync-code.sh dsa` 快更，Control 源码摘要一致、容器 healthy、精确路由仍 `not_admitted`；镜像未更新，真实准入和普通回测尚未执行。
+`CONT-D01-H-admission-path` done：[准入接缝证据](../../evidence/2026-09-28-cont-d01-hithink-admission-path.md)。新例修前复现目录 ready 而 Control 仍拒绝，修后合成精确准入可在 V3 Effective Policy 生效；无行、旧修订、换 Key、撤销、缺主密钥均拒绝，轮换后 Data V3 未调用 Adapter。新增 6、相邻六文件 37 passed；新完整隔离输入的官方 syntax/critical flake8 与 `offline-tests` 7377 passed、1 skipped、4 deselected、626 subtests passed。目标经官方 `sync-code.sh dsa` 快更，Control 源码摘要一致、容器 healthy、精确路由仍 `not_admitted`；镜像未更新，真实准入和普通回测尚未执行。
 
-`CONT-S05-v3-execution-clock-precision` 功能完成、两份既有测试文件格式门禁 `skipped_after_retry`：[精确时钟证据](../../tasks/evidence/2026-09-28-cont-s05-v3-execution-clock-precision.md)。预检、冻结和重放复用 Schemas 精确瞬时比较；来源观察、Bar 时间/可用时间、多窗口完成及 Server 实际抓取均按 `dataAsOf` 阻断无效或未来事实。定向及相邻 44 passed，Server 全包 1799 passed/90 skipped，typecheck/build/限定 lint/边界/HEAD 尺寸 ratchet 通过；官方快更后 Server/Worker 均 healthy，关键编译产物摘要相等。格式剩余情况见证据。此叶不签发 HiThink 单位、真实来源、严格 PIT 或目标业务验收资格。
+`CONT-S05-v3-execution-clock-precision` 功能完成、两份既有测试文件格式门禁 `skipped_after_retry`：[精确时钟证据](../../evidence/2026-09-28-cont-s05-v3-execution-clock-precision.md)。预检、冻结和重放复用 Schemas 精确瞬时比较；来源观察、Bar 时间/可用时间、多窗口完成及 Server 实际抓取均按 `dataAsOf` 阻断无效或未来事实。定向及相邻 44 passed，Server 全包 1799 passed/90 skipped，typecheck/build/限定 lint/边界/HEAD 尺寸 ratchet 通过；官方快更后 Server/Worker 均 healthy，关键编译产物摘要相等。格式剩余情况见证据。此叶不签发 HiThink 单位、真实来源、严格 PIT 或目标业务验收资格。
 
-`CONT-S05-v3-dependency-clock-precision` 功能完成、既有依赖测试文件格式门禁 `skipped_after_retry`：[非价格时钟证据](../../tasks/evidence/2026-09-28-cont-s05-v3-dependency-clock-precision.md)。非价格事实 `availableAt` 与首个执行开盘前的标的事实 `occurredAt` 都修复同毫秒亚毫秒误放行；相邻 16 passed，最终 Server 全包 1799 passed/90 skipped，typecheck/build/限定 lint/边界/HEAD 尺寸 ratchet 通过。第二次官方快更后 Server/Worker healthy、两份关键 JS 摘要相等。未据此关闭真实来源、目标或整体 S05。
+`CONT-S05-v3-dependency-clock-precision` 功能完成、既有依赖测试文件格式门禁 `skipped_after_retry`：[非价格时钟证据](../../evidence/2026-09-28-cont-s05-v3-dependency-clock-precision.md)。非价格事实 `availableAt` 与首个执行开盘前的标的事实 `occurredAt` 都修复同毫秒亚毫秒误放行；相邻 16 passed，最终 Server 全包 1799 passed/90 skipped，typecheck/build/限定 lint/边界/HEAD 尺寸 ratchet 通过。第二次官方快更后 Server/Worker healthy、两份关键 JS 摘要相等。未据此关闭真实来源、目标或整体 S05。
 
-`CONT-D01-target-runtime` done：[目标运行态核对](../../tasks/evidence/2026-09-28-cont-d01-target-runtime.md)。目标 V3 协议 smoke 通过，DSA 多窗口/HiThink/Provider Runtime 与 Server/Worker Reader/Snapshot/Runner 的宿主和目标代码摘要一致，精确 HiThink qfq 路由仍 `not_admitted`。据此只收口 `D01-runtime` 的目标运行代码一致性；真实来源单位/价格基准/修订、精确 RouteAdmission、`G0-H-target`、`G-Deploy-159516` 与 `G-Run` 保持开放，本叶未发起 Provider 行情或写数据库。
+`CONT-D01-target-runtime` done：[目标运行态核对](../../evidence/2026-09-28-cont-d01-target-runtime.md)。目标 V3 协议 smoke 通过，DSA 多窗口/HiThink/Provider Runtime 与 Server/Worker Reader/Snapshot/Runner 的宿主和目标代码摘要一致，精确 HiThink qfq 路由仍 `not_admitted`。据此只收口 `D01-runtime` 的目标运行代码一致性；真实来源单位/价格基准/修订、精确 RouteAdmission、`G0-H-target`、`G-Deploy-159516` 与 `G-Run` 保持开放，本叶未发起 Provider 行情或写数据库。
 
-`CONT-R06-sector-ranking-source` done：[行业板块来源证据](../../tasks/evidence/2026-09-28-cont-r06-sector-ranking-source.md)。R06.3/R06.4 复用独立纯 helper 核对板块名唯一/非空和有限涨跌幅，并在每行保留 `akshare/eastmoney:stock_board_industry_name_em` 或 `akshare/sina:stock_sector_spot` 实际来源；EastMoney 坏合同后的 Sina 回退不再冒充主源。专属修前 3 failed/4 passed，修后 7 passed，相邻消费者合并 56 passed；限定 lint/编译/空白通过，AkshareFetcher 2630→2612 行。仅完成本地 endpoint/行合同，真实 as-of、单位、覆盖和 G0-M 仍开放。
+`CONT-R06-sector-ranking-source` done：[行业板块来源证据](../../evidence/2026-09-28-cont-r06-sector-ranking-source.md)。R06.3/R06.4 复用独立纯 helper 核对板块名唯一/非空和有限涨跌幅，并在每行保留 `akshare/eastmoney:stock_board_industry_name_em` 或 `akshare/sina:stock_sector_spot` 实际来源；EastMoney 坏合同后的 Sina 回退不再冒充主源。专属修前 3 failed/4 passed，修后 7 passed，相邻消费者合并 56 passed；限定 lint/编译/空白通过，AkshareFetcher 2630→2612 行。仅完成本地 endpoint/行合同，真实 as-of、单位、覆盖和 G0-M 仍开放。
 
-`CONT-R06-concept-efinance-ranking-source` done：[续接来源证据](../../tasks/evidence/2026-09-28-cont-r06-concept-efinance-ranking-source.md)。R06.9 概念板块新增 EastMoney source 与重复身份拒绝，修前 2 failed 后通过；R06.5 Efinance 行业板块静态确认底层为 EastMoney `clist/get`，专属 2 failed/1 passed 后 3 passed，并显式标记 `efinance/eastmoney`。四文件消费者合并 61 passed、限定 lint/编译/空白通过；AkshareFetcher 降至 2594 行、EfinanceFetcher 1422 行。两入口同源关系已固定，真实分类版本、as-of、单位/覆盖及 G0-M 继续开放。
+`CONT-R06-concept-efinance-ranking-source` done：[续接来源证据](../../evidence/2026-09-28-cont-r06-concept-efinance-ranking-source.md)。R06.9 概念板块新增 EastMoney source 与重复身份拒绝，修前 2 failed 后通过；R06.5 Efinance 行业板块静态确认底层为 EastMoney `clist/get`，专属 2 failed/1 passed 后 3 passed，并显式标记 `efinance/eastmoney`。四文件消费者合并 61 passed、限定 lint/编译/空白通过；AkshareFetcher 降至 2594 行、EfinanceFetcher 1422 行。两入口同源关系已固定，真实分类版本、as-of、单位/覆盖及 G0-M 继续开放。
 
-`CONT-R06-tushare-sector-ranking-source` done：[Tushare 行业排名证据](../../tasks/evidence/2026-09-28-cont-r06-tushare-sector-ranking-source.md)。R06.6/R06.7 分别保留 `tushare/ths:moneyflow_ind_ths` 与 `tushare/eastmoney:moneyflow_ind_dc`，共享唯一行业/有限涨跌幅合同但不合并分类；THS 坏合同按既有顺序回退东财。两红例修后通过，15:00 专属用例确认请求上一交易日、16:00 使用当日；Tushare follow-up 9 passed，组合回归 69 passed，限定质量通过，真实权限/分类版本/as-of 与 G0-M 仍开放。
+`CONT-R06-tushare-sector-ranking-source` done：[Tushare 行业排名证据](../../evidence/2026-09-28-cont-r06-tushare-sector-ranking-source.md)。R06.6/R06.7 分别保留 `tushare/ths:moneyflow_ind_ths` 与 `tushare/eastmoney:moneyflow_ind_dc`，共享唯一行业/有限涨跌幅合同但不合并分类；THS 坏合同按既有顺序回退东财。两红例修后通过，15:00 专属用例确认请求上一交易日、16:00 使用当日；Tushare follow-up 9 passed，组合回归 69 passed，限定质量通过，真实权限/分类版本/as-of 与 G0-M 仍开放。
 
-`CONT-R06-tickflow-sector-ranking` done：[TickFlow SW1 证据](../../tasks/evidence/2026-09-28-cont-r06-tickflow-sector-ranking.md)。R06.8 保留 universes.list/batch + quotes.get 的派生来源，参与排名的实际成分 quote 必须都有同一 provider timestamp；缺失或混合时点整体拒绝。成功行携带精确 source、`classification=SW1`、`classification_version=null`、provider `as_of` 与成分数，不从 universe ID 猜分类版本。两红例修后通过，TickFlow 及当前板块消费者组合 89 passed，限定 lint/编译/空白通过；真实 SDK/套餐权限、分类版本、时点语义与 G0-M 仍开放。
+`CONT-R06-tickflow-sector-ranking` done：[TickFlow SW1 证据](../../evidence/2026-09-28-cont-r06-tickflow-sector-ranking.md)。R06.8 保留 universes.list/batch + quotes.get 的派生来源，参与排名的实际成分 quote 必须都有同一 provider timestamp；缺失或混合时点整体拒绝。成功行携带精确 source、`classification=SW1`、`classification_version=null`、provider `as_of` 与成分数，不从 universe ID 猜分类版本。两红例修后通过，TickFlow 及当前板块消费者组合 89 passed，限定 lint/编译/空白通过；真实 SDK/套餐权限、分类版本、时点语义与 G0-M 仍开放。
 
-`CONT-R06-sector-membership-consumer` done/blocked：[Consumer 选择证据](../../tasks/evidence/2026-09-28-cont-r06-sector-membership-consumer.md)。R06.10 选定现有 `screening.industry.enrich_industry_concepts`，AKShare 当前链为行业板块列表→板块成分，不新建第二套 membership Consumer；R06.11 继续 blocked，因为 provider cache 只有本地 `created_at`/mtime TTL，没有来源 as-of、分类版本或历史有效期，本地时间不能冒充截面日期，也不得回填历史。无生产代码/网络/目标变更，真实 G0-M 与历史/PIT 仍开放。
+`CONT-R06-sector-membership-consumer` done/blocked：[Consumer 选择证据](../../evidence/2026-09-28-cont-r06-sector-membership-consumer.md)。R06.10 选定现有 `screening.industry.enrich_industry_concepts`，AKShare 当前链为行业板块列表→板块成分，不新建第二套 membership Consumer；R06.11 继续 blocked，因为 provider cache 只有本地 `created_at`/mtime TTL，没有来源 as-of、分类版本或历史有效期，本地时间不能冒充截面日期，也不得回填历史。无生产代码/网络/目标变更，真实 G0-M 与历史/PIT 仍开放。
 
-`CONT-R04-fund-holdings-source-year` done：[基金持仓来源年份证据](../../tasks/evidence/2026-09-28-cont-r04-fund-holdings-source-year.md)。R04.1 复用现有季度/代码/权重/披露未知合同，新增上海时区查询年和内部来源证据；仅当前年空结果才回退上一年，非空错年/坏行立即拒绝，不用 fallback 掩盖。AKShare 静态源码确认年份参数与百分比字段语义；Fetcher 集成红例修前 1 failed/6 passed，最终持仓链 28 passed，限定 lint/编译/空白通过。真实权限、完整覆盖、披露发布时间/修订和 G0-M 仍开放；R03.5/R03.6、R04.2–R04.5 均因无现存 Consumer 按 Spec 保持 blocked，不新建基金资料/估值平台。
+`CONT-R04-fund-holdings-source-year` done：[基金持仓来源年份证据](../../evidence/2026-09-28-cont-r04-fund-holdings-source-year.md)。R04.1 复用现有季度/代码/权重/披露未知合同，新增上海时区查询年和内部来源证据；仅当前年空结果才回退上一年，非空错年/坏行立即拒绝，不用 fallback 掩盖。AKShare 静态源码确认年份参数与百分比字段语义；Fetcher 集成红例修前 1 failed/6 passed，最终持仓链 28 passed，限定 lint/编译/空白通过。真实权限、完整覆盖、披露发布时间/修订和 G0-M 仍开放；R03.5/R03.6、R04.2–R04.5 均因无现存 Consumer 按 Spec 保持 blocked，不新建基金资料/估值平台。
 
-`CONT-R05-yahoo-valuation` done：[Yahoo 美股估值证据](../../tasks/evidence/2026-09-28-cont-r05-yahoo-valuation.md)。R05.5 只选择 US STOCK 的 `trailingPE/priceToBook` 无量纲倍数，yfinance 1.7.0 静态核心入口为 `query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}`；current observation 只保留本机 observed_at，source_available_at=null、historical_visibility_verified=false，不纳入 marketCap。R05.6 让 US `get_fundamental_context` 优先消费独立 yfinance valuation bundle，避免混合 quote 补字段冒充 Yahoo provenance；消费红例 32.5→25.5 后修复，adapter/consumer 两文件 38 passed，限定 lint/编译/空白通过。真实 Yahoo 请求/许可/发布时间/修订、目标与 G0-R 仍开放。
+`CONT-R05-yahoo-valuation` done：[Yahoo 美股估值证据](../../evidence/2026-09-28-cont-r05-yahoo-valuation.md)。R05.5 只选择 US STOCK 的 `trailingPE/priceToBook` 无量纲倍数，yfinance 1.7.0 静态核心入口为 `query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}`；current observation 只保留本机 observed_at，source_available_at=null、historical_visibility_verified=false，不纳入 marketCap。R05.6 让 US `get_fundamental_context` 优先消费独立 yfinance valuation bundle，避免混合 quote 补字段冒充 Yahoo provenance；消费红例 32.5→25.5 后修复，adapter/consumer 两文件 38 passed，限定 lint/编译/空白通过。真实 Yahoo 请求/许可/发布时间/修订、目标与 G0-R 仍开放。
 
-`CONT-R06-market-breadth` done：[市场宽度证据](../../tasks/evidence/2026-09-28-cont-r06-market-breadth.md)。R06.1 选择 Efinance 0.5.9/EastMoney 全市场股票快照与现有 MarketAnalyzer Consumer，只把上涨/下跌/平盘/涨停/跌停家数纳入合同；R06.2 要求六位股票身份唯一，重复或缺身份整体拒绝，成功保留 `efinance/eastmoney` source、本地 observed_at，来源可见时刻仍未知。专属修前2 failed/1 passed→3 passed，MarketAnalyzer/TickFlow回退组合21 passed，限定 lint/编译/空白通过；`total_amount` 仅兼容保留，不作为已核单位能力。真实交易阶段/as-of/覆盖/HTTP/许可和 G0-M 仍开放。
+`CONT-R06-market-breadth` done：[市场宽度证据](../../evidence/2026-09-28-cont-r06-market-breadth.md)。R06.1 选择 Efinance 0.5.9/EastMoney 全市场股票快照与现有 MarketAnalyzer Consumer，只把上涨/下跌/平盘/涨停/跌停家数纳入合同；R06.2 要求六位股票身份唯一，重复或缺身份整体拒绝，成功保留 `efinance/eastmoney` source、本地 observed_at，来源可见时刻仍未知。专属修前2 failed/1 passed→3 passed，MarketAnalyzer/TickFlow回退组合21 passed，限定 lint/编译/空白通过；`total_amount` 仅兼容保留，不作为已核单位能力。真实交易阶段/as-of/覆盖/HTTP/许可和 G0-M 仍开放。
 
-`CONT-R02-tickflow-index-quote` done：[TickFlow 指数报价证据](../../tasks/evidence/2026-09-28-cont-r02-tickflow-index-quote.md)。R02.14 固定 tickflow 0.1.25 的 6 个 CN 主指数 `quotes.get` 路径；每批只消费本批请求 symbol、重复目标整体拒绝、缺 provider timestamp 拒绝，结果保留 `tickflow:quotes.get:index` 与逐行 as_of。点位/变动单位显式 `index_point`、涨跌幅 `percent`，量额单位保持 unknown。新增合同初次3 failed，修复批次额外行处理后3 passed；TickFlow/MarketAnalyzer 组合60 passed，限定 lint/编译/空白通过。真实 Key/套餐、覆盖、timestamp 源端语义、量额单位、交易阶段和 G0-M 仍开放。
+`CONT-R02-tickflow-index-quote` done：[TickFlow 指数报价证据](../../evidence/2026-09-28-cont-r02-tickflow-index-quote.md)。R02.14 固定 tickflow 0.1.25 的 6 个 CN 主指数 `quotes.get` 路径；每批只消费本批请求 symbol、重复目标整体拒绝、缺 provider timestamp 拒绝，结果保留 `tickflow:quotes.get:index` 与逐行 as_of。点位/变动单位显式 `index_point`、涨跌幅 `percent`，量额单位保持 unknown。新增合同初次3 failed，修复批次额外行处理后3 passed；TickFlow/MarketAnalyzer 组合60 passed，限定 lint/编译/空白通过。真实 Key/套餐、覆盖、timestamp 源端语义、量额单位、交易阶段和 G0-M 仍开放。
 
 ## 13. 最终一致性 Review
 
 ### 历史检查点
 
-目标执行接续（2026-09-26）：U04 本地窗口闭环已完成，目标部署入口尚未调用。全量回归重试后 Server 1249/49 skipped、Desktop 509、DSA 56 通过；当前带 HEAD 基线的尺寸门禁仍有 AI Provider 三文件增长，先按职责拆分保留全部 WIP 后重试，不能以无基线警告模式冒充通过。完整记录见 [目标执行记录](../../tasks/evidence/2026-09-26-goal-execution.md)。其余 M2/M3 范围不变，目标持续 active。
+目标执行接续（2026-09-26）：U04 本地窗口闭环已完成，目标部署入口尚未调用。全量回归重试后 Server 1249/49 skipped、Desktop 509、DSA 56 通过；当前带 HEAD 基线的尺寸门禁仍有 AI Provider 三文件增长，先按职责拆分保留全部 WIP 后重试，不能以无基线警告模式冒充通过。完整记录见 [目标执行记录](../../evidence/2026-09-26-goal-execution.md)。其余 M2/M3 范围不变，目标持续 active。
 
-2026-09-28 当前检查点补充：职责拆分和精确格式后，带真实 HEAD 基线的尺寸 ratchet 已通过，保留 13 条存量警告；上段 2026-09-26 的 AI Provider 三文件增长是历史失败记录，不能当作当前失败。精度修复后的稳定回归与目标同步另按 §12.8 记录，真实来源及整体验收仍未通过。[本批集中 Review](../../tasks/evidence/2026-09-28-backtest-implementation-review.md) 记录实际源码覆盖、F01/F02 修复、各层证据和完整剩余范围；其局部结论不勾选本节全局清单。
+2026-09-28 当前检查点补充：职责拆分和精确格式后，带真实 HEAD 基线的尺寸 ratchet 已通过，保留 13 条存量警告；上段 2026-09-26 的 AI Provider 三文件增长是历史失败记录，不能当作当前失败。精度修复后的稳定回归与目标同步另按 §12.8 记录，真实来源及整体验收仍未通过。[本批集中 Review](../../evidence/2026-09-28-backtest-implementation-review.md) 记录实际源码覆盖、F01/F02 修复、各层证据和完整剩余范围；其局部结论不勾选本节全局清单。
 
 ### 2026-10-03 当前结论
 

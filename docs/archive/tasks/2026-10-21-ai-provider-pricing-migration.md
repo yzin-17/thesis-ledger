@@ -1,6 +1,6 @@
 # AI 模型价格迁移实施与验收
 
-状态：2026-10-21 完成并归档。对应[Spec](../../specs/2026-10-21-ai-provider-pricing-migration.md)，接续[原配置任务](2026-09-21-ai-provider-model-usage-configuration.md) AC-25/26；结果见[验收回执](../../tasks/evidence/2026-10-21-ai-provider-pricing-migration.md)。主线程执行、保留脏工作区和原数据；真实模型暂停，只验 Web，DG3 TODO。
+状态：2026-10-21 完成并归档。对应[Spec](../../specs/2026-10-21-ai-provider-pricing-migration.md)，接续[原配置任务](2026-09-21-ai-provider-model-usage-configuration.md) AC-25/26；结果见[验收回执](../../evidence/2026-10-21-ai-provider-pricing-migration.md)。主线程执行、保留脏工作区和原数据；真实模型暂停，只验 Web，DG3 TODO。
 
 - [x] M1 状态与规划：纠正依赖归类；完整/已有价格、旧键清理、非法及超限输入均有规则与定向证据。
 - [x] M2 执行面：默认只读维护 CLI；显式应用绑定身份和源指纹，事务/条件更新、JSONB 精确复制、审计、幂等均实现。

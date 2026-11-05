@@ -1,6 +1,6 @@
 # 免费官方新闻与 DG3 接入规格
 
-本规格承接 [DSA 新闻合同](../../../daily-stock-analysis/docs/specs/2026-10-18-data-only-service.md)，实施见[已完成任务](../archive/tasks/2026-10-22-free-news-dg3.md)与[最终复核](../reviews/2026-10-22-free-news-dg3-final-review.md)。DG3 的完成记录由 DSA 原 Task 持有，研究 G3 的模型与发布门禁保持独立。
+本规格承接 [DSA 新闻合同](../../../daily-stock-analysis/docs/specs/2026-10-18-data-only-service.md)，实施见[已完成任务](../archive/tasks/2026-10-22-free-news-dg3.md)与[最终复核](../archive/reviews/2026-10-22-free-news-dg3-final-review.md)。DG3 的完成记录由 DSA 原 Task 持有，研究 G3 的模型与发布门禁保持独立。
 
 ## 来源与范围
 

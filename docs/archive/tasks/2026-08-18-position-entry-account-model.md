@@ -8,15 +8,15 @@
 
 > 历史对账（2026-10-03）：当时 T12/T13 的原生与账户模式交互仍开放。DSA pytest/FastAPI 缺依赖是旧环境记录，最新 DSA 全包已执行；不再要求安装旧环境依赖或恢复 V1 Contract。账户与 Ledger 的 Canonical E03 证据只证明相应范围。此段保留当时结论，后续证据及本页最终 Review 接续其状态。对账依据见[当时 Review](../../archive/reviews/2026-10-03-task-state-reconciliation.md)。
 
-> 2026-10-16 接续：Android/iOS 已恢复验收，原生编译、实际/模拟隔离、停用账户及 Portfolio/Risk 刷新通过，见[三端完成记录](2026-09-14-permanent-account-deletion.md#2026-10-16-交互验收与证据边界)。[富途当前证据](../../tasks/evidence/2026-10-15-futu-minute-integration.md)包含最新 DSA 全包与正式链路；“缺 pytest/FastAPI”不再是待办。仍不能据此关闭原 Spec 的基金 NAV 正向及全部原视觉断言；暂未开放入口不在本轮恢复。
+> 2026-10-16 接续：Android/iOS 已恢复验收，原生编译、实际/模拟隔离、停用账户及 Portfolio/Risk 刷新通过，见[三端完成记录](2026-09-14-permanent-account-deletion.md#2026-10-16-交互验收与证据边界)。[富途当前证据](../../evidence/2026-10-15-futu-minute-integration.md)包含最新 DSA 全包与正式链路；“缺 pytest/FastAPI”不再是待办。仍不能据此关闭原 Spec 的基金 NAV 正向及全部原视觉断言；暂未开放入口不在本轮恢复。
 
-> 2026-10-20 接续：T12.NAV 的现行 V3 当前净值及历史五点接口实读已通过，临时路由已恢复、正常缓存以外的业务数据未变，见[本次证据](../../tasks/evidence/2026-10-20-fund-nav-source-acceptance.md)。该记录不替代基金产品展示、披露/正式校准及仍未覆盖的原产品断言，T12/T13 父项继续开放。
+> 2026-10-20 接续：T12.NAV 的现行 V3 当前净值及历史五点接口实读已通过，临时路由已恢复、正常缓存以外的业务数据未变，见[本次证据](../../evidence/2026-10-20-fund-nav-source-acceptance.md)。该记录不替代基金产品展示、披露/正式校准及仍未覆盖的原产品断言，T12/T13 父项继续开放。
 
-> 2026-10-21 接续：基金正式修订、披露、qfq 分钟/Web 及跨日误差已通过，[组合十九项 AC 对账](../../tasks/evidence/2026-10-21-portfolio-final-acceptance.md)关闭相应基金消费缺口。本次修复 USD 币种回显并实测 Ledger 模式锁定拒绝，25 项测试及 Web/数据保护通过，见[账户产品对账](../../tasks/evidence/2026-10-21-account-product-acceptance.md)。手动绝对余额、现金、清空与五观察审计的实际 Web 闭环也已通过，正常 ETF 确认时间刷新经备份重算摘要独立核对，严格失败不改写为成功。
+> 2026-10-21 接续：基金正式修订、披露、qfq 分钟/Web 及跨日误差已通过，[组合十九项 AC 对账](../../evidence/2026-10-21-portfolio-final-acceptance.md)关闭相应基金消费缺口。本次修复 USD 币种回显并实测 Ledger 模式锁定拒绝，25 项测试及 Web/数据保护通过，见[账户产品对账](../../evidence/2026-10-21-account-product-acceptance.md)。手动绝对余额、现金、清空与五观察审计的实际 Web 闭环也已通过，正常 ETF 确认时间刷新经备份重算摘要独立核对，严格失败不改写为成功。
 
-> 2026-10-21 接续：[基金实源正式校准及 Web 日线](../../tasks/evidence/2026-10-21-fund-calibration-acceptance.md)和[真实披露/维护分钟/Web](../../tasks/evidence/2026-10-21-fund-disclosure-acceptance.md)已通过，两项专用账户结清停用；原失败、正常目录刷新及有限恢复均保留证据。日级及分钟消费不再构成阻塞，继续核对账户产品本身尚未覆盖的原断言与未开放入口。
+> 2026-10-21 接续：[基金实源正式校准及 Web 日线](../../evidence/2026-10-21-fund-calibration-acceptance.md)和[真实披露/维护分钟/Web](../../evidence/2026-10-21-fund-disclosure-acceptance.md)已通过，两项专用账户结清停用；原失败、正常目录刷新及有限恢复均保留证据。日级及分钟消费不再构成阻塞，继续核对账户产品本身尚未覆盖的原断言与未开放入口。
 
-> 2026-10-21 当前接续：用户选择的[草稿/对账无模型路径](2026-10-21-account-draft-reconciliation-web.md)及[乱序投影一致性修复](2026-10-21-baseline-projection-consistency.md)已通过正式同步、真实 Web 与差集保护，[完整证据](../../tasks/evidence/2026-10-21-account-draft-reconciliation-acceptance.md)记录修订、部分提交、409 恢复、冻结、对账幂等/撤回及结清停用。当前已有规范化持仓草稿审核与确定性对账入口，T12/T13 按现行范围完成最终证据核对。
+> 2026-10-21 当前接续：用户选择的[草稿/对账无模型路径](2026-10-21-account-draft-reconciliation-web.md)及[乱序投影一致性修复](2026-10-21-baseline-projection-consistency.md)已通过正式同步、真实 Web 与差集保护，[完整证据](../../evidence/2026-10-21-account-draft-reconciliation-acceptance.md)记录修订、部分提交、409 恢复、冻结、对账幂等/撤回及结清停用。当前已有规范化持仓草稿审核与确定性对账入口，T12/T13 按现行范围完成最终证据核对。
 
 
 关联规格：[录入持仓与账户模型重构规格](../../specs/2026-08-18-position-entry-account-model.md)
@@ -43,11 +43,11 @@
 - [x] T10 在 `thesis-ledger-infra` 更新三仓版本矩阵、固定镜像与源码 override，并加入主系统、数据库和 DSA capability 的兼容门禁。
 - [x] T11 更新 README、用户指南、运维/发布说明和相关活动文档，确保账户、录入来源、基金净值和三仓边界用词一致。
 - [x] T12：账户、Ledger、消费范围、Fund NAV、设备交互与草稿/对账的适用证据全部核对通过；各子项证据及边界见下方和最终 Review。
-  - [x] T12.NAV：复用组合 R3.I6 的当前净值及五点历史实读、原日期年龄状态与恢复核对；只关闭接口读取叶，[证据](../../tasks/evidence/2026-10-20-fund-nav-source-acceptance.md)。
-  - [x] T12.FUND：当前 V3 NAV 的缓存/日级正式修订、真实披露、同序列 qfq 分钟、覆盖率、误差及 Web 消费通过；[完整证据映射](../../tasks/evidence/2026-10-21-portfolio-final-acceptance.md)。
-  - [x] T12.WEB：实际 USD/CNY 币种回显、已有 Ledger 账户模式变更拒绝、失败草稿保留和取消恢复通过；原十一账户、十三张业务表、57 个 V3、来源/政策/模型计数完全不变；[本次证据](../../tasks/evidence/2026-10-21-account-product-acceptance.md)。
-  - [x] T12.MANUAL：按预案完成新账户 `019a28a7-1b21-41bf-85ed-ec67b82f0ecd` 的绝对数量 10→15、现金 1000→0、清空不动现金、五观察与来源/原因审计，最终归零停用。字段丢失先失败复现，再修复持仓“账本”中文回显；31 项、构建及实际 Web 通过。原十一账户和十三张业务表不变，正常 ETF 确认仅刷新三处时间，既有备份代入重算精确复原前摘要；保留原严格失败及独立复核，[完整证据](../../tasks/evidence/2026-10-21-account-product-acceptance.md)。
-  - [x] T12.DRAFT：恢复规范化持仓草稿审核、显式修订/选行提交、部分提交冻结、409 双重重读及确定性对账。新增乱序观察修复已通过，专用第十五账户结清停用，原十四账户/十三表、57 个 V3 结果、来源/路由和零模型计数保持；[完整验收](../../tasks/evidence/2026-10-21-account-draft-reconciliation-acceptance.md)。
+  - [x] T12.NAV：复用组合 R3.I6 的当前净值及五点历史实读、原日期年龄状态与恢复核对；只关闭接口读取叶，[证据](../../evidence/2026-10-20-fund-nav-source-acceptance.md)。
+  - [x] T12.FUND：当前 V3 NAV 的缓存/日级正式修订、真实披露、同序列 qfq 分钟、覆盖率、误差及 Web 消费通过；[完整证据映射](../../evidence/2026-10-21-portfolio-final-acceptance.md)。
+  - [x] T12.WEB：实际 USD/CNY 币种回显、已有 Ledger 账户模式变更拒绝、失败草稿保留和取消恢复通过；原十一账户、十三张业务表、57 个 V3、来源/政策/模型计数完全不变；[本次证据](../../evidence/2026-10-21-account-product-acceptance.md)。
+  - [x] T12.MANUAL：按预案完成新账户 `019a28a7-1b21-41bf-85ed-ec67b82f0ecd` 的绝对数量 10→15、现金 1000→0、清空不动现金、五观察与来源/原因审计，最终归零停用。字段丢失先失败复现，再修复持仓“账本”中文回显；31 项、构建及实际 Web 通过。原十一账户和十三张业务表不变，正常 ETF 确认仅刷新三处时间，既有备份代入重算精确复原前摘要；保留原严格失败及独立复核，[完整证据](../../evidence/2026-10-21-account-product-acceptance.md)。
+  - [x] T12.DRAFT：恢复规范化持仓草稿审核、显式修订/选行提交、部分提交冻结、409 双重重读及确定性对账。新增乱序观察修复已通过，专用第十五账户结清停用，原十四账户/十三表、57 个 V3 结果、来源/路由和零模型计数保持；[完整验收](../../evidence/2026-10-21-account-draft-reconciliation-acceptance.md)。
 - [x] T13 对现行 Spec、任务、ADR-009 至 ADR-014、实现、测试和三仓版本关系完成最终一致性 Review；后继合同与旧表述已对齐，结论通过，无本任务持有的未完成事项。
 
 ## 验证证据
@@ -63,7 +63,7 @@
 
 ## 当前状态
 
-- 三仓边界沿用 ADR-014，正式 DSA Fork 位于同级 `daily-stock-analysis`；当前接口/信封按 [Canonical](../../architecture/canonical-runtime.md) 的 V3 合同，不恢复原 V1。
+- 三仓边界沿用 ADR-014，正式 DSA Fork 位于同级 `daily-stock-analysis`；当前接口/信封按 [Canonical](../../design/canonical-runtime.md) 的 V3 合同，不恢复原 V1。
 - 主仓账户、Ledger、消费范围及 Fund NAV 底层已有实现；规范化草稿审核与确定性对账入口已有验收证据。
 - 早期基础测试、类型、构建、Prisma generate、迁移矩阵及 Contract 检查通过；后续修改的定向/包级、构建与运行态结果由对应证据接续，不将旧全量结果声称为最终工作区的远端 CI 结果。
 - DSA 全包、目标 V3 链路、双端原生基本模式、基金产品、绝对余额/清空及草稿/对账均有相应分层证据。最终 Review 通过，本任务退出当前执行清单，现行 Spec 保留。
@@ -81,14 +81,14 @@
 
 | 验收断言 | 实现与适用证据 | 结论 |
 | --- | --- | --- |
-| AC1 直接录入、空账户引导与导航 | `app/routes.tsx`、`LegacyImportReviewRedirect`、`useAccountDataNavigation`、`AccountDataPage`；[现行入口及恢复](../../tasks/evidence/2026-10-18-ui-final-ac.md)、[账户产品记录](../../tasks/evidence/2026-10-21-account-product-acceptance.md)。旧路径转 `/accounts`，已有账户直接记录快照，空态先区分加载/失败再引导设置。 | 通过 |
+| AC1 直接录入、空账户引导与导航 | `app/routes.tsx`、`LegacyImportReviewRedirect`、`useAccountDataNavigation`、`AccountDataPage`；[现行入口及恢复](../../evidence/2026-10-18-ui-final-ac.md)、[账户产品记录](../../evidence/2026-10-21-account-product-acceptance.md)。旧路径转 `/accounts`，已有账户直接记录快照，空态先区分加载/失败再引导设置。 | 通过 |
 | AC2 身份、机构与来源分离 | Prisma `Account`、`schemas/src/portfolio.ts`、`AccountsService`、Ledger 审计及账户标签；本次实际账户 API 也无 `source` 字段。来源字段修复及真实审计见账户产品记录。 | 通过 |
 | AC3 类型、模式、币种锁定与生命周期 | `accounts.service.ts`、`assertWritableAccount`、`assertAccountCanHoldAsset`；复用原迁移预检、Canonical 完整结构及[三端账户验收](2026-09-14-permanent-account-deletion.md#2026-10-16-交互验收与证据边界)。真实 Ledger 锁定拒绝、失败保留和结清停用见账户产品记录。多币种按后继 Ledger 合同，不恢复早期 CNY 限制。 | 通过 |
 | AC4 绝对余额、现金、清空和审计 | `LedgerService` 的当前 Observation 命令与投影；复用 T12.MANUAL 的数量 10→15、现金 1000→0、清空不动现金及五观察审计。31 项回归、构建和真实 Web 均有回执。 | 通过 |
-| AC5 草稿、类型/重复/CAS 冲突和冻结 | `BaselineImportService`、审核只读查询、`ImportDraftReviewSheet`；[草稿与对账验收](../../tasks/evidence/2026-10-21-account-draft-reconciliation-acceptance.md)覆盖显式修订、两次真实 409、双重重读、部分提交冻结、后续修订及后续事实阻止回滚。FULL/PARTIAL 影响按现行基线合同，部分更新未提交标的和现金保持。 | 通过 |
-| AC6 真实/模拟与消费范围 | `investment-account-scope.ts`、Portfolio/Risk/Performance/AI 范围及 Mobile store；[全局模式](../../tasks/evidence/2026-10-18-global-account-mode.md)与[Android/iOS 原生模式和错误恢复](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#已执行验证)分别证明各自范围。本次账户 API 的实际/模拟集合不重叠且完整覆盖全部账户。 | 通过 |
-| AC7 基金来源、独立合同、缓存与估值 | `market-fund-reader.ts`、当前 DSA 两来源净值能力、契约测试和 Portfolio 估值；T12.NAV、T12.FUND 及[组合十九项对账](../../tasks/evidence/2026-10-21-portfolio-final-acceptance.md)覆盖当前/历史读取、缓存、正式修订、披露、误差与真实 Web。 | 通过 |
-| AC8 三仓版本与快速失败 | Canonical E03 的持久信封 V3/旧行拒绝、完整 migration 与运行结构证据；[正式更新记录](../../tasks/evidence/2026-10-21-provider-account-level.md#正式更新与目标运行态验收)证明 `update.sh all` 退出 0、同源构建与保留数据。补查 infra `check-compatibility.mjs` 通过，目标健康/结构 head 相符。 | 通过 |
+| AC5 草稿、类型/重复/CAS 冲突和冻结 | `BaselineImportService`、审核只读查询、`ImportDraftReviewSheet`；[草稿与对账验收](../../evidence/2026-10-21-account-draft-reconciliation-acceptance.md)覆盖显式修订、两次真实 409、双重重读、部分提交冻结、后续修订及后续事实阻止回滚。FULL/PARTIAL 影响按现行基线合同，部分更新未提交标的和现金保持。 | 通过 |
+| AC6 真实/模拟与消费范围 | `investment-account-scope.ts`、Portfolio/Risk/Performance/AI 范围及 Mobile store；[全局模式](../../evidence/2026-10-18-global-account-mode.md)与[Android/iOS 原生模式和错误恢复](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#已执行验证)分别证明各自范围。本次账户 API 的实际/模拟集合不重叠且完整覆盖全部账户。 | 通过 |
+| AC7 基金来源、独立合同、缓存与估值 | `market-fund-reader.ts`、当前 DSA 两来源净值能力、契约测试和 Portfolio 估值；T12.NAV、T12.FUND 及[组合十九项对账](../../evidence/2026-10-21-portfolio-final-acceptance.md)覆盖当前/历史读取、缓存、正式修订、披露、误差与真实 Web。 | 通过 |
+| AC8 三仓版本与快速失败 | Canonical E03 的持久信封 V3/旧行拒绝、完整 migration 与运行结构证据；[正式更新记录](../../evidence/2026-10-21-provider-account-level.md#正式更新与目标运行态验收)证明 `update.sh all` 退出 0、同源构建与保留数据。补查 infra `check-compatibility.mjs` 通过，目标健康/结构 head 相符。 | 通过 |
 | AC9 分层验证、视觉、原生与最终 Review | 原基础验证及后续账户 31 项、草稿 Server 39/客户端 57 项、Domain 455 项、Server 相邻 43 项、类型/构建和工程门禁均按实际输入复用。目标 Web、Android/iOS 独立证据已有归属；本次九项及下列 ADR/版本对账通过。 | 通过 |
 
 ### ADR 与版本适用性
@@ -106,5 +106,5 @@
 - `thesis-ledger-infra` 中执行 `rtk proxy node scripts/check-compatibility.mjs`：通过，固定 digest、Contract/Protocol/Business smoke 的发布要求均保留。
 - 2026-10-22 03:00（北京时间）两次只读核对健康与账户 API，共 8 个 GET。目标 Server、数据库、Redis、DSA 均健康；全部 15 账户与既有账户数一致，实际 11、模拟 4，集合隔离且完备，账户无 `source`，手工及草稿专用账户仍停用。私有回执为 `.recovery-artifacts/remaining-p1-2026-10-20/account-final-review-20261022.json`。
 - 本轮不发送业务写请求，不调用真实 Provider 或模型，不启停来源，不运行 Docker 状态变更；既有数据、审计和草稿修订保留。后续正式更新已有同源构建与数据留存证据，未为归档重复构建、原生编译或业务验收。
-- 当前有效 Spec 留在 `docs/specs/`；本任务归档，当前任务总表、接续索引及入站/出站相对链接同步更新。原日期的失败与保护差异保留，不改写为本轮成功。
+- 当前有效 Spec 留在 `docs/specs`；本任务归档，当前任务总表、接续索引及入站/出站相对链接同步更新。原日期的失败与保护差异保留，不改写为本轮成功。
 - 归档检查：11 份相关文档的 208 条相对链接及锚点全部可达，归档 Task 无未完成 checkbox，旧活动任务路径及失效引用已移除；作用域内差异和新归档正文的空白检查通过。与开工快照比较，仅这些文档及任务移位发生变化，三个仓库的其余源码、依赖与既有工作区修改均保持。

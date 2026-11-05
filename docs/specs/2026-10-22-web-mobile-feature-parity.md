@@ -1,15 +1,15 @@
 # Web 功能完整迁移至 Android / iOS
 
-> 验收范围调整（2026-10-25）：按用户要求，运行验收使用 Android Emulator 与 iOS Simulator；真机、正式签名（含 signed archive/IPA 正式导出）及选定渠道结果已移出迁移验收范围。当前必需层级为原生编译、当前源码 CI、目标 API、双端模拟器及原业务实源；见[范围调整记录](../tasks/evidence/web-mobile-parity/2026-10-25-acceptance-scope.md)。
+> 验收范围调整（2026-10-25）：按用户要求，运行验收使用 Android Emulator 与 iOS Simulator；真机、正式签名（含 signed archive/IPA 正式导出）及选定渠道结果已移出迁移验收范围。当前必需层级为原生编译、当前源码 CI、目标 API、双端模拟器及原业务实源；见[范围调整记录](../evidence/web-mobile-parity/2026-10-25-acceptance-scope.md)。
 
-> 已有工具交付：2026-10-25 无凭据构建与校验准备的本机范围已通过。模板、校验/接续脚本及无上传工作流齐备，Android Release 缺材料不再回退 debug key；Android Debug/未签名 Release、iOS Simulator Debug/iPhoneOS 未签名 archive 分别通过，见[当次记录](../tasks/evidence/web-mobile-parity/2026-10-25-release-preparation.md)。当时尚未推送；2026-10-26 接续提交 `feea66c1` 的 quality、contracts、Android/iOS Native 四项主 CI 及默认工具检查均成功，桌面打包跳过、无 artifact。真实手动历史双端消费、G6 独立资源差集及当前动作输入核对已通过，见[接续记录](../tasks/evidence/web-mobile-parity/2026-10-26-continuation.md)。下文 `e8a258d6` 与 64 输入复用描述均属于工具增量之前的验收基线，当前迁移状态以 Task 为准。
+> 已有工具交付：2026-10-25 无凭据构建与校验准备的本机范围已通过。模板、校验/接续脚本及无上传工作流齐备，Android Release 缺材料不再回退 debug key；Android Debug/未签名 Release、iOS Simulator Debug/iPhoneOS 未签名 archive 分别通过，见[当次记录](../evidence/web-mobile-parity/2026-10-25-release-preparation.md)。当时尚未推送；2026-10-26 接续提交 `feea66c1` 的 quality、contracts、Android/iOS Native 四项主 CI 及默认工具检查均成功，桌面打包跳过、无 artifact。真实手动历史双端消费、G6 独立资源差集及当前动作输入核对已通过，见[接续记录](../evidence/web-mobile-parity/2026-10-26-continuation.md)。下文 `e8a258d6` 与 64 输入复用描述均属于工具增量之前的验收基线，当前迁移状态以 Task 为准。
 
 > 2026-10-24 接续：第 2 批的研究模型绑定合同由[研究规格的模型绑定补验](2026-10-18-research-evidence-evolution.md#研究报告实际模型绑定补验2026-10-24)负责；市场回归路径修正已一并进入隔离快照并通过实际 CI。手动 CI 增加保留原默认值的桌面打包开关，本批关闭打包以遵守安装包不上传的范围，quality、contracts 及两端 Native job 完整执行。
 
 > 状态：2026-10-31；当前约定迁移范围已验收，Android与iOS独立G0～G6、G7及最终Review通过，实施记录归档。CI6四项首次成功、artifact为0，当前候选/目标/客户端输入核对成立。Longbridge和通知Provider实源按用户明确决定保留后续未验；原树及独立WIP保留，不自动开放模型、来源或外发能力。
-> 本规格继续描述现行迁移合同；验收与保护记录见[归档任务](../archive/tasks/2026-10-22-web-mobile-feature-parity.md)及[最终审查](../reviews/2026-10-30-web-mobile-parity-final-review.md)。历史编译、设备及实源证据按各自输入和断言复用，后续范围恢复时单独建立实施任务。
+> 本规格继续描述现行迁移合同；验收与保护记录见[归档任务](../archive/tasks/2026-10-22-web-mobile-feature-parity.md)及[最终审查](../archive/reviews/2026-10-30-web-mobile-parity-final-review.md)。历史编译、设备及实源证据按各自输入和断言复用，后续范围恢复时单独建立实施任务。
 
-> 工具准备之前的剩余条件核对（2026-10-25）：当时 189 个手机生产文件、64 个原生/打包输入及已验本机测试输入未变。随后工具准备修改 Android Gradle 与两份 iOS 原生配置，已独立原生编译验证；手机业务源码未变。[剩余门禁记录](../tasks/evidence/web-mobile-parity/2026-10-25-remaining-gates.md)保留调整前的历史核对，当前完成条件由本规格和 Task 维护。
+> 工具准备之前的剩余条件核对（2026-10-25）：当时 189 个手机生产文件、64 个原生/打包输入及已验本机测试输入未变。随后工具准备修改 Android Gradle 与两份 iOS 原生配置，已独立原生编译验证；手机业务源码未变。[剩余门禁记录](../evidence/web-mobile-parity/2026-10-25-remaining-gates.md)保留调整前的历史核对，当前完成条件由本规格和 Task 维护。
 
 第 3 批沿用复盘与研究的现行服务端合同：确定性事实、草稿、AI 解释及不可变快照分别保存；事实指纹、算法或草稿改变后必须重新分析才能保存。区间按显式时区转换，采用左闭右开窗口。研究读取按当前模式与可信范围隔离，旧报告使用明确的历史兼容入口；请求失败保留已读正文。新建使用服务端能力与模型设置预检，提交标识和原始输入先持久化，再调用提交/找回/取消接口；审计、用量、实际模型及材料来源只读。比较和复核沿用服务端可用状态，不启用受控写入，也不因迁移扩大原研究任务的模型调用、启停及预算边界。正向自动验收使用隔离数据库及受控响应，不能据此勾选实源验收。
 
@@ -48,7 +48,7 @@
 <a id="notification-provider-followup"></a>
 2026-10-30范围确认：用户明确答复“暂时不需要验证通知provider”。据此暂缓手机迁移中的通知Provider真实投递、供应商回执及双端实源消费，后续记录见[独立验收](../archive/tasks/2026-11-03-mobile-notification-provider-live-acceptance.md)，不再作为当轮G5A/G5I、G6A/G6I或G7的完成条件，当时没有通过结论。已交付的通知诊断读取、受控交互和失败展示仍在迁移范围。当轮未配置可投递渠道，通知发送0；原单条许可不自动延续，恢复时须先确认安全配置、目标及有效发送范围。
 
-2026-11-03 通知后续按用户要求恢复并验收完成，由[独立规格](2026-11-03-mobile-notification-provider-live-acceptance.md)和[独立任务](../archive/tasks/2026-11-03-mobile-notification-provider-live-acceptance.md)承接。原飞书测试群两次真实 POST 均业务成功，用户确认收到，Android／指定 iPhone Air 页面消费通过，临时配置及资源清理完成，见[最终证据](../tasks/evidence/2026-11-03-mobile-notification-provider-live-acceptance.md)。两次许可均已使用，原迁移和 Longbridge 范围分别维护。
+2026-11-03 通知后续按用户要求恢复并验收完成，由[独立规格](2026-11-03-mobile-notification-provider-live-acceptance.md)和[独立任务](../archive/tasks/2026-11-03-mobile-notification-provider-live-acceptance.md)承接。原飞书测试群两次真实 POST 均业务成功，用户确认收到，Android／指定 iPhone Air 页面消费通过，临时配置及资源清理完成，见[最终证据](../evidence/2026-11-03-mobile-notification-provider-live-acceptance.md)。两次许可均已使用，原迁移和 Longbridge 范围分别维护。
 
 ### 正式签名与发布准备
 
@@ -205,11 +205,11 @@ API Key 与行情凭证只驻留当前原生表单内存，使用安全输入；
 
 2026-10-26 剩余任务接续增加真实手动执行的独立验证面：仅新建本轮具名、始终停用的 `daily-digest` 测试任务，手动运行一次并读取持久化历史。该处理器只读已有风险事件并生成摘要，手动路径不触发 Scheduler 或失败通知；不启用任务、不修改任何已有任务或账本，不调用模型、行情探测或外发。执行请求不自动重试，结果不确定时按原任务 ID 找回记录。该子断言不替代真实 Scheduler、通知、OAuth 或模型/来源验收。
 
-同日[剩余门禁核对](../tasks/evidence/web-mobile-parity/2026-10-26-remaining-gates.md)允许对已就绪的现有真实目录做双端只读消费验证；只读取目录状态及显式重新读取，不启动同步或确认标的。无副作用盘点避开会自动重试策略和过期化 OAuth 会话的 GET；操作权限按实际处理器行为判断，不能只凭 HTTP 方法推断。G5CA/G5CI 已独立通过真实目录读取及原 API/模式保持；只核销现有目录读取，完整 G5/G6/G7 仍等待全部原业务断言。Scheduler 优先以只读持久化元数据确认既有 scheduled/领取/终态，历史成功仍须匹配当前运行态和消费证据。
+同日[剩余门禁核对](../evidence/web-mobile-parity/2026-10-26-remaining-gates.md)允许对已就绪的现有真实目录做双端只读消费验证；只读取目录状态及显式重新读取，不启动同步或确认标的。无副作用盘点避开会自动重试策略和过期化 OAuth 会话的 GET；操作权限按实际处理器行为判断，不能只凭 HTTP 方法推断。G5CA/G5CI 已独立通过真实目录读取及原 API/模式保持；只核销现有目录读取，完整 G5/G6/G7 仍等待全部原业务断言。Scheduler 优先以只读持久化元数据确认既有 scheduled/领取/终态，历史成功仍须匹配当前运行态和消费证据。
 
 用户进一步授权新建独立测试任务自动调度一次、完成后停用。仅使用无模型/行情调用的 `daily-digest` 处理器、独立日期 cron 和新 UUID，不改变已有任务。先核对通知零路由，轮询过程中保持该条件；成功不发送通知，异常/超时先停用后核对。服务端 scheduled、领取与终态和 Android/iOS 历史消费分开验证；iOS 本次明确使用已启动的 iPhone Air，单平台失败保持该叶未完成。该授权只解除本次 Scheduler 条件，OAuth、模型/来源及真实通知条件继续保留。
 
-该[单次 Scheduler 验收](../tasks/evidence/web-mobile-parity/2026-10-26-scheduler-acceptance.md)已通过：唯一新任务自然调度一次、一次领取并成功后停用，通知 0、原六任务配置摘要不变；Android 与 iPhone Air 独立消费和 API/模式保持通过。只关闭 G5SA/G5SI，完整 G5/G6/G7 及其他业务实源条件不据此勾选。
+该[单次 Scheduler 验收](../evidence/web-mobile-parity/2026-10-26-scheduler-acceptance.md)已通过：唯一新任务自然调度一次、一次领取并成功后停用，通知 0、原六任务配置摘要不变；Android 与 iPhone Air 独立消费和 API/模式保持通过。只关闭 G5SA/G5SI，完整 G5/G6/G7 及其他业务实源条件不据此勾选。
 
 ## 风险、默认值与待准备资源
 

@@ -1,6 +1,6 @@
 # ThesisLedger 工作区与 DSA 集成迁移规格
 
-> 状态说明：本文记录迁移前的约束与已完成的迁移验收；当前三仓边界以 [ADR-014](../../adr/2026-08-18-ADR-014-thesis-ledger-workspace-boundary.md) 为准。本文不回写历史审计证据。
+> 状态说明：本文记录迁移前的约束与已完成的迁移验收；当前三仓边界以 [ADR-014](../../design/2026-08-18-ADR-014-thesis-ledger-workspace-boundary.md) 为准。本文不回写历史审计证据。
 
 ## 背景与问题
 

@@ -6,7 +6,7 @@
 
 ## 当前执行摘要
 
-T1–T5 已完成。策略修订 184 的两条 AKShare 净值路由已验证，原 83 条及来源配置保持；原因契约、两端公共状态投影与项目规范已生效，桌面真实 API / 隔离故障页面和 Android、iOS 原生当前 JS 验收通过。七类业务表摘要保持。详细结果与首次失败及修复见[验收证据](../../tasks/evidence/2026-11-04-portfolio-valuation-availability.md)。
+T1–T5 已完成。策略修订 184 的两条 AKShare 净值路由已验证，原 83 条及来源配置保持；原因契约、两端公共状态投影与项目规范已生效，桌面真实 API / 隔离故障页面和 Android、iOS 原生当前 JS 验收通过。七类业务表摘要保持。详细结果与首次失败及修复见[验收证据](../../evidence/2026-11-04-portfolio-valuation-availability.md)。
 
 ## 任务
 

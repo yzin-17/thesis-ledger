@@ -1,6 +1,6 @@
 # 手机通知 Provider 真实投递验收
 
-日期：2026-11-03。状态：本次验收完成，AC1～AC6 全部通过，见[验收与最终复核](../tasks/evidence/2026-11-03-mobile-notification-provider-live-acceptance.md)。对应[任务](../archive/tasks/2026-11-03-mobile-notification-provider-live-acceptance.md)。承接[手机迁移 AC12 的通知后续](2026-10-22-web-mobile-feature-parity.md#notification-provider-followup)，原迁移验收及其他后续范围继续独立维护。本规格保留本次验收合同，两次外发许可已用尽。
+日期：2026-11-03。状态：本次验收完成，AC1～AC6 全部通过，见[验收与最终复核](../evidence/2026-11-03-mobile-notification-provider-live-acceptance.md)。对应[任务](../archive/tasks/2026-11-03-mobile-notification-provider-live-acceptance.md)。承接[手机迁移 AC12 的通知后续](2026-10-22-web-mobile-feature-parity.md#notification-provider-followup)，原迁移验收及其他后续范围继续独立维护。本规格保留本次验收合同，两次外发许可已用尽。
 
 ## 目标与授权
 

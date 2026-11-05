@@ -6,7 +6,7 @@
 - 关联现状：[`2026-09-07-automatic-snapshot-entry.md`](2026-09-07-automatic-snapshot-entry.md)、[`2026-09-07-portfolio-aggregate-snapshot.md`](2026-09-07-portfolio-aggregate-snapshot.md)
 - 下游读模型：[`2026-09-07-portfolio-valuation-series.md`](2026-09-07-portfolio-valuation-series.md)
 
-> 2026-10-20 基金实源接续：目录就绪不代表现行路由已选择来源。基金 NAV 的正向消费先独立核对当前 V3 输入；临时路由验收按[精确预案](../tasks/evidence/2026-10-20-fund-nav-route-plan.md)限定来源、证券、窗口及恢复范围，在获得路由变更授权前仅执行只读预案。当前 NAV 合同没有完整披露资格，不能由净值接口成功关闭基金披露、正式校准或研究经济价格门禁。
+> 2026-10-20 基金实源接续：目录就绪不代表现行路由已选择来源。基金 NAV 的正向消费先独立核对当前 V3 输入；临时路由验收按[精确预案](../evidence/2026-10-20-fund-nav-route-plan.md)限定来源、证券、窗口及恢复范围，在获得路由变更授权前仅执行只读预案。当前 NAV 合同没有完整披露资格，不能由净值接口成功关闭基金披露、正式校准或研究经济价格门禁。
 
 > 历史点按[来源合同 §13.46](2026-10-09-unified-data-capability-source-contracts.md#1346-四缓存实读验收的分层与恢复)保留日期年龄产生的 `stale`，与 `servedFromCache` 和末次有效缓存回退分别核对。当前净值正向仍拒绝陈旧；历史实源读取核对原日期年龄状态、精确窗口、来源和未回退事实，不把历史陈旧点提升为当前新鲜估值或合格经济价格。
 

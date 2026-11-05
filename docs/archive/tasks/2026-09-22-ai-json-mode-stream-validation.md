@@ -37,7 +37,7 @@
 
 ## 2026-10-03 本地证据接续
 
-只读核对[共同价格回归记录](../../tasks/evidence/2026-10-03-common-price-baseline.md)及原日志：`ai-generation-output.test.ts` 8 项、`ai-json-mode.integration.test.ts` 27 项、`ai-sdk-generation-adapter.integration.test.ts` 20 项、`ai-provider-readiness.test.ts` 16 项均通过。最新 Server 总计 2074 passed/125 skipped，Desktop 543、Schemas 589 项通过，Schema/Server/Desktop 构建、边界/依赖与尺寸 ratchet 有对应记录；本轮没有重跑。Server 包级跳过的 PostgreSQL 集成项不计通过，独立环境证据只覆盖其原断言。消费者穷尽映射、完整当前 CI、浏览器选项、真实 Chat/Responses、Token/费用与任务终态仍属本任务义务。
+只读核对[共同价格回归记录](../../evidence/2026-10-03-common-price-baseline.md)及原日志：`ai-generation-output.test.ts` 8 项、`ai-json-mode.integration.test.ts` 27 项、`ai-sdk-generation-adapter.integration.test.ts` 20 项、`ai-provider-readiness.test.ts` 16 项均通过。最新 Server 总计 2074 passed/125 skipped，Desktop 543、Schemas 589 项通过，Schema/Server/Desktop 构建、边界/依赖与尺寸 ratchet 有对应记录；本轮没有重跑。Server 包级跳过的 PostgreSQL 集成项不计通过，独立环境证据只覆盖其原断言。消费者穷尽映射、完整当前 CI、浏览器选项、真实 Chat/Responses、Token/费用与任务终态仍属本任务义务。
 
 ## 尚需执行的门禁
 

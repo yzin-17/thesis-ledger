@@ -2,7 +2,7 @@
 
 状态：已完成并归档（2026-10-19）。仅完成已授权的界面迁移；未提交或推送代码，未修改目标默认配置，未发送真实 AI 请求。
 
-[现行规格与 AC](../../specs/2026-10-19-research-default-model-placement.md) · [验证证据](../../tasks/evidence/2026-10-19-research-default-model-placement.md)
+[现行规格与 AC](../../specs/2026-10-19-research-default-model-placement.md) · [验证证据](../../evidence/2026-10-19-research-default-model-placement.md)
 
 ## 当前执行单元
 
@@ -12,6 +12,6 @@
 
 ## 当前检查点
 
-最终一致性 Review 通过，本次范围无未完成事项。配置页仍查询设置，以保护被默认模型引用的提供方启停和删除；真实配置写入只在受控测试中验证。界面验收时的目标 V2 资格读取问题后续由[独立运行态修复](../../tasks/evidence/2026-10-19-research-capabilities-runtime.md)解决；本次未声称完成真实创建。
+最终一致性 Review 通过，本次范围无未完成事项。配置页仍查询设置，以保护被默认模型引用的提供方启停和删除；真实配置写入只在受控测试中验证。界面验收时的目标 V2 资格读取问题后续由[独立运行态修复](../../evidence/2026-10-19-research-capabilities-runtime.md)解决；本次未声称完成真实创建。
 
 详细命令与 AC 映射见验证证据；已有研究真实运行门禁保持原状态，不新增重复 TODO。当前产品合同保留在现行 Spec。

@@ -3,7 +3,7 @@
 <a id="priority"></a>
 > 归档（2026-10-31）：**L3-V 摘牌正向消费通过，当前任务已完成**。原 S/L/D 有界交付与 R 预研证据复用，未恢复已取消范围。
 > 任务标识：`history-data-on-demand`；首次日期：2026-10-09；最后验收：2026-10-31。
-> [现行 Spec](../../specs/2026-10-09-history-data-on-demand.md) · [本轮验收证据](../../tasks/evidence/2026-10-31-history-demand-l3v.md) · [完整历史](2026-10-09-history-data-on-demand-history.md) · [统一适配层 Task](../../tasks/2026-10-09-unified-data-capability-adapter.md)
+> [现行 Spec](../../specs/2026-10-09-history-data-on-demand.md) · [本轮验收证据](../../evidence/2026-10-31-history-demand-l3v.md) · [完整历史](2026-10-09-history-data-on-demand-history.md) · [统一适配层 Task](../../tasks/2026-10-09-unified-data-capability-adapter.md)
 
 ## 最后验收
 
@@ -26,7 +26,7 @@
 
 | 范围 | 已完成内容与证据 |
 | --- | --- |
-| L3-V 摘牌正向消费 | 2026-10-31 原600112窗口正常准备/创建、新快照、Worker、Web/实际下载及两次离线重放通过；原20条路由已恢复，旧数据保护通过。见[本轮证据](../../tasks/evidence/2026-10-31-history-demand-l3v.md)。 |
+| L3-V 摘牌正向消费 | 2026-10-31 原600112窗口正常准备/创建、新快照、Worker、Web/实际下载及两次离线重放通过；原20条路由已恢复，旧数据保护通过。见[本轮证据](../../evidence/2026-10-31-history-demand-l3v.md)。 |
 | S、L1/L2、L3 的普通/跨上市部分 | A0、S1～S5、日级状态/生命周期读取与冻结、跨月/起点停牌、新证券及旧快照回归；普通/跨上市准备创建、页面、诊断下载 L3-V-U 和新旧重放已完成。见[历史执行记录](2026-10-09-history-data-on-demand-history.md)；摘牌正例由上项补齐。 |
 | D1～D5 | 有界标准读取、准备/创建、快照、Worker、展示/下载、七窗口独立复算与新旧重放完成。D3-R/A 已由 D3-RH、D3-RE、D3-A1/A2 等实际子任务及目标证据闭合，勿重新实施旧父步骤。见[最终有界验收](2026-10-09-history-data-on-demand-history.md#d-line-closeout)。 |
 | 普通现金与登记资格后继 | HiThink K37f-R、东财 K37b-R 和 K37-C 登记资格 v2 已由[统一适配层](../../tasks/2026-10-09-unified-data-capability-adapter.md#已完成范围与证据)完成，不在此重复维护或验收。新准备使用登记截止成交持有份额 v2；旧数字状态约定/已结算资格只用于相应历史冻结版本。 |

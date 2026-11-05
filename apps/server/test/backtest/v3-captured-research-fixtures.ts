@@ -17,7 +17,7 @@ import { completeSnapshotFixture } from './v3-complete-snapshot-fixtures.js';
 
 const evidenceJson = (name: string) =>
   JSON.parse(
-    readFileSync(new URL(`../../../../docs/tasks/evidence/${name}`, import.meta.url), 'utf8'),
+    readFileSync(new URL(`../../../../docs/evidence/${name}`, import.meta.url), 'utf8'),
   ) as Record<string, unknown>;
 
 export async function capturedResearchFixture(symbol: string) {

@@ -1,6 +1,6 @@
 # AI 请求的超时、截止时间与受控重试
 
-任务标识：`ai-adaptive-execution`，首次建立于2026-10-25。对应[已完成实施记录](../archive/tasks/2026-10-25-ai-adaptive-execution.md)。2026-10-27按用户附件更新现有方案；[调用链核对与实施证据](../tasks/evidence/2026-10-27-ai-timeout-governance.md)。本版替换v1的冷启动／24小时学习规则，原AE编号保留。
+任务标识：`ai-adaptive-execution`，首次建立于2026-10-25。对应[已完成实施记录](../archive/tasks/2026-10-25-ai-adaptive-execution.md)。2026-10-27按用户附件更新现有方案；[调用链核对与实施证据](../evidence/2026-10-27-ai-timeout-governance.md)。本版替换v1的冷启动／24小时学习规则，原AE编号保留。
 
 ## 目标与边界
 

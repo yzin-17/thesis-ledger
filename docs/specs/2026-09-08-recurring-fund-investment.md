@@ -5,7 +5,7 @@
 - 适用项目：`thesis-ledger`
 - 类型：增量设计
 
-当前完成证据：[2026-10-04 运行时验收](../tasks/evidence/2026-10-04-recurring-fund-runtime.md)。实施 Task 归档不改变本 Spec 的需求和验收标准。
+当前完成证据：[2026-10-04 运行时验收](../evidence/2026-10-04-recurring-fund-runtime.md)。实施 Task 归档不改变本 Spec 的需求和验收标准。
 
 ## 背景与问题
 

@@ -21,7 +21,7 @@
 
 行业排名采证曾取得一页，后续两次真实产品调用及一次当前 SDK 请求仍连接中断；取消仅指本轮接入，不判定永久不支持。EPS 与行业排名精确路由均通过首次计划归属证明撤销；原 20 条路由逐项保持，最终修订 181 共 49 条。Provider 和准入摘要未变，19 张受保护业务表共 38421 行摘要未变，三仓 HEAD／索引及非本轮源码保全。
 
-完整交付／取消矩阵、失败修正与验证层次见[交付复核](../reviews/2026-11-03-market-reference-delivery.md)，可复查命令和证据见[验收记录](../../tasks/evidence/2026-11-03-astock-existing-sources-delivery.md)。取消项不移回 TODO。来源采证为 43 次 HTTP 尝试和 1 个 SDK 会话／查询；产品读取另留回执，模型及通知调用为 0，新增费用为 0 USD。
+完整交付／取消矩阵、失败修正与验证层次见[交付复核](../reviews/2026-11-03-market-reference-delivery.md)，可复查命令和证据见[验收记录](../../evidence/2026-11-03-astock-existing-sources-delivery.md)。取消项不移回 TODO。来源采证为 43 次 HTTP 尝试和 1 个 SDK 会话／查询；产品读取另留回执，模型及通知调用为 0，新增费用为 0 USD。
 
 ## 规划复核
 

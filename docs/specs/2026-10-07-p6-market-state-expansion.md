@@ -6,7 +6,7 @@
 
 按用户确认的[多源范围取消基线](2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)，取消 P6-G2 中两个缺失旧任务的继续追补义务；其缺失、未验证结论与现有旧样本回归证据保留，不作为本任务关闭或镜像固化的前置。严格 PIT、M32、专业 Quote、旧 HiThink 分红和复杂旧版本回退不再是 P6 的交付依赖；不删除相关代码、备份或运行校验。
 
-P6-E1／F3 已在保留范围内完成：美股GME有界原价整股/TAF实际单位见[美股核验](../tasks/evidence/2026-10-08-p6-us-share-window-acceptance.md)，港股原价和可覆盖每手研究预设见[最终港股核验](../tasks/evidence/2026-10-08-p6-hk-share-window-acceptance.md)。当前镜像、版本绑定备份、旧数据保护及五类隔离恢复通过；此前[精简F01核验](../tasks/evidence/2026-10-08-f01-image-recovery-acceptance.md)保留。Task完成并归档，本Spec继续定义现行合同；取消任务不是验收通过，港股历史整手变更未核验。
+P6-E1／F3 已在保留范围内完成：美股GME有界原价整股/TAF实际单位见[美股核验](../evidence/2026-10-08-p6-us-share-window-acceptance.md)，港股原价和可覆盖每手研究预设见[最终港股核验](../evidence/2026-10-08-p6-hk-share-window-acceptance.md)。当前镜像、版本绑定备份、旧数据保护及五类隔离恢复通过；此前[精简F01核验](../evidence/2026-10-08-f01-image-recovery-acceptance.md)保留。Task完成并归档，本Spec继续定义现行合同；取消任务不是验收通过，港股历史整手变更未核验。
 
 ## 港股每手股数研究预设（2026-10-08确认）
 

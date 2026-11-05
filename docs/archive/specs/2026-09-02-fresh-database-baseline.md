@@ -1,6 +1,6 @@
 # Fresh Database Baseline Spec
 
-> 状态：已完成并归档。当前架构决策以 [`ADR-018`](../../adr/2026-09-02-ADR-018-fresh-database-lifecycle.md) 为准。
+> 状态：已完成并归档。当前架构决策以 [`ADR-018`](../../design/2026-09-02-ADR-018-fresh-database-lifecycle.md) 为准。
 
 ## 背景与问题
 

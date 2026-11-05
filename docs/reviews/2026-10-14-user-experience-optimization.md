@@ -389,7 +389,7 @@
 | E06 | [`FirstRunOnboarding.tsx`](../../apps/desktop/src/features/onboarding/FirstRunOnboarding.tsx) | 四步引导及完成后展示 |
 | E03、E11 | [`StrategyExperimentCreatePage.tsx`](../../apps/desktop/src/features/strategy/StrategyExperimentCreatePage.tsx) | 第 188 行参数必选校验；第 380–400 行基线选择器值和名称 |
 | E04 | [`AiChat.tsx`](../../apps/desktop/src/features/ai/AiChat.tsx)、[`NewResearchSheet.tsx`](../../apps/desktop/src/features/ai/NewResearchSheet.tsx) | 首页第 37–45 行服务状态与新建抽屉模型前提 |
-| E04 | [`AiResearchDefaultSettings.tsx`](../../apps/desktop/src/features/providers/AiResearchDefaultSettings.tsx) | 第 94–97 行未选模型与缺价格共用提示 |
+| E04 | [`AiResearchDefaultSettings.tsx`](https://github.com/yzin-17/thesis-ledger/blob/da002744bd317b7754832c6ac41d169bcf005e27/apps/desktop/src/features/providers/AiResearchDefaultSettings.tsx) | 第 94–97 行未选模型与缺价格共用提示 |
 | E07 | [`AccountDataCashSections.tsx`](../../apps/desktop/src/features/account-data/AccountDataCashSections.tsx) | 第 338–347 行合计不可用原因的统一回退 |
 | E08、E19 | [`RiskRuleEditorSheet.tsx`](../../apps/desktop/src/features/risk/RiskRuleEditorSheet.tsx) | 第 685 行阈值内部格式说明 |
 | E10 | [`BacktestModelConfiguration.tsx`](../../apps/desktop/src/features/strategy/BacktestModelConfiguration.tsx) | 执行模型 JSON 输入与校验 |

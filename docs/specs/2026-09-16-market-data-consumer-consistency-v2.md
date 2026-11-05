@@ -1,6 +1,6 @@
 # 市场数据消费者一致性 V2 Spec
 
-2026-10-03 适用性对账：保留 acceptance、领域边界和受保护清理原则；旧 V2 创建与存储路径由[Canonical 架构](../architecture/canonical-runtime.md)替代，固定快照按[现行多源规格](2026-09-25-multi-source-adjustment-aware-backtest.md)；S05 严格历史 PIT 已由[10-08 范围决定](2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)取消。原 G1 尚未覆盖断言见[原 Task](../tasks/2026-10-09-unified-data-capability-adapter.md#market-consumer-acceptance)；重建后的归零检查不要求每次 smoke 后再清理。
+2026-10-03 适用性对账：保留 acceptance、领域边界和受保护清理原则；旧 V2 创建与存储路径由[Canonical 架构](../design/canonical-runtime.md)替代，固定快照按[现行多源规格](2026-09-25-multi-source-adjustment-aware-backtest.md)；S05 严格历史 PIT 已由[10-08 范围决定](2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)取消。原 G1 尚未覆盖断言见[原 Task](../tasks/2026-10-09-unified-data-capability-adapter.md#market-consumer-acceptance)；重建后的归零检查不要求每次 smoke 后再清理。
 
 > 任务标识：market-data-consumer-consistency-v2
 > 日期：2026-09-16

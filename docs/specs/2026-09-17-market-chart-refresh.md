@@ -6,7 +6,7 @@
 > 对应任务：[实施任务](../archive/tasks/2026-09-10-market-chart-indicator-integration.md#chart-refresh-acceptance)
 > 关联规格：[日线行情与技术指标联动](2026-09-10-market-chart-indicator-integration.md)
 
-> 当前接口与来源遵守 [Canonical V3](../architecture/canonical-runtime.md)及[交互 V3 整窗合同](2026-09-25-multi-source-adjustment-aware-backtest.md#72-复权-ui)。历史加载的真正游标/`calculationAnchor` 已进入[既有 TODO](../TODO.md)。2026-10-17 对账明确：V3 的历史和最新检查均获取当前计划整窗并原子替换价格与指标；旧 `start=末日` 增量合并方案被该合同取代。跨日、视图、错误与真实截止日期义务继续有效。
+> 当前接口与来源遵守 [Canonical V3](../design/canonical-runtime.md)及[交互 V3 整窗合同](2026-09-25-multi-source-adjustment-aware-backtest.md#72-复权-ui)。历史加载的真正游标/`calculationAnchor` 已进入[既有 TODO](../TODO.md)。2026-10-17 对账明确：V3 的历史和最新检查均获取当前计划整窗并原子替换价格与指标；旧 `start=末日` 增量合并方案被该合同取代。跨日、视图、错误与真实截止日期义务继续有效。
 
 ## 背景与问题
 

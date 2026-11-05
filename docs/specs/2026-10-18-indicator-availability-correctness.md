@@ -1,6 +1,6 @@
 # 指标依赖时钟与不可用状态修复规格
 
-> 任务标识：`indicator-availability-correctness`；日期：2026-10-18；状态：本地修复及 IVAG 目标 Worker 构建、冻结、执行、重放和历史保护均通过。目标证据见[验收记录](../tasks/evidence/2026-10-19-p0-target-acceptance.md)。
+> 任务标识：`indicator-availability-correctness`；日期：2026-10-18；状态：本地修复及 IVAG 目标 Worker 构建、冻结、执行、重放和历史保护均通过。目标证据见[验收记录](../evidence/2026-10-19-p0-target-acceptance.md)。
 > [实施任务](../archive/tasks/2026-10-18-indicator-availability-correctness.md) · [全局优先级](../tasks/README.md#priority-p0) · [IR09/IR10 原始反例](../reviews/2026-10-18-starred-project-source-audit.md#indicator-findings)。
 
 ## 1. 目标与范围

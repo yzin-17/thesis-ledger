@@ -14,6 +14,6 @@
 
 ## 最终验收
 
-R1～R5 分别由严格共享合同、DSA 控制与投影、Server／API client、双端实际页面、29 类链路与保护矩阵验收。具体命令、输入范围和最后结果由[验收证据](../../tasks/evidence/2026-11-03-astock-existing-sources-delivery.md)维护；已通过的高成本检查不为归档重复执行。
+R1～R5 分别由严格共享合同、DSA 控制与投影、Server／API client、双端实际页面、29 类链路与保护矩阵验收。具体命令、输入范围和最后结果由[验收证据](../../evidence/2026-11-03-astock-existing-sources-delivery.md)维护；已通过的高成本检查不为归档重复执行。
 
 目标使用 `sync-code.sh all` 代码快更，未构建新镜像。原生工程与依赖未变，当前 JS 在复用的原生二进制内验收；未宣称新 Native compile、真机或商店发布。新增 HiThink 回归夹具明确启用合成来源，未改真实配置。

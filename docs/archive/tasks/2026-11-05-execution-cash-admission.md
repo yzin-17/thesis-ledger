@@ -24,6 +24,6 @@ T1–T3 完成，最终一致性复核通过。写入端现金准入已在本地
 
 ## 最终一致性复核
 
-全部 AC 已按[验收记录](../../reviews/2026-11-05-execution-cash-admission.md)核对。命令 35 项、三组独立 PostgreSQL 15／13／8 项、Desktop 38 项、Mobile 37 项及类型、Server 构建、边界／格式通过；Server 全量中两项未修改的迁移断言失败已单独保留。
+全部 AC 已按[验收记录](../reviews/2026-11-05-execution-cash-admission.md)核对。命令 35 项、三组独立 PostgreSQL 15／13／8 项、Desktop 38 项、Mobile 37 项及类型、Server 构建、边界／格式通过；Server 全量中两项未修改的迁移断言失败已单独保留。
 
 维护入口 `../thesis-ledger-infra/scripts/sync-code.sh thesis-ledger` 同步退出码 0；只读目标事务确认两个原账户被新准入拒绝且审计事实／版本不变，真实现金仍为 −82 元。无本次范围遗留事项。未提交、推送、改写旧账本或重新打包／安装手机应用。

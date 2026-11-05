@@ -4,7 +4,7 @@
 
 - 规格：[文件尺寸门禁源码归属](../../specs/2026-10-26-file-size-source-ownership.md)。计划预检：Ready。
 - 来源：[Cloudflare 模型目录任务](2026-10-26-cloudflare-model-catalog.md) 的 T2 门禁；原三项尺寸违规均已处理，未提高阈值或修改快照。
-- S1、S2 完成，原目录任务继续其运行态验收。[验收记录](../../tasks/evidence/2026-10-26-file-size-source-ownership.md)
+- S1、S2 完成，原目录任务继续其运行态验收。[验收记录](../../evidence/2026-10-26-file-size-source-ownership.md)
 
 ## 任务
 

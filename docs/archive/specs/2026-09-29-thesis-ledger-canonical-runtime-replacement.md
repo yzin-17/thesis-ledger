@@ -8,7 +8,7 @@
 
 ## 1. 目标与范围
 
-最终实施与验收见[收口证据](../../tasks/evidence/2026-10-02-canonical-final-completion.md)；当前模块与 API 见[当前运行链](../../architecture/canonical-runtime.md)。
+最终实施与验收见[收口证据](../../evidence/2026-10-02-canonical-final-completion.md)；当前模块与 API 见[当前运行链](../../design/canonical-runtime.md)。
 
 ThesisLedger 只维护一条现行的 Market、Backtest、Ledger 业务链路。Schema、Domain、Server API、Worker、客户端、DSA 中 ThesisLedger 专属数据/控制接口和部署输入须指向同一套合同与运行实现。已有 V3 能力直接成为现行实现，不再以 V2 创建、V3 旁路执行、旧快照回读和旧字段补齐来维持两套语义。模块按领域职责收敛到清楚的所有权；版本后缀不再作为并行实现的理由。
 

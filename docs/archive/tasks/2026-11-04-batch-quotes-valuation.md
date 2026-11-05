@@ -9,8 +9,8 @@
 - [x] B09-R／P10-R 包、边界、正式目标和真实消费分别验收。
 - [x] F 最终复核、父项对账及正文归档。
 
-本地批量／组合7项及组合／FX／realized相关59项通过，Server类型检查通过；真实数据库只读基线、成本和规模见[进度证据](../../tasks/evidence/2026-11-04-todo-4-15-local-progress.md)。FX／现金投影／realized当前没有需改SQL的瓶颈，不新增索引或迁移；该性能基线不含真实来源耗时，实源批次结果另见最终验收。B09-B的API Client实际HTTP与部署消费已通过。
+本地批量／组合7项及组合／FX／realized相关59项通过，Server类型检查通过；真实数据库只读基线、成本和规模见[进度证据](../../evidence/2026-11-04-todo-4-15-local-progress.md)。FX／现金投影／realized当前没有需改SQL的瓶颈，不新增索引或迁移；该性能基线不含真实来源耗时，实源批次结果另见最终验收。B09-B的API Client实际HTTP与部署消费已通过。
 
 ## 最终验收
 
-状态：已完成。真实批量HTTP的3项输入去重为2个证券，股票成功、ETF准入失败逐项保留；当前真实DB跨账户3条ETF持仓合为1个批次项，单标读取0，缺价保留null和partial。原冷／热性能基线复用。 证据见[最终验收](../../tasks/evidence/2026-11-05-todo-4-15-final-acceptance.md)及[最终复核](../reviews/2026-11-05-todo-4-15-delivery-review.md)。
+状态：已完成。真实批量HTTP的3项输入去重为2个证券，股票成功、ETF准入失败逐项保留；当前真实DB跨账户3条ETF持仓合为1个批次项，单标读取0，缺价保留null和partial。原冷／热性能基线复用。 证据见[最终验收](../../evidence/2026-11-05-todo-4-15-final-acceptance.md)及[最终复核](../reviews/2026-11-05-todo-4-15-delivery-review.md)。

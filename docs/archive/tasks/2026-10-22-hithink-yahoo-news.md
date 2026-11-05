@@ -4,7 +4,7 @@
 
 ## 当前检查点
 
-五个实施叶全部通过并归档。497 项 DSA、6 项前端、维护 Node 5/Python 8、build 和边界通过；正式快更、HMAC 首次准入、目标 V3/Market/Web、九文件摘要与前后保全通过。政策/DSA 170，CN 新闻为 HiThink 首源、AKShare 备用，其余十七条不变。Yahoo `Search.news` 宿主/目标 NVDA/AAPL 返回 5/4 条，Ticker 路径 404；未新增其路线。完整记录见[DSA 证据](../../../../daily-stock-analysis/docs/tasks/evidence/2026-10-22-hithink-yahoo-news.md)。
+五个实施叶全部通过并归档。497 项 DSA、6 项前端、维护 Node 5/Python 8、build 和边界通过；正式快更、HMAC 首次准入、目标 V3/Market/Web、九文件摘要与前后保全通过。政策/DSA 170，CN 新闻为 HiThink 首源、AKShare 备用，其余十七条不变。Yahoo `Search.news` 宿主/目标 NVDA/AAPL 返回 5/4 条，Ticker 路径 404；未新增其路线。完整记录见[DSA 证据](../../../../daily-stock-analysis/docs/evidence/2026-10-22-hithink-yahoo-news.md)。
 
 ## 执行清单
 
@@ -27,4 +27,4 @@
 
 ## 最终一致性 Review
 
-结论：通过。HN-AC1～4 与 YN-AC1 的来源、控制/快照、接口、时间、首屏覆盖、错误、副作用、目标一致性与保全均有适用证据，见[唯一最终复核](../../reviews/2026-10-22-hithink-yahoo-news-final-review.md)。未发现未处理的阻断问题；Yahoo 业务接入和目标故障切源不属于本次验收范围，研究模型条件保持。所有变更未提交，其他工作区修改保留。
+结论：通过。HN-AC1～4 与 YN-AC1 的来源、控制/快照、接口、时间、首屏覆盖、错误、副作用、目标一致性与保全均有适用证据，见[唯一最终复核](../reviews/2026-10-22-hithink-yahoo-news-final-review.md)。未发现未处理的阻断问题；Yahoo 业务接入和目标故障切源不属于本次验收范围，研究模型条件保持。所有变更未提交，其他工作区修改保留。

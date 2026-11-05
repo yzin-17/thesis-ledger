@@ -13,7 +13,7 @@
 
 工作区为 ThesisLedger 及相邻 DSA、infra 三仓。本轮初始工作树分别有 987、303、19 条状态记录；保留全部既有修改，不提交、发布、清理或重建数据库。本轮串行执行。
 
-共同价格交付以[旧 Task §0、§13](2026-09-25-multi-source-adjustment-aware-backtest.md)和[最终证据](../../tasks/evidence/2026-10-03-common-price-baseline.md)为准；Canonical 以[归档任务](2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准。旧记录中 RQData 的“无账号／跳过”曾由本次注册验证单独承接，用户已取消该计划，不取消其他扩展的边界。
+共同价格交付以[旧 Task §0、§13](2026-09-25-multi-source-adjustment-aware-backtest.md)和[最终证据](../../evidence/2026-10-03-common-price-baseline.md)为准；Canonical 以[归档任务](2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准。旧记录中 RQData 的“无账号／跳过”曾由本次注册验证单独承接，用户已取消该计划，不取消其他扩展的边界。
 
 允许写入本 Spec/Task、相关导航和 TODO 的窄范围索引。注册仅操作官方页面；秘密通过既有安全配置入口，真实探针只读。生产适配、策略/准入修改、部署、付款及其他来源均不在本轮写集。
 
@@ -56,7 +56,7 @@
 - RQ04（用户取消，未执行）：核验目标 ETF 身份及原生日线实际权限。
   - 覆盖 AC03；依赖 RQ03，先验证合约身份，身份不匹配即停。
   - 执行面：目标 SDK 有界只读请求；规范证券 `159516.SZ`，候选合约 `159516.XSHE`，窗口 `2026-07-01..2026-07-07`，最多 5 行。
-  - 上下文：DSA `data_provider/rqdata_etf_daily_contract.py`、`data_provider/rqdata_etf_daily_process.py`，原 Task 的 `R02.18-process` 及[隔离读取证据](../../tasks/evidence/2026-09-29-cont-r02-18-rqdata-etf-process.md)。
+  - 上下文：DSA `data_provider/rqdata_etf_daily_contract.py`、`data_provider/rqdata_etf_daily_process.py`，原 Task 的 `R02.18-process` 及[隔离读取证据](../../evidence/2026-09-29-cont-r02-18-rqdata-etf-process.md)。
   - 验证：单次 `get_price`，`frequency='1d'`、`adjust_type='none'`、`expect_df=True`，显式 OHLC/量额字段、30 秒总期限；核实证券、返回日期、价格口径、原生单位与内容指纹。
   - 完成条件：逐项记录真实数据、空响应、权限错误及未知语义；本探针不授予整段历史覆盖或生产路由。
 

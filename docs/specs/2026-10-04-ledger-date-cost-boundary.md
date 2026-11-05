@@ -24,4 +24,4 @@
 - AC3：原成本与收益守恒、既有开仓周期策略固定及 Ledger 回归通过。
 - AC4：基金定投生产 HTTP 在真实隔离 PostgreSQL 下确认、重复确认、并发确认和竞争回滚通过。
 
-目标运行态与浏览器由原 T2.R3 独立验收，已完成；本地、目标及 Browser 的分层结果见[运行时证据](../tasks/evidence/2026-10-04-recurring-fund-runtime.md)。
+目标运行态与浏览器由原 T2.R3 独立验收，已完成；本地、目标及 Browser 的分层结果见[运行时证据](../evidence/2026-10-04-recurring-fund-runtime.md)。

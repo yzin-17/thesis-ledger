@@ -5,7 +5,7 @@
 
 ## 现在做什么
 
-PFCG 已完成正式保留更新、目标实际 HTTP/ORM 消费和浏览器验收。503 保存失败保留 60%/40% 草稿与原 v1，重试生成 v2，刷新仍可读；缺边界原因、严重亏损和模式隔离均通过。目标并发、当前现金信封正例及原数据/快照保护独立通过，本主题无剩余实施叶。详见[目标验收记录](../../tasks/evidence/2026-10-19-p0-target-acceptance.md)和[本地证据](../../tasks/evidence/2026-10-18-performance-correctness.md)。
+PFCG 已完成正式保留更新、目标实际 HTTP/ORM 消费和浏览器验收。503 保存失败保留 60%/40% 草稿与原 v1，重试生成 v2，刷新仍可读；缺边界原因、严重亏损和模式隔离均通过。目标并发、当前现金信封正例及原数据/快照保护独立通过，本主题无剩余实施叶。详见[目标验收记录](../../evidence/2026-10-19-p0-target-acceptance.md)和[本地证据](../../evidence/2026-10-18-performance-correctness.md)。
 
 <a id="pfc0"></a>
 ## PFC0：固定合同、消费者与结构差异
@@ -62,7 +62,7 @@ PFCG 已完成正式保留更新、目标实际 HTTP/ORM 消费和浏览器验�
   - 本轮执行范围：用户已授权正式更新并保留数据，使用现有 infra 保留升级路径；三个 P0 门禁共用候选产物。infra `scripts/p0-target-acceptance.mjs` 在目标 Server 内装配实际收益 HTTP/业务服务/ORM，使用专属临时数据库完成持久化及错误反例，本机浏览器读取该独立验收服务。原目标、收益、快照及 Ledger 在更新前后对账，测试不写用户账户，真实模型暂停。
   - 依赖：PFC5、必要隔离升级证据、正式维护入口和明确验收范围。
   - 完成：PFC-AC6 通过；通过正式更新入口使运行版本一致，合成反例与获准实际输入分开记账，旧目标/快照/Ledger 保留。新增结构必须做保留升级，不能用开发清库验收。
-  - 已通过：正式备份/恢复演练及更新退出 0；同一候选的目标 HTTP 五组结果、实际浏览器失败→重试→刷新及模式隔离通过，最终清理和原数据对账通过。见[目标证据](../../tasks/evidence/2026-10-19-p0-target-acceptance.md#pfcg目标-http-与实际浏览器)。本主题未新增数据库结构。
+  - 已通过：正式备份/恢复演练及更新退出 0；同一候选的目标 HTTP 五组结果、实际浏览器失败→重试→刷新及模式隔离通过，最终清理和原数据对账通过。见[目标证据](../../evidence/2026-10-19-p0-target-acceptance.md#pfcg目标-http-与实际浏览器)。本主题未新增数据库结构。
   - 外部 FX/NAV 或目标条件不足时只保留对应门禁，其他定向叶可完成；不向用户账户写入测试交易或重算历史结果。
 
 ## 验收映射与执行记录
@@ -75,4 +75,4 @@ PFCG 已完成正式保留更新、目标实际 HTTP/ORM 消费和浏览器验�
 | IR04 / PFC-AC3 | PFC0/PFC4 |
 | PFC-AC5 / PFC-AC6 | PFC5 / PFCG |
 
-原 [Portfolio G1](2026-08-28-portfolio-snapshot-system.md#portfolio-pnl-acceptance) 只证明其已实现盈亏和 Close Slice 场景。本主题的 Domain、Server、Schema、客户端、隔离数据库/HTTP 与 PFCG 目标/浏览器分别通过，未互相代收。正常 Server/Desktop 类型与构建通过，全仓 lint 仍被既有账户操作的三处 Promise 错误阻断，未修改该既有写集。命令及精确输入范围见[本地证据](../../tasks/evidence/2026-10-18-performance-correctness.md)和目标验收记录。
+原 [Portfolio G1](2026-08-28-portfolio-snapshot-system.md#portfolio-pnl-acceptance) 只证明其已实现盈亏和 Close Slice 场景。本主题的 Domain、Server、Schema、客户端、隔离数据库/HTTP 与 PFCG 目标/浏览器分别通过，未互相代收。正常 Server/Desktop 类型与构建通过，全仓 lint 仍被既有账户操作的三处 Promise 错误阻断，未修改该既有写集。命令及精确输入范围见[本地证据](../../evidence/2026-10-18-performance-correctness.md)和目标验收记录。

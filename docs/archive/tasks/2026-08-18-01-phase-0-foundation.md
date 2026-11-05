@@ -44,9 +44,9 @@
 
 - [x] T009：Fork daily_stock_analysis 并配置 upstream
   - 涉及范围：创建自己的 DSA Fork；配置 origin 指向 Fork、upstream 指向官方仓库；记录同步策略。
-  - 完成条件：本地可 fetch upstream；Fork 保留官方目录结构；有 `docs/architecture/2026-08-18-dsa-upstream.md`。
+  - 完成条件：本地可 fetch upstream；Fork 保留官方目录结构；有 `docs/design/2026-08-18-dsa-upstream.md`。
   - 验证方式：执行一次 upstream fetch + dry-run merge/rebase，记录潜在冲突。
-  - 验证证据：已创建 `https://github.com/yzin-17/daily_stock_analysis`，本地 `third_party/daily_stock_analysis` 的 `origin/upstream` 配置、`fetch --tags --prune` 和 `merge-tree` dry-run 均通过，详见 `docs/architecture/2026-08-18-dsa-upstream.md`。
+  - 验证证据：已创建 `https://github.com/yzin-17/daily_stock_analysis`，本地 `third_party/daily_stock_analysis` 的 `origin/upstream` 配置、`fetch --tags --prune` 和 `merge-tree` dry-run 均通过，详见 `docs/design/2026-08-18-dsa-upstream.md`。
 
 - [x] T010：构建自有 DSA Docker 镜像
   - 涉及范围：为 Fork 固定构建镜像和版本标签，不长期依赖 upstream latest。
@@ -66,33 +66,33 @@
 
 - [x] T013：审计 DSA 行情能力
   - 涉及范围：核对 Quote、Kline、ETF、基金、指数、财务、资金流等现有 API/模块及其输入输出。
-  - 完成条件：形成 `docs/archive/architecture/2026-08-18-dsa-capability-market.md`，列出可直接复用、需薄封装、需补 API 的能力。
+  - 完成条件：形成 `docs/archive/design/2026-08-18-dsa-capability-market.md`，列出可直接复用、需薄封装、需补 API 的能力。
   - 验证方式：随机选 A 股、ETF、基金各一个标的实际调用并记录样例响应。
-  - 验证证据：真实 Fork 镜像已完成 A 股、ETF、基金候选和历史行情调用；基金路由的 `404 not_found` 已作为明确能力边界记录在 `docs/archive/architecture/2026-08-18-dsa-capability-market.md`。
+  - 验证证据：真实 Fork 镜像已完成 A 股、ETF、基金候选和历史行情调用；基金路由的 `404 not_found` 已作为明确能力边界记录在 `docs/archive/design/2026-08-18-dsa-capability-market.md`。
 
 - [x] T014：审计 DSA Portfolio / Risk 能力
   - 涉及范围：核对 Account、Trade、Cash Ledger、FIFO/AVG、Snapshot、集中度、Drawdown、StopLoss 等现有实现。
   - 完成条件：形成复用边界表，标记 V0.1 临时复用和 V0.3 前必须收回到主仓的能力。
   - 验证方式：用 DSA 建账户、录入交易并生成 Portfolio/Risk，确认文档与实际行为一致。
-  - 验证证据：真实 Fork 镜像完成建账户→交易→Portfolio Snapshot→Risk 报告链路，结果和复用边界记录在 `docs/archive/architecture/2026-08-18-dsa-capability-portfolio-risk.md`。
+  - 验证证据：真实 Fork 镜像完成建账户→交易→Portfolio Snapshot→Risk 报告链路，结果和复用边界记录在 `docs/archive/design/2026-08-18-dsa-capability-portfolio-risk.md`。
 
 - [x] T015：审计 DSA Notification 能力
   - 涉及范围：验证 Feishu、severity、cooldown、dedup、quiet hours、delivery result 等实际实现范围。
-  - 完成条件：形成 `docs/archive/architecture/2026-08-18-dsa-capability-notification.md`；明确可复用代码和长期替换边界。
+  - 完成条件：形成 `docs/archive/design/2026-08-18-dsa-capability-notification.md`；明确可复用代码和长期替换边界。
   - 验证方式：使用测试 Webhook 发送一条通知，并验证 cooldown/dedup 至少一种行为。
-  - 验证证据：真实 Fork 镜像通过隔离 Webhook 验证 Feishu interactive/text fallback、失败可重试、成功后的 dedup/cooldown 抑制，详见 `docs/archive/architecture/2026-08-18-dsa-capability-notification.md`。
+  - 验证证据：真实 Fork 镜像通过隔离 Webhook 验证 Feishu interactive/text fallback、失败可重试、成功后的 dedup/cooldown 抑制，详见 `docs/archive/design/2026-08-18-dsa-capability-notification.md`。
 
 - [x] T016：审计 DSA AI 与 Tool 能力
   - 涉及范围：核对模型 Provider、单股分析、Portfolio Agent、Tool Registry、Memory/Calibration 等模块。
   - 完成条件：形成 AI 复用方案，明确 AI 未来通过 Investment OS Tool 获取真实 Portfolio，而不是继续读 DSA Portfolio。
   - 验证方式：构造一个最小 Tool 调用链，确认 DSA AI 能被外部上下文驱动或明确记录需要增加的薄适配。
-  - 验证证据：真实 Fork 镜像注册 18 个工具并通过 `ToolSurface` 执行 Quote、Portfolio/Risk；结果带审计摘要，超出 `600519` 股票 scope 的请求返回不可重试的 `stock_scope_violation`。正式 Portfolio Tool 薄适配、真实 LLM Provider Contract Test 作为发布前置条件，详见 `docs/archive/architecture/2026-08-18-dsa-capability-ai.md`。
+  - 验证证据：真实 Fork 镜像注册 18 个工具并通过 `ToolSurface` 执行 Quote、Portfolio/Risk；结果带审计摘要，超出 `600519` 股票 scope 的请求返回不可重试的 `stock_scope_violation`。正式 Portfolio Tool 薄适配、真实 LLM Provider Contract Test 作为发布前置条件，详见 `docs/archive/design/2026-08-18-dsa-capability-ai.md`。
 
 - [x] T017：审计 DSA 筹码实现
   - 涉及范围：记录筹码算法输入、历史窗口、输出字段、依赖数据源和边界条件。
-  - 完成条件：形成 `docs/archive/architecture/2026-08-18-dsa-chip-audit.md`，可据此与 InStock 做同标的 benchmark。
+  - 完成条件：形成 `docs/archive/design/2026-08-18-dsa-chip-audit.md`，可据此与 InStock 做同标的 benchmark。
   - 验证方式：固定一个股票和日期保存 DSA 原始输入、输出，后续回归可重复。
-  - 验证证据：固定 `600519` 的真实 Provider 调用已保存 unavailable 原始输出；固定交易日 `2025-06-30` 的 Tushare 形状输入和 `compute_cyq_metrics` 输出已保存为确定性 fixture，字段、算法、Provider 边界和缺失策略详见 `docs/archive/architecture/2026-08-18-dsa-chip-audit.md`。
+  - 验证证据：固定 `600519` 的真实 Provider 调用已保存 unavailable 原始输出；固定交易日 `2025-06-30` 的 Tushare 形状输入和 `compute_cyq_metrics` 输出已保存为确定性 fixture，字段、算法、Provider 边界和缺失策略详见 `docs/archive/design/2026-08-18-dsa-chip-audit.md`。
 
 - [x] T018：完成 Phase 0 一致性 Review
   - 涉及范围：Review Spec、ADR、目录、Compose、DSA Fork、能力审计结果和版本计划之间的一致性。

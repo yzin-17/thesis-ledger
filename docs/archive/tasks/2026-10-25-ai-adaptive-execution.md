@@ -2,15 +2,15 @@
 
 > 状态：2026-10-30完成现行Spec阶段并归档；以下各时点状态和证据保留为历史。影子估计不自动应用，其他模型／方言／权限由活动责任Task管理。
 
-> 当前G3检查点（2026-10-29 D59）：OpenRouter/free正式单次通过，实际Nvidia／Nemotron3.5免费模型；2条断言／5条数字／11条真实引用、完整trace及重建反读通过。V2保持开启、默认与配置保持；原新闻准入仅按新授权续至23:31:34。见[复测回执](../../tasks/evidence/2026-10-29-g3-openrouter-formal-retest.md)。
+> 当前G3检查点（2026-10-29 D59）：OpenRouter/free正式单次通过，实际Nvidia／Nemotron3.5免费模型；2条断言／5条数字／11条真实引用、完整trace及重建反读通过。V2保持开启、默认与配置保持；原新闻准入仅按新授权续至23:31:34。见[复测回执](../../evidence/2026-10-29-g3-openrouter-formal-retest.md)。
 
-> 当前运行状态（2026-10-29 22:05）：按用户新授权开启V2，`canCreate=true`；本地运行配置已持久保存。默认仍为OpenRouter/free，Cloudflare保持停用。本轮模型调用0，原配置／业务记录和WIP保持。见[开关生效回执](../../tasks/evidence/2026-10-29-g3-formal-acceptance.md#v2-enable)。
+> 当前运行状态（2026-10-29 22:05）：按用户新授权开启V2，`canCreate=true`；本地运行配置已持久保存。默认仍为OpenRouter/free，Cloudflare保持停用。本轮模型调用0，原配置／业务记录和WIP保持。见[开关生效回执](../../evidence/2026-10-29-g3-formal-acceptance.md#v2-enable)。
 
 对应[Spec](../../specs/2026-10-25-ai-adaptive-execution.md)，任务标识沿用ai-adaptive-execution。
 
-> 2026-10-29 D58接续：当前获准Qwen正式路径已完成真实报告、原数值／范围、11条实际引用和Web／历史验收；完整trace与网关正文一致，原开关／配置已恢复，V2关闭、双角色重建反读、WIP保护及一致性Review通过，本轮叶收口。D41双模型推广与历史因果义务不代收，GLM冻结。见[正式回执](../../tasks/evidence/2026-10-29-g3-formal-acceptance.md)。
+> 2026-10-29 D58接续：当前获准Qwen正式路径已完成真实报告、原数值／范围、11条实际引用和Web／历史验收；完整trace与网关正文一致，原开关／配置已恢复，V2关闭、双角色重建反读、WIP保护及一致性Review通过，本轮叶收口。D41双模型推广与历史因果义务不代收，GLM冻结。见[正式回执](../../evidence/2026-10-29-g3-formal-acceptance.md)。
 > 当前边界：零付费、同Cloudflare/Qwen、关闭reasoning、不加token上限；按明确证据继续尝试，每次失败收敛后再选下一步。仅为本次正式验收临时变更开关／配置，结束恢复并保留报告；保护旧数据、旧GLM冻结额度和WIP，不stage或commit。
-> [核对与实施证据](../../tasks/evidence/2026-10-27-ai-timeout-governance.md)。T1～T4为v1历史交付，原部署与D37～D41证据保持，不代收本轮义务。
+> [核对与实施证据](../../evidence/2026-10-27-ai-timeout-governance.md)。T1～T4为v1历史交付，原部署与D37～D41证据保持，不代收本轮义务。
 
 ## 当前执行摘要
 
@@ -18,17 +18,17 @@ T6～T16工程证据保留；D58新增当前Qwen正式G3正向、结果／引用
 
 ## 历史交付与正式G3
 
-- [x] T1：v1纯策略历史交付；[原回执](../../tasks/evidence/2026-10-25-ai-adaptive-execution.md)，新增修正由T7／T13承担。
+- [x] T1：v1纯策略历史交付；[原回执](../../evidence/2026-10-25-ai-adaptive-execution.md)，新增修正由T7／T13承担。
 - [x] T2：v1缓存历史交付；原子合同与安全入口复用，新窗口／影子语义由T13承担。
 - [x] T3：v1研究SDK／trace历史接线；新时钟与归因义务由T8～T11承担。
 - [x] T4：v1本地集成历史交付；原109项仅对原输入适用，本轮回归T15。
 - [x] T5：正式真实Provider正向；D58／D59与D60补齐原G3成功报告及Web消费。
-  - [x] T5.G3-D59：用户新增授权复测OpenRouter/free正式路径，保留原时钟／模式／请求参数，1次零费用、失败即停；不改变旧实验和GLM冻结。见[复测回执](../../tasks/evidence/2026-10-29-g3-openrouter-formal-retest.md)。
+  - [x] T5.G3-D59：用户新增授权复测OpenRouter/free正式路径，保留原时钟／模式／请求参数，1次零费用、失败即停；不改变旧实验和GLM冻结。见[复测回执](../../evidence/2026-10-29-g3-openrouter-formal-retest.md)。
   - [x] T5.G3-D58：当前Cloudflare/Qwen／JSON Mode正式路径、原校验／引用／历史、关闭重建、WIP保护及最终Review通过，报告和失败审计保留；不代收D41双模型推广。
   - 覆盖AE7及实际模型边界；依赖T15／T16、同模型／路由／用途／冻结输入就绪和明确次数／费用。D41推广和GLM冻结由研究Task独立保留，不作为当前治理阶段的推广要求。
   - 入口：正式创建→领取→账本预留／派发→持久化终态→结果／引用／历史读取；写集仅获准的受控任务及证据，不改默认配置制造成功。
   - 验证：阶段事实、用量未知、原表／配置／WIP、失败停止及关闭恢复。失败保持未勾选，阻塞留本叶。
-  - 历史实验及旧冻结边界见[历史记录](../../tasks/evidence/2026-10-30-ai-timeout-governance-history.md)；D41候选由研究Task持有，不在此任务激活。
+  - 历史实验及旧冻结边界见[历史记录](../../evidence/2026-10-30-ai-timeout-governance-history.md)；D41候选由研究Task持有，不在此任务激活。
 
 ## 状态与契约
 
@@ -155,4 +155,4 @@ T6～T16工程证据保留；D58新增当前Qwen正式G3正向、结果／引用
 - [x] 历史失败与原授权账本保留；方言候选／GLM冻结由活动研究Task持有，不属于本治理阶段的未完成实施。
 - [x] 配置、开关、旧数据及WIP保护通过，本轮0新增模型；未stage或commit。无剩余实施或阻塞问题，具备归档条件。
 
-结论：现行超时治理Spec对应阶段验收通过，2026-10-30归档；Spec继续作为稳定合同。闭环及证据索引见[最终回执](../../tasks/evidence/2026-10-30-g3-frontend-closeout.md)。
+结论：现行超时治理Spec对应阶段验收通过，2026-10-30归档；Spec继续作为稳定合同。闭环及证据索引见[最终回执](../../evidence/2026-10-30-g3-frontend-closeout.md)。

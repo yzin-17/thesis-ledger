@@ -1,8 +1,8 @@
 # ETF 日线独立备用源 Spec
 
-> 归档说明（2026-10-14）：旧内部备用合同由[显式 RouteTarget Spec](../../specs/2026-09-16-market-data-route-target-v2.md)取代；本页及其任务仅保存历史实现和验证，不作为当前 Adapter 回退合同。
+> 归档说明（2026-10-14）：旧内部备用合同由[显式 RouteTarget Spec](2026-09-16-market-data-route-target-v2.md)取代；本页及其任务仅保存历史实现和验证，不作为当前 Adapter 回退合同。
 
-> 状态：已被 [`2026-09-16-market-data-route-target-v2.md`](../../specs/2026-09-16-market-data-route-target-v2.md) 取代。本文保留 2026-09-08 的历史实现与验收证据；其中“AkShare 内部 EastMoney → Tencent 回退”“内部切换不计入 fallback”的设计不再是现行契约。现行行为由显式 `RouteTarget` 顺序决定，ETF `DAILY_BAR` 默认是 `tencent/tencent → akshare/eastmoney`，DSA Adapter 不得隐藏回退。
+> 状态：已被 [`2026-09-16-market-data-route-target-v2.md`](2026-09-16-market-data-route-target-v2.md) 取代。本文保留 2026-09-08 的历史实现与验收证据；其中“AkShare 内部 EastMoney → Tencent 回退”“内部切换不计入 fallback”的设计不再是现行契约。现行行为由显式 `RouteTarget` 顺序决定，ETF `DAILY_BAR` 默认是 `tencent/tencent → akshare/eastmoney`，DSA Adapter 不得隐藏回退。
 
 ## 背景与问题
 

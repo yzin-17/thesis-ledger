@@ -11,4 +11,4 @@
 
 ## 最终验收
 
-状态：已完成。三个ETF精确来源的目标能力测试均healthy；只读Mapping集成缺陷修复后81项相关回归通过。现有策略路由保持；官方材料、金额／冻结和券商研究口径按有界范围分列。 证据见[最终验收](../../tasks/evidence/2026-11-05-todo-4-15-final-acceptance.md)及[最终复核](../reviews/2026-11-05-todo-4-15-delivery-review.md)。
+状态：已完成。三个ETF精确来源的目标能力测试均healthy；只读Mapping集成缺陷修复后81项相关回归通过。现有策略路由保持；官方材料、金额／冻结和券商研究口径按有界范围分列。 证据见[最终验收](../../evidence/2026-11-05-todo-4-15-final-acceptance.md)及[最终复核](../reviews/2026-11-05-todo-4-15-delivery-review.md)。

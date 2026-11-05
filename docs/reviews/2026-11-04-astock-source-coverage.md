@@ -1,6 +1,6 @@
 # 主要来源覆盖与首批备用源核对
 
-核对日期：2026-11-04。对应[规格](../specs/2026-11-04-astock-source-coverage.md)、[任务](../archive/tasks/2026-11-04-astock-source-coverage.md)及[采证／验证记录](../tasks/evidence/2026-11-04-astock-source-coverage.md)。
+核对日期：2026-11-04。对应[规格](../specs/2026-11-04-astock-source-coverage.md)、[任务](../archive/tasks/2026-11-04-astock-source-coverage.md)及[采证／验证记录](../evidence/2026-11-04-astock-source-coverage.md)。
 
 ## 口径与结论
 
@@ -49,7 +49,7 @@
 | 33 | 广期所 | 衍生16：期货日行情，2026-11-04 | 期权及会员排名不在交付范围 |
 | 34 | 上金所 | 未测，本轮未读取贵金属现货 | 当前四组备源不包含新增现货类别 |
 
-证据入口：[原29类](../tasks/evidence/2026-11-03-astock-existing-sources-delivery.md)、[公开18类](2026-11-04-astock-public-source-reuse.md)、[衍生16类](2026-11-04-astock-derivative-reference.md)、[财联社／见闻快讯](2026-10-22-market-flash-news-dg3-final-review.md)、[研报元数据](../tasks/evidence/2026-10-23-research-report-metadata.md)及[本轮原件与验证](../tasks/evidence/2026-11-04-astock-source-coverage.md)。
+证据入口：[原29类](../evidence/2026-11-03-astock-existing-sources-delivery.md)、[公开18类](../archive/reviews/2026-11-04-astock-public-source-reuse.md)、[衍生16类](../archive/reviews/2026-11-04-astock-derivative-reference.md)、[财联社／见闻快讯](../archive/reviews/2026-10-22-market-flash-news-dg3-final-review.md)、[研报元数据](../evidence/2026-10-23-research-report-metadata.md)及[本轮原件与验证](../evidence/2026-11-04-astock-source-coverage.md)。
 
 ## 四组备用路径的实际结果
 

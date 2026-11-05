@@ -19,4 +19,4 @@
 
 [实施任务](../archive/tasks/2026-11-05-combined-performance-trend.md) · [统一工作区](2026-11-05-performance-workspace.md) · [累计盈亏口径](2026-11-04-portfolio-pnl-chart.md)
 
-[验收记录](../reviews/2026-11-05-combined-performance-trend.md)
+[验收记录](../archive/reviews/2026-11-05-combined-performance-trend.md)

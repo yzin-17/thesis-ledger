@@ -15,4 +15,4 @@
 
 先Node参数／打包与Python真实隔离SQLite，后单页真实来源、正式apply／verify及目标控制表差集。新闻续验不代收G3；再继续既有唯一一次模型请求，失败停止、原配置与V2开启状态保持。
 
-实施与目标验收通过，见[已完成任务](../archive/tasks/2026-10-29-news-admission-renewal.md)；实际调用与保护见[G3回执](../tasks/evidence/2026-10-29-g3-openrouter-formal-retest.md)。
+实施与目标验收通过，见[已完成任务](../archive/tasks/2026-10-29-news-admission-renewal.md)；实际调用与保护见[G3回执](../evidence/2026-10-29-g3-openrouter-formal-retest.md)。

@@ -1,6 +1,6 @@
 # 持仓行情详情共享读模型与按能力加载优化任务
 
-> 已完成并归档（2026-10-16）：T8/T11、金额精度与基金净值日期修复均已通过。股票/ETF 的真实读取、基金路由不可用与正向受控样本分层保留；当前 Desktop 139 文件、830 项测试及 typecheck/build/目标 ESLint 通过。[最终证据](../../tasks/evidence/2026-10-16-market-detail-chart-acceptance.md)记录完整状态与请求矩阵。原 V1 兼容和 90 根上限已被现行 V3 合同替代；本任务不再承担图表更新或富途分钟后继范围。
+> 已完成并归档（2026-10-16）：T8/T11、金额精度与基金净值日期修复均已通过。股票/ETF 的真实读取、基金路由不可用与正向受控样本分层保留；当前 Desktop 139 文件、830 项测试及 typecheck/build/目标 ESLint 通过。[最终证据](../../evidence/2026-10-16-market-detail-chart-acceptance.md)记录完整状态与请求矩阵。原 V1 兼容和 90 根上限已被现行 V3 合同替代；本任务不再承担图表更新或富途分钟后继范围。
 
 关联规格：[持仓行情详情共享读模型与按能力加载优化规格](../../specs/2026-08-21-market-detail-read-model.md)
 
@@ -35,7 +35,7 @@
 - [x] T7 完成 Schema、Server、API client 以及 Desktop 请求协调器/类型辅助函数的确定性回归：覆盖资产矩阵、参数校验、状态映射、缓存、single-flight、错误诊断和旧接口兼容。
 - [x] T7a 补充 Desktop Dialog 的确定性回归：覆盖股票、ETF、基金、partial/stale/unavailable、整页刷新和失败分段局部重试。
 - [x] T8 完成 Desktop 浏览器 Network/视觉验收：覆盖股票、ETF、基金、StrictMode、partial、stale、empty、unsupported、unavailable 和局部重试。
-  - 最终检查点（2026-10-16）：窄屏溢出、长提示高度、金额精度及净值日期修复通过；完整状态、失败恢复、局部重试、关闭取消、重新打开与未知身份受控降级均有证据。最终 Desktop 830 项及各层检查通过；[本轮记录](../../tasks/evidence/2026-10-16-market-detail-chart-acceptance.md)保留细节。
+  - 最终检查点（2026-10-16）：窄屏溢出、长提示高度、金额精度及净值日期修复通过；完整状态、失败恢复、局部重试、关闭取消、重新打开与未知身份受控降级均有证据。最终 Desktop 830 项及各层检查通过；[本轮记录](../../evidence/2026-10-16-market-detail-chart-acceptance.md)保留细节。
   - [x] T8-Q：行情金额尊重响应币种并保留报价精度。
     - 范围：现有 `market-quote-display.ts`、`QuoteSection` 和对应确定性测试；仅调整实时价/前收价的展示，不改变市场事实、交易规则或资金金额。
     - 完成条件：CNY/HKD/USD 与缺少币种的状态可区分；ETF 千分位及更小报价不被货币默认两位小数截断；受控浏览器验证与包级回归通过。

@@ -4,7 +4,7 @@
 
 ## 当前检查点
 
-Y1～Y6 均通过：483 项 DSA、15 项维护、7 项前端测试及构建/门禁通过；正式同步和九个关键生产文件摘要通过。Yahoo 的 V3/Market/Web 返回五条真实新闻，精确拒绝零尝试；政策/DSA 171、28 来源/193 目标，原其余十七路线保持。15 账户、原持仓/账本、57 回测、206 原 DSA 文件与配置/凭据保留。详细结果见 [DSA 证据](../../../../daily-stock-analysis/docs/tasks/evidence/2026-10-22-yahoo-news-dg3.md)与[最终复核](../../reviews/2026-10-22-yahoo-news-dg3-final-review.md)。
+Y1～Y6 均通过：483 项 DSA、15 项维护、7 项前端测试及构建/门禁通过；正式同步和九个关键生产文件摘要通过。Yahoo 的 V3/Market/Web 返回五条真实新闻，精确拒绝零尝试；政策/DSA 171、28 来源/193 目标，原其余十七路线保持。15 账户、原持仓/账本、57 回测、206 原 DSA 文件与配置/凭据保留。详细结果见 [DSA 证据](../../../../daily-stock-analysis/docs/evidence/2026-10-22-yahoo-news-dg3.md)与[最终复核](../reviews/2026-10-22-yahoo-news-dg3-final-review.md)。
 
 ## 执行清单
 
@@ -32,8 +32,8 @@ Y1～Y6 均通过：483 项 DSA、15 项维护、7 项前端测试及构建/门�
 
 ## 证据复用与停止条件
 
-[前次复核](../../reviews/2026-10-22-hithink-yahoo-news-final-review.md)的 HiThink/AKShare/NVIDIA、共享合同与未改 Server 证据按输入复用；Yahoo 的旧 SDK 成功已补本次业务适配验收。不触碰模型、研究写入、Tushare 积分权限或其他标的准入。必要门禁均已通过，无待执行叶。
+[前次复核](../reviews/2026-10-22-hithink-yahoo-news-final-review.md)的 HiThink/AKShare/NVIDIA、共享合同与未改 Server 证据按输入复用；Yahoo 的旧 SDK 成功已补本次业务适配验收。不触碰模型、研究写入、Tushare 积分权限或其他标的准入。必要门禁均已通过，无待执行叶。
 
 ## 最终一致性复核
 
-YD-AC1～5、全部六叶、代码/接口/时间/修订/错误/副作用、正式部署、目标实源、Web、保全差集与当前文档入口均已核对。结论：通过；具体发现、修正及验证边界见[最终复核](../../reviews/2026-10-22-yahoo-news-dg3-final-review.md)。当前源与测试未提交，无未处理的本主题缺口；研究 G3 和非本次准入标的继续由原边界持有。
+YD-AC1～5、全部六叶、代码/接口/时间/修订/错误/副作用、正式部署、目标实源、Web、保全差集与当前文档入口均已核对。结论：通过；具体发现、修正及验证边界见[最终复核](../reviews/2026-10-22-yahoo-news-dg3-final-review.md)。当前源与测试未提交，无未处理的本主题缺口；研究 G3 和非本次准入标的继续由原边界持有。

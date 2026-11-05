@@ -7,7 +7,7 @@
 
 > 2026-09-17 后续范围：重新打开与最新边界更新、双向加载一致性、盘中日线快照以 [行情图表更新 Spec](2026-09-17-market-chart-refresh.md) 为准。10-17 已完成该范围的核心更新与截止日期降级；稳定盘中日线仍按既有 TODO 单独立项。
 
-> 当前数据合同以 [Canonical V3](../architecture/canonical-runtime.md)及[周期聚合](2026-09-16-market-chart-period-aggregation.md)为准。下方 9 月源码基线仅保留历史背景；旧 V1/scalar 兼容、90 根硬上限和未开放周/月周期不再作为当前实现要求。富途 1m 由[现行富途合同](2026-10-08-futu-openapi-full-integration.md)独立承接；真正游标与 `calculationAnchor` 继续遵循[既有 TODO](../TODO.md)，不按旧末日参数重做扩窗。
+> 当前数据合同以 [Canonical V3](../design/canonical-runtime.md)及[周期聚合](2026-09-16-market-chart-period-aggregation.md)为准。下方 9 月源码基线仅保留历史背景；旧 V1/scalar 兼容、90 根硬上限和未开放周/月周期不再作为当前实现要求。富途 1m 由[现行富途合同](2026-10-08-futu-openapi-full-integration.md)独立承接；真正游标与 `calculationAnchor` 继续遵循[既有 TODO](../TODO.md)，不按旧末日参数重做扩窗。
 
 ## 背景与问题
 

@@ -2,7 +2,7 @@
 
 > 对应 Spec：[标的名称统一读取](../../specs/2026-11-04-instrument-display-read-model.md)
 > 当前状态：已完成。T1–T7、G1–G3 与最终一致性 Review 通过；工作区修改未提交。
-> 验证记录：[实施与验收证据](../../tasks/evidence/2026-11-04-instrument-display-read-model.md)
+> 验证记录：[实施与验收证据](../../evidence/2026-11-04-instrument-display-read-model.md)
 
 ## 执行边界与任务
 

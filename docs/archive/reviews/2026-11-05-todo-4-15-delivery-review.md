@@ -1,6 +1,6 @@
 # 第4至15项交付最终一致性复核
 
-日期：2026-11-05。结论：AC04～AC15在已确认的有界范围内完成，任务正文归档；原TODO第1～3项保持延期。当前实现见[总体规格](../../specs/2026-11-04-todo-4-15-delivery.md)和[使用说明](../../guides/market-chart-and-rule-monitor.md)，详细结果见[最终验收](../../tasks/evidence/2026-11-05-todo-4-15-final-acceptance.md)。
+日期：2026-11-05。结论：AC04～AC15在已确认的有界范围内完成，任务正文归档；原TODO第1～3项保持延期。当前实现见[总体规格](../../specs/2026-11-04-todo-4-15-delivery.md)和[使用说明](../../guides/market-chart-and-rule-monitor.md)，详细结果见[最终验收](../../evidence/2026-11-05-todo-4-15-final-acceptance.md)。
 
 ## 逐项责任
 

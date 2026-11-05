@@ -1,6 +1,6 @@
 # 复用现有来源的个股新闻规格
 
-实施见[已完成任务](../archive/tasks/2026-10-22-existing-source-news.md)和[最终复核](../reviews/2026-10-22-existing-source-news-final-review.md)。本主题承接用户的来源选择顺序：现有来源、GitHub 开源方案、此前查找的免费来源。原 [DG3 验收](../reviews/2026-10-22-free-news-dg3-final-review.md)继续有效，研究 G3 的模型及发布条件独立。
+实施见[已完成任务](../archive/tasks/2026-10-22-existing-source-news.md)和[最终复核](../archive/reviews/2026-10-22-existing-source-news-final-review.md)。本主题承接用户的来源选择顺序：现有来源、GitHub 开源方案、此前查找的免费来源。原 [DG3 验收](../archive/reviews/2026-10-22-free-news-dg3-final-review.md)继续有效，研究 G3 的模型及发布条件独立。
 
 ## 来源选择与边界
 

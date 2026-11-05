@@ -5,7 +5,7 @@
 ## 当前执行摘要
 
 - 历史规格：[Cloudflare 模型目录适配](../specs/2026-10-26-cloudflare-model-catalog.md)。计划预检：Ready。
-- T1—T3 已完成并通过最终 Review。[验收记录](../../tasks/evidence/2026-10-26-cloudflare-model-catalog.md)
+- T1—T3 已完成并通过最终 Review。[验收记录](../../evidence/2026-10-26-cloudflare-model-catalog.md)
 - 原生目录适配、包级及仓库门禁通过。正式 `sync-code.sh thesis-ledger` 退出 0；目标 API 返回 201／39 个 Workers AI 文本模型，实际前端按钮成功且保留三个选择。Server／Worker 代码及 187 个实际 Schema 模块一致；22 张受保护表、配置、默认研究设置、原镜像及挂载反读通过。
 - 此次生效方式是容器可写层快更。完整新镜像构建仍受 Alpine TLS 限制，不能把快更作为新镜像或发布证据；目录修复不代表 G3 模型验收通过。
 - 边界：模型调用 0，V2 关闭，余 2 次冻结；保留配置、数据、WIP 和验收包，不 stage 或 commit。

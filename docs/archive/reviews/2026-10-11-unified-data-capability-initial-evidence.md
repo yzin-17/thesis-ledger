@@ -155,7 +155,7 @@ A01–A04 已经经由原 Control Store、Runtime、精确执行器、HTTP 标�
 - 主仓标准契约新增 `packages/schemas/src/market-bar-query-semantics.ts`、`market-order-book.ts`；增量 `market-route-v3.ts`、`market-route-catalog-v3.ts`、`market-data-wire-v3.ts`、`index.ts`；新增 `packages/schemas/test/market-order-book.test.ts`、`test/fixtures/order-book-v1.json`。
 - 主仓消费者增量 `apps/server/src/market/market-basic-price-fallback.ts`、`market-window-selector-v3.ts`、`market-chart-selector-v3.ts`、`market-chart-options-v3.ts`，仍使用原 Reader；增量 `apps/server/src/integration/dsa/dsa-v3-protocol.ts`；新增错误码要求穷尽映射，故增量 `apps/server/src/backtest/backtest-nav-preparation-result.ts`，映射到已有不可用/未授权诊断，不改 NAV 合同。
 - 主仓测试新增 `apps/server/test/market/bar-query.fixture.ts`、`market-basic-price-fallback.test.ts`；增量 `market-window-selector-v3.test.ts`、`market-chart-selector-v3.test.ts`、`market-chart-options-v3.test.ts`、`futu-market-chart-consumer.test.ts` 和 `apps/server/test/integration/dsa-chart-v3.test.ts`。Futu 测试只补目录事实夹具，不改其业务实现或任务。门禁增量 `scripts/check-boundaries.mjs`。
-- 文档：本对原 Spec/Task、主仓 `docs/architecture/canonical-runtime.md`；DSA `docs/thesis-ledger-capability-adapters.md` 与 `docs/CHANGELOG.md`。新增说明均使用中文。Desktop 未改业务页面，infra 未改文件，数据库/依赖清单/SDK 未改。
+- 文档：本对原 Spec/Task、主仓 `docs/design/canonical-runtime.md`；DSA `docs/thesis-ledger-capability-adapters.md` 与 `docs/CHANGELOG.md`。新增说明均使用中文。Desktop 未改业务页面，infra 未改文件，数据库/依赖清单/SDK 未改。
 
 新来源证明的独立改动面：`test_new_provider_uses_original_runtime_without_supplier_branch` 在隔离环境定义新身份、工厂、日线绑定及处理器并显式登记，随后走原 Runtime/精确执行/标准图表投影；公共 Runtime、Control、Server 不出现这个测试 providerId 分支。注册本身不创建用户政策。真实迁移定义的工厂、凭据、依赖、有效组合和本地修订由来源模块拥有，目录/查找视图从绑定派生。
 
@@ -215,7 +215,7 @@ E05 仍不勾选：已有真实正例、身份错误、冻结和重放，但没�
 | AC09 | 原凭据快照、配置失效、在途保护、安全错误回归和盘口共享隔离通过；真实撤权/账号变更没有执行 |
 | AC10 | 新来源不改已有 UI/计算；新盘口合同/处理/隔离测试没有改写既有能力；无盘口页面 |
 | AC11 | 政策未改，目录按合同产生修订，新旧冻结兼容且断网重放通过；真实故障切源部分同 E05 开放；不改 Ledger/已取消义务 |
-| AC12 | [接入指南](../../../../daily-stock-analysis/docs/thesis-ledger-capability-adapters.md)与[当前架构](../../architecture/canonical-runtime.md)已同步，分层结果及跳过项留本 Task；不把本地/真实/浏览器相互替代 |
+| AC12 | [接入指南](../../../../daily-stock-analysis/docs/design/thesis-ledger-capability-adapters.md)与[当前架构](../../design/canonical-runtime.md)已同步，分层结果及跳过项留本 Task；不把本地/真实/浏览器相互替代 |
 
 下一执行叶是 E05 的受保护真实故障切源验收；授权或既有政策出现合适双源目标后，先重新核对当前政策/目标与消费者资格，再执行有界验证及 CAS 恢复。统一适配层剩余门禁不作为历史按需/富途交付前置，不自动关闭其退市真实消费验收，也不重开已通过或取消切片。
 

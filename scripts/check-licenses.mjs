@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const pnpmRoot = resolve(root, 'node_modules/.pnpm');
-const outputPath = resolve(root, 'docs/engineering/third-party-license-inventory.md');
+const outputPath = resolve(root, 'docs/guides/third-party-license-inventory.md');
 
 const normalizeLicense = (value) => {
   if (typeof value === 'string') return value.trim();

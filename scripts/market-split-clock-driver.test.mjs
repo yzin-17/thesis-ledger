@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { splitAcquisitionDriverV3 } from './market-split-target-acceptance.mjs';
 
-const original = readFileSync(new URL('../docs/tasks/evidence/2026-10-02-m22-159516-split-mapping.json', import.meta.url), 'utf8');
+const original = readFileSync(new URL('../docs/evidence/2026-10-02-m22-159516-split-mapping.json', import.meta.url), 'utf8');
 const digest = 'b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e';
 const production = new URL('../apps/server/dist/src/market/market-split-acquisition-v3.js', import.meta.url).href;
 const admissionReader = new URL('../apps/server/dist/src/integration/dsa/dsa-event-admission-catalog-v3.js', import.meta.url).href;

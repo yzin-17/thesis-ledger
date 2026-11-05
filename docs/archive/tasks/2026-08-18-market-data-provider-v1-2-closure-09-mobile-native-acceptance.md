@@ -50,7 +50,7 @@ Android 环境修复记录：系统镜像首次重装空间不足，仓库正式
 
 原 [v1.2 父任务](2026-08-18-market-data-provider-v1-2.md) T11 和 [closure-11 汇总](2026-08-18-market-data-provider-v1-2-closure-11-final-review.md)没有另一组独立原生验收。本轮已补齐实际网络、actual/shadow 隔离和浅色/深色、空数据、stale、错误态条件；AC-09 的原生客户端体验、AC-10 与 AC-11 原先仅因原生缺口开放的承接范围均已通过。历史持久化、发布和回滚证据仍只对原版本与范围有效，不据此宣称当前镜像或其他 Task 的部署验收通过。
 
-原实现、来源 smoke、发布和回滚记录仅在原版本与范围有效。旧 Data/Control Contract、Effective Policy 和旧接口已由 [Canonical](../../architecture/canonical-runtime.md)承接；2026-10-03 对账已明确不重复已完成发布/回滚。本节不恢复退役 V1 接口或新增第二次设备验收。原 T11 原文及全部 AC 矩阵仍留在归档正文，其他当前合同与各 Task 的独立门禁不受此承接影响。
+原实现、来源 smoke、发布和回滚记录仅在原版本与范围有效。旧 Data/Control Contract、Effective Policy 和旧接口已由 [Canonical](../../design/canonical-runtime.md)承接；2026-10-03 对账已明确不重复已完成发布/回滚。本节不恢复退役 V1 接口或新增第二次设备验收。原 T11 原文及全部 AC 矩阵仍留在归档正文，其他当前合同与各 Task 的独立门禁不受此承接影响。
 
 
 <a id="mobile-color-acceptance"></a>

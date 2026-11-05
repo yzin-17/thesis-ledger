@@ -2,7 +2,7 @@
 
 任务标识：LOT。关联：[实施任务](../archive/tasks/2026-10-08-security-lot-size-routing.md)。
 
-当前选择富途的开发目标验收已完成，真实00147/00700股数、默认/覆盖模型冻结、重放及页面下载见[验收证据](../tasks/evidence/2026-10-08-security-lot-size-live-acceptance.md)。长桥未配置，不记真实读取；Task归档，本Spec保留当前接口与行为合同。富途后续研究增量与正式镜像也已完成，见[归档实施](../archive/tasks/2026-10-08-futu-openapi-full-integration.md)，不再保留镜像待办。
+当前选择富途的开发目标验收已完成，真实00147/00700股数、默认/覆盖模型冻结、重放及页面下载见[验收证据](../evidence/2026-10-08-security-lot-size-live-acceptance.md)。长桥未配置，不记真实读取；Task归档，本Spec保留当前接口与行为合同。富途后续研究增量与正式镜像也已完成，见[归档实施](../archive/tasks/2026-10-08-futu-openapi-full-integration.md)，不再保留镜像待办。
 
 ## 目标与范围
 
@@ -39,4 +39,4 @@ LOT-AC4：定向测试及受影响构建通过；真实券商联调与目标部�
 
 ## 配置说明
 
-连接与 DSA 读取细节见 [每手股数与富途连接指南](../../../daily-stock-analysis/docs/thesis-ledger-security-lot-size.md)。当前实现、开发同步及真实连接待配置状态只维护在关联 Task；查询返回值不是历史规则事实，也不扩大已有价格来源范围。
+连接与 DSA 读取细节见 [每手股数与富途连接指南](../../../daily-stock-analysis/docs/design/thesis-ledger-security-lot-size.md)。当前实现、开发同步及真实连接待配置状态只维护在关联 Task；查询返回值不是历史规则事实，也不扩大已有价格来源范围。

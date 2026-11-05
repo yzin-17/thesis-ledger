@@ -1,6 +1,6 @@
 # 新闻准入限时续验实施任务
 
-对应[Spec](../../specs/2026-10-29-news-admission-renewal.md)，承接[G3复测](../../tasks/evidence/2026-10-29-g3-openrouter-formal-retest.md)。
+对应[Spec](../../specs/2026-10-29-news-admission-renewal.md)，承接[G3复测](../../evidence/2026-10-29-g3-openrouter-formal-retest.md)。
 
 - [x] N1 合同与状态：在原维护入口增加显式一小时续验，完成参数、过期／撤销、范围、摘要／版本、证据链和凭据竞争的隔离验证（AC1～3）。写集仅infra的新闻维护入口、独立续验helper及测试。
 - [x] N2 执行面：单页实读原hithink源，保留完整脱敏元数据与摘要；正式入口计划／apply／verify，核对唯一准入增量及其他控制表保持（AC2～4）。不通过则停止，不改政策和来源启停。

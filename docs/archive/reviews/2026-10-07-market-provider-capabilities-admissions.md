@@ -65,7 +65,7 @@ SQLite 使用 URI `mode=ro`、`PRAGMA query_only=ON`；目录计算通过只读�
 
 ### 上一轮五条记录的历史事实
 
-下表仅引用[上一轮只读诊断](../../tasks/evidence/2026-10-07-market-route-admission-diagnosis.md)，本轮无法重新读取原记录或核验其当前凭证/适配器修订。**它们不是当前有效准入证据。**
+下表仅引用[上一轮只读诊断](../../evidence/2026-10-07-market-route-admission-diagnosis.md)，本轮无法重新读取原记录或核验其当前凭证/适配器修订。**它们不是当前有效准入证据。**
 
 | 历史记录 | 上一轮可读时的状态 | 当时的实际作用 |
 | --- | --- | --- |

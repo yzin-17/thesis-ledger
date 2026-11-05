@@ -127,7 +127,7 @@
   - 验证方式：
     - API/UI 测试覆盖 AI 成功、失败、不可用、重复触发、账户/模式切换、当前/过期 Snapshot 和历史 Snapshot。
     - 确认 AI 请求不创建交易事实、不改变 Snapshot STALE 状态。
-  - 2026-10-05 增量：真实默认模型 revision 2 的单笔／周期 v2 内容与引用、引用刷新恢复、目标进程恢复及 J8.3 真实页面消费均通过，见[内容证据](../../tasks/evidence/2026-10-05-journal-model-content-v2.md)、[本轮目标证据](../../tasks/evidence/2026-10-05-journal-review-completion.md)和[真实消费](../../tasks/evidence/2026-10-05-journal-browser-j83.md)。旧 revision 1 报告保留为历史，不覆盖旧输出。
+  - 2026-10-05 增量：真实默认模型 revision 2 的单笔／周期 v2 内容与引用、引用刷新恢复、目标进程恢复及 J8.3 真实页面消费均通过，见[内容证据](../../evidence/2026-10-05-journal-model-content-v2.md)、[本轮目标证据](../../evidence/2026-10-05-journal-review-completion.md)和[真实消费](../../evidence/2026-10-05-journal-browser-j83.md)。旧 revision 1 报告保留为历史，不覆盖旧输出。
 
 - [x] T7：完成回归验证、文档和最终一致性 Review
   - 覆盖验收标准：AC1–AC16
@@ -194,4 +194,4 @@
 
 ### Review 结论
 
-通过，验收范围为完整规格 AC1—AC16 及用户调整后的本轮门禁。J8.1—J8.3、J8.4 和 J8.5 证据分别支持浏览器、对应提交 CI 与最终闭合；具体步骤、SHA、环境边界和归档结果见[最终证据](../../tasks/evidence/2026-10-05-journal-final-j85.md)。正式生产发布及原非目标仍不属于本 Task。历史 2026-10-04 Review 和早期证据保留当时的未完成记录，以本轮最终 Review 为当前结论。
+通过，验收范围为完整规格 AC1—AC16 及用户调整后的本轮门禁。J8.1—J8.3、J8.4 和 J8.5 证据分别支持浏览器、对应提交 CI 与最终闭合；具体步骤、SHA、环境边界和归档结果见[最终证据](../../evidence/2026-10-05-journal-final-j85.md)。正式生产发布及原非目标仍不属于本 Task。历史 2026-10-04 Review 和早期证据保留当时的未完成记录，以本轮最终 Review 为当前结论。

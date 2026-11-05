@@ -7,7 +7,7 @@
 
 ## 背景与范围
 
-用户授权适配 Alpha Vantage 免费近期日线，更早历史保持受限。现行精确日线固定请求 `outputsize=full`，免费 Key 无法完成；此前同一 Key 直连 `compact` 已返回 100 条 AAPL 日线，见[前置证据](../tasks/evidence/2026-10-21-continuation-frontier.md#provider-followup-2026-10-22)。
+用户授权适配 Alpha Vantage 免费近期日线，更早历史保持受限。现行精确日线固定请求 `outputsize=full`，免费 Key 无法完成；此前同一 Key 直连 `compact` 已返回 100 条 AAPL 日线，见[前置证据](../evidence/2026-10-21-continuation-frontier.md#provider-followup-2026-10-22)。
 
 本切片只调整既有 US/STOCK/DAILY_BAR/1d/none 绑定的来源读取。工厂、凭据、报价、路由键、上游来源名称及消费者接口继续复用。Finnhub 日线权限与 Longbridge 暂缓由原任务持有；凭据首次保存状态另按[独立合同](2026-10-22-provider-first-credential-state.md)验证。
 

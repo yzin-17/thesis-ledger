@@ -1,6 +1,6 @@
 # 当前 Review 与发布证据
 
-`docs/reviews/` 保留仍承担发布外部门禁、跨仓审计、来源路由查阅或当前优化决策的正文。一次性运行结果、已结案对账与实施日志进入 [`../archive/reviews/`](../archive/reviews/)，原始证据继续留在 `evidence/`。
+`docs/reviews` 保留仍承担发布外部门禁、跨仓审计、来源路由查阅或当前优化决策的正文。一次性运行结果、已结案对账与实施日志进入 [`../archive/reviews/`](../archive/reviews/)，原始证据统一从[验证证据](../evidence/README.md)查阅。
 
 本 README 不再手工枚举全部 Review 状态；每个主题的当前状态由对应 Task/Review 自身维护，避免目录索引在新增 Review 后长期漂移。
 
@@ -14,15 +14,15 @@
 - [DSA Fork 审计](2026-08-18-dsa-fork-delta-audit.md)：跨仓归属、移植及上游合并依据；来源实际实现由 DSA 维护。
 - [来源与功能路由矩阵](2026-10-10-provider-adaptation-and-route-matrix.md)：查阅来源差异与证据映射；设计和当前进度回查原 Spec/Task。
 - [用户体验评审与优化建议](2026-10-14-user-experience-optimization.md)：保留本轮体验问题、实测范围及待处理建议，不自动扩大产品任务。
-- [页面一致性、密度与交互恢复验收](2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)：保留 10-19 状态基线和排查历史，补充 10-20 修复、162 个布局视图、目标 Web 与保留数据核对；任务已完成归档，真实业务门禁维持原归属。
+- [页面一致性、密度与交互恢复验收](../archive/reviews/2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)：保留 10-19 状态基线和排查历史，补充 10-20 修复、162 个布局视图、目标 Web 与保留数据核对；任务已完成归档，真实业务门禁维持原归属。
 - [股票收藏项目实现对照](2026-10-18-starred-project-implementation-coverage.md)：逐项记录参考点、源码覆盖与本地问题对账；核查任务见研究增强 T0R，不替代领域实施状态。
-- [衍生品与可转债来源复核](2026-11-04-astock-derivative-reference.md)：原 47 类基础上新增 16 类，当前 63 类查询的来源、语义和验收从此查阅；[前轮公开实现复用](2026-11-04-astock-public-source-reuse.md)保留原 18 类新增及取消依据；[原模块盘点](2026-10-22-astock-data-module-followups.md)、[前期评估](../archive/reviews/2026-11-03-astock-followup-feasibility.md)及[原轮交付](../archive/reviews/2026-11-03-market-reference-delivery.md)保留当时事实。
+- [衍生品与可转债来源复核](../archive/reviews/2026-11-04-astock-derivative-reference.md)：原 47 类基础上新增 16 类，当前 63 类查询的来源、语义和验收从此查阅；[前轮公开实现复用](../archive/reviews/2026-11-04-astock-public-source-reuse.md)保留原 18 类新增及取消依据；[原模块盘点](2026-10-22-astock-data-module-followups.md)、[前期评估](../archive/reviews/2026-11-03-astock-followup-feasibility.md)及[原轮交付](../archive/reviews/2026-11-03-market-reference-delivery.md)保留当时事实。
 
-投资复盘的[中间对账](../archive/reviews/2026-10-04-journal-review-consistency.md)与[最终验收](../archive/reviews/2026-10-05-journal-review-completion.md)、统一适配层的[实施日志](../archive/reviews/2026-10-11-unified-data-capability-implementation-log.md)和旧[聚合对账](../archive/reviews/2026-10-04-parallel-task-integration.md)均为历史记录。可由固定脱敏输入重复执行的基准留在 `docs/benchmarks/`。
+投资复盘的[中间对账](../archive/reviews/2026-10-04-journal-review-consistency.md)与[最终验收](../archive/reviews/2026-10-05-journal-review-completion.md)、统一适配层的[实施日志](../archive/reviews/2026-10-11-unified-data-capability-implementation-log.md)和旧[聚合对账](../archive/reviews/2026-10-04-parallel-task-integration.md)均为历史记录。可由固定脱敏输入重复执行的基准留在 `docs/evidence/benchmarks`。
 
 ## 原始证据
 
-`evidence/` 下的截图、XML 和一次性运行产物只作为验证证据，不作为产品需求或运行手册。
+`../evidence/` 下的截图、XML 和一次性运行产物只作为验证证据，不作为产品需求或运行手册。
 
 - 状态 XML、日志摘要和截图必须和实际场景对应；
 - 不同文件名如果实际指向同一二进制 blob，不应被当作多个状态的独立视觉证据；
@@ -31,4 +31,6 @@
 
 历史 Review 统一从 [`../archive/README.md`](../archive/README.md) 和 [`../archive/reviews/`](../archive/reviews/) 追溯。主题 Review 文件使用 `YYYY-MM-DD-<topic>.md` 命名；`README.md` 仅作为治理入口。
 
-少量旧路径仍被原始证据或邻仓引用，只保留归档链接供兼容，不属于当前报告正文；已无实际引用的跳转文件删除。
+已结案报告直接链接归档正文；本轮已修正引用并移除两份旧 Review 跳转壳，原锚点保留在归档正文。
+
+本轮目录、归档依据、保留门禁与检查结果见[三仓文档整理记录](../archive/reviews/2026-11-05-three-repository-documentation.md)。

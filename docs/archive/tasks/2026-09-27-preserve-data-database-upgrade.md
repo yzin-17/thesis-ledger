@@ -25,7 +25,7 @@
 
 - [x] P6-a 校验状态：由本次待执行迁移选择归档映射，保留全量旧列摘要守卫；验证不同起点及空增量。映射/计划/演练记录共 24 项通过，类型与 lint 通过。
 - [x] P6-b 隔离执行：构造已完成归档、当前 Policy 非空的 PostgreSQL 副本，真实备份恢复后仅升级 NAV 准备表，核对全部旧数据、角色权限与源 head 不变。真实 PostgreSQL 7 项通过（新增场景 11.8 秒），测试容器已清理，日志 `/private/tmp/n4-nav-upgrade-postgres-final.log`。
-- [x] P6-c 目标验收：官方入口保留数据升级成功，核对目标结构及已有策略/任务身份，再继续 N4 业务验收。目标 head `20261001100000_nav_backtest_preparation`、71 张表；原有 Strategy 10 条和 BacktestJob 37 条的数量及排序 ID 摘要与升级前一致。Server/Worker/DSA 健康，HTTP 健康检查 200；备份及完整演练记录保留于 `.database-upgrades/run.eXosbN/`，详见 [N4 目标记录](../../tasks/evidence/2026-10-01-n4-nav-target.md)。
+- [x] P6-c 目标验收：官方入口保留数据升级成功，核对目标结构及已有策略/任务身份，再继续 N4 业务验收。目标 head `20261001100000_nav_backtest_preparation`、71 张表；原有 Strategy 10 条和 BacktestJob 37 条的数量及排序 ID 摘要与升级前一致。Server/Worker/DSA 健康，HTTP 健康检查 200；备份及完整演练记录保留于 `.database-upgrades/run.eXosbN/`，详见 [N4 目标记录](../../evidence/2026-10-01-n4-nav-target.md)。
 
 写集为 `database-upgrade-data-witness.ts`、`database-upgrade-run-rehearsal.ts`、专属映射测试与既有 PostgreSQL 集成测试；不修改历史 migration 或目标业务数据。首次目标失败保留在 infra `.database-upgrades/run.BSpyKk/`，未执行源库事务，消费者保持停止。
 

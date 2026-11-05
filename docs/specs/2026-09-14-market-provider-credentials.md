@@ -3,7 +3,7 @@
 > 任务标识：market-provider-credentials
 > 日期：2026-09-14
 > 状态：实施、当前获准在线范围及最终Review完成（2026-11-01）；本Spec继续维护现行合同，Longbridge真实在线后续范围由TODO承接
-> 对应任务：[归档实施任务](../archive/tasks/2026-09-14-market-provider-credentials.md) · [最终复核](../tasks/evidence/2026-11-01-provider-credentials-final-review.md)
+> 对应任务：[归档实施任务](../archive/tasks/2026-09-14-market-provider-credentials.md) · [最终复核](../evidence/2026-11-01-provider-credentials-final-review.md)
 
 ## 背景与范围
 
@@ -75,7 +75,7 @@ ThesisLedger Server 将以下接口转发至 DSA 同名 control 路径，维持�
 
 用户于 2026-10-22 明确授权按免费能力范围验收。Finnhub 官方维护者在 [Issue #546](https://github.com/finnhubio/Finnhub-API/issues/546) 的 2025-04-15 答复明确免费方案不开放 `/stock/candle`；本账号当日实际日线请求亦返回 `permission_denied`。现有接入中的 US STOCK 报价已真实通过，复用原证据，Finnhub 当前免费范围验收完成。
 
-现有 US STOCK/DAILY_BAR/1d/qfq 绑定在本免费账号下明确受限，不列为本轮待修复或待购买权限项；原失败记录保留，不能据此宣称日线读取通过。免费接口声明不扩大到尚未接入或未测试的能力。未来账号范围改变后另行核对精确权限及读取，不自动启用来源、改路由或购买套餐。详细依据见[范围验收记录](../tasks/evidence/2026-10-22-finnhub-free-scope-acceptance.md)。
+现有 US STOCK/DAILY_BAR/1d/qfq 绑定在本免费账号下明确受限，不列为本轮待修复或待购买权限项；原失败记录保留，不能据此宣称日线读取通过。免费接口声明不扩大到尚未接入或未测试的能力。未来账号范围改变后另行核对精确权限及读取，不自动启用来源、改路由或购买套餐。详细依据见[范围验收记录](../evidence/2026-10-22-finnhub-free-scope-acceptance.md)。
 
 ## 验证策略与约束
 

@@ -27,7 +27,7 @@ model.scope.range = range;
 for (const segment of model.segments) {
   segment.range = range;
   segment.source.description = 'GME有界每股原价，显式整股日线执行与当前富途研究预设';
-  segment.source.references.push('docs/tasks/evidence/2026-10-08-p6-share-unit-input-review.md');
+  segment.source.references.push('docs/evidence/2026-10-08-p6-share-unit-input-review.md');
   segment.assumptions = [
     '每股原价和整数股模拟成交；最小步长1股，不等同NYSE报价整手，不使用参考股价换算。',
     '一美分成交价网格；只还原原响应不超过USD0.000005的浮点表示误差，不改变明显偏离网格的价格。',

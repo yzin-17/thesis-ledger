@@ -1,6 +1,6 @@
 # 后台风险估值口径与完整性修复规格
 
-> 任务标识：`risk-valuation-correctness`；日期：2026-10-18；状态：本地修复、真实隔离存储和 RVCG 目标受控消费均已通过，IR02 关闭对账完成。目标证据见[验收记录](../tasks/evidence/2026-10-19-p0-target-acceptance.md)。
+> 任务标识：`risk-valuation-correctness`；日期：2026-10-18；状态：本地修复、真实隔离存储和 RVCG 目标受控消费均已通过，IR02 关闭对账完成。目标证据见[验收记录](../evidence/2026-10-19-p0-target-acceptance.md)。
 > [实施任务](../archive/tasks/2026-10-18-risk-valuation-correctness.md) · [全局优先级](../tasks/README.md#priority-p0) · [IR02 原始核查](../reviews/2026-10-18-starred-project-implementation-coverage.md#local-findings)。
 
 ## 1. 目标与依据

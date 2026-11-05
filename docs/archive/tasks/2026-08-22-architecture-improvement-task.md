@@ -48,7 +48,7 @@ DSA capability declaration 由 `getDsaCapabilitySnapshot()` 归一化；DSA adap
 
 ### TASK-ARCH-005 Infra 版本矩阵——已完成
 
-- 主仓在 [`docs/architecture/version-matrix.md`](../../architecture/version-matrix.md) 记录具体兼容基线；
+- 主仓在 [`docs/design/version-matrix.md`](../../design/version-matrix.md) 记录具体兼容基线；
 - infra 持有部署期兼容清单和校验脚本；
 - 三仓 Contract Test 仍是阻断型集成门禁。
 

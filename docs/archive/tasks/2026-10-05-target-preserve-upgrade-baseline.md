@@ -15,7 +15,7 @@
 - [x] B1 状态/结构（AC-01）：实际目标库名/owner 均为 `thesis_ledger`，旧 head `20261001120000_require_explicit_strategy_contract`，71 表；源码 28 项 migration、76 表，head `20261004140000_strategy_authoring_records`。源码链测试补齐两项新增 migration 后 26 项通过；Server 类型/build、migration matrix、runtime 输入、边界、infra 生命周期/Compose 合同通过。DSA 两个合同文件的 31 项测试通过。
 - [x] B2 升级执行（AC-02）：8 项隔离检查及真实源库备份恢复通过；官方入口绑定待部署镜像重新备份演练，提交两项增量、权限及结构门禁成功；正式备份保留于 infra `.database-upgrades/run.BiB68z/`。首次构建失败发生在源库升级前，重启/缓存清理后同一入口成功，未清库。
 - [x] B3 服务消费（AC-03/04）：三个账户数据库与 HTTP 语义摘要、Journal/AI 历史和配置保留；关键文件及完整结构输入与镜像匹配，五服务健康，Worker ready、无缺表/入口/依赖错误，实际应用连接角色及逐项权限通过；18 项只读 API 检查通过。
-- [x] B4 部署验收（AC-05）：[最终证据](../../tasks/evidence/2026-10-05-target-preserve-upgrade-baseline.md)记录命令、输入、备份恢复、镜像/结构、保护摘要和未执行产品门禁；交接索引转向下一推荐叶，本轮停止。
+- [x] B4 部署验收（AC-05）：[最终证据](../../evidence/2026-10-05-target-preserve-upgrade-baseline.md)记录命令、输入、备份恢复、镜像/结构、保护摘要和未执行产品门禁；交接索引转向下一推荐叶，本轮停止。
 
 ## 计划预检
 
@@ -29,7 +29,7 @@
 - 宿主 APFS 一度仅余 138 MiB，随后恢复约 19 GiB；Docker 报 `Docker Desktop is unable to start`。用户直接授权仅重启，官方 stop/start 成功，`traffic-monitor` 恢复健康。复核源库仍为旧 head/71 表及原保护摘要。
 - 用户授权“清除所有可清空的缓存”，执行范围限定未使用 BuildKit 缓存，清理 8.788 GB，虚拟盘空闲增至约 14.6 GiB；镜像、回滚镜像、业务容器和卷未删除。同一官方更新入口重试成功；日志 `/private/tmp/tl-preserve-upgrade-baseline-20261005-retry.log`。
 - 额外 HTTP 语义摘要脚本首次未通过；Docker 恢复后在真实备份副本运行，修正验收脚本的对象键序与 PostgreSQL 无时区时间 UTC 解析；升级后实际 HTTP 语义完全一致，排除 instrumentDirectory，不输出业务内容。最终结果见正式批次 `protected-http-backup-comparison.json`。
-- 最终结果：官方重试退出 0，目标 head/76 表、服务/角色权限、代码输入及保护摘要全部通过。阶段失败与准备为历史检查点，最终事实以[证据](../../tasks/evidence/2026-10-05-target-preserve-upgrade-baseline.md)为准。没有活跃更新/测试进程或本轮隔离容器，不启动其他产品任务或故障注入。
+- 最终结果：官方重试退出 0，目标 head/76 表、服务/角色权限、代码输入及保护摘要全部通过。阶段失败与准备为历史检查点，最终事实以[证据](../../evidence/2026-10-05-target-preserve-upgrade-baseline.md)为准。没有活跃更新/测试进程或本轮隔离容器，不启动其他产品任务或故障注入。
 
 ## 最终一致性 Review
 

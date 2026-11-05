@@ -39,7 +39,7 @@
 
 ## 执行记录
 
-- D1 已完成：目标 Provider/能力 API 与只读 SQLite 状态一致；逐源原因见[诊断证据](../../tasks/evidence/2026-10-07-market-route-admission-diagnosis.md)。
+- D1 已完成：目标 Provider/能力 API 与只读 SQLite 状态一致；逐源原因见[诊断证据](../../evidence/2026-10-07-market-route-admission-diagnosis.md)。
 - T1 本地定向验证：`pnpm --filter @thesis-ledger/desktop exec vitest run test/market-policy-defaults.test.tsx test/market-policy-workflow.test.tsx test/provider-credentials.test.tsx test/market-data-provider-ui.test.tsx`，四个文件 27 项通过。最后补充凭证配置后自动默认值及保存修订断言，再运行 `test/market-policy-workflow.test.tsx`，3 项通过；其他已通过输入未变化。
 - T2 本地定向验证：凭证/加密/HTTP 27 项通过；日线、报价、分红与 Provider 接缝回归 144 项通过。额外执行的宽 registry 清单测试失败，原期望不包含工作区已有 `official-dividends`；该能力由并行工作新增，不属于本次写入范围，记录一项未通过，不据此修改其他人的清单。
 - T2 的 DSA 定向测试使用 `.venv/bin/python -m pytest`，输入为 `test_hithink_control_credentials.py`、`test_provider_credentials.py`、`test_thesis_ledger_hithink_credential_revision.py` 及 HiThink 日线/报价/事件、Provider runtime、RQData 凭证接缝测试。总计 171 项通过；另外一项宽 registry 清单失败已如实保留。最后 smoke 健康维度调整后重跑新 HTTP 文件，5 项通过。源码语法检查通过；超限 Provider runtime 将连接诊断提取为独立职责，当前 2300 行，小于 HEAD 的 2486 行。

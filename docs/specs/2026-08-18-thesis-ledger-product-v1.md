@@ -33,4 +33,4 @@ PostgreSQL 中的 Ledger 是 V0.3 起唯一资产事实源；Position、Portfoli
 
 ## 需求映射
 
-唯一版本归属以 `docs/archive/tasks/2026-08-18-00-index.md` 中 T001～T294 为历史任务基线；当前新增功能使用 `docs/tasks/` 下的任务文档，功能域追踪见 `docs/architecture/2026-08-18-spec-traceability.md`。发生范围变化时先更新本文，再同步任务文档。
+唯一版本归属以 `docs/archive/tasks/2026-08-18-00-index.md` 中 T001～T294 为历史任务基线；当前新增功能使用 `docs/tasks` 下的任务文档，功能域追踪见 `docs/architecture/2026-08-18-spec-traceability.md`。发生范围变化时先更新本文，再同步任务文档。

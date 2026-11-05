@@ -244,14 +244,14 @@ T2 和 T3 可以在 T1 完成后并行；T2.1 完成后才能进行真实 Provid
 - [x] 独立进程领取 queued 研究并持久化 prepared 或 dispatched 请求；强制结束后由新进程恢复，验证未发送请求的新代次领取、已发送未知结果终态及旧代次提交拒绝。
 - 输入：当前 AiRunService、AiExecutionStateStore、全部 migration 与现有恢复状态机；使用专用临时数据库，不操作目标任务，不请求真实 Provider。
 - 验证阶段：数据库准备/领取与持久化 → 服务进程终止及新进程恢复 → 终态与代次屏障检查。该证据不能替代下方目标服务与真实 Provider 的重启 smoke，目标仍受默认选择及 Provider 连接阻塞。
-- 证据：[生命周期与提交](../../tasks/evidence/2026-10-04-ai-lifecycle-and-submission.md)，三个独立进程场景通过，目标门禁不勾选。
+- 证据：[生命周期与提交](../../evidence/2026-10-04-ai-lifecycle-and-submission.md)，三个独立进程场景通过，目标门禁不勾选。
 
 - [ ] 真实 OpenAI-compatible Provider smoke：使用部署环境 `AI_BASE_URL`/`AI_API_KEY`/`AI_MODEL` 完成至少一次真实研究任务并核对 Provider/Model/Token/来源链事实。
 - [ ] 服务进程重启 smoke：在任务处于 `queued/running` 时重启服务，确认租约恢复和终态收敛符合设计。
 - [ ] 外部来源长任务 smoke：连接实际新闻/财务等来源，确认 Tool 部分失败、超时和 citation 关联在真实链路下可解释。
 - [ ] 浏览器视觉/键盘 smoke：覆盖工作台宽窄布局、新建 Sheet、来源链 Sheet、焦点返回和长内容滚动。
 
-完成以上门禁后再将本任务从 `docs/tasks/` 移入 `docs/archive/tasks/`。
+完成以上门禁后再将本任务从 `docs/tasks` 移入 `docs/archive/tasks`。
 
 ## 验收标准映射
 
@@ -293,4 +293,4 @@ T2 和 T3 可以在 T1 完成后并行；T2.1 完成后才能进行真实 Provid
 
 代码一致性 Review 通过：T1-T10 的实现、接口、Desktop 交互、回归测试和用户文档已与 Spec 对齐；创建任务由持久化队列和专用执行器驱动，Provider、Tool 审计、结果契约、租约恢复、稳定分页、能力预检和 citation 关联均有代码与确定性测试证据。
 
-整体任务状态仍为 **Implementation Complete / Runtime Acceptance Pending**。真实 Provider、进程重启、外部来源和浏览器视觉/键盘 smoke 尚未完成，因此本任务继续保留在 `docs/tasks/`，不能归档，也不能把上述运行时门禁描述为已验收。
+整体任务状态仍为 **Implementation Complete / Runtime Acceptance Pending**。真实 Provider、进程重启、外部来源和浏览器视觉/键盘 smoke 尚未完成，因此本任务继续保留在 `docs/tasks`，不能归档，也不能把上述运行时门禁描述为已验收。

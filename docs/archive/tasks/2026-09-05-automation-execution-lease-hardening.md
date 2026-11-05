@@ -18,7 +18,7 @@
 - `apps/server/prisma/raw-owned-tables.json`
 - `apps/server/test/automation/**`
 - `.github/workflows/ci.yml`
-- `docs/architecture/2026-09-02-server-module-boundaries.md`
+- `docs/design/2026-09-02-server-module-boundaries.md`
 
 不涉及：通用 Job Framework、AI/Backtest 合表、业务 handler 重写、Desktop UI 重做。
 
@@ -163,4 +163,4 @@ pnpm --filter @thesis-ledger/server exec vitest run \
 
 当前 Compose Server 镜像内的专用生产 Scheduler 执行进程、独立 tmpfs PostgreSQL 和全部 33 份 migration 已通过原六项进程条件。真实 SIGKILL、owner 1→2、双实例唯一领取、新 owner running 时拒绝旧提交及 unknown-outcome 不重放均有回执；正常 Server 未中断，临时资源已清理。七份编译输入与宿主一致，三项资源保护测试通过。
 
-现金分支额外复用真实 RuntimeHandlers/计划服务，补齐 1＋3 条、暂停过滤、恢复零重复及按计划通知参数捕获；外部投递仍由 Cash Task 保留。命令、版本、Run、失败修正和数据边界统一见[进程与现金补期证据](../../tasks/evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)。不重复原实现或高成本构建，不提交、不推送。
+现金分支额外复用真实 RuntimeHandlers/计划服务，补齐 1＋3 条、暂停过滤、恢复零重复及按计划通知参数捕获；外部投递仍由 Cash Task 保留。命令、版本、Run、失败修正和数据边界统一见[进程与现金补期证据](../../evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)。不重复原实现或高成本构建，不提交、不推送。

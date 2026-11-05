@@ -199,13 +199,13 @@
   - 验证方式：在本地 Docker 环境执行全量影子重建、差异分类、切换与回滚门禁；记录逐账户不变量和原始账本未修改结果；不得用修改原始事实静默配平。正式发布环境不属于当前任务范围。
   - 验证证据：新增 `projection-shadow-diff.mjs`、`projection-shadow-rebuild.mjs`、`projection-switch-gate.mjs` 及 domain 差异分类/切换门禁；差异分为预期粒度、证据不足、FX 缺口、迁移缺陷、算法缺陷和未分类，迁移/算法/未分类阻断；shadow rebuild 在事务内回滚并输出逐账户稳定性报告，`sourceLedgerMutated` 固定为 `false`。固定快照差异为全零，unified 四阶段门禁允许通过；开发 Compose 两个账户的回滚重建均 `rolledBack=true`、稳定报告 `PASS`。
   - 本地验收结果：`pnpm projection:shadow-diff` 的六类差异计数均为 0；unified 四阶段切换门禁和 legacy 回滚门禁均 `allowed=true`；带 `--source-ledger-mutated` 的危险路径按预期拒绝。Compose 内逐账户回滚重建覆盖 2 个账户，均 `rolledBack=true`、差异为 0、稳定性 `PASS`，且 `sourceLedgerMutated=false`；本地 `/api/v1/health` 与 `/api/v1/integrity` 分别为 `healthy` 和 `issueCount=0`。
-  - 范围说明：生产数据副本提交型迁移、完整性能/并发演练、真实在线 FX、分阶段发布和旧镜像回滚属于正式发布范围外事项；相关操作仍记录在 [`Trade Projection 影子迁移与分阶段切换手册`](../../operations/2026-08-28-trade-projection-cutover.md) 中，但不作为当前任务门禁。
+  - 范围说明：生产数据副本提交型迁移、完整性能/并发演练、真实在线 FX、分阶段发布和旧镜像回滚属于正式发布范围外事项；相关操作仍记录在 [`Trade Projection 影子迁移与分阶段切换手册`](../../guides/2026-08-28-trade-projection-cutover.md) 中，但不作为当前任务门禁。
 
 - [x] T17：补齐文档、运行时验收与最终一致性 Review（本地环境已完成）
   - 涉及范围：总 Spec、子 Spec、任务证据、领域文档、API 文档、用户指南、迁移手册、浏览器与真实数据库验收。
   - 完成条件：当前 Spec 范围内的本地验收标准均有实现与证据；正式发布环境属于非目标；确定性测试与本地真实运行证据分别记录；所有 P1/P2 均已修复。
   - 验证方式：运行受影响包的测试、类型检查、构建、格式、ESLint、Markdown 链接扫描、`git diff --check` 和最终 Spec/任务/实现三方核对。
-  - 验证证据：新增 [`Trade Projection 影子迁移与分阶段切换手册`](../../operations/2026-08-28-trade-projection-cutover.md)，并同步环境变量、迁移矩阵、总 Spec 与本任务证据；确定性测试和本地 Compose/浏览器运行态证据已完整记录，正式发布环境不纳入当前验收。
+  - 验证证据：新增 [`Trade Projection 影子迁移与分阶段切换手册`](../../guides/2026-08-28-trade-projection-cutover.md)，并同步环境变量、迁移矩阵、总 Spec 与本任务证据；确定性测试和本地 Compose/浏览器运行态证据已完整记录，正式发布环境不纳入当前验收。
   - 本地最终回归：`pnpm test` 通过，domain 9 个测试文件/97 个测试、server 38 个测试文件/294 个测试、schemas 7 个测试文件/96 个测试、api-client 10 个测试、desktop 18 个测试文件/103 个测试、mobile 1 个测试文件/7 个测试全部通过；`pnpm typecheck`、35 条 migration matrix、全仓 ESLint、受影响文件 Prettier、脚本 `node --check`、`git diff --check` 均通过。
   - 本轮 Review 收口：新增 V2 projection schema hardening migration，将 Trade 状态字段改为 Prisma enum，删除 LedgerEvent V1 宽字段和运行时 legacy projection 分支；Draft 事件前缀改用共享 helper，测试 fixture 统一使用 V2 envelope；Baseline 负残量回归明确保留 `observedQuantity` 并断言 `quantity=0`，确认该 Review 观察不构成语义缺陷。Market Data provider/catalog/policy 改动属于独立既有 Spec/Task，保留在当前工作树范围内。
   - 本地运行态：T5 迁移 smoke、T6 数据库不变量、T14 本地浏览器验收、T16 影子差异/回滚/切换门禁、Compose health/integrity 均通过；V2 全类型迁移 smoke 确认 `eventsBefore=17`、`eventsAfter=17`、`positions=2`、`cashFlows=7`、`cashBaselineBatchRefs=0`、`legacyLedgerColumnsRemaining=0`，`/api/v1/health` 为 `healthy`，`/api/v1/integrity` 为 `issueCount=0`。

@@ -51,7 +51,7 @@ Run **`9f2cfeaa-b8dc-4ba0-8b5f-2c275a04696c`**成功；不可变快照 **`9b8f81
 
 固化前检查点为TF-F1～F3完成、TF-F4仅镜像固化开放；现行状态由Task及下方最终固化取代。限制保留：仅沪深A股历史日K、有限样本、量额单位未普遍证明、原生调整锚点/历史可见性未知、固定研究模型费用/数量假设；不扩实时/分钟/ETF或公司行动证明平台。未提交、推送、发布、采购、写真实Ledger或清库；RQ/Tushare外部条件保持分层记录。
 
-2026-10-14后续空间核对：发现正式dsa更新将紧张期回滚整备限定为DSA，遗漏共享磁盘上Server的超额历史镜像。现已修复该范围并通过定向编排/原政策37项、更新20场景、基线11场景验证；经正式update.sh dsa移除旧Server回滚及Desktop回收，宿主19759MiB仍少721MiB，Docker21439MiB满足门槛，入口退出1且未构建。当前仍保留每服务1个历史回滚；镜像未固化，详见[infra实际记录](../../../../thesis-ledger-infra/docs/tasks/evidence/2026-10-14-shared-docker-space.md)。上方19325MiB为前次读数，当前进度由Task TF-F4维护，不重采供应商。
+2026-10-14后续空间核对：发现正式dsa更新将紧张期回滚整备限定为DSA，遗漏共享磁盘上Server的超额历史镜像。现已修复该范围并通过定向编排/原政策37项、更新20场景、基线11场景验证；经正式update.sh dsa移除旧Server回滚及Desktop回收，宿主19759MiB仍少721MiB，Docker21439MiB满足门槛，入口退出1且未构建。当前仍保留每服务1个历史回滚；镜像未固化，详见[infra实际记录](../../../../thesis-ledger-infra/docs/archive/evidence/2026-10-14-shared-docker-space.md)。上方19325MiB为前次读数，当前进度由Task TF-F4维护，不重采供应商。
 
 <a id="record-tickflow-free-image-solidified"></a>
 
@@ -61,7 +61,7 @@ Run **`9f2cfeaa-b8dc-4ba0-8b5f-2c275a04696c`**成功；不可变快照 **`9b8f81
 
 实际DSA镜像及开发标签一致为`sha256:d9cdba416f1f56b974adf5090ebf5f8d45a68bc484e735c67c08481b989fd48f`；Server/Worker镜像保持71621979c96c…，原DSA更新前基线51b6b86b755b…可读，五容器健康，6卷及全部应用挂载前后相等。三个TickFlow生产文件哈希与宿主相同，实际SDK0.1.25/三个免费绑定/URL及范围通过；容器diff无三个源文件写入，无后续sync-code，证明已在新镜像内固化。
 
-同一Worker用原Runner及比较模块字节只读重放，网络阻断。新Run `9f2cfeaa-b8dc-4ba0-8b5f-2c275a04696c`的09741358529bd3a8、旧Run `8db8879d-e27d-4d8b-8df2-96eba083fee6`的a180c8307c637ac3各两次一致、网络0，快照/物理产物校验保持。原文`/tmp/tickflow-free-image-new-replay.json`、`/tmp/tickflow-free-image-old-replay.json`，派生`/tmp/tickflow-image-zero-verification.json`；[完整infra固化及保护证据](../../../../thesis-ledger-infra/docs/tasks/evidence/2026-10-14-shared-docker-space.md)。TF-F1～F4完成；原数据/模型限制保持，未新增供应商请求或重验RQ/Tushare外部条件。
+同一Worker用原Runner及比较模块字节只读重放，网络阻断。新Run `9f2cfeaa-b8dc-4ba0-8b5f-2c275a04696c`的09741358529bd3a8、旧Run `8db8879d-e27d-4d8b-8df2-96eba083fee6`的a180c8307c637ac3各两次一致、网络0，快照/物理产物校验保持。原文`/tmp/tickflow-free-image-new-replay.json`、`/tmp/tickflow-free-image-old-replay.json`，派生`/tmp/tickflow-image-zero-verification.json`；[完整infra固化及保护证据](../../../../thesis-ledger-infra/docs/archive/evidence/2026-10-14-shared-docker-space.md)。TF-F1～F4完成；原数据/模型限制保持，未新增供应商请求或重验RQ/Tushare外部条件。
 
 <a id="record-k37-entitlement-v2"></a>
 
@@ -1397,10 +1397,10 @@ not_admitted且attempted=false只证明项目拒绝；credential_missing不产�
 
 - 对目标 DSA `/app/data/stock_analysis.db` 使用 SQLite `mode=ro`、`PRAGMA query_only=ON` 查询 `thesis_ledger_route_admission_v3`，限定 consumer=thesis-ledger、四个精确 RouteKey×RouteTarget。HiThink现金、东财现金、东财拆分均 **无记录**；不能叫“记录过期”“账号拒绝”或已进入SDK失败。
 - 公告现金唯一记录 status=admitted、recordVersion=1、未撤销，但 validUntil=`2026-10-08T05:58:17.966070+00:00`，即北京时间 **2026-10-08 13:58:17.966070 到期**。scope=`510300.SH / 2023-01-03..2023-02-01`；adapterRevision=official-cash-notices-v1、sourceRevision=official-cash-notices-sha256:924ca0ef585cbc044a34cc552ec0a17b24645a63ecbfec4df9fa01ded414cfa3、credentialRevision=not-required。没有发现摘要/接口修订/作用域错配。
-- 公告包的宿主文件、目标源码包和目标 `/app/data/thesis-ledger-route-evidence/924ca0ef585cbc044a34cc552ec0a17b24645a63ecbfec4df9fa01ded414cfa3.json` 原字节摘要都与旧记录相同，受控原文仍在。复用[原真实公告及年报审核](../../tasks/evidence/2026-10-07-m31-notice-source.md)，不重新下载或重复源包测试。
+- 公告包的宿主文件、目标源码包和目标 `/app/data/thesis-ledger-route-evidence/924ca0ef585cbc044a34cc552ec0a17b24645a63ecbfec4df9fa01ded414cfa3.json` 原字节摘要都与旧记录相同，受控原文仍在。复用[原真实公告及年报审核](../../evidence/2026-10-07-m31-notice-source.md)，不重新下载或重复源包测试。
 - 目标 `/app/data/thesis-ledger-mapping-evidence` **不存在**。这是 HiThink 身份原文和东财拆分映射的目标文件缺口，不代表仓库没有证据。
-- HiThink已有[独立身份/分红币种审核](../../tasks/evidence/2026-09-29-cont-m31-510300-public-identity-currency.md)及[候选原文](../../tasks/evidence/2026-09-29-m31-510300-identity-candidate.json)，708字节/SHA256 `8f6eaec2a6e8c0459ced8528804a2bc0b95b40c75eaeecdc61c00d68aa927498`。实际字段为 510300.SH/ETF/queryThscode=510300.SH/fundType=exchange/CNY，**只覆盖2025-06-01..2025-06-30**，observedAt=2026-09-28T18:26:32Z；两项文档证明引用同一上交所六月分红公告。原结构校验已过，本轮只核字节/字段，不重跑。不能扩为所有ETF、2023窗口或全历史。
-- 东财拆分已有[真实公告/源行交叉证据](../../tasks/evidence/2026-09-28-cont-m22-159516-splits.md)、[后续真实观测与离线审核](../../tasks/evidence/2026-10-02-priority2-m21-m22-continuation.md)及[映射候选](../../tasks/evidence/2026-10-02-m22-159516-split-mapping.json)，936字节/SHA256 `b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e`。两项均159516.SZ/1拆2，源转换日03-27/07-09，生效日03-30/07-10；原公告与结果公告审核保持，不重新联网、映射或测回归。
+- HiThink已有[独立身份/分红币种审核](../../evidence/2026-09-29-cont-m31-510300-public-identity-currency.md)及[候选原文](../../evidence/2026-09-29-m31-510300-identity-candidate.json)，708字节/SHA256 `8f6eaec2a6e8c0459ced8528804a2bc0b95b40c75eaeecdc61c00d68aa927498`。实际字段为 510300.SH/ETF/queryThscode=510300.SH/fundType=exchange/CNY，**只覆盖2025-06-01..2025-06-30**，observedAt=2026-09-28T18:26:32Z；两项文档证明引用同一上交所六月分红公告。原结构校验已过，本轮只核字节/字段，不重跑。不能扩为所有ETF、2023窗口或全历史。
+- 东财拆分已有[真实公告/源行交叉证据](../../evidence/2026-09-28-cont-m22-159516-splits.md)、[后续真实观测与离线审核](../../evidence/2026-10-02-priority2-m21-m22-continuation.md)及[映射候选](../../evidence/2026-10-02-m22-159516-split-mapping.json)，936字节/SHA256 `b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e`。两项均159516.SZ/1拆2，源转换日03-27/07-09，生效日03-30/07-10；原公告与结果公告审核保持，不重新联网、映射或测回归。
 - 本轮只在 DSA docs/data 与主仓 tasks/evidence 的结构化JSON中定位候选；不是整机穷尽搜索。旧 `/tmp/history-demand-d0-bounded-probe.jsonl`、D3 target-reading/final-reading/legacy-entry 临时文件及 `/private/tmp/priority2-m22-offline-guards.log` 当前不可读；相关历史请求/通过仍按持久报告认定，不冒称本轮从原响应重放。
 - 原 Server DsaClient 只读有效政策111：现金仍 HiThink index0/not_admitted、公告 index1/admission_expired；东财现金不在所选现金主备中，SPLIT_EVENT无已选政策条目。不是全局开关关闭，不能只补记录就声称东财已选路线消费通过。
 
@@ -1488,8 +1488,8 @@ not_admitted且attempted=false只证明项目拒绝；credential_missing不产�
 
 ### 现有材料和当前缺项
 
-- [原映射](../../tasks/evidence/2026-10-02-m22-159516-split-mapping.json)仍936字节，SHA256 `b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e`。两条159516.SZ均1拆2：源转换/登记日 `2026-03-27 / 07-09`，除权生效日 `2026-03-30 / 07-10`；公告日期 `03-24 / 07-06`、PDF URL和原字节摘要保持。没有重新格式化JSON或下载PDF。
-- 复用[原独立公告交叉核对](../../tasks/evidence/2026-09-28-cont-m22-159516-splits.md)和[10月2日真实源观测/离线审核](../../tasks/evidence/2026-10-02-priority2-m21-m22-continuation.md)：年度第一页83行，目标两行，分页摘要 `39f3575f37c8533470802c0626d99e3c843b224b7cb119c65a04867bd8d1dfd5`；原源修订 `eastmoney-fund-cf:b1effe1fd7b9ca8b9ba169c7e65c561d1308b5ca85cbf2fc3bada67bd2f12398`。历史 `paginationComplete=true / historicalRevisionsVerified=false / coverage.complete=false`；31项映射/存储合同及迁移定向99项、受影响1946项按原报告复用，不重跑。
+- [原映射](../../evidence/2026-10-02-m22-159516-split-mapping.json)仍936字节，SHA256 `b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e`。两条159516.SZ均1拆2：源转换/登记日 `2026-03-27 / 07-09`，除权生效日 `2026-03-30 / 07-10`；公告日期 `03-24 / 07-06`、PDF URL和原字节摘要保持。没有重新格式化JSON或下载PDF。
+- 复用[原独立公告交叉核对](../../evidence/2026-09-28-cont-m22-159516-splits.md)和[10月2日真实源观测/离线审核](../../evidence/2026-10-02-priority2-m21-m22-continuation.md)：年度第一页83行，目标两行，分页摘要 `39f3575f37c8533470802c0626d99e3c843b224b7cb119c65a04867bd8d1dfd5`；原源修订 `eastmoney-fund-cf:b1effe1fd7b9ca8b9ba169c7e65c561d1308b5ca85cbf2fc3bada67bd2f12398`。历史 `paginationComplete=true / historicalRevisionsVerified=false / coverage.complete=false`；31项映射/存储合同及迁移定向99项、受影响1946项按原报告复用，不重跑。
 - 旧 `/private/tmp/priority2-m22-source-capture.json` 和对应离线日志当前不存在。能复用持久报告、原JSON及已记录的摘要/观测，不声称本轮已从旧捕获原文重放，也不为找回临时文件再发源请求。
 - 本轮目标SQLite `mode=ro / query_only=ON`确认，consumer=thesis-ledger、`CN/ETF/SPLIT_EVENT × akshare/eastmoney`的准入记录 **0条**；`/app/data/thesis-ledger-mapping-evidence`不存在。当前原Server政策 `111/111 / applied`，16 routes，SPLIT_EVENT无条目；现金仍HiThink主/公告备。配置2行摘要仍 `386d5f6c297c016f0f42cabab49a0c77f0e6dc3b76c81d10d9543fd667b68df1`，不输出秘密。
 - 当前宿主/目标5个实际模块SHA256逐项相同：Eastmoney Split能力、mapped reader、mapping resolver、MappingEvidenceStore及源分页reader；目标编译Worker也保留覆盖不完整/冻结拒绝守卫。首次用python读取Worker失败因该镜像无python，随后以原Node只读文件确认，未改变镜像或运行态。
@@ -1633,7 +1633,7 @@ node scripts/market-split-target-acceptance.mjs --execute --authorized-159516-sp
 
 用户本轮仅授权补脱敏错误诊断、离线核对并提出最小时钟修正方案、完成局部验证；明确暂不再实源请求、重签准入、改主备或保存凭据。实施前已在原K37d-live执行包写明边界与停止点。本轮到本地验证停止，不同步目标，不修改公共Schema/绑定合同、Spec完成标准或原验收勾选，不新增优化责任叶。
 
-复用[原159516映射](../../tasks/evidence/2026-10-02-m22-159516-split-mapping.json)的936字节/SHA256 `b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e`，以及[原apply/单次503/CAS恢复证据](#record-k37d-split-apply-read-restored)。原真实请求仍为`ed92afdb-5f4b-4d6c-8f95-d8acf8dc08cf`、112/112、目录4494082701661225、截止`2026-10-12T10:57:44.604Z`；当次没有可消费事实/原页或内层异常。本轮没有新增真实观察时刻，不能以合成时钟回填旧证据。原准入回执版本1至北京时间10月13日18:53:01，最后真实恢复状态113/113及原主备/配置摘要引用原记录，本轮未重新读取运行态或续期。
+复用[原159516映射](../../evidence/2026-10-02-m22-159516-split-mapping.json)的936字节/SHA256 `b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e`，以及[原apply/单次503/CAS恢复证据](#record-k37d-split-apply-read-restored)。原真实请求仍为`ed92afdb-5f4b-4d6c-8f95-d8acf8dc08cf`、112/112、目录4494082701661225、截止`2026-10-12T10:57:44.604Z`；当次没有可消费事实/原页或内层异常。本轮没有新增真实观察时刻，不能以合成时钟回填旧证据。原准入回执版本1至北京时间10月13日18:53:01，最后真实恢复状态113/113及原主备/配置摘要引用原记录，本轮未重新读取运行态或续期。
 
 ### 诊断实现与失败层级
 

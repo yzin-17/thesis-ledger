@@ -24,7 +24,7 @@
 
 ## 9.24 TickFlow 代码叶验证与目标准备（2026-10-11）
 
-实际写集为 DSA `data_provider/thesis_ledger_sources/tickflow.py`、`data_provider/cn_exact_daily.py`、`src/services/{thesis_ledger_capability_sources,thesis_ledger_capability_registry,thesis_ledger_provider_runtime,thesis_ledger_provider_manifests,thesis_ledger_provider_dependencies,provider_credentials,thesis_ledger_native_daily}.py`，以及 `tests/{test_native_exact_daily,test_thesis_ledger_inventory_export,test_thesis_ledger_tickflow_capability_path,test_thesis_ledger_capability_registry}.py`。文档增量为本 Spec/Task、原来源矩阵、`docs/architecture/canonical-runtime.md`、DSA 接入指南及 CHANGELOG；公共 Schema、Server、SDK、运行依赖和用户配置未改。
+实际写集为 DSA `data_provider/thesis_ledger_sources/tickflow.py`、`data_provider/cn_exact_daily.py`、`src/services/{thesis_ledger_capability_sources,thesis_ledger_capability_registry,thesis_ledger_provider_runtime,thesis_ledger_provider_manifests,thesis_ledger_provider_dependencies,provider_credentials,thesis_ledger_native_daily}.py`，以及 `tests/{test_native_exact_daily,test_thesis_ledger_inventory_export,test_thesis_ledger_tickflow_capability_path,test_thesis_ledger_capability_registry}.py`。文档增量为本 Spec/Task、原来源矩阵、`docs/design/canonical-runtime.md`、DSA 接入指南及 CHANGELOG；公共 Schema、Server、SDK、运行依赖和用户配置未改。
 
 原 Runtime 重复创建 SDK 的新增回归先失败（1 失败/8 通过，`/tmp/tl-cap-h07-tickflow-cache-red.log`），作用域修复后定向四文件 60 项通过（`/tmp/tl-cap-h07-tickflow-cache-green.log`）。随后 `env PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest` 运行 Native/Control/Runtime/目录/凭据/独立状态及四项 TickFlow SDK 回归，共 19 文件 260 项通过（`/tmp/tl-cap-h07-tickflow-regression.log`）。最后将既有“新 providerId 经原执行器”样例分别用两种工厂作用域执行，注册器及 TickFlow 两文件 24 项通过（`/tmp/tl-cap-h07-tickflow-extension-scope.log`）；新增来源不需要公共供应商分支。
 

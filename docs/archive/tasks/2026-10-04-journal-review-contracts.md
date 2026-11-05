@@ -9,7 +9,7 @@
 - [x] C1：定义 domain 对象 ID、统计资格、nullable 时间及半开窗口规则。
   - 对应原 T1/AC2、AC3、AC4、AC7、AC9、AC10；写集为边界明确的 domain 复盘模块与定向测试。
   - 验证完整 Trade、ACTIVE、部分减仓、余额观察结束、Baseline、成本冲突、FX、未知时间与窗口端点。复用 Trade Projection 的稳定领域输入，不重算成本或生命周期。
-  - 证据：domain 定向 27 项及全包 327 项通过，typecheck/build 通过；时间窗口保留亚毫秒秒内小数。详见 [契约证据](../../tasks/evidence/2026-10-04-journal-review-contracts.md)。
+  - 证据：domain 定向 27 项及全包 327 项通过，typecheck/build 通过；时间窗口保留亚毫秒秒内小数。详见 [契约证据](../../evidence/2026-10-04-journal-review-contracts.md)。
 - [x] C2：定义 decimal 事实、来源、候选与 Snapshot 的 Schema 契约和兼容适配边界。
   - 依赖 C1；对应原 T1/AC6、AC12、AC13、AC16。
   - 验证 Schema/domain 对象类型和排除原因一致、decimal 非近似、nullable 时间及 legacy 不进入正式对象。旧分析 number 入口仅保留显式兼容边界。
@@ -48,11 +48,11 @@
 
 ## 已确认的验证输入
 
-初始目标候选为空、Snapshot GET 缺失属于实施前基线。2026-10-04 已建立独立标记的开发验收账户 `95bd7e1a-72df-4cd7-aae8-121d8545e5ea`，正式分析、保存、GET 历史/详情及 STALE 已验证。两个旧受保护账户的 Ledger 哈希不变；详细输入与结果见[证据](../../tasks/evidence/2026-10-04-journal-review-contracts.md)。
+初始目标候选为空、Snapshot GET 缺失属于实施前基线。2026-10-04 已建立独立标记的开发验收账户 `95bd7e1a-72df-4cd7-aae8-121d8545e5ea`，正式分析、保存、GET 历史/详情及 STALE 已验证。两个旧受保护账户的 Ledger 哈希不变；详细输入与结果见[证据](../../evidence/2026-10-04-journal-review-contracts.md)。
 
 ## 证据边界与最终一致性 Review
 
-实施早期 lmstudio 超时与未选择默认模型属于历史就绪阻塞。后续已使用当前默认 revision 2 完成真实单笔／周期 v2 内容及引用核对，目标在途任务安全恢复、保护性读取和最终镜像更新均通过，见[内容](../../tasks/evidence/2026-10-05-journal-model-content-v2.md)与[目标证据](../../tasks/evidence/2026-10-05-journal-review-completion.md)。
+实施早期 lmstudio 超时与未选择默认模型属于历史就绪阻塞。后续已使用当前默认 revision 2 完成真实单笔／周期 v2 内容及引用核对，目标在途任务安全恢复、保护性读取和最终镜像更新均通过，见[内容](../../evidence/2026-10-05-journal-model-content-v2.md)与[目标证据](../../evidence/2026-10-05-journal-review-completion.md)。
 
 - [x] C1—C5 的契约、读取、分析、Snapshot、冻结提交／执行／消费与目标验收全部闭合
 - [x] 原 AC1—AC16、显式关联、decimal／时间／资格／指纹语义和跨模块方向一致
@@ -60,4 +60,4 @@
 - [x] 不存在未解决的当前 Blocking 问题或本任务拥有的后续义务
 - [x] 实现、用户指南与最终 Review 同步，未关联 WIP 保留，现行 Spec 保留
 
-结论：通过并归档。逐条实现与验证见[最终 Review](../reviews/2026-10-05-journal-review-completion.md)，文档及归档检查见[J8.5](../../tasks/evidence/2026-10-05-journal-final-j85.md)。原 C5 的拆分义务由收口 J4—J8 完成，不以核心目标流程代替完整消费验收。
+结论：通过并归档。逐条实现与验证见[最终 Review](../reviews/2026-10-05-journal-review-completion.md)，文档及归档检查见[J8.5](../../evidence/2026-10-05-journal-final-j85.md)。原 C5 的拆分义务由收口 J4—J8 完成，不以核心目标流程代替完整消费验收。

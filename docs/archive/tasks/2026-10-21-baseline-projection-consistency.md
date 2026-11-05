@@ -23,4 +23,4 @@
 
 正式脚本已成功同步 Server/Worker 并健康，镜像仍为 `sha256:1562291459dea8079e7a3edf53ece29a9cfd7e14f38c7afad11546e314bae880`。仅对专用账户执行正常重建 API，两次结果相等、修订和 6 个事实均不变；独立估值及 Trade 读取确认数量 3、平均成本 8，并保留 `CONFLICTED` 和原问题代码。真实 Web 已显示 `600000.SH · 3 股 · ¥8.00`，截图保存为 `.recovery-artifacts/remaining-p1-2026-10-20/baseline-consistency-web.jpg`。只读复核完整原数据哈希保持；政策/DSA 164、16 路由、27 来源公共配置指纹及五项模型计数均未改变。初次来源复核脚本漏解包 `providers` 响应，修正为只读复核，没有重发重建；完整结果在 `baseline-consistency-fixed.json`。现已返回原草稿任务 A5，不据此结束总目标。
 
-A5 后续已完成真实对账确认、幂等、撤回及专用账户结清停用；原 14 账户、13 张业务表、57 个 V3 结果与三份草稿修订完全保持。[完整验收及清理](../../tasks/evidence/2026-10-21-account-draft-reconciliation-acceptance.md)保留所有分层证据。补充任务完成归档，原父项与剩余外部条件继续由原清单持有。
+A5 后续已完成真实对账确认、幂等、撤回及专用账户结清停用；原 14 账户、13 张业务表、57 个 V3 结果与三份草稿修订完全保持。[完整验收及清理](../../evidence/2026-10-21-account-draft-reconciliation-acceptance.md)保留所有分层证据。补充任务完成归档，原父项与剩余外部条件继续由原清单持有。

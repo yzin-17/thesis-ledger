@@ -1,6 +1,6 @@
 # 全仓架构审查与核心边界加固 Spec
 
-> 归档说明（2026-10-14）：原全仓架构加固任务已完成；长期依赖方向、职责与复杂度约束由主仓 AGENTS.md、边界门禁及现行架构维护。本文的审查基线、Draft 标记和推荐实施顺序仅为原时点记录。 当前入口：[现行 Agent 约束](../../../AGENTS.md)及[Canonical 架构](../../architecture/canonical-runtime.md)。
+> 归档说明（2026-10-14）：原全仓架构加固任务已完成；长期依赖方向、职责与复杂度约束由主仓 AGENTS.md、边界门禁及现行架构维护。本文的审查基线、Draft 标记和推荐实施顺序仅为原时点记录。 当前入口：[现行 Agent 约束](../../../AGENTS.md)及[Canonical 架构](../../design/canonical-runtime.md)。
 
 
 > 日期：2026-09-02  
@@ -18,7 +18,7 @@
 - `packages/domain`、`packages/schemas`、`packages/api-client`、`packages/shared`：职责与 workspace 依赖方向；
 - `services/dsa-adapter`：跨仓适配边界；
 - Prisma schema / migration、测试结构、`scripts/` 工程守卫和 GitHub Actions；
-- 当前 `docs/specs`、`docs/tasks`、`docs/architecture` 与实现的一致性。
+- 当前 `docs/specs`、`docs/tasks`、`docs/specs` 与实现的一致性。
 
 本轮目标不是把所有技术债塞进一个实施 PR，而是先完整识别候选项，再按“正确性风险 > 架构扩散风险 > 单纯文件大小”排序，选择可收敛、可验证的一组改进。
 
@@ -127,7 +127,7 @@
 
 ### 4.4 Server 内部模块职责缺少当前 Architecture SSOT
 
-当前 `docs/architecture/` 主要记录 DSA、Provider 与版本兼容边界，对 Server 内部的 Ledger / Portfolio / Risk / Performance / Notification 等模块依赖方向没有一份当前 SSOT。实际约束一部分隐藏在 Nest Module，一部分隐藏在 `check-boundaries.mjs`。
+当前 `docs/specs` 主要记录 DSA、Provider 与版本兼容边界，对 Server 内部的 Ledger / Portfolio / Risk / Performance / Notification 等模块依赖方向没有一份当前 SSOT。实际约束一部分隐藏在 Nest Module，一部分隐藏在 `check-boundaries.mjs`。
 
 本轮实施后应补一份简洁的 Server module boundary 文档，避免依赖规则只存在于脚本代码中。
 

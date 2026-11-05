@@ -1,6 +1,6 @@
 # 投资复盘工作区布局任务
 
-规格：[投资复盘工作区布局](../../specs/2026-10-24-investment-journal-layout.md)。证据：[验收记录](../../reviews/2026-10-24-investment-journal-layout.md)。
+规格：[投资复盘工作区布局](../../specs/2026-10-24-investment-journal-layout.md)。证据：[验收记录](../reviews/2026-10-24-investment-journal-layout.md)。
 
 ## 当前状态
 

@@ -3,7 +3,7 @@
 > 历史记录（2026-10-15 归档）：保留原步骤、编号、完成条件、当时状态和证据。尚未通过的条件已由[当前 Task](2026-09-21-ai-provider-model-usage-configuration.md#verified-save-acceptance)承接；不再从本文启动实施，归档不表示验收完成。
 
 
-> 状态对账（更新于 2026-10-04）：已实现待验收：verified-save、onboarding HTTP 和 Desktop 历史局部门禁保留，#45 已在本地提交历史合入。本轮 T6.P1 的真实 PostgreSQL 保存竞争 5 项通过，默认引用另由用途配置 T4.2.P1 验证；T6 仍缺完整当前 CI、真实 Provider、浏览器与修订后超时/取消及目标运行态。初始对账见[Review](../reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](../../tasks/evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
+> 状态对账（更新于 2026-10-04）：已实现待验收：verified-save、onboarding HTTP 和 Desktop 历史局部门禁保留，#45 已在本地提交历史合入。本轮 T6.P1 的真实 PostgreSQL 保存竞争 5 项通过，默认引用另由用途配置 T4.2.P1 验证；T6 仍缺完整当前 CI、真实 Provider、浏览器与修订后超时/取消及目标运行态。初始对账见[Review](../reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](../../evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
 
 - Spec：[AI 接入自动选择与测试后保存](../../specs/2026-09-23-ai-provider-auto-test-save.md)
 - 基线：main@f74a18e7dc8711aab7833461c2b4adeb4bb04fbe（#44 已合入）
@@ -28,7 +28,7 @@
 - 输入：当前锁定 SDK、连接探针、验证 runner 和保存服务；复用已有 T6.P1 保存竞争证据，不重新执行未改变的数据库输入。
 - 写集：用途验证的中止归因与 HTTP/SSE 回归，发现缺陷时仅修复该领域边界；不改正式研究/优化预算或重试，不访问收费模型、不写目标 Provider 草稿。
 - 执行拆分：先本机真实 HTTP/SSE 证明传输和归因，再类型/包级与仓库门禁，随后官方入口更新目标并核对接口。真实供应商/浏览器费用确认仍属于独立门禁。
-- 已修复操作总期限被解释成用户取消的归因缺陷，保留两类事实及已知用量；32 项生命周期/保存/HTTP 回归通过。官方完整更新后目标空默认拒绝连续 3 次未退出进程；详见 [生命周期及目标证据](../../tasks/evidence/2026-10-04-ai-lifecycle-and-submission.md)。完整 T6 的真实 Provider、费用与客户端门禁继续开放。
+- 已修复操作总期限被解释成用户取消的归因缺陷，保留两类事实及已知用量；32 项生命周期/保存/HTTP 回归通过。官方完整更新后目标空默认拒绝连续 3 次未退出进程；详见 [生命周期及目标证据](../../evidence/2026-10-04-ai-lifecycle-and-submission.md)。完整 T6 的真实 Provider、费用与客户端门禁继续开放。
 
 ### T6.P1：真实 PostgreSQL 保存竞争（2026-10-03）
 
@@ -38,7 +38,7 @@
 - 验证：先现有保存定向测试，再真实 PostgreSQL / 本机 HTTP 竞争；SDK 输出为受控样例，数据库、服务与 HTTP 为真实实现。应用门禁按实际源码变化升级验证，不把本叶结果视为完整 T6。
 - 停止点：保存竞争叶交付后，默认引用竞争由用途配置 T4.2.P1 独立执行；真实模型/计费、浏览器、完整 CI、超时与目标部署保持原门禁。
 - 规划预检：输入与验收契约就绪，可执行；完整上传设计稿当前不在 Downloads，本叶使用仓库 Spec 与已固化的原断言，不缩减验收。
-- 完成检查：5 项真实 PostgreSQL/HTTP 用例通过；补上删除后旧草稿不能重建的保护。原 T6 不勾选，未触发真实模型、修改目标数据库或部署。详细命令与范围见[证据](../../tasks/evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
+- 完成检查：5 项真实 PostgreSQL/HTTP 用例通过；补上删除后旧草稿不能重建的保护。原 T6 不勾选，未触发真实模型、修改目标数据库或部署。详细命令与范围见[证据](../../evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
 
 环境：Node 22.16.0；项目锁定依赖由同仓临时只读 source/dependency artifact 获取，未升级 manifest 或 lockfile。CI/部署使用 Node24，需单独观察结果。
 

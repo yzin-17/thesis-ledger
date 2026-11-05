@@ -11,4 +11,4 @@
 
 ## 最终验收
 
-状态：已完成。正式同步、真实2份港交所材料、版本查看及390宽度页面通过；DSA重启后任务与3条观察保留。配置revision=0、enabled=false、sourceIds=[]；运行态与受控生命周期分别留证。 证据见[最终验收](../../tasks/evidence/2026-11-05-todo-4-15-final-acceptance.md)及[最终复核](../reviews/2026-11-05-todo-4-15-delivery-review.md)。
+状态：已完成。正式同步、真实2份港交所材料、版本查看及390宽度页面通过；DSA重启后任务与3条观察保留。配置revision=0、enabled=false、sourceIds=[]；运行态与受控生命周期分别留证。 证据见[最终验收](../../evidence/2026-11-05-todo-4-15-final-acceptance.md)及[最终复核](../reviews/2026-11-05-todo-4-15-delivery-review.md)。

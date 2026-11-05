@@ -4,7 +4,7 @@
 
 让用户先确认账户、标的和复盘粒度，再选择交易事实。收敛筛选区、时间窗口和空状态的视觉层级，保持既有浅色设计系统、组件和业务数据契约。
 
-本地实施已验收，执行记录见[归档任务](../archive/tasks/2026-10-24-investment-journal-layout.md)，视觉与验证证据见[验收记录](../reviews/2026-10-24-investment-journal-layout.md)。
+本地实施已验收，执行记录见[归档任务](../archive/tasks/2026-10-24-investment-journal-layout.md)，视觉与验证证据见[验收记录](../archive/reviews/2026-10-24-investment-journal-layout.md)。
 
 ## 设计约束
 

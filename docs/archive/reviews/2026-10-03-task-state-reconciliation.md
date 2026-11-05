@@ -21,7 +21,7 @@
 
 ## 原断言与后继证据
 
-先核对旧 RouteTarget、消费者、BullMQ Spec 的完整验收标准，再与[Canonical 收口](../../tasks/evidence/2026-10-02-canonical-final-completion.md)、[C01/C02](../../tasks/evidence/2026-10-02-c01-c02-completion.md)、[共同价格验收](../../tasks/evidence/2026-10-03-common-price-baseline.md)及[后继 Task](../tasks/2026-10-03-multi-source-remaining-acceptance.md)对照。下表只说明哪些断言能复用证据，未覆盖部分仍由原 Task 或明确 successor 持有；三个旧 Task 均未整体归档或补勾。
+先核对旧 RouteTarget、消费者、BullMQ Spec 的完整验收标准，再与[Canonical 收口](../../evidence/2026-10-02-canonical-final-completion.md)、[C01/C02](../../evidence/2026-10-02-c01-c02-completion.md)、[共同价格验收](../../evidence/2026-10-03-common-price-baseline.md)及[后继 Task](../tasks/2026-10-03-multi-source-remaining-acceptance.md)对照。下表只说明哪些断言能复用证据，未覆盖部分仍由原 Task 或明确 successor 持有；三个旧 Task 均未整体归档或补勾。
 
 | 原 Spec 断言 | 现行承接与证据 | 未覆盖或范围替代的处理 |
 | --- | --- | --- |
@@ -45,7 +45,7 @@
 | --- | --- | --- |
 | `/private/tmp/ledger-test-split-server-full-20261003.log`，及共同价格的最终 Server 日志 | 输出解析 8、JSON Mode 27、SDK HTTP/SSE 20、就绪 16、verified-save 22、onboarding HTTP 4 项均通过；总计 2074 passed/125 skipped | 受控 HTTP/SSE 不是在线模型；数据库跳过不是通过；当前完整 CI 和全部超时/费用断言仍待匹配 |
 | `/private/tmp/common-price-desktop-full-20261003.log` 与 Schema 全包日志 | Provider UI 30、auto-save 7、凭据 5 项；Desktop 总计 543、Schemas 589 项通过 | 组件/SSR 用例不证明浏览器保存、Electron 或真实费用 |
-| [共同价格回归记录](../../tasks/evidence/2026-10-03-common-price-baseline.md)与[Canonical 收口](../../tasks/evidence/2026-10-02-canonical-final-completion.md) | Schema/Server/Desktop 构建、边界/依赖、尺寸 ratchet 及受影响文件 lint | 不声明完整当前 `pnpm lint` 通过；旧错误数与旧缺依赖只保留历史时点，不能作为当前固定阻塞 |
+| [共同价格回归记录](../../evidence/2026-10-03-common-price-baseline.md)与[Canonical 收口](../../evidence/2026-10-02-canonical-final-completion.md) | Schema/Server/Desktop 构建、边界/依赖、尺寸 ratchet 及受影响文件 lint | 不声明完整当前 `pnpm lint` 通过；旧错误数与旧缺依赖只保留历史时点，不能作为当前固定阻塞 |
 | [AI SDK Task](../tasks/2026-09-19-vercel-ai-sdk-integration.md) T2/G0/G0.1、[用途配置 Task](../tasks/2026-09-21-ai-provider-model-usage-configuration.md) G2/G4 与 9/23 lmstudio | 原隔离状态/预算事务、目标受控测试及无认证零价三用途生成已有独立证据 | Provider 保存 CAS、默认引用竞争、认证/非零计费、新版 AC-09 的各执行面和 Electron 不自动通过；原免费模型限流也不等于现在所有来源不可用 |
 
 最新包级日志中 `ai-execution-state-postgres` 9 项、research recovery 4 项、research SDK 1 项、research query 3 项、strategy SDK PostgreSQL 3 项均跳过。原单独执行记录证明其当时的断言，不能把新跳过批次写为通过，也不能否认历史数据库门禁确实曾执行。

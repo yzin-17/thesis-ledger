@@ -222,7 +222,7 @@ AI Provider 与模型用途使用现有配置入口，选择适配器、模型�
 
 自动化任务列表显示任务类型、启停状态和下一次运行时间。可以在页面启用或停用任务，并查看自动化运行历史中的状态、开始时间和错误摘要。服务端会按 cron、timezone、交易日条件、重试策略和 Redis 锁运行任务，避免同一窗口重复执行。
 
-页面还会集中展示通知失败和开放的数据质量问题。遇到异常时，先刷新页面并按顺序检查：Provider 健康历史 → 数据质量问题 → 自动化运行历史 → 通知失败记录。详细排查步骤见 [`docs/operations/2026-08-18-operations.md`](docs/operations/2026-08-18-operations.md)、[`docs/domain/2026-08-18-provider-reliability.md`](docs/domain/2026-08-18-provider-reliability.md) 和 [`docs/domain/2026-08-18-automation.md`](docs/domain/2026-08-18-automation.md)。
+页面还会集中展示通知失败和开放的数据质量问题。遇到异常时，先刷新页面并按顺序检查：Provider 健康历史 → 数据质量问题 → 自动化运行历史 → 通知失败记录。详细排查步骤见 [`docs/guides/2026-08-18-operations.md`](docs/guides/2026-08-18-operations.md)、[`docs/design/2026-08-18-provider-reliability.md`](docs/design/2026-08-18-provider-reliability.md) 和 [`docs/design/2026-08-18-automation.md`](docs/design/2026-08-18-automation.md)。
 
 ### 9. 界面主题与数据状态
 
@@ -250,7 +250,7 @@ Mobile 使用“组合、账户、市场、研究、更多”五个入口，支�
 - 配置与运行：AI 模型/用途、行情凭证/账号与 OAuth、路由与目录、自动化管理及来源/质量/通知诊断；保存、验证、启用和实际执行分别反馈。
 - 连接与主题：服务地址验证，系统、浅色和深色主题。页面保留加载、空数据、读取失败和陈旧状态。
 
-在“研究 → 打开策略与回测”进入策略工作区；保存定义、采用建议、冻结回测及升级风险应用均需明确确认。未知模型费用与服务端能力状态按现行合同提示，手机不会自动启用模型、来源或通知。操作入口、凭证与错误恢复见[Android / iOS 使用说明](docs/guides/2026-10-25-mobile-client.md)；当前约定迁移范围已完成Android/iOS独立验收，分层记录见[验收归档](docs/archive/tasks/2026-10-22-web-mobile-feature-parity.md)及[最终审查](docs/reviews/2026-10-30-web-mobile-parity-final-review.md)。Longbridge与通知Provider实源按已确认后续范围保留未验。
+在“研究 → 打开策略与回测”进入策略工作区；保存定义、采用建议、冻结回测及升级风险应用均需明确确认。未知模型费用与服务端能力状态按现行合同提示，手机不会自动启用模型、来源或通知。操作入口、凭证与错误恢复见[Android / iOS 使用说明](docs/guides/2026-10-25-mobile-client.md)；当前约定迁移范围已完成Android/iOS独立验收，分层记录见[验收归档](docs/archive/tasks/2026-10-22-web-mobile-feature-parity.md)及[最终审查](docs/archive/reviews/2026-10-30-web-mobile-parity-final-review.md)。Longbridge与通知Provider实源按已确认后续范围保留未验。
 
 移动端默认连接本机 API：iOS/Web 使用 `http://127.0.0.1:3000/api/v1`，Android 模拟器使用 `http://10.0.2.2:3000/api/v1`；也可以通过 `EXPO_PUBLIC_API_BASE_URL` 指定地址。移动端同样会显示加载、空数据、读取失败和陈旧状态。
 
@@ -282,7 +282,7 @@ pnpm --filter @thesis-ledger/mobile start
 - 盘前事件、风险预览、开盘扫描、收盘同步、快照、风险扫描、日报和周报等自动化工作流。
 - 账户数据导出、数据库备份/恢复、完整性检查和发布门禁。
 
-这些能力不代表开放了交易执行；相关运维流程见 [`docs/operations/2026-08-18-release-and-recovery.md`](docs/operations/2026-08-18-release-and-recovery.md)，领域边界见 [`docs/specs/2026-08-18-thesis-ledger-product-v1.md`](docs/specs/2026-08-18-thesis-ledger-product-v1.md) 和 [`docs/domain/2026-08-18-domain-model.md`](docs/domain/2026-08-18-domain-model.md)。
+这些能力不代表开放了交易执行；相关运维流程见 [`docs/guides/2026-08-18-release-and-recovery.md`](docs/guides/2026-08-18-release-and-recovery.md)，领域边界见 [`docs/specs/2026-08-18-thesis-ledger-product-v1.md`](docs/specs/2026-08-18-thesis-ledger-product-v1.md) 和 [`docs/design/2026-08-18-domain-model.md`](docs/design/2026-08-18-domain-model.md)。
 
 ## 当前限制
 
@@ -291,4 +291,4 @@ pnpm --filter @thesis-ledger/mobile start
 - 真实飞书 Webhook、专业 Provider 和跨平台签名仍需要仓库所有者提供外部资源。
 - 所有收益、风险、回测和 AI 输出仅供研究，不构成投资建议。
 
-更详细的运行和模块说明见 [`docs/operations/2026-08-18-operations.md`](docs/operations/2026-08-18-operations.md) 与 [`docs/guides/2026-08-18-user-guide.md`](docs/guides/2026-08-18-user-guide.md)。
+更详细的运行和模块说明见 [`docs/guides/2026-08-18-operations.md`](docs/guides/2026-08-18-operations.md) 与 [`docs/guides/2026-08-18-user-guide.md`](docs/guides/2026-08-18-user-guide.md)。

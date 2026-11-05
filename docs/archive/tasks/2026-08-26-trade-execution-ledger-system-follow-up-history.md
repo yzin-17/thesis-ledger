@@ -65,7 +65,7 @@
 | R-SPEC-01 | P1 | 已修复 | `apps/server/prisma/schema.prisma`、`20260828020000_harden_v2_projection_schema`、`apps/server/src/ledger/*` | V2 收缩不再只删除 `correctionOf`：新 migration 在 preflight 后删除 LedgerEvent V1 宽字段，运行时移除 legacy projection/adapter 路径，并保留 `sourceRowId` 等 V2 来源字段；迁移 smoke 已验证旧列为 0。 | T17-R1 |
 | R-SPEC-02 | P2 | 已验证为误报 | `packages/domain/src/trade-projection.ts`、`packages/domain/test/trade-projection.test.ts` | Review 对负残量的担忧并未发生：`observedQuantity` 仍保留权威观察值，贡献数量为 0、剩余数量为 0，并记录 `QUANTITY_CONFLICT`；新增回归断言锁定该语义，不修改正确的领域行为。 | T17-R1 |
 | R-SPEC-03 | P3 | 独立既有范围 | Market Data provider/catalog/policy 相关 Spec 与实现 | 该组改动属于当前工作树中已有的独立 Market Data Spec/Task，不是 Trade Spec 的实现偏离；本轮保留，不通过删除用户范围内改动来消除 Review 计数。 | 无 |
-| R-DOC-01 | P2 | 已修复 | `docs/engineering/2026-08-18-database-index-review.md` | 索引说明已同步为 `accountId + sourceChannel + externalId` 唯一约束和 `accountId + sourceChannel + sourceRowId` 来源行索引。 | T6-R3 |
+| R-DOC-01 | P2 | 已修复 | `docs/guides/2026-08-18-database-index-review.md` | 索引说明已同步为 `accountId + sourceChannel + externalId` 唯一约束和 `accountId + sourceChannel + sourceRowId` 来源行索引。 | T6-R3 |
 | R-DOC-02 | P2 | 已修复 | 原始实施任务 T2/T3/T4/T5/T6 证据 | 历史任务证据保留其当时的 server 测试与迁移数量，并明确 Compose 演练实际部署的迁移；当前收尾证据已同步为 server 294 个测试、35 条迁移。 | T6-R3 |
 | R-FX-01 | P1（T11 范围） | 已修复 | `market/fx-conversion.ts`、`portfolio.service.ts`、`performance.service.ts`、`ledger/cash-projection.ts` | 原币 Cash/Position 先按币种分桶，本位币汇总统一通过按日期解析的 FX Conversion View；成交非同币种费用独立进入费用原币种 Cash/settlement 并保留 `FEE_CURRENCY_MISMATCH`；缺失 FX 保留原币结果和部分状态，已删除直接跨币种求和路径。 | T11 |
 | R-VAL-01 | 范围外 | 不纳入当前任务 | 正式发布环境验收 | 生产数据副本、正式发布环境浏览器、在线 FX、进程重启和最终切换/回滚不属于当前任务范围；未来若发布需另立门禁。 | 无 |
@@ -240,13 +240,13 @@
   - 验证方式：在本地 Docker 环境执行影子迁移、逐账户不变量、切换和回滚演练；形成可追溯差异报告。正式发布环境不属于当前任务范围。
   - 验证证据：新增 `projection-shadow-diff.mjs`、`projection-shadow-rebuild.mjs`、`projection-switch-gate.mjs` 及 domain 差异分类/切换门禁；差异分为预期粒度、证据不足、FX 缺口、迁移缺陷、算法缺陷和未分类，迁移/算法/未分类阻断；shadow rebuild 在事务内回滚并输出逐账户稳定性报告，`sourceLedgerMutated` 固定为 `false`。固定快照差异为全零，unified 四阶段门禁允许通过；开发 Compose 两个账户的回滚重建均 `rolledBack=true`、稳定报告 `PASS`。
   - 本地验收结果：固定快照差异六类计数均为 0；unified 四阶段和 legacy 回滚门禁均通过，修改原始 Ledger 的危险路径被拒绝；Compose 内 2 个账户的回滚重建均 `rolledBack=true`、差异为 0、稳定性 `PASS`，health 为 `healthy`，integrity 为 `issueCount=0`。
-  - 范围说明：生产数据副本提交型迁移、完整性能/并发演练、真实在线 FX、分阶段发布和旧镜像回滚属于正式发布范围外事项；相关操作仍记录在 [`Trade Projection 影子迁移与分阶段切换手册`](../../operations/2026-08-28-trade-projection-cutover.md) 中，但不作为当前任务门禁。
+  - 范围说明：生产数据副本提交型迁移、完整性能/并发演练、真实在线 FX、分阶段发布和旧镜像回滚属于正式发布范围外事项；相关操作仍记录在 [`Trade Projection 影子迁移与分阶段切换手册`](../../guides/2026-08-28-trade-projection-cutover.md) 中，但不作为当前任务门禁。
 
 - [x] **T17：完成文档、运行时验收和最终一致性 Review（本地环境已完成）**
   - 涉及范围：Spec、任务证据、领域/API/用户文档、迁移手册、真实数据库、并发、浏览器、FX 和最终 Review。
   - 完成条件：当前 Spec 范围内的本地验收标准都有实现与证据；正式发布环境属于非目标；所有 P1/P2 已修复。
   - 验证方式：运行受影响包测试、类型检查、构建、格式、ESLint、Markdown 链接扫描和 `git diff --check`，并完成 Spec/任务/实现三方核对。
-  - 验证证据：新增 [`Trade Projection 影子迁移与分阶段切换手册`](../../operations/2026-08-28-trade-projection-cutover.md)，并同步环境变量、迁移矩阵、总 Spec 与本任务证据；确定性测试和本地 Compose/浏览器运行态证据已完整记录，正式发布环境不纳入当前验收。
+  - 验证证据：新增 [`Trade Projection 影子迁移与分阶段切换手册`](../../guides/2026-08-28-trade-projection-cutover.md)，并同步环境变量、迁移矩阵、总 Spec 与本任务证据；确定性测试和本地 Compose/浏览器运行态证据已完整记录，正式发布环境不纳入当前验收。
   - 本地最终回归：`pnpm test`、`pnpm typecheck`、34 条 migration matrix、全仓 ESLint、定向 Prettier、脚本语法检查和 `git diff --check` 均通过；当前 server 为 291 个测试、schemas 为 96 个测试；T5/T6/T14/T16 本地运行态证据已同步。
 
 - [x] **T17-R1：收口本轮 Standards + Spec Review 发现（本地环境已完成）**

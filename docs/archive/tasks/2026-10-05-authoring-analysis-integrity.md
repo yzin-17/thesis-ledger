@@ -8,4 +8,4 @@
 
 本叶不完成 T03 的生成语义、标的目录和完整澄清界面。
 
-2026-10-05 完成：[验收证据](../../tasks/evidence/2026-10-05-authoring-analysis-integrity.md)。6 项纯函数和 15 项实际数据库/Redis/HTTP 集成通过，本地门禁通过，目标部署继续开放。
+2026-10-05 完成：[验收证据](../../evidence/2026-10-05-authoring-analysis-integrity.md)。6 项纯函数和 15 项实际数据库/Redis/HTTP 集成通过，本地门禁通过，目标部署继续开放。

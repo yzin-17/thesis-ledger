@@ -1,6 +1,6 @@
 # 手机通知 Provider 真实投递验收任务
 
-对应[规格](../../specs/2026-11-03-mobile-notification-provider-live-acceptance.md)。状态：已完成，2026-11-03 最终复核通过。真实飞书投递、用户收件确认和 Android／指定 iPhone Air 页面消费全部通过；总许可两次均已使用。详见[验收与最终复核](../../tasks/evidence/2026-11-03-mobile-notification-provider-live-acceptance.md)。
+对应[规格](../../specs/2026-11-03-mobile-notification-provider-live-acceptance.md)。状态：已完成，2026-11-03 最终复核通过。真实飞书投递、用户收件确认和 Android／指定 iPhone Air 页面消费全部通过；总许可两次均已使用。详见[验收与最终复核](../../evidence/2026-11-03-mobile-notification-provider-live-acceptance.md)。
 
 ## 执行清单
 
@@ -19,4 +19,4 @@ N1 工具责任见 [infra Task](../../../../thesis-ledger-infra/docs/archive/tas
 
 ## 最终一致性复核
 
-结论：通过，覆盖本次 Spec AC1～AC6 和 infra I1～I4。原生输入按实际摘要复用，当前 JS／真实 API 双端消费通过；本轮没有产品依赖或原生配置变化。失败事实、临时凭据清理和资源恢复均留证，无未完成义务或阻塞项。完整命令、来源摘要及分层结果见[验收与最终复核](../../tasks/evidence/2026-11-03-mobile-notification-provider-live-acceptance.md)。
+结论：通过，覆盖本次 Spec AC1～AC6 和 infra I1～I4。原生输入按实际摘要复用，当前 JS／真实 API 双端消费通过；本轮没有产品依赖或原生配置变化。失败事实、临时凭据清理和资源恢复均留证，无未完成义务或阻塞项。完整命令、来源摘要及分层结果见[验收与最终复核](../../evidence/2026-11-03-mobile-notification-provider-live-acceptance.md)。

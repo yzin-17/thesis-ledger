@@ -8,7 +8,7 @@ Android / iOS 的页面入口、范围切换、凭证与失败恢复见[手机�
 
 手动录入表达“设置当前余额”，不是伪造一笔买入：持仓写入 `POSITION_BASELINE_OBSERVATION`，现金写入 `CASH_BALANCE_OBSERVATION`。数量设为零或执行“清空持仓”会保留可审计的零余额观察。持仓导入先生成 Import Draft，经审核、冲突检查和提交后才写入 Ledger；未提交行不改变现有持仓。
 
-真实账户与影子账户使用独立 Ledger、投影和估值范围，默认聚合只包含实际账户。完整边界见 [`录入持仓与账户模型重构`](../specs/2026-08-18-position-entry-account-model.md) 和 [`Ledger 与收益计算`](../domain/2026-08-18-ledger-and-performance.md)。
+真实账户与影子账户使用独立 Ledger、投影和估值范围，默认聚合只包含实际账户。完整边界见 [`录入持仓与账户模型重构`](../specs/2026-08-18-position-entry-account-model.md) 和 [`Ledger 与收益计算`](../design/2026-08-18-ledger-and-performance.md)。
 
 ## 市场数据与标的
 
@@ -20,7 +20,7 @@ Android / iOS 的页面入口、范围切换、凭证与失败恢复见[手机�
 
 图表口径独立于回测配置，切换、扩窗和刷新沿用同一口径；实际来源以图表标注为准。HiThink 前复权不可用时，已配置的腾讯前复权备源可接替完整窗口。报价、分红、净值等能力分别显示可用状态，日线成功不保证其他分段可用。
 
-当前实现边界见 [`市场数据与标的中心 v1.2`](../specs/2026-08-18-market-data-provider-spec-v1.2.md) 和 [`实施说明`](../architecture/2026-08-18-market-data-provider-v1-2-implementation.md)。
+当前实现边界见 [`市场数据与标的中心 v1.2`](../specs/2026-08-18-market-data-provider-spec-v1.2.md) 和 [`实施说明`](../design/2026-08-18-market-data-provider-v1-2-implementation.md)。
 
 ## Portfolio、Trade 与投资复盘
 
@@ -45,7 +45,7 @@ Android / iOS 的页面入口、范围切换、凭证与失败恢复见[手机�
 
 RiskRule 负责确定性判断，RiskEvent 保存规则版本、触发值、阈值、行情时点和账户范围。影子账户风险必须明确标注模拟，默认不与真实账户混算。Notification 只负责渠道、静默、去重、重试和送达记录，不重新计算风险。
 
-完整规则见 [`风控与通知说明`](../domain/2026-08-18-risk-and-notifications.md)。
+完整规则见 [`风控与通知说明`](../design/2026-08-18-risk-and-notifications.md)。
 
 ## Strategy 与 Backtest
 
@@ -73,4 +73,4 @@ AI Research 只能调用获准的只读/研究 Tool。关键数字必须能追�
 
 AutomationJob 保存 cron、timezone、重试策略、锁、nextRunAt 和执行历史；Snapshot、行情同步、风险扫描、日报等任务复用服务端业务能力。排查运行问题时先查看任务状态和历史 run，再检查 Provider、Redis 锁、数据库和权限。
 
-日常启动、故障排查见 [`运维与故障排查`](../operations/2026-08-18-operations.md)；备份恢复和发布门禁见 [`发布、备份与恢复`](../operations/2026-08-18-release-and-recovery.md)。
+日常启动、故障排查见 [`运维与故障排查`](2026-08-18-operations.md)；备份恢复和发布门禁见 [`发布、备份与恢复`](2026-08-18-release-and-recovery.md)。

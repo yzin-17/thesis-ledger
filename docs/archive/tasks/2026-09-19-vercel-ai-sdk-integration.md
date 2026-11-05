@@ -2,24 +2,24 @@
 
 > 完成检查点（2026-10-31）：SDK原48项AC、JSON Mode原12项及G0/G0.1/G1/G2全部通过，完成归档。四个官方适配器本地HTTP与三类真实合法业务分别验收；本次补目标Cloudflare真实交付期限，原配置/凭据/默认和业务保持。[逐项最终评审](../reviews/2026-10-31-ai-sdk-final-ac-review.md)。当前配置的实际非零账单和其他组合资格继续由[配置Task](2026-09-21-ai-provider-model-usage-configuration.md)持有，没有记作SDK实源成功。
 
-> 历史 G3 检查点（2026-10-29 D59）：OpenRouter/free正式单次通过，实际Nvidia／Nemotron3.5免费模型；2条断言／5条数字／11条真实引用、完整trace及重建反读通过。V2保持开启、默认与配置保持；原新闻准入仅按当次授权续至23:31:34。见[复测回执](../../tasks/evidence/2026-10-29-g3-openrouter-formal-retest.md)。
+> 历史 G3 检查点（2026-10-29 D59）：OpenRouter/free正式单次通过，实际Nvidia／Nemotron3.5免费模型；2条断言／5条数字／11条真实引用、完整trace及重建反读通过。V2保持开启、默认与配置保持；原新闻准入仅按当次授权续至23:31:34。见[复测回执](../../evidence/2026-10-29-g3-openrouter-formal-retest.md)。
 
-> 历史开关回执（2026-10-29 22:05）：按用户当次授权开启V2，`canCreate=true`；本地运行配置已持久保存。默认仍为OpenRouter/free，Cloudflare保持停用。该批模型调用0，原配置／业务记录和WIP保持。见[开关生效回执](../../tasks/evidence/2026-10-29-g3-formal-acceptance.md#v2-enable)。
+> 历史开关回执（2026-10-29 22:05）：按用户当次授权开启V2，`canCreate=true`；本地运行配置已持久保存。默认仍为OpenRouter/free，Cloudflare保持停用。该批模型调用0，原配置／业务记录和WIP保持。见[开关生效回执](../../evidence/2026-10-29-g3-formal-acceptance.md#v2-enable)。
 
-> D58验收检查点（2026-10-29）：Cloudflare/Qwen正式报告已成功落库，3条claims／4条结构化数值和11条真实引用通过原校验，完整网关正文／SDK／结果一致，17份trace完整；原配置与开关恢复、双角色重建后报告／引用／trace反读一致。WIP最终保护及一致性Review通过，本轮收口，不再调用模型。旧GLM冻结、D41推广及其他G1／客户端义务保持。见[正式接续回执](../../tasks/evidence/2026-10-29-g3-formal-acceptance.md)。
+> D58验收检查点（2026-10-29）：Cloudflare/Qwen正式报告已成功落库，3条claims／4条结构化数值和11条真实引用通过原校验，完整网关正文／SDK／结果一致，17份trace完整；原配置与开关恢复、双角色重建后报告／引用／trace反读一致。WIP最终保护及一致性Review通过，本轮收口，不再调用模型。旧GLM冻结、D41推广及其他G1／客户端义务保持。见[正式接续回执](../../evidence/2026-10-29-g3-formal-acceptance.md)。
 
-> 2026-10-23 研究默认切换：用户独立授权最多 3 次零费用验证，实际仅 1 次 `openrouter/free` 的研究用途验证通过，费用记录为配置估算 0 USD，研究用途启用后默认修订 4→5。历史账本保留，未用次数不转为业务额度；G1 三类完整业务与 G3 生成继续暂停。[执行与保护证据](../../tasks/evidence/2026-10-23-openrouter-research-default.md)。
+> 2026-10-23 研究默认切换：用户独立授权最多 3 次零费用验证，实际仅 1 次 `openrouter/free` 的研究用途验证通过，费用记录为配置估算 0 USD，研究用途启用后默认修订 4→5。历史账本保留，未用次数不转为业务额度；G1 三类完整业务与 G3 生成继续暂停。[执行与保护证据](../../evidence/2026-10-23-openrouter-research-default.md)。
 
 > 来源合同更新（2026-10-20 对账）：部署来源与接管由[统一页面配置规格](../../specs/2026-10-19-ai-provider-database-only.md)取代，本来源收敛实现及分层验收见[已完成记录](2026-10-19-ai-provider-database-only.md)。原接管证据仅作历史记录，真实三类业务等其他完整验收条件保留。
 >
-> 2026-10-20 零生成接续：完整 AC 与现行 Web 差集已核对，实际 HTTP 路由唯一性、目标专属配置 Web 保存与 Provider 409 均通过，原配置/默认/凭证已恢复，见 [AI 配置 T2.5.E4](2026-09-21-ai-provider-model-usage-configuration.md#剩余步骤)及[证据](../../tasks/evidence/2026-10-20-ai-zero-generation-acceptance.md)。本轮客户端仅 Web；G1、真实 Chat/Responses、完整用途流、费用和期限的未过条件不变，新增真实模型请求为零。
+> 2026-10-20 零生成接续：完整 AC 与现行 Web 差集已核对，实际 HTTP 路由唯一性、目标专属配置 Web 保存与 Provider 409 均通过，原配置/默认/凭证已恢复，见 [AI 配置 T2.5.E4](2026-09-21-ai-provider-model-usage-configuration.md#剩余步骤)及[证据](../../evidence/2026-10-20-ai-zero-generation-acceptance.md)。本轮客户端仅 Web；G1、真实 Chat/Responses、完整用途流、费用和期限的未过条件不变，新增真实模型请求为零。
 
 <a id="priority"></a>
 
 > 归档范围：原SDK迁移、显式协议、输出模式、计量/预算、两条调用链及规定的真实验收；当前费用0授权和旧冻结账本保持。[全局索引](../../tasks/README.md)继续只列未完成Task。
 > [全局优先级与接续规则](../../tasks/README.md#priority-policy)。沿用原任务编号和验收条件，逐项按当前证据更新。
 
-> 当前对账（2026-10-18）：三仓消费者、只读配置和 Web 禁用配置双向保存已补验，安装版用途名称及覆盖值回显通过；E1 隔离服务接管、E2 目录/旧路由和 E3 默认引用客户端子集见 [AI 配置任务](2026-09-21-ai-provider-model-usage-configuration.md#剩余步骤)。实际凭证保留、目标环境/存量混合配置和真实业务/费用仍开放。账本核对后用户明确历史连接/用途全部计入原上限并停止真实生成，当前没有剩余四次。本轮新增生成 0 次，见[核对与停止决定](../../tasks/evidence/2026-10-16-ai-output-mode-compatibility.md#10-17-请求账本核对与停止决定)。
+> 当前对账（2026-10-18）：三仓消费者、只读配置和 Web 禁用配置双向保存已补验，安装版用途名称及覆盖值回显通过；E1 隔离服务接管、E2 目录/旧路由和 E3 默认引用客户端子集见 [AI 配置任务](2026-09-21-ai-provider-model-usage-configuration.md#剩余步骤)。实际凭证保留、目标环境/存量混合配置和真实业务/费用仍开放。账本核对后用户明确历史连接/用途全部计入原上限并停止真实生成，当前没有剩余四次。本轮新增生成 0 次，见[核对与停止决定](../../evidence/2026-10-16-ai-output-mode-compatibility.md#10-17-请求账本核对与停止决定)。
 
 > 2026-10-03 历史对账：T0～T13 本地实现和 G0/G0.1/G2 有界证据保留；其时三类完整业务未齐。研究正向现由 D58～D60 补齐，当前剩余以 G1 表和本页检查点为准。历史免费模型限流不代表今天不可用，9/23 用途测试不代收完整业务；不据旧记录恢复额度。[历史 Review](../reviews/2026-10-03-task-state-reconciliation.md)保留。
 
@@ -43,9 +43,9 @@
 
 G0/G0.1/G2的历史有界结果保留；只读交互与消费者核对已按10-16补验，不重做已过菜单、类型切换或模式映射。10-17原预算及暂停账本保持冻结；本次新授权仅现有Cloudflare、不限次数、费用0，按独立有限样本执行。[目标费用拒绝/实源交付期限验收](2026-10-31-ai-provider-live-fault-acceptance.md)持有本批范围，未通过叶及其他协议/费用门禁继续保留。
 
-10-17 AC48 零生成验收：禁用专用配置的 AI↔行情真实保存与失败草稿保留通过。发现并修复 Desktop 普通草稿与类型切换丢失 `updatedAt`；反向保存请求已携带 `expectedRevision`，计划 `maxCalls=0` 后保存成功，继续保留服务端原子版本检查。缺凭证的环境接管拒绝通过；当时凭证条件单列，现由 10-21 Web 差集接续；本轮不验 Electron，见[当前证据](../../tasks/evidence/2026-10-16-ai-output-mode-compatibility.md#10-17-禁用配置保存与安装态)。
+10-17 AC48 零生成验收：禁用专用配置的 AI↔行情真实保存与失败草稿保留通过。发现并修复 Desktop 普通草稿与类型切换丢失 `updatedAt`；反向保存请求已携带 `expectedRevision`，计划 `maxCalls=0` 后保存成功，继续保留服务端原子版本检查。缺凭证的环境接管拒绝通过；当时凭证条件单列，现由 10-21 Web 差集接续；本轮不验 Electron，见[当前证据](../../evidence/2026-10-16-ai-output-mode-compatibility.md#10-17-禁用配置保存与安装态)。
 
-环境正向接管的服务级零生成结果复用 [AI 配置 T2.5.E1](2026-09-21-ai-provider-model-usage-configuration.md#剩余步骤)及[证据](../../tasks/evidence/2026-10-18-ai-environment-takeover.md)；它使用真实保存服务和内存存储，不关闭实际用户凭证、目标环境或安装态的剩余验收。
+环境正向接管的服务级零生成结果复用 [AI 配置 T2.5.E1](2026-09-21-ai-provider-model-usage-configuration.md#剩余步骤)及[证据](../../evidence/2026-10-18-ai-environment-takeover.md)；它使用真实保存服务和内存存储，不关闭实际用户凭证、目标环境或安装态的剩余验收。
 
 - [x] G1：三类真实业务合同验收（保留原零费用授权与请求账本）。
   - 覆盖验收：AC01、AC19、AC25、AC28、AC36、AC40 的真实接入断言。
@@ -53,7 +53,7 @@ G0/G0.1/G2的历史有界结果保留；只读交互与消费者核对已按10-1
   - 责任与入口：参数优化、discovery、研究助手分别使用业务等价完整提示词并取得可追溯合法结果；研究 V2 已按后继合同通过，剩余只执行下表缺口。
   - 当前预算与停止：用户于本次接续明确授权前四项调用次数不限，并确认使用现有免费 Provider；总费用保持 0，按新授权逐次记账，每个业务样本仍冻结有限 maxAiCalls，禁止隐式重试。旧十次账本和冻结记录保留，不恢复旧余额；同类外部错误连续 3 次停止受影响路由。就绪检查不额外生成，不为验收引入收费 Provider。
   - 证据与放行：逐次记录业务/request ID、源码/SDK/配置/Schema 版本、请求/实际模型、首输出/总耗时、完整率、Schema 合法率、错误分布、用量/费用未知占比及每个合法结果的请求数。三类分别记录；外部阻塞保持未通过，少量样本不证明长期 SLA 或整个回测闭环。
-  - 完成匹配：参数优化复用本轮已验真实结果/六次回测；探索新增两次Qwen请求均合法DTO，单次即可取得合法结果，其中一个完成封存测试与首次采纳；研究复用Cloudflare D58与D59/D60现行V2证据。新增探索用量完整、费用均估算0 USD，旧失败/未知不重写。当前仅风险账户准入源码改变，SDK/提示/Schema输入未变。[三类证据及保护](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md#三类sdk业务合同的最终匹配)。父Task的协议、费用与期限差集保持。
+  - 完成匹配：参数优化复用本轮已验真实结果/六次回测；探索新增两次Qwen请求均合法DTO，单次即可取得合法结果，其中一个完成封存测试与首次采纳；研究复用Cloudflare D58与D59/D60现行V2证据。新增探索用量完整、费用均估算0 USD，旧失败/未知不重写。当前仅风险账户准入源码改变，SDK/提示/Schema输入未变。[三类证据及保护](../../evidence/2026-10-31-cloudflare-first-four-continuation.md#三类sdk业务合同的最终匹配)。父Task的协议、费用与期限差集保持。
 
 ### G1 的业务证据差集
 
@@ -62,28 +62,28 @@ G0/G0.1/G2的历史有界结果保留；只读交互与消费者核对已按10-1
   - 数据：现行同花顺日线、600519.SH、归一化固定来源研究；沿用已验经济假设，开发2025-03-03～04-30、验证05-01～06-30，测试改为09-01～10-31，避开本轮已揭示的07～08月分区。通过正常准备入口冻结完整新窗口，不改旧快照或曝光，不声明严格PIT/统计独立。
   - 样本/预算：独立幂等、1轮、最多1次模型、6次回测、100000/8192输入输出Token及费用0；先完成开发/验证和真实合法精简DTO/装配。失败保留首次原因及预留，不自动重发；同类外部失败边界保持。
   - 完成条件：真实SDK按原strategy-discovery-v2校验并装配合法候选，保存请求/实际模型、时间、用量和费用事实；候选开发/验证资格、封存测试、采纳和风险预览由T19各叶负责，不能由合同通过代收。
-  - 结果：实验 `92aaf787-5a5f-4573-8128-b594f246d6c0` 的真实 Qwen 请求通过原 Zod 与装配，1891/824 Token、估算0 USD；候选开发段零成交导致partial，验证段complete且1笔闭合交易。模型合同通过、资格失败分别保留。[当前证据](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md)。
+  - 结果：实验 `92aaf787-5a5f-4573-8128-b594f246d6c0` 的真实 Qwen 请求通过原 Zod 与装配，1891/824 Token、估算0 USD；候选开发段零成交导致partial，验证段complete且1笔闭合交易。模型合同通过、资格失败分别保留。[当前证据](../../evidence/2026-10-31-cloudflare-first-four-continuation.md)。
 
 - [x] **G1.COST-PROJECTION：策略实验读取当前 SDK 费用账本**
   - 来源：参数优化已取得合法真实结果和上游实报 0 USD，详情摘要却只读取旧 `costStatus/costCurrency`，显示历史元数据缺失。
   - 合同/写集：当前 `sdkExecution` 逐请求、最新计量修订是读取来源；仅已报告费用计入已知合计，估算与未知不补零，不修改预留、结算、旧行或配置。保留无 SDK 账本的旧记录兼容，坏 SDK 账本不能退回旧零值。
   - 验证：真实账本的只读复现 → 零值/估算/未知/新修订/多请求/多币种/旧记录正反例 → Server 类型、写集、构建与边界 → 最小维护同步 → 复用同一真实实验反读；真实模型新增 0 次。
-  - 结果：24 项、Server 类型/构建/写集/边界与维护同步通过；同一参数实验 API/Web 初始与刷新显示已确认 0 USD，失败探索仍为 partial / unknown_cost。原账本未改、无新增模型。[证据](../../tasks/evidence/2026-10-31-optimization-g1-and-cost.md)。
+  - 结果：24 项、Server 类型/构建/写集/边界与维护同步通过；同一参数实验 API/Web 初始与刷新显示已确认 0 USD，失败探索仍为 partial / unknown_cost。原账本未改、无新增模型。[证据](../../evidence/2026-10-31-optimization-g1-and-cost.md)。
 
 - [x] **G1.PROMPT-CONTRACT：业务 JSON Mode 的完整输出合同提示**
   - 来源：目标 discovery 新样本完整返回但 series 枚举等原 Zod 断言失败；输入仅有精简字段描述，没有把输出 Schema 提供给 JSON Mode 模型。原失败、已报告用量及未知请求独立保留，不重置终态。
   - 写集：策略优化实际提示构造及冻结研究语义说明、定向消息回归、本 Spec/Task；使用当前 `aiGenerationContracts` 生成 Schema 文本，覆盖参数优化和 discovery，不改变输出合同、价格、模式、默认或数据资格门禁。
   - 顺序：实际消息正反例 → 既有反馈隔离/探索/采纳回归 → Server 类型/写集/边界 → 最小目标同步 → 按本轮免费授权用正式新建入口、独立幂等与单次预算取得完整合法结果。旧未知预留保留，SDK 不重试。
   - 预算：本地及同步零模型；后续各业务样本仍固定最多 1 次实际请求、费用 0，不以提示修复完成代收 G1 或 T19。
-  - 当前结果：源码提示及示例已实施并通过本地/隔离/目标同步；参数优化真实合同通过。原OpenRouter探索五次请求按第三次格式失败停止，原失败和未知预留保持；后续用户新授权的Cloudflare探索已取得合法DTO，合同闭环见G1.CLOUDFLARE-DISCOVERY，T19已独立通过并归档。[原证据](../../tasks/evidence/2026-10-31-optimization-g1-and-cost.md)及[新证据](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md)。
+  - 当前结果：源码提示及示例已实施并通过本地/隔离/目标同步；参数优化真实合同通过。原OpenRouter探索五次请求按第三次格式失败停止，原失败和未知预留保持；后续用户新授权的Cloudflare探索已取得合法DTO，合同闭环见G1.CLOUDFLARE-DISCOVERY，T19已独立通过并归档。[原证据](../../evidence/2026-10-31-optimization-g1-and-cost.md)及[新证据](../../evidence/2026-10-31-cloudflare-first-four-continuation.md)。
 
 | 业务 | 本次判定与原责任 |
 | --- | --- |
 | 研究助手 | 研究后继 Spec §5.3 使用 V2；D58/D59 正式生成、原 Zod/数字/范围/真实 Tool 绑定及完整 trace 通过，D59 实际上游费用 0，D60 Web 通过。复用 AC01/19/25/28/40 的适用研究子断言；V1 历史保持独立读取，不要求重生成。 |
 | 参数优化 | 本次真实实验 `60ea6a25-7cec-4a37-888e-0efcb66e4c83` 合同与参数差异合法，1 次模型、728/508 Token、上游实报 0 USD，6 次真实回测及留出集揭示通过；费用摘要读取修复由 G1.COST-PROJECTION 接续。该结果不代收 discovery 或 T19。 |
-| discovery | 原OpenRouter/free三次schema_invalid和两次网络未知保持冻结，不重发；后继Cloudflare合法DTO、六次回测、封存测试、首次正式V2采纳及风险预览已通过，见[当前匹配](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md)。G1三类业务及[T19](2026-09-09-strategy-risk-ai-optimization.md)已分别完成，不代收其他协议/费用/期限。 |
+| discovery | 原OpenRouter/free三次schema_invalid和两次网络未知保持冻结，不重发；后继Cloudflare合法DTO、六次回测、封存测试、首次正式V2采纳及风险预览已通过，见[当前匹配](../../evidence/2026-10-31-cloudflare-first-four-continuation.md)。G1三类业务及[T19](2026-09-09-strategy-risk-ai-optimization.md)已分别完成，不代收其他协议/费用/期限。 |
 
-D58/D59 的调用分别保留原独立授权与账本，不回填到旧十次额度或产生可复用余额。详细断言、协议及费用边界见[本次证据对账](../../tasks/evidence/2026-10-30-nonmobile-evidence-reconciliation.md)。
+D58/D59 的调用分别保留原独立授权与账本，不回填到旧十次额度或产生可复用余额。详细断言、协议及费用边界见[本次证据对账](../../evidence/2026-10-30-nonmobile-evidence-reconciliation.md)。
 
 ## 已完成任务索引
 
@@ -158,7 +158,7 @@ AC01–AC29 保留初稿稳定编号，AC30–AC40 对应第一轮新增决策�
 | AC45 分层验证                    | T12.2、T12.3                   | Server 状态/组件消费；G0.1、G2                                                                                                                                                        |
 | AC46 编辑状态与验证竞态          | T12.3                          | 组件交互与异步竞态；G2                                                                                                                                                                |
 | AC47 Provider 类型统一编辑流程   | T13.1                          | 同一编辑器的双向类型切换、公共字段保留与专属字段隔离；G2                                                                                                                              |
-| AC48 Provider 类型转换保存       | T13.2                          | 目标 Web 带占位凭证双向保存、版本贯穿、AI→行情原密文保留、反向空 Key 地址保护及明确重填通过；完整保护恢复。实际认证另列，[回执](../../tasks/evidence/2026-10-21-ai-credential-type-conversion.md) |
+| AC48 Provider 类型转换保存       | T13.2                          | 目标 Web 带占位凭证双向保存、版本贯穿、AI→行情原密文保留、反向空 Key 地址保护及明确重填通过；完整保护恢复。实际认证另列，[回执](../../evidence/2026-10-21-ai-credential-type-conversion.md) |
 
 ## 5. 验证入口与成本控制
 
@@ -227,7 +227,7 @@ rtk git diff --check
   - 输入：D56c 完整真实 SSE 与当前编译实现；先离线消费与请求差异核对，再按持续授权执行有必要的真实调用。
   - 完成条件：正常终止、原生成与业务校验通过，trace 节点输入／输出及正文完整性可反读；诊断审计占位与真实数据库关联明确区分。
 - [x] J-G3-WEB：仅用D59已存报告补验当前Web的阅读／来源展开／刷新／历史列表及实际／模拟隔离；拦截写请求，无新增模型、来源续期、配置或业务写入。以D59与D58及独立DSA／R01有效证据核对G3收口，不代收SDK G1其他业务。
-- [x] J-G3-OR：按新授权复测当前默认OpenRouter/free的正式G3；依赖已验镜像／V2开启及研究用途就绪，单次零费用、失败即停。原生成／数字／引用／trace及持久化独立核对，不由D58代收。见[复测回执](../../tasks/evidence/2026-10-29-g3-openrouter-formal-retest.md)。
+- [x] J-G3-OR：按新授权复测当前默认OpenRouter/free的正式G3；依赖已验镜像／V2开启及研究用途就绪，单次零费用、失败即停。原生成／数字／引用／trace及持久化独立核对，不由D58代收。见[复测回执](../../evidence/2026-10-29-g3-openrouter-formal-retest.md)。
 - [x] J-G3-3：正式目标 G3（本次Cloudflare/Qwen路径，关联研究G3-D58）。
   - 用户已授权正式部署、临时启用 V2及验收报告落库，结束恢复开关和配置，保留报告；零付费、GLM冻结、WIP与空索引保护继续。
   - [x] J-G3-3A：最小目标正式部署与模块反读。依赖[配置T7](2026-09-21-ai-provider-model-usage-configuration.md#g3所需的通用请求参数)本地检查，先备份原配置／业务清单；根据容器与兼容性选择 infra 最小入口，核对Server／Worker／实际Schema与capabilities，不隐式清库。
@@ -240,9 +240,9 @@ J-G3-1／2沿用D57；J-G3-3A／3B／3C及最终Review通过，本次正式路�
 - [x] 核对可见三仓的新模式消费者及穷尽映射：主仓 10 个生产入口、DSA 独立布尔模式和 infra 边界已核实；Schema 7、受控 Server/SDK 44 项及 API client/Mobile 类型检查通过。证据限定当前代码/共享类型，不宣称未知外部客户端兼容。
 - [x] 原代码 CI 等待条件由当前 `main@da002744` 的成功 CI 接续；本轮 docs 未提交，不触发新 PR 或远端 CI。
 - [x] 浏览器两级输出选项、禁用状态和原值回显通过；协议切换、当前三种中文方式及窄屏检查见 10-16 记录。
-- [x] 原三类真实业务门禁：D58/D59/D60研究、真实参数优化与Cloudflare探索已完成原AC40/G1；原模式与严格业务合同没有放宽。各新增配置/用途的适用资格继续由配置Task持有，不推广为所有模型/用途都已实源通过。[三类证据](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md#三类sdk业务合同的最终匹配)。
-- [x] 原协议/输出模式断言：T12/G0.1的四条官方适配器本地HTTP及原严格输出、完整流/失败计量通过；本次前的Responses/OpenAI原生Chat选定探针只按其实际范围记录。Anthropic流式用途仍为schema_invalid/费用未知，未声明正向通过；SDK原AC43不要求四家实源全组合，该组合的实际配置资格由配置Task继续持有。[历史协议事实](../../tasks/evidence/2026-10-31-ai-provider-protocols-and-stall.md)、[最终范围对账](../reviews/2026-10-31-ai-sdk-final-ac-review.md)。
+- [x] 原三类真实业务门禁：D58/D59/D60研究、真实参数优化与Cloudflare探索已完成原AC40/G1；原模式与严格业务合同没有放宽。各新增配置/用途的适用资格继续由配置Task持有，不推广为所有模型/用途都已实源通过。[三类证据](../../evidence/2026-10-31-cloudflare-first-four-continuation.md#三类sdk业务合同的最终匹配)。
+- [x] 原协议/输出模式断言：T12/G0.1的四条官方适配器本地HTTP及原严格输出、完整流/失败计量通过；本次前的Responses/OpenAI原生Chat选定探针只按其实际范围记录。Anthropic流式用途仍为schema_invalid/费用未知，未声明正向通过；SDK原AC43不要求四家实源全组合，该组合的实际配置资格由配置Task继续持有。[历史协议事实](../../evidence/2026-10-31-ai-provider-protocols-and-stall.md)、[最终范围对账](../reviews/2026-10-31-ai-sdk-final-ac-review.md)。
 
 2026-10-04原检查、后继源码CI、生命周期/取消及本次目标真实交付期限分别按匹配输入复用；各层没有互相替代。实际新增模型仅属于本批配置验收的5次Qwen，G1业务没有为收尾重生成；本Task未提交、未发PR或触发新CI。
 
-数据库唯一来源及当前镜像受控恢复复用[原记录](../../tasks/evidence/2026-10-19-ai-provider-database-only.md#2026-10-20-目标只读与同一镜像副本接续)与[恢复证据](../../tasks/evidence/2026-10-20-research-execution-recovery.md)。本Task当前完成结论由[48项及JSON Mode评审](../reviews/2026-10-31-ai-sdk-final-ac-review.md)持有；现行规格继续有效，历史环境、失败和旧额度仍保留原观察时点。
+数据库唯一来源及当前镜像受控恢复复用[原记录](../../evidence/2026-10-19-ai-provider-database-only.md#2026-10-20-目标只读与同一镜像副本接续)与[恢复证据](../../evidence/2026-10-20-research-execution-recovery.md)。本Task当前完成结论由[48项及JSON Mode评审](../reviews/2026-10-31-ai-sdk-final-ac-review.md)持有；现行规格继续有效，历史环境、失败和旧额度仍保留原观察时点。

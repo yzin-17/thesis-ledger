@@ -6,4 +6,4 @@
 - [x] A2 唯一自有估算、正常立即运行一次、真实正式修订、succeeded/attempt1/owner1 和释放租约通过。
 - [x] A3 原估算/旧历史/配置与十二账户保护通过，新账户归零停用、原路由恢复，Web 实际历史及最终只读收尾通过。更新共同门禁并继续原清单。
 
-[验收回执](../../tasks/evidence/2026-10-21-automation-market-consumer.md)与[预案](../../tasks/evidence/2026-10-21-automation-market-consumer-plan.md)保留所有原始绑定。没有模型调用、通知、永久路由或来源启停变更。
+[验收回执](../../evidence/2026-10-21-automation-market-consumer.md)与[预案](../../evidence/2026-10-21-automation-market-consumer-plan.md)保留所有原始绑定。没有模型调用、通知、永久路由或来源启停变更。

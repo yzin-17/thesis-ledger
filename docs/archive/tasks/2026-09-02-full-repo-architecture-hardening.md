@@ -44,7 +44,7 @@
 - [x] 不破坏现有 execution / cash / baseline 单命令语义。
 - [x] 复合命令失败时 revision / generation 不产生半提交。
 
-实施证据：#26；Architecture SSOT：`docs/architecture/2026-09-02-server-module-boundaries.md`。
+实施证据：#26；Architecture SSOT：`docs/design/2026-09-02-server-module-boundaries.md`。
 
 ## 4. TASK-ARCH-073：原子持仓身份迁移
 
@@ -201,7 +201,7 @@
 
 优先级：P2
 
-- [x] 在 `docs/architecture/` 增加简洁 Server module boundary 文档。
+- [x] 在 `docs/specs` 增加简洁 Server module boundary 文档。
 - [x] 记录 Ledger -> Portfolio 的写边界：Portfolio 发起用户命令，Ledger 拥有多事实事务。
 - [x] 记录 Risk -> Notification 单向依赖；Notification 不反向依赖 Risk。
 - [x] 记录 Performance 读取 Ledger/Market projection，但不拥有 Ledger 写入。
@@ -209,7 +209,7 @@
 - [x] 标明 V2 已覆盖旧 Position Adjustment 写入语义。
 - [x] 不复制各 Spec 的完整业务协议，只维护模块所有权与依赖方向。
 
-实施证据：#31；文档：`docs/architecture/2026-09-02-server-module-boundaries.md`。
+实施证据：#31；文档：`docs/design/2026-09-02-server-module-boundaries.md`。
 
 ## 11. TASK-REVIEW-080：最终全仓回归 Review
 

@@ -33,4 +33,4 @@
 
 构建收尾：`pnpm --filter @thesis-ledger/server build` 通过，`git diff --check` 通过。主任务仅关闭本地修复叶子 `M22-followup-calendar`，M22 父项及真实门禁保持开放。
 
-后续部署进展：官方 `sync-code.sh thesis-ledger` 已成功同步 Server/Worker，健康检查和结算日历构建文件摘要一致性通过；详见 [目标运行态记录](../../tasks/evidence/2026-09-27-target-runtime-gates.md)。此前“尚未更新”描述对应本地验证时点；真实来源期末成交验收仍未完成。
+后续部署进展：官方 `sync-code.sh thesis-ledger` 已成功同步 Server/Worker，健康检查和结算日历构建文件摘要一致性通过；详见 [目标运行态记录](../../evidence/2026-09-27-target-runtime-gates.md)。此前“尚未更新”描述对应本地验证时点；真实来源期末成交验收仍未完成。

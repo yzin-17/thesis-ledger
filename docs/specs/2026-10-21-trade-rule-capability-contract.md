@@ -4,11 +4,11 @@
 
 ## 问题与目标
 
-当前每手参考与静态信息没有完整规则内容、精确适用范围和有效时间，不能作为表单或 Server 的已验证依据。[当前官方来源核对](../tasks/evidence/2026-10-21-trade-rule-source-contract.md)还表明，申报整手不能代替部分成交数量，单笔价格不能自动覆盖聚合均价。
+当前每手参考与静态信息没有完整规则内容、精确适用范围和有效时间，不能作为表单或 Server 的已验证依据。[当前官方来源核对](../evidence/2026-10-21-trade-rule-source-contract.md)还表明，申报整手不能代替部分成交数量，单笔价格不能自动覆盖聚合均价。
 
 先形成一份只表达规则能力的稳定 V3 Schema，要求请求与响应在范围、时间和内容上自洽。结构校验不证明发布机构可信或来源字节实际匹配，不能授予 `capabilityVerification=VERIFIED`。本阶段不新增来源、路由、准入系统、业务入口或数据库结构。
 
-2026-10-21 用户明确将本轮 T18 收敛为“基本校验＋规则参考”，见[范围决定](../tasks/evidence/2026-10-21-trade-rule-source-contract.md#trade-rule-compromise)。本合同已完成的 Schema 和时钟边界继续保留；真实规则生产、来源资格核对、服务端命令正向验证及完整规则 Web 消费移出本轮必须交付范围，仍未通过原完整实源验收。当前交付以[成交产品 Spec](2026-08-26-trade-product-experience.md#成交录入)为准，不能由规则参考授予 `VERIFIED`。
+2026-10-21 用户明确将本轮 T18 收敛为“基本校验＋规则参考”，见[范围决定](../evidence/2026-10-21-trade-rule-source-contract.md#trade-rule-compromise)。本合同已完成的 Schema 和时钟边界继续保留；真实规则生产、来源资格核对、服务端命令正向验证及完整规则 Web 消费移出本轮必须交付范围，仍未通过原完整实源验收。当前交付以[成交产品 Spec](2026-08-26-trade-product-experience.md#成交录入)为准，不能由规则参考授予 `VERIFIED`。
 
 ## 请求与响应
 

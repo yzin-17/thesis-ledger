@@ -7,7 +7,7 @@
 
 ## 执行边界与基线
 
-三仓初始 `git status --short` 均为空。主仓 HEAD 为 `514abeebfe57bac0c16271439d8b777ff3b02a9f`，DSA 为 `d40549602d187da7bdd0e8bebb59d2a0fc271919`，infra 为 `dd3d92b5f46a780d10fdc3e66543b98471aa9bc2`。初始 `docs/tasks/` 有 65 个主题文件，其中 32 个包含未勾选项；这不是 32 个待实施功能，包含历史范围和已取消计划。
+三仓初始 `git status --short` 均为空。主仓 HEAD 为 `514abeebfe57bac0c16271439d8b777ff3b02a9f`，DSA 为 `d40549602d187da7bdd0e8bebb59d2a0fc271919`，infra 为 `dd3d92b5f46a780d10fdc3e66543b98471aa9bc2`。初始 `docs/tasks` 有 65 个主题文件，其中 32 个包含未勾选项；这不是 32 个待实施功能，包含历史范围和已取消计划。
 
 本轮遵循工作区/主仓 AGENTS、Codex/RTK 规则及文档生命周期指南。没有可调用的 Context Mode，使用 RTK 与脚本筛选。三仓源码只读，写集为主仓 `docs/`；应用测试、Provider、容器更新、业务写入和故障注入均不执行。
 

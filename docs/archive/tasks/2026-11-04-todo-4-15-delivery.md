@@ -26,7 +26,7 @@
 
 ## 最终一致性复核
 
-AC04～AC15、各子任务与DSA前置均完成。命令、输入、运行态、浏览器、来源次数及数据保护由[最终验收](../../tasks/evidence/2026-11-05-todo-4-15-final-acceptance.md)和[单一最终复核](../reviews/2026-11-05-todo-4-15-delivery-review.md)持有；[使用说明](../../guides/market-chart-and-rule-monitor.md)描述当前产品行为。
+AC04～AC15、各子任务与DSA前置均完成。命令、输入、运行态、浏览器、来源次数及数据保护由[最终验收](../../evidence/2026-11-05-todo-4-15-final-acceptance.md)和[单一最终复核](../reviews/2026-11-05-todo-4-15-delivery-review.md)持有；[使用说明](../../guides/market-chart-and-rule-monitor.md)描述当前产品行为。
 
 富途19/20、Yahoo6/8及失败事实保留，5条临时路由恢复至187；当前真实ETF报价准入不足按单证券失败保留。规则监测配置保持关闭，LM Studio本次保存配置的用途测试通过，未增加付费模型或通知。8张金融表摘要一致，三仓HEAD与暂存不变；其他任务的并发修改保留。正式快更不作为生产镜像或CI证明。
 

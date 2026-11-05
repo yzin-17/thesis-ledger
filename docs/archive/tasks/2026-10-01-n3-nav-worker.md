@@ -35,4 +35,4 @@
 
 官方完整更新已经生成当前应用镜像并完成数据库升级；之后两次源码修复经 `sync-code.sh dsa`、`sync-code.sh thesis-ledger` 应用到容器可写层，镜像 ID 保持不变。重建后须通过官方入口再部署当前源码。没有清库、删除 volume、提交或发布；全部既有未提交工作保留。
 
-证据：[N3 状态机与隔离执行](../../tasks/evidence/2026-10-01-n3-nav-worker.md)、[N4 最终目标验收](../../tasks/evidence/2026-10-01-n4-nav-target.md)。当前主 Task 的 E01-N3/E01-N4 已勾选，其余独立事项继续按主 Task 判断。
+证据：[N3 状态机与隔离执行](../../evidence/2026-10-01-n3-nav-worker.md)、[N4 最终目标验收](../../evidence/2026-10-01-n4-nav-target.md)。当前主 Task 的 E01-N3/E01-N4 已勾选，其余独立事项继续按主 Task 判断。

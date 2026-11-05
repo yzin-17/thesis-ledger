@@ -2,11 +2,11 @@
 
 > 历史记录（2026-10-15 归档）：保留原步骤、编号、完成条件、当时状态和证据。尚未通过的条件已由[当前 Task](../../tasks/2026-10-09-unified-data-capability-adapter.md#route-target-acceptance)承接；不再从本文启动实施，归档不表示验收完成。
 
-> 2026-10-21 接续索引：现行 Canonical 的精确 HiThink→Tencent 路由已完成冷主源 1537.267ms、受控不可用后成功备用 453.987167ms 及恢复后 Web/数据保护，[当前 G1 与 AC4/6/8 对应已通过](../../tasks/evidence/2026-10-21-route-failover-acceptance.md)。下文旧默认主备、未通过 checkbox 和 Review 保留为历史时点；不把用户已跳过的旧 AKShare 分支记为通过。
+> 2026-10-21 接续索引：现行 Canonical 的精确 HiThink→Tencent 路由已完成冷主源 1537.267ms、受控不可用后成功备用 453.987167ms 及恢复后 Web/数据保护，[当前 G1 与 AC4/6/8 对应已通过](../../evidence/2026-10-21-route-failover-acceptance.md)。下文旧默认主备、未通过 checkbox 和 Review 保留为历史时点；不把用户已跳过的旧 AKShare 分支记为通过。
 
 > 状态对账（2026-10-03）：历史范围被替代/已实现待验收：当前精确路由、主备与 provenance 已由 Canonical E02/E04、共同价格四条 Run/三口径接续；V2 默认主备与 handshake 路径不再是现行执行目标。AKShare/EastMoney 已被用户跳过，不再强制恢复。旧 ≤5s/≤10s 冷主源/成功备用性能断言没有当前等价测量，G1 保留该证据缺口，不以两秒 Run 终态代替请求延迟。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
 
-对应 Spec：[市场数据 RouteTarget V2 Spec](../../specs/2026-09-16-market-data-route-target-v2.md)
+对应 Spec：[市场数据 RouteTarget V2 Spec](../specs/2026-09-16-market-data-route-target-v2.md)
 
 > 状态：T1–T3、当前 Docker、Tencent 主源与主路径性能完成；AkShare/EastMoney 真实备用源门禁未通过
 

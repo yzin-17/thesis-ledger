@@ -3,20 +3,20 @@
 > 归档状态：2026-10-06 全部本主题任务与 G1—G3 完成，最终一致性审查通过。现行产品契约继续保留在 Spec。
 > 历史状态对账（2026-10-04）：T00 契约冻结完成，T01 独立持久化叶已形成并验证；完整功能尚未验收。用户身份 API、模型执行、正式确认保存、客户端和 G1—G3 仍待完成。详见本批独立证据。
 >
-> 2026-10-05 部署检查点：两项新增 migration 已通过目标保数据升级，五张编写表及应用角色权限已就绪；原有 Ledger/Journal/AI 历史保留。仅解除结构与部署前置，不关闭身份/API、正式保存或产品 AC；详见[目标基线证据](../../tasks/evidence/2026-10-05-target-preserve-upgrade-baseline.md)。
+> 2026-10-05 部署检查点：两项新增 migration 已通过目标保数据升级，五张编写表及应用角色权限已就绪；原有 Ledger/Journal/AI 历史保留。仅解除结构与部署前置，不关闭身份/API、正式保存或产品 AC；详见[目标基线证据](../../evidence/2026-10-05-target-preserve-upgrade-baseline.md)。
 
-> 2026-10-05 实施增量：可信用户/会话与草稿 HTTP 已通过双用户隔离验收；专属编写队列、调用审计、取消/期限和有界未派发恢复已通过真实 PostgreSQL/Redis/受控 HTTP 的 10 项验证。源码共 31 项 migration，目标仍为 28 项。详见[身份证据](../../tasks/evidence/2026-10-05-strategy-identity-isolated.md)、[执行证据](../../tasks/evidence/2026-10-05-authoring-execution-isolated.md)。下文旧时点“无 principal”是历史状态；完整 T01/T02 和产品 AC 继续开放。
+> 2026-10-05 实施增量：可信用户/会话与草稿 HTTP 已通过双用户隔离验收；专属编写队列、调用审计、取消/期限和有界未派发恢复已通过真实 PostgreSQL/Redis/受控 HTTP 的 10 项验证。源码共 31 项 migration，目标仍为 28 项。详见[身份证据](../../evidence/2026-10-05-strategy-identity-isolated.md)、[执行证据](../../evidence/2026-10-05-authoring-execution-isolated.md)。下文旧时点“无 principal”是历史状态；完整 T01/T02 和产品 AC 继续开放。
 
-> 2026-10-05 后续检查点：分析引用、确认失效与原子应用已完成独立叶，真实集成扩展至 15 项、纯函数 6 项；源码追加应用状态 migration 后为 32 项/80 表。详见[分析验收](../../tasks/evidence/2026-10-05-authoring-analysis-integrity.md)。T03 的目录、关键条件澄清和完整生成语义仍待实施，目标仍未升级新结构。
+> 2026-10-05 后续检查点：分析引用、确认失效与原子应用已完成独立叶，真实集成扩展至 15 项、纯函数 6 项；源码追加应用状态 migration 后为 32 项/80 表。详见[分析验收](../../evidence/2026-10-05-authoring-analysis-integrity.md)。T03 的目录、关键条件澄清和完整生成语义仍待实施，目标仍未升级新结构。
 
-> 2026-10-06 早期检查点：目标已通过后续官方保数据更新达到 32 项 migration、80 表，head 为 `20261005143000_authoring_analysis_application`；以上“目标 28 项/未升级”均为较早时点记录。身份 I4 已完成当前目标双用户 HTTP 验收，45 项检查通过，77 张受保护表行数及内容摘要保持，标记草稿已丢弃、会话已撤销。见[目标身份证据](../../tasks/evidence/2026-10-06-strategy-identity-target.md)及[部署依据](../../tasks/evidence/2026-10-05-journal-review-completion.md)。T01 分组、完整产品 AC 和 G1—G3 继续开放；本轮停止于 I4。
+> 2026-10-06 早期检查点：目标已通过后续官方保数据更新达到 32 项 migration、80 表，head 为 `20261005143000_authoring_analysis_application`；以上“目标 28 项/未升级”均为较早时点记录。身份 I4 已完成当前目标双用户 HTTP 验收，45 项检查通过，77 张受保护表行数及内容摘要保持，标记草稿已丢弃、会话已撤销。见[目标身份证据](../../evidence/2026-10-06-strategy-identity-target.md)及[部署依据](../../evidence/2026-10-05-journal-review-completion.md)。T01 分组、完整产品 AC 和 G1—G3 继续开放；本轮停止于 I4。
 
-> 2026-10-06 执行目标增量：A5 已按目标准入、在线执行、进程恢复拆为独立叶。A5-D 完成，24 项实际 HTTP 检查通过；目标编写 Worker 心跳有效，两个现有 Provider 均缺少编写三用途，六次提交均正确拒绝且无操作/调用事实增加，77 张受保护表摘要保持。见[目标准入证据](../../tasks/evidence/2026-10-06-authoring-target-admission.md)。下一叶 A5-L 需选定模型并完成现行编写用途验证；A5-R、完整 T02/T05 和 G1—G3 保持开放。本轮停止于 A5-D。
+> 2026-10-06 执行目标增量：A5 已按目标准入、在线执行、进程恢复拆为独立叶。A5-D 完成，24 项实际 HTTP 检查通过；目标编写 Worker 心跳有效，两个现有 Provider 均缺少编写三用途，六次提交均正确拒绝且无操作/调用事实增加，77 张受保护表摘要保持。见[目标准入证据](../../evidence/2026-10-06-authoring-target-admission.md)。下一叶 A5-L 需选定模型并完成现行编写用途验证；A5-R、完整 T02/T05 和 G1—G3 保持开放。本轮停止于 A5-D。
 
 > 任务标识：natural-language-strategy-authoring  
 > 日期：2026-09-18  
 > 对应 Spec：[自然语言创建与修改回测策略](../../specs/2026-09-18-natural-language-strategy-authoring.md)  
-> 状态：2026-10-06 T00—T08、G1—G3、T07-B/T07-C 与 T04-P 均完成。真实浏览器、目标匿名/双用户分组、当前 v6 描述到唯一 v1 与显式回测通过；最终一致性审查通过。本 Task 归档，现行 Spec 保留。见[浏览器证据](../../tasks/evidence/2026-10-06-authoring-browser.md)和[完整验收对账](../../tasks/evidence/2026-10-06-authoring-completion.md)。较早检查点保留为历史依据。
+> 状态：2026-10-06 T00—T08、G1—G3、T07-B/T07-C 与 T04-P 均完成。真实浏览器、目标匿名/双用户分组、当前 v6 描述到唯一 v1 与显式回测通过；最终一致性审查通过。本 Task 归档，现行 Spec 保留。见[浏览器证据](../../evidence/2026-10-06-authoring-browser.md)和[完整验收对账](../../evidence/2026-10-06-authoring-completion.md)。较早检查点保留为历史依据。
 > 最初交付范围（历史）：契约冻结与独立持久化，不调用收费模型，不更新目标运行态，不提交 Git。父对话已将底层补丁聚合到主仓，并保留并行工作区。
 
 ## 1. 范围、责任与前置条件
@@ -32,7 +32,7 @@
 - [x] T03-C：服务端结构化条件确认与目录权威解析。扩展共享草稿合同，确定性检查关键条件、问题依赖、需求原文覆盖；目录解析归 market。写集为共享编写合同、market 解析入口、编写语义 helper/提交门禁及定向验证。完成条件：缺少/过期/不支持条件不可生成，不能用模型默认值补齐。
 - [x] T03-G：生成结果验证和原子应用。依赖 T03-C；校验能力、确认约束及每项需求覆盖路径，操作绑定修订，应用与重复请求保持原子一致。写集编写结果 helper/repository/controller；真实隔离 API 验证。
 - [x] T04-S：正式策略归属、原子保存与来源。依赖 T03-G；策略领域拥有事务创建能力，编写模块消费；新增保数据 migration 同步结构清单/运行打包门禁。隔离验证并发/重试/回滚/跨用户和历史兼容。
-- [x] G1：上述真实组件受控纵向闭环；首轮 2 文件 16 项真实隔离集成通过，后续扩大至 3 文件 31 项，详见[生成保存验收](../../tasks/evidence/2026-10-06-authoring-generation-save.md)。T03-C、T03-G、T04-S 已通过此阶段验收。
+- [x] G1：上述真实组件受控纵向闭环；首轮 2 文件 16 项真实隔离集成通过，后续扩大至 3 文件 31 项，详见[生成保存验收](../../evidence/2026-10-06-authoring-generation-save.md)。T03-C、T03-G、T04-S 已通过此阶段验收。
 - [x] T05-M：服务端授权的局部变更、差异提案及确认/放弃。依赖 G1；范围外深度比较，旧提案与空修改拒绝；取消/恢复复用已实现状态机，目标故障验收归 A5-R。
 - [x] T06-W：身份、恢复、自动保存及正式保存工作页。依赖 G1 和来源合同；TanStack Query 管理状态，保持手动创建入口；原子类及现有 shadcn 组件。
 - [x] T07-W：澄清卡片、可读规则、结构化/高级编辑、模型费用与局部修改审核。依赖 T03-G/T05-M/T06-W；共享实际定义预览，完成组件与类型/build 验证。
@@ -113,7 +113,7 @@ T01 为分组，按以下依赖逐叶实施；不是把数据库、API、模型�
 
 T02 还需独立持久化 Provider attempt 用量/费用审计，不能仅依赖本批操作 outcome；finish 在租约/attempt 失效时会拒绝状态提交，实际调用事实必须在该 CAS 之外保留。排队取消、续租、结果未知恢复与租约过期收敛仍归原 T02/T05。
 
-本批独立证据：[2026-10-04 并行交付](../../tasks/evidence/2026-10-04-natural-language-strategy-parallel.md)。T01-C/R/O/P 只覆盖 NL-AC-06/08/13/14 的底层断言；任何整项 AC 及 G1—G3 都不能由其局部通过勾选。
+本批独立证据：[2026-10-04 并行交付](../../evidence/2026-10-04-natural-language-strategy-parallel.md)。T01-C/R/O/P 只覆盖 NL-AC-06/08/13/14 的底层断言；任何整项 AC 及 G1—G3 都不能由其局部通过勾选。
 
 - [x] T02：实现指定模型的持久化编写执行
   - 覆盖：NL-AC-11、NL-AC-12、NL-AC-13。
@@ -216,7 +216,7 @@ T02 还需独立持久化 Provider attempt 用量/费用审计，不能仅依赖
 
 ## 7. 验证入口与证据记录
 
-实施与验收在责任任务中记录实际测试路径及命令。可复用入口如下，本次实际结果见[当前验收对账](../../tasks/evidence/2026-10-06-authoring-completion.md)及历史阶段证据；未执行门禁保持开放。
+实施与验收在责任任务中记录实际测试路径及命令。可复用入口如下，本次实际结果见[当前验收对账](../../evidence/2026-10-06-authoring-completion.md)及历史阶段证据；未执行门禁保持开放。
 
 | 层级          | 入口或要求                                                                                     |
 | ------------- | ---------------------------------------------------------------------------------------------- |
@@ -233,10 +233,10 @@ T02 还需独立持久化 Provider attempt 用量/费用审计，不能仅依赖
 
 ### 2026-10-04 阶段检查点
 
-父对话集成复验：新增文件及共享导出、四条边界规则、五张 raw-owned 表和两项 migration 已最小合入，保留 Journal/行情/AI dirty 修改。修正草稿分页游标的 PostgreSQL 微秒截断；主仓专用 tmpfs PostgreSQL 14 项通过，包含同一毫秒内四条记录连续分页及 UUID 同时刻边界。Schema 667 项、repository 9 项、类型/build、定向复杂度上限 20、28 migration/运行打包输入与边界门禁通过。目标数据库和用户身份/API 仍未验收；完整记录见[父聚合证据](../../tasks/evidence/2026-10-04-natural-language-strategy-integration.md)。
+父对话集成复验：新增文件及共享导出、四条边界规则、五张 raw-owned 表和两项 migration 已最小合入，保留 Journal/行情/AI dirty 修改。修正草稿分页游标的 PostgreSQL 微秒截断；主仓专用 tmpfs PostgreSQL 14 项通过，包含同一毫秒内四条记录连续分页及 UUID 同时刻边界。Schema 667 项、repository 9 项、类型/build、定向复杂度上限 20、28 migration/运行打包输入与边界门禁通过。目标数据库和用户身份/API 仍未验收；完整记录见[父聚合证据](../../evidence/2026-10-04-natural-language-strategy-integration.md)。
 
 - 任务/状态：T00、T01-C/R/O/P 底层叶完成；原 T01 分组与全部产品 AC、G1—G3 仍未完成。
-- 输出/基线：工作区 `/Users/yzin/.codex/worktrees/11ea/thesis-ledger`，HEAD `514abeebfe57bac0c16271439d8b777ff3b02a9f`；新增文件及共享最小补丁见[独立证据](../../tasks/evidence/2026-10-04-natural-language-strategy-parallel.md)。
+- 输出/基线：工作区 `/Users/yzin/.codex/worktrees/11ea/thesis-ledger`，HEAD `514abeebfe57bac0c16271439d8b777ff3b02a9f`；新增文件及共享最小补丁见[独立证据](../../evidence/2026-10-04-natural-language-strategy-parallel.md)。
 - 证据：共享包 616 项测试、repository 9 项定向测试、受限 app role 的 PostgreSQL 13 项集成测试通过；受影响包 build/typecheck、边界、迁移输入、复杂度与秘密检查通过。隔离容器已移除。
 - 决策/剩余：模型用途尚未注册，用户 principal 与正式创建事务/来源读取仍为具体缺口；未注册 Controller/Nest Module，不进行目标部署或收费调用。T02/T03/T04/T06 必须先消费父对话整合后的现行依赖。
 - 所有权/活跃工作：只修改本工作区策略编写主题；没有子代理、后台服务、浏览器或保留测试端口；未 stage/commit/push。下方 2026-09-18 内容为历史文档阶段记录。

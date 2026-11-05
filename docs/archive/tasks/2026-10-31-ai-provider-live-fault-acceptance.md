@@ -4,7 +4,7 @@
 
 ## 当前执行摘要
 
-ZF0～ZF6全部通过，完成归档。本批真实Cloudflare模型5次，费用为估算0 USD；目标费用拒绝、空正文/仅心跳120秒、输出间隔60秒及共享595秒执行期限均通过，原配置/数据保持、所属目录已清理。[完整证据](../../tasks/evidence/2026-10-31-ai-provider-live-fault-acceptance.md)。既有研究/T19、完整本机墙钟与其他已验输入复用；新闻/来源续验0次。执行包由`.recovery-artifacts/first-four-zero-current.json`指向。
+ZF0～ZF6全部通过，完成归档。本批真实Cloudflare模型5次，费用为估算0 USD；目标费用拒绝、空正文/仅心跳120秒、输出间隔60秒及共享595秒执行期限均通过，原配置/数据保持、所属目录已清理。[完整证据](../../evidence/2026-10-31-ai-provider-live-fault-acceptance.md)。既有研究/T19、完整本机墙钟与其他已验输入复用；新闻/来源续验0次。执行包由`.recovery-artifacts/first-four-zero-current.json`指向。
 
 生产源码、依赖、Schema和镜像不改；写集为`scripts/ai-provider-target-fault-*.mjs`、本Spec/Task、父Task与证据/必要导航。Docker执行与所属目录清理由新维护入口统一负责。主配置不保存、真实凭据不出原容器，失败即停止后续实源派发。
 

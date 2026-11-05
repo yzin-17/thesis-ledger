@@ -34,7 +34,7 @@
 - NAV Runner 已调用 `CnNavSimulation`，仍有固定 `cutoffLocalTime: '15:00'`；本轮未逐项验收 NAV 配置消费，T3.2 必须核对并改为冻结模型的相应语义，不能据入口存在就宣称生命周期全部可用。
 - 相关 Snapshot/Execution 测试含冻结规则与 unavailable 拒绝用例；本轮只读，不重跑，不改变旧验证结论。
 
-[`T13 记录`](../../benchmarks/2026-09-09-unified-backtest-v2-t13.md)中的 Run `145d7946-296a-4323-a1f7-f7676ee453ae` 已取得 68 根 raw 日线，随后 `failed/DATA_UNAVAILABLE`、`snapshotId=null`。这是此前真实失败证据，不是本轮环境探测；文档改动不会解除代码门禁。已有测试、取消/重试、隔离与性能证据继续按其原范围保留。
+[`T13 记录`](../../evidence/benchmarks/2026-09-09-unified-backtest-v2-t13.md)中的 Run `145d7946-296a-4323-a1f7-f7676ee453ae` 已取得 68 根 raw 日线，随后 `failed/DATA_UNAVAILABLE`、`snapshotId=null`。这是此前真实失败证据，不是本轮环境探测；文档改动不会解除代码门禁。已有测试、取消/重试、隔离与性能证据继续按其原范围保留。
 
 2026-09-10 首轮实施增量：新增独立的 `execution-model-v1` 契约、按事件分段解析及 Decimal 费用计算；Server → DSA 显式传递事实与执行范围，真实静态 Instrument 路径返回历史可交易性缺失及原始规则原因。2026-09-11 先后接通 RunConfig、模型 Artifact/哈希和 Runner 模型消费，旧快照/Provider 关键事实保护继续生效。具体状态及本地验证见关联 Task；受控 Runner 通过不等于真实 Provider、部署或目标场景已验收。
 

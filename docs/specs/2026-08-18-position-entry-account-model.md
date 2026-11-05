@@ -1,8 +1,8 @@
 # 录入持仓与账户模型重构规格
 
-账户模型原则保持。当前 Ledger/Market 信封与接口以[Canonical 架构](../architecture/canonical-runtime.md)为准，设备与产品验收见[已完成 Task](../archive/tasks/2026-08-18-position-entry-account-model.md)。
+账户模型原则保持。当前 Ledger/Market 信封与接口以[Canonical 架构](../design/canonical-runtime.md)为准，设备与产品验收见[已完成 Task](../archive/tasks/2026-08-18-position-entry-account-model.md)。
 
-2026-10-21 当前范围：草稿/对账无模型路径已完成，实施边界以[补充规格](2026-10-21-account-draft-reconciliation-web.md)为准，[验收记录](../tasks/evidence/2026-10-21-account-draft-reconciliation-acceptance.md)承接目标 Web 与数据保护证据。
+2026-10-21 当前范围：草稿/对账无模型路径已完成，实施边界以[补充规格](2026-10-21-account-draft-reconciliation-web.md)为准，[验收记录](../evidence/2026-10-21-account-draft-reconciliation-acceptance.md)承接目标 Web 与数据保护证据。
 
 2026-10-22 最终核对：账户身份、类型/模式、字段锁定与生命周期继续由本规格约束；导航和余额交互沿用[账户数据产品规格](2026-08-26-trade-product-experience.md#导航与账户数据)，多币种和账本语义沿用[Ledger 规格](2026-08-26-trade-execution-ledger-system.md)，完整/部分快照及修订沿用[基线与导入合同](2026-08-26-trade-baseline-import-reconciliation.md)。以下已同步这些后继合同；ADR-009 至 ADR-014 保留决策时的协议与迁移背景。
 

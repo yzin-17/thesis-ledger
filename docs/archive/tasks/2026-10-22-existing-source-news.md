@@ -4,7 +4,7 @@
 
 ## 当前检查点
 
-E1～E4 全部通过并归档。复用已启用 AKShare，`600519.SH` 的目标 V3、Market、实际 Web、首次准入及保全完成；当前政策/DSA 169、18 路线，原十七条保留。[最终复核](../../reviews/2026-10-22-existing-source-news-final-review.md)关联五项 AC 和完整证据。原 NVIDIA DG3 继续有效，模型保持暂停。
+E1～E4 全部通过并归档。复用已启用 AKShare，`600519.SH` 的目标 V3、Market、实际 Web、首次准入及保全完成；当前政策/DSA 169、18 路线，原十七条保留。[最终复核](../reviews/2026-10-22-existing-source-news-final-review.md)关联五项 AC 和完整证据。原 NVIDIA DG3 继续有效，模型保持暂停。
 
 ## 执行清单
 
@@ -21,4 +21,4 @@ E1～E4 全部通过并归档。复用已启用 AKShare，`600519.SH` 的目标 
 
 ## 证据复用
 
-[已有最终复核](../../reviews/2026-10-22-free-news-dg3-final-review.md)中的共享合同、Market 服务和 NVIDIA 实源证据在输入未变化时复用。仅对本次来源、SDK 传输、侧栏和维护入口的变化补验；健康容器或宿主探针不替代目标业务读取。
+[已有最终复核](../reviews/2026-10-22-free-news-dg3-final-review.md)中的共享合同、Market 服务和 NVIDIA 实源证据在输入未变化时复用。仅对本次来源、SDK 传输、侧栏和维护入口的变化补验；健康容器或宿主探针不替代目标业务读取。

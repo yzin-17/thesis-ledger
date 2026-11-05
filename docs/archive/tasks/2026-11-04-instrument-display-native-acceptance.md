@@ -3,7 +3,7 @@
 > 对应 Spec：[标的名称统一读取](../../specs/2026-11-04-instrument-display-read-model.md)
 > 当前状态：已完成；两端八个业务页面、连接核对、数据保护与资源清理均通过。
 > 原实现与 Web 验收：[已完成任务](2026-11-04-instrument-display-read-model.md)
-> 证据：[原生验收记录](../../tasks/evidence/2026-11-04-instrument-display-native-acceptance.md)
+> 证据：[原生验收记录](../../evidence/2026-11-04-instrument-display-native-acceptance.md)
 
 ## 范围与边界
 

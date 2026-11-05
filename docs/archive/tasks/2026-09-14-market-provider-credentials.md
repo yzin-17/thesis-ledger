@@ -1,7 +1,7 @@
 # 数据源即时启停与页面凭证配置实施任务
 
 <a id="priority"></a>
-> 最终检查点（2026-11-01）：**当前获准范围及最终Review已完成，归档本Task**。AC1～AC7的实现、目标Docker/Web、保密及在线范围逐项复核，关键Control与Alpha Vantage源码摘要仍与原验收一致。模型、来源、配置及通知动作均0，复用已有证据。见[最终复核](../../tasks/evidence/2026-11-01-provider-credentials-final-review.md)。
+> 最终检查点（2026-11-01）：**当前获准范围及最终Review已完成，归档本Task**。AC1～AC7的实现、目标Docker/Web、保密及在线范围逐项复核，关键Control与Alpha Vantage源码摘要仍与原验收一致。模型、来源、配置及通知动作均0，复用已有证据。见[最终复核](../../evidence/2026-11-01-provider-credentials-final-review.md)。
 > [全局优先级与接续规则](../../tasks/README.md#priority-policy)。Longbridge延期仍由TODO持有；Tushare原设置、积分和跳过范围保持，现金正向消费仍由适配层原Task持有，本次不执行或代收。
 
 <a id="t5b-lb"></a>
@@ -13,11 +13,11 @@
 
 > 状态：T1～T5a及现行T5b验收完成，最终Review通过并归档。TickFlow原日线/报价、Alpha Vantage免费近期/报价、Finnhub获准免费报价及首存修复证据按输入复用，受限日线和旧历史不记作成功。Tushare既有配置和原跳过保持，未扩大其数据资格；下方分日期记录保留当时事实，不代替当前结论。
 
-> 最新范围确认（2026-10-22）：Finnhub 官方维护者明确免费方案不开放 `/stock/candle`；复用本账号报价 `healthy`、1818ms 及日线 `permission_denied` 的原实测，完成[免费范围验收](../../tasks/evidence/2026-10-22-finnhub-free-scope-acceptance.md)。只更新合同与验收状态，凭据、启停及路由保持；Longbridge 仍暂缓。
+> 最新范围确认（2026-10-22）：Finnhub 官方维护者明确免费方案不开放 `/stock/candle`；复用本账号报价 `healthy`、1818ms 及日线 `permission_denied` 的原实测，完成[免费范围验收](../../evidence/2026-10-22-finnhub-free-scope-acceptance.md)。只更新合同与验收状态，凭据、启停及路由保持；Longbridge 仍暂缓。
 
-> 当前接续检查（2026-10-22）：[首次保存状态修复已完成归档](2026-10-22-provider-first-credential-state.md)，202 项定向/关联测试和门禁通过；用户授权的正式 `update.sh dsa` 保留数据完整更新成功，目标同版代码与原数据卷均核对。TickFlow 凭据补丁省略启停，返回 201，仍停用且凭据内容/内部版本保持，仅配置版本 2→3；其他 29 家来源和 195 个目录目标状态保持。详细结果见[证据](../../tasks/evidence/2026-10-22-provider-first-credential-state.md)。
+> 当前接续检查（2026-10-22）：[首次保存状态修复已完成归档](2026-10-22-provider-first-credential-state.md)，202 项定向/关联测试和门禁通过；用户授权的正式 `update.sh dsa` 保留数据完整更新成功，目标同版代码与原数据卷均核对。TickFlow 凭据补丁省略启停，返回 201，仍停用且凭据内容/内部版本保持，仅配置版本 2→3；其他 29 家来源和 195 个目录目标状态保持。详细结果见[证据](../../evidence/2026-10-22-provider-first-credential-state.md)。
 
-> 前一切片结果（2026-10-22）：用户已授权 Alpha Vantage 免费近期适配，现已[完成并归档](2026-10-22-alphavantage-free-recent-daily.md)。来源改为单次 compact，470 项定向/关联测试及门禁通过；正式 `sync-code.sh dsa` 后，目标 AAPL 近期日线读取 `healthy`、2521ms，2024 年旧窗同版处理器实际返回 `not_covered`、零行且无 full 回退。该切片结束时三家仍停用，配置版本为 2/1/1，30 家来源配置与 195 个目录目标的准入状态保持。当前合同见[免费近期 Spec](../../specs/2026-10-22-alphavantage-free-recent-daily.md)，详细结果见[验收证据](../../tasks/evidence/2026-10-22-alphavantage-free-recent-daily.md)。Finnhub 日线 `permission_denied` 与 Longbridge 暂缓仍由本 Task 持有；首存修复现已通过上方独立验收。
+> 前一切片结果（2026-10-22）：用户已授权 Alpha Vantage 免费近期适配，现已[完成并归档](2026-10-22-alphavantage-free-recent-daily.md)。来源改为单次 compact，470 项定向/关联测试及门禁通过；正式 `sync-code.sh dsa` 后，目标 AAPL 近期日线读取 `healthy`、2521ms，2024 年旧窗同版处理器实际返回 `not_covered`、零行且无 full 回退。该切片结束时三家仍停用，配置版本为 2/1/1，30 家来源配置与 195 个目录目标的准入状态保持。当前合同见[免费近期 Spec](../../specs/2026-10-22-alphavantage-free-recent-daily.md)，详细结果见[验收证据](../../evidence/2026-10-22-alphavantage-free-recent-daily.md)。Finnhub 日线 `permission_denied` 与 Longbridge 暂缓仍由本 Task 持有；首存修复现已通过上方独立验收。
 
 ## 任务与依赖
 
@@ -115,15 +115,15 @@ T3b 启动契约核对：SDK Python 存储回调、禁止隐式授权和异步�
 - [x] 凭证来源、加密与失败语义符合 Spec，没有扩大数据消费范围。
 - [x] 文档与实际实现同步，既有修改保留。
 
-结论：通过。AC1～AC7、原T1～T5a及当前获准T5b均有相应层级证据，关键源码摘要与已验收输入一致，最终两项Review关闭，归档本Task。原首存修复、真实报价/近期与受限旧窗结论均保持；Longbridge真实在线只由TODO持有，不计通过。Tushare现金正向消费不属于本Task收口结果，本轮没有任何Tushare操作。详细映射、证据及保护见[最终复核](../../tasks/evidence/2026-11-01-provider-credentials-final-review.md)。未改源码、配置或运行态，未提交/推送。
+结论：通过。AC1～AC7、原T1～T5a及当前获准T5b均有相应层级证据，关键源码摘要与已验收输入一致，最终两项Review关闭，归档本Task。原首存修复、真实报价/近期与受限旧窗结论均保持；Longbridge真实在线只由TODO持有，不计通过。Tushare现金正向消费不属于本Task收口结果，本轮没有任何Tushare操作。详细映射、证据及保护见[最终复核](../../evidence/2026-11-01-provider-credentials-final-review.md)。未改源码、配置或运行态，未提交/推送。
 
 ## 在线验收前提
 
 | 来源 | 当前结论 | 证据与范围边界 |
 | --- | --- | --- |
-| Tushare | 页面凭据与测试链路已有证据；ETF 免费接口权限不足，当前跳过 | [目标凭据记录](../../tasks/evidence/2026-10-02-tushare-page-credentials-target.md)及主多源 Task 的 40203 记录；其他能力不由此授予资格，当前不要求恢复 ETF 来源 |
-| TickFlow | Key 已配置，版本 3，保持停用；股票日线 none 与实时报价实际读取通过，首存状态修复已完成目标验收 | 证据仅覆盖 `600519.SH` 指定窗口/能力，不推广其他精确目标；[状态修复验收](../../tasks/evidence/2026-10-22-provider-first-credential-state.md)不扩大行情权限 |
-| Finnhub | 当前已接入免费报价范围验收通过；Key 已配置、版本 1、保持停用，`AAPL.US` 报价实测通过；股票日线为免费范围外受限 | [官方依据与范围验收](../../tasks/evidence/2026-10-22-finnhub-free-scope-acceptance.md)；日线原 `permission_denied` 保留，不再作为本轮待修复，不扩大其他接口资格 |
+| Tushare | 页面凭据与测试链路已有证据；ETF 免费接口权限不足，当前跳过 | [目标凭据记录](../../evidence/2026-10-02-tushare-page-credentials-target.md)及主多源 Task 的 40203 记录；其他能力不由此授予资格，当前不要求恢复 ETF 来源 |
+| TickFlow | Key 已配置，版本 3，保持停用；股票日线 none 与实时报价实际读取通过，首存状态修复已完成目标验收 | 证据仅覆盖 `600519.SH` 指定窗口/能力，不推广其他精确目标；[状态修复验收](../../evidence/2026-10-22-provider-first-credential-state.md)不扩大行情权限 |
+| Finnhub | 当前已接入免费报价范围验收通过；Key 已配置、版本 1、保持停用，`AAPL.US` 报价实测通过；股票日线为免费范围外受限 | [官方依据与范围验收](../../evidence/2026-10-22-finnhub-free-scope-acceptance.md)；日线原 `permission_denied` 保留，不再作为本轮待修复，不扩大其他接口资格 |
 | Alpha Vantage | Key 已配置，版本 1，保持停用；目标报价及免费近期日线通过，旧窗实际返回 `not_covered` | [免费近期切片已完成](2026-10-22-alphavantage-free-recent-daily.md)；更早历史继续受限。默认报价为历史口径，不据内部 `REALTIME_QUOTE` 名称承诺实时 |
 
 凭证在配置页面输入，不写入文档或聊天记录。Docker/浏览器持久化及现行获准范围证据继续复用；后续范围不作为当前接续前提。

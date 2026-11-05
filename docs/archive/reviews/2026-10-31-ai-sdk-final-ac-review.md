@@ -17,11 +17,11 @@ Anthropic流式用途的原`schema_invalid`、未知费用和停止事实继续�
 ## 共用证据索引
 
 - E0：[原实施及G0/G0.1/G2](../tasks/2026-09-19-vercel-ai-sdk-integration-history.md)。包含T0～T13、四个官方适配器本地HTTP/SDK、目标数据库故障、部署/回滚、浏览器消费；历史环境和失败不改写。
-- E1：[生命周期与提交](../../tasks/evidence/2026-10-04-ai-lifecycle-and-submission.md)、[当前研究执行恢复](../../tasks/evidence/2026-10-20-research-execution-recovery.md)。包括持久化领取、发送窗口、取消、未知预留、重投和旧执行器拒绝。
-- E2：[配置Web/HTTP差集](../../tasks/evidence/2026-10-20-ai-zero-generation-acceptance.md)、[类型转换](../../tasks/evidence/2026-10-21-ai-credential-type-conversion.md)、[协议继承及停顿](../../tasks/evidence/2026-10-31-ai-provider-protocols-and-stall.md)。
-- E3：[D58正式研究](../../tasks/evidence/2026-10-29-g3-formal-acceptance.md)、[D59现行V2原生结构化](../../tasks/evidence/2026-10-29-g3-openrouter-formal-retest.md)、[D60实际Web](../../tasks/evidence/2026-10-30-g3-frontend-closeout.md)。
-- E4：[参数优化及费用摘要](../../tasks/evidence/2026-10-31-optimization-g1-and-cost.md)、[Cloudflare探索/G1/T19](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md)。
-- E5：[目标在途重启与真实新闻](../../tasks/evidence/2026-10-31-research-source-and-restart.md)、[V2实源准备故障/截止](../../tasks/evidence/2026-10-31-research-source-fault-acceptance.md)。
+- E1：[生命周期与提交](../../evidence/2026-10-04-ai-lifecycle-and-submission.md)、[当前研究执行恢复](../../evidence/2026-10-20-research-execution-recovery.md)。包括持久化领取、发送窗口、取消、未知预留、重投和旧执行器拒绝。
+- E2：[配置Web/HTTP差集](../../evidence/2026-10-20-ai-zero-generation-acceptance.md)、[类型转换](../../evidence/2026-10-21-ai-credential-type-conversion.md)、[协议继承及停顿](../../evidence/2026-10-31-ai-provider-protocols-and-stall.md)。
+- E3：[D58正式研究](../../evidence/2026-10-29-g3-formal-acceptance.md)、[D59现行V2原生结构化](../../evidence/2026-10-29-g3-openrouter-formal-retest.md)、[D60实际Web](../../evidence/2026-10-30-g3-frontend-closeout.md)。
+- E4：[参数优化及费用摘要](../../evidence/2026-10-31-optimization-g1-and-cost.md)、[Cloudflare探索/G1/T19](../../evidence/2026-10-31-cloudflare-first-four-continuation.md)。
+- E5：[目标在途重启与真实新闻](../../evidence/2026-10-31-research-source-and-restart.md)、[V2实源准备故障/截止](../../evidence/2026-10-31-research-source-fault-acceptance.md)。
 - E6：[当前源码质量固定基线](../../tasks/README.md#verified-source-baseline)。各后继改动的定向/类型/构建/维护同步另由E2～E5保存，不把旧CI推广到未提交的新代码。
 - E7：[本批费用拒绝与实源期限Task](../tasks/2026-10-31-ai-provider-live-fault-acceptance.md)。执行包`.recovery-artifacts/first-four-zero-20261031T040822Z`，记录公开主Server、原SDK、真实Qwen、受控交付、调用上限及原配置/数据保护。
 

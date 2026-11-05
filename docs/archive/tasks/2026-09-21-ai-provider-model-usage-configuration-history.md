@@ -3,7 +3,7 @@
 > 历史实施与验收记录（2026-10-15 归档）：本文保留原步骤、原编号、当时状态和证据。仍未通过的验收由[当前 Task](2026-09-21-ai-provider-model-usage-configuration.md)承接；本文不作为当前任务入口，归档不表示功能完成。
 
 
-> 状态对账（更新于 2026-10-04）：已实现待验收：原完整 AC-01～30 及 9/24 AC-09 仍是基线。历史隔离执行状态与 lmstudio 零价用途证据保留；本轮 T4.2.P1 的默认引用 PostgreSQL/HTTP 竞争 10 项通过，并修复检查与提交分离的竞态。认证、非零计费、研究提交/冻结竞态、超时/取消、目标运行态与 Electron 缺口分别保留。初始对账见[Review](../reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](../../tasks/evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
+> 状态对账（更新于 2026-10-04）：已实现待验收：原完整 AC-01～30 及 9/24 AC-09 仍是基线。历史隔离执行状态与 lmstudio 零价用途证据保留；本轮 T4.2.P1 的默认引用 PostgreSQL/HTTP 竞争 10 项通过，并修复检查与提交分离的竞态。认证、非零计费、研究提交/冻结竞态、超时/取消、目标运行态与 Electron 缺口分别保留。初始对账见[Review](../reviews/2026-10-03-task-state-reconciliation.md)，本轮证据见[保存与默认引用竞争](../../evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
 
 对应 Spec：[AI Provider 配置与模型用途配置优化](../../specs/2026-09-21-ai-provider-model-usage-configuration.md)
 
@@ -132,7 +132,7 @@
 - 写入范围：AI 配置持久化、通用 Provider 存储的事务参数、定向/集成测试和必要门禁；不修改 Schema/migration、Desktop、正式研究执行或目标配置。若发现检查与提交分离的确切竞态，沿现有概念所有权修复，再维护依赖门禁。
 - 验证：先稳定复现竞争，再修复及定向回归，最后隔离 PostgreSQL / HTTP；本叶不代替完整 G2/G5。
 - 规划预检：仓库契约已固化，输入就绪；外部原稿不可取回的限制保留，不借本叶关闭其他断言。
-- 完成检查：10 项真实 PostgreSQL/HTTP 用例通过，含双向锁竞争、默认清除回滚与确认/版本保护；隔离故障通过真实数据库触发器注入，未操作业务库。CI 增加独立隔离入口，但远端 Checks 未运行。详细验证及剩余边界见[证据](../../tasks/evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
+- 完成检查：10 项真实 PostgreSQL/HTTP 用例通过，含双向锁竞争、默认清除回滚与确认/版本保护；隔离故障通过真实数据库触发器注入，未操作业务库。CI 增加独立隔离入口，但远端 Checks 未运行。详细验证及剩余边界见[证据](../../evidence/2026-10-04-ai-provider-postgres-concurrency.md)。
 
 ### T5：迁移、兼容性、回归与真实运行态
 
@@ -162,7 +162,7 @@
 - [x] 使用专用隔离 PostgreSQL 和真实服务验证 AC-17～20：缺默认阻断、过期设置版本冲突、配置/默认变更与创建竞争、创建后 Provider/Model/价格/修订冻结。
 - 依赖：T4.2.P1 的配置事务；固定 SDK 输入仅用于配置验证，不访问真实模型或修改目标默认。
 - 写集：AI 研究创建的持久化边界、对应领域 helper、专用数据库集成测试和本任务；先建立可重复竞争，再修复已证实的缺陷。
-- 当前证据：[生命周期与提交](../../tasks/evidence/2026-10-04-ai-lifecycle-and-submission.md)。三项研究提交数据库竞争通过；保存、默认引用及独立进程共 21 项通过。目标空默认错误另发现控制器未处理拒绝并已修复，完整更新及服务存活复验继续。
+- 当前证据：[生命周期与提交](../../evidence/2026-10-04-ai-lifecycle-and-submission.md)。三项研究提交数据库竞争通过；保存、默认引用及独立进程共 21 项通过。目标空默认错误另发现控制器未处理拒绝并已修复，完整更新及服务存活复验继续。
 - 目标研究额外阻塞：当前 researchDefault=null；用户显式选择仍待回复。2026-10-04 实际 lmstudio 用途调用 requestId `af19a83d-4805-4471-939f-489d9a0880f6` 于 10.73 秒返回 provider_timeout（连接 192.168.5.20:6789 超时），usage/cost 为 unknown；未再次请求。
 
 下表是当前基线快照。`局部实现`不等于完整 AC 通过；完整 AC 只有在“完成”条件满足后才能勾选。

@@ -21,6 +21,6 @@ T1、T2 完成，最终一致性复核通过。真实原失败请求从 400 恢�
 
 ## 最终一致性复核
 
-全部 AC 已按[验收记录](../../reviews/2026-11-05-negative-cash-allocation.md)核对；领域全包 474 项、Server 定向 37 项、Desktop 39 项回归，领域／Server 构建、ESLint、边界与差异检查通过。无当前范围遗留项。
+全部 AC 已按[验收记录](../reviews/2026-11-05-negative-cash-allocation.md)核对；领域全包 474 项、Server 定向 37 项、Desktop 39 项回归，领域／Server 构建、ESLint、边界与差异检查通过。无当前范围遗留项。
 
 已使用维护入口 `../thesis-ledger-infra/scripts/sync-code.sh thesis-ledger` 同步本地开发 Server／Worker，退出码 0、镜像 ID 不变；冻结真实请求与真实浏览器复测通过。未改写业务记录、数据库结构或卷，未提交、推送或发布新镜像。仅代码更新位于容器可写层，容器重建后会恢复镜像内代码。

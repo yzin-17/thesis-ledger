@@ -2,7 +2,7 @@
 
 ## Review 范围
 
-本次 Review 对照 `docs/specs/2026-08-18-thesis-ledger-product-v1.md`、`docs/archive/specs/2026-08-18-stock-investment-os-spec-v3.md`、ADR-001～ADR-008、`docs/domain/2026-08-18-domain-model.md`、`docker-compose.yml`、DSA Fork、行情/Portfolio/Risk/Notification/AI/筹码能力审计和 V1 发布任务清单执行。审计基线为 DSA Fork 提交 `831ada5370123551e5cb4fc099208dd70e892e22`。
+本次 Review 对照 `docs/specs/2026-08-18-thesis-ledger-product-v1.md`、`docs/archive/specs/2026-08-18-stock-investment-os-spec-v3.md`、ADR-001～ADR-008、`docs/design/2026-08-18-domain-model.md`、`docker-compose.yml`、DSA Fork、行情/Portfolio/Risk/Notification/AI/筹码能力审计和 V1 发布任务清单执行。审计基线为 DSA Fork 提交 `831ada5370123551e5cb4fc099208dd70e892e22`。
 
 ## 架构职责矩阵
 

@@ -18,4 +18,4 @@
 
 旧研究规格中“不由客户端伪造 Provider/模型执行事实”的约束继续成立；这里保存的是服务端默认配置，创建请求不直接提交或覆盖实际执行事实。
 
-[已归档实施回执](../archive/tasks/2026-10-19-research-default-model-placement.md) · [验证证据](../tasks/evidence/2026-10-19-research-default-model-placement.md)
+[已归档实施回执](../archive/tasks/2026-10-19-research-default-model-placement.md) · [验证证据](../evidence/2026-10-19-research-default-model-placement.md)

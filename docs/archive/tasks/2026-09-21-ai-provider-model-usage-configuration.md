@@ -1,12 +1,12 @@
 # AI配置、模型用途与测试后保存验收记录
 
-> 最终检查点（2026-11-01）：用户明确将AI费用验收移到TODO。完整设计稿AC-13及同一实际非零费用正向分支尚未通过，已转由[后续费用验收](../../TODO.md#ai-provider-positive-cost-acceptance)承接；当前Web与目标Server/Worker的T5.2/T6及最终Review通过，归档本Task。费用上限0、现有Provider/默认/凭据/两空字段和旧数据保持，新增模型/收费/通知均0。见[范围决定与逐项复核](../../tasks/evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
+> 最终检查点（2026-11-01）：用户明确将AI费用验收移到TODO。完整设计稿AC-13及同一实际非零费用正向分支尚未通过，已转由[后续费用验收](../../TODO.md#ai-provider-positive-cost-acceptance)承接；当前Web与目标Server/Worker的T5.2/T6及最终Review通过，归档本Task。费用上限0、现有Provider/默认/凭据/两空字段和旧数据保持，新增模型/收费/通知均0。见[范围决定与逐项复核](../../evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
 
-> 历史交付检查点（2026-10-31）：目标费用拒绝及变价409、Cloudflare真实交付下120秒首输出/仅心跳、60秒输出间隔和595秒共享执行期限全部通过；新增模型5次、费用估算0 USD，5份完整配置及旧业务/审计保持。[完成任务](2026-10-31-ai-provider-live-fault-acceptance.md)、[证据](../../tasks/evidence/2026-10-31-ai-provider-live-fault-acceptance.md)。SDK原48项/JSON Mode12项、研究工作台与T19均已完成；本Task的真实非零上游费用仍待验，本轮不验Electron。
+> 历史交付检查点（2026-10-31）：目标费用拒绝及变价409、Cloudflare真实交付下120秒首输出/仅心跳、60秒输出间隔和595秒共享执行期限全部通过；新增模型5次、费用估算0 USD，5份完整配置及旧业务/审计保持。[完成任务](2026-10-31-ai-provider-live-fault-acceptance.md)、[证据](../../evidence/2026-10-31-ai-provider-live-fault-acceptance.md)。SDK原48项/JSON Mode12项、研究工作台与T19均已完成；本Task的真实非零上游费用仍待验，本轮不验Electron。
 
 > 当前验收范围（2026-11-01）：本Task只关闭既定Web/目标服务范围；真实正金额费用按用户明确决定转入TODO，未记通过，Electron不计本轮交付。原Anthropic实源任务删除决定与其他历史成功/失败/未知保留，不恢复旧额度或协议验收。
 
-> 2026-10-23 研究默认增量：已按用户明确的独立验证授权启用 OpenRouter 的研究用途，并将研究默认切为 `openrouter/free`，修订 5。实际 1 次原生结构化用途验证通过，费用为配置估算 0 USD；其他 Provider、其他用途和价格输入保持。该结果仅补本次用途接入与默认选择，不代收真实业务、完整费用与期限门禁；G3 业务生成继续暂停。见[执行证据](../../tasks/evidence/2026-10-23-openrouter-research-default.md)。
+> 2026-10-23 研究默认增量：已按用户明确的独立验证授权启用 OpenRouter 的研究用途，并将研究默认切为 `openrouter/free`，修订 5。实际 1 次原生结构化用途验证通过，费用为配置估算 0 USD；其他 Provider、其他用途和价格输入保持。该结果仅补本次用途接入与默认选择，不代收真实业务、完整费用与期限门禁；G3 业务生成继续暂停。见[执行证据](../../evidence/2026-10-23-openrouter-research-default.md)。
 
 <a id="priority"></a>
 
@@ -15,13 +15,13 @@
 
 > 来源合同更新（2026-10-20 对账）：环境来源与接管已由[统一页面配置 Spec](../../specs/2026-10-19-ai-provider-database-only.md)取代，本来源收敛的实施和目标验收已完成，见[归档记录](2026-10-19-ai-provider-database-only.md)。E1 仅保留历史证据，不恢复正向接管；本 Task 的真实用途、费用与其他完整 AC 义务继续保留。
 
-> 当前进展（2026-10-18，历史基线）：E1 服务隔离环境接管、E2 目录刷新/迟到响应与旧混合路由、E3 研究默认 Provider 生命周期客户端验收已过；Web/安装版禁用配置保存、失败及冲突恢复复用[既有证据](../../tasks/evidence/2026-10-16-ai-output-mode-compatibility.md)。真实生成继续停止；认证、非零费用、真实业务、实际凭证、目标数据库存量配置及安装态完整条件仍开放。
+> 当前进展（2026-10-18，历史基线）：E1 服务隔离环境接管、E2 目录刷新/迟到响应与旧混合路由、E3 研究默认 Provider 生命周期客户端验收已过；Web/安装版禁用配置保存、失败及冲突恢复复用[既有证据](../../evidence/2026-10-16-ai-output-mode-compatibility.md)。真实生成继续停止；认证、非零费用、真实业务、实际凭证、目标数据库存量配置及安装态完整条件仍开放。
 >
-> 2026-10-20 现行接续：T2.5.E4 零生成差集通过，补齐实际 HTTP 路由唯一性和目标 Provider 过期保存 409；专属配置由 Web 保存 992 后已删除，原配置/默认/凭证及业务保持一致，见[本次证据](../../tasks/evidence/2026-10-20-ai-zero-generation-acceptance.md)。本轮所有客户端验收只计 Web，矩阵保留的 Electron 历史条件不纳入本轮执行；完整真实业务及费用门禁不关闭。
+> 2026-10-20 现行接续：T2.5.E4 零生成差集通过，补齐实际 HTTP 路由唯一性和目标 Provider 过期保存 409；专属配置由 Web 保存 992 后已删除，原配置/默认/凭证及业务保持一致，见[本次证据](../../evidence/2026-10-20-ai-zero-generation-acceptance.md)。本轮所有客户端验收只计 Web，矩阵保留的 Electron 历史条件不纳入本轮执行；完整真实业务及费用门禁不关闭。
 >
 > 现行合同：[Spec](../../specs/2026-09-21-ai-provider-model-usage-configuration.md)。原实施步骤、迁移、交互增量和逐次验证日志见[历史实施记录](2026-09-21-ai-provider-model-usage-configuration-history.md)。
 
-> D58 历史验收：T7 本地合同、执行与前端及正式 Cloudflare/Qwen 报告、重建反读和 WIP 保护通过，结束时恢复配置并关闭 V2。其后开启决定及 D59/D60 已更新状态，不能沿用 D58 的关闭状态；历史调用和审计见[正式 G3 回执](../../tasks/evidence/2026-10-29-g3-formal-acceptance.md)，其他业务额度独立。
+> D58 历史验收：T7 本地合同、执行与前端及正式 Cloudflare/Qwen 报告、重建反读和 WIP 保护通过，结束时恢复配置并关闭 V2。其后开启决定及 D59/D60 已更新状态，不能沿用 D58 的关闭状态；历史调用和审计见[正式 G3 回执](../../evidence/2026-10-29-g3-formal-acceptance.md)，其他业务额度独立。
 
 ## 现在做什么
 
@@ -53,19 +53,19 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
 
 > 2026-10-21 持续执行校正：价格迁移、历史保留、默认并发、旧字段、混合配置/认证切换、带凭证类型转换及默认引用清除的独立非生成条件均已补齐。原数据与模型暂停边界继续；真实认证、生成、费用及业务仍按各 AC 保留，不将配置验收等同于业务完成。
 
-- [x] T5.1.MIGRATION：显式价格维护入口、26 项定向、9 项真实隔离 PostgreSQL（含独立 CLI 进程竞争）及正式同步/双容器只读预览通过；整个目标保护 JSON 未变。[子任务已归档](2026-10-21-ai-provider-pricing-migration.md)，[回执](../../tasks/evidence/2026-10-21-ai-provider-pricing-migration.md)。
-- [x] T5.2.DEFAULT-CONCURRENCY：目标同修订竞争 200/409、旧版本 409、无效引用 400 通过；原默认引用不变，版本正常 1→2；完整保护和 Web 回显通过。[回执](../../tasks/evidence/2026-10-21-ai-settings-concurrency.md)，模型正向消费仍单列暂停。
-- [x] T5.2.CONTRACT-REGRESSION.FIELDS：AC-29 的三类旧字段、九份 manifest 和既定 SDK 依赖核对通过；24 项定向及两容器十八项实际模块断言通过，零网络、原保护状态保持。[回执](../../tasks/evidence/2026-10-21-ai-config-contract-regression.md)。
-- [x] T5.2.CONTRACT-REGRESSION.HISTORY：真实 PostgreSQL/HTTP 的四项合成历史保留通过，SDK 调用为零；正常改价、显式迁移、旧客户端 409 和删除后历史读取均有原始 JSON/费用证据。[子任务已归档](2026-10-21-ai-provider-history-preservation.md)，[回执](../../tasks/evidence/2026-10-21-ai-provider-history-preservation.md)。
-- [x] T5.2.CONTROLLED-CONFIG：两模型/三用途、价格和覆盖、打开关闭不写、普通优先级保存保留 Key、取消/确认清除及重新输入均通过。19 项保护测试通过，初次等义表示差异单独保留；专属条目已正常删除，完整保护恢复。[子任务已归档](2026-10-21-ai-controlled-config-web.md)，[回执](../../tasks/evidence/2026-10-21-ai-controlled-config-web.md)。
-- [x] T5.2.CREDENTIALED-CONVERSION：目标 Web 带占位凭证的 AI↔行情转换通过；空 Key 保留、地址变化拒绝零写、显式重填后恢复及完整保护均通过，专属条目已删除。[子任务已归档](2026-10-21-ai-credential-type-conversion.md)，[回执](../../tasks/evidence/2026-10-21-ai-credential-type-conversion.md)。
-- [x] T5.2.DEFAULT-LIFECYCLE：目标缺少清除标记/错误默认版本均 409 零写，当前双版本原子清除与恢复均 200；Provider 始终启用，默认正常 2→4，其余原设置/密文/业务保护通过，Web 原引用恢复。[子任务已归档](2026-10-21-ai-default-lifecycle-target.md)，[回执](../../tasks/evidence/2026-10-21-ai-default-lifecycle-target.md)。
+- [x] T5.1.MIGRATION：显式价格维护入口、26 项定向、9 项真实隔离 PostgreSQL（含独立 CLI 进程竞争）及正式同步/双容器只读预览通过；整个目标保护 JSON 未变。[子任务已归档](2026-10-21-ai-provider-pricing-migration.md)，[回执](../../evidence/2026-10-21-ai-provider-pricing-migration.md)。
+- [x] T5.2.DEFAULT-CONCURRENCY：目标同修订竞争 200/409、旧版本 409、无效引用 400 通过；原默认引用不变，版本正常 1→2；完整保护和 Web 回显通过。[回执](../../evidence/2026-10-21-ai-settings-concurrency.md)，模型正向消费仍单列暂停。
+- [x] T5.2.CONTRACT-REGRESSION.FIELDS：AC-29 的三类旧字段、九份 manifest 和既定 SDK 依赖核对通过；24 项定向及两容器十八项实际模块断言通过，零网络、原保护状态保持。[回执](../../evidence/2026-10-21-ai-config-contract-regression.md)。
+- [x] T5.2.CONTRACT-REGRESSION.HISTORY：真实 PostgreSQL/HTTP 的四项合成历史保留通过，SDK 调用为零；正常改价、显式迁移、旧客户端 409 和删除后历史读取均有原始 JSON/费用证据。[子任务已归档](2026-10-21-ai-provider-history-preservation.md)，[回执](../../evidence/2026-10-21-ai-provider-history-preservation.md)。
+- [x] T5.2.CONTROLLED-CONFIG：两模型/三用途、价格和覆盖、打开关闭不写、普通优先级保存保留 Key、取消/确认清除及重新输入均通过。19 项保护测试通过，初次等义表示差异单独保留；专属条目已正常删除，完整保护恢复。[子任务已归档](2026-10-21-ai-controlled-config-web.md)，[回执](../../evidence/2026-10-21-ai-controlled-config-web.md)。
+- [x] T5.2.CREDENTIALED-CONVERSION：目标 Web 带占位凭证的 AI↔行情转换通过；空 Key 保留、地址变化拒绝零写、显式重填后恢复及完整保护均通过，专属条目已删除。[子任务已归档](2026-10-21-ai-credential-type-conversion.md)，[回执](../../evidence/2026-10-21-ai-credential-type-conversion.md)。
+- [x] T5.2.DEFAULT-LIFECYCLE：目标缺少清除标记/错误默认版本均 409 零写，当前双版本原子清除与恢复均 200；Provider 始终启用，默认正常 2→4，其余原设置/密文/业务保护通过，Web 原引用恢复。[子任务已归档](2026-10-21-ai-default-lifecycle-target.md)，[回执](../../evidence/2026-10-21-ai-default-lifecycle-target.md)。
 
-完整 AC 的本次证据映射已核对，精确边界见[对账记录](../../tasks/evidence/2026-10-30-nonmobile-evidence-reconciliation.md)；继续复用[配置保存与默认引用竞争](../../tasks/evidence/2026-10-04-ai-provider-postgres-concurrency.md)及[生命周期、研究提交与独立进程](../../tasks/evidence/2026-10-04-ai-lifecycle-and-submission.md)。研究提交/冻结三项竞争已完成，不再作为待实现或待重跑项。AC-09 已有本机真实 SDK/HTTP/SSE 证据，尚缺的跨业务执行面、目标和实机条件单独保留。
+完整 AC 的本次证据映射已核对，精确边界见[对账记录](../../evidence/2026-10-30-nonmobile-evidence-reconciliation.md)；继续复用[配置保存与默认引用竞争](../../evidence/2026-10-04-ai-provider-postgres-concurrency.md)及[生命周期、研究提交与独立进程](../../evidence/2026-10-04-ai-lifecycle-and-submission.md)。研究提交/冻结三项竞争已完成，不再作为待实现或待重跑项。AC-09 已有本机真实 SDK/HTTP/SSE 证据，尚缺的跨业务执行面、目标和实机条件单独保留。
 
 涉及目标研究默认、认证、非零预算或外部调用时，须有当前可用配置及用户授权；历史 lmstudio 零价用途成功不证明今天连接可用，也不覆盖认证、实际计费或完整研究任务。文档整理不构成修改配置或发起调用的授权。
 
-10-17 用户明确将历史连接与用途生成全部计入原十次上限，本轮停止真实生成，见 [SDK 账本核对](../../tasks/evidence/2026-10-16-ai-output-mode-compatibility.md#10-17-请求账本核对与停止决定)。包括保存前验证在内的真实模型测试均不得隐式发出；不消耗模型的界面/禁用配置检查按各自范围继续。
+10-17 用户明确将历史连接与用途生成全部计入原十次上限，本轮停止真实生成，见 [SDK 账本核对](../../evidence/2026-10-16-ai-output-mode-compatibility.md#10-17-请求账本核对与停止决定)。包括保存前验证在内的真实模型测试均不得隐式发出；不消耗模型的界面/禁用配置检查按各自范围继续。
 
 
 
@@ -84,18 +84,18 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
 
 已补目标双模型混合控制样本与带占位凭证类型转换，原凭证保留和地址变化明确重填边界通过；真实用户 Key 未改。真正剩余：实际认证、生成/费用、业务与完整 AC 的独立条件；已补的名称、Web/安装版禁用配置保存/冲突、只读离开保护及 E2 客户端目录/旧路由用例不重做。原服务级环境接管仅作为下方 E1 历史证据保留。既有 Desktop/Server 自动化证据见[原交互增量](2026-09-21-ai-provider-model-usage-configuration-history.md#7-2026-09-22-模型用途交互收敛增量)。
 
-- [x] T2.5.E1（历史合同）：环境正向接管的零生成服务隔离验收通过。真实保存/凭证加密服务配合内存 Prisma 验证接管、版本条件、缺凭证拒绝、默认引用和停用边界；2 项测试、Server 类型检查及定向 ESLint 通过，`fetch`/SDK 生成均零调用。仅使用合成凭证，没有改原配置或账本；不证明 PostgreSQL、目标环境、Web/Electron 或实际用户凭证。见[验收记录](../../tasks/evidence/2026-10-18-ai-environment-takeover.md)。该环境接管合同已由[数据库唯一来源](../../specs/2026-10-19-ai-provider-database-only.md)取代，保留历史证据，不恢复为当前待办。
+- [x] T2.5.E1（历史合同）：环境正向接管的零生成服务隔离验收通过。真实保存/凭证加密服务配合内存 Prisma 验证接管、版本条件、缺凭证拒绝、默认引用和停用边界；2 项测试、Server 类型检查及定向 ESLint 通过，`fetch`/SDK 生成均零调用。仅使用合成凭证，没有改原配置或账本；不证明 PostgreSQL、目标环境、Web/Electron 或实际用户凭证。见[验收记录](../../evidence/2026-10-18-ai-environment-takeover.md)。该环境接管合同已由[数据库唯一来源](../../specs/2026-10-19-ai-provider-database-only.md)取代，保留历史证据，不恢复为当前待办。
 
-- [x] T2.5.E2：模型目录与旧混合路由的零生成客户端验收通过。真实编辑 Hook 挂载验证刷新保留模型、用途、价格和默认、迟到回包隔离、旧路由的模式/停用态/空默认序列化；相关定向 37 项通过。IAB 两次目录 POST 均受控返回，草稿价格/用途与新地址保留，最终放弃草稿，未写真实配置或发生成。覆盖完整 AC-04/AC-05 与 AC-08 子集，[回执](../../tasks/evidence/2026-10-18-ui-read-states-ai-catalog.md#ai-配置目录与旧路由)；不代表目标存量迁移、真实凭证或 Electron。
+- [x] T2.5.E2：模型目录与旧混合路由的零生成客户端验收通过。真实编辑 Hook 挂载验证刷新保留模型、用途、价格和默认、迟到回包隔离、旧路由的模式/停用态/空默认序列化；相关定向 37 项通过。IAB 两次目录 POST 均受控返回，草稿价格/用途与新地址保留，最终放弃草稿，未写真实配置或发生成。覆盖完整 AC-04/AC-05 与 AC-08 子集，[回执](../../evidence/2026-10-18-ui-read-states-ai-catalog.md#ai-配置目录与旧路由)；不代表目标存量迁移、真实凭证或 Electron。
 
-- [x] T2.5.E3：研究默认 Provider 停用/删除的桌面确认与请求契约通过。真实 Hook/表格挂载的 2 项回归与 IAB 双主题三视口确认取消零写入、确认携带 Provider/settings 两版本及清除默认标记、409/503 提示保留；无生成或自动重试。浏览器 PATCH/DELETE 全部截获，未改真实配置、默认或凭证；复用已过数据库原子竞争证据。覆盖完整 AC-21 客户端子集，[回执](../../tasks/evidence/2026-10-18-ui-management-scope-and-ai-default.md#ai-默认引用t25e3)；10-21 已补目标原子清除/恢复，见当前 T5.2.DEFAULT-LIFECYCLE。本轮不验 Electron。
+- [x] T2.5.E3：研究默认 Provider 停用/删除的桌面确认与请求契约通过。真实 Hook/表格挂载的 2 项回归与 IAB 双主题三视口确认取消零写入、确认携带 Provider/settings 两版本及清除默认标记、409/503 提示保留；无生成或自动重试。浏览器 PATCH/DELETE 全部截获，未改真实配置、默认或凭证；复用已过数据库原子竞争证据。覆盖完整 AC-21 客户端子集，[回执](../../evidence/2026-10-18-ui-management-scope-and-ai-default.md#ai-默认引用t25e3)；10-21 已补目标原子清除/恢复，见当前 T5.2.DEFAULT-LIFECYCLE。本轮不验 Electron。
 
 - [x] **T2.5.E4：现行 Web 合同的零生成证据差集**
   - 按数据库唯一来源合同核对 AC-01～30 与 SDK AC01～48，复用已过保存、目录、默认引用、迁移和目标证据。
   - 补齐同模型同用途重复路由的实际 HTTP 拒绝断言；核对过期粒度、旧值保留和能力移除的现有验证。只连接本机受控 HTTP，不访问模型或修改既有目标配置。
   - 沿用用户已授权的目标专属临时配置，只由 Web 将优先级 991 改为 992；通过维护脚本提交原版本的同一优先级草稿，验证 409 且新版不变，随后删除并核对原配置、默认、凭证、业务与调用事实恢复一致。
   - 分别记录自动化、保留副本、目标 Web 与实源门禁；本轮只验 Web，Electron 不列为接续执行项。真实认证、费用、业务生成及目标存量配置的未过条件继续保留。
-  - 完成：Server 36 项、Desktop 43 项、Infra 14 项及目标 Web/HTTP 验收通过；真实模型请求为零，详见[验收差集](../../tasks/evidence/2026-10-20-ai-zero-generation-acceptance.md)。
+  - 完成：Server 36 项、Desktop 43 项、Infra 14 项及目标 Web/HTTP 验收通过；真实模型请求为零，详见[验收差集](../../evidence/2026-10-20-ai-zero-generation-acceptance.md)。
 
 - [x] **T5.2：能力移除回归与真实运行态门禁**
   - 覆盖：完整 AC-29～30，以及 AC-03、AC-15、AC-23 的真实环境部分。
@@ -103,7 +103,7 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
   - 完成条件：不恢复能力声明、免费依据、上游限制或按域名切 SDK；通过实际 Server / Worker 地址完成无认证、有认证、指定模型测试、显式默认和业务用途输出闭环；Desktop 布局、滚动、保存和错误反馈可操作。
   - 验证方式：仓库门禁、`thesis-ledger-infra` 正确更新入口、目标 Docker、Web 人工验收和真实 Provider；没有凭证或环境时必须记录为未通过门禁。
 
-目标镜像、结构、无认证零价用途、D58有认证V2/失败不覆盖、D59/D60默认研究和Web读取、非流式认证连接及审计目标反读按原证据复用。后续三类真实SDK业务、T19、取消与完整交付期限已由各责任叶验收；真实正金额费用未验，按2026-11-01用户决定转由TODO持有。当前只计既定Web与目标服务，不宣称Electron实机交付。[最终对账](../../tasks/evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
+目标镜像、结构、无认证零价用途、D58有认证V2/失败不覆盖、D59/D60默认研究和Web读取、非流式认证连接及审计目标反读按原证据复用。后续三类真实SDK业务、T19、取消与完整交付期限已由各责任叶验收；真实正金额费用未验，按2026-11-01用户决定转由TODO持有。当前只计既定Web与目标服务，不宣称Electron实机交付。[最终对账](../../evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
 
 <a id="auth-connection-acceptance"></a>
 
@@ -113,61 +113,61 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
   - 入口：`AiProviderController.testSaved`、`AiProviderService.testSaved`、`runProviderConnectionTest`；正式 `POST /api/v1/ai/providers/openrouter/test`，显式 `model=openrouter/free`、`testKind=connection`，独立 `requestId`，不设置业务用途。
   - 执行边界：原单次授权与结果保持历史。本次使用用户新增的现有免费 Provider 调用不限、费用 0 授权，单样本仍冻结最多 1 次生成、不重试、不保存配置或创建报告；部署由 MODEL-IDENTITY 独立负责，不借用旧额度。
   - 完成/验证：目标接口真实认证请求、合法最小响应、冻结请求模型与实际模型、用量/费用及终态可追溯，确认无额外派发；配置/默认/凭据和原业务保持。失败或费用/重试前提不明立即保留结果并停止。
-  - 当前结果：本次单次真实认证连接 HTTP 201/healthy、18.512 秒，实际 `dots-studio/dots-3-note-preview:free`、24/30 Token、上游实报 0 USD；独立审计反读与保护核对通过，本叶通过。原 9.7 秒、17/156 Token 样本及其身份未知保留为历史，不改写旧审计。[证据](../../tasks/evidence/2026-10-30-ai-provider-model-identity.md)。
+  - 当前结果：本次单次真实认证连接 HTTP 201/healthy、18.512 秒，实际 `dots-studio/dots-3-note-preview:free`、24/30 Token、上游实报 0 USD；独立审计反读与保护核对通过，本叶通过。原 9.7 秒、17/156 Token 样本及其身份未知保留为历史，不改写旧审计。[证据](../../evidence/2026-10-30-ai-provider-model-identity.md)。
 
 - [x] **T5.2.MODEL-IDENTITY：诊断实际模型事实的透传与验收**
   - 覆盖：AC-03 与局部 AC-37 的模型身份事实；从原 SDK result/fact 透传 `actualModel` 至返回和新审计，缺失保留 null，旧审计不改写。
   - 写集：AI Provider 测试事实 helper、服务调用及响应类型、Desktop 接口类型、定向测试和本 Spec/Task；提取现有计量/费用纯逻辑，控制存量大服务继续收敛。
   - 顺序：纯函数/服务/本机 HTTP 定向与类型/写集检查 → 正式最小目标同步及零生成读回 → 本次已授权免费调用中的单次真实连接。旧 1/1 不复用，新实源样本未获准前不派发。
-  - 当前结果：九文件 77 项、本地 HTTP/SDK、Server/Desktop 类型及写集/边界通过；正式快更两角色模块摘要匹配。新真实认证连接 API 与审计一致保留请求别名及实际模型，配置/密文/默认、旧记录与两个空字段保持，本叶及 AUTH-CONNECTION 通过；历史身份未知不补写。[证据](../../tasks/evidence/2026-10-30-ai-provider-model-identity.md)。
+  - 当前结果：九文件 77 项、本地 HTTP/SDK、Server/Desktop 类型及写集/边界通过；正式快更两角色模块摘要匹配。新真实认证连接 API 与审计一致保留请求别名及实际模型，配置/密文/默认、旧记录与两个空字段保持，本叶及 AUTH-CONNECTION 通过；历史身份未知不补写。[证据](../../evidence/2026-10-30-ai-provider-model-identity.md)。
 
 - [x] **T5.2.CONNECTION-AUDIT：连接探针与业务用途的审计归因**
   - 来源/覆盖：本次真实连接读回审计时发现错标，归完整 AC-23/24 及局部 AC-36/37；认证和零费用事实有效，不以错误标签代收其他模式或研究用途。
   - 输入：本次连接 request/result/audit、`executeTest` 的实际 mode/route 与现行健康审计接口；定向回归又发现已保存 V2 用途没有传入准确 `contractRef`，同叶补齐既有 AC-36 的透传，不新增合同或模型/来源请求。
   - 写集：AI 内有明确所有权的测试审计 helper、`ai-provider.service.ts` 接线和定向服务测试；存量大文件只减不增，不调整依赖方向、数据库或 API 数据结构，不修改既有审计。
   - 完成条件：连接成功/失败/取消的记录均不套用途合同，mode 与实际调用一致；用途测试仅选准确启用路由并保留原计量/费用，定向回归、Server 类型/构建及写集检查通过。
-  - 本地结果：5 项服务级定向、9 文件/93 项相关回归、Server 类型/构建、写集 ESLint/格式及依赖边界通过；旧服务 975→945 行。准确合同透传和成功/失败/取消的审计归因已修复，无新增模型、数据库或依赖变更。详见[本次证据](../../tasks/evidence/2026-10-30-nonmobile-evidence-reconciliation.md#authenticated-connection)。
+  - 本地结果：5 项服务级定向、9 文件/93 项相关回归、Server 类型/构建、写集 ESLint/格式及依赖边界通过；旧服务 975→945 行。准确合同透传和成功/失败/取消的审计归因已修复，无新增模型、数据库或依赖变更。详见[本次证据](../../evidence/2026-10-30-nonmobile-evidence-reconciliation.md#authenticated-connection)。
   - 规划预检：就绪（Ready），单一 AI 审计输出、同一服务验证面；本项只验本地交付，部署由下一叶独立持有，不追加模型复测。
 
 - [x] **T5.2.CONNECTION-TARGET：审计修复的目标同步与零生成反读**
   - 依赖：CONNECTION-AUDIT 的本地验证与目标同步/重启授权；本次单次模型额度不可复用。
   - 入口/范围：infra `./scripts/sync-code.sh thesis-ledger`，仅 Server/Worker 及其 workspace 依赖产物；兼容性预检必须通过，保留所有配置、旧审计、业务和挂载。不部署两个后续前端改动。
   - 验收：核对两角色模块摘要及当前代码、旧请求事实在新 helper 中的正确归因、用途合同映射；仅执行纯函数/只读检查，不写入合成健康记录、不调用模型。核对原表、凭据、默认/开关和挂载；快更不声称镜像已更新。
-  - 当前结果：2026-10-30 正式快更退出 0，两角色各 1,576 个 JS 模块与本机构建一致；原请求事实在目标 helper 的只读归因及用途合同映射通过，未写入新审计或调用模型。39 张原表、配置/凭据、默认/开关、五容器/镜像/挂载及三仓 HEAD/索引保留；DSA 自然健康审计单列，移动端 Task 并发文档更新原样保留。Node24 下 93 项回归及独立类型检查通过。[完整目标证据](../../tasks/evidence/2026-10-30-nonmobile-evidence-reconciliation.md#connection-target)。
+  - 当前结果：2026-10-30 正式快更退出 0，两角色各 1,576 个 JS 模块与本机构建一致；原请求事实在目标 helper 的只读归因及用途合同映射通过，未写入新审计或调用模型。39 张原表、配置/凭据、默认/开关、五容器/镜像/挂载及三仓 HEAD/索引保留；DSA 自然健康审计单列，移动端 Task 并发文档更新原样保留。Node24 下 93 项回归及独立类型检查通过。[完整目标证据](../../evidence/2026-10-30-nonmobile-evidence-reconciliation.md#connection-target)。
 
 ## 完整 AC-01～30
 
 | 完整 AC | 核心断言                                                                                                                            | 实现责任         | 验证责任 / 门禁                                                | 当前判定                                                                                                                                                                                                                                                                                                                                 |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AC-01   | 同一 Drawer 双页签切换不丢草稿，关闭有未保存保护                                                                                    | T3.2             | Desktop 交互、Electron                                         | 内建浏览器已检查双页签与未保存保护；本轮只验 Web，Electron 不列接续阻塞                                                                                                                                                                                                                                                                  |
-| AC-02   | 切换 Provider 类型不重建 Drawer，非 AI 功能不回归                                                                                   | T3.2             | Desktop 交互回归                                               | 本轮 Web/目标编辑合同通过：带占位凭证 AI↔行情保存、专属字段清理、空 Key 保留与地址保护拒绝、明确重填、失败草稿恢复均通过；非 AI 基本保存复用 E4，真实外部服务不代收。环境接管已退役，本轮不验 Electron。[回执](../../tasks/evidence/2026-10-21-ai-credential-type-conversion.md)                                                                     |
+| AC-02   | 切换 Provider 类型不重建 Drawer，非 AI 功能不回归                                                                                   | T3.2             | Desktop 交互回归                                               | 本轮 Web/目标编辑合同通过：带占位凭证 AI↔行情保存、专属字段清理、空 Key 保留与地址保护拒绝、明确重填、失败草稿恢复均通过；非 AI 基本保存复用 E4，真实外部服务不代收。环境接管已退役，本轮不验 Electron。[回执](../../evidence/2026-10-21-ai-credential-type-conversion.md)                                                                     |
 | AC-03   | 连接配置与目录获取分离，不要求先填价格或用途                                                                                        | T3.2             | Server adapter、真实连接                                       | 原lmstudio无认证连接、D58有认证V2用途及已保存模型非流式认证连接真实通过；审计归因修复与两角色目标反读通过。免费网关未返回实际模型的旧记录保持未知，不改写；后续正式研究实际模型由G3/MB1证据支持。 |
 | AC-04   | 目录刷新不自动选用途、改价格、删模型或设默认                                                                                        | T3.2             | 目录定向测试、Electron                                         | E2 挂载与 IAB 受控刷新通过；本轮不验 Electron                                                                                                                                                                                                                                                                                            |
 | AC-05   | 连接参数变化后，晚到目录响应不能覆盖新草稿                                                                                          | T3.2             | 请求竞态测试、Desktop                                          | E2 挂载与 IAB 迟到回包通过；本轮不验 Electron                                                                                                                                                                                                                                                                                            |
-| AC-06   | 一个模型的多用途转换为唯一用途路由，模式和覆盖值不丢                                                                                | T2.1、T2.2       | 路由转换、Desktop 交互                                         | 目标 Web 双模型三用途的模式、两组价格及三个覆盖组合回显/保存通过；原值保持，测试条目已清理。历史单模型/安装版回显复用，本轮只验 Web。[回执](../../tasks/evidence/2026-10-21-ai-controlled-config-web.md)                                                                                                                                             |
+| AC-06   | 一个模型的多用途转换为唯一用途路由，模式和覆盖值不丢                                                                                | T2.1、T2.2       | 路由转换、Desktop 交互                                         | 目标 Web 双模型三用途的模式、两组价格及三个覆盖组合回显/保存通过；原值保持，测试条目已清理。历史单模型/安装版回显复用，本轮只验 Web。[回执](../../evidence/2026-10-21-ai-controlled-config-web.md)                                                                                                                                             |
 | AC-07   | API 拒绝同模型同用途的多模式活跃路由                                                                                                | T2.1             | Server Schema / HTTP 契约                                      | E4 实际 HTTP 三项通过：同/异模式重复返回 400 且未调用保存，不同模型路由可普通保存；不发模型请求                                                                                                                                                                                                                                          |
-| AC-08   | 旧配置模式混合时显示按用途配置，不打开保存即覆盖                                                                                    | T2.2             | 旧配置 fixture、Desktop                                        | E2 和 AC-29 旧格式合同复用；目标已保存混合控制样本显示用途单独设置且逐项方式准确，打开关闭整行不写，普通保存保留模式/覆盖/价格/Key。两类等义字段表示保留初次失败及独立复核；不冒充真实用户旧数据。本轮只验 Web。[回执](../../tasks/evidence/2026-10-21-ai-controlled-config-web.md)                                                                  |
+| AC-08   | 旧配置模式混合时显示按用途配置，不打开保存即覆盖                                                                                    | T2.2             | 旧配置 fixture、Desktop                                        | E2 和 AC-29 旧格式合同复用；目标已保存混合控制样本显示用途单独设置且逐项方式准确，打开关闭整行不写，普通保存保留模式/覆盖/价格/Key。两类等义字段表示保留初次失败及独立复核；不冒充真实用户旧数据。本轮只验 Web。[回执](../../evidence/2026-10-21-ai-controlled-config-web.md)                                                                  |
 | AC-09   | 空值继承、非法值拒绝；Provider `timeoutMs` 约束目录 / 非流式连接，流式请求按首输出、输出间隔和操作 / 任务绝对期限收敛，超时归因准确 | T2.2、T3.2、T1.2 | Schema、Server 非流式与流式定向测试、Desktop 字段来源、G2 / G5 | 原继承、目录/非流式及隔离生命周期复用；目标取消已过。本批公开test-and-save/真实Qwen分别完成120秒空正文/心跳、60秒间隔及600秒根预算/595秒执行共享期限，准确审计、不保存、无后续用途。只证明这些实际执行面，未将受控交付写为上游自然停顿。本轮不验Electron。 |
 | AC-10   | 不同模型按目标模型冻结价格并预留、结算                                                                                              | T1.2             | Server / 费用 / 任务集成                                       | 已过隔离冻结/预留/结算及真实零费率研究；参数优化/探索的真实SDK和账目由原业务证据支持。真实正金额费用正向分支按用户决定由[费用TODO](../../TODO.md#ai-provider-positive-cost-acceptance)承接，未记通过。 |
 | AC-11   | 零费率、未知、非零和单边零价严格区分                                                                                                | T1.1、T1.2       | Schema、费用门禁                                               | 值域门禁、隔离费用事实及真实零/未知记录区分已有证据；D59上游实报0和后续估算0/unknown保持独立。真实非零正向费用分支转由[费用TODO](../../TODO.md#ai-provider-positive-cost-acceptance)承接，未补零或伪造账单。 |
-| AC-12   | 新价格不重算旧任务的冻结价格和结算                                                                                                  | T1.2             | 快照、历史任务集成                                             | 通过：实际 PostgreSQL/HTTP 中改价至 9/9、显式迁移后，历史原始 JSON、冻结预留 USD 0.3、合成已结算 USD 0.25、计量修订及费用汇总均保持。SDK 调用零，不冒充真实上游支出。[回执](../../tasks/evidence/2026-10-21-ai-provider-history-preservation.md)                                                                                                     |
+| AC-12   | 新价格不重算旧任务的冻结价格和结算                                                                                                  | T1.2             | 快照、历史任务集成                                             | 通过：实际 PostgreSQL/HTTP 中改价至 9/9、显式迁移后，历史原始 JSON、冻结预留 USD 0.3、合成已结算 USD 0.25、计量修订及费用汇总均保持。SDK 调用零，不冒充真实上游支出。[回执](../../evidence/2026-10-21-ai-provider-history-preservation.md)                                                                                                     |
 | AC-13   | 用户零价与上游真实非零费用分别保留                                                                                                  | T1.2             | Provider 报告、费用结算                                        | 尚未通过。用户于2026-11-01明确转入[费用TODO](../../TODO.md#ai-provider-positive-cost-acceptance)；原配置估算、网关指标、上游0及unknown均保留，不替代“用户零价/上游实际非零”场景。 |
 | AC-14   | 非零模型未获本次预算授权时阻断调用                                                                                                  | T1.2             | 预算门禁、生成测试                                             | 原任务创建、策略门禁和隔离闭环复用；本次ZF1补目标公开API对原Cloudflare非零价格、单边正价及未知价格的拒绝，canary/模型0，变价旧计划409、原配置/审计不变。拒绝条件通过；非零费用正向结算仍归AC-13。 |
 | AC-15   | 无认证连接不发 Key，不读取环境 Key 兜底                                                                                             | T3.1、T5.2       | adapter 定向测试、真实服务                                     | lmstudio authMode=none真实成功且未读取Key的原证据、有认证研究与非流式连接均复用；失败/取消/审计按所属叶和SDK评审分别支持。本轮当前Provider范围之外及已删除实源任务不计通过。 |
-| AC-16   | 留空保留 Key；切换认证方式有确认和重新输入边界                                                                                      | T3.1、T3.2       | Server、Desktop、Electron                                      | Web/目标配置条件通过：占位 Key 不回显、留空保留原密文、取消不写、确认清除、切回空框并重新输入后实存；原用户 Key 未触。真实认证仍由 AC-03/15 持有，本轮不验 Electron。[回执](../../tasks/evidence/2026-10-21-ai-controlled-config-web.md)                                                                                                             |
+| AC-16   | 留空保留 Key；切换认证方式有确认和重新输入边界                                                                                      | T3.1、T3.2       | Server、Desktop、Electron                                      | Web/目标配置条件通过：占位 Key 不回显、留空保留原密文、取消不写、确认清除、切回空框并重新输入后实存；原用户 Key 未触。真实认证仍由 AC-03/15 持有，本轮不验 Electron。[回执](../../evidence/2026-10-21-ai-controlled-config-web.md)                                                                                                             |
 | AC-17   | 默认失效或预算不足时明确阻断，不按顺序换模型                                                                                        | T4.1、T4.2       | Server、研究创建、真实服务                                     | 原隔离提交竞争和目标空默认拒绝、D59默认OpenRouter/free修订7正向创建及D60读取通过；后续主Server零预算下正价/单边正价/未知价格拒绝和变价409通过，未按顺序切模型。 |
 | AC-18   | 调整排序不改变显式默认                                                                                                              | T4.2             | settings / 研究创建测试                                        | 隔离排序不改默认及创建冻结证据复用；D59 补目标研究消费显式默认的正向结果，未在该真实调用中改变排序，不将其当作新增排序竞争验收。 |
 | AC-19   | 默认在研究提交前变更时返回版本冲突                                                                                                  | T4.2             | 并发 HTTP、PostgreSQL                                          | 隔离 PostgreSQL 提交版本冲突与默认切换竞争已通过；D59 补匹配默认修订的目标正向创建。该次成功没有制造目标并发版本冲突，不扩写并发证据。 |
 | AC-20   | 研究和策略只使用允许且冻结的模型，不自动换模型                                                                                      | T4.2             | Server 执行集成                                                | D59研究冻结请求/实际上游模型、MB1精确模型绑定，以及Cloudflare参数优化/探索和T19的真实业务与冻结路径分别有证据；不改变当前默认、冒充固定网关上游或恢复旧失败实验。 |
-| AC-21   | 删除、停用或移除默认引用时确认并原子提交                                                                                            | T4.2、T2.5.E3    | Provider 生命周期、PostgreSQL                                  | 配置生命周期条件通过：原 PostgreSQL 删除/停用/原子清除/竞争、E3 Web 确认/取消/409/503 复用；目标当前双版本原子清除及正常恢复均 200，缺标记和旧默认版本均 409 零写。Provider 始终启用，仅正常时间/默认修订推进，不冒称实际停用或删除原配置；Web 原默认恢复。本轮不验 Electron。[回执](../../tasks/evidence/2026-10-21-ai-default-lifecycle-target.md) |
+| AC-21   | 删除、停用或移除默认引用时确认并原子提交                                                                                            | T4.2、T2.5.E3    | Provider 生命周期、PostgreSQL                                  | 配置生命周期条件通过：原 PostgreSQL 删除/停用/原子清除/竞争、E3 Web 确认/取消/409/503 复用；目标当前双版本原子清除及正常恢复均 200，缺标记和旧默认版本均 409 零写。Provider 始终启用，仅正常时间/默认修订推进，不冒称实际停用或删除原配置；Web 原默认恢复。本轮不验 Electron。[回执](../../evidence/2026-10-21-ai-default-lifecycle-target.md) |
 | AC-22   | 保存、切页、详情打开不产生生成请求，未测试为中性状态                                                                                | T3.2             | Desktop 请求断言                                               | Web 切页/编辑/撤销与自动化请求断言复用；E4 目标普通保存通过且真实调用计数不变，专属未测试配置保持中性状态                                                                                                                                                                                                                                |
 | AC-23   | 指定模型测试只调用目标模型，付费先授权，重复点击不重复调用                                                                          | T1.2、T3.2       | 生成生命周期、费用、取消                                       | 单飞、取消及费用授权本地证据复用；D58 经公开 test-and-save 对准确 Qwen/V2 用途失败一次、成功一次，均为独立获准请求。T6.SAVE-CURRENT 补当前编写分析/研究 V2 的准确 2/2 次用途请求及实际上游零费用；T6.CANCEL-ISOLATED 补取消后终止上游/后续用途且不保存的隔离子场景。其他用途/协议和非零费率真实授权仍未通过，不将业务生成当用途测试。 |
 | AC-24   | 配置变化和测试失败按正确粒度过期、归因                                                                                              | T3.2             | 请求竞态、状态测试                                             | E4 的指纹、迟到/单飞、失效粒度及用途隔离复用；D58 真实用途 Schema 失败未覆盖原配置，修正探针后独立验证成功。T6.SAVE-CURRENT 补两个当前用途的验证指纹持久化与零待验复读；T6.CANCEL-ISOLATED 补 validation_cancelled、未知用量和原配置保留的持久化隔离证据；认证/限流/期限等失败场景按原门禁保留。 |
-| AC-25   | 价格迁移保留值、缺失不补零、重复执行幂等                                                                                            | T5.1             | 隔离 PostgreSQL、迁移 dry-run                                  | 通过：显式应用、数据库精确 JSONB 保留、同计划幂等、未来模型未知、独立进程竞争和故障全回滚均有真实 PostgreSQL 证据；目标两容器只读预览均为三配置 noop，完整保护不变。[回执](../../tasks/evidence/2026-10-21-ai-provider-pricing-migration.md)                                                                                                         |
-| AC-26   | 旧路由冲突保留原值并可定位，不静默合并                                                                                              | T5.1             | 迁移报告、冲突 fixture                                         | 通过：缺价格字段、重复旧路由报告冲突，真实 PostgreSQL 整批不写且原值/审计不变；不静默合并。[回执](../../tasks/evidence/2026-10-21-ai-provider-pricing-migration.md)                                                                                                                                                                                  |
+| AC-25   | 价格迁移保留值、缺失不补零、重复执行幂等                                                                                            | T5.1             | 隔离 PostgreSQL、迁移 dry-run                                  | 通过：显式应用、数据库精确 JSONB 保留、同计划幂等、未来模型未知、独立进程竞争和故障全回滚均有真实 PostgreSQL 证据；目标两容器只读预览均为三配置 noop，完整保护不变。[回执](../../evidence/2026-10-21-ai-provider-pricing-migration.md)                                                                                                         |
+| AC-26   | 旧路由冲突保留原值并可定位，不静默合并                                                                                              | T5.1             | 迁移报告、冲突 fixture                                         | 通过：缺价格字段、重复旧路由报告冲突，真实 PostgreSQL 整批不写且原值/审计不变；不静默合并。[回执](../../evidence/2026-10-21-ai-provider-pricing-migration.md)                                                                                                                                                                                  |
 | AC-27   | 历史任务和部署配置不被改写，旧客户端有损写入被拒绝                                                                                  | T5.1             | 兼容 Schema、历史任务、部署检查                                | 原 PostgreSQL/HTTP 有损写入拒绝与合成历史保护通过；D58/D59 又证明真实报告/失败审计、旧数据及 trace 在正式重建后保持。旧“目标 AiRun 为零”仅属 10-21 基线，不作为当前状态。 |
-| AC-28   | Provider / 默认设置并发编辑返回冲突且无悬空引用                                                                                     | T4.2             | PostgreSQL、并发 HTTP                                          | 通过：原 PostgreSQL 引用竞争、E4 目标 Provider 409 复用；默认设置目标竞争 200/409、旧版本 409、无效引用 400，引用保持、修订仅 1→2，保护及 Web 通过。[回执](../../tasks/evidence/2026-10-21-ai-settings-concurrency.md)。模型正向消费仍由 AC-17～20 持有                                                                                              |
-| AC-29   | 不恢复已移除能力声明、免费依据、上游限制或供应商专用依赖                                                                            | T5.2             | 源码扫描、边界 / 回归门禁                                      | 通过：三个字段只在兼容输入删除，九份 manifest 未恢复专用直连依赖；24 项定向、两容器十八项实际读取/输入/投影断言及保护核对通过，网络为零。[回执](../../tasks/evidence/2026-10-21-ai-config-contract-regression.md)                                                                                                                                    |
+| AC-28   | Provider / 默认设置并发编辑返回冲突且无悬空引用                                                                                     | T4.2             | PostgreSQL、并发 HTTP                                          | 通过：原 PostgreSQL 引用竞争、E4 目标 Provider 409 复用；默认设置目标竞争 200/409、旧版本 409、无效引用 400，引用保持、修订仅 1→2，保护及 Web 通过。[回执](../../evidence/2026-10-21-ai-settings-concurrency.md)。模型正向消费仍由 AC-17～20 持有                                                                                              |
+| AC-29   | 不恢复已移除能力声明、免费依据、上游限制或供应商专用依赖                                                                            | T5.2             | 源码扫描、边界 / 回归门禁                                      | 通过：三个字段只在兼容输入删除，九份 manifest 未恢复专用直连依赖；24 项定向、两容器十八项实际读取/输入/投影断言及保护核对通过，网络为零。[回执](../../evidence/2026-10-21-ai-config-contract-regression.md)                                                                                                                                    |
 | AC-30   | 真实 Desktop / Server 闭环可操作并能修复失败                                                                                        | T5.2             | Docker、Server / Worker、Electron、Provider                    | D58～D60、同配置测试后保存、三类真实SDK业务/工作台/T19、目标取消及主Server真实Cloudflare交付期限/恢复均由原责任证据支持。当前Web及目标服务范围完成；真实正金额费用转TODO，Electron不计本轮交付。 |
 
 ## 局部 AC 映射
@@ -189,7 +189,7 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
 
 ## 最终验收
 
-最终复核范围：原完整AC-01～30已逐项对账，真实非零费用按用户明确决定转入TODO而非计通过；当前Web/目标服务的实现、迁移、竞态、准确模型/用途、三类SDK业务、保存、取消及完整交付期限证据齐备。下列Review按该当前范围关闭，详细证据和原失败/未知边界见[最终复核](../../tasks/evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
+最终复核范围：原完整AC-01～30已逐项对账，真实非零费用按用户明确决定转入TODO而非计通过；当前Web/目标服务的实现、迁移、竞态、准确模型/用途、三类SDK业务、保存、取消及完整交付期限证据齐备。下列Review按该当前范围关闭，详细证据和原失败/未知边界见[最终复核](../../evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
 
 - [x] 完整设计稿 AC-01～30 均有明确实现责任和验证责任
 - [x] 仓库 Spec 局部 AC 已映射到完整设计稿主 AC，编号不再混用
@@ -210,13 +210,13 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
 
 现行合同：[自动选择与测试后保存 Spec](../../specs/2026-09-23-ai-provider-auto-test-save.md)。T0～T5、verified-save / onboarding HTTP 和 Desktop 既有实现不重做；原步骤与映射见[历史 Task](2026-09-23-ai-provider-auto-test-save.md)。
 
-- [x] T6综合验收：当前源码CI、数据库竞争、既有保存/Web、D58～D60、三类真实SDK业务、目标取消及主Server/真实Cloudflare完整交付期限通过，原证据按输入复用。真实正金额费用仍未通过，按用户决定由TODO持有；当前范围收口，不宣称Electron验收。[最终复核](../../tasks/evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
+- [x] T6综合验收：当前源码CI、数据库竞争、既有保存/Web、D58～D60、三类真实SDK业务、目标取消及主Server/真实Cloudflare完整交付期限通过，原证据按输入复用。真实正金额费用仍未通过，按用户决定由TODO持有；当前范围收口，不宣称Electron验收。[最终复核](../../evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
   - 第9项的本机完整墙钟及目标实际共享期限、首输出、仅心跳和输出间隔分别通过；真实上游响应完成与中继交付故障分列，不声称源站自然停顿。普通用途/默认研究600秒、默认首输出120秒和输出间隔60秒保持。
 
 - [x] **T6.TARGET-FAULT：主Server费用拒绝与真实Cloudflare交付期限**
   - 输入/预算：现有Qwen、原容器内存凭据、原120/60/600秒策略及5秒收尾；四个独立故障样本最多1/1/1/2次，合计5次，费用0，无重试/回退/后续未授权用途。
   - 结果：零模型费用拒绝/变价409、122.40/126.36秒首输出、60.01秒间隔及595.01秒共享执行截止全部通过；成功用途的reported用量保留，失败unknown与estimated 0 USD分列，全部不保存。
-  - 保护：原40张表聚合、598条业务/审计、658条旧健康行与5份完整Provider保持，仅新增14条所属健康审计，默认修订7及两个空字段保持。所属目录已导出清理、Server未重启；[完成Task](2026-10-31-ai-provider-live-fault-acceptance.md)及[证据](../../tasks/evidence/2026-10-31-ai-provider-live-fault-acceptance.md)。
+  - 保护：原40张表聚合、598条业务/审计、658条旧健康行与5份完整Provider保持，仅新增14条所属健康审计，默认修订7及两个空字段保持。所属目录已导出清理、Server未重启；[完成Task](2026-10-31-ai-provider-live-fault-acceptance.md)及[证据](../../evidence/2026-10-31-ai-provider-live-fault-acceptance.md)。
 
 <a id="t6-deadline-isolated"></a>
 
@@ -231,13 +231,13 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
 - [x] **T6.CLOUDFLARE-RESTORE：本批临时验收配置恢复与保护对账**
   - 依赖：本批 Cloudflare 请求全部终态。经公开保存先清空临时默认，再恢复原无默认字段、标准价格、空用途及停用；每步先取得零调用 validation-plan 与新修订，不修改凭据或计费。
   - 完成条件：原配置普通字段和凭据摘要一致，其他 Provider、OpenRouter 两个空对象与研究默认保持；保存时间/价格元数据正常更新如实披露。新增真实模型 0 次；对账通过前保持未勾选。
-  - 结果：两次公开普通保存均201、各自计划maxCalls=0；恢复原停用、标准价格、空用途及无默认字段。其他四个Provider业务/验证/修订、全部凭据、默认revision=7和两个空对象保持；569条原业务、645条旧审计无变化。仅正常价格时间/保存修订推进。[证据](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md#配置恢复调用账本与保护)。
+  - 结果：两次公开普通保存均201、各自计划maxCalls=0；恢复原停用、标准价格、空用途及无默认字段。其他四个Provider业务/验证/修订、全部凭据、默认revision=7和两个空对象保持；569条原业务、645条旧审计无变化。仅正常价格时间/保存修订推进。[证据](../../evidence/2026-10-31-cloudflare-first-four-continuation.md#配置恢复调用账本与保护)。
 
 - [x] **T6.STALL-ISOLATED：默认首输出与输出间隔的完整墙钟验收**
   - 输入/预算：本机假上游、现行 SDK、公开 test-and-save 和专属 PostgreSQL；三个独立 Provider 并行验证 headers 已到无正文、仅 SSE 心跳、首段有效输出后停顿。真实模型 0 次、费用 0，不使用真实来源或凭据。
   - 期限：使用默认首输出 120000ms、输出间隔 60000ms、普通操作 600000ms 与原 5000ms 收尾，不使用假时钟或缩短超时；Provider 非流式 timeoutMs=3000 不得成为流式总时限。外层测试等待只影响本机测试进程。
   - 完成条件：两项首输出超时约 120 秒、一项输出间隔超时约 60 秒；准确错误归因、断流、每操作只发送第一用途、不保存且保留未知用量，原隔离配置/默认/两个空对象保持。整体 600 秒样本和目标取消按既有输入复用；目标真实停顿仍单独保留。
-  - 结果：120039.5 / 120036.8 / 60069.6ms，三条请求均断流，无后续用途、回退或保存；原配置、默认、两空对象和业务表保持。首次外层错误码前缀断言失败及修正留痕；维护入口完整重验 1 项通过、无跳过。[证据](../../tasks/evidence/2026-10-31-ai-provider-protocols-and-stall.md#默认停顿的完整墙钟隔离验收)。
+  - 结果：120039.5 / 120036.8 / 60069.6ms，三条请求均断流，无后续用途、回退或保存；原配置、默认、两空对象和业务表保持。首次外层错误码前缀断言失败及修正留痕；维护入口完整重验 1 项通过、无跳过。[证据](../../evidence/2026-10-31-ai-provider-protocols-and-stall.md#默认停顿的完整墙钟隔离验收)。
 
 - [x] **T6.DEADLINE-ISOLATED：完整冻结期限的本机流与持久化隔离验收**
   - 覆盖：测试后保存 Spec 第 6/8/9 项的普通用途完整预算及跨用途共享截止子场景，关联 AC-09/23/24/30；目标/实源仍分别验收。
@@ -245,7 +245,7 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
   - 断言：不加速时间；两项 SDK 请求持有同一 taskDeadlineAt，根预算 600000ms、既有收尾预留 5000ms，约 595 秒执行余量到期后断流且不保存；已完成用途的用量/成功审计保留，第二用途按 task_budget_exhausted 终止，不冒充用户取消或空闲停顿。
   - 写边界/入口：新增定向隔离测试；维护 `scripts/test-ai-provider-postgres.mjs` 的可选测试进程等待上限，并在启动 Docker 前验证范围，默认行为不变。仍由该脚本创建/清理所属 tmpfs PostgreSQL；不改生产预算、目标服务/配置、凭据、默认或两个空字段。
   - 验证顺序：测试上限非法值零资源预检及定向静态检查 → 现有短样本回归 → 完整墙钟隔离样本一次 → 原目标只读保护。输入未变不重复长样本。
-  - 当前结果：本叶通过。真实墙钟 595.049 秒进入既有 5 秒收尾；两个用途的截止时间完全相同，第一项成功及用量保留，第二项 task_budget_exhausted 断流且不保存，原隔离配置/默认保持。首轮测试客户端 300 秒响应头限制失败及修正已留痕。[证据](../../tasks/evidence/2026-10-30-ai-provider-deadline-isolated.md)。后续按用户本次调用不限、现有免费 Provider/费用 0 的范围推进，不使用旧账本。
+  - 当前结果：本叶通过。真实墙钟 595.049 秒进入既有 5 秒收尾；两个用途的截止时间完全相同，第一项成功及用量保留，第二项 task_budget_exhausted 断流且不保存，原隔离配置/默认保持。首轮测试客户端 300 秒响应头限制失败及修正已留痕。[证据](../../evidence/2026-10-30-ai-provider-deadline-isolated.md)。后续按用户本次调用不限、现有免费 Provider/费用 0 的范围推进，不使用旧账本。
 
 <a id="t6-cancel-isolated"></a>
 
@@ -253,20 +253,20 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
   - 已有分析、研究、探索和参数优化的用途证明按准确合同复用；仅补 `authoring-generation-v2` 与 `authoring-modification-v2` 的 JSON Mode 最小合同实例。
   - 当前 OpenRouter/free 与原认证，最多 2 次请求、费用上限 0；只在草稿启用本次用途，不保存配置或创建正式策略。每用途最多 1 次，首次失败或费用未知即停止该批，不回退或重试。
   - 通过只证明受控用途合同，不代收真实策略编写业务或 discovery 的已冻结失败。
-  - 结果：两次 JSON Mode 流式探针均 healthy，实际模型为 nemotron-3-ultra-550b-a55b:free，417/445 与 417/384 Token，上游均实报 0 USD；草稿未保存，未建正式策略。[证据](../../tasks/evidence/2026-10-31-ai-provider-protocols-and-stall.md#目标实际探针)。
+  - 结果：两次 JSON Mode 流式探针均 healthy，实际模型为 nemotron-3-ultra-550b-a55b:free，417/445 与 417/384 Token，上游均实报 0 USD；草稿未保存，未建正式策略。[证据](../../evidence/2026-10-31-ai-provider-protocols-and-stall.md#目标实际探针)。
 
 - [x] **T6.PROTOCOL-PROFILE：协议切换草稿的兼容扩展继承**
   - 来源：当前 OpenRouter 配置包含 `openrouter-v1`，切换至 Responses、OpenAI 原生 Chat 或 Anthropic 的草稿会再次继承该专属扩展，阻断后续协议验收。
   - 合同及写集：仅在最终选择仍为兼容 Chat Completions 时继承省略的扩展；显式不合法组合仍拒绝。统一测试运行时、验证计划和普通保存的解析，覆盖旧配置保留、协议切换、重新验证及凭据保护，不改默认或历史记录。
   - 验证：定向消息/保存正反例 → Server 类型、写集与边界 → 当前任务终态后的维护入口同步 → 目标零调用计划与按单样本有限预算的现有免费协议请求。协议文档不代替实际结果。
-  - 结果：14 项本地、1 项独立 PostgreSQL、Server 类型/构建/边界及维护同步通过。目标 Responses/OpenAI 原生 Chat 的选定探针通过，Anthropic 连接通过而流式用途 Schema 失败，已停止该分支；扩展继承修复通过不代表全部远端合同通过。最后复用历史证明 maxCalls=0 恢复原配置，五份业务摘要/密文及两空对象保持。[证据](../../tasks/evidence/2026-10-31-ai-provider-protocols-and-stall.md)。
+  - 结果：14 项本地、1 项独立 PostgreSQL、Server 类型/构建/边界及维护同步通过。目标 Responses/OpenAI 原生 Chat 的选定探针通过，Anthropic 连接通过而流式用途 Schema 失败，已停止该分支；扩展继承修复通过不代表全部远端合同通过。最后复用历史证明 maxCalls=0 恢复原配置，五份业务摘要/密文及两空对象保持。[证据](../../evidence/2026-10-31-ai-provider-protocols-and-stall.md)。
 
 - [x] **T6.CANCEL-TARGET：目标公开测试后保存的真实免费上游取消**
   - 覆盖：测试后保存 Spec 第 6/8/9 项的目标 Server、真实免费上游、共享取消与禁止保存子场景；复用隔离用例的断流及数据库竞争证明。
   - 输入：当前 OpenRouter/free、原凭据、默认和两个空对象；草稿仅增加待验 `strategy_authoring_generation / authoring-generation-v2` 的 JSON Mode 用途。零模型计划确认其余四条启用用途复用已有验证，唯一 pending 及 maxCalls 均为 1。
   - 预算/执行：使用本次免费调用不限授权，单样本最多 1 次真实请求、费用上限 0；请求落 pending 审计后约 2 秒经公开 validation/cancel 取消，不自动重试或格式回退。若提前自然结束则据实记录，不误判为取消通过。
   - 完成条件：公开取消成功，原请求 validation_cancelled，唯一请求和未知计量可追溯，没有配置保存、后续用途或业务报告；当前临时配置、密文、默认、两个空对象及旧业务/审计保持。
-  - 当前结果：公开取消 201、原验证 400，唯一请求 `e37b265d-bc5f-44e6-bc74-0d8c28c4f9c3` 保留 pending 与 `validation_cancelled`，配置修订不变。未观测 Token 和上游账单，审计中的 0 USD 仅为配置估算；物理断流沿用隔离证据，不声称本次上游已确认断开。详见[目标取消证据](../../tasks/evidence/2026-10-31-ai-provider-target-cancel.md)。
+  - 当前结果：公开取消 201、原验证 400，唯一请求 `e37b265d-bc5f-44e6-bc74-0d8c28c4f9c3` 保留 pending 与 `validation_cancelled`，配置修订不变。未观测 Token 和上游账单，审计中的 0 USD 仅为配置估算；物理断流沿用隔离证据，不声称本次上游已确认断开。详见[目标取消证据](../../evidence/2026-10-31-ai-provider-target-cancel.md)。
 
 - [x] **T6.CANCEL-ISOLATED：公开取消接口的本机流与持久化隔离验收**
   - 覆盖：测试后保存 Spec 第 6/8/9 项的用户取消子场景，关联 AC-09/23/24/30；完整 T6 及完整墙钟期限仍单独保留。
@@ -275,7 +275,7 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
   - 写边界：只新增本叶定向集成测试及必要 fixture 参数，修改本 Spec/Task/证据/索引；数据库写入仅在身份已核对的隔离库。目标配置、密文、默认、原审计/业务数据、`modelDefaults={}`/`modelReasoning={}` 及运行态保全，不 stage/commit 或部署。
   - 完成条件：公开取消返回成功，验证请求因用户取消结束；SSE 上游断开，无第二用途/格式回退/重试；数据库保留意图及 `validation_cancelled` 失败审计，未知用量不补零；隔离原配置/密文/默认/历史记录不变，没有用途验证成功或配置保存；目标只读保护对账通过。
   - 验证顺序：定向现有取消回归与本叶静态检查 → 维护入口执行本叶隔离 HTTP/SDK/PostgreSQL 集成 → 目标只读保护与文档一致性复核。失败先定位本叶，不扩模型预算或改目标现状。
-  - 当前结果：本叶通过。取消接口 201／原验证 400，假上游一条请求后断开，第二用途/回退/重试/保存均为 0；独立连接读回 pending/validation_cancelled，未知用量不补零。600 秒计划与准确用途已核对；原隔离配置/密文/默认/两个空字段/旧审计，以及目标 41 表和五容器均保持。前置定向 1 项、保存竞争 5 项、本叶 1 项通过；测试密钥造数失败和修正保留。详见[证据](../../tasks/evidence/2026-10-30-ai-provider-cancel-isolated.md)。
+  - 当前结果：本叶通过。取消接口 201／原验证 400，假上游一条请求后断开，第二用途/回退/重试/保存均为 0；独立连接读回 pending/validation_cancelled，未知用量不补零。600 秒计划与准确用途已核对；原隔离配置/密文/默认/两个空字段/旧审计，以及目标 41 表和五容器均保持。前置定向 1 项、保存竞争 5 项、本叶 1 项通过；测试密钥造数失败和修正保留。详见[证据](../../evidence/2026-10-30-ai-provider-cancel-isolated.md)。
 
 <a id="t6-save-current"></a>
 
@@ -287,12 +287,12 @@ AC-13需要可追溯的上游实报非零费用。只读检索现有健康审计
   - 入口/写边界：正式 `POST /api/v1/ai/providers/test-and-save`；两项通过才按当前 `expectedRevision` 保存同一配置一次。只允许匹配验证记录、操作/健康审计及正常配置修订推进；原设置值、用途启停、默认、密文、旧审计与业务记录保全，不部署或重启。
   - 执行前重新读取零调用计划；只在同一两个用途/模型和零费用前提仍成立时执行，匹配记录可减少实际次数。范围增大、非零/未知价格、修订冲突或任一失败时停止受影响步骤，保留成功/失败事实，不扩大预算或覆盖并发改动。
   - 验收：两项结果通过各自原合同，原生结构化模式/用途/验证指纹关联正确；同配置保存及 API/Web 重读结果可追溯，配置/凭据/默认和旧业务保护通过。用量/费用按真实来源保留，未知不补零；G3、保存竞争、迁移、原 Web 交互等匹配证据复用。
-  - 当前结果：2026-10-30 14:30:59～14:33:11（北京时间），正式接口 HTTP 201／132.521 秒；两项均为 native_schema，上游各自报告 known／0 USD，使用 2/2 次后保存同一配置一次。API 与当前源码 Web 重读通过：用途验证 2/2、六项仅原两项启用；后续计划 pending=0／maxCalls=0，未二次保存。普通配置、密文、默认修订 7、606 条旧健康审计、AiRun 15／AiToolCall 165 及原业务行保全；估值新增 44 行与既有 Scheduler 的 22 次成功采样匹配，原 1476 行摘要不变。五容器和三仓 HEAD／索引不变。本叶通过，父 T6 保持开放。[范围及结果](../../tasks/evidence/2026-10-30-ai-config-next-acceptance-scope.md)。
+  - 当前结果：2026-10-30 14:30:59～14:33:11（北京时间），正式接口 HTTP 201／132.521 秒；两项均为 native_schema，上游各自报告 known／0 USD，使用 2/2 次后保存同一配置一次。API 与当前源码 Web 重读通过：用途验证 2/2、六项仅原两项启用；后续计划 pending=0／maxCalls=0，未二次保存。普通配置、密文、默认修订 7、606 条旧健康审计、AiRun 15／AiToolCall 165 及原业务行保全；估值新增 44 行与既有 Scheduler 的 22 次成功采样匹配，原 1476 行摘要不变。五容器和三仓 HEAD／索引不变。本叶通过，父 T6 保持开放。[范围及结果](../../evidence/2026-10-30-ai-config-next-acceptance-scope.md)。
   - 验收后观察：15:12:43.798 的后续修订补入 `modelDefaults={}` 与 `modelReasoning={}`，来源尚未归属；其余业务摘要、密文、验证指纹、默认和已保留审计保持，最新零调用计划仍无待验项。本操作未二次保存，差异及严格比较失败已留痕，现状保留；来源归属作为本叶接续观察项，不宣称当前原始 settings 逐字节相同。
 
-T6.P1 保存竞争 5 项、用途配置 T4.2.P1 默认引用 10 项、T4.2.P2 研究提交 3 项及独立进程 3 项已有[隔离数据库证据](../../tasks/evidence/2026-10-04-ai-lifecycle-and-submission.md)。历史非流式/流式/取消六类生命周期有本机 HTTP/SSE 证据；当时 300 秒信号使用加速定时器，仅复用其信号语义，不代收当前用途策略的完整墙钟期限或目标实机验收。
+T6.P1 保存竞争 5 项、用途配置 T4.2.P1 默认引用 10 项、T4.2.P2 研究提交 3 项及独立进程 3 项已有[隔离数据库证据](../../evidence/2026-10-04-ai-lifecycle-and-submission.md)。历史非流式/流式/取消六类生命周期有本机 HTTP/SSE 证据；当时 300 秒信号使用加速定时器，仅复用其信号语义，不代收当前用途策略的完整墙钟期限或目标实机验收。
 
-数据库唯一来源的目标/副本、Web 保存与恢复继续复用[原证据](../../tasks/evidence/2026-10-19-ai-provider-database-only.md#2026-10-20-获准目标-web-保存与最终复核)。本次补入 D58 真实测试并保存及 D59/D60 研究正向证据，详见[本次差集](../../tasks/evidence/2026-10-30-nonmobile-evidence-reconciliation.md)；不再笼统标记全部真实认证/用途/研究未验，也不重复已过场景。无本次授权仍不新增请求。
+数据库唯一来源的目标/副本、Web 保存与恢复继续复用[原证据](../../evidence/2026-10-19-ai-provider-database-only.md#2026-10-20-获准目标-web-保存与最终复核)。本次补入 D58 真实测试并保存及 D59/D60 研究正向证据，详见[本次差集](../../evidence/2026-10-30-nonmobile-evidence-reconciliation.md)；不再笼统标记全部真实认证/用途/研究未验，也不重复已过场景。无本次授权仍不新增请求。
 
 <a id="free-evidence-acceptance"></a>
 

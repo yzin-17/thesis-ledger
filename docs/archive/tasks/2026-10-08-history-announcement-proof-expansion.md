@@ -31,4 +31,4 @@
 - 后端门禁首次为 8314 项通过、1 项失败，失败仅为已有 Futu 注册未同步测试清单；补正后该项单测通过。最终执行 DSA `env PATH="$PWD/.venv/bin:$PATH" ./scripts/ci_gate.sh all`，语法、critical flake8、确定性检查和离线测试全部通过：8315 passed、1 skipped、4 deselected、626 subtests passed。日志 `/tmp/history-announcement-backend-gate.log`；客户端与共享契约未改，不重复其高成本验收。
 - T2：从 infra 执行 `./scripts/sync-code.sh dsa`，退出 0；目标 parser/jobs 字节摘要与本机一致，5 个服务健康。中广核技 08-28 复牌实际进入认证状态响应，既有原文及皇台风险事实保持。
 - T3：现有四证券整月任务均 succeeded，库存 8→11 份、7 份解析成功；新增罗博特科首次停牌与复牌原文，四家均返回两项明确停复牌事实，其他请求日期保持 unknown。客户端消费的 Server 公告列表 HTTP 200，新增事实条目 parsed；配置投影及两份已有回测的 API/清单摘要保持。
-- 最终一致性检查通过；完整逐项原文、摘要、输入边界与生产证据见[验收记录](../../tasks/evidence/2026-10-08-history-announcement-proof-expansion.md)。本 Task 范围全部完成，没有未移交的执行义务；较大历史范围不由本局部 Task 承接，等待用户确定后另行立项。未提交或推送。
+- 最终一致性检查通过；完整逐项原文、摘要、输入边界与生产证据见[验收记录](../../evidence/2026-10-08-history-announcement-proof-expansion.md)。本 Task 范围全部完成，没有未移交的执行义务；较大历史范围不由本局部 Task 承接，等待用户确定后另行立项。未提交或推送。

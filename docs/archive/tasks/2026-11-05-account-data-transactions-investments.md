@@ -5,7 +5,7 @@
 
 ## 当前状态
 
-本次范围已完成并通过最终复核，任务归档。实现与本地 Web 验证见[验收记录](../../tasks/evidence/2026-11-05-account-data-transactions-investments.md)。相关 69/69 测试通过，完整测试集保留两项独立失败，不声称全量门禁通过。
+本次范围已完成并通过最终复核，任务归档。实现与本地 Web 验证见[验收记录](../../evidence/2026-11-05-account-data-transactions-investments.md)。相关 69/69 测试通过，完整测试集保留两项独立失败，不声称全量门禁通过。
 
 ## 执行清单
 

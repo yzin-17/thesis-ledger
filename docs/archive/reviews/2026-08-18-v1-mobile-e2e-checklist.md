@@ -29,7 +29,7 @@
 - 构建：`apps/mobile/release/investment-os-0.1.0-arm64.apk`，SHA-256：`cf4f81ddf9bb46355cc6e68b0e5b6b5a19e30558b3dc232c659215af5576da1e`；AAB SHA-256：`90567f3a84f10f6706cf7b3f073fa2c4f14f2c95a6ee0b95264183f614d6316a`。
 - API：临时隔离 fixture 只读账户 `fixture-account`，Android fallback 使用 `http://10.0.2.2:3000/api/v1`；fixture 仅提供测试数据，不含真实凭证或生产数据。
 - M1：通过。冷启动先显示“正在加载”，随后显示“数据已更新”，未直接访问 DSA。
-- M2：通过。macOS Desktop release 与 Android release 使用同一隔离 `fixture-account`，总市值 `CN¥178,000.00`、总成本 `CN¥160,000.00`、累计盈亏 `CN¥18,000.00`、`600519.SH` 数量 100 和 Risk warning 事件均一致；对照报告见 `docs/reviews/evidence/mobile-android/2026-08-18-desktop-mobile-fixture-comparison.md`。
+- M2：通过。macOS Desktop release 与 Android release 使用同一隔离 `fixture-account`，总市值 `CN¥178,000.00`、总成本 `CN¥160,000.00`、累计盈亏 `CN¥18,000.00`、`600519.SH` 数量 100 和 Risk warning 事件均一致；对照报告见 `docs/evidence/mobile-android/2026-08-18-desktop-mobile-fixture-comparison.md`。
 - M3：通过。持仓代码、数量 100、成本、市值、盈亏和“已估值”均可读。
 - M4：通过。Risk 显示 `warning`、规则 v2、测试消息和市场时间。
 - M5：通过。slow fixture 下点击“重新读取”可观察 loading，再由新响应覆盖为 ready。
@@ -37,7 +37,7 @@
 - M7：通过。503 fixture 显示“读取失败”和“重新读取”入口，并保留此前内容而不伪装为最新值。
 - M8：通过。`partial=true`/`stale=true` 显示“数据可能陈旧”，持仓显示“行情陈旧”。
 - M9：通过。600×1000 下 Tab、状态提示和指标卡未横向遮挡；向上滚动可访问持仓和刷新控件。
-- XML 与 PNG 证据已归档至 `docs/reviews/evidence/mobile-android/`，文件名按状态区分。
+- XML 与 PNG 证据已归档至 `docs/evidence/mobile-android`，文件名按状态区分。
 
 ## 归档规则
 

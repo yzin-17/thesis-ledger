@@ -12,10 +12,10 @@
 
 ## 实施证据
 
-实现与独立验证完成，见 [结果与 Runner 证据](../../tasks/evidence/2026-10-01-n3-nav-result-runner.md)。Schemas 全包 586 项、NAV/离线/场内 Runner 定向 36 项、独立类型/编译及复杂度/边界通过。继承 [N3 离线经济证据](../../tasks/evidence/2026-10-01-parallel-n3-nav-offline.md)，仅复用输入未变化时仍有效的验证。
+实现与独立验证完成，见 [结果与 Runner 证据](../../evidence/2026-10-01-n3-nav-result-runner.md)。Schemas 全包 586 项、NAV/离线/场内 Runner 定向 36 项、独立类型/编译及复杂度/边界通过。继承 [N3 离线经济证据](../../evidence/2026-10-01-parallel-n3-nav-offline.md)，仅复用输入未变化时仍有效的验证。
 
 初次停止时 R03 未勾选：Server 常规类型/构建失败于 N2 新增 `backtest-nav-run.controller.ts:14` 的 UUID `version: 'all'` 类型不符，当时按验证分层没有运行最终全包测试。
 
-2026-10-01 公共集成阶段已修复该阻塞，Server 最终常规类型、build 与全包回归通过（1987 项通过、103 项跳过），边界与最终一致性复核通过，R03 完成。真实 PostgreSQL/BullMQ 的三个独立执行场景另外通过，见 [N3/N4 集成证据](../../tasks/evidence/2026-10-01-n4-nav-target.md)。本叶的完成只覆盖结果与 Runner 范围；目标业务验收由 N4 单独记录。
+2026-10-01 公共集成阶段已修复该阻塞，Server 最终常规类型、build 与全包回归通过（1987 项通过、103 项跳过），边界与最终一致性复核通过，R03 完成。真实 PostgreSQL/BullMQ 的三个独立执行场景另外通过，见 [N3/N4 集成证据](../../evidence/2026-10-01-n4-nav-target.md)。本叶的完成只覆盖结果与 Runner 范围；目标业务验收由 N4 单独记录。
 
 本任务的全部叶完成后归档；Worker/消费面与目标验收亦已完成，见 [归档汇合任务](2026-10-01-n3-nav-worker.md)。

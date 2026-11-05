@@ -1,6 +1,6 @@
 # 基金定投计划实施任务
 
-> 完成（2026-10-04）：T2.R1/R2/R3 已通过真实隔离 PostgreSQL、目标 Scheduler/Server 和 Desktop Browser 验收；修复首次日期精度成交的成本策略比较错误。详见[运行时验收证据](../../tasks/evidence/2026-10-04-recurring-fund-runtime.md)。2026-10-03 的旧 404 阻塞解除只是前置状态，本次完成结论由实际创建、物化、确认与消费面证据支持。
+> 完成（2026-10-04）：T2.R1/R2/R3 已通过真实隔离 PostgreSQL、目标 Scheduler/Server 和 Desktop Browser 验收；修复首次日期精度成交的成本策略比较错误。详见[运行时验收证据](../../evidence/2026-10-04-recurring-fund-runtime.md)。2026-10-03 的旧 404 阻塞解除只是前置状态，本次完成结论由实际创建、物化、确认与消费面证据支持。
 
 对应 Spec：[`../../specs/2026-09-08-recurring-fund-investment.md`](../../specs/2026-09-08-recurring-fund-investment.md)
 
@@ -58,7 +58,7 @@
 - 结论：AC1–AC6 的当前实现、隔离数据库、目标运行态与浏览器证据一致；全部任务完成，无未解决实施义务，可归档。
 - 运行时：目标结构 head 为 `20261001120000_require_explicit_strategy_contract`；通过 infra 快更入口同步，实际 Scheduler 触发、确认幂等和成交可见均通过，未重建数据库。
 - 证据边界：固定输入验收账户保留一笔买入供复核；不代表外部下单、真实基金平台成交、Electron 或原生设备验收。这些不属于本 Spec 的完成条件。
-- 当前检查命令、统计及输入范围统一见[运行时证据](../../tasks/evidence/2026-10-04-recurring-fund-runtime.md)。以下为首次实施的历史验证记录，旧运行时阻塞与 lint 错误不能代表当前状态：
+- 当前检查命令、统计及输入范围统一见[运行时证据](../../evidence/2026-10-04-recurring-fund-runtime.md)。以下为首次实施的历史验证记录，旧运行时阻塞与 lint 错误不能代表当前状态：
   - `pnpm --dir packages/schemas test`：9 个测试文件、106 项测试通过。
   - `pnpm --dir packages/api-client test`：1 个测试文件、10 项测试通过。
   - `pnpm --dir apps/server exec vitest run test/fund-plans/recurring-fund-investment.test.ts test/automation-runtime.test.ts test/cash-plans/recurring-cash-deposit.service.test.ts test/ledger/ledger-command.service.test.ts`：4 个测试文件、50 项测试通过（新增物化补期覆盖后，定投测试单独复跑 4 项通过）。

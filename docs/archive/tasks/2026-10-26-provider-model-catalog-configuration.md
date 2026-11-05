@@ -4,7 +4,7 @@
 
 ## 当前执行摘要
 
-T1—T4 全部完成：共享合同、通用执行器、前端手动规则、包级及仓库门禁通过；正式 `sync-code.sh thesis-ledger` 退出 0，Server／Worker 及实际消费的 188 个 Schema 模块一致。真实前端临时手填规则读取 39 个模型，原三款选择保留；取消后重开仍为默认规则，未代用户保存。[实施证据](../../tasks/evidence/2026-10-26-provider-model-catalog-configuration.md)
+T1—T4 全部完成：共享合同、通用执行器、前端手动规则、包级及仓库门禁通过；正式 `sync-code.sh thesis-ledger` 退出 0，Server／Worker 及实际消费的 188 个 Schema 模块一致。真实前端临时手填规则读取 39 个模型，原三款选择保留；取消后重开仍为默认规则，未代用户保存。[实施证据](../../evidence/2026-10-26-provider-model-catalog-configuration.md)
 
 配置、凭据、原 AI 历史及三仓 WIP 已反读确认。22 张保护表的原有行全部保留；其中 21 张整表未变，另 3 条快照来自快更前已成功的既有 16:00 定时作业，逐行及作业关联证据保留，未回滚业务记录。此次更新为容器可写层快更，不构成新镜像或 G3 模型验收。
 

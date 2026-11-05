@@ -17,4 +17,4 @@
 
 ## 权威任务
 
-本次执行已完成，历史执行状态及验收以[归档任务](../tasks/2026-10-05-target-preserve-upgrade-baseline.md)为准；实际部署证据以[本次记录](../../tasks/evidence/2026-10-05-target-preserve-upgrade-baseline.md)为准。
+本次执行已完成，历史执行状态及验收以[归档任务](../tasks/2026-10-05-target-preserve-upgrade-baseline.md)为准；实际部署证据以[本次记录](../../evidence/2026-10-05-target-preserve-upgrade-baseline.md)为准。

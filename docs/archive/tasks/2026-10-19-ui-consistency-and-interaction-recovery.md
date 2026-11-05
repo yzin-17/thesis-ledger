@@ -1,10 +1,10 @@
 # 页面一致性与交互恢复实施任务
 
-配套规格：[Spec](../../specs/2026-10-19-ui-consistency-and-interaction-recovery.md)  
-输入证据：[Review U01～U08、I01～I09 及覆盖表](../../reviews/2026-10-19-ui-consistency-and-density-audit.md)  
+配套规格：[Spec](../../specs/2026-10-19-ui-consistency-and-interaction-recovery.md)
+输入证据：[Review U01～U08、I01～I09 及覆盖表](../reviews/2026-10-19-ui-consistency-and-density-audit.md)
 当前状态：2026-10-20 Web 实施与验收完成，任务归档。P1 的真实模型、新闻、来源权限与其他领域门禁继续由原任务持有，本主题不替代其业务资格。
 
-2026-10-22 完成状态复核：源码关键修复与原始回执一致；发现并补齐收益页 390 宽浅色失败态的截图主题误标，继续保持 Web 完成归档，见[复核与补验证据](../../reviews/2026-10-19-ui-consistency-and-density-audit.md#completion-recheck-20261022)。
+2026-10-22 完成状态复核：源码关键修复与原始回执一致；发现并补齐收益页 390 宽浅色失败态的截图主题误标，继续保持 Web 完成归档，见[复核与补验证据](../reviews/2026-10-19-ui-consistency-and-density-audit.md#completion-recheck-20261022)。
 
 ## 执行边界与当前结论
 
@@ -196,7 +196,7 @@
 
 ## 10-20 实施与验收
 
-R1～R20、V1～V6、C1～C3、G1～G3 已按限定写集完成。实际路由、首次失败与成功空态、旧数据、草稿离开、提交身份、写后确认和只读恢复逐项核对；新增发现先回写 Review，再拆 R13～R20 接续修复。结果与可复现测试、样本修正、截图及源码输入统一见[最终验收记录](../../reviews/2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)。
+R1～R20、V1～V6、C1～C3、G1～G3 已按限定写集完成。实际路由、首次失败与成功空态、旧数据、草稿离开、提交身份、写后确认和只读恢复逐项核对；新增发现先回写 Review，再拆 R13～R20 接续修复。结果与可复现测试、样本修正、截图及源码输入统一见[最终验收记录](../reviews/2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)。
 
 Desktop Web 全量为 184 个文件／1058 项通过，正常类型与构建通过；ESLint 差集、依赖图、依赖边界、文件尺寸 ratchet、可访问性静态检查和差异空白检查通过。九页三视口、两主题、三读取状态为 162 个布局场景；其中收益页手机浅色失败态的原截图误标已于 10-22 补验。最终收益错误区、实际创建路由及账户写后读取回调单独复验，复用未变化职责的已过证据。
 

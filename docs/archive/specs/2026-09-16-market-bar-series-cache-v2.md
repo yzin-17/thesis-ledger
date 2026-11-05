@@ -1,6 +1,6 @@
 # 市场 BarSeries 与缓存 V2 Spec
 
-> 归档说明（2026-10-14）：原缓存 V2 阶段和目标验收已完成；现行 V3 接线、事实与覆盖及缓存身份由 Canonical、统一适配层和多源复权感知回测规格维护。本文保留原 V2 设计与验收依据。 当前入口：[Canonical 架构](../../architecture/canonical-runtime.md)、[统一适配层](../../specs/2026-10-09-unified-data-capability-adapter.md)及[多源经济与复权合同](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)。
+> 归档说明（2026-10-14）：原缓存 V2 阶段和目标验收已完成；现行 V3 接线、事实与覆盖及缓存身份由 Canonical、统一适配层和多源复权感知回测规格维护。本文保留原 V2 设计与验收依据。 当前入口：[Canonical 架构](../../design/canonical-runtime.md)、[统一适配层](../../specs/2026-10-09-unified-data-capability-adapter.md)及[多源经济与复权合同](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)。
 
 
 > 任务标识：market-bar-series-cache-v2
@@ -10,7 +10,7 @@
 
 ## 背景与问题
 
-V3 增量由[多源复权感知回测规格](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)定义：来源价格基准、复权修订及完整窗口身份参与冻结；请求窗口相关的复权序列不能跨窗逐行拼接。`MarketBarWindowEvidenceV3` 保存严格校验后的完整响应和摘要，父窗口引用只能读取其覆盖的子窗口。载荷损坏、范围不足或身份不匹配时阻断，不通过在线补取悄悄改变实验的比较数据。下文保留 V2 阶段的存储设计，现行公开入口与消费边界见[当前运行链](../../architecture/canonical-runtime.md)，不恢复退役读取路径。
+V3 增量由[多源复权感知回测规格](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)定义：来源价格基准、复权修订及完整窗口身份参与冻结；请求窗口相关的复权序列不能跨窗逐行拼接。`MarketBarWindowEvidenceV3` 保存严格校验后的完整响应和摘要，父窗口引用只能读取其覆盖的子窗口。载荷损坏、范围不足或身份不匹配时阻断，不通过在线补取悄悄改变实验的比较数据。下文保留 V2 阶段的存储设计，现行公开入口与消费边界见[当前运行链](../../design/canonical-runtime.md)，不恢复退役读取路径。
 
 当前 bars cache 的 freshness 主要由固定 TTL 和请求窗口决定，不能区分交易中、收盘后、已完成历史和复权历史；缓存也没有稳定的 RouteTarget、策略 revision 和输入指纹，可能把旧来源或旧策略视为当前数据。
 

@@ -34,7 +34,7 @@ DSA 将行情、技术指标、新闻等材料组织为单标的分析上下文�
 - 帮助研究助手形成更稳定的单标的研究模板，例如观点、依据、反证、观察条件与未知项。
 - 帮助用户先看到重点，再逐层查看数据、来源和分析过程，而不是先读一整篇长报告。
 
-本地 Fork 已有 `StockAnalysisPipeline`，所以这部分主要是尚未被 ThesisLedger 消费的既有能力，不应整体标为上游最近才新增。[本地分析流水线](../../../daily-stock-analysis/src/core/pipeline.py)
+本地 Fork 已有 `StockAnalysisPipeline`，所以这部分主要是尚未被 ThesisLedger 消费的既有能力，不应整体标为上游最近才新增。[本地分析流水线](https://github.com/yzin-17/daily_stock_analysis/blob/dd26571509e842ab230c393f5f339911ea98425d/src/core/pipeline.py)
 
 **建议做法：** 先选同一批单标的研究问题，冻结相同的可用数据、研究时间和预算，对比 ThesisLedger 与 DSA 的输出。评价引用是否正确、是否保留未知、是否回答问题，以及调用成本和失败行为，再决定是否引入某个分析阶段。
 
@@ -67,7 +67,7 @@ ThesisLedger 已有结构化研究结果、引用校验和持久化，因此建�
 
 ### 3.4 报告历史：从“查旧报告”发展到“解释观点变化”
 
-DSA 已有历史列表、详情、Markdown、新闻材料、运行诊断和流程读取；本地还已有 `history_comparison_service.py`，会提取同一标的近期信号变化，并排除当前记录。这些基础能力不是本轮上游才新增。[本地历史比较](../../../daily-stock-analysis/src/services/history_comparison_service.py)、[上游历史接口](https://github.com/ZhuLinsen/daily_stock_analysis/blob/7a21cd76952c7fe44a7fc5a6113a5b2b8a16bb32/api/v1/endpoints/history.py)
+DSA 已有历史列表、详情、Markdown、新闻材料、运行诊断和流程读取；本地还已有 `history_comparison_service.py`，会提取同一标的近期信号变化，并排除当前记录。这些基础能力不是本轮上游才新增。[本地历史比较](https://github.com/yzin-17/daily_stock_analysis/blob/dd26571509e842ab230c393f5f339911ea98425d/src/services/history_comparison_service.py)、[上游历史接口](https://github.com/ZhuLinsen/daily_stock_analysis/blob/7a21cd76952c7fe44a7fc5a6113a5b2b8a16bb32/api/v1/endpoints/history.py)
 
 对 ThesisLedger 更有价值的方向是：同一研究对象前后两次报告，观点、风险、证据和未知项分别发生了什么变化，变化是否由新数据、模型、提示词或研究范围造成。这是建议扩展的产品能力；上游文档中的完整 `ResearchArtifact` 观点/证据差异比较也仍属于后续接入方向，不能把它描述成已完整交付。
 

@@ -1,6 +1,6 @@
 # AI 多模型与认证切换 Web 验收
 
-状态：2026-10-21 完成并归档。接续[原配置 Task](2026-09-21-ai-provider-model-usage-configuration.md) AC-06/08/16；合同为[原 Spec](../../specs/2026-09-21-ai-provider-model-usage-configuration.md)，完整结果见[回执](../../tasks/evidence/2026-10-21-ai-controlled-config-web.md)。主线程执行，真实模型暂停，DG3 TODO，只验 Web。
+状态：2026-10-21 完成并归档。接续[原配置 Task](2026-09-21-ai-provider-model-usage-configuration.md) AC-06/08/16；合同为[原 Spec](../../specs/2026-09-21-ai-provider-model-usage-configuration.md)，完整结果见[回执](../../evidence/2026-10-21-ai-controlled-config-web.md)。主线程执行，真实模型暂停，DG3 TODO，只验 Web。
 
 - [x] W1 维护入口、精确计划、自有 ID/固定名称保护及最终 19 项保护测试通过；只有专属停用配置和占位 Key。
 - [x] W2 两模型、三用途、两组价格、三个模式/覆盖组合实际回显；打开关闭不写；普通优先级保存后业务值和密文保持。两类等义字段表示保留首次差异并独立复核。

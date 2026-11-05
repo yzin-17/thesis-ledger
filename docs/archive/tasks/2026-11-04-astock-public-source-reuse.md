@@ -1,6 +1,6 @@
 # A 股公开来源实现复用任务
 
-对应[规格](../specs/2026-11-04-astock-public-source-reuse.md)。状态：已完成并归档。先前 29 类资料的验收继续有效；本项接续仅因“未接入”而过早取消的候选，结果见[当前复核](../../reviews/2026-11-04-astock-public-source-reuse.md)及[证据](../../tasks/evidence/2026-11-04-astock-public-source-reuse.md)。
+对应[规格](../specs/2026-11-04-astock-public-source-reuse.md)。状态：已完成并归档。先前 29 类资料的验收继续有效；本项接续仅因“未接入”而过早取消的候选，结果见[当前复核](../reviews/2026-11-04-astock-public-source-reuse.md)及[证据](../../evidence/2026-11-04-astock-public-source-reuse.md)。
 
 ## 来源核对叶
 

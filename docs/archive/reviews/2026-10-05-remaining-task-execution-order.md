@@ -15,9 +15,9 @@
 
 行情 T3.3b1/b2 及父叶 T3.3b 已完成：展示详情联合合同、每指标独立预检和降级、单次基础获取、独立周期能力入口及 SDK 已交付。Schema 全包 673 项、SDK 全包 72 项、Server 受影响范围 784 项通过，27 项条件跳过；类型/build、lint/格式、架构与尺寸门禁通过。
 
-宿主机能力服务到目标真实日历/价格路由的前序只读核验通过。随后经官方 `update.sh all` 完成目标 28 项结构/76 表、两仓镜像与 Server/Worker 部署，三账户及 Journal/AI 历史保护摘要通过；新公开入口、研究提示已部署。详见[部署基线证据](../../tasks/evidence/2026-10-05-target-preserve-upgrade-baseline.md)。两点详情/能力与失败参数的部署检查不关闭完整窗口/指纹矩阵，Desktop 周期 UI 未实施；T3.3c、T3.3/T3 和产品门禁继续开放，范围仍见[行情叶证据](../../tasks/evidence/2026-10-05-market-period-detail-and-options.md)。
+宿主机能力服务到目标真实日历/价格路由的前序只读核验通过。随后经官方 `update.sh all` 完成目标 28 项结构/76 表、两仓镜像与 Server/Worker 部署，三账户及 Journal/AI 历史保护摘要通过；新公开入口、研究提示已部署。详见[部署基线证据](../../evidence/2026-10-05-target-preserve-upgrade-baseline.md)。两点详情/能力与失败参数的部署检查不关闭完整窗口/指纹矩阵，Desktop 周期 UI 未实施；T3.3c、T3.3/T3 和产品门禁继续开放，范围仍见[行情叶证据](../../evidence/2026-10-05-market-period-detail-and-options.md)。
 
-用户的配置选择已经落实：日线采用现行腾讯 ETF/qfq 路由，研究使用现有 OpenRouter 的 `nvidia/nemotron-3-super-120b-a12b:free`。研究单笔/周期运行已 succeeded；周期结果仅通用结论且证据为空，内容质量仍未通过。见[来源与模型证据](../../tasks/evidence/2026-10-05-source-and-research-default.md)。
+用户的配置选择已经落实：日线采用现行腾讯 ETF/qfq 路由，研究使用现有 OpenRouter 的 `nvidia/nemotron-3-super-120b-a12b:free`。研究单笔/周期运行已 succeeded；周期结果仅通用结论且证据为空，内容质量仍未通过。见[来源与模型证据](../../evidence/2026-10-05-source-and-research-default.md)。
 
 ## 历史剩余数量与口径
 
@@ -39,7 +39,7 @@ Journal 子任务与研究提示合同的目标部署归入 Journal T6/T7；Back
 
 1. 原目标保数据基线为 28 项结构/76 表。当前源码追加身份、调用事实、执行状态及分析应用，共 32 项 migration/80 表；这些新结构尚未部署，下一次更新须先备份、演练并执行官方 update。DSA 和 Journal v2 的快更不是最终镜像证据。
 2. 腾讯 ETF 的目标真实窗口、周期 bars/指标及缓存故障已验收，年度历史不足按结构化原因降级。剩余行情交互矩阵与 500 点性能仍待浏览器权限生效后验证；不把 capability 可用等同于全部指标有完整历史。
-3. 自然语言策略已有可信用户/会话和草稿 HTTP；专属编写队列、分析校验与原子应用的 15 项真实 PostgreSQL/Redis/受控 Provider 验收通过，另有 6 项分析纯函数验证。调用审计、原子领取与取消、未知费用、查询失败及两次补投上限已有证据，详见[执行验收](../../tasks/evidence/2026-10-05-authoring-execution-isolated.md)和[分析应用验收](../../tasks/evidence/2026-10-05-authoring-analysis-integrity.md)。目标更新、完整生成语义、正式策略用户归属与完整编写链路仍待完成。
+3. 自然语言策略已有可信用户/会话和草稿 HTTP；专属编写队列、分析校验与原子应用的 15 项真实 PostgreSQL/Redis/受控 Provider 验收通过，另有 6 项分析纯函数验证。调用审计、原子领取与取消、未知费用、查询失败及两次补投上限已有证据，详见[执行验收](../../evidence/2026-10-05-authoring-execution-isolated.md)和[分析应用验收](../../evidence/2026-10-05-authoring-analysis-integrity.md)。目标更新、完整生成语义、正式策略用户归属与完整编写链路仍待完成。
 4. 历史 PIT、事件、因子、Quote 及发布回退的必要真实输入尚不完整；有界调查不能替代来源准入或真实验收。
 5. 设备和远端 CI 是独立验收。当前未提交工作区不是远端 CI 的提交基线。Journal 两项新模型报告已人工核对引用和关键事实，结果消费与在途恢复仍待完成。
 
@@ -59,7 +59,7 @@ Journal 子任务与研究提示合同的目标部署归入 Journal T6/T7；Back
 
 ## 当时推荐执行顺序
 
-1. **目标保数据升级与部署基线已完成。** 真实备份恢复、隔离演练、目标两项增量、完整结构/应用角色、镜像输入、Server/Worker/DSA 及 18 项 API 部署检查通过；保护数据与配置保留。详见[归档任务](../tasks/2026-10-05-target-preserve-upgrade-baseline.md)与[证据](../../tasks/evidence/2026-10-05-target-preserve-upgrade-baseline.md)。
+1. **目标保数据升级与部署基线已完成。** 真实备份恢复、隔离演练、目标两项增量、完整结构/应用角色、镜像输入、Server/Worker/DSA 及 18 项 API 部署检查通过；保护数据与配置保留。详见[归档任务](../tasks/2026-10-05-target-preserve-upgrade-baseline.md)与[证据](../../evidence/2026-10-05-target-preserve-upgrade-baseline.md)。
 2. **优先关闭行情 T3 的三个运行态叶。** 先补齐 T3.2b2.2 的真实基础/预热窗口及 T3.3c 的目标公开成功基线；成功基线稳定后做 T3.2c3 输入/日历变化与缓存故障，全部满足后关闭 T3。
 3. **推进行情产品消费与 Journal 剩余交互。** 行情按 T5 → T6/G1/P1 → R1；Journal T4/T5 和已有合同下的 T6 内容/审计消费可在前两步期间独立推进，最后完成 T7。新研究提示部署、内容质量和真实运行态分别记账。
 4. **在稳定目标上逐个完成恢复验收。** Backtest T4 目标故障、Journal AI 在途恢复串行执行；每个场景先恢复正常基线再执行下一个。Electron、设备和远端 CI 保留各自门禁。

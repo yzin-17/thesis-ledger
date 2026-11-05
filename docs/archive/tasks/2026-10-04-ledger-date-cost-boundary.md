@@ -19,6 +19,6 @@
 - [x] 定向测试、构建和门禁通过，输入范围与结果已记录。
 - [x] 目标 Docker 与 Browser 在原 T2.R3 独立通过，未用本地证据替代。
 
-Review 结论：同日零点 DATE/INSTANT 等时、未来策略拒绝和 UTC offset 排序的 5 项回归通过；原成本定向 16 项、Domain 全包 300 项通过；基金定投隔离 PostgreSQL 13 项与目标首次日期成交确认通过。实现无新增公共接口或依赖方向变化，无未解决实施义务，可归档。命令、输入及结果见[分层证据](../../tasks/evidence/2026-10-04-recurring-fund-runtime.md)。
+Review 结论：同日零点 DATE/INSTANT 等时、未来策略拒绝和 UTC offset 排序的 5 项回归通过；原成本定向 16 项、Domain 全包 300 项通过；基金定投隔离 PostgreSQL 13 项与目标首次日期成交确认通过。实现无新增公共接口或依赖方向变化，无未解决实施义务，可归档。命令、输入及结果见[分层证据](../../evidence/2026-10-04-recurring-fund-runtime.md)。
 
 提交边界：保留工作树已有改动，不提交或推送。

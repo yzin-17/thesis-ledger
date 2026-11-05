@@ -1,6 +1,6 @@
 # 基金披露日期证据与保守可用边界
 
-承接[组合走势原 Spec](2026-09-07-portfolio-valuation-series.md)及 [R3/T4.I2](../archive/tasks/2026-08-28-portfolio-snapshot-system.md)，只补齐当前基金披露输入的真实缺口。实施及验收已完成，见[本仓归档 Task](../archive/tasks/2026-10-21-fund-disclosure-date-evidence.md)、[DSA 归档 Task](../../../daily-stock-analysis/docs/archive/tasks/2026-10-21-fund-disclosure-date-evidence.md)与[真实来源/分钟记录](../tasks/evidence/2026-10-21-fund-disclosure-acceptance.md)。用户于 2026-10-21 明确允许本次及后续全部验收、不再逐项确认；本合同不新增 Provider、永久路由、产品入口或模型调用。
+承接[组合走势原 Spec](2026-09-07-portfolio-valuation-series.md)及 [R3/T4.I2](../archive/tasks/2026-08-28-portfolio-snapshot-system.md)，只补齐当前基金披露输入的真实缺口。实施及验收已完成，见[本仓归档 Task](../archive/tasks/2026-10-21-fund-disclosure-date-evidence.md)、[DSA 归档 Task](../../../daily-stock-analysis/docs/archive/tasks/2026-10-21-fund-disclosure-date-evidence.md)与[真实来源/分钟记录](../evidence/2026-10-21-fund-disclosure-acceptance.md)。用户于 2026-10-21 明确允许本次及后续全部验收、不再逐项确认；本合同不新增 Provider、永久路由、产品入口或模型调用。
 
 ## 当前问题
 

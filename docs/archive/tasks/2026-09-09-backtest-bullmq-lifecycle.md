@@ -1,6 +1,6 @@
 # V1 回测任务 BullMQ 生命周期实施任务
 
-> 最终状态（2026-10-06）：T4.1–T4.12、T4 父项及最终一致性 Review 全部完成。正式更新和保留数据升级成功，同一新镜像上的九组保护场景、真实浏览器/Electron 及独立生产启动通过。任务已归档，当前需求继续以 Spec 为准。见[最终验收与部署证据](../../tasks/evidence/2026-10-06-backtest-target-lifecycle.md)。
+> 最终状态（2026-10-06）：T4.1–T4.12、T4 父项及最终一致性 Review 全部完成。正式更新和保留数据升级成功，同一新镜像上的九组保护场景、真实浏览器/Electron 及独立生产启动通过。任务已归档，当前需求继续以 Spec 为准。见[最终验收与部署证据](../../evidence/2026-10-06-backtest-target-lifecycle.md)。
 
 > 历史状态对账（2026-10-03）：durable owner、CAS、分页恢复的当前实现与隔离 Worker 证据由 Canonical C02 承接，旧 jobs/V1/V2 执行入口已退役。当时 T4 的目标故障、429 与 Electron 证据未完整。只对当前 Run 执行剩余断言。下文历史环境与协议描述仅在其原范围有效；对账依据见[当时 Review](../reviews/2026-10-03-task-state-reconciliation.md)。
 
@@ -37,7 +37,7 @@
   - 验证证据：Server 事件测试确认 Pub/Sub/SSE 摘要剔除 input/result；Desktop 测试确认摘要与详情分离、多个订阅者共享一个 EventSource、重连刷新和非终态 30 秒兜底；Electron 代理测试确认上游结束前首个 SSE 分片已到达。
 
 - [x] T4：完成 Compose 部署、post-claim 故障恢复 Smoke 与全量一致性验证
-  - 2026-10-05 历史增量：当前 Run 的独立进程硬杀、Redis 短停和运输记录重建已在主仓当时 28 项 migration 下通过三项真实隔离验收；19 项定向与 Backtest 585 项通过。当时仅接受隔离叶，目标门禁仍开放；后由本轮完成。见[主仓恢复证据](../../tasks/evidence/2026-10-05-backtest-recovery-integration.md)。
+  - 2026-10-05 历史增量：当前 Run 的独立进程硬杀、Redis 短停和运输记录重建已在主仓当时 28 项 migration 下通过三项真实隔离验收；19 项定向与 Backtest 585 项通过。当时仅接受隔离叶，目标门禁仍开放；后由本轮完成。见[主仓恢复证据](../../evidence/2026-10-05-backtest-recovery-integration.md)。
   - 覆盖验收标准：AC2、AC8、AC9、AC10。
   - 依赖：T2、T3、T5、T6。
   - 涉及范围：生产镜像、`thesis-ledger-infra` 开发/生产 Compose、运行脚本、真实 Worker 进程故障注入、浏览器/Electron 与文档同步。
@@ -58,7 +58,7 @@
   - [x] T4.10：真实浏览器 SSE/重连/取消/结果/429（AC5/AC6/AC9）。网络故障恢复、共享冷却、摘要缓存、详情和终态停止通过；133,209 ms 正常窗口一条 SSE、7 个心跳分片、0 个额外 API 请求及 0 个 429。
   - [x] T4.11：真实 Electron 生产代理（AC7/AC9）。实际 main.cjs 生产静态服务和代理通过；首分片 261 ms、持续流式心跳、下游关闭释放对应上游 socket、真实取消和成功结果详情通过。
   - [x] T4.12：基础生产 Compose 配置及部署责任（AC8/AC9）。配置合同及保护测试通过；官方 ./scripts/update.sh thesis-ledger 完成镜像构建、备份、隔离副本演练和保留数据升级。共享目标与独立生产项目均确认镜像内完整 33 项 migration、app role、80 表、五服务健康及宿主机映射 API 200，生产验收四个专属卷已清理。磁盘阈值未降低，共享卷和既有业务数据保留。
-  - 本轮完整记录：[目标运行态、客户端及部署证据](../../tasks/evidence/2026-10-06-backtest-target-lifecycle.md)。隔离生产配置与共享目标部署分别记账，外部发布不计入本次执行结果。
+  - 本轮完整记录：[目标运行态、客户端及部署证据](../../evidence/2026-10-06-backtest-target-lifecycle.md)。隔离生产配置与共享目标部署分别记账，外部发布不计入本次执行结果。
   - 收口：复用下方单一最终一致性 Review。按实际输入变化执行定向→包级/typecheck/build→仓库门禁→目标运行态；保留未执行与跳过边界，不因测试数量勾选父项。
 
 - [x] T5：将 `executionAttempt` 收敛为 durable ownerAttempt，并关闭运输记录重建活锁

@@ -40,7 +40,7 @@
 | HiThink            |          7 | 已有股票三口径日线、ETF 前复权日线、两类报价与 ETF 分红          |
 | RQData             |          2 | 已有 ETF 分红/拆分来源，证据检查独立                             |
 
-接口和价格语义见 [DSA 接入说明](../../../../daily-stock-analysis/docs/thesis-ledger-exact-market-routes.md)。Tushare 股票报价已改用官方 [`rt_k`](https://tushare.pro/document/2?doc_id=372)，独立权限不足由实际请求返回；不沿用旧 Fetcher 的非精确 `quotation`/新浪降级链。
+接口和价格语义见 [DSA 接入说明](../../../../daily-stock-analysis/docs/design/thesis-ledger-exact-market-routes.md)。Tushare 股票报价已改用官方 [`rt_k`](https://tushare.pro/document/2?doc_id=372)，独立权限不足由实际请求返回；不沿用旧 Fetcher 的非精确 `quotation`/新浪降级链。
 
 ## 本地验证
 

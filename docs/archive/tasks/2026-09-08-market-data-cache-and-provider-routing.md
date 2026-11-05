@@ -1,6 +1,6 @@
 # 市场数据缓存与 Provider 路由交互实施任务
 
-> 归档说明（2026-10-14）：原缓存和 Provider 路由修复及验证已完成；原 Spec 保留历史设计依据，现行架构由[Canonical](../../architecture/canonical-runtime.md)和[RouteTarget Spec](../../specs/2026-09-16-market-data-route-target-v2.md)维护，不恢复旧链路或旧隐藏回退。
+> 归档说明（2026-10-14）：原缓存和 Provider 路由修复及验证已完成；原 Spec 保留历史设计依据，现行架构由[Canonical](../../design/canonical-runtime.md)和[RouteTarget Spec](../specs/2026-09-16-market-data-route-target-v2.md)维护，不恢复旧链路或旧隐藏回退。
 
 对应 Spec：[`../specs/2026-09-08-market-data-cache-and-provider-routing.md`](../../specs/2026-09-08-market-data-cache-and-provider-routing.md)
 

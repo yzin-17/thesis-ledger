@@ -2,7 +2,7 @@
 
 任务标识：`ui-interaction-consistency`  
 状态：实施与独立验收完成；现行界面合同继续有效（2026-11-01）。
-配套文档：[归档实施任务](../archive/tasks/2026-09-08-ui-interaction-consistency.md) · [最终证据](../tasks/evidence/2026-10-31-research-comparison-and-ui-closeout.md)
+配套文档：[归档实施任务](../archive/tasks/2026-09-08-ui-interaction-consistency.md) · [最终证据](../evidence/2026-10-31-research-comparison-and-ui-closeout.md)
 
 2026-10-19 接续：[页面一致性与交互恢复规格](2026-10-19-ui-consistency-and-interaction-recovery.md)承接有数据交互审查新复现的布局、状态与恢复问题，并细化全局账户范围的呈现位置；本规格已有模式隔离、浮层、焦点和真实业务合同继续有效。旧 Task 已过证据不因新审查整体重开。
 
@@ -14,7 +14,7 @@
 
 ## 现状与范围
 
-下面列出当前检查范围。10-18 已按现行路由、实际调用方和逐批浏览器/原生记录完成[入口与 AC 对账](../tasks/evidence/2026-10-18-ui-final-ac.md)；当前客户端差集已过，真实业务未通过条件仍按配套 Task 保留，不据盘点宣称全量产品验收通过。
+下面列出当前检查范围。10-18 已按现行路由、实际调用方和逐批浏览器/原生记录完成[入口与 AC 对账](../evidence/2026-10-18-ui-final-ac.md)；当前客户端差集已过，真实业务未通过条件仍按配套 Task 保留，不据盘点宣称全量产品验收通过。
 
 | 页面 | 必须覆盖的内容 |
 | --- | --- |

@@ -6,7 +6,7 @@
 >
 > 当前状态：当前Web及目标Server/Worker范围的实现、测试后保存、真实业务、取消与完整交付期限均已完成；2026-11-01用户明确将实际非零上游费用验收转入TODO，未记为通过。当前验收只覆盖既定Web范围，Electron实机不计本轮交付。完整设计输入的历史来源为用户上传的 `/Users/yzin/Downloads/2026-09-21-ai-provider-model-usage-configuration.md`，仓库Task保留完整AC映射。
 >
-> 对应任务：[归档实施任务](../archive/tasks/2026-09-21-ai-provider-model-usage-configuration.md) · [最终范围及复核](../tasks/evidence/2026-11-01-ai-fee-deferral-and-closeout.md)
+> 对应任务：[归档实施任务](../archive/tasks/2026-09-21-ai-provider-model-usage-configuration.md) · [最终范围及复核](../evidence/2026-11-01-ai-fee-deferral-and-closeout.md)
 
 <a id="positive-billing-followup"></a>
 

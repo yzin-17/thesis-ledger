@@ -1,26 +1,28 @@
 # 历史文档归档
 
-- 2026-11-01 [AI配置、模型用途与测试后保存](tasks/2026-09-21-ai-provider-model-usage-configuration.md)当前Web/目标服务范围完成最终Review并归档，配置/迁移/并发/精确测试/三类真实SDK业务/取消/交付期限证据复用。用户明确将[实际正费用验收](../TODO.md#ai-provider-positive-cost-acceptance)转为后续范围，未计通过，费用上限0及原配置/账目保持；Electron不计本轮交付。[完整范围与复核](../tasks/evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
+本轮目录及归档依据见[三仓整理记录](reviews/2026-11-05-three-repository-documentation.md)；已结案报告见 [reviews/](reviews/)，被替代合同见 [specs/](specs/)，完成任务见 [tasks/](tasks/)。当前执行以[任务索引](../tasks/README.md)为准。
 
-- 2026-11-01 [来源即时启停与凭据配置](tasks/2026-09-14-market-provider-credentials.md)完成AC1～AC7及最终Review，当前获准范围的配置/加密/OAuth基础/目标Docker与Web/在线证据按原输入复用；关键Control和Alpha Vantage源码摘要与已验收版本相同。本次模型、来源和通知动作均0；Longbridge仍由TODO持有，Tushare现金正向消费保留原Task。[最终复核](../tasks/evidence/2026-11-01-provider-credentials-final-review.md)分列成功、范围外受限和延期，不扩大来源资格。
+- 2026-11-01 [AI配置、模型用途与测试后保存](tasks/2026-09-21-ai-provider-model-usage-configuration.md)当前Web/目标服务范围完成最终Review并归档，配置/迁移/并发/精确测试/三类真实SDK业务/取消/交付期限证据复用。用户明确将[实际正费用验收](../TODO.md#ai-provider-positive-cost-acceptance)转为后续范围，未计通过，费用上限0及原配置/账目保持；Electron不计本轮交付。[完整范围与复核](../evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
 
-- 2026-11-01 [全站UI与交互统一](tasks/2026-09-08-ui-interaction-consistency.md)的T2～T6/T8及原AC自身条件完成，原矩阵/恢复/原生证据复用，T19/工作台依赖已过；补齐完整阅读两行标题与V2完整问题，最终Web三视口双主题及长问题可读。[最终证据](../tasks/evidence/2026-10-31-research-comparison-and-ui-closeout.md)保留检查器裁切误报、运行环境修正和数据保护；研究T13c/G4b经济价格、非零费用及实际通知等原领域条件不代收。
+- 2026-11-01 [来源即时启停与凭据配置](tasks/2026-09-14-market-provider-credentials.md)完成AC1～AC7及最终Review，当前获准范围的配置/加密/OAuth基础/目标Docker与Web/在线证据按原输入复用；关键Control和Alpha Vantage源码摘要与已验收版本相同。本次模型、来源和通知动作均0；Longbridge仍由TODO持有，Tushare现金正向消费保留原Task。[最终复核](../evidence/2026-11-01-provider-credentials-final-review.md)分列成功、范围外受限和延期，不扩大来源资格。
 
-- 2026-10-31 [历史数据按需获取](tasks/2026-10-09-history-data-on-demand.md)最后的L3-V摘牌正向消费通过：原600112窗口新准备/快照、目标Worker、Web/实际下载及同引擎两次断网重放完成；临时主备已恢复，旧数据保护通过，模型调用0次、费用0。[完整证据](../tasks/evidence/2026-10-31-history-demand-l3v.md)保留历史来源失败、跨引擎比较边界及本机校验修正记录；[现行Spec](../specs/2026-10-09-history-data-on-demand.md)保持原合同。
+- 2026-11-01 [全站UI与交互统一](tasks/2026-09-08-ui-interaction-consistency.md)的T2～T6/T8及原AC自身条件完成，原矩阵/恢复/原生证据复用，T19/工作台依赖已过；补齐完整阅读两行标题与V2完整问题，最终Web三视口双主题及长问题可读。[最终证据](../evidence/2026-10-31-research-comparison-and-ui-closeout.md)保留检查器裁切误报、运行环境修正和数据保护；研究T13c/G4b经济价格、非零费用及实际通知等原领域条件不代收。
 
-- 2026-10-31 [AI SDK与输出模式](tasks/2026-09-19-vercel-ai-sdk-integration.md)按原48项AC、JSON Mode12项及G0/G0.1/G1/G2完成；[最终逐项评审](reviews/2026-10-31-ai-sdk-final-ac-review.md)明确四条本地适配器合同与三类真实业务范围。[费用拒绝及真实Cloudflare交付期限](tasks/2026-10-31-ai-provider-live-fault-acceptance.md)同步完成，5次模型、估算0 USD、原配置/业务/旧审计保持；[完整证据](../tasks/evidence/2026-10-31-ai-provider-live-fault-acceptance.md)保留失败与边界。现行Spec保留，配置Task的实际非零费用及其他组合资格没有代收。
+- 2026-10-31 [历史数据按需获取](tasks/2026-10-09-history-data-on-demand.md)最后的L3-V摘牌正向消费通过：原600112窗口新准备/快照、目标Worker、Web/实际下载及同引擎两次断网重放完成；临时主备已恢复，旧数据保护通过，模型调用0次、费用0。[完整证据](../evidence/2026-10-31-history-demand-l3v.md)保留历史来源失败、跨引擎比较边界及本机校验修正记录；[现行Spec](../specs/2026-10-09-history-data-on-demand.md)保持原合同。
 
-- 2026-10-31 [Web至手机端功能迁移](tasks/2026-10-22-web-mobile-feature-parity.md)当前约定范围完成；Android/iOS独立G0～G6、G7与最终Review通过，CI6四项首次成功、零artifact。保留[现行Spec](../specs/2026-10-22-web-mobile-feature-parity.md)和[最终审查](../reviews/2026-10-30-web-mobile-parity-final-review.md)；Longbridge/通知Provider实源仍由TODO承接，原树和独立WIP保留。
+- 2026-10-31 [AI SDK与输出模式](tasks/2026-09-19-vercel-ai-sdk-integration.md)按原48项AC、JSON Mode12项及G0/G0.1/G1/G2完成；[最终逐项评审](reviews/2026-10-31-ai-sdk-final-ac-review.md)明确四条本地适配器合同与三类真实业务范围。[费用拒绝及真实Cloudflare交付期限](tasks/2026-10-31-ai-provider-live-fault-acceptance.md)同步完成，5次模型、估算0 USD、原配置/业务/旧审计保持；[完整证据](../evidence/2026-10-31-ai-provider-live-fault-acceptance.md)保留失败与边界。现行Spec保留，配置Task的实际非零费用及其他组合资格没有代收。
 
-- 2026-10-31 [研究工作台](tasks/2026-08-25-ai-research-workbench.md)及[实源故障/准备截止验收](tasks/2026-10-31-research-source-fault-acceptance.md)全部门禁通过；复用原Provider/Web、真实新闻成功研究及目标在途重启，补齐V2实源交付中断、完整30秒准备截止、Cloudflare单次部分报告及引用反读。主配置/默认、业务和审计保持，所属隔离资源已清理。[完整证据](../tasks/evidence/2026-10-31-research-source-fault-acceptance.md)和[现行Spec](../specs/2026-08-25-ai-research-workbench.md)保留；其他AI费用/协议/期限矩阵仍由各自现行任务持有。
+- 2026-10-31 [Web至手机端功能迁移](tasks/2026-10-22-web-mobile-feature-parity.md)当前约定范围完成；Android/iOS独立G0～G6、G7与最终Review通过，CI6四项首次成功、零artifact。保留[现行Spec](../specs/2026-10-22-web-mobile-feature-parity.md)和[最终审查](reviews/2026-10-30-web-mobile-parity-final-review.md)；Longbridge/通知Provider实源仍由TODO承接，原树和独立WIP保留。
 
-- 2026-10-26 [Provider 模型目录通用配置](tasks/2026-10-26-provider-model-catalog-configuration.md)完成共享合同、通用执行器、前端手动规则及正式快更；实际前端临时规则读取 39 个模型，取消后未保存，Server／Worker 及 188 个实际 Schema 模块一致。配置及原数据保持，既有定时作业独立新增 3 条快照的关联证据保留。[现行 Spec](../specs/2026-10-26-provider-model-catalog-configuration.md)与[完整证据](../tasks/evidence/2026-10-26-provider-model-catalog-configuration.md)保留，模型调用为 0，目标规则由用户在前端手动保存。
+- 2026-10-31 [研究工作台](tasks/2026-08-25-ai-research-workbench.md)及[实源故障/准备截止验收](tasks/2026-10-31-research-source-fault-acceptance.md)全部门禁通过；复用原Provider/Web、真实新闻成功研究及目标在途重启，补齐V2实源交付中断、完整30秒准备截止、Cloudflare单次部分报告及引用反读。主配置/默认、业务和审计保持，所属隔离资源已清理。[完整证据](../evidence/2026-10-31-research-source-fault-acceptance.md)和[现行Spec](../specs/2026-08-25-ai-research-workbench.md)保留；其他AI费用/协议/期限矩阵仍由各自现行任务持有。
 
-- 2026-10-26 [Cloudflare 模型目录适配](tasks/2026-10-26-cloudflare-model-catalog.md)完成当时的原生目录、正式快更、目标 API 与实际前端验收；39 个 Workers AI 文本候选、三个原选择及配置数据保全通过。[历史 Spec](specs/2026-10-26-cloudflare-model-catalog.md)与[完整证据](../tasks/evidence/2026-10-26-cloudflare-model-catalog.md)保留，模型调用为 0，研究 G3 仍按原边界处理。现行实现与验收见[通用目录配置任务](tasks/2026-10-26-provider-model-catalog-configuration.md)。
+- 2026-10-26 [Provider 模型目录通用配置](tasks/2026-10-26-provider-model-catalog-configuration.md)完成共享合同、通用执行器、前端手动规则及正式快更；实际前端临时规则读取 39 个模型，取消后未保存，Server／Worker 及 188 个实际 Schema 模块一致。配置及原数据保持，既有定时作业独立新增 3 条快照的关联证据保留。[现行 Spec](../specs/2026-10-26-provider-model-catalog-configuration.md)与[完整证据](../evidence/2026-10-26-provider-model-catalog-configuration.md)保留，模型调用为 0，目标规则由用户在前端手动保存。
 
-- 2026-10-23 [研报长期按需读取](tasks/2026-10-23-research-report-on-demand.md)完成日期可选的 v2 合同、标准错误投影与来源空日期字段兼容、保留数据完整更新及目标无日期单页验收；采集 201、2 条/来源总数 772，新旧历史 200，旧快照摘要不变。原来源启停、20 条路由、11 张受保护业务表与挂载保持，用户确认的预期修改保留。[现行 Spec](../specs/2026-10-23-research-report-on-demand.md)与[完整证据](../tasks/evidence/2026-10-23-research-report-on-demand.md)保留，当前按需读取不再依赖首次 24 小时验收记录。
+- 2026-10-26 [Cloudflare 模型目录适配](tasks/2026-10-26-cloudflare-model-catalog.md)完成当时的原生目录、正式快更、目标 API 与实际前端验收；39 个 Workers AI 文本候选、三个原选择及配置数据保全通过。[历史 Spec](specs/2026-10-26-cloudflare-model-catalog.md)与[完整证据](../evidence/2026-10-26-cloudflare-model-catalog.md)保留，模型调用为 0，研究 G3 仍按原边界处理。现行实现与验收见[通用目录配置任务](tasks/2026-10-26-provider-model-catalog-configuration.md)。
 
-- 2026-10-23 [研报最小元数据](tasks/2026-10-23-research-report-metadata.md)完成单标单页采证、限定范围首次准入、单条路由、真实采集、引用/本地历史及同一 Server 重启留存；用户确认的并发账户新增保留，原数据、凭据及原路由保护通过。[现行 Spec](../specs/2026-10-23-research-report-metadata.md)与[完整证据](../tasks/evidence/2026-10-23-research-report-metadata.md)保留，模型研究与全历史边界保持。
+- 2026-10-23 [研报长期按需读取](tasks/2026-10-23-research-report-on-demand.md)完成日期可选的 v2 合同、标准错误投影与来源空日期字段兼容、保留数据完整更新及目标无日期单页验收；采集 201、2 条/来源总数 772，新旧历史 200，旧快照摘要不变。原来源启停、20 条路由、11 张受保护业务表与挂载保持，用户确认的预期修改保留。[现行 Spec](../specs/2026-10-23-research-report-on-demand.md)与[完整证据](../evidence/2026-10-23-research-report-on-demand.md)保留，当前按需读取不再依赖首次 24 小时验收记录。
+
+- 2026-10-23 [研报最小元数据](tasks/2026-10-23-research-report-metadata.md)完成单标单页采证、限定范围首次准入、单条路由、真实采集、引用/本地历史及同一 Server 重启留存；用户确认的并发账户新增保留，原数据、凭据及原路由保护通过。[现行 Spec](../specs/2026-10-23-research-report-metadata.md)与[完整证据](../evidence/2026-10-23-research-report-metadata.md)保留，模型研究与全历史边界保持。
 
 - 2026-10-22 [财联社与见闻市场快讯](tasks/2026-10-22-market-flash-news-dg3.md)完成；独立市场快讯合同、两家 DSA/Docker/Market/Web 与原数据保全通过，原个股新闻和研究 G3 边界保持；其他模块已入后续 TODO。
 - 2026-10-22 [Yahoo 新闻接入与 DG3 扩展](tasks/2026-10-22-yahoo-news-dg3.md)完成；NVDA.US 的 Yahoo V3/Market/Web、零尝试拒绝与保全通过，原 NVIDIA 作为备用，HiThink/AKShare 和研究边界保持。
@@ -43,22 +45,22 @@
 | [`specs/`](specs/)               | 旧版 Investment OS / Provider 规格、已完成架构改进，以及被当前 Snapshot / Trade Projection 等方案取代的历史规格 |
 | [`tasks/`](tasks/)               | 已完成任务、旧阶段任务、历史迁移、被取代的任务，以及已经关闭当前运行时验收的专项任务                            |
 | [`reviews/`](reviews/)           | 历史一致性 Review、一次性 closure/发布执行记录和被新版复核取代的 Review                                         |
-| [`architecture/`](architecture/) | 被当前架构 SSOT 取代的实现说明、DSA 详细历史审计和旧 Traceability                                               |
-| [`domain/`](domain/)             | 被合并或取代的领域说明和一次性 Domain Model 审计                                                                |
+| [`architecture/`](specs/) | 被当前架构 SSOT 取代的实现说明、DSA 详细历史审计和旧 Traceability                                               |
+| [`domain/`](specs/)             | 被合并或取代的领域说明和一次性 Domain Model 审计                                                                |
 
 归档文档可以被历史 Review 引用，但不能作为新实现的需求、接口或运行状态真源。若要删除归档内容，必须先确认 Git 历史或外部证据已满足保留要求。
 
 近期归档包括：
 
-- 2026-10-20 [页面一致性与交互恢复](tasks/2026-10-19-ui-consistency-and-interaction-recovery.md)：R1～R20、V1～V6、C1～C3、G1～G3 的 Web 实施与独立验收完成；当前任务正文 17→16。[现行 Spec](../specs/2026-10-19-ui-consistency-and-interaction-recovery.md)与[最终记录](../reviews/2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)保留，真实模型、新闻和领域实源门禁仍由原任务持有；旧路径只保留兼容跳转。
+- 2026-10-20 [页面一致性与交互恢复](tasks/2026-10-19-ui-consistency-and-interaction-recovery.md)：R1～R20、V1～V6、C1～C3、G1～G3 的 Web 实施与独立验收完成；当前任务正文 17→16。[现行 Spec](../specs/2026-10-19-ui-consistency-and-interaction-recovery.md)与[最终记录](reviews/2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)保留，真实模型、新闻和领域实源门禁仍由原任务持有；旧路径只保留兼容跳转。
 
-- 2026-10-20 [AI 服务统一页面配置](tasks/2026-10-19-ai-provider-database-only.md)：本地、同一目标镜像保留副本及获准临时配置的目标 Web 保存/删除还原均通过，原配置、默认、密文和业务数据保持。当前 Task 正文 18→17；[现行 Spec](../specs/2026-10-19-ai-provider-database-only.md)保留，其他 AI 真实用途门禁继续归原 Task 且暂停。[分层证据](../tasks/evidence/2026-10-19-ai-provider-database-only.md#2026-10-20-获准目标-web-保存与最终复核)保留原路径，旧 Task 路径只保留兼容跳转。
+- 2026-10-20 [AI 服务统一页面配置](tasks/2026-10-19-ai-provider-database-only.md)：本地、同一目标镜像保留副本及获准临时配置的目标 Web 保存/删除还原均通过，原配置、默认、密文和业务数据保持。当前 Task 正文 18→17；[现行 Spec](../specs/2026-10-19-ai-provider-database-only.md)保留，其他 AI 真实用途门禁继续归原 Task 且暂停。[分层证据](../evidence/2026-10-19-ai-provider-database-only.md#2026-10-20-获准目标-web-保存与最终复核)保留原路径，旧 Task 路径只保留兼容跳转。
 
-- 2026-10-17 [Scheduler 执行租约](tasks/2026-09-05-automation-execution-lease-hardening.md)：当前镜像内专用执行进程的 SIGKILL、租约恢复、双实例竞争、旧 owner fencing 和 unknown-outcome 不重放通过，当前 Task 正文 13→12。现行 Spec 保留，Cash 的真实处理器补期结果共用[一份证据](../tasks/evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)，外部通知继续开放。
+- 2026-10-17 [Scheduler 执行租约](tasks/2026-09-05-automation-execution-lease-hardening.md)：当前镜像内专用执行进程的 SIGKILL、租约恢复、双实例竞争、旧 owner fencing 和 unknown-outcome 不重放通过，当前 Task 正文 13→12。现行 Spec 保留，Cash 的真实处理器补期结果共用[一份证据](../evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)，外部通知继续开放。
 
-- 2026-10-17 [图表交互与更新](tasks/2026-09-10-market-chart-indicator-integration.md)：跨日重开、V3 整窗乱序隔离、在途去重、失败恢复、同日修订和真实截止日期降级已补齐，当前 Task 正文 14→13。现行指标/更新 Spec 保留；稳定盘中日线继续留在原 TODO，不新增跳转文件。见[逐项证据](../tasks/evidence/2026-10-16-market-detail-chart-acceptance.md#10-17-图表更新与截止日期补验)。
+- 2026-10-17 [图表交互与更新](tasks/2026-09-10-market-chart-indicator-integration.md)：跨日重开、V3 整窗乱序隔离、在途去重、失败恢复、同日修订和真实截止日期降级已补齐，当前 Task 正文 14→13。现行指标/更新 Spec 保留；稳定盘中日线继续留在原 TODO，不新增跳转文件。见[逐项证据](../evidence/2026-10-16-market-detail-chart-acceptance.md#10-17-图表更新与截止日期补验)。
 
-- 2026-10-17 [富途研究能力](tasks/2026-10-08-futu-openapi-full-integration.md)：报价/图表、历史 1m 与首批腾讯/苹果 qfq 研究冻结已完成；正式重建后的 22 份输入及两份快照各两次断网重放通过，最后的镜像条件关闭。当前 Task 正文 15→14，无新增跳转文件；[Spec](../specs/2026-10-08-futu-openapi-full-integration.md)保留现行合同，[最终证据](../tasks/evidence/2026-10-15-futu-minute-integration.md#2026-10-17-研究镜像固化与重建后复验)保留失败、范围与数据保护边界。
+- 2026-10-17 [富途研究能力](tasks/2026-10-08-futu-openapi-full-integration.md)：报价/图表、历史 1m 与首批腾讯/苹果 qfq 研究冻结已完成；正式重建后的 22 份输入及两份快照各两次断网重放通过，最后的镜像条件关闭。当前 Task 正文 15→14，无新增跳转文件；[Spec](../specs/2026-10-08-futu-openapi-full-integration.md)保留现行合同，[最终证据](../evidence/2026-10-15-futu-minute-integration.md#2026-10-17-研究镜像固化与重建后复验)保留失败、范围与数据保护边界。
 
 - 2026-10-16 [行情详情读模型](tasks/2026-08-21-market-detail-read-model.md)及四份子 Ticket：完整资产/状态、Network、失败恢复、取消、宽窄屏与一致性通过；修复窄屏裁切、报价币种/精度与净值 ISO 日期崩溃。[现行 Spec](../specs/2026-08-21-market-detail-read-model.md)继续保留；实源、受控样本和后继图表/分钟范围分别记账。
 
@@ -78,13 +80,13 @@
 
 - 2026-10-14 当前入口治理：[实施与验证记录](tasks/2026-10-14-docs-current-entry-cleanup.md)。16 份历史 Task 退出当前执行入口：09-25 多源、Docker 更新、自动化历史分页、两份 AI 配置移除、ETF 内部备用、七份 09-27 修复、交易主任务、旧历史规则、缓存与路由。ETF 旧备用及旧历史规则 Spec 一并归档，其余 Spec 保留；取消、跳过与未验证记录不改为通过。原始证据保持原路径与字节。
 
-- 每手股数独立路由：[已完成任务](tasks/2026-10-08-security-lot-size-routing.md)，当前选择富途的真实股数、模型冻结及页面/下载通过；[现行Spec](../specs/2026-10-08-security-lot-size-routing.md)保留，[验收证据](../tasks/evidence/2026-10-08-security-lot-size-live-acceptance.md)区分长桥未配置与开发同步边界。
+- 每手股数独立路由：[已完成任务](tasks/2026-10-08-security-lot-size-routing.md)，当前选择富途的真实股数、模型冻结及页面/下载通过；[现行Spec](../specs/2026-10-08-security-lot-size-routing.md)保留，[验收证据](../evidence/2026-10-08-security-lot-size-live-acceptance.md)区分长桥未配置与开发同步边界。
 
-- 多源扩展、历史规则与P6：[多源任务](tasks/2026-10-03-multi-source-remaining-acceptance.md) · [历史规则任务](tasks/2026-10-06-historical-rules-primary-backup.md) · [P6任务](tasks/2026-10-07-p6-market-state-expansion.md)。基础报价/普通研究、M31、用户选定状态/市场、港美实际股数与精简镜像/恢复范围完成；[现行P6 Spec](../specs/2026-10-07-p6-market-state-expansion.md)保留，最终证据见[港股与当前版本核验](../tasks/evidence/2026-10-08-p6-hk-share-window-acceptance.md)。取消项不记作通过，港股每手历史变更未核验。
+- 多源扩展、历史规则与P6：[多源任务](tasks/2026-10-03-multi-source-remaining-acceptance.md) · [历史规则任务](tasks/2026-10-06-historical-rules-primary-backup.md) · [P6任务](tasks/2026-10-07-p6-market-state-expansion.md)。基础报价/普通研究、M31、用户选定状态/市场、港美实际股数与精简镜像/恢复范围完成；[现行P6 Spec](../specs/2026-10-07-p6-market-state-expansion.md)保留，最终证据见[港股与当前版本核验](../evidence/2026-10-08-p6-hk-share-window-acceptance.md)。取消项不记作通过，港股每手历史变更未核验。
 
-- 自然语言策略编写：[完整任务](tasks/2026-09-18-natural-language-strategy-authoring.md)、[可信身份与会话](tasks/2026-10-05-strategy-identity.md)、[执行与调用事实](tasks/2026-10-05-authoring-execution.md)均完成各自门禁；[现行 Spec](../specs/2026-09-18-natural-language-strategy-authoring.md)保留，详见[最终对账](../tasks/evidence/2026-10-06-authoring-completion.md)与[浏览器证据](../tasks/evidence/2026-10-06-authoring-browser.md)。
+- 自然语言策略编写：[完整任务](tasks/2026-09-18-natural-language-strategy-authoring.md)、[可信身份与会话](tasks/2026-10-05-strategy-identity.md)、[执行与调用事实](tasks/2026-10-05-authoring-execution.md)均完成各自门禁；[现行 Spec](../specs/2026-09-18-natural-language-strategy-authoring.md)保留，详见[最终对账](../evidence/2026-10-06-authoring-completion.md)与[浏览器证据](../evidence/2026-10-06-authoring-browser.md)。
 
-- 行情图表周期聚合：[已完成任务](tasks/2026-09-16-market-chart-period-aggregation.md)，完整 AC1–AC11 与 T1～T6/G1/P1/R1 已通过；[现行 Spec](../specs/2026-09-16-market-chart-period-aggregation.md)保留，分层证据见[R1 最终 Review](../tasks/evidence/2026-10-06-market-period-r1-final-review.md)。
+- 行情图表周期聚合：[已完成任务](tasks/2026-09-16-market-chart-period-aggregation.md)，完整 AC1–AC11 与 T1～T6/G1/P1/R1 已通过；[现行 Spec](../specs/2026-09-16-market-chart-period-aggregation.md)保留，分层证据见[R1 最终 Review](../evidence/2026-10-06-market-period-r1-final-review.md)。
 
 - 投资复盘：[原任务](tasks/2026-08-28-journal-review-trade-projection.md)、[契约子任务](tasks/2026-10-04-journal-review-contracts.md)、[收口任务](tasks/2026-10-05-journal-review-completion.md)；完整 AC1—AC16 与本轮 Web／真实模型／目标恢复／远端 CI 已通过，见[最终 Review](reviews/2026-10-05-journal-review-completion.md)。现行产品与契约 Spec 保留。
 
@@ -92,7 +94,7 @@
 - `2026-09-17-strategy-center-ux-consolidation`：T00—T16 与 G1—G3 已完成，最终一致性 Review 通过；Spec 继续保留为当前产品与交互契约；
 - `2026-08-28-unified-backtest-v2`、`2026-09-10-backtest-historical-execution-rule-facts`、`2026-09-11-backtest-v2-closure-follow-up`：V2 产品/引擎交付与收敛任务已经完成；历史规则后继由已完成的[主备任务](tasks/2026-10-06-historical-rules-primary-backup.md)和[P6 任务](tasks/2026-10-07-p6-market-state-expansion.md)承接，未选定扩展不作为当前重做入口；
 - `2026-09-14-portfolio-valuation-demand-guard`：当前功能和运行态门禁已经完成；明确延期的 batch/catalog、FX、LedgerEvent 与 realized PnL 优化转入 `docs/TODO.md`；
-- `2026-09-16-market-bar-series-cache-v2`：BarSeries Fact/Coverage、Reader、缓存和当前 Docker 门禁已经完成；原 V2 设计保留历史依据，当前架构由 [Canonical](../architecture/canonical-runtime.md)维护；
+- `2026-09-16-market-bar-series-cache-v2`：BarSeries Fact/Coverage、Reader、缓存和当前 Docker 门禁已经完成；原 V2 设计保留历史依据，当前架构由 [Canonical](../design/canonical-runtime.md)维护；
 - `2026-09-11-backtest-v2-closure.md`：一次性收敛验收记录从 `benchmarks/` 归档到 `archive/reviews/`；
 - `2026-08-18-market-data-provider-v1-2-implementation.md`：旧 Market Data v1.2 实施说明被 Market Data V2 Architecture 取代；
 - `2026-08-18-provider-selection.md` 与 `2026-08-18-provider-reliability.md`：旧 Provider 领域说明合并为 V2 `provider-routing-and-reliability`。

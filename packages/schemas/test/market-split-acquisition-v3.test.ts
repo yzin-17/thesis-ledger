@@ -5,7 +5,7 @@ import { marketEventExchangeV3Schema } from '../src/market-event-wire-v3.js';
 import { marketSplitAcquisitionV3Schema } from '../src/market-split-acquisition-v3.js';
 import { marketEventAdmissionCatalogV3Schema } from '../src/market-event-admission-catalog-v3.js';
 
-const original = readFileSync(new URL('../../../docs/tasks/evidence/2026-10-02-m22-159516-split-mapping.json', import.meta.url), 'utf8');
+const original = readFileSync(new URL('../../../docs/evidence/2026-10-02-m22-159516-split-mapping.json', import.meta.url), 'utf8');
 const digest = 'b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e';
 
 function fixture() {

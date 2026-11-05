@@ -1,6 +1,6 @@
 # HiThink 新闻接入与 Yahoo 新闻验证规格
 
-实施见[已完成任务](../archive/tasks/2026-10-22-hithink-yahoo-news.md)与[最终复核](../reviews/2026-10-22-hithink-yahoo-news-final-review.md)。用户授权接入现有 HiThink，并验证 Yahoo Finance；原 AKShare/NVIDIA 的 DG3 证据继续复用，模型与研究发布条件保持独立。
+实施见[已完成任务](../archive/tasks/2026-10-22-hithink-yahoo-news.md)与[最终复核](../archive/reviews/2026-10-22-hithink-yahoo-news-final-review.md)。用户授权接入现有 HiThink，并验证 Yahoo Finance；原 AKShare/NVIDIA 的 DG3 证据继续复用，模型与研究发布条件保持独立。
 
 ## HiThink 的明确边界
 

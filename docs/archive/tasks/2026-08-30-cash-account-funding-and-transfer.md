@@ -1,6 +1,6 @@
 # 现金资金、划转与定期入账验收
 
-> 完成结论（2026-11-01）：T1–T4、Scheduler/客户端、模拟 NM1/NM2 及真实飞书 NF1/NF2 全部通过。真实请求 1 次，飞书 HTTP 200、业务码 0，隔离 Outbox 为 `delivered / attemptCount=1`；三期合并、重复/竞争零新增，正常 12 表及配置/空路由保持，临时资源已清理。模型调用 0、费用 0，凭据不输出、不写正常配置。最终一致性复核通过，详见[真实验收与复核](../../tasks/evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
+> 完成结论（2026-11-01）：T1–T4、Scheduler/客户端、模拟 NM1/NM2 及真实飞书 NF1/NF2 全部通过。真实请求 1 次，飞书 HTTP 200、业务码 0，隔离 Outbox 为 `delivered / attemptCount=1`；三期合并、重复/竞争零新增，正常 12 表及配置/空路由保持，临时资源已清理。模型调用 0、费用 0，凭据不输出、不写正常配置。最终一致性复核通过，详见[真实验收与复核](../../evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
 
 <a id="priority"></a>
 > 排期：**已完成并退出活动 P2**。本页保存资金/划转、客户端、Scheduler 和通知的完整验收证据；正常通知路由仍按用户边界保持为空，真实验收 Provider 仅在临时隔离库启用。
@@ -8,7 +8,7 @@
 
 > 证据接续：原 T1–T4 确定性验证、10-16 客户端、10-17 Scheduler 恢复及 11-01 模拟/真实通知分层证明各自条件，本地实现不替代真实验收。
 
-> 10-17 已过条件：资金双向划转/修正链、未来入账、客户端、scheduled 正向及进程停机/并发恢复；专用进程和隔离 PostgreSQL 验证真实现金 handler，生成 1＋3 条后重放零新增，正常账户、扫描 cron 与通知配置保持。详见[原执行证据](../../tasks/evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)，其当时未验的外部通知由 NF2 接续。
+> 10-17 已过条件：资金双向划转/修正链、未来入账、客户端、scheduled 正向及进程停机/并发恢复；专用进程和隔离 PostgreSQL 验证真实现金 handler，生成 1＋3 条后重放零新增，正常账户、扫描 cron 与通知配置保持。详见[原执行证据](../../evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)，其当时未验的外部通知由 NF2 接续。
 
 > 原[10-03 状态对账](../reviews/2026-10-03-task-state-reconciliation.md)指出的客户端缺口已补齐；Canonical E03 与旧运行记录保留原范围，新增条件分别由上述证据补齐。
 
@@ -95,7 +95,7 @@
 
 ### Review 结论
 
-- 结论：通过；两份 Spec 的全部 AC 均有对应实现与适当分层证据，当前现金 Task 无未交付义务，可以归档。详见[逐项复核](../../tasks/evidence/2026-11-01-cash-notification-feishu-acceptance.md#最终一致性复核)。
+- 结论：通过；两份 Spec 的全部 AC 均有对应实现与适当分层证据，当前现金 Task 无未交付义务，可以归档。详见[逐项复核](../../evidence/2026-11-01-cash-notification-feishu-acceptance.md#最终一致性复核)。
 - 发现的问题：本轮预检和真实请求均无失败；前序生成代码转义失败、已修复反例和历史测试失败保留，不改写为首次全绿。
 - 验证边界：真实飞书明确业务成功回执证明服务端接收；失败恢复由模拟证据证明，不声称成员已读。正常配置/路由保持，后续自动启用不属于本次验收。
 - 原 T4 Desktop 定向 2 文件 18/18、Server 投影 6/6、Desktop 类型/构建及后续客户端、Scheduler 证据按输入复用；本轮 11 项守卫、5 脚本语法/格式、共享入口模拟回归、真实单请求和数据保护通过。没有重跑业务全量、构建镜像或提交代码。
@@ -105,11 +105,11 @@
 
 对应 [定期入账 Spec](../../specs/2026-08-30-recurring-cash-deposit-plan.md)及 [T1–T4 原实施记录](2026-08-30-recurring-cash-deposit-plan.md)。原确定性状态、事务、日期及客户端回归已经完成；以下是原要求中未取得实际证据的执行面、通知与消费面，不重做原实现，也不重跑输入未变的通过证据。其他 Scheduler lease/进程恢复仍归其原 Task，不由本节证明。
 
-- [x] NM1｜建立可复用模拟通知维护入口与安全预检：`scripts/cash-notification-mock-smoke.mjs`、对应 contract/runtime 及 Node 守卫测试已完成。固定项目、同令牌 tmpfs 资源、既有本地镜像、编译输入、独立库身份和清理边界已校验；语法、格式及 8 项守卫通过。首轮生成代码的转义失败已修复并保留反例，未修改业务源码或启动入口。见[证据与输入](../../tasks/evidence/2026-11-01-cash-notification-mock-provider.md)。
-- [x] NM2｜执行模拟通知闭环：复用原 Scheduler 进程恢复证据，补齐真实现金 handler → 隔离 PostgreSQL/Redis → Outbox/Dispatcher → 飞书适配器 → 回环 HTTP。5 场景通过，最终轮 8 次本机请求；13 条待确认、4 条 Outbox、8 条投递健康记录和失败三次封顶符合合同，重复/竞争零新增，隔离账本事件为 0。正常 12 表摘要及 Server/Redis 身份保持，两项临时资源已清理；本叶仅证明模拟条件，真实接收由 NF2 独立证明。见[最终回执与逐项结果](../../tasks/evidence/2026-11-01-cash-notification-mock-provider.md)。
+- [x] NM1｜建立可复用模拟通知维护入口与安全预检：`scripts/cash-notification-mock-smoke.mjs`、对应 contract/runtime 及 Node 守卫测试已完成。固定项目、同令牌 tmpfs 资源、既有本地镜像、编译输入、独立库身份和清理边界已校验；语法、格式及 8 项守卫通过。首轮生成代码的转义失败已修复并保留反例，未修改业务源码或启动入口。见[证据与输入](../../evidence/2026-11-01-cash-notification-mock-provider.md)。
+- [x] NM2｜执行模拟通知闭环：复用原 Scheduler 进程恢复证据，补齐真实现金 handler → 隔离 PostgreSQL/Redis → Outbox/Dispatcher → 飞书适配器 → 回环 HTTP。5 场景通过，最终轮 8 次本机请求；13 条待确认、4 条 Outbox、8 条投递健康记录和失败三次封顶符合合同，重复/竞争零新增，隔离账本事件为 0。正常 12 表摘要及 Server/Redis 身份保持，两项临时资源已清理；本叶仅证明模拟条件，真实接收由 NF2 独立证明。见[最终回执与逐项结果](../../evidence/2026-11-01-cash-notification-mock-provider.md)。
 
-- [x] NF1｜真实飞书单次验收入口完成：固定解析 `~/.zshrc:FEISHU_HOOK`，不执行 Shell，拒绝表达式/重复项/非官方目标，经 stdin 传递并脱敏。11 项守卫、5 脚本语法/格式及共享入口模拟回归通过，业务源码、正常配置/路由、凭据文件保持。见[入口与检查](../../tasks/evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
-- [x] NF2｜一次真实通知通过：向该 Webhook 绑定群提交一个隔离计划的三期验收汇总，飞书确认 HTTP 200、业务码 0，Outbox 为 `delivered / attemptCount=1`；双 Dispatcher、重复/竞争零新增。真实请求仅 1 次，模型 0、费用 0，正常 12 表摘要一致且临时资源清理通过；失败恢复复用 NM2，飞书接收不等于成员已读。见[真实回执及最终复核](../../tasks/evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
+- [x] NF1｜真实飞书单次验收入口完成：固定解析 `~/.zshrc:FEISHU_HOOK`，不执行 Shell，拒绝表达式/重复项/非官方目标，经 stdin 传递并脱敏。11 项守卫、5 脚本语法/格式及共享入口模拟回归通过，业务源码、正常配置/路由、凭据文件保持。见[入口与检查](../../evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
+- [x] NF2｜一次真实通知通过：向该 Webhook 绑定群提交一个隔离计划的三期验收汇总，飞书确认 HTTP 200、业务码 0，Outbox 为 `delivered / attemptCount=1`；双 Dispatcher、重复/竞争零新增。真实请求仅 1 次，模型 0、费用 0，正常 12 表摘要一致且临时资源清理通过；失败恢复复用 NM2，飞书接收不等于成员已读。见[真实回执及最终复核](../../evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
 
 - [x] 定期入账 T3 的 Scheduler、补期/恢复及外部汇总通知均已验收，不以参数捕获替代真实接收。
   - 覆盖验收标准：AC2、AC5、AC6、AC7
@@ -118,8 +118,8 @@
   - 完成条件：单例任务扫描所有到期计划；补齐全部启用期漏期；暂停月份跳过；并发运行不重复；补期通知按计划合并。
   - 验证方式：日期纯函数、Automation service/runtime/scheduler、并发与重启恢复测试，真实 Scheduler 运行演练。
   - 验证证据：
-    - [x] 10-16 日期/Service/Automation runtime 回归及目标手动 1＋3 条、重跑零新增；10-17 同一目标镜像内真实 Scheduler/现金 handler 的独立进程、隔离 PostgreSQL、补期/暂停/双实例竞争和 SIGKILL 恢复通过。见[逐项证据](../../tasks/evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)。
-    - [x] 真实外部通知：NF2 使用用户提供的 Webhook 取得官方业务成功回执和 `delivered`，三期只一条、重复/竞争零新增；NM2 独立覆盖失败恢复。正常配置和空路由保持，资源清理通过，详见[分层证据](../../tasks/evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
+    - [x] 10-16 日期/Service/Automation runtime 回归及目标手动 1＋3 条、重跑零新增；10-17 同一目标镜像内真实 Scheduler/现金 handler 的独立进程、隔离 PostgreSQL、补期/暂停/双实例竞争和 SIGKILL 恢复通过。见[逐项证据](../../evidence/2026-10-16-cash-runtime-acceptance.md#10-17-scheduler-进程与现金补期恢复)。
+    - [x] 真实外部通知：NF2 使用用户提供的 Webhook 取得官方业务成功回执和 `delivered`，三期只一条、重复/竞争零新增；NM2 独立覆盖失败恢复。正常配置和空路由保持，资源清理通过，详见[分层证据](../../evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
 
 - [x] 定期入账 T4 的真实客户端、宽窄屏与键盘验收；覆盖确认实际金额/日期、跳过/恢复、账户切换及错误状态。
   - 覆盖验收标准：AC1、AC3、AC4、AC8

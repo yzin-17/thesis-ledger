@@ -27,7 +27,7 @@
 | [历史按需 Task](2026-10-09-history-data-on-demand.md) | 144629 | 21486 | 摘牌条件、当前执行边界及 D1～D5 完成索引保留；[历史记录](2026-10-09-history-data-on-demand-history.md)保留失败/修正与有界验收 |
 | [AI SDK Task](2026-09-19-vercel-ai-sdk-integration.md) | 78419 | 14676 | G1、T13 后客户端条件、48 项 AC 映射及原预算保留；[历史记录](2026-09-19-vercel-ai-sdk-integration-history.md)保留旧失败与请求账本 |
 | [策略中心 Spec](../../specs/2026-09-17-strategy-center-ux-consolidation.md) | 91039 | 79669 | 决策/AC 和交互语义保留；原问题和布局示意随[原归档任务](2026-09-17-strategy-center-ux-consolidation.md#strategy-original-problems-20261014)保存 |
-| [S05 证据入口](../../tasks/evidence/2026-09-28-s05-venue-parser-discovery.md) | 614251 | 18926 | URL、响应元数据、长度、摘要和历史结论保留，原件独立存储 |
+| [S05 证据入口](../../evidence/2026-09-28-s05-venue-parser-discovery.md) | 614251 | 18926 | URL、响应元数据、长度、摘要和历史结论保留，原件独立存储 |
 
 三份 Task 当前正文合计从 418704 降至 77862 字节，约减少 81%。统一 Spec 是分离通用和来源合同，不减少合同集合；历史正文归档后不作为另一套当前状态。
 
@@ -35,8 +35,8 @@
 
 - 三个统一适配阶段/来源/运行报告保留于[初始证据](../reviews/2026-10-11-unified-data-capability-initial-evidence.md)、[来源证据](../reviews/2026-10-11-unified-data-capability-source-evidence.md)、[运行证据](../reviews/2026-10-11-unified-data-capability-runtime-evidence.md)。原日期、输入、命令、失败、修正、实际结果和未覆盖条件均保留；正文只增加归档说明及修正链接。
 - [历史规则来源矩阵](../reviews/2026-09-10-backtest-historical-execution-rule-source-matrix.md)、[图表一次性运行记录](../reviews/2026-09-13-market-chart-runtime.md)和[旧状态对账](../reviews/2026-10-03-task-state-reconciliation.md)按历史证据归档。可重复执行的 T13 基准继续留在 benchmarks。
-- S05 HTML/PDF 原件分别存于 [HTML Base64](../../tasks/evidence/2026-09-28-s05-venue-parser-discovery.cb3aabff.html.b64)和 [PDF Base64](../../tasks/evidence/2026-09-28-s05-venue-parser-discovery.46af95b6.pdf.b64)。解码长度分别为 16126、430850 字节；SHA-256 分别为 `cb3aabff8709091d9e534b5979e14bcbe3d825a51826aabf87c3a265b17751dc`、`46af95b681fe58d9c409d2252be57404c5191fd2b678ba4a9781c588f852f2c3`，与原内嵌内容逐字节相同。载体未被 Git 忽略，不生成另一份有相同正文的 Markdown。
-- 删除 `investment-os-mobile-slow-ready.xml`；全仓跟踪文本中两文件均无直接引用，删除前字节完全相同。[规范副本](../../reviews/evidence/mobile-android/investment-os-mobile-ready.xml)保留，SHA-256 为 `4d221d95cbbe8db31015fa1154e4e1a908d53cadb4b60e41973649a414da53a2`。慢速场景其他截图和记录保留，不把相同 UI XML 当作新的性能证明。
+- S05 HTML/PDF 原件分别存于 [HTML Base64](../../evidence/2026-09-28-s05-venue-parser-discovery.cb3aabff.html.b64)和 [PDF Base64](../../evidence/2026-09-28-s05-venue-parser-discovery.46af95b6.pdf.b64)。解码长度分别为 16126、430850 字节；SHA-256 分别为 `cb3aabff8709091d9e534b5979e14bcbe3d825a51826aabf87c3a265b17751dc`、`46af95b681fe58d9c409d2252be57404c5191fd2b678ba4a9781c588f852f2c3`，与原内嵌内容逐字节相同。载体未被 Git 忽略，不生成另一份有相同正文的 Markdown。
+- 删除 `investment-os-mobile-slow-ready.xml`；全仓跟踪文本中两文件均无直接引用，删除前字节完全相同。[规范副本](../../evidence/mobile-android/investment-os-mobile-ready.xml)保留，SHA-256 为 `4d221d95cbbe8db31015fa1154e4e1a908d53cadb4b60e41973649a414da53a2`。慢速场景其他截图和记录保留，不把相同 UI XML 当作新的性能证明。
 
 ## 验证结果与边界
 
@@ -65,7 +65,7 @@
 | 历史 Spec | 真实状态与承接依据 |
 | --- | --- |
 | [巨型组件拆分](../specs/2026-08-23-large-component-split.md) | [原任务](2026-08-23-large-component-split.md)声明范围与本地最终 Review 已完成；旧路径与拆分计划保留历史。长期请求、复杂度和依赖方向由 [AGENTS.md](../../../AGENTS.md)及现行架构维护。 |
-| [全仓架构加固](../specs/2026-09-02-full-repo-architecture-hardening.md) | [原任务](2026-09-02-full-repo-architecture-hardening.md)为 Completed；原 Draft 与分批改造顺序属于旧审查基线。长期规则由 AGENTS.md、边界门禁及 [Canonical](../../architecture/canonical-runtime.md)承接。 |
+| [全仓架构加固](../specs/2026-09-02-full-repo-architecture-hardening.md) | [原任务](2026-09-02-full-repo-architecture-hardening.md)为 Completed；原 Draft 与分批改造顺序属于旧审查基线。长期规则由 AGENTS.md、边界门禁及 [Canonical](../../design/canonical-runtime.md)承接。 |
 | [事实与研究模型](../specs/2026-09-10-backtest-historical-execution-rule-facts.md) | [原任务](2026-09-10-backtest-historical-execution-rule-facts.md)已完成；现行经济模型、复权与冻结由 [09-25 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)及 [V2 产品合同](../../specs/2026-08-28-unified-backtest-v2.md)维护，最新范围决定仍在 [10-03 Spec](../../specs/2026-10-03-multi-source-remaining-acceptance.md)。 |
 | [V2 收敛补充](../specs/2026-09-11-backtest-v2-closure-follow-up.md) | [原收敛任务](2026-09-11-backtest-v2-closure-follow-up.md)已完成；仅保留当次责任边界与分层验收。产品及不可变冻结由上述 V2、09-25 合同承接。 |
 | [BarSeries 缓存 V2](../specs/2026-09-16-market-bar-series-cache-v2.md) | [原 Task](2026-09-16-market-bar-series-cache-v2.md)的 T1–T3/G1、隔离存储、Docker 与性能验收完成；现行 V3 接线见 Canonical、09-25 与 [统一适配层](../../specs/2026-10-09-unified-data-capability-adapter.md)。`backtest-snapshot-v3-builder.ts`、`backtest-snapshot-v3-dependency-response-checks.ts`仍消费当前冻结与来源信封。 |
@@ -111,7 +111,7 @@
 
 承接后的归档状态明确为“已被承接、验收仍开放”，原勾选、实施、命令、失败和 Scope 保留，不标 Completed。各 Spec 仍维护原行为/AC，当前 Task 按来源节区分原编号，避免 T4、G1 等跨主题混同。2026-10-03/04 记录里的设备或来源不可用只作当时事实，未据此断言今天仍阻塞；新的来源资格也不替代真实 Portfolio/Native 消费。
 
-当前任务正文从 33 降为 26，`docs/tasks/` 顶层 Markdown 从 48 降为 41：26 份当前正文、14 个第三轮已核实的必要兼容入口及 README。本组主仓原始证据、源码和两邻仓扫描没有发现必须保留旧路径的引用，因此没有新增跳转文件。三个承接 Task 分别约 5KB、15KB、10KB，历史日志保留在原归档记录。
+当前任务正文从 33 降为 26，`docs/tasks` 顶层 Markdown 从 48 降为 41：26 份当前正文、14 个第三轮已核实的必要兼容入口及 README。本组主仓原始证据、源码和两邻仓扫描没有发现必须保留旧路径的引用，因此没有新增跳转文件。三个承接 Task 分别约 5KB、15KB、10KB，历史日志保留在原归档记录。
 
 本轮同时修正定期现金入账 Spec 的“已实现并验证”摘要，明确其确定性验证与真实 Scheduler/通知/客户端验收的区别。其他 Portfolio、Cash、Scheduler、AI、Market Consumer、Provider 及富途的独立责任继续保留，不将功能无关的 Task 混为一份大任务。
 

@@ -1,6 +1,6 @@
 # Web 至手机端完整功能迁移任务
 
-> 当前验收范围（2026-10-25）：按 Spec AC14 分别记录 Android/iOS 原生编译、Debug 或未签名产物、目标 API、Android Emulator/iOS Simulator 运行与当前源码 CI；原业务实源独立验收。范围调整见[记录](../../tasks/evidence/web-mobile-parity/2026-10-25-acceptance-scope.md)。
+> 当前验收范围（2026-10-25）：按 Spec AC14 分别记录 Android/iOS 原生编译、Debug 或未签名产物、目标 API、Android Emulator/iOS Simulator 运行与当前源码 CI；原业务实源独立验收。范围调整见[记录](../../evidence/web-mobile-parity/2026-10-25-acceptance-scope.md)。
 
 <a id="m29b"></a>
 > 归档状态（2026-10-31）：当前约定手机迁移范围全部通过，G0～G6双平台、G7及七项最终Review已关闭。当时 Longbridge 和通知Provider实源按用户决定延期。[Longbridge TODO](../../TODO.md#longbridge-oauth-live-acceptance)继续独立维护；[通知后续验收](2026-11-03-mobile-notification-provider-live-acceptance.md)于 2026-11-03 独立完成真实投递、收件确认和双端页面消费。以下带日期的实施记录保留当时事实，迁移结论以本段和末尾Review为准。
@@ -8,7 +8,7 @@
 <a id="notification-provider-followup"></a>
 2026-10-30后续范围：用户明确“暂时不需要验证通知provider”，手机迁移的通知Provider真实投递、供应商回执和双端实源消费当时延期，后续记录见[独立验收](2026-11-03-mobile-notification-provider-live-acceptance.md)，不再阻塞当轮G5A/G5I、G6A/G6I或G7。通知诊断读取、已交付受控交互及失败展示保持迁移范围；当轮发送0，未使用的单条许可不自动延续。
 
-> 最终验收（2026-10-31）：CI6的a75d6e5d/树ea8c2f95…与4541文件冻结输入绑定，四项必需CI首次全部成功，桌面打包跳过、artifact为0，无追加修复。35项/193子动作、139映射输入和875个手机/共享合同/原生相关输入核对通过；10模块匹配Server/Worker。独立研究及AI手动工具按未跟踪/无冻结引用/未部署证明保留WIP，原始全仓严格比较未改写。原树未提交，分支未合并，业务额度不追加。见[最终审查](../../reviews/2026-10-30-web-mobile-parity-final-review.md)。
+> 最终验收（2026-10-31）：CI6的a75d6e5d/树ea8c2f95…与4541文件冻结输入绑定，四项必需CI首次全部成功，桌面打包跳过、artifact为0，无追加修复。35项/193子动作、139映射输入和875个手机/共享合同/原生相关输入核对通过；10模块匹配Server/Worker。独立研究及AI手动工具按未跟踪/无冻结引用/未部署证明保留WIP，原始全仓严格比较未改写。原树未提交，分支未合并，业务额度不追加。见[最终审查](../reviews/2026-10-30-web-mobile-parity-final-review.md)。
 
 ## 2026-10-24 模型绑定与 CI 接续
 
@@ -24,31 +24,31 @@
 
 > 历史状态核对：2026-10-25；第 0～4 批实现与分平台运行验收通过，第 5 批受控实现/运行通过，当时缺外部条件的 M29b、G5A/G5I 未勾选。第 6 批可执行的 M33a/M33b、G6P/G6AP/G6IP 已通过：旧请求路径退休、文档和 35 项/193 子动作责任核销、两端独立集成预检完成；隔离提交 `e8a258d6` 的四项必需 CI 全部成功。当时完整 G6A/G6I、G7 与最终迁移 Review 保持未勾选，当前源码远端 CI、剩余集成断言及原业务实源条件未满足；后续结果及当前范围以上方最新说明为准。
 > 共享执行约束：原树 `main/da002744` 不重置、不暂存、不提交。用户已授权第 6 批 4289 文件隔离快照及限定修复公开 CI，沿第 5 批 `5c67b4fa` 仅更新 12 路径，分支 `codex/mobile-parity-ci-20261023` 未合并。最终结果说明与 CI 冻结说明分别保存；两个非本批既有源码/测试 WIP 未公开复制。数据库、安装包和验收包不上传；原模型、来源、通知及预算边界保持。两份研究文档出现并发变化，原始哈希比较如实保留，不回退其内容。
-> 事实来源：[差异盘点](../../reviews/2026-10-22-web-mobile-feature-parity-inventory.md)保留迁移起点与源码增量，当前状态只由本 Task 维护。已通过的旧证据只在输入及断言仍一致时复用。
-> 实施记录与证据：[第 0、1 批记录](../../tasks/evidence/web-mobile-parity/2026-10-22-batch-0-1.md)、[第 2 批历史记录](../../tasks/evidence/web-mobile-parity/2026-10-23-batch-2.md)、[第 2 批当前收口](../../tasks/evidence/web-mobile-parity/2026-10-24-batch-2-ci-closeout.md)、[第 5 批及 Chrome 接续补验](../../tasks/evidence/web-mobile-parity/2026-10-25-batch-5.md)、[第 6 批实施与独立预检](../../tasks/evidence/web-mobile-parity/2026-10-25-batch-6.md)。
-> 已有工具交付：2026-10-25；G6RA/G6RI/G6RC 的本机范围已通过，Android Debug/未签名 Release、iOS Simulator Debug/iPhoneOS 未签名 archive 分别留证。当次尚未推送；2026-10-26 当前快照的远端结果见下方接续状态。[当次记录](../../tasks/evidence/web-mobile-parity/2026-10-25-release-preparation.md)及[可选工具说明](../../guides/2026-10-25-mobile-release-preparation.md)保留原本机范围。
+> 事实来源：[差异盘点](../reviews/2026-10-22-web-mobile-feature-parity-inventory.md)保留迁移起点与源码增量，当前状态只由本 Task 维护。已通过的旧证据只在输入及断言仍一致时复用。
+> 实施记录与证据：[第 0、1 批记录](../../evidence/web-mobile-parity/2026-10-22-batch-0-1.md)、[第 2 批历史记录](../../evidence/web-mobile-parity/2026-10-23-batch-2.md)、[第 2 批当前收口](../../evidence/web-mobile-parity/2026-10-24-batch-2-ci-closeout.md)、[第 5 批及 Chrome 接续补验](../../evidence/web-mobile-parity/2026-10-25-batch-5.md)、[第 6 批实施与独立预检](../../evidence/web-mobile-parity/2026-10-25-batch-6.md)。
+> 已有工具交付：2026-10-25；G6RA/G6RI/G6RC 的本机范围已通过，Android Debug/未签名 Release、iOS Simulator Debug/iPhoneOS 未签名 archive 分别留证。当次尚未推送；2026-10-26 当前快照的远端结果见下方接续状态。[当次记录](../../evidence/web-mobile-parity/2026-10-25-release-preparation.md)及[可选工具说明](../../guides/2026-10-25-mobile-release-preparation.md)保留原本机范围。
 
 ## 当前执行摘要
 
 本轮报告、Android与指定iPhone Air的AI原值保存、Tushare来源账号、六项路由目录确认及数据/资源保护分别通过；模型新请求0，来源检查4次daily及六项写入额度已关闭。最终策略175、目录24代/35528；两次目录job的efinance不可用明细保留。CI6与当前候选/目标/客户端输入均核对通过，G6A/G6I、G7及最终Review关闭，当前无剩余实施义务。历史资源专项保留原设备身份，未声称在Air重跑全部专项。
-并发来源已核对：[非手机证据对账](../../tasks/evidence/2026-10-30-nonmobile-evidence-reconciliation.md)的认证连接和审计修复属于另一独立授权；其责任方随后于12:43完成正式快更与零生成目标验收。Air用例在该更新之后执行，本轮再次确认Server/Worker的4个报告读取模块与本机一致；不重复已过同步或扩展手机调用额度。并发差异原样保留，三仓HEAD/空索引保持。
+并发来源已核对：[非手机证据对账](../../evidence/2026-10-30-nonmobile-evidence-reconciliation.md)的认证连接和审计修复属于另一独立授权；其责任方随后于12:43完成正式快更与零生成目标验收。Air用例在该更新之后执行，本轮再次确认Server/Worker的4个报告读取模块与本机一致；不重复已过同步或扩展手机调用额度。并发差异原样保留，三仓HEAD/空索引保持。
 
 
-2026-10-26 接续已完成 CI1 本机前置、当前源码远端 CI、停用测试任务的真实手动执行与双端历史消费 G5M、G6AR/G6IR 独立资源差集及 G7D 输入一致性核对，见[本轮记录](../../tasks/evidence/web-mobile-parity/2026-10-26-continuation.md)。4407 文件快照及一处测试兼容修复已获授权，隔离提交 `feea66c1` 的 quality、contracts、Android Native、iOS Native 四项主 CI 及新工具检查均成功；桌面打包按要求跳过，两个运行的 artifact 均为 0。手机生产、139 个动作映射输入及最近本机编译输入未漂移；Android 安装 APK 和 iOS 59 文件与已编译产物一致。完整 G5/G6/G7 的依赖与勾选不变，不沿用过期实源预算。
+2026-10-26 接续已完成 CI1 本机前置、当前源码远端 CI、停用测试任务的真实手动执行与双端历史消费 G5M、G6AR/G6IR 独立资源差集及 G7D 输入一致性核对，见[本轮记录](../../evidence/web-mobile-parity/2026-10-26-continuation.md)。4407 文件快照及一处测试兼容修复已获授权，隔离提交 `feea66c1` 的 quality、contracts、Android Native、iOS Native 四项主 CI 及新工具检查均成功；桌面打包按要求跳过，两个运行的 artifact 均为 0。手机生产、139 个动作映射输入及最近本机编译输入未漂移；Android 安装 APK 和 iOS 59 文件与已编译产物一致。完整 G5/G6/G7 的依赖与勾选不变，不沿用过期实源预算。
 
-同日[逐项剩余门禁核对](../../tasks/evidence/web-mobile-parity/2026-10-26-remaining-gates.md)已补齐 G5CA/G5CI：Android/iOS 从真实目标读取目录第 18 代、35459 个标的，显式 GET 重读及 API/模式保持分别通过。八组纯读取状态核对通过；Longbridge 原明确暂缓、研究业务失败与冻结预算、未获准的来源/路由/同步写入、当前运行态 Scheduler 样本及通知零路由分别保留。只读持久化核对发现既有 scheduled 成功早于当前容器启动，不作为当前 Scheduler 通过；M29b、G5A/G5I、完整 G6A/G6I 和 G7 仍未勾选。
+同日[逐项剩余门禁核对](../../evidence/web-mobile-parity/2026-10-26-remaining-gates.md)已补齐 G5CA/G5CI：Android/iOS 从真实目标读取目录第 18 代、35459 个标的，显式 GET 重读及 API/模式保持分别通过。八组纯读取状态核对通过；Longbridge 原明确暂缓、研究业务失败与冻结预算、未获准的来源/路由/同步写入、当前运行态 Scheduler 样本及通知零路由分别保留。只读持久化核对发现既有 scheduled 成功早于当前容器启动，不作为当前 Scheduler 通过；M29b、G5A/G5I、完整 G6A/G6I 和 G7 仍未勾选。
 
-随后用户授权一次独立调度并指定 iPhone Air，[本轮 Scheduler 验收](../../tasks/evidence/web-mobile-parity/2026-10-26-scheduler-acceptance.md)已完成 G5SA/G5SI：新任务自然触发一次、一次领取并成功后停用，Android/Air 独立历史消费通过，原六任务配置摘要不变、通知 0。此前缺当前运行态样本的判断保留历史含义；正常单次 Scheduler 不再作为剩余阻塞，其他外部条件及完整 G5/G6/G7 不变。
+随后用户授权一次独立调度并指定 iPhone Air，[本轮 Scheduler 验收](../../evidence/web-mobile-parity/2026-10-26-scheduler-acceptance.md)已完成 G5SA/G5SI：新任务自然触发一次、一次领取并成功后停用，Android/Air 独立历史消费通过，原六任务配置摘要不变、通知 0。此前缺当前运行态样本的判断保留历史含义；正常单次 Scheduler 不再作为剩余阻塞，其他外部条件及完整 G5/G6/G7 不变。
 
 2026-10-25 工具准备历史：G6RA、G6RI、G6RC 本机范围通过，模板、校验、接续及默认无上传工作流齐备。16 项定向、规范/边界、20 文件凭据扫描及静态文档复核通过。Android arm64 Debug/未签名 Release、iOS arm64 Simulator Debug/iPhoneOS 未签名 archive 分别通过，候选绑定指纹 `90d55cb8…`。该阶段只生成本机候选，不安装或分发；临时 Android 受控签名 fixture 已销毁，当次尚未推送新工作流。后续当前 CI 由本轮 `feea66c1` 独立核销，原 `e8a258d6` 只保留此前事实；M29b/G5、完整 G6/G7 继续未勾选。
 
-工具准备之前的[剩余门禁与接续条件核对](../../tasks/evidence/web-mobile-parity/2026-10-25-remaining-gates.md)保留为历史证据：当时 189 个手机生产文件、64 个原生/打包输入及本机测试输入未变化。后续工具准备已新增独立原生编译记录；旧输入一致性结论不外推到新 Gradle/iOS 工程。M29b、G5A/G5I、完整 G6A/G6I、G7 均继续未勾选；当前运行范围按 AC14，原业务实源、预算和账号边界保持。
+工具准备之前的[剩余门禁与接续条件核对](../../evidence/web-mobile-parity/2026-10-25-remaining-gates.md)保留为历史证据：当时 189 个手机生产文件、64 个原生/打包输入及本机测试输入未变化。后续工具准备已新增独立原生编译记录；旧输入一致性结论不外推到新 Gradle/iOS 工程。M29b、G5A/G5I、完整 G6A/G6I、G7 均继续未勾选；当前运行范围按 AC14，原业务实源、预算和账号边界保持。
 
-工具准备阶段原树 HEAD/空索引保持；1529 个非本批已有路径中 1527 个哈希不变，两份研究 Spec/Task 及新增研究审计记录存在并发变化，原样保留且未回退。[原始保护记录](../../tasks/evidence/web-mobile-parity/2026-10-25-release-preparation.md)继续保留未完全相等的事实。本轮保护与冻结源码差分另见接续记录：生产/测试/构建输入与公开快照一致，其他会话后续文档变化未并入公开提交。
+工具准备阶段原树 HEAD/空索引保持；1529 个非本批已有路径中 1527 个哈希不变，两份研究 Spec/Task 及新增研究审计记录存在并发变化，原样保留且未回退。[原始保护记录](../../evidence/web-mobile-parity/2026-10-25-release-preparation.md)继续保留未完全相等的事实。本轮保护与冻结源码差分另见接续记录：生产/测试/构建输入与公开快照一致，其他会话后续文档变化未并入公开提交。
 
 第 6 批签名前的自动预检已完成。定向 26 项、手机全包 40 文件 153 项、类型/构建及严格规范/边界通过；[CI 40183177280](https://github.com/yzin-17/thesis-ledger/actions/runs/40183177280) 的 quality、contracts、Android Native、iOS Native 全部成功，桌面打包跳过且上传产物为零。Android 5 个独立阶段及 iOS 6 个独立阶段通过，分别记录该批 JS、五入口/跨模块、键盘取消、有限视口、前后台与真实 API 恢复；历史工具失败保留。当时两端原生/打包 64 个输入与本机容器一致，实际安装指纹核对通过；本轮原生增量按独立记录验收，未重新安装或运行设备。
 
-两端已恢复本机真实 API 与模拟范围；Android 显示设置、iOS 竖屏恢复，本轮回环网关关闭，原 API/Metro 保留。28 个账本与 99 个策略保护通过；自动化原始完整哈希比较因单个分钟 `nextRunAt` 失败，单字段重构精确命中旧哈希，原失败不改写。原树 HEAD 和空索引保持；1516 个非本批已有 WIP 中 1514 个哈希不变，两份研究说明发生并发差异，本批未写入、不回退、不公开复制。详细范围见[第 6 批证据](../../tasks/evidence/web-mobile-parity/2026-10-25-batch-6.md)。
+两端已恢复本机真实 API 与模拟范围；Android 显示设置、iOS 竖屏恢复，本轮回环网关关闭，原 API/Metro 保留。28 个账本与 99 个策略保护通过；自动化原始完整哈希比较因单个分钟 `nextRunAt` 失败，单字段重构精确命中旧哈希，原失败不改写。原树 HEAD 和空索引保持；1516 个非本批已有 WIP 中 1514 个哈希不变，两份研究说明发生并发差异，本批未写入、不回退、不公开复制。详细范围见[第 6 批证据](../../evidence/web-mobile-parity/2026-10-25-batch-6.md)。
 
 下一阻塞为 G5 的原任务模型/来源预算、真实路由/目录写入及通知外发条件。正常单次 Scheduler 已独立通过；G6 独立模拟器差集与当前源码主 CI 已完成，完整 G6 仍依赖同平台 G5。条件未解除前不发起相应真实调用或外发；本任务不上传或分发应用产物，G7 继续未勾选。
 
@@ -124,7 +124,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 - [x] P00：完成 Web/手机源码差异矩阵、架构边界和实施拆分。
   - 覆盖：AC01 的规划基线；不代表动作级设备覆盖率已完成。
-  - 范围：本 Spec、Task、[盘点报告](../../reviews/2026-10-22-web-mobile-feature-parity-inventory.md)及当前任务入口。
+  - 范围：本 Spec、Task、[盘点报告](../reviews/2026-10-22-web-mobile-feature-parity-inventory.md)及当前任务入口。
   - 当前结果：9 项 Web 一级业务入口与 3 个手机简化入口已核对；账户永久删除例外、Web 本地 API、原生适配和 CI 差异已记录。后续每批开工复核动作与源码差集。
 
 ## 第 0 批：基础与原生可行性
@@ -200,7 +200,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 ## 第 3 批：复盘与研究
 
-当前证据：[第 3 批实施与验收](../../tasks/evidence/web-mobile-parity/2026-10-24-batch-3.md)。C07、M17～M22、G3A/G3I 已依据独立原生编译、安装指纹、自动运行、真实 API 恢复及数据保护通过；最终 CI 四项成功，验收包内容、文档指纹与 CRC 预检通过。8 个既有保护账本完整响应不变，真实模型调用为零，原研究实源及受控条件仍由原任务持有。
+当前证据：[第 3 批实施与验收](../../evidence/web-mobile-parity/2026-10-24-batch-3.md)。C07、M17～M22、G3A/G3I 已依据独立原生编译、安装指纹、自动运行、真实 API 恢复及数据保护通过；最终 CI 四项成功，验收包内容、文档指纹与 CRC 预检通过。8 个既有保护账本完整响应不变，真实模型调用为零，原研究实源及受控条件仍由原任务持有。
 
 当前执行顺序：C07 的共享运行合同与定向合同测试 → M17/M18 复盘事实、草稿及快照 → M19 解释与引用 → M20 报告分页和证据 → M21 持久化提交恢复 → M22 比较与复核状态 → 分平台编译及自动运行 → 当前源码 CI 与验收包。写集限手机相关领域目录、共享 Schema/client、相应 Web 请求包装和定向测试；不改变研究服务端业务流程、默认模型或来源开关。新建 B3 受控对象与既有账本分离，既有 WIP 及原工作树索引保持原样。公开 CI 仅在源码范围完成清单核对和对应授权后触发。
 
@@ -231,9 +231,9 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 2026-10-25 用户授权按[研究 G3-D23](../../tasks/2026-10-18-research-evidence-evolution.md)修复本机第 4 批生成脚本的三条跨应用引用。该叶只处理手机合成合同夹具及局部验证，不改变已验手机功能、原生工程或原运行产物；原公开 CI／原生验收按其冻结输入保留。
 
-- [x] 夹具边界：新增手机自有四字段 NAV 合成快照与公共 Schema 工厂，原生成脚本不再导入 Server NAV 实现／测试工厂；原受控 JSON 摘要及字段语义保持，未覆写验收包。原边界门禁无豁免通过，定向 9 项、手机 src 类型与新增测试聚焦类型／规范通过。新测试未进入旧 CI 冻结提交，原生输入未变；D21 目标与真实模型仍归研究 Task。详见[本轮证据](../../tasks/evidence/2026-10-25-g3-d21-preflight.md)。
+- [x] 夹具边界：新增手机自有四字段 NAV 合成快照与公共 Schema 工厂，原生成脚本不再导入 Server NAV 实现／测试工厂；原受控 JSON 摘要及字段语义保持，未覆写验收包。原边界门禁无豁免通过，定向 9 项、手机 src 类型与新增测试聚焦类型／规范通过。新测试未进入旧 CI 冻结提交，原生输入未变；D21 目标与真实模型仍归研究 Task。详见[本轮证据](../../evidence/2026-10-25-g3-d21-preflight.md)。
 
-当前证据：[第 4 批实施与验收](../../tasks/evidence/web-mobile-parity/2026-10-24-batch-4.md)。本轮执行面限手机、共享 Schema/client、对应 Web 包装与测试说明。C08/C09、M23～M27、G4A/G4I 已依据合同、独立原生编译、安装指纹、双端受控闭环、真实 API 恢复及数据保护通过；当前隔离提交 `1ea300be` 四项必需 CI 成功。原树初始 1132 项 WIP 及后续并发修改保留，原 HEAD 和空索引不变。原 Provider、模型、队列及 Worker 实源门禁继续由原任务持有。
+当前证据：[第 4 批实施与验收](../../evidence/web-mobile-parity/2026-10-24-batch-4.md)。本轮执行面限手机、共享 Schema/client、对应 Web 包装与测试说明。C08/C09、M23～M27、G4A/G4I 已依据合同、独立原生编译、安装指纹、双端受控闭环、真实 API 恢复及数据保护通过；当前隔离提交 `1ea300be` 四项必需 CI 成功。原树初始 1132 项 WIP 及后续并发修改保留，原 HEAD 和空索引不变。原 Provider、模型、队列及 Worker 实源门禁继续由原任务持有。
 
 | 独立合同叶 | 精确交付及写集 | 完成条件与后续 |
 | --- | --- | --- |
@@ -266,7 +266,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 ## 第 5 批：配置、来源与自动化
 
-用户已授权继续实施本批及隔离快照的限定公开 CI。C10a～C12b、M28a～M29a、M30a～M32 的实现与受控验收通过；最终隔离提交 `5c67b4fa` 的四项必需 CI 全部成功，双平台本机原生编译、安装分别通过。本次已按授权接受 Android Chrome 首次条款；中国区官方地址已通过 HTTPS 到达，假客户端收到未注册拒绝，返回仍等待及取消通过；两端受控成功/失败终态及按钮禁用补验通过。M29b、G5A/G5I 保持未勾选：有效测试客户端、真实账号授权与回调，以及模型/Provider、调度/外发断言仍缺相应条件。应用源码未变，复用现有 CI、编译与不受影响的运行证据。写集限手机、共享 Schema/client、对应 Web 薄包装和测试说明，不改 Server/DSA 的状态机、数据库、真实配置或预算。原工作树 `main/da002744`，开始时 1449 项未提交条目、索引为空；基线与分平台结果见[第 5 批记录](../../tasks/evidence/web-mobile-parity/2026-10-25-batch-5.md)。
+用户已授权继续实施本批及隔离快照的限定公开 CI。C10a～C12b、M28a～M29a、M30a～M32 的实现与受控验收通过；最终隔离提交 `5c67b4fa` 的四项必需 CI 全部成功，双平台本机原生编译、安装分别通过。本次已按授权接受 Android Chrome 首次条款；中国区官方地址已通过 HTTPS 到达，假客户端收到未注册拒绝，返回仍等待及取消通过；两端受控成功/失败终态及按钮禁用补验通过。M29b、G5A/G5I 保持未勾选：有效测试客户端、真实账号授权与回调，以及模型/Provider、调度/外发断言仍缺相应条件。应用源码未变，复用现有 CI、编译与不受影响的运行证据。写集限手机、共享 Schema/client、对应 Web 薄包装和测试说明，不改 Server/DSA 的状态机、数据库、真实配置或预算。原工作树 `main/da002744`，开始时 1449 项未提交条目、索引为空；基线与分平台结果见[第 5 批记录](../../evidence/web-mobile-parity/2026-10-25-batch-5.md)。
 
 原 C10～C12 按独立消费合同拆分，父编号仅分组，完成断言不减少：
 
@@ -298,7 +298,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 ## 各批 Android / iOS 独立运行门禁
 
-每行包含两个独立叶；两个复选框分别维护，不共用“移动端已通过”结论。主执行面为该平台安装包与设备，写集只含 `docs/tasks/evidence/web-mobile-parity/<门禁编号>/` 的证据及本 Task 当前状态。发现缺陷返回责任 F/C/M 叶修复，不能在验收叶扩大代码写集。
+每行包含两个独立叶；两个复选框分别维护，不共用“移动端已通过”结论。主执行面为该平台安装包与设备，写集只含 `docs/tasks/evidence/web-mobile-parity/<门禁编号` 的证据及本 Task 当前状态。发现缺陷返回责任 F/C/M 叶修复，不能在验收叶扩大代码写集。
 
 共同过程：先复用仍有效的本地验证，完成该平台原生构建并安装；以 VG 对照目标 API/Web；记录新鲜、空、部分失败、陈旧、断网/恢复、版本冲突及实际/模拟隔离。只有本行适用的场景才执行，不人为触发无关 Provider 调用。
 
@@ -325,7 +325,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
   - 写集：`apps/mobile/src/index.ts`、旧 `mobile-account.queries.ts`、对应 `test/mobile.test.ts` 与 `test/mobile-account.test.ts`；不改变当前页面、HTTP 合同或原生依赖。
   - 完成条件：旧 store/bootstrap/三入口导航及重复查询钩子无源码消费者；安全 API 默认地址、当前展示类型/文案保留；原现金、坏响应、错误保留和晚到取消等断言由现行 Query 测试承接，不靠删除断言消除失败。
   - 验证：引用图、现行 Query/组合/账户定向测试、手机包测试、类型/构建及边界/规范检查；旧测试与现行责任对应记录在本批证据。
-  - 当前结果：旧执行路径已退休，定向 6 文件 26 项、手机 40 文件 153 项、类型/构建、严格规范和边界检查通过；实际页面与原生输入保持，详见[第 6 批证据](../../tasks/evidence/web-mobile-parity/2026-10-25-batch-6.md)。本地通过不替代本批 CI 或设备预检。
+  - 当前结果：旧执行路径已退休，定向 6 文件 26 项、手机 40 文件 153 项、类型/构建、严格规范和边界检查通过；实际页面与原生输入保持，详见[第 6 批证据](../../evidence/web-mobile-parity/2026-10-25-batch-6.md)。本地通过不替代本批 CI 或设备预检。
 - [x] M33b：同步产品/手机文档、归属与逐动作迁移结论；AC01/15。
   - 启动依赖：M01～M32 的本地交付及 G0～G5 的已有结果；不依赖 G6，避免文档与最终门禁互相等待。
   - 本轮就绪边界：已交付页面/合同与双端受控状态消费按原证据保留；当前范围的真实外部条件由 G5 持有，已确认延期范围按顶部 TODO 引用执行。
@@ -333,7 +333,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
   - 可写范围：README 手机段落、现行手机用户说明、直接受影响的 Spec/Task/盘点及本批证据。只更新真实已完成范围；无关历史与既有阻塞保留。
   - 完成条件：旧“只读”口径被真实范围替换；共享 API 边界、动作到入口/测试/两平台证据与未验部分可定位；M33a 的退休结论、依赖与最终差集一致；不声称完整迁移通过。
   - 验证：逐动作差集核对、相对链接/路径检查、修改范围与中文审阅；文档不触发无关业务重跑。
-  - 当前结果：手机使用指南、README 手机段落及文档导航已同步；35 项/193 子动作和各批证据归属可定位，链接/中文/尾空白复核通过。第 5 批实源与完整 G6/G7 明确保留，详见[第 6 批记录](../../tasks/evidence/web-mobile-parity/2026-10-25-batch-6.md)。
+  - 当前结果：手机使用指南、README 手机段落及文档导航已同步；35 项/193 子动作和各批证据归属可定位，链接/中文/尾空白复核通过。第 5 批实源与完整 G6/G7 明确保留，详见[第 6 批记录](../../evidence/web-mobile-parity/2026-10-25-batch-6.md)。
 
 ### 已完成的本机构建与校验工具
 
@@ -343,12 +343,12 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
   - 依赖/上下文：已有 Gradle 原生工程与已验 Debug；现行 keystore 环境/文件入口、正式签名准备规格。
   - 写集：Android `build.gradle`/签名示例，手机配置模板，`scripts/mobile-release*` 中 Android/policy 及相应测试；不改包标识、业务或真实密钥。
   - 完成条件：正式 Release 缺配置明确失败，显式 unsigned 路径与 Debug 可编译；真实工具可拒绝 debug 签名，正向证书/身份规则由离线反例验证；记录 Android Native 结果。
-  - 当前结果：16 项定向及严格规范通过，Gradle 缺材料拒绝、arm64 Debug、未签名 Release/真实未签名和身份验证均通过；真实 debug APK 被拒绝。隔离一天测试证书的签名/固定指纹正向与错指纹/篡改拒绝通过，临时材料已删除；不作为正式密钥或分发证据。详见[本次记录](../../tasks/evidence/web-mobile-parity/2026-10-25-release-preparation.md)。
+  - 当前结果：16 项定向及严格规范通过，Gradle 缺材料拒绝、arm64 Debug、未签名 Release/真实未签名和身份验证均通过；真实 debug APK 被拒绝。隔离一天测试证书的签名/固定指纹正向与错指纹/篡改拒绝通过，临时材料已删除；不作为正式密钥或分发证据。详见[本次记录](../../evidence/web-mobile-parity/2026-10-25-release-preparation.md)。
 - [x] G6RI：iOS 手动签名/导出模板与独立校验接续；AC14/15。
   - 依赖/上下文：已锁定 Pods/workspace，G6RA 的配置/日志约定；本机 Xcode 的导出参数。
   - 写集：手机 iOS 导出/环境模板、专属 iOS 校验和命令生成器/测试；Info.plist/工程版本绑定，保持实际默认 `0.1.0/1`；不登录账号、不导入证书、不修改真实 profile。
   - 完成条件：缺材料时签名动作前停止；Team、证书、描述文件、包身份、iPhoneOS 平台及 entitlements 的拒绝反例通过；iPhoneOS Release 无签名原生编译独立记录。
-  - 当前结果：16 项定向通过，实际 Simulator 产物被正式校验拒绝；Xcode 设置核对证明 `MOBILE_RELEASE_*` 只作用于 App。修复 Info.plist 的硬编码版本后，Simulator Debug 与 iPhoneOS Release 未签名 archive/身份核验分别通过，默认 `0.1.0/1` 不变。原失败回执与当次未覆盖范围保留，见[历史记录](../../tasks/evidence/web-mobile-parity/2026-10-25-release-preparation.md)。
+  - 当前结果：16 项定向通过，实际 Simulator 产物被正式校验拒绝；Xcode 设置核对证明 `MOBILE_RELEASE_*` 只作用于 App。修复 Info.plist 的硬编码版本后，Simulator Debug 与 iPhoneOS Release 未签名 archive/身份核验分别通过，默认 `0.1.0/1` 不变。原失败回执与当次未覆盖范围保留，见[历史记录](../../evidence/web-mobile-parity/2026-10-25-release-preparation.md)。
 - [x] G6RC：无上传准备流水线与回执/操作说明；AC14/15。
   - 依赖：G6RA/G6RI 本地脚本和定向验证；只准备本轮不依赖外部条件的阶段。
   - 写集：独立 `.github/workflows/mobile-release-prepare.yml`、既有 CI 的专属反例门禁、手机发布说明/本批证据；不改桌面发布行为、不推送、不上传 artifact。
@@ -377,11 +377,11 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 - [x] G5RPI：iPhone Air 对同一报告与证明的独立消费；AC10/12/14。
   - 输入与写集同 G5RPA，执行面固定为 iPhone Air；旧设备已不存在时可建立新的 Air 实例并记录 UDID 与运行时。
   - 完成条件同 G5RPA；独立 XCUITest 及安装指纹，不复制 Android 结果。已有编译按实际输入复用，运行时变化单独留证。
-  - 当前结果：用户授权的 iOS26.5 arm64/23F77 安装成功，支持清单包含 iPhone Air；目标 `23AB3E1A-4C30-462C-943C-B9CB5B894E96` 的已安装 App 59 文件与已验归档一致。两项独立 XCUITest 零失败，D59 正文/实际模型/5 数值/11 材料/工具审计/刷新重开/实际范围隔离及 API/模式保持通过；默认 OpenRouter/free 修订7、用途指纹和最近 passed、目录22代/35851及来源注册表重读通过。48 份原生附件和30个实际 GET200 留证，4个估值自动请求由网关拦截。本轮模型、来源探测、配置写入及通知均0；收尾已恢复 Air 的初始 Shutdown 状态。详见[Air 证据](../../tasks/evidence/web-mobile-parity/2026-10-30-ios-air-acceptance.md)。
+  - 当前结果：用户授权的 iOS26.5 arm64/23F77 安装成功，支持清单包含 iPhone Air；目标 `23AB3E1A-4C30-462C-943C-B9CB5B894E96` 的已安装 App 59 文件与已验归档一致。两项独立 XCUITest 零失败，D59 正文/实际模型/5 数值/11 材料/工具审计/刷新重开/实际范围隔离及 API/模式保持通过；默认 OpenRouter/free 修订7、用途指纹和最近 passed、目录22代/35851及来源注册表重读通过。48 份原生附件和30个实际 GET200 留证，4个估值自动请求由网关拦截。本轮模型、来源探测、配置写入及通知均0；收尾已恢复 Air 的初始 Shutdown 状态。详见[Air 证据](../../evidence/web-mobile-parity/2026-10-30-ios-air-acceptance.md)。
 
 ### 双端 AI 配置原值保存
 
-用户已明确批准：CI通过后，Android对现有OpenRouter/free的研究、策略分析用途执行一次原值验证保存，合计最多6次实际模型请求、费用上限0 USD；成功后Air仅在计划无需模型调用时原值保存一次。保留现有凭证、模型、参数、用途及默认值，整次失败不再提交。两端按顺序独立验收，不追加连接检查或研究生成。执行前发现同Provider的并发验证并等待其收敛；随后复用已落库的两条匹配真实用途验证，不重复派发。该非手机操作的实际两次调用与本轮手机零调用分别计数。详细授权和实际结果见[保存验收](../../tasks/evidence/web-mobile-parity/2026-10-30-mobile-ai-save-acceptance.md)。
+用户已明确批准：CI通过后，Android对现有OpenRouter/free的研究、策略分析用途执行一次原值验证保存，合计最多6次实际模型请求、费用上限0 USD；成功后Air仅在计划无需模型调用时原值保存一次。保留现有凭证、模型、参数、用途及默认值，整次失败不再提交。两端按顺序独立验收，不追加连接检查或研究生成。执行前发现同Provider的并发验证并等待其收敛；随后复用已落库的两条匹配真实用途验证，不重复派发。该非手机操作的实际两次调用与本轮手机零调用分别计数。详细授权和实际结果见[保存验收](../../evidence/web-mobile-parity/2026-10-30-mobile-ai-save-acceptance.md)。
 
 - [x] G5AVA：Android的真实用途验证与配置原值保存；AC12/14。
   - 输入/依赖：CI2、G5RPA/G5RPI已过；现有openrouter/free及两个启用用途、当前配置修订和无执行副作用的验证计划，用户本次最多6次/0 USD授权。
@@ -397,7 +397,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 ### 双端来源与账号实源检查
 
-用户已将来源、能力、标的、账号权限及预算选择交由本轮决定。采用当前 Tushare Pro 代次3、120积分及无独立接口权限原值；Android和指定Air各一次账号检查及各一次精确日线检查，合计最多4次上游`daily`、新增费用上限0 USD。账号检查正常更新当前权限记录；来源配置、凭证、权限声明、路由和目录保持。详细边界、停止条件及结果见[来源实源验收](../../tasks/evidence/web-mobile-parity/2026-10-30-mobile-source-acceptance.md)。本次额度与已关闭的AI保存额度分别计数。
+用户已将来源、能力、标的、账号权限及预算选择交由本轮决定。采用当前 Tushare Pro 代次3、120积分及无独立接口权限原值；Android和指定Air各一次账号检查及各一次精确日线检查，合计最多4次上游`daily`、新增费用上限0 USD。账号检查正常更新当前权限记录；来源配置、凭证、权限声明、路由和目录保持。详细边界、停止条件及结果见[来源实源验收](../../evidence/web-mobile-parity/2026-10-30-mobile-source-acceptance.md)。本次额度与已关闭的AI保存额度分别计数。
 
 - [x] G5SAA：Android现有Tushare账号访问检查；AC12/14。
   - 输入/依赖：CI2及现有代次3配置，120积分、`independentApis=[]`；执行前核对当前生产检查器与单次请求预算。
@@ -423,7 +423,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 ### 双端路由与目录写入接续
 
-用户已明确批准本组限定写入。新鲜纯读仍为路由修订173/applied、20条原路由，目录22代/35851、无在途job；已有510300.SH为confirmed/catalog及active关联。待审请求、冻结原值与守卫自检位于本机`apps/mobile/release/acceptance-write-scope-2026-10-30/路由目录写入审批说明.md`，原值规范化SHA256为`27f6f616122d50eda2056338a21a2630dc624bcd6766d5e10c77746c383a0aaa`。执行与保护结果见[真实写入验收](../../tasks/evidence/web-mobile-parity/2026-10-30-mobile-write-acceptance.md)；不使用已关闭的模型/来源额度。用户随后明确暂不验证通知Provider，本轮不发送，不影响本组独立工作。
+用户已明确批准本组限定写入。新鲜纯读仍为路由修订173/applied、20条原路由，目录22代/35851、无在途job；已有510300.SH为confirmed/catalog及active关联。待审请求、冻结原值与守卫自检位于本机`apps/mobile/release/acceptance-write-scope-2026-10-30/路由目录写入审批说明.md`，原值规范化SHA256为`27f6f616122d50eda2056338a21a2630dc624bcd6766d5e10c77746c383a0aaa`。执行与保护结果见[真实写入验收](../../evidence/web-mobile-parity/2026-10-30-mobile-write-acceptance.md)；不使用已关闭的模型/来源额度。用户随后明确暂不验证通知Provider，本轮不发送，不影响本组独立工作。
 
 - [x] G5PWA：Android现有路由原值保存；AC12/14。
   - 依赖/输入：本组明确授权、CI2及来源实源叶；当前修订173与冻结20条原值，下一修订174。
@@ -464,7 +464,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
   - 输入：原获批e3e9e872加8修改/7新增路径，冻结4533文件、53361886字节；指纹`b4422942150ac49dfe85eb3b75797d9b1f9b632ea3836fb6294ab88d4d52c484`，全量凭据扫描通过。手机/共享Schema/SDK/Native输入未变。
   - 依赖及边界：用户已批准该精确4533文件快照及限定CI修复；原树不提交，沿既有临时分支，不合并、不上传安装包或验收包，不重复模型、来源及六项业务写入。
   - 完成条件：冻结源码与提交绑定，quality、contracts、Android Native、iOS Native均有有效结果；原数据/WIP保护成立。旧CI2保持原快照的通过，新CI3未过前不关闭完整G6/G7及最终Review。
-  - 当前结果：获批4533文件与提交`4e4c8b4b`逐文件绑定通过，[CI3运行41081141441](https://github.com/yzin-17/thesis-ledger/actions/runs/41081141441)四项必需作业首次全部成功，桌面打包跳过、artifact为0，无额外CI修复。仅公开15条获批增量；三仓HEAD/空索引及隔离干净状态保持。其后5路径并发策略变化不属于该通过范围，完整G6/G7另待CI4；详见[CI3接续](../../tasks/evidence/web-mobile-parity/2026-10-30-ci3-current-inputs.md)。
+  - 当前结果：获批4533文件与提交`4e4c8b4b`逐文件绑定通过，[CI3运行41081141441](https://github.com/yzin-17/thesis-ledger/actions/runs/41081141441)四项必需作业首次全部成功，桌面打包跳过、artifact为0，无额外CI修复。仅公开15条获批增量；三仓HEAD/空索引及隔离干净状态保持。其后5路径并发策略变化不属于该通过范围，完整G6/G7另待CI4；详见[CI3接续](../../evidence/web-mobile-parity/2026-10-30-ci3-current-inputs.md)。
 
 ### 策略并发增量的CI接续
 
@@ -472,7 +472,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
   - 输入：CI3冻结输入加3修改/2新增路径，共4535文件、53369601字节；指纹`1d8e6e10491d75aef8d7623098637790d7c885f01e9f3321e70f4f633bee4170`，全量凭据扫描通过。手机、共享Schema/SDK及Native输入未变。
   - 依赖及边界：用户已批准这份精确4535文件快照的公开推送及限定必要CI修复。原树不暂存/提交，不合并，不上传安装包或验收包，不重复模型/来源及六项业务写入；并发策略业务与部署仍由原Task负责。
   - 完成条件：精确冻结输入与提交绑定，四项必需CI有效通过；目标构建与动作证据适用性分别核对，无未解释的功能输入漂移，数据及WIP保护成立。
-  - 当前结果：`cb17dd50`/Git树d2ff2bb0…与获批4535文件逐文件绑定通过；[CI4运行41110270736](https://github.com/yzin-17/thesis-ledger/actions/runs/41110270736)四项必需作业首次全部成功、无额外修复，桌面打包跳过、artifact为0。三策略模块匹配两角色目标，三仓HEAD/空索引与隔离干净状态保持；后续9路径明确归CI5，不扩张本叶。见[CI4证据](../../tasks/evidence/web-mobile-parity/2026-10-30-ci4-current-inputs.md)。
+  - 当前结果：`cb17dd50`/Git树d2ff2bb0…与获批4535文件逐文件绑定通过；[CI4运行41110270736](https://github.com/yzin-17/thesis-ledger/actions/runs/41110270736)四项必需作业首次全部成功、无额外修复，桌面打包跳过、artifact为0。三策略模块匹配两角色目标，三仓HEAD/空索引与隔离干净状态保持；后续9路径明确归CI5，不扩张本叶。见[CI4证据](../../evidence/web-mobile-parity/2026-10-30-ci4-current-inputs.md)。
 
 ### AI保存与策略费用并发增量的CI接续
 
@@ -480,7 +480,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
   - 输入：CI4加5修改/4新增，共4539文件、53390846字节，指纹`614849c94278eb26e912e4583c369179961c28f32cecbffa60dfc5b8cb7bd8c7`；全量凭据扫描、13项定向测试通过。手机/共享Schema/SDK/Native未变，五个运行模块已由原Task同步。
   - 边界：用户已批准这份精确4539文件快照及限定必要CI修复，已沿原临时分支公开。原树不暂存/提交、不合并、不上传安装包或验收包，旧模型/来源/六项业务写入额度不恢复。
   - 完成条件：精确冻结输入、公开提交、四项CI与目标适用性分别成立，完整功能输入无未解释漂移，数据/WIP保护成立。
-  - 当前结果：2c64d888/公开树ab936392…与获批4539文件精确绑定；[CI5运行41160876169](https://github.com/yzin-17/thesis-ledger/actions/runs/41160876169)四项必需作业首次成功，桌面打包跳过、artifact为0，无追加修复或重跑。五模块及此前三策略模块匹配两角色目标，三仓HEAD/空索引及隔离干净状态保持；后续4条风险约束另待CI6。见[CI5证据](../../tasks/evidence/web-mobile-parity/2026-10-31-ci5-current-inputs.md)。
+  - 当前结果：2c64d888/公开树ab936392…与获批4539文件精确绑定；[CI5运行41160876169](https://github.com/yzin-17/thesis-ledger/actions/runs/41160876169)四项必需作业首次成功，桌面打包跳过、artifact为0，无追加修复或重跑。五模块及此前三策略模块匹配两角色目标，三仓HEAD/空索引及隔离干净状态保持；后续4条风险约束另待CI6。见[CI5证据](../../evidence/web-mobile-parity/2026-10-31-ci5-current-inputs.md)。
 
 ### 风险账户约束并发增量的CI接续
 
@@ -492,7 +492,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 ### 真实手动执行与历史消费
 
-2026-10-26 剩余门禁再核对：使用已审阅的纯读取 API 和共享 SDK/TanStack Query 更新外部条件，避开会自动重试策略的 `GET policy` 及会过期化现有会话的 `GET OAuth current/get`。真实目录已 ready，可独立补齐两平台对现有目录的读取；不启动同步、确认标的、模型/来源探测、OAuth 会话或通知。详细阻塞、材料和接续顺序见[逐项核对](../../tasks/evidence/web-mobile-parity/2026-10-26-remaining-gates.md)。
+2026-10-26 剩余门禁再核对：使用已审阅的纯读取 API 和共享 SDK/TanStack Query 更新外部条件，避开会自动重试策略的 `GET policy` 及会过期化现有会话的 `GET OAuth current/get`。真实目录已 ready，可独立补齐两平台对现有目录的读取；不启动同步、确认标的、模型/来源探测、OAuth 会话或通知。详细阻塞、材料和接续顺序见[逐项核对](../../evidence/web-mobile-parity/2026-10-26-remaining-gates.md)。
 
 原 Scheduler 缺口先尝试复用已发生的运行：公开历史不携带 trigger，允许对已确认的目标 PostgreSQL 用 `default_transaction_read_only=on`、`BEGIN READ ONLY` 联查 `AutomationRunLease/AutomationRun/AutomationJob` 的身份、领取和终态元数据，不读取业务输出或凭证，不锁行、不写库、不改变任务。只有原始 scheduled 事实、目标运行态及双端同 ID 消费都对齐时，才核销相应子断言；否则继续保留原缺口，不为取证新建或启用任务。
 
@@ -501,7 +501,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 - [x] G5SA：独立单次真实调度与 Android 历史消费；AC12/14。
   - 状态机/执行面：新 UUID 任务先停用创建，独立日期 cron 自然调度一次后停用；若返回不确定，按同一 UUID/历史找回，不再创建或手动执行。记录 trigger=scheduled、scheduledAt、executionAttempt=1、成功终态、租约释放与仅 1 条历史。
   - 消费面/保护：Android 独立读取同一任务/run ID 和已停用状态；原任务配置摘要保持，原 API/模式保持；无模型/来源请求，无本任务通知。
-  - 当前结果：独立任务 `bae2b62e…` 在北京时间 02:53 自然触发，唯一 run `c0da3b3d…` succeeded，scheduled/领取一次/租约释放与通知 0 只读核对通过，任务已停用。Android 独立停用/历史及 API/模式核对通过；原六任务配置摘要不变，见[本轮记录](../../tasks/evidence/web-mobile-parity/2026-10-26-scheduler-acceptance.md)。
+  - 当前结果：独立任务 `bae2b62e…` 在北京时间 02:53 自然触发，唯一 run `c0da3b3d…` succeeded，scheduled/领取一次/租约释放与通知 0 只读核对通过，任务已停用。Android 独立停用/历史及 API/模式核对通过；原六任务配置摘要不变，见[本轮记录](../../evidence/web-mobile-parity/2026-10-26-scheduler-acceptance.md)。
 - [x] G5SI：同一单次调度的 iPhone Air 独立消费；AC12/14。
   - 依赖/完成条件同 G5SA 的服务端事实；Air 安装指纹、API/模式及原生读取独立记录，既有 iPhone 17 Pro 结果不代收本叶。只核销 Scheduler，其他外部条件及完整 G5/G6/G7 保留。
   - 当前结果：新装 Air 的 59 文件与已验 Simulator Debug 一致；修正本机开发脚本连接后 XCUITest 独立读取同一任务/run ID、唯一成功与停用，API/actual 模式保持。初始运行失败及全局调试键清理均保留；不是 App 新编译回执，Native CI 按未变输入复用。
@@ -535,7 +535,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
   - 输入：本轮修复及旧feea66c1之后的现有研究/共享合同增量；本机待审快照、完整路径/指纹与凭据规则扫描已准备。
   - 写集：本机隔离源码副本及获准后的专属临时分支；原树不暂存/提交，不上传数据库、安装包或验收包。
   - 完成条件：用户对精确新快照的公开推送及限定必要修复明确授权后，quality、contracts、Android Native、iOS Native全部成功；保持选定工作流的桌面打包/上传边界。
-  - 当前结果：获准的4526文件/指纹2821a276…已按清单绑定并发布e3e9e872；[CI 41007478526](https://github.com/yzin-17/thesis-ledger/actions/runs/41007478526)四项首次全部成功。仅追加本临时分支的push触发，job和上传条件不变；桌面打包跳过、artifact为0。当前功能输入与获批快照一致，仅中文文档存在后续差异；三仓HEAD/索引保留，原树未提交、分支未合并。完整结果与工作区保留说明见[CI证据](../../tasks/evidence/web-mobile-parity/2026-10-30-current-source-ci.md)。
+  - 当前结果：获准的4526文件/指纹2821a276…已按清单绑定并发布e3e9e872；[CI 41007478526](https://github.com/yzin-17/thesis-ledger/actions/runs/41007478526)四项首次全部成功。仅追加本临时分支的push触发，job和上传条件不变；桌面打包跳过、artifact为0。当前功能输入与获批快照一致，仅中文文档存在后续差异；三仓HEAD/索引保留，原树未提交、分支未合并。完整结果与工作区保留说明见[CI证据](../../evidence/web-mobile-parity/2026-10-30-current-source-ci.md)。
 
 ### G6 可独立执行的预检
 
@@ -604,7 +604,7 @@ F06 当前容器的原生补验已通过：新 Android APK 与设备实际安装
 
 ## 最终一致性 Review
 
-以下针对当前约定迁移范围，七项均已核对通过。[最终一致性审查](../../reviews/2026-10-30-web-mobile-parity-final-review.md)记录各AC、有效输入、独立平台证据及未验后续范围。
+以下针对当前约定迁移范围，七项均已核对通过。[最终一致性审查](../reviews/2026-10-30-web-mobile-parity-final-review.md)记录各AC、有效输入、独立平台证据及未验后续范围。
 
 - [x] 全部 AC 及逐动作断言均有实现、Web 回归和对应平台证据。
 - [x] 所有已勾选叶满足自身完成条件，证据适用于同一稳定输入；无关 WIP 与用户数据保留。

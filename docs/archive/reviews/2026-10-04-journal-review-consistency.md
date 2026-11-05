@@ -5,7 +5,7 @@
 
 本文件保留 2026-10-04 的历史基线；后续实现、验证和用户调整后的本轮验收范围以[2026-10-05 对账](2026-10-05-journal-review-completion.md)及[当前收口任务](../tasks/2026-10-05-journal-review-completion.md)为准。下文历史待办不作为当前额外验收门槛。
 
-基线为[原 Spec 的 AC1～AC16](../../specs/2026-08-28-journal-review-trade-projection.md)，任务由[原 Task](../tasks/2026-08-28-journal-review-trade-projection.md)统筹，[当前子任务](../tasks/2026-10-04-journal-review-contracts.md)记录实施阶段，[证据](../../tasks/evidence/2026-10-04-journal-review-contracts.md)记录各次输入和结果。
+基线为[原 Spec 的 AC1～AC16](../../specs/2026-08-28-journal-review-trade-projection.md)，任务由[原 Task](../tasks/2026-08-28-journal-review-trade-projection.md)统筹，[当前子任务](../tasks/2026-10-04-journal-review-contracts.md)记录实施阶段，[证据](../../evidence/2026-10-04-journal-review-contracts.md)记录各次输入和结果。
 
 ## 2026-10-04 历史结论
 

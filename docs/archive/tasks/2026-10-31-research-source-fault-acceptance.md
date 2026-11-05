@@ -6,7 +6,7 @@
 
 用户已明确授权单源续验和Cloudflare零费用调用，不再等待原问题回复。目标默认/路由/凭据/Provider配置保持；使用实际Server编译模块的专属HTTP及隔离数据库。预算为1次业务模型、0付费、前置实读1页10条、两个消费样本各1页10条，无重试/回退。原成功研究、恢复、SDK G1及T19不重做。
 
-执行包由`.recovery-artifacts/research-source-fault-current.json`指向。RF0～RF5全部通过；准入4→5、生效窗口为北京时间2026-10-31 11:13:51～12:13:51。live-01的两个实源场景一次通过，真实Cloudflare请求1次、费用估算0 USD，所属资源已清理。[完整证据](../../tasks/evidence/2026-10-31-research-source-fault-acceptance.md)。
+执行包由`.recovery-artifacts/research-source-fault-current.json`指向。RF0～RF5全部通过；准入4→5、生效窗口为北京时间2026-10-31 11:13:51～12:13:51。live-01的两个实源场景一次通过，真实Cloudflare请求1次、费用估算0 USD，所属资源已清理。[完整证据](../../evidence/2026-10-31-research-source-fault-acceptance.md)。
 
 ## RF0：维护入口与局部边界
 

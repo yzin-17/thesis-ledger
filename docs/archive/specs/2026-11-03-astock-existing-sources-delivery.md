@@ -43,4 +43,4 @@
 
 ## 未决问题
 
-无未决问题。原七组经来源核对、合格实现及真实消费后结案，交付 29 类；其余独立范围按用户条件取消，未转回 TODO。最终范围、失败与验证见[交付复核](../reviews/2026-11-03-market-reference-delivery.md)及[验收证据](../../tasks/evidence/2026-11-03-astock-existing-sources-delivery.md)。本规格保留当时条件交付与保护决定，不作为后续新增能力的自动授权。
+无未决问题。原七组经来源核对、合格实现及真实消费后结案，交付 29 类；其余独立范围按用户条件取消，未转回 TODO。最终范围、失败与验证见[交付复核](../reviews/2026-11-03-market-reference-delivery.md)及[验收证据](../../evidence/2026-11-03-astock-existing-sources-delivery.md)。本规格保留当时条件交付与保护决定，不作为后续新增能力的自动授权。

@@ -1,10 +1,10 @@
 # 策略驱动风险规则与 AI 多模型优化实施任务
 
 <a id="priority"></a>
-> 完成检查点（2026-10-31）：**T19及本Task现行范围通过最终一致性评审**。现有Cloudflare新授权按费用上限0执行，真实探索、六次回测、封存揭示、首次正式V2定义采纳及风险预览完成；旧冻结账本和失败原记录保持。适用指标前置复用已完成的[P0修复](../../tasks/README.md#priority-p0)，PARITY/T17/T18未变输入证据复用。[完整接续证据](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md)。
+> 完成检查点（2026-10-31）：**T19及本Task现行范围通过最终一致性评审**。现有Cloudflare新授权按费用上限0执行，真实探索、六次回测、封存揭示、首次正式V2定义采纳及风险预览完成；旧冻结账本和失败原记录保持。适用指标前置复用已完成的[P0修复](../../tasks/README.md#priority-p0)，PARITY/T17/T18未变输入证据复用。[完整接续证据](../../evidence/2026-10-31-cloudflare-first-four-continuation.md)。
 > [全局优先级与接续规则](../../tasks/README.md#priority-policy)。沿用原任务编号和验收条件，仅按匹配证据更新叶状态，不扩大各次授权。
 
-> 当前入口收敛（2026-10-17）：T00–T16 的实现与既有证据已收口；T17/T18 的本地实现及后继数据库证据保留。策略编辑、两版追溯、配置、结果与正向启动已补验；修复比例单位缺失及提交后切页时点，见[当前运行态证据](../../tasks/evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)。当前仅继续 T19 的真实探索业务闭环。
+> 当前入口收敛（2026-10-17）：T00–T16 的实现与既有证据已收口；T17/T18 的本地实现及后继数据库证据保留。策略编辑、两版追溯、配置、结果与正向启动已补验；修复比例单位缺失及提交后切页时点，见[当前运行态证据](../../evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)。当前仅继续 T19 的真实探索业务闭环。
 >
 > 现行合同：[Spec](../../specs/2026-09-09-strategy-risk-ai-optimization.md)。原步骤、测试矩阵、AC 追踪与 PR #35～38 记录保留在[历史实施记录](2026-09-09-strategy-risk-ai-optimization-history.md)，旧日期的未完成描述保留为历史；当前未通过条件以本页 T19 和承接验收为准。
 
@@ -42,14 +42,14 @@ Canonical U02 的 Run 过滤与旧结果拒绝不能代替新增策略应用事�
 
 ### T19：探索闭环与目标运行态验收
 
-- [x] T19 真实探索到首次采纳的闭环：原OpenRouter/free探索保持停止，Cloudflare新样本完成合法DTO、真实六次回测、封存揭示、首个正式version=1/schemaVersion=2及确定性风险预览。首例资格失败及资料未就绪终态保持；实际持仓缺失如实展示。保护及目标Web通过。[原结果与停止条件](../../tasks/evidence/2026-10-31-optimization-g1-and-cost.md)及[当前完整证据](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md)。
+- [x] T19 真实探索到首次采纳的闭环：原OpenRouter/free探索保持停止，Cloudflare新样本完成合法DTO、真实六次回测、封存揭示、首个正式version=1/schemaVersion=2及确定性风险预览。首例资格失败及资料未就绪终态保持；实际持仓缺失如实展示。保护及目标Web通过。[原结果与停止条件](../../evidence/2026-10-31-optimization-g1-and-cost.md)及[当前完整证据](../../evidence/2026-10-31-cloudflare-first-four-continuation.md)。
 
 - [x] **T19.CLOUDFLARE-QUALIFY：合法探索候选的开发与验证资格**
   - 来源：首例完整行情快照、MA30预热与来源质量均通过，但开发2025年3～4月无成交，夏普/交易指标不可用导致partial；验证段complete、1笔闭合交易。原实验终态no_valid_candidate和未曝光事实保持。
   - 最小后继样本：通过正常准备入口冻结600519.SH同一日线路由及显式归一化经济假设，开发2023-01-03～2024-06-28、验证2024-07-01～2025-06-30，测试仍2025-09-01～10-31。扩大观察窗不改变minClosedTrades=1或complete门禁，不声明严格PIT/统计独立，不读取测试指标。
   - 预算/停止：独立幂等、1轮、最多1次Qwen请求与6次回测、100000/8192输入输出Token、费用上限0；关闭自动重试/回退，异常保留本样本事实。先核对适用的指标修复与目标版本证据，源码不变则复用。
   - 完成条件：同一真实生成候选开发及验证均valid/complete，预算、冻结输入及原DTO可追溯，实验到awaiting_finalization；否则保持未通过。
-  - 结果：扩展首例因公告资料准备中在模型调用前停止，0次模型、原终态保留；现有准备入口确认34项资料ready后，新实验`5f1c7bae-dc55-4314-a6c4-3c6e8bd3a00b`运行1次Qwen、4次回测，候选`e71c6bdc-5527-4cae-9d7e-3fbbc53d6575`开发/验证均valid/complete、24/11笔闭合交易，进入awaiting_finalization且测试未揭示。后续只锁定该候选，余2次回测、0次模型。[证据](../../tasks/evidence/2026-10-31-cloudflare-first-four-continuation.md)。
+  - 结果：扩展首例因公告资料准备中在模型调用前停止，0次模型、原终态保留；现有准备入口确认34项资料ready后，新实验`5f1c7bae-dc55-4314-a6c4-3c6e8bd3a00b`运行1次Qwen、4次回测，候选`e71c6bdc-5527-4cae-9d7e-3fbbc53d6575`开发/验证均valid/complete、24/11笔闭合交易，进入awaiting_finalization且测试未揭示。后续只锁定该候选，余2次回测、0次模型。[证据](../../evidence/2026-10-31-cloudflare-first-four-continuation.md)。
 
 - [x] **T19.CLOUDFLARE-HOLDOUT：锁定新候选后揭示测试分区**
   - 启动依赖：SDK G1.CLOUDFLARE-DISCOVERY和T19.CLOUDFLARE-QUALIFY通过。选定候选后一次性锁定集合/预选候选，经公开finalize运行本实验剩余最多2次测试回测；新增模型0次。旧实验及测试揭示保持，测试结果不得回流生成。
@@ -76,7 +76,7 @@ Canonical U02 的 Run 过滤与旧结果拒绝不能代替新增策略应用事�
   - 输入/范围：复用现行 `600519.SH` 同花顺固定快照、显式归一化执行模型与 200 交易日预热预算；仅将新种子入场改为无持仓状态，离场、仓位、成本、执行与探索空间保持。旧种子、旧实验及单位转换门禁不改写。
   - 顺序：原失败与纯函数问题复现 → 正/反例定向与既有探索/采纳回归 → Server 类型/写集/边界 → 维护入口最小同步 → 新实验真实基线与后续 G1/T19 共用样本。
   - 预算：修复验证与同步零模型；实际业务继续使用本次免费 Provider 授权，单实验 1 轮、最多 1 次模型、6 次回测、费用上限 0。不得用本地通过关闭完整 T19。
-  - 结果：原失败先复现，正反例及既有回归 26 项、Server 类型/写集/边界和目标同步反读通过；新实验的开发/验证实际基线 complete、20/19 笔闭合交易、均 valid。本叶通过。随后模型单次 TLS 断连为 unknown_outcome，原事实和预留保持；真实合法候选与完整 T19 继续验收。[证据](../../tasks/evidence/2026-10-30-discovery-seed-coordinate.md)。
+  - 结果：原失败先复现，正反例及既有回归 26 项、Server 类型/写集/边界和目标同步反读通过；新实验的开发/验证实际基线 complete、20/19 笔闭合交易、均 valid。本叶通过。随后模型单次 TLS 断连为 unknown_outcome，原事实和预留保持；真实合法候选与完整 T19 继续验收。[证据](../../evidence/2026-10-30-discovery-seed-coordinate.md)。
 
 **依赖：**T17、T18。
 **覆盖验收：**AC36–AC40，并回归 AC13–AC24、AC31、AC32。
@@ -99,8 +99,8 @@ T17/T18 仅关闭自身本地与隔离里程碑；T19 仍按上述 AC 和全部�
 本节承接[原 Task](2026-09-08-strategy-lab-execution-parity.md)的 T-06 与完整验收对账；现行行为与断言仍按[原 Spec](../../specs/2026-09-08-strategy-lab-execution-parity.md)及其有效后继合同判断。原 T-01～T-05、T-07/T-08 的实现、单一路径和一年窗口证据保留，不重做旧实现，不恢复旧 V1 jobs API、客户端行情上传或旧握手。
 
 - [x] PARITY-T06：逐项核对原 AC-01～AC-13 与现行链路，并补齐原 AC-12 的浏览器覆盖。
-  - 10-16 结果：JSON 阻断/往返、真实两版创建与历史版编辑/配置、日期预设、已有真实结果、诊断和 1024px 布局通过；比例 0–1 标签/说明已修复，Desktop 843 项及类型、构建、定向检查通过。一次真实 prepare 在上游调用前因 `readyExecutionRouteTarget` 缺失阻断，未新建 Run；仅 AC-13 当前正向启动与提交后反馈保持未通过。逐项适用性和证据见[浏览器记录](../../tasks/evidence/2026-10-16-strategy-parity-browser.md)，不恢复旧 V1、trailing/ATR/risk sizing。
-  - 10-17 完成：自建 `600519.SH` 正式 v2 经现有 HiThink 主源准备、真实运行成功，Run `3f3691ae-a025-40a9-8cc6-4ad1ee96ca81`，原 54 份成功结果与原七表摘要不变。修复即时切页及创建失败后重读任务：暂停请求时弹窗关闭且路由为 `/strategy/jobs`，模拟 503 后显示失败并重新 GET 策略/任务，没有新增 Run。失败刷新断言先失败后通过；定向 30 项、Desktop 860 项、类型/构建、定向 ESLint 和边界检查通过，最终正式同步入口退出 0。真实成功与受控失败分别记录，详见[当前证据](../../tasks/evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)。旧港股窗口拒绝保留为历史，不再阻塞本节。
+  - 10-16 结果：JSON 阻断/往返、真实两版创建与历史版编辑/配置、日期预设、已有真实结果、诊断和 1024px 布局通过；比例 0–1 标签/说明已修复，Desktop 843 项及类型、构建、定向检查通过。一次真实 prepare 在上游调用前因 `readyExecutionRouteTarget` 缺失阻断，未新建 Run；仅 AC-13 当前正向启动与提交后反馈保持未通过。逐项适用性和证据见[浏览器记录](../../evidence/2026-10-16-strategy-parity-browser.md)，不恢复旧 V1、trailing/ATR/risk sizing。
+  - 10-17 完成：自建 `600519.SH` 正式 v2 经现有 HiThink 主源准备、真实运行成功，Run `3f3691ae-a025-40a9-8cc6-4ad1ee96ca81`，原 54 份成功结果与原七表摘要不变。修复即时切页及创建失败后重读任务：暂停请求时弹窗关闭且路由为 `/strategy/jobs`，模拟 503 后显示失败并重新 GET 策略/任务，没有新增 Run。失败刷新断言先失败后通过；定向 30 项、Desktop 860 项、类型/构建、定向 ESLint 和边界检查通过，最终正式同步入口退出 0。真实成功与受控失败分别记录，详见[当前证据](../../evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)。旧港股窗口拒绝保留为历史，不再阻塞本节。
   - 前置：使用当前 Canonical/正式 V2 策略和可合法复用的版本、快照及结果；原完成记录只证明各自日期和范围。T19 的外部模型条件不作为本节全部 UI 检查的统一前置。
   - 原 T-06 范围继续保留：相关测试/类型/lint/build/边界证据；本地页面的新建/编辑、历史版本、JSON 防丢失、任务配置、结果、1024px 布局；Console 错误/警告；实际结果与未覆盖边界记录。
   - 已有源码 CI 见[本次通过记录](https://github.com/yzin-17/thesis-ledger/actions/runs/38601670572)，仅覆盖 `main@da002744` 的源码输入；本轮未提交 docs 不宣称已被远端 CI 验证。涉及后续源码变化时再核对受影响检查。
@@ -108,11 +108,11 @@ T17/T18 仅关闭自身本地与隔离里程碑；T19 仍按上述 AC 和全部�
 
 | 原断言 | 当前承接与核对目的 |
 | --- | --- |
-| AC-01 | 旧 V1 客户端传行情/载荷已被 [Canonical](../../architecture/canonical-runtime.md)及[现行经济/冻结合同](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)取代；当前真实 Run 绑定 v2、请求区间与固定快照，执行/信号/基准均冻结实际 provenance。原基准缺失回归保留，不恢复旧路径。 |
+| AC-01 | 旧 V1 客户端传行情/载荷已被 [Canonical](../../design/canonical-runtime.md)及[现行经济/冻结合同](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)取代；当前真实 Run 绑定 v2、请求区间与固定快照，执行/信号/基准均冻结实际 provenance。原基准缺失回归保留，不恢复旧路径。 |
 | AC-02～04 | 原 Domain 行为证据保留；[正式 V2](../../specs/2026-08-28-unified-backtest-v2.md)现行固定止损、固定止盈、最长持有期及固定金额/权益比例适用。旧 trailing/ATR/risk sizing 已退役，属于被替代范围，不能按未实现重启。 |
-| AC-05～08 | [10-16 浏览器证据](../../tasks/evidence/2026-10-16-strategy-parity-browser.md#已通过的当前断言)：JSON 阻断与往返、真实两版创建/历史版编辑回测、固定金额/0–1 比例、默认一年及三个预设通过；旧 ATR 单位随能力退役。 |
+| AC-05～08 | [10-16 浏览器证据](../../evidence/2026-10-16-strategy-parity-browser.md#已通过的当前断言)：JSON 阻断与往返、真实两版创建/历史版编辑回测、固定金额/0–1 比例、默认一年及三个预设通过；旧 ATR 单位随能力退役。 |
 | AC-09～10 | 同一记录与[原完成证据](2026-09-08-strategy-lab-execution-parity.md)覆盖结果图表/诊断、标题/关闭、可访问名称、中文/空态/终态/未知状态和 1024px；当前成功结果也可读，无终态伪进度条。 |
 | AC-11～12 | 原 Domain/Server 与受影响检查复用未变输入；10-16 的实际编辑/配置/结果覆盖加上 10-17 的成功启动及受控失败完成 Web 矩阵。当前 Desktop 860 项及构建通过；不扩大为 Electron 全产品验收。 |
-| AC-13 | [10-17 证据](../../tasks/evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)：同步校验、即时关闭/切页、真实创建/完成、后台失败提示通过。旧 queue/run 双请求由现行 V3 创建与服务端 Worker 生命周期取代；持久化后的恢复见[Scheduler 进程验收](2026-09-05-automation-execution-lease-hardening.md)，不主动重试原有失败任务。 |
+| AC-13 | [10-17 证据](../../evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)：同步校验、即时关闭/切页、真实创建/完成、后台失败提示通过。旧 queue/run 双请求由现行 V3 创建与服务端 Worker 生命周期取代；持久化后的恢复见[Scheduler 进程验收](2026-09-05-automation-execution-lease-hardening.md)，不主动重试原有失败任务。 |
 
 原[验收标准](../../specs/2026-09-08-strategy-lab-execution-parity.md#验收标准)与[全部历史任务/证据](2026-09-08-strategy-lab-execution-parity.md)完整保留。本节已完成交接核对；T19的真实AI组合业务由本批独立目标证据关闭。

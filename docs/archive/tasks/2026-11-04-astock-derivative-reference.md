@@ -1,6 +1,6 @@
 # 衍生品与可转债资料实施任务
 
-对应[规格](../../specs/2026-11-04-astock-derivative-reference.md)。状态：已完成并归档。16 类来源、合同、正常 API、Desktop／Android／iPhone Air 模拟器、数据／配置保护及最终文档核对全部通过。[证据](../../tasks/evidence/2026-11-04-astock-derivative-reference.md)维护原件、尝试与分层验证。沿用当前三仓 checkout，保留先前 47 类交付与所有无关 WIP，不提交或推送。
+对应[规格](../../specs/2026-11-04-astock-derivative-reference.md)。状态：已完成并归档。16 类来源、合同、正常 API、Desktop／Android／iPhone Air 模拟器、数据／配置保护及最终文档核对全部通过。[证据](../../evidence/2026-11-04-astock-derivative-reference.md)维护原件、尝试与分层验证。沿用当前三仓 checkout，保留先前 47 类交付与所有无关 WIP，不提交或推送。
 
 ## 当前依赖与执行面
 
@@ -68,6 +68,6 @@ Q1～Q16 原件及语义均已核对，16 类产品合同与独立投影、异�
 
 ## 单一最终一致性复核
 
-本节为本轮唯一最终 Review 叶，覆盖 Q1～Q16、P0、C1／C2、U1／U2、I1 与 DSA／infra 子任务，不新增并行最终复核任务。逐项核对[来源复核](../../reviews/2026-11-04-astock-derivative-reference.md)、[当前指南](../../market-reference.md)、63 类跨语言目录、16×3 客户端矩阵、29 个正常 API、原 47 份复用回执与 40 次资格采证。来源身份、价格／数量单位、日期见证、三套会员、近月链、Greeks、连续线及可转债状态的边界均与实现和测试一致。
+本节为本轮唯一最终 Review 叶，覆盖 Q1～Q16、P0、C1／C2、U1／U2、I1 与 DSA／infra 子任务，不新增并行最终复核任务。逐项核对[来源复核](../reviews/2026-11-04-astock-derivative-reference.md)、[当前指南](../../guides/market-reference.md)、63 类跨语言目录、16×3 客户端矩阵、29 个正常 API、原 47 份复用回执与 40 次资格采证。来源身份、价格／数量单位、日期见证、三套会员、近月链、Greeks、连续线及可转债状态的边界均与实现和测试一致。
 
 正式入口的 DSA 快更拒绝、无效 venv、AKShare 导入 Smoke 失败、前置兼容修复及最终完整镜像成功均保留。原 67 路由、Provider／准入、19 表原 38661 行、三仓 HEAD／索引与无关 WIP 保全；后台新增估值点按创建时间核对并保留，未据此改回旧整表行数。未将本轮消费冒称新应用 Native compile、实体设备或远端 CI。语法、秘密扫描、定向 diff 和移动后站内／跨仓链接检查为最后收口输入。

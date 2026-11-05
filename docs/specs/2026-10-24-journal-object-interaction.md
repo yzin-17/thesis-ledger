@@ -21,4 +21,4 @@
 
 ## 实施与证据
 
-[归档任务](../archive/tasks/2026-10-24-journal-object-interaction.md)、[复核记录](../reviews/2026-10-24-journal-object-interaction.md)。
+[归档任务](../archive/tasks/2026-10-24-journal-object-interaction.md)、[复核记录](../archive/reviews/2026-10-24-journal-object-interaction.md)。

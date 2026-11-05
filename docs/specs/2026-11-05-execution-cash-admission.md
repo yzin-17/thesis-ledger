@@ -21,4 +21,4 @@
 
 [实施任务](../archive/tasks/2026-11-05-execution-cash-admission.md)
 
-[验收记录](../reviews/2026-11-05-execution-cash-admission.md)
+[验收记录](../archive/reviews/2026-11-05-execution-cash-admission.md)

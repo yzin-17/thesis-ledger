@@ -11,7 +11,7 @@
 
 ## 现在做什么
 
-当前执行：按 [账号等级与本地权限保存规格](../specs/2026-10-09-unified-data-capability-adapter.md#account-access-persistence)完成下列独立阶段；[统一证据](evidence/2026-10-21-provider-account-level.md)记录命令、结果与限制。2026-10-22 已使用现有 Key 保存用户确认的120分，实际 daily 检查通过，其余五项零请求跳过，权限记录落盘；随后按用户授权启用，configVersion=3，实际页面仅显示当前可用的股票日线，原路由不变。未包含接口不强制验证；RQData TODO 维持。
+当前执行：按 [账号等级与本地权限保存规格](../specs/2026-10-09-unified-data-capability-adapter.md#account-access-persistence)完成下列独立阶段；[统一证据](../evidence/2026-10-21-provider-account-level.md)记录命令、结果与限制。2026-10-22 已使用现有 Key 保存用户确认的120分，实际 daily 检查通过，其余五项零请求跳过，权限记录落盘；随后按用户授权启用，configVersion=3，实际页面仅显示当前可用的股票日线，原路由不变。未包含接口不强制验证；RQData TODO 维持。
 
 | 阶段 | 状态与写入范围 | 完成条件与验证 |
 | --- | --- | --- |
@@ -42,7 +42,7 @@ Tushare 的真实正向条件仍阻止 K37 父项完成；RQData 已转为后续
 
 - [ ] H07-K37-event-batches：七事件实现/来源绑定及中央分派退役已齐；公告a-live、拆分d-live及普通研究新合同下的HiThink f-live、东财b正向层已过。Tushare e-live 仍受外部条件阻塞，父项保持开放；RQ c-live 已延期至 TODO，不记为验收通过。[东财证据](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-k37b-research-v2)。
   - 证据与原执行范围：[原§9.69](../archive/reviews/2026-10-11-unified-data-capability-source-evidence.md#record-9-69)。
-- [ ] H07-K37e-live：Tushare真实现金消费；用户已提供现有 `TUSHARE_API_KEY`。既有独立 `fund_div` 实际 HTTP200/40203 拒绝，同凭据 `daily` 单日成功，`fund_daily` 亦明确拒绝。权限依据和至少 400 积分门槛见 [现行 Spec](../specs/2026-10-09-unified-data-capability-adapter.md#source-scope-20261021)，实际权益变化及原准入条件具备后才接续。目标已加密配置并启用120分账号，daily检查通过，fund_div本轮跳过；未选路由且无现金合法准入，现金正向生产消费未过。[精确核查](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-20261012-exact-entitlement-audit)与[当前启用及页面证据](evidence/2026-10-21-provider-account-level.md#2026-10-22-启用与当前等级页面核对)。
+- [ ] H07-K37e-live：Tushare真实现金消费；用户已提供现有 `TUSHARE_API_KEY`。既有独立 `fund_div` 实际 HTTP200/40203 拒绝，同凭据 `daily` 单日成功，`fund_daily` 亦明确拒绝。权限依据和至少 400 积分门槛见 [现行 Spec](../specs/2026-10-09-unified-data-capability-adapter.md#source-scope-20261021)，实际权益变化及原准入条件具备后才接续。目标已加密配置并启用120分账号，daily检查通过，fund_div本轮跳过；未选路由且无现金合法准入，现金正向生产消费未过。[精确核查](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-20261012-exact-entitlement-audit)与[当前启用及页面证据](../evidence/2026-10-21-provider-account-level.md#2026-10-22-启用与当前等级页面核对)。
   - 证据与原执行范围：[原§9.73](../archive/reviews/2026-10-11-unified-data-capability-source-evidence.md#record-9-73)。
 
 ## 后续实施约束
@@ -67,7 +67,7 @@ AC01～AC20 与来源专属断言由现行 Spec 维护。过程、真实写集/�
 
 ## RouteTarget：现行路由接续验收
 
-[原 Task 与历史证据](../archive/tasks/2026-09-16-market-data-route-target-v2.md)的 T1～T3、旧 Docker 与当时冷主源结果保留。稳定路由合同以本主题 [Spec](../specs/2026-10-09-unified-data-capability-adapter.md)及 [Canonical](../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准；[旧 V2 Spec](../specs/2026-09-16-market-data-route-target-v2.md)保留断言追溯，不恢复默认主备或 handshake。
+[原 Task 与历史证据](../archive/tasks/2026-09-16-market-data-route-target-v2.md)的 T1～T3、旧 Docker 与当时冷主源结果保留。稳定路由合同以本主题 [Spec](../specs/2026-10-09-unified-data-capability-adapter.md)及 [Canonical](../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准；[旧 V2 Spec](../archive/specs/2026-09-16-market-data-route-target-v2.md)保留断言追溯，不恢复默认主备或 handshake。
 
 - [x] G1：真实 Provider 与目标级性能/运行态门禁
   - 覆盖验收标准：AC4、AC6、AC8
@@ -78,11 +78,11 @@ AC01～AC20 与来源专属断言由现行 Spec 维护。过程、真实写集/�
 
 Canonical E02/E04 和共同价格四条 Run/三口径已有路由、主备与 provenance 的接续证据。10-17 对当前选中绑定强制新鲜读取：`510300.SH` ETF/qfq/1d、`2024-07-15～19`、`refresh=true`，HTTP 200、5 个准确交易日、`servedFromCache=false`，HiThink / `fund-market-historical`、routeIndex 0、policy 154，耗时 370ms，满足该精确窗口主源 ≤5s。原始回执 `.recovery-artifacts/portfolio-pnl-2026-10-17/route-primary-fresh.json`；它不代表新建进程冷启动，也不替代其他绑定或失败回退。
 
-10-21 新进程主源冷态已补：同一精确 HiThink ETF/qfq/1d 五日窗口，正式鉴权 ASGI、首次 Runtime/适配器，整个专用进程 1537.267ms、请求 303.489ms，HTTP 200/五日完整/真实来源，原保护不变。[回执](evidence/2026-10-21-route-cold-primary.md)明确不启动额外后台生命周期、不代表正常服务完整停启，也不扩大至其他来源。
+10-21 新进程主源冷态已补：同一精确 HiThink ETF/qfq/1d 五日窗口，正式鉴权 ASGI、首次 Runtime/适配器，整个专用进程 1537.267ms、请求 303.489ms，HTTP 200/五日完整/真实来源，原保护不变。[回执](../evidence/2026-10-21-route-cold-primary.md)明确不启动额外后台生命周期、不代表正常服务完整停启，也不扩大至其他来源。
 
 10-17 时点剩余独立缺口是失败后成功备用 ≤10s 测量及其原 AC4/6/8 对应；两秒 Run 终态不等于请求延迟。当时维护入口的只读预案通过，ETF qfq 仅选 HiThink，腾讯候选就绪；用户选择“先保留该项未完成”，故未写临时 policy 或停用来源。该暂停记录保留为历史时点。AKShare/EastMoney 用户跳过保持有效，不要求启用、采购或强制恢复该分支。
 
-2026-10-21 用户明确恢复后，正式入口的 16 项定向验证、受控切源、恢复后主源重读与实际 Web/数据保护均通过。三次真实五日非缓存请求分别为 HiThink 401.508041ms、腾讯备用 453.987167ms、恢复后 HiThink 307.090791ms；备用为第二目标，满足 ≤10s，冷主源复用上段 1537.267ms。政策 164→165→166、HiThink 配置 7→8→9，原 16 条路由与启用状态恢复；15 账户/13 表/57 个 V3、草稿/资产摘要相等，模型计数全 0。G1 按当前适用范围关闭，[完整回执及 AC4/6/8 对应](evidence/2026-10-21-route-failover-acceptance.md)保留受控停用与真实网络超时的证据边界。主线程执行、只验 Web、真实模型暂停、DG3 TODO、截图暂缓保持；其余 H07 正向权限条件仍未通过。
+2026-10-21 用户明确恢复后，正式入口的 16 项定向验证、受控切源、恢复后主源重读与实际 Web/数据保护均通过。三次真实五日非缓存请求分别为 HiThink 401.508041ms、腾讯备用 453.987167ms、恢复后 HiThink 307.090791ms；备用为第二目标，满足 ≤10s，冷主源复用上段 1537.267ms。政策 164→165→166、HiThink 配置 7→8→9，原 16 条路由与启用状态恢复；15 账户/13 表/57 个 V3、草稿/资产摘要相等，模型计数全 0。G1 按当前适用范围关闭，[完整回执及 AC4/6/8 对应](../evidence/2026-10-21-route-failover-acceptance.md)保留受控停用与真实网络超时的证据边界。主线程执行、只验 Web、真实模型暂停、DG3 TODO、截图暂缓保持；其余 H07 正向权限条件仍未通过。
 
 <a id="market-consumer-acceptance"></a>
 
@@ -98,19 +98,19 @@ Canonical E02/E04 和共同价格四条 Run/三口径已有路由、主备与 pr
   - 验证方式：按验证阶梯匹配定向、包级、仓库与真实消费证据；需要目标更新时按 infra 规则选择最小适用入口，不因旧命令记录默认执行完整更新。
   - 10-17 当前执行叶已完成：Risk 最近收盘价格只取必要单日，最长持有期仍完整读取真实开仓窗口；修复实时读取的可得性上限和预览漏传持有周期需求。现有 `600000.SH` 已知上市事实/2026 日历/HiThink 主源真实消费通过，三条规则均正常求值。未启用规则、通知或故障切换；显式历史评价和自动扫描不因实时预览而放宽。正式快照冻结输入与幂等修复见 Portfolio R3.I1–I3。
 
-10-17 目标已通过官方完整更新恢复，随后 Web 跳转修复通过正式快更同步；当时政策 revision 154、`applied`、`effectiveStale=false`。10-20 获准临时基金 NAV 接口实读后恢复原全部绑定，现行政策 156、`applied`、`effectiveStale=false`，原 11 张业务保护表与 57 个 V3 结果未变；[本次接口证据](evidence/2026-10-20-fund-nav-source-acceptance.md)不关闭下列业务父门禁。按消费者保留以下边界，不重复适配器探针或已过业务：
+10-17 目标已通过官方完整更新恢复，随后 Web 跳转修复通过正式快更同步；当时政策 revision 154、`applied`、`effectiveStale=false`。10-20 获准临时基金 NAV 接口实读后恢复原全部绑定，现行政策 156、`applied`、`effectiveStale=false`，原 11 张业务保护表与 57 个 V3 结果未变；[本次接口证据](../evidence/2026-10-20-fund-nav-source-acceptance.md)不关闭下列业务父门禁。按消费者保留以下边界，不重复适配器探针或已过业务：
 
-10-21 接续：[基金正式校准/Web 日线](evidence/2026-10-21-fund-calibration-acceptance.md)与[真实披露/维护分钟/Web](evidence/2026-10-21-fund-disclosure-acceptance.md)已补齐当前精确基金/季度的消费；后续[复权分钟与误差](evidence/2026-10-21-fund-adjusted-returns.md)补齐当前算法口径，政策 162、`applied`、非 stale，原 16 条路由恢复。三项新专用基金账户结清停用、审计/修订/点位保留，原 13 张表/57 个 V3/旧点位保护通过。原严格收尾的正常目录刷新及验收脚本失败均保留独立复核，不冒称原执行一次无误。
+10-21 接续：[基金正式校准/Web 日线](../evidence/2026-10-21-fund-calibration-acceptance.md)与[真实披露/维护分钟/Web](../evidence/2026-10-21-fund-disclosure-acceptance.md)已补齐当前精确基金/季度的消费；后续[复权分钟与误差](../evidence/2026-10-21-fund-adjusted-returns.md)补齐当前算法口径，政策 162、`applied`、非 stale，原 16 条路由恢复。三项新专用基金账户结清停用、审计/修订/点位保留，原 13 张表/57 个 V3/旧点位保护通过。原严格收尾的正常目录刷新及验收脚本失败均保留独立复核，不冒称原执行一次无误。
 
 | 消费面      | 可复用的实际证据                                                                                                                                                                                                                                                                                                 | 仍未覆盖的条件                                                                                                                                                                                 |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backtest    | 自有 `600519.SH` V3 Run `3f3691ae-a025-40a9-8cc6-4ad1ee96ca81` 成功，执行/信号/基准均冻结 HiThink、policy 154；[回执与结果](evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)。                                                                                                                     | 该精确前复权固定序列窗口已过；不扩展为全部市场/来源或真实历史规则。其他绑定复用其现有证据。                                                                                                    |
-| Risk        | 自有 100 股持仓、平均成本 10，HiThink 不复权完整日线收盘 9.73；止损/止盈值 -0.027、持有周期 1，三条均 `not_triggered`，价格与可得时点均有值。单日与完整开仓窗口均选中，账户已清仓停用，见[当前回执](evidence/2026-10-17-ui-runtime-closeout.md#股票正式校准与-risk-正向消费)。                                   | 本例已覆盖 Reader 正向消费；未创建风险应用、启用规则、写事件或发通知，不充作这些独立业务验收，也不代表全部市场/来源或历史评价通过。                                                            |
-| Performance | [收益 G1](evidence/2026-10-17-portfolio-pnl-directory-consumers.md)含真实 FX、Trade Close Slice 和缺失降级；股票及[基金正式校准](evidence/2026-10-21-fund-calibration-acceptance.md)验证冻结输入、修订链及幂等；[基金披露和维护分钟](evidence/2026-10-21-fund-disclosure-acceptance.md)已有独立实源及 Web 证据。 | 当前精确基金/季度、qfq 与跨日误差通过；[原组合十九项 AC](evidence/2026-10-21-portfolio-final-acceptance.md)已对账归档。其他主题事实/日历条件继续由各自原任务承担，不扩大为全部基金或历史 PIT。 |
-| Portfolio   | 同一收益记录覆盖真实行情/FX、清仓现金态和降级；Safari 真实触屏、股票点位、基金日线及两个维护分钟均有对应证据。                                                                                                                                                                                                   | [组合原十九项 AC 最终对账](evidence/2026-10-21-portfolio-final-acceptance.md)已通过并归档；维护采样不冒称现场开市调度，其他主题的历史事实仍按原任务保留。                                      |
-| Automation  | Scheduler 真实进程、现金与受管快照证据复用；10-21 正常受管正式校准实际处理唯一自有基金估算，succeeded/attempt1、释放租约、真实 NAV、冻结输入及 Web 扫描1/正式化1/待补齐0通过。[回执](evidence/2026-10-21-automation-market-consumer.md)。                                                                        | 本项真实行情/正式快照组合已补；外部通知、现场开市采样和其他来源性能仍由各自原门禁持有。                                                                                                        |
+| Backtest    | 自有 `600519.SH` V3 Run `3f3691ae-a025-40a9-8cc6-4ad1ee96ca81` 成功，执行/信号/基准均冻结 HiThink、policy 154；[回执与结果](../evidence/2026-10-17-ui-runtime-closeout.md#策略启动与后台反馈)。                                                                                                                     | 该精确前复权固定序列窗口已过；不扩展为全部市场/来源或真实历史规则。其他绑定复用其现有证据。                                                                                                    |
+| Risk        | 自有 100 股持仓、平均成本 10，HiThink 不复权完整日线收盘 9.73；止损/止盈值 -0.027、持有周期 1，三条均 `not_triggered`，价格与可得时点均有值。单日与完整开仓窗口均选中，账户已清仓停用，见[当前回执](../evidence/2026-10-17-ui-runtime-closeout.md#股票正式校准与-risk-正向消费)。                                   | 本例已覆盖 Reader 正向消费；未创建风险应用、启用规则、写事件或发通知，不充作这些独立业务验收，也不代表全部市场/来源或历史评价通过。                                                            |
+| Performance | [收益 G1](../evidence/2026-10-17-portfolio-pnl-directory-consumers.md)含真实 FX、Trade Close Slice 和缺失降级；股票及[基金正式校准](../evidence/2026-10-21-fund-calibration-acceptance.md)验证冻结输入、修订链及幂等；[基金披露和维护分钟](../evidence/2026-10-21-fund-disclosure-acceptance.md)已有独立实源及 Web 证据。 | 当前精确基金/季度、qfq 与跨日误差通过；[原组合十九项 AC](../evidence/2026-10-21-portfolio-final-acceptance.md)已对账归档。其他主题事实/日历条件继续由各自原任务承担，不扩大为全部基金或历史 PIT。 |
+| Portfolio   | 同一收益记录覆盖真实行情/FX、清仓现金态和降级；Safari 真实触屏、股票点位、基金日线及两个维护分钟均有对应证据。                                                                                                                                                                                                   | [组合原十九项 AC 最终对账](../evidence/2026-10-21-portfolio-final-acceptance.md)已通过并归档；维护采样不冒称现场开市调度，其他主题的历史事实仍按原任务保留。                                      |
+| Automation  | Scheduler 真实进程、现金与受管快照证据复用；10-21 正常受管正式校准实际处理唯一自有基金估算，succeeded/attempt1、释放租约、真实 NAV、冻结输入及 Web 扫描1/正式化1/待补齐0通过。[回执](../evidence/2026-10-21-automation-market-consumer.md)。                                                                        | 本项真实行情/正式快照组合已补；外部通知、现场开市采样和其他来源性能仍由各自原门禁持有。                                                                                                        |
 
-10-21 共同 G1 收口：五类消费面的真实链均有逐项证据，当前两个容器的全部 Server 649 个及 Schema 164 个 JavaScript 产物与本地一致，边界门禁通过。自有新账户归零停用，原十二账户和业务保护保持，政策 164 恢复原十六条路由；[完整回执](evidence/2026-10-21-automation-market-consumer.md)。本门禁关闭不关闭上方 RouteTarget 的失败备用/冷态范围，也不关闭其他产品独有条件。
+10-21 共同 G1 收口：五类消费面的真实链均有逐项证据，当前两个容器的全部 Server 649 个及 Schema 164 个 JavaScript 产物与本地一致，边界门禁通过。自有新账户归零停用，原十二账户和业务保护保持，政策 164 恢复原十六条路由；[完整回执](../evidence/2026-10-21-automation-market-consumer.md)。本门禁关闭不关闭上方 RouteTarget 的失败备用/冷态范围，也不关闭其他产品独有条件。
 
 对应产品 Task 继续负责本产品独有条件，本节只维护共同消费门禁。没有把 RQ/Tushare 权限条件用作其他消费者统一前置，也没有因为端点成功或服务健康而批量关闭。
 

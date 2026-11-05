@@ -1,6 +1,6 @@
 # Android 与 iOS 手机端使用说明
 
-手机端使用“组合、账户、市场、研究、更多”五个入口，当前约定迁移范围已完成Android/iOS独立验收。操作方式见本文，分层证据与范围见[验收归档](../archive/tasks/2026-10-22-web-mobile-feature-parity.md)和[最终审查](../reviews/2026-10-30-web-mobile-parity-final-review.md)；Longbridge与通知Provider实源留待后续验收。
+手机端使用“组合、账户、市场、研究、更多”五个入口，当前约定迁移范围已完成Android/iOS独立验收。操作方式见本文，分层证据与范围见[验收归档](../archive/tasks/2026-10-22-web-mobile-feature-parity.md)和[最终审查](../archive/reviews/2026-10-30-web-mobile-parity-final-review.md)；Longbridge与通知Provider实源留待后续验收。
 
 ## 连接服务与范围
 

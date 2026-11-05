@@ -2,7 +2,7 @@
 
 任务标识：`ui-consistency-and-interaction-recovery`  
 状态：2026-10-20 Web 实施与独立验收完成，Task 已归档；真实业务资格仍由原领域任务持有。  
-配套文档：[已完成 Task](../archive/tasks/2026-10-19-ui-consistency-and-interaction-recovery.md) · [最终验收 Review](../reviews/2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)
+配套文档：[已完成 Task](../archive/tasks/2026-10-19-ui-consistency-and-interaction-recovery.md) · [最终验收 Review](../archive/reviews/2026-10-19-ui-consistency-and-density-audit.md#web-recovery-20261020)
 
 ## 背景与问题
 

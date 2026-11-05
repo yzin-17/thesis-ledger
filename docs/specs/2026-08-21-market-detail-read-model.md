@@ -1,6 +1,6 @@
 # 持仓行情详情共享读模型与按能力加载优化规格
 
-> 现行合同（2026-10-16）：本规格维护详情的只读边界、分段状态与客户端交互。V3 数据来源与图表窗口分别由 [Canonical](../architecture/canonical-runtime.md)、[行情图表](2026-09-10-market-chart-indicator-integration.md)、[周期聚合](2026-09-16-market-chart-period-aggregation.md)和[富途分钟范围](2026-10-08-futu-openapi-full-integration.md)维护；原 V1 路径兼容和 90 根日线硬上限已被后继合同替代。
+> 现行合同（2026-10-16）：本规格维护详情的只读边界、分段状态与客户端交互。V3 数据来源与图表窗口分别由 [Canonical](../design/canonical-runtime.md)、[行情图表](2026-09-10-market-chart-indicator-integration.md)、[周期聚合](2026-09-16-market-chart-period-aggregation.md)和[富途分钟范围](2026-10-08-futu-openapi-full-integration.md)维护；原 V1 路径兼容和 90 根日线硬上限已被后继合同替代。
 
 ## 问题陈述
 

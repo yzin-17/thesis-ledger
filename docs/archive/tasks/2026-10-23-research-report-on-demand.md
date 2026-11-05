@@ -4,7 +4,7 @@
 > 状态：已完成，完整部署与目标验收通过，已归档
 > 优先级：P1
 > 规格：[长期按需读取](../../specs/2026-10-23-research-report-on-demand.md)
-> 证据：[验证与数据保护记录](../../tasks/evidence/2026-10-23-research-report-on-demand.md)
+> 证据：[验证与数据保护记录](../../evidence/2026-10-23-research-report-on-demand.md)
 
 ## 执行边界
 

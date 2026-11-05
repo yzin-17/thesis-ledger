@@ -1,6 +1,6 @@
 # V1 回测任务 BullMQ 生命周期 Spec
 
-2026-10-03 历史适用性对账：数据库事实源、durable owner、有限重试及 CAS 原则继续适用；旧 V1/V2 HTTP/执行路径已由[Canonical 架构](../architecture/canonical-runtime.md)替代。当时未覆盖的当前 Run 故障恢复、SSE/429 与 Electron 场景由原 T4 承接；该任务现已完成，见[归档任务](../archive/tasks/2026-09-09-backtest-bullmq-lifecycle.md)，不恢复退役接口。
+2026-10-03 历史适用性对账：数据库事实源、durable owner、有限重试及 CAS 原则继续适用；旧 V1/V2 HTTP/执行路径已由[Canonical 架构](../design/canonical-runtime.md)替代。当时未覆盖的当前 Run 故障恢复、SSE/429 与 Electron 场景由原 T4 承接；该任务现已完成，见[归档任务](../archive/tasks/2026-09-09-backtest-bullmq-lifecycle.md)，不恢复退役接口。
 
 2026-10-06 当前验收合同：公开读取/创建/运行/取消使用 `/api/v1/backtests/runs`，事件保持 `/api/v1/backtests/events`；下文旧 jobs 路径只属于历史契约。自动执行周期最多三个 durable attempts，运输记录重建不能刷新预算；用户显式 `/retry` 按当前冻结重试合同建立新周期，owner 继续单调增加。列表、分组列表与详情均使用 30 秒非终态事实源兜底；SSE 更新直接更新对应 Query 缓存，终态按需刷新已打开详情。HTTP 与 SSE 重连共享按源站和 HTTP 方法的 429 冷却，兼容 `Retry-After` 秒数及 HTTP 日期；冷却和流式读取均可取消。已取消终态显示“已取消”，只有运行中的取消请求显示“正在取消”。
 
@@ -223,7 +223,7 @@ API 与 Worker 不记录 bars、结果正文或敏感配置。
 
 ### 部署验证门禁
 
-目标 Compose 的“真实 claimed/running 后硬杀 Worker → 自动恢复 → durable ownerAttempt 递增 → 唯一终态”及客户端、基础生产配置门禁已完成，见[最终运行态证据](../tasks/evidence/2026-10-06-backtest-target-lifecycle.md)。后续修改仍须按实际输入复核部署及进程级恢复，不以单元测试替代真实运行态。
+目标 Compose 的“真实 claimed/running 后硬杀 Worker → 自动恢复 → durable ownerAttempt 递增 → 唯一终态”及客户端、基础生产配置门禁已完成，见[最终运行态证据](../evidence/2026-10-06-backtest-target-lifecycle.md)。后续修改仍须按实际输入复核部署及进程级恢复，不以单元测试替代真实运行态。
 
 ## 验收标准
 

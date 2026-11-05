@@ -1,6 +1,6 @@
 # 收益计算、再平衡与目标保存修复规格
 
-> 任务标识：`performance-correctness`；日期：2026-10-18；状态：本地计算、数据库竞争、实际 HTTP 及 PFCG 保留更新、目标运行和浏览器消费均通过。目标证据见[验收记录](../tasks/evidence/2026-10-19-p0-target-acceptance.md)。
+> 任务标识：`performance-correctness`；日期：2026-10-18；状态：本地计算、数据库竞争、实际 HTTP 及 PFCG 保留更新、目标运行和浏览器消费均通过。目标证据见[验收记录](../evidence/2026-10-19-p0-target-acceptance.md)。
 > [实施任务](../archive/tasks/2026-10-18-performance-correctness.md) · [全局优先级](../tasks/README.md#priority-p0) · [IR03～IR06 原始核查](../reviews/2026-10-18-starred-project-implementation-coverage.md#local-findings)。
 
 ## 1. 目标与现有边界
