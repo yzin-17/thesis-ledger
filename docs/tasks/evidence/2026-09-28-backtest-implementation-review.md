@@ -1,6 +1,6 @@
 # 回测接续实施集中 Review
 
-日期：2026-09-28。主记录为 [完整 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) 和 [主 Task](../2026-09-25-multi-source-adjustment-aware-backtest.md)；本文记录本批实际实施、集中 Review 与证据边界，不替代任务台账或 M3 能力目录。
+日期：2026-09-28。主记录为 [完整 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) 和 [主 Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)；本文记录本批实际实施、集中 Review 与证据边界，不替代任务台账或 M3 能力目录。
 
 ## 当前结论
 

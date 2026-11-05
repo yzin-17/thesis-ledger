@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
-import { marketProviderProbeRouteSchema } from '@thesis-ledger/schemas';
+import { marketProviderProbeRouteSchema, marketProviderAccountLevelSchema } from '@thesis-ledger/schemas';
 
 const envelope = {
   contractVersion: z.literal(3).optional(),
@@ -26,6 +26,7 @@ const test = z.strictObject({
   credentials: credentials.optional(),
   route: marketProviderProbeRouteSchema.optional(),
   purpose: z.enum(['capability_read', 'account_access']).optional(),
+  accountLevel: marketProviderAccountLevelSchema.optional(),
 });
 const remove = z.strictObject(envelope);
 

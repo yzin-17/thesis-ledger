@@ -28,7 +28,7 @@ Desktop 的 `apps/desktop/src/features/legacy-pages.tsx` 约 6210 行，集中�
 
 ## 现状与约束
 
-- `legacy-pages.tsx` 当前包含 `InstrumentCombobox`、`StrategyDashboard`、`AiChat`、`JournalDashboard`、`ProviderSettings`、`PerformanceDashboard`、`RiskCenter`、`ScreenshotImportReview`、`ImportReview`、`PortfolioDashboard`、`PortfolioManagement`、`FirstRunOnboarding` 和共享状态展示组件。
+- `legacy-pages.tsx` 当前包含 `InstrumentCombobox`、`StrategyDashboard`、`AiChat`、`JournalDashboard`、`ProviderSettings`、`PerformanceDashboard`、`RiskCenter`、`ImportReview`、`PortfolioDashboard`、`PortfolioManagement`、`FirstRunOnboarding` 和共享状态展示组件。
 - `portfolio.types.ts`、`portfolio.api.ts`、`portfolio.queries.ts` 与 `market-data` feature 已提供可复用模式，新增模块应遵守现有 `.js` 导入后缀、TanStack Query 和项目样式约定。
 - Query key 必须包含影响结果的模式、账户、页码、任务 ID、标的等参数；Mutation 成功后必须精确更新或失效相关 query。
 - 当前 RiskCenter 的规则删除、审计 Dialog 和成功后局部更新行为必须保留。
@@ -49,7 +49,7 @@ Desktop 的 `apps/desktop/src/features/legacy-pages.tsx` 约 6210 行，集中�
 ### 领域拆分
 
 - `portfolio`：组合、账户/持仓管理、标的选择器，复用并扩展现有 Portfolio 类型、API 和 Query。
-- `import`：手动/截图导入、导入 DTO/API/Query/Mutation 和旧路径重定向。
+- `import`：手动录入、导入 DTO/API/Query/Mutation 和旧路径重定向。
 - `onboarding`：首次运行 UI 及 Provider/Risk/Market Data 聚合状态 Query。
 - `providers`、`risk`、`performance`、`strategy`、`ai`、`journal`：各自维护 types、API、queries、mutations 和局部组件。
 - `market-detail`：保留 Dialog 编排器，拆出 Quote/Bars/Indicator/Chip/Fund NAV sections、状态标题、指标原语和 Query hook。

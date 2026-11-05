@@ -1,7 +1,15 @@
+import { aiRouteReasoningFields } from './ai-route-reasoning-options.js';
+import { buildAiProviderTestRuntime, type AiTestRuntimeInput } from './ai-provider-test-runtime.js';
+export type { AiTestRuntimeInput } from './ai-provider-test-runtime.js';
+import { modelRequestOptionsFields } from './ai-model-request-options.js';
 import { aiTestRuntimeFingerprint } from './ai-provider-test-fingerprint.js';
+import { aiProviderTestAuditDetails } from './ai-provider-test-audit.js';
+import {
+  aiProviderTestSuccessFacts,
+  aiProviderTestFailureFacts,
+} from './ai-provider-test-facts.js';
 import {
   BadRequestException,
-  BadGatewayException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -15,22 +23,16 @@ import { loadConfig } from '../platform/config.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { ProviderConfigService } from '../providers/provider-config.service.js';
 import { ProviderHealthService, type ProviderState } from '../providers/provider-health.service.js';
-import { AiProviderRegistry, routeSnapshotsFromProvider } from './provider-registry.js';
-import { createConfiguredAiProviders } from './provider-adapters.js';
+import { AiProviderRegistry } from './provider-registry.js';
 import { runProviderConnectionTest } from './provider-connection-test.js';
-import {
-  AiSdkGenerationAdapter,
-  AiSdkGenerationError,
-  type AiSdkGenerationResult,
-} from './ai-sdk-generation.adapter.js';
+import { probeTimeoutOverrides } from './ai-provider-probe-timeout.js';
+import { AiSdkGenerationAdapter, AiSdkGenerationError } from './ai-sdk-generation.adapter.js';
 import type { AiProvider } from './contracts.js';
 import {
   aiProviderInputSchema,
-  aiProviderModelCatalogInputSchema,
   errorCodeFor,
   sanitizeAiProviderError,
   type AiProviderInput,
-  type AiProviderModelReasoning,
   type AiProviderModelCatalogResult,
   type AiProviderSummary,
   type AiProviderTestKind,
@@ -41,28 +43,14 @@ import {
   type AiProviderLifecycleOptions,
   aiProviderTestInputSchema,
 } from './ai-provider.contracts.js';
-import { fetchAiProviderModelCatalog } from './ai-provider-model-catalog.js';
+import { queryAiProviderModels } from './ai-provider-model-catalog-query.js';
 import {
   aiProviderCapabilities,
-  aiProviderSummaryFromProvider,
   aiProviderSummaryFromRow,
   parseAiProviderSettings,
 } from './ai-provider-summary.js';
 import { evaluateAiProviderReadiness } from './ai-provider-readiness.js';
-import {
-  aiCostFactsSchema,
-  aiUpstreamSelectionSchema,
-  type AiAdapter,
-  type AiChatImplementation,
-  type AiCostFacts,
-  type AiUsageFacts,
-  type AiUpstreamFormat,
-  type AiGenerationMode,
-} from '@thesis-ledger/schemas';
-import {
-  runtimeAdapterForSelection,
-  type AiCompatibilityExtensionProfile,
-} from './ai-provider-upstream.js';
+import type { AiGenerationMode } from '@thesis-ledger/schemas';
 import {
   persistAiCapabilityRevocation,
   routeSnapshotsFromProviderRow,
@@ -70,7 +58,7 @@ import {
   type AiCapabilityRevocationInput,
 } from './ai-provider-readiness.persistence.js';
 import { createStoredAiProvider } from './ai-provider-runtime.js';
-import { generationPricingError, testPricingForModel } from './ai-provider-test-pricing.js';
+import { generationPricingError } from './ai-provider-test-pricing.js';
 import {
   withAiProviderConfigurationTransaction,
   mutateAiProviderLifecycle,
@@ -84,7 +72,10 @@ import type {
   AiRoutingSettingsUpdate,
 } from './ai-routing-settings.contracts.js';
 
-import { VALIDATION_DURATION_SECONDS, type VerifiedRoute } from './ai-provider-validation-policy.js';
+import {
+  VALIDATION_DURATION_SECONDS,
+  type VerifiedRoute,
+} from './ai-provider-validation-policy.js';
 
 export { aiProviderInputSchema, sanitizeAiProviderError } from './ai-provider.contracts.js';
 
@@ -102,47 +93,7 @@ interface DraftTest {
   expiresAt: number;
 }
 
-export interface AiTestRuntimeInput {
-  name: string;
-  requestId?: string;
-  baseUrl: string;
-  models: string[];
-  authMode: 'api_key' | 'none';
-  testModel?: string;
-  testKind: AiProviderTestKind;
-  purpose?: AiProviderTestPurpose;
-  mode?: AiGenerationMode;
-  budgetAuthorized?: boolean;
-  modelPricing?: Readonly<Record<string, AiTestModelPricing>>;
-  modelReasoning?: Record<string, AiProviderModelReasoning>;
-  credential: string;
-  enabled: boolean;
-  priority: number;
-  capabilities: string[];
-  timeoutMs?: number;
-  firstOutputTimeoutMs?: number;
-  outputIdleTimeoutMs?: number;
-  costPer1kInput?: number;
-  costPer1kOutput?: number;
-  costCurrency?: string;
-  pricingVersion?: string;
-  upstreamFormat: AiUpstreamFormat;
-  chatImplementation?: AiChatImplementation;
-  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
-  adapter: AiAdapter;
-  executionRoutes?: AiProviderExecutionRouteInput[];
-}
-
-
-type AiTestModelPricing = {
-  costPer1kInput?: number | undefined;
-  costPer1kOutput?: number | undefined;
-  costCurrency?: string | undefined;
-  pricingVersion?: string | undefined;
-};
-
 const DRAFT_TTL_MS = 5 * 60 * 1000;
-const DEFAULT_PROBE_TIMEOUT_MS = 30_000;
 /**
  * AI 链路判断「慢」的延迟阈值。`ProviderHealthService` 的默认 3 秒是为轻量连接测试定的，
  * 而一次成功的用途探针实测 43～103 秒（本地推理模型的思考 token 与正文共用输出预算）——
@@ -150,22 +101,6 @@ const DEFAULT_PROBE_TIMEOUT_MS = 30_000;
  * 这里按授权给验证的总时长判慢：跑超授权预算的请求根本不可能成功返回。
  */
 export const AI_GENERATION_SLOW_AFTER_MS = VALIDATION_DURATION_SECONDS * 1_000;
-
-const unknownTestUsage = (): AiUsageFacts => ({
-  status: 'unknown',
-  inputTokens: null,
-  outputTokens: null,
-});
-
-const unknownTestCost = (source: string | null = null): AiCostFacts => ({
-  status: 'unknown',
-  amount: null,
-  currency: null,
-  source,
-  pricingVersion: null,
-});
-
-const decimalTestCost = (value: number) => value.toFixed(8).replace(/\.?0+$/u, '') || '0';
 
 const configuredTimeout = () => {
   try {
@@ -199,18 +134,6 @@ export class AiProviderService implements OnModuleInit {
 
   async list(transaction?: Prisma.TransactionClient): Promise<AiProviderSummary[]> {
     const rows = await this.configs.listStored(transaction);
-    const environment = this.environmentProviders();
-    const databaseIds = new Set(rows.map((row) => row.name));
-    const disabled = new Set(rows.filter((row) => !row.enabled).map((row) => row.name));
-    const environmentSummaries = environment
-      .filter((provider) => !databaseIds.has(provider.id) && !disabled.has(provider.id))
-      .map((provider) => {
-        const summary = aiProviderSummaryFromProvider(provider);
-        const executionRoutes = routeSnapshotsFromProvider(provider).map((snapshot) =>
-          evaluateAiProviderReadiness(snapshot, { budgetAuthorized: false }),
-        );
-        return executionRoutes.length > 0 ? { ...summary, executionRoutes } : summary;
-      });
     const databaseSummaries = await Promise.all(
       rows.map(async (row) => {
         const settings = parseAiProviderSettings(row.settings);
@@ -227,7 +150,7 @@ export class AiProviderService implements OnModuleInit {
         return executionRoutes.length > 0 ? { ...summary, executionRoutes } : summary;
       }),
     );
-    return [...databaseSummaries, ...environmentSummaries].sort(
+    return databaseSummaries.sort(
       (left, right) => left.priority - right.priority || left.name.localeCompare(right.name),
     );
   }
@@ -256,8 +179,11 @@ export class AiProviderService implements OnModuleInit {
       if (input.researchDefault) {
         const candidate = (await this.list(transaction))
           .flatMap((provider) => this.researchCandidatesFromSummary(provider))
-          .find((item) => item.providerId === input.researchDefault?.providerId &&
-            item.model === input.researchDefault?.model);
+          .find(
+            (item) =>
+              item.providerId === input.researchDefault?.providerId &&
+              item.model === input.researchDefault?.model,
+          );
         if (!candidate) throw new BadRequestException('研究默认模型必须配置研究报告用途');
         if (!candidate.enabled) throw new BadRequestException('研究默认模型所属 Provider 已停用');
         if (candidate.health === 'down')
@@ -288,15 +214,6 @@ export class AiProviderService implements OnModuleInit {
       if (existingSettings?.modelPricing && input.modelPricing === undefined)
         throw new ConflictException('当前 Provider 含模型级价格，请使用新版完整配置后再保存');
     }
-    const environment = this.environmentProviders();
-    const hasInputCredential = Boolean(input.apiKey?.trim() || input.credentialsRef?.trim());
-    if (
-      !existing &&
-      environment.some((provider) => provider.id === input.name) &&
-      input.authMode === 'api_key' &&
-      !hasInputCredential
-    )
-      throw new BadRequestException('接管部署配置时必须重新输入 API Key');
     const runtimeInput = this.runtimeInput(input, existing, '');
     const draft = this.consumeDraft(
       input.connectionTestToken,
@@ -305,6 +222,8 @@ export class AiProviderService implements OnModuleInit {
       input.apiKey?.trim() || input.credentialsRef?.trim(),
     );
     const credential = input.apiKey?.trim() || input.credentialsRef?.trim() || draft?.credential;
+    if (!existing && input.authMode === 'api_key' && !credential && input.enabled !== false)
+      throw new BadRequestException('请填写 API Key');
     const persist = async (transaction?: Prisma.TransactionClient) => {
       await this.assertResearchDefaultPreserved(input, transaction);
       return this.configs.saveAi(
@@ -319,7 +238,9 @@ export class AiProviderService implements OnModuleInit {
             ...settingsFromAiProviderInput(input, existing?.settings),
             ...(verifiedRoutes === undefined ? {} : { generationValidation: verifiedRoutes }),
           },
-          ...(input.expectedRevision === undefined ? {} : { expectedRevision: input.expectedRevision }),
+          ...(input.expectedRevision === undefined
+            ? {}
+            : { expectedRevision: input.expectedRevision }),
         },
         transaction,
       );
@@ -414,46 +335,12 @@ export class AiProviderService implements OnModuleInit {
   }
 
   async models(rawInput: unknown): Promise<AiProviderModelCatalogResult> {
-    const input = aiProviderModelCatalogInputSchema.parse(rawInput);
-    const existing = input.name ? await this.configs.findStored(input.name) : undefined;
-    if (existing && existing.type !== 'ai')
-      throw new ConflictException('同名 Provider 已存在且不是 AI，不能读取其模型目录');
-    const suppliedCredential = input.apiKey?.trim() || input.credentialsRef?.trim();
-    const existingSettings = existing ? parseAiProviderSettings(existing.settings) : null;
-    if (existing && input.authMode === 'api_key' && !suppliedCredential) {
-      if (!existingSettings) throw new BadRequestException('保存的 AI Provider 配置无效');
-      const requestedBaseUrl = input.baseUrl.replace(/\/+$/u, '');
-      const savedBaseUrl = existingSettings.baseUrl.replace(/\/+$/u, '');
-      if (requestedBaseUrl !== savedBaseUrl)
-        throw new BadRequestException('Base URL 已变化，请输入 API Key 后重新获取模型目录');
-    }
-    const credential =
-      input.authMode === 'none'
-        ? ''
-        : suppliedCredential || (existing ? await this.configs.readCredential(existing) : '');
-    try {
-      const catalog = await fetchAiProviderModelCatalog(
-        input.baseUrl,
-        credential,
-        input.timeoutMs ?? configuredTimeout(),
-        input.upstreamFormat ?? existingSettings?.upstreamFormat ?? 'chat-completions',
-        input.authMode,
-      );
-      return { ...catalog, fetchedAt: new Date().toISOString() };
-    } catch (error) {
-      throw new BadGatewayException(
-        `获取 Provider 模型目录失败：${sanitizeAiProviderError(error, credential)}`,
-      );
-    }
+    return queryAiProviderModels(rawInput, this.configs);
   }
 
   async setEnabled(name: string, enabled: boolean, options: AiProviderLifecycleOptions = {}) {
     const config = await this.configs.findStored(name);
-    if (!config || config.type !== 'ai') {
-      if (this.environmentProviders().some((provider) => provider.id === name))
-        throw new ConflictException('部署配置不可启停，请先创建数据库配置接管');
-      throw new NotFoundException('AI Provider 配置不存在');
-    }
+    if (!config || config.type !== 'ai') throw new NotFoundException('AI Provider 配置不存在');
     if (options.expectedRevision && options.expectedRevision !== config.updatedAt.toISOString())
       throw new ConflictException('Provider 配置已变化，请刷新后重试');
     await this.mutateStoredProvider(name, { kind: 'set-enabled', enabled }, options);
@@ -463,11 +350,7 @@ export class AiProviderService implements OnModuleInit {
 
   async remove(name: string, options: AiProviderLifecycleOptions = {}) {
     const config = await this.configs.findStored(name);
-    if (!config || config.type !== 'ai') {
-      if (this.environmentProviders().some((provider) => provider.id === name))
-        throw new ConflictException('部署配置不可删除');
-      throw new NotFoundException('AI Provider 配置不存在');
-    }
+    if (!config || config.type !== 'ai') throw new NotFoundException('AI Provider 配置不存在');
     if (options.expectedRevision && options.expectedRevision !== config.updatedAt.toISOString())
       throw new ConflictException('Provider 配置已变化，请刷新后重试');
     await this.mutateStoredProvider(name, { kind: 'delete' }, options);
@@ -477,25 +360,14 @@ export class AiProviderService implements OnModuleInit {
 
   async refreshRegistry() {
     const rows = await this.configs.listStored();
-    const environment = this.environmentProviders();
-    const disabled = new Set(rows.filter((row) => !row.enabled).map((row) => row.name));
-    const databaseIds = new Set(rows.map((row) => row.name));
     const databaseProviders = await Promise.all(
       rows.map(async (row) => createStoredAiProvider(row, this.configs, configuredTimeout())),
     );
-    const next = [
-      ...databaseProviders.filter((provider): provider is AiProvider => provider !== null),
-      ...environment.filter(
-        (provider) => !databaseIds.has(provider.id) && !disabled.has(provider.id),
-      ),
-    ];
+    const next = databaseProviders.filter((provider): provider is AiProvider => provider !== null);
     const databaseRoutes = rows.flatMap((row) =>
       routeSnapshotsFromProviderRow(row, parseAiProviderSettings(row.settings), row.health),
     );
-    const environmentRoutes = next
-      .filter((provider) => provider.metadata?.source !== 'database')
-      .flatMap((provider) => routeSnapshotsFromProvider(provider));
-    this.registry.replace(next, [...databaseRoutes, ...environmentRoutes]);
+    this.registry.replace(next, databaseRoutes);
     return next;
   }
 
@@ -506,17 +378,6 @@ export class AiProviderService implements OnModuleInit {
       throw new InternalServerErrorException(
         `AI Provider Registry 刷新失败：${sanitizeAiProviderError(error)}`,
       );
-    }
-  }
-
-  private environmentProviders() {
-    try {
-      return createConfiguredAiProviders(loadConfig()).map((provider) => {
-        if (provider.metadata) provider.metadata.source = 'environment';
-        return provider;
-      });
-    } catch {
-      return [];
     }
   }
 
@@ -720,23 +581,18 @@ export class AiProviderService implements OnModuleInit {
         authMode: input.authMode,
         apiKey: input.credential,
         model,
-        timeoutMs: input.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
+        ...modelRequestOptionsFields(input.modelDefaults, model),
+        timeoutMs: input.timeoutMs,
         requestId,
         signal: controller.signal,
         ...(purpose === undefined ? {} : { purpose }),
+        ...(purposeRoute ? { contractRef: purposeRoute.contract } : {}),
         mode,
-        ...((purposeRoute?.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs)
-          ? {
-              firstOutputTimeoutMs:
-                purposeRoute?.firstOutputTimeoutMs ?? input.firstOutputTimeoutMs,
-            }
-          : {}),
-        ...((purposeRoute?.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs)
-          ? { outputIdleTimeoutMs: purposeRoute?.outputIdleTimeoutMs ?? input.outputIdleTimeoutMs }
-          : {}),
+        ...aiRouteReasoningFields(purposeRoute),
+        ...probeTimeoutOverrides(input, purposeRoute),
       });
       if (controller.signal.aborted) throw new Error('AI provider test cancelled');
-      const facts = this.testFacts(input, model, result);
+      const facts = aiProviderTestSuccessFacts(input, model, result);
       if (!persist) {
         const testToken = randomUUID();
         this.drafts.set(testToken, {
@@ -775,7 +631,7 @@ export class AiProviderService implements OnModuleInit {
         latencyMs,
         new Date(),
         undefined,
-        this.testRecordDetails(input, model, facts),
+        aiProviderTestAuditDetails(input, model, facts),
       );
       return {
         ...health,
@@ -793,8 +649,12 @@ export class AiProviderService implements OnModuleInit {
       };
     } catch (error) {
       const latencyMs = Date.now() - started;
-      const facts = this.testFailureFacts(error);
-      if (controller.signal.aborted) {
+      const facts = aiProviderTestFailureFacts(error);
+      if (
+        controller.signal.aborted &&
+        ((error instanceof AiSdkGenerationError && error.fact.code === 'cancelled') ||
+          error === controller.signal.reason)
+      ) {
         const message = '测试已取消；外部结果未知，未将费用或用量记为零';
         if (!persist)
           return {
@@ -816,7 +676,7 @@ export class AiProviderService implements OnModuleInit {
           input.name,
           latencyMs,
           new Date(),
-          this.testRecordDetails(input, model, facts, 'cancelled', 'cancelled'),
+          aiProviderTestAuditDetails(input, model, facts, 'cancelled', 'cancelled'),
         );
         return {
           ...health,
@@ -834,16 +694,9 @@ export class AiProviderService implements OnModuleInit {
           errorCode: 'cancelled',
         };
       }
-      // 探针自带 total 超时，适配器只能看到合并后的 signal，会把探针超时也归为 “cancelled”。
-      // 调用方没有取消时，这里必须把超时如实报成 provider_timeout，不能显示成用户取消。
-      const probeTimedOut =
-        error instanceof AiSdkGenerationError &&
-        error.fact.code === 'cancelled' &&
-        !controller.signal.aborted;
-      const errorCode = probeTimedOut ? 'provider_timeout' : errorCodeFor(error);
-      const message = probeTimedOut
-        ? `Provider 未在 ${input.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS} ms 内返回结果，已按超时中断`
-        : sanitizeAiProviderError(error, input.credential);
+      const errorCode =
+        error instanceof AiSdkGenerationError ? error.fact.code : errorCodeFor(error);
+      const message = sanitizeAiProviderError(error, input.credential);
       if (!persist)
         return {
           name: input.name,
@@ -866,7 +719,7 @@ export class AiProviderService implements OnModuleInit {
         latencyMs,
         new Date(),
         errorCode,
-        this.testRecordDetails(input, model, facts, errorCode),
+        aiProviderTestAuditDetails(input, model, facts, errorCode),
       );
       return {
         name: input.name,
@@ -993,130 +846,17 @@ export class AiProviderService implements OnModuleInit {
     mode?: AiGenerationMode,
     requestId?: string,
   ): AiTestRuntimeInput {
-    const selection = aiUpstreamSelectionSchema.parse({
-      upstreamFormat: input.upstreamFormat,
-      ...(input.chatImplementation === undefined
-        ? {}
-        : { chatImplementation: input.chatImplementation }),
-    });
-    const existingSettings = existing ? parseAiProviderSettings(existing.settings) : null;
-    const compatibilityExtensionProfile = existingSettings?.compatibilityExtensionProfile;
-    const adapter = runtimeAdapterForSelection(selection, compatibilityExtensionProfile);
-    return {
-      name: input.name,
-      ...(requestId === undefined ? {} : { requestId }),
-      baseUrl: input.baseUrl,
-      models: input.models,
-      authMode: input.authMode,
-      ...(testModel === undefined ? {} : { testModel }),
-      testKind,
-      ...(purpose === undefined ? {} : { purpose }),
-      ...(mode === undefined ? {} : { mode }),
-      ...(budgetAuthorized === undefined ? {} : { budgetAuthorized }),
-      ...(input.modelPricing === undefined ? {} : { modelPricing: input.modelPricing }),
-      ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
+    return buildAiProviderTestRuntime(
+      input,
+      existing,
       credential,
-      enabled: input.enabled ?? existing?.enabled ?? true,
-      priority: input.priority,
-      capabilities: input.capabilities ?? ['chat'],
-      ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
-      ...(input.firstOutputTimeoutMs === undefined
-        ? {}
-        : { firstOutputTimeoutMs: input.firstOutputTimeoutMs }),
-      ...(input.outputIdleTimeoutMs === undefined
-        ? {}
-        : { outputIdleTimeoutMs: input.outputIdleTimeoutMs }),
-      ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
-      ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
-      ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
-      upstreamFormat: selection.upstreamFormat,
-      ...(selection.upstreamFormat === 'chat-completions'
-        ? { chatImplementation: selection.chatImplementation }
-        : {}),
-      ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
-      adapter,
-      ...(input.executionRoutes === undefined ? {} : { executionRoutes: input.executionRoutes }),
-    };
-  }
-
-  private testFacts(
-    input: AiTestRuntimeInput,
-    model: string,
-    result: Pick<AiSdkGenerationResult<unknown>, 'usage' | 'providerCost' | 'providerCostCurrency'>,
-  ): { usage: AiUsageFacts; cost: AiCostFacts } {
-    const usage = result.usage ?? unknownTestUsage();
-    const pricing = testPricingForModel(input, model);
-    const providerCurrency = result.providerCostCurrency?.trim().toUpperCase();
-    if (typeof result.providerCost === 'string' && /^[A-Z]{3}$/u.test(providerCurrency ?? '')) {
-      const reported = aiCostFactsSchema.safeParse({
-        status: 'known',
-        amount: result.providerCost,
-        currency: providerCurrency,
-        source: 'provider_reported',
-        pricingVersion: pricing.pricingVersion ?? null,
-      });
-      if (reported.success) return { usage, cost: reported.data };
-    }
-    const currency = pricing.costCurrency?.trim().toUpperCase();
-    if (
-      usage.inputTokens === null ||
-      usage.outputTokens === null ||
-      pricing.costPer1kInput === undefined ||
-      pricing.costPer1kOutput === undefined ||
-      !/^[A-Z]{3}$/u.test(currency ?? '')
-    )
-      return { usage, cost: unknownTestCost() };
-    const estimated = aiCostFactsSchema.safeParse({
-      status: 'estimated',
-      amount: decimalTestCost(
-        (usage.inputTokens * pricing.costPer1kInput +
-          usage.outputTokens * pricing.costPer1kOutput) /
-          1_000,
-      ),
-      currency,
-      source: 'configured_model_pricing',
-      pricingVersion: pricing.pricingVersion ?? null,
-    });
-    return { usage, cost: estimated.success ? estimated.data : unknownTestCost() };
-  }
-
-  private testFailureFacts(error: unknown): { usage: AiUsageFacts; cost: AiCostFacts } {
-    return {
-      usage: error instanceof AiSdkGenerationError ? error.usage : unknownTestUsage(),
-      cost: unknownTestCost('provider_cost_unavailable'),
-    };
-  }
-
-  private testRecordDetails(
-    input: AiTestRuntimeInput,
-    model: string,
-    facts: { usage: AiUsageFacts; cost: AiCostFacts },
-    errorCode?: string,
-    status?: AiProviderTestStatus,
-  ): Prisma.InputJsonValue {
-    const route = input.executionRoutes?.find(
-      (candidate) =>
-        candidate.model === model && candidate.contract.id === (input.purpose ?? 'research'),
+      testModel,
+      testKind,
+      budgetAuthorized,
+      purpose,
+      mode,
+      requestId,
     );
-    return {
-      kind: 'ai_provider_test',
-      testKind: input.testKind,
-      model,
-      adapter: input.adapter,
-      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
-      ...(input.mode === undefined ? {} : { mode: input.mode }),
-      ...(route
-        ? {
-            mode: route.mode,
-            contract: route.contract,
-          }
-        : {}),
-      configurationFingerprint: aiTestRuntimeFingerprint(input),
-      usage: facts.usage,
-      cost: facts.cost,
-      ...(errorCode ? { errorCode } : {}),
-      ...(status ? { status } : {}),
-    };
   }
 
   private credentialHash(credential: string) {

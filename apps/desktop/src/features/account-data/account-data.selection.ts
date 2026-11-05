@@ -9,10 +9,8 @@ export const resolveAccountSelection = ({
   accountId: string;
   requestedAccountId: string;
 }) => {
-  if (requestedAccountId === 'all') return 'all';
   if (requestedAccountId && accounts.some((account) => account.id === requestedAccountId))
     return requestedAccountId;
-  if (accountId === 'all') return 'all';
   if (accountId && accounts.some((account) => account.id === accountId)) return accountId;
   return accounts[0]?.id ?? '';
 };

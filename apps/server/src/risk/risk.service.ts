@@ -5,6 +5,7 @@ import { PrismaService } from '../platform/prisma.service.js';
 import { MarketBarReader } from '../market/market-bar-reader.js';
 import { RiskContextService } from './risk-context.service.js';
 import { RiskEventService } from './risk-event.service.js';
+import { riskInputUnavailableReason } from './risk-input-availability.js';
 import {
   enqueueRiskNotificationIfNeeded,
   type RiskNotificationInput,
@@ -103,7 +104,10 @@ export class RiskService {
             await this.evaluateStrategyStoredRule(stored, evaluatedAt, scanId, traceId, results);
           continue;
         }
-        for (const { candidate, event } of this.evaluateStoredRule(stored, parsed)) {
+        const evaluated = this.evaluateStoredRule(stored, parsed, (reason, candidate) => {
+          results.push({ ruleId: stored.id, error: `${reason}；对象 ${candidate.symbol ?? candidate.accountId ?? '组合'}` });
+        });
+        for (const { candidate, event } of evaluated) {
           const outcome = await this.events.persist(stored, candidate, event, scanId, traceId);
           if (!outcome.eventId) continue;
           try {
@@ -246,10 +250,16 @@ export class RiskService {
     await enqueueRiskNotificationIfNeeded(this.notifications, input);
   }
 
-  private evaluateStoredRule(stored: StoredRule, scan: ParsedScan) {
+  private evaluateStoredRule(stored: StoredRule, scan: ParsedScan,
+    unavailable?: (reason: string, candidate: EvaluationCandidate) => void) {
     const rule = this.toRule(stored);
     return this.contexts
       .candidatesForRule(rule, scan)
+      .filter((candidate) => {
+        const reason = riskInputUnavailableReason(rule, candidate);
+        if (reason) unavailable?.(reason, candidate);
+        return reason === undefined;
+      })
       .filter((candidate) => !this.contexts.shouldSkipStaleRule(rule.kind, candidate, scan))
       .map((candidate) => ({ candidate, event: evaluateCompleteRule(rule, candidate.domain) }))
       .filter(

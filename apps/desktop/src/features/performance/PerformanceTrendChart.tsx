@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { money } from '../shared/display.js';
+import { performanceTrendGeometry } from './performance-trend-model.js';
+import { pnlReasonLabels, type PnlChartPoint } from './performance-pnl-model.js';
 import type {
   Currency,
   PerformanceSeriesInterval,
@@ -32,90 +34,79 @@ export const performanceSeriesQualityLabel = (quality: PerformanceSeriesPoint['d
 export function PerformanceTrendChart({
   seriesPoints,
   interval,
+  pnlPoints,
+  pnlCurrency = 'CNY',
 }: {
   seriesPoints: PerformanceSeriesPoint[];
   interval: PerformanceSeriesInterval;
+  pnlPoints?: PnlChartPoint[] | undefined;
+  pnlCurrency?: Currency | undefined;
 }) {
+  const container = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(720);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [tooltipX, setTooltipX] = useState(0);
-  useEffect(() => setActiveIndex(null), [seriesPoints]);
-  const values = seriesPoints.map((point) => point.value);
-  const width = 640;
-  const height = 220;
-  const padding = { top: 18, right: 18, bottom: 28, left: 18 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const valueRange = Math.max(maxValue - minValue, 1);
-  const times = seriesPoints.map((point) => new Date(point.at).getTime());
-  const minTime = Math.min(...times);
-  const maxTime = Math.max(...times);
-  const timeRange = Math.max(maxTime - minTime, 1);
-  const points = values.map((value, index) => {
-    let x = padding.left + (((times[index] ?? minTime) - minTime) / timeRange) * chartWidth;
-    if (seriesPoints.length === 1) x = padding.left + chartWidth / 2;
-    const y = padding.top + (1 - (value - minValue) / valueRange) * chartHeight;
-    return { x, y };
-  });
-  const pointsValue = points.map((point) => `${point.x},${point.y}`).join(' ');
-  const first = seriesPoints[0];
-  const last = seriesPoints.at(-1);
-  const activePoint = activeIndex === null ? undefined : points[activeIndex];
-  const activeValue = activeIndex === null ? undefined : seriesPoints[activeIndex];
-  const dense = interval === '1min' || interval === '1h';
-
-  const activatePoint = (index: number, target: SVGSVGElement) => {
-    const point = points[index];
-    const transform = target.getScreenCTM();
-    const bounds = target.parentElement?.getBoundingClientRect();
-    if (!point || !transform || !bounds) return;
-    const anchor = target.createSVGPoint();
-    anchor.x = point.x;
-    anchor.y = point.y;
-    setTooltipX(anchor.matrixTransform(transform).x - bounds.left);
-    setActiveIndex(index);
-  };
-
-  const activateNearest = (clientX: number, clientY: number, target: SVGSVGElement) => {
-    const transform = target.getScreenCTM();
-    if (!transform || points.length === 0) return;
-    const pointer = target.createSVGPoint();
-    pointer.x = clientX;
-    pointer.y = clientY;
-    const viewX = pointer.matrixTransform(transform.inverse()).x;
-    let nearest = 0;
-    let distance = Number.POSITIVE_INFINITY;
-    points.forEach((point, index) => {
-      const nextDistance = Math.abs(point.x - viewX);
-      if (nextDistance < distance) {
-        nearest = index;
-        distance = nextDistance;
-      }
+  useEffect(() => {
+    const element = container.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setWidth(Math.max(280, entry.contentRect.width));
     });
-    activatePoint(nearest, target);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => setActiveIndex(null), [seriesPoints, pnlPoints]);
+  const geometry = performanceTrendGeometry(seriesPoints, pnlPoints ?? [], width);
+  const active = activeIndex === null ? undefined : geometry.timeline[activeIndex];
+  const currency = seriesPoints[0]?.currency ?? pnlCurrency;
+  const combined = pnlPoints !== undefined;
+  const axisMoney = (value: number, unit: Currency) =>
+    new Intl.NumberFormat('zh-CN', {
+      style: 'currency',
+      currency: unit,
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(value);
+  const pickPoint = (clientX: number, svg: SVGSVGElement) => {
+    const bounds = svg.getBoundingClientRect();
+    if (!bounds.width || !geometry.timeline.length) return;
+    const x = ((clientX - bounds.left) / bounds.width) * width;
+    let nearest = 0;
+    geometry.timeline.forEach((point, index) => {
+      if (Math.abs(point.x - x) < Math.abs(geometry.timeline[nearest]!.x - x)) nearest = index;
+    });
+    setActiveIndex(nearest);
   };
-
   return (
-    <div className="relative rounded-lg bg-muted/30 px-3 py-3" aria-label="资产走势">
+    <div
+      ref={container}
+      className="relative min-w-0 rounded-lg bg-muted/30 p-3"
+      aria-label={combined ? '资产总值与累计盈亏走势' : '资产走势'}
+    >
+      <div className="mb-2 flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-2">
+          <span className="h-0.5 w-4 bg-chart-1" />
+          资产总值 · {currency} · 左轴
+        </span>
+        {combined && (
+          <span className="inline-flex items-center gap-2">
+            <span className="w-4 border-t-2 border-dashed border-chart-4" />
+            累计盈亏 · {pnlCurrency} · 右轴
+          </span>
+        )}
+      </div>
       <svg
-        className="h-52 w-full touch-none text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        viewBox={`0 0 ${width} ${height}`}
+        className="h-64 w-full touch-pan-y outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        viewBox={`0 0 ${width} ${geometry.height}`}
         role="application"
         tabIndex={0}
-        aria-label="资产价值走势图，可使用左右方向键逐点查看"
-        onFocus={(event) =>
-          activatePoint(activeIndex ?? seriesPoints.length - 1, event.currentTarget)
-        }
-        onPointerMove={(event) =>
-          activateNearest(event.clientX, event.clientY, event.currentTarget)
-        }
-        onPointerDown={(event) =>
-          activateNearest(event.clientX, event.clientY, event.currentTarget)
-        }
+        aria-label={`${combined ? '资产总值与累计盈亏' : '资产价值'}走势图，可使用左右方向键逐点查看，按 Escape 关闭详情`}
+        onFocus={() => setActiveIndex(geometry.timeline.length - 1)}
+        onPointerMove={(event) => pickPoint(event.clientX, event.currentTarget)}
+        onPointerDown={(event) => pickPoint(event.clientX, event.currentTarget)}
         onPointerLeave={(event) => {
           if (event.pointerType === 'mouse') setActiveIndex(null);
         }}
+        onBlur={() => setActiveIndex(null)}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             setActiveIndex(null);
@@ -123,92 +114,189 @@ export function PerformanceTrendChart({
           }
           if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
           event.preventDefault();
-          const current = activeIndex ?? seriesPoints.length - 1;
           const direction = event.key === 'ArrowLeft' ? -1 : 1;
-          activatePoint(
-            Math.max(0, Math.min(seriesPoints.length - 1, current + direction)),
-            event.currentTarget,
+          setActiveIndex(
+            Math.max(
+              0,
+              Math.min(
+                geometry.timeline.length - 1,
+                (activeIndex ?? geometry.timeline.length - 1) + direction,
+              ),
+            ),
           );
         }}
       >
-        <line
-          x1={padding.left}
-          x2={width - padding.right}
-          y1={height - padding.bottom}
-          y2={height - padding.bottom}
-          className="stroke-border"
-          strokeWidth="1"
-        />
+        <title>{combined ? '资产总值与累计盈亏走势' : '资产走势'}</title>
+        {geometry.assetAxis.ticks.map((tick) => (
+          <g key={tick.value}>
+            <line
+              x1={geometry.padding.left}
+              x2={width - geometry.padding.right}
+              y1={tick.y}
+              y2={tick.y}
+              className="stroke-border/50"
+              strokeDasharray="3 5"
+            />
+            {seriesPoints.length > 0 && (
+              <text x={0} y={tick.y + 4} className="fill-muted-foreground text-[10px]">
+                {axisMoney(tick.value, currency)}
+              </text>
+            )}
+          </g>
+        ))}
+        {combined &&
+          geometry.pnlAxis.ticks.map((tick) => (
+            <text
+              key={tick.value}
+              x={width}
+              y={tick.y + 4}
+              textAnchor="end"
+              className="fill-muted-foreground text-[10px]"
+            >
+              {axisMoney(tick.value, pnlCurrency)}
+            </text>
+          ))}
+        {combined && (
+          <line
+            x1={geometry.padding.left}
+            x2={width - geometry.padding.right}
+            y1={geometry.pnlAxis.y(0)}
+            y2={geometry.pnlAxis.y(0)}
+            className="stroke-chart-4/50"
+            strokeDasharray="3 5"
+          />
+        )}
         <polyline
-          points={pointsValue}
+          points={geometry.assetCoordinates.map((point) => `${point.x},${point.y}`).join(' ')}
           fill="none"
-          stroke="currentColor"
+          className="stroke-chart-1"
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeWidth="3"
+          strokeWidth="2"
         />
-        {!dense
-          ? points.map((point, index) => (
+        {interval !== '1min' &&
+          interval !== '1h' &&
+          geometry.assetCoordinates.map((point, index) => (
+            <circle
+              key={seriesPoints[index]!.at}
+              cx={point.x}
+              cy={point.y}
+              r="2.5"
+              className="fill-chart-1"
+            />
+          ))}
+        {geometry.segments.map((segment, index) => (
+          <polyline
+            key={index}
+            points={segment.map((point) => `${point.x},${point.y}`).join(' ')}
+            fill="none"
+            className="stroke-chart-4"
+            strokeDasharray="6 4"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+        ))}
+        {geometry.pnlCoordinates.map(
+          (point, index) =>
+            point.y !== null && (
               <circle
-                key={`${seriesPoints[index]?.sourceSnapshotId ?? seriesPoints[index]?.at ?? index}`}
+                key={pnlPoints![index]!.at}
                 cx={point.x}
                 cy={point.y}
-                r="3"
-                fill="currentColor"
+                r={pnlPoints![index]!.current ? 4 : 2.5}
+                className="fill-chart-4"
               />
-            ))
-          : null}
-        {activePoint ? (
-          <>
-            <line
-              x1={activePoint.x}
-              x2={activePoint.x}
-              y1={padding.top}
-              y2={height - padding.bottom}
-              className="stroke-muted-foreground/60"
-              strokeDasharray="4 4"
-            />
-            <line
-              x1={padding.left}
-              x2={width - padding.right}
-              y1={activePoint.y}
-              y2={activePoint.y}
-              className="stroke-muted-foreground/60"
-              strokeDasharray="4 4"
-            />
-            <circle cx={activePoint.x} cy={activePoint.y} r="5" fill="currentColor" />
-          </>
-        ) : null}
+            ),
+        )}
+        {active && (
+          <line
+            x1={active.x}
+            x2={active.x}
+            y1={geometry.padding.top}
+            y2={geometry.height - geometry.padding.bottom}
+            className="stroke-muted-foreground"
+            strokeDasharray="3 4"
+          />
+        )}
+        <text
+          x={geometry.padding.left}
+          y={geometry.height - 5}
+          className="fill-muted-foreground text-[10px]"
+        >
+          {geometry.timeline[0]
+            ? new Date(geometry.timeline[0].at).toLocaleDateString('zh-CN')
+            : ''}
+        </text>
+        <text
+          x={width - geometry.padding.right}
+          y={geometry.height - 5}
+          textAnchor="end"
+          className="fill-muted-foreground text-[10px]"
+        >
+          {geometry.timeline.length > 1
+            ? new Date(geometry.timeline.at(-1)!.at).toLocaleDateString('zh-CN')
+            : ''}
+        </text>
       </svg>
-      {activePoint && activeValue ? (
+      {active && (
         <div
-          className="pointer-events-none absolute top-3 z-10 w-64 max-w-full rounded-lg border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
-          style={{
-            left: `clamp(0px, calc(${tooltipX}px - 8rem), max(0px, calc(100% - 16rem)))`,
-          }}
+          className="pointer-events-none absolute top-9 right-3 max-w-[calc(100%-1.5rem)] rounded-lg border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
           role="status"
           aria-live="polite"
         >
-          <p className="m-0 font-medium">{formatDate(activeValue.at)}</p>
-          <p className="m-0 mt-1 text-sm font-semibold">
-            {formatMoney(activeValue.value, activeValue.currency)}
+          <p className="m-0 font-medium">{formatDate(active.at)}</p>
+          <p className="m-0 mt-2 font-semibold">
+            资产总值{' '}
+            {active.asset ? formatMoney(active.asset.value, active.asset.currency) : '该时点无记录'}
           </p>
-          <p className="m-0 mt-1 text-muted-foreground">
-            {activeValue.valuationBasis === 'OFFICIAL' ? '正式估值' : '估算值'} ·{' '}
-            {performanceSeriesQualityLabel(activeValue.dataQuality)}
-          </p>
-          <p className="m-0 text-muted-foreground">
-            披露覆盖 {formatCoverage(activeValue.disclosureCoverage)} · 可定价覆盖{' '}
-            {formatCoverage(activeValue.pricedCoverage)}
-          </p>
+          {active.asset && (
+            <>
+              <p className="m-0 mt-1 text-muted-foreground">
+                {active.asset.valuationBasis === 'OFFICIAL' ? '正式估值' : '估算值'} ·{' '}
+                {performanceSeriesQualityLabel(active.asset.dataQuality)}
+              </p>
+              <p className="m-0 text-muted-foreground">
+                披露覆盖 {formatCoverage(active.asset.disclosureCoverage)} · 可定价覆盖{' '}
+                {formatCoverage(active.asset.pricedCoverage)}
+              </p>
+            </>
+          )}
+          {combined && (
+            <>
+              <p className="m-0 mt-2 font-semibold">
+                累计盈亏{' '}
+                {active.pnl?.value !== null && active.pnl?.value !== undefined
+                  ? formatMoney(active.pnl.value, pnlCurrency)
+                  : '—'}
+              </p>
+              {!active.pnl && <p className="m-0 text-muted-foreground">该时点无盈亏记录</p>}
+              {active.pnl && (
+                <>
+                  <p className="m-0 text-muted-foreground">
+                    {active.pnl.current ? '当前估值' : '历史收盘记录'}
+                  </p>
+                  {active.pnl.reason ? (
+                    <p className="m-0 text-muted-foreground">
+                      {pnlReasonLabels[active.pnl.reason]}
+                    </p>
+                  ) : (
+                    <p className="m-0 text-muted-foreground">
+                      已实现{' '}
+                      {active.pnl.realizedPnl === null
+                        ? '—'
+                        : formatMoney(active.pnl.realizedPnl, pnlCurrency)}{' '}
+                      · 未实现{' '}
+                      {active.pnl.unrealizedPnl === null
+                        ? '—'
+                        : formatMoney(active.pnl.unrealizedPnl, pnlCurrency)}
+                    </p>
+                  )}
+                </>
+              )}
+            </>
+          )}
         </div>
-      ) : null}
-      <div className="flex justify-between gap-3 text-xs text-muted-foreground">
-        <span>{first ? formatDate(first.at) : '尚无数据时点'}</span>
-        <span>
-          {last ? `${formatDate(last.at)} · ${formatMoney(last.value, last.currency)}` : ''}
-        </span>
-      </div>
+      )}
     </div>
   );
 }

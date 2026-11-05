@@ -4,7 +4,7 @@
 
 `S05-window-local-gates-0928 / blocked / needs_split`。Server build、模块边界、workspace 依赖和普通 owned ESLint 已通过；本批两个 Schema 函数复杂度分别为 66 与 27，超过实际阈值 20，需新的有界语义拆分任务。本叶不修复源码，不关闭本地集成门禁。协调者明确要求将本批新增复杂度视为当前缺口，即使仓库脚本配置为 warning，也不能接受为完成。
 
-依据：[主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §6、AC12/AC15 与 [主 Task](../2026-09-25-multi-source-adjustment-aware-backtest.md) §12.8。工作区为 `main / fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 的既有脏工作区。本叶仅写本文、`/private/tmp/s05-window-local-gates-0928-*` 日志及快照；Server build 产生可重建的 dist。无 source/test/config/lockfile/台账修改，无 stage、commit、reset 或 clean。全部命令已结束，构建及静态门禁执行资源已释放，本 dispatch 关闭后不得复用。
+依据：[主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §6、AC12/AC15 与 [主 Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) §12.8。工作区为 `main / fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 的既有脏工作区。本叶仅写本文、`/private/tmp/s05-window-local-gates-0928-*` 日志及快照；Server build 产生可重建的 dist。无 source/test/config/lockfile/台账修改，无 stage、commit、reset 或 clean。全部命令已结束，构建及静态门禁执行资源已释放，本 dispatch 关闭后不得复用。
 
 RTK、Codex 规则已读，Shell 均经 RTK。Context Mode 工具发现不可用，日志存入临时文件，仅回传结果和警告。
 

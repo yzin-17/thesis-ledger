@@ -11,27 +11,19 @@
 
 ## 当前 TODO
 
+2026-11-05：原第4～15项已完成并[归档](archive/tasks/2026-11-04-todo-4-15-delivery.md)，逐项证据见[最终验收](tasks/evidence/2026-11-05-todo-4-15-final-acceptance.md)；下方保留原第1～3项。
+
 | ID | 延期范围 | 来源 | 重新立项前置条件 / 触发条件 |
 | --- | --- | --- | --- |
-| `market-chart-minute-period` | 富途当前历史 1m 子集以外的通用分钟能力：其他周期/来源/市场、相应 Session/午休与分页窗口、尾 bar/指标预热，以及尚未立项的盘中刷新和增量更新 | [周期 Spec](specs/2026-09-16-market-chart-period-aggregation.md)；[指标 Task](tasks/2026-09-10-market-chart-indicator-integration.md) | 确有新增需求且能力/授权/预算明确后独立立项。[富途 Task](tasks/2026-10-08-futu-openapi-full-integration.md) FAPI-M1～M4 已拥有 1m、none、正常时段、完整分页、标准合同/缓存和产品验收，不在此重复登记 |
-| `market-chart-intraday-daily-bar` | 稳定交付股票与 ETF 的盘中日线快照（非分钟线）：在完整窗口和最新端正确选择真实当日 `incomplete` bar，验证跨源复权、价格、成交量单位与指标输入可比性，并处理上游临时故障、请求预算及收盘状态转换。当前图表路径的盘中日线尚未通过可用性验收；单次备用源成功不代表稳定支持 | `specs/2026-09-17-market-chart-refresh.md`；`tasks/2026-09-17-market-chart-refresh.md`（2026-09-28 盘中核查与降级分支） | 核实目标 Provider 的盘中覆盖、频率限制或配额、时间戳与字段语义后单独立项；至少以真实 ETF 和股票目标验证同日两次快照、`incomplete → complete`、故障退避及浏览器展示。本轮 T4 仍须完成无当日 bar 时的截止日期降级验收 |
-| `market-detail-pagination-anchor` | 为现行 `/api/market/:symbol/detail` 明确接收并消费 `calculationAnchor`；核对历史加载与指标计算锚点的一致性。当前 `loadEarlier` 通过增加 `barsLimit` 扩窗，旧“传序列末尾日期”不再是现行行为 | [周期 Spec](specs/2026-09-16-market-chart-period-aggregation.md)；`apps/server/src/market/market.controller.ts`；`apps/desktop/src/features/market-detail/MarketDetailDialog.tsx` | 扩展真正分页/游标或出现可复现锚点问题时独立立项，验证完整/扩窗输入与指标锚点，不重复修复已退役的尾日参数路径 |
-| `market-chart-trading-overlays` | 行情图表交易标记、成本线、风险线与区间测量等交易叠加层 | `tasks/2026-09-10-market-chart-indicator-integration.md` | 产品交互与数据来源明确后单独立项；不得夹带进周期、指标或分页任务 |
-| `backtest-market-rules-expansion` | 扩展已验收切片以外、尚未立项的市场/资产与历史规则覆盖，以及其他客户收费适用性和所需可复核来源材料 | [历史来源调查](archive/tasks/2026-09-16-backtest-real-historical-market-rules.md)为历史来源；现行已交付范围见[主备 Spec](specs/2026-10-06-historical-rules-primary-backup.md)与[P6 Spec](specs/2026-10-07-p6-market-state-expansion.md) | 出现超出现行完成范围的明确需求后按市场/能力立项；已完成主备、公共费用、选定港美和券商成本不重复登记，取消的严格 PIT/全历史追补不恢复 |
-| `market-batch-catalog` | 为真正需要批量行情的消费者建立显式 batch/catalog 边界，禁止从单标 Quote 路径恢复 universe/full-market fallback | `archive/tasks/2026-09-14-portfolio-valuation-demand-guard.md` | 出现独立批量消费场景并能定义请求预算、缓存和 Provider 责任边界 |
-| `portfolio-valuation-followups` | FX、LedgerEvent 与 realized PnL 相关的组合估值/性能优化 | `archive/tasks/2026-09-14-portfolio-valuation-demand-guard.md` | 有独立性能证据或产品需求证明当前链路需要优化；分别立项，不回填进已完成的估值保护任务 |
-| `ai-provider-probe-route-parameters` | 用途探针已消费首输出与输出间隔配置；路由级 `reasoningEffort` 尚未注入受控验证，需要评估该参数与正式执行及验证指纹的一致性 | `tasks/2026-09-21-ai-provider-model-usage-configuration.md`（2026-09-23 复核记录） | 产品确认用途验证必须覆盖指定推理强度时独立立项 |
-| `ai-generation-contract-semantic-refinements` | 评估当前生成合同中不能由 JSON Schema 表达的 decimal 正值、比例上限和跨字段语义，明确可结构化的约束与应用侧校验。entry/exit 已为表达式 AST，all/any 条件已有 `.min(1)`，不沿用旧数组/单一 `superRefine` 描述 | [用途配置 Task](tasks/2026-09-21-ai-provider-model-usage-configuration.md)；`packages/schemas/src/ai-execution.ts`、`backtest-strategy.ts`、`monetary-values.ts` | 反复出现合法结构但非法语义输出，或需要上游保证更多语义时立项；同步当前契约版本、路由和冻结兼容影响 |
-| `ai-provider-json-text-error-classification` | `json_validated` 空内容仍由 `parseGenerationOutput` 抛普通 `Error`，不能进入适配器的结构校验错误分支，可能落为 `transport_unknown`；修正失败类型与阶段，保留真实外部结果 | `apps/server/src/ai/ai-generation-output.ts`；`apps/server/src/ai/ai-sdk-generation.adapter.ts` | 出现空内容被当传输问题排查，或需要按 `schema_invalid` 统计输出质量时立项；本条更新源码定位，不代表已经修复 |
-| `ai-provider-json-validated-prompt-guard` | 为新增 `json_validated` 调用评估统一字段指令或守卫，避免调用点遗漏当前输出契约。研究字段指令已由[正式研究输出 Spec](specs/2026-10-05-research-json-prompt-contract.md)及其完成任务交付，不重复实现 | [用途配置 Task](tasks/2026-09-21-ai-provider-model-usage-configuration.md)；`apps/server/src/ai/ai-generation-output.ts` | 新增尚未消费共享字段指令的调用点，或再次发生漏 JSON 指令导致的业务生成失败时独立立项 |
-| `historical-rule-update-monitoring` | 按需要监测历史收费/规则来源更新，沿既有来源与版本记录处理变化 | [历史规则主备 Spec](specs/2026-10-06-historical-rules-primary-backup.md#9-实施顺序与任务拆分)的“更新监测按需要后续补充” | 需要自动发现规则更新时再立项；不作为已完成 P1～P5 的前置，也不重复公告每日更新和现行缓存代次失效 |
+| <a id="ai-provider-positive-cost-acceptance"></a>`ai-provider-positive-cost-acceptance` | 完整设计稿AC-13的真实非零上游费用验收：用户零价与供应商正金额费用分列，以及对应真实费用/结算证据；用户于2026-11-01明确延期，尚未验收通过 | [现行费用范围](specs/2026-09-21-ai-provider-model-usage-configuration.md#positive-billing-followup)；[原T5.2/T6及最终对账](archive/tasks/2026-09-21-ai-provider-model-usage-configuration.md)；[本次决定](tasks/evidence/2026-11-01-ai-fee-deferral-and-closeout.md) | 用户明确恢复后建立成对Spec/Task；先具备可归属请求的真实正金额费用、币种和结算材料，或明确Provider及总付费上限。当前费用上限0、现有配置和凭据保持，延期不授权付费请求 |
+| <a id="longbridge-oauth-live-acceptance"></a>`longbridge-oauth-live-acceptance` | Longbridge 真实账号授权、行情权限与令牌刷新恢复，以及 Android/iPhone Air 的真实 OAuth 闭环验收 | [来源凭据 Spec](specs/2026-09-14-market-provider-credentials.md) AC6/AC7、[原 T5b-LB](archive/tasks/2026-09-14-market-provider-credentials.md#t5b-lb)、[手机迁移范围](specs/2026-10-22-web-mobile-feature-parity.md#longbridge-oauth-followup)及[原 M29b](archive/tasks/2026-10-22-web-mobile-feature-parity.md#m29b) | 用户明确恢复后单独立项；准备有效 OAuth 配置、获准测试账号/权限、可达回调及凭据安全写入范围。按 2026-10-26 用户确认延期，当前迁移剩余清单和 G5/G6/G7 均不依赖此项；该项尚未通过验收 |
+| <a id="rqdata-live-consumption"></a>`rqdata-live-consumption` | RQData 原 `H07-K37c-live` 的真实账号正向读取与消费验收；用户于 2026-10-21 明确延期，已从当前适配层验收范围转出，实源尚未通过 | [范围决定](specs/2026-10-09-unified-data-capability-adapter.md#source-scope-20261021)；[原责任项与证据](tasks/2026-10-09-unified-data-capability-adapter.md#rqdata-deferred) | 用户明确恢复且合法账号、目标接口权限及原身份/准入输入具备后，建立成对 Spec/Task，承接原真实读取与消费断言 |
 
 ## 不属于 TODO 的当前门禁
 
 以下类型即使受外部条件影响，也仍属于**当前任务完成条件**，不得迁入本文：
 
-- 原共同价格与多源扩展已收尾，取消范围见[现行决定](specs/2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)；统一适配层的 RQ/Tushare 正向条件仍归[当前 Task](tasks/2026-10-09-unified-data-capability-adapter.md)，不新增开户、采购或重复探测动作；
-- Market Provider 的当前凭证/在线验收以[来源配置 Task](tasks/2026-09-14-market-provider-credentials.md)为准，区分有效义务与 Tushare 等来源的范围性跳过；
+- 原共同价格与多源扩展已收尾，取消范围见[现行决定](specs/2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)；统一适配层的 Tushare 正向条件仍归[当前 Task](tasks/2026-10-09-unified-data-capability-adapter.md)，不新增开户、采购或重复探测动作。RQData 已按明确范围决定列入上方 TODO；
 - Desktop / Mobile / Browser / Simulator 的当前产品运行态验收；
 - 已实现功能的 Docker、Worker、PostgreSQL、Redis 或真实 Provider smoke；
 - 当前 Task 明确列出的用户确认或受保护数据清理门禁。

@@ -6,6 +6,7 @@ import { RiskController } from './risk.controller.js';
 import { RiskEventService } from './risk-event.service.js';
 import { RiskRuleService } from './risk-rule.service.js';
 import { RiskService } from './risk.service.js';
+import { RiskValuationContextService } from './risk-valuation-context.service.js';
 import { StrategyRiskContextService } from './strategy-risk-context.service.js';
 import { StrategyRiskRuntimeService } from './strategy-risk-runtime.service.js';
 
@@ -19,7 +20,8 @@ import { StrategyRiskRuntimeService } from './strategy-risk-runtime.service.js';
     StrategyRiskContextService,
     StrategyRiskRuntimeService,
     RiskService,
+    RiskValuationContextService,
   ],
-  exports: [RiskService, StrategyRiskContextService],
+  exports: [RiskService, StrategyRiskContextService, RiskValuationContextService],
 })
 export class RiskModule {}

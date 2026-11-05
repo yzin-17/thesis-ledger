@@ -2,7 +2,7 @@
 
 ## 执行包
 
-所属[规格](../../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)与[任务](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md)。C03 已完成，本叶继续核验当前场内 Store 的冻结与复用边界。
+所属[规格](../../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)与[任务](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)。C03 已完成，本叶继续核验当前场内 Store 的冻结与复用边界。
 
 - 输入：当前 RunConfig、Snapshot V3 与当前产物合同；保留已经完成的 NAV 执行链。
 - 写集：`backtest-snapshot-v3-store.ts`、独立场内身份回归测试、本记录与主任务进度。

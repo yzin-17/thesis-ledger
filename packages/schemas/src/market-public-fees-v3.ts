@@ -12,7 +12,7 @@ const key = marketRouteKeyV3Schema.pipe(
   z.strictObject({
     kind: z.literal('data'),
     market: z.enum(['CN', 'HK', 'US']),
-    assetType: z.literal('STOCK'),
+    assetType: z.enum(['STOCK', 'ETF']),
     capability: z.literal(marketPublicFeesCapabilityV3),
   }),
 );

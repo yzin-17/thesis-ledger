@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FundNavHistory } from '@thesis-ledger/schemas';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { Currency, FundNavHistory } from '@thesis-ledger/schemas';
 import { CrosshairMode, LineSeries, createChart } from 'lightweight-charts';
 import { Button } from '@/components/ui/button';
+import { MarketNavChartReadout } from './MarketNavChartReadout.js';
 import { MarketChartAttribution } from './MarketChartAttribution.js';
-
-const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
+import type { PnlChartPoint } from '../performance/performance-pnl-model.js';
+import { navPnlData, useNavPnlSeries } from './fund-nav-pnl-series.js';
+import { navViewportChange } from './nav-chart-viewport.js';
+import { FundIntradayChart } from './FundIntradayChart.js';
 
 const rangeLabel = (months: number) => {
   if (months === 1) return '1月';
@@ -38,8 +41,26 @@ export const navRangeAvailability = (history: FundNavHistory, months: number) =>
   };
 };
 
-export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
+type FundNavHistoryChartProps = {
+  history: FundNavHistory;
+  pnl?: { points: PnlChartPoint[]; currency: Currency; notice?: ReactNode };
+};
+
+export function FundNavHistoryChart(props: FundNavHistoryChartProps) {
+  const [today, setToday] = useState(false);
+  const symbol = props.history.at(-1)?.symbol;
+  if (today && symbol) return <FundIntradayChart key={symbol} symbol={symbol} onHistory={() => setToday(false)} />;
+  return <HistoricalFundNavChart {...props} onToday={() => setToday(true)} />;
+}
+
+function HistoricalFundNavChart({ history: sourceHistory, pnl, onToday }: FundNavHistoryChartProps & { onToday: () => void }) {
+  const history = useMemo(
+    () => sourceHistory.map((point) => ({ ...point, navDate: point.navDate.slice(0, 10) })),
+    [sourceHistory],
+  );
   const containerRef = useRef<HTMLDivElement>(null);
+  const pnlData = useMemo(() => navPnlData(pnl?.points ?? []), [pnl?.points]);
+  const lastDate = [history.at(-1)?.navDate, pnlData.dated.at(-1)?.[0]].filter(Boolean).sort().at(-1);
   type ChartApi = ReturnType<typeof createChart>;
   type TimeScaleApi = ReturnType<ChartApi['timeScale']>;
   const chartRef = useRef<ChartApi | null>(null);
@@ -50,44 +71,20 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
   const lastResetRevisionRef = useRef(0);
   const lastFocusRevisionRef = useRef(0);
   const lastRangeMonthsRef = useRef(3);
-  const onVisibleRangeChangeRef = useRef<
-    ((range: { from: string; to: string } | null) => void) | null
-  >(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [locked, setLocked] = useState<string | null>(null);
   const [rangeMonths, setRangeMonths] = useState(3);
   const [resetRevision, setResetRevision] = useState(0);
   const [focusRevision, setFocusRevision] = useState(0);
   const [viewport, setViewport] = useState<{ from: string; to: string } | null>(null);
+  const viewportChange = useMemo(() => navViewportChange(history, viewport), [history, viewport]);
   const rangeAvailability = useMemo(
     () => NAV_RANGES.map((months) => ({ months, ...navRangeAvailability(history, months) })),
     [history],
   );
-  const unavailableRanges = rangeAvailability.filter((range) => !range.available);
-  const coverageNotice =
-    unavailableRanges.length > 0 && history.length > 0
-      ? `当前净值历史覆盖 ${history[0]!.navDate.slice(0, 10)} 至 ${history.at(-1)!.navDate.slice(0, 10)}，暂未覆盖 ${unavailableRanges.map((range) => rangeLabel(range.months)).join('、')}`
-      : null;
-  const visibleHistory = useMemo(() => {
-    const latest = history.at(-1);
-    if (!latest) return [];
-    const cutoff = new Date(latest.navDate);
-    cutoff.setUTCMonth(cutoff.getUTCMonth() - rangeMonths);
-    return history.filter((point) => new Date(point.navDate).getTime() >= cutoff.getTime());
-  }, [history, rangeMonths]);
   const selectedDate = locked ?? hovered;
-  const selected =
-    visibleHistory.find((point) => point.navDate === selectedDate) ?? visibleHistory.at(-1);
-  const viewportHistory = viewport
-    ? history.filter((point) => point.navDate.slice(0, 10) >= viewport.from && point.navDate.slice(0, 10) <= viewport.to)
-    : visibleHistory;
-  const viewportFirst = viewportHistory[0];
-  const viewportLast = viewportHistory.at(-1);
-  const viewportChange =
-    viewportFirst && viewportLast && viewportFirst.unitNav !== 0
-      ? viewportLast.unitNav / viewportFirst.unitNav - 1
-      : null;
-  onVisibleRangeChangeRef.current = (range) => setViewport(range);
+  const selected = selectedDate ? history.find((point) => point.navDate === selectedDate) : history.at(-1);
+  const selectedPnl = selectedDate ? pnlData.dated.find(([date]) => date === selectedDate) : pnlData.dated.at(-1);
 
   useEffect(() => {
     if (history.length === 0) return;
@@ -118,6 +115,8 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
         getComputedStyle(document.documentElement).getPropertyValue('--chart-1').trim() ||
         '#2563eb',
       lineWidth: 2,
+      priceScaleId: 'right',
+      priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
     });
     const hoveredRef = { current: setHovered };
     const lockedRef = { current: setLocked };
@@ -132,7 +131,10 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
       if (range && typeof range.from === 'string' && typeof range.to === 'string') {
         if (firstLayoutPendingRef.current) return;
         previousVisibleRangeRef.current = range;
-        onVisibleRangeChangeRef.current?.({ from: range.from, to: range.to });
+        setViewport((current) => {
+          if (current?.from === range.from && current.to === range.to) return current;
+          return { from: range.from as string, to: range.to as string };
+        });
       }
     };
     chart.timeScale().subscribeVisibleTimeRangeChange(visibleRangeHandler);
@@ -144,7 +146,7 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
       chart.timeScale().setVisibleRange(requested);
       previousVisibleRangeRef.current = requested;
       firstLayoutPendingRef.current = false;
-      onVisibleRangeChangeRef.current?.({ from: requested.from as string, to: requested.to as string });
+      visibleRangeHandler();
     });
     resizeObserver.observe(container);
     chartRef.current = chart;
@@ -160,6 +162,8 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
     };
   }, []);
 
+  useNavPnlSeries(chartRef, pnl?.points, pnl?.currency);
+
   useEffect(() => {
     const chart = chartRef.current;
     const line = lineRef.current;
@@ -174,31 +178,23 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
     lastFocusRevisionRef.current = focusRevision;
     lastRangeMonthsRef.current = rangeMonths;
     if (shouldReset || shouldChangeRange || !previous) {
-      const cutoff = new Date(latest.navDate);
+      const cutoff = new Date(lastDate ?? latest.navDate);
       cutoff.setUTCMonth(cutoff.getUTCMonth() - rangeMonths);
       chart
         .timeScale()
-        .setVisibleRange({ from: cutoff.toISOString().slice(0, 10), to: latest.navDate });
+        .setVisibleRange({ from: cutoff.toISOString().slice(0, 10), to: lastDate ?? latest.navDate });
       requestedInitialRangeRef.current = {
         from: cutoff.toISOString().slice(0, 10),
-        to: latest.navDate,
+        to: lastDate ?? latest.navDate,
       };
       if (previous) firstLayoutPendingRef.current = false;
     } else if (shouldFocusLatest) {
-      const logical = chart.timeScale().getVisibleLogicalRange();
-      if (logical) {
-        const width = Math.max(Number(logical.to) - Number(logical.from), 1);
-        const to = history.length - 1;
-        chart.timeScale().setVisibleLogicalRange({
-          from: Math.max(0, to - width),
-          to,
-        });
-      }
+      chart.timeScale().scrollToRealTime();
     } else {
       chart.timeScale().setVisibleRange(previous);
     }
     previousVisibleRangeRef.current = chart.timeScale().getVisibleRange();
-  }, [focusRevision, history, rangeMonths, resetRevision]);
+  }, [focusRevision, history, rangeMonths, resetRevision, lastDate]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -215,6 +211,7 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
   return (
     <div className="grid gap-2 rounded-lg bg-muted/30 p-3" data-market-nav-chart>
       <div className="flex flex-wrap items-center gap-1" role="toolbar" aria-label="净值范围">
+        <Button type="button" size="sm" variant="ghost" onClick={onToday}>今日</Button>
         {rangeAvailability.map((range) => (
           <Button
             key={range.months}
@@ -260,35 +257,25 @@ export function FundNavHistoryChart({ history }: { history: FundNavHistory }) {
           回到最新
         </Button>
       </div>
-      {coverageNotice ? (
-        <p className="m-0 text-xs text-muted-foreground" role="status">
-          {coverageNotice}
-        </p>
+      {pnl ? (
+        <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground" aria-label="净值与累计盈亏图例">
+          <span>┄ 累计盈亏（{pnl.currency}，左轴）{pnlData.dated.filter(([, point]) => point.value !== null).length === 1 ? ' · 单点' : ''}</span>
+          <span>━ 单位净值（右轴）</span>
+        </div>
       ) : null}
+      {pnl?.notice}
       <div
         ref={containerRef}
         className="h-[220px] max-h-[220px] min-h-0 min-w-0 w-full max-w-full overflow-hidden [&_table]:h-auto [&_table]:min-w-0 [&_table]:w-auto [&_td]:min-w-0 [&_td]:p-0"
       />
-      <div
-        className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"
-        role="status"
-      >
-        <span>
-          {selectedDate
-            ? `${locked ? '已锁定' : '悬停'} ${selectedDate}`
-            : '悬停查看，点击锁定，Esc 恢复最新'}
-        </span>
-        <span>
-          {viewportFirst ? `${viewportFirst.navDate.slice(0, 10)} 至 ${viewportLast?.navDate.slice(0, 10)}` : '日期未知'} · 币种 CNY
-        </span>
-        <span>
-          单位净值 {selected ? number.format(selected.unitNav) : '—'} · 来源 {selected?.provider ?? '未知'}
-          {viewportChange === null
-            ? ''
-            : ` · 可视区间 ${viewportChange >= 0 ? '+' : ''}${(viewportChange * 100).toFixed(2)}%`}
-        </span>
-        <MarketChartAttribution />
-      </div>
+      <MarketNavChartReadout
+        selectedDate={selectedDate}
+        locked={locked !== null}
+        selected={selected}
+        viewportChange={viewportChange}
+        pnl={pnl ? { currency: pnl.currency, value: selectedPnl?.[1].value ?? null, date: selectedPnl?.[0] } : undefined}
+      />
+      <div className="text-xs text-muted-foreground"><MarketChartAttribution /></div>
     </div>
   );
 }

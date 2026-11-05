@@ -70,7 +70,7 @@ describe('Portfolio Trade UI 契约', () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain('只读查看统一交易投影');
+    expect(markup).toContain('交易周期');
     expect(markup).toContain('苹果公司');
     expect(markup).toContain('AAPL.US');
     expect(markup).toContain('实际账户');
@@ -79,6 +79,14 @@ describe('Portfolio Trade UI 契约', () => {
     expect(markup).toContain('text-button');
     expect(markup).toContain('已加载');
     expect(markup).toContain('清除筛选');
+    const headers = [...markup.matchAll(/<th\b[^>]*>/g)].map((match) => match[0]);
+    const cells = [...markup.matchAll(/<td\b[^>]*>/g)].map((match) => match[0]);
+    for (const index of [3, 4, 6]) {
+      expect(headers[index]).toContain('text-right');
+      expect(cells[index]).toContain('text-right');
+    }
+    expect(headers[5]).not.toContain('text-right');
+    expect(cells[5]).not.toContain('text-right');
     expect(markup).not.toContain(trade.id);
     expect(markup).not.toContain('编辑 Trade');
   });
@@ -90,6 +98,7 @@ describe('Portfolio Trade UI 契约', () => {
           ...trade,
           excludedReasons: ['LIFECYCLE_ACTIVE'],
           issues: ['MISSING_OPENING_BOUNDARY'],
+          costIssues: ['FEE_CURRENCY_MISMATCH'],
           entryLegs: [],
           baselineComponents: [],
           corporateActions: [],
@@ -107,6 +116,7 @@ describe('Portfolio Trade UI 契约', () => {
     expect(markup).toContain('证据与技术信息');
     expect(markup).toContain('交易仍在进行');
     expect(markup).toContain('缺少明确的建仓起点');
+    expect(markup).toContain('费用币种与成交币种不一致，净收益暂不可确认');
     expect(markup).toContain('技术信息');
     expect(markup).not.toContain('Entry Legs');
     expect(markup).not.toContain('Close Slices');

@@ -5,6 +5,7 @@ import {
   type InstrumentDirectoryItem,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../../platform/prisma.service.js';
+import type { Prisma } from '@prisma/client';
 
 type ParsedSymbol = {
   symbol: string;
@@ -76,7 +77,8 @@ export class InstrumentDirectoryService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async resolveSymbols(symbols: readonly string[]): Promise<InstrumentDirectory> {
+  async resolveSymbols(symbols: readonly string[], transaction?: Prisma.TransactionClient): Promise<InstrumentDirectory> {
+    const database = transaction ?? this.prisma;
     const normalizedSymbols = uniqueSymbols(symbols);
     const parsedSymbols = normalizedSymbols
       .map(parseSymbol)
@@ -89,7 +91,7 @@ export class InstrumentDirectoryService {
 
     try {
       const [instruments, syncState] = await Promise.all([
-        this.prisma.instrument.findMany({
+        database.instrument.findMany({
           where: {
             OR: parsedSymbols.map(({ canonicalCode, market }) => ({ canonicalCode, market })),
           },
@@ -105,7 +107,7 @@ export class InstrumentDirectoryService {
           },
           orderBy: [{ active: 'desc' }, { generation: 'desc' }, { updatedAt: 'desc' }],
         }),
-        this.prisma.catalogSyncState.findUnique({
+        database.catalogSyncState.findUnique({
           where: { consumer: 'thesis-ledger' },
           select: { generation: true },
         }),

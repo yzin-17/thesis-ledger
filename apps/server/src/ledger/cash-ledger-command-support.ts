@@ -6,7 +6,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { Prisma } from '@prisma/client';
 import { isEqual } from 'es-toolkit';
-import { projectCashMaterialization } from './cash-projection.js';
+import { cashEffectiveAt, projectCashMaterialization } from './cash-projection.js';
 import {
   toLedgerEventV2,
   type AccountLedgerWriteContext,
@@ -18,10 +18,9 @@ export type CashFlowPayloadEvent = Extract<
   LedgerEvent,
   { type: 'CASH_FLOW'; revisionAction: 'CREATE' | 'REPLACE' | 'RESTORE' }
 >;
-export type CashFlowVoidEvent = Extract<
-  LedgerEvent,
-  { revisionAction: 'VOID' }
-> & { type: 'CASH_FLOW' };
+export type CashFlowVoidEvent = Extract<LedgerEvent, { revisionAction: 'VOID' }> & {
+  type: 'CASH_FLOW';
+};
 export type CashFlowLedgerEvent = CashFlowPayloadEvent | CashFlowVoidEvent;
 
 export type SingleCashMutation = {
@@ -109,8 +108,14 @@ const eventFingerprint = (event: LedgerEvent) => ({
   ...(event.revisionAction === 'VOID' ? {} : { payload: event.payload }),
 });
 
-const signedCashImpact = (event: CashFlowLedgerEvent) => {
+const signedCashImpact = (event: CashFlowLedgerEvent, targetAt: Date) => {
   if (event.revisionAction === 'VOID') return new Prisma.Decimal(0);
+  // 外部未来资金只影响待结算；内部划转继续按已结算资金约束可用额度。
+  if (event.payload.category !== 'TRANSFER') {
+    const effectiveAt = cashEffectiveAt(event.payload, event.occurredAt);
+    if (effectiveAt !== null && new Date(effectiveAt).getTime() > targetAt.getTime())
+      return new Prisma.Decimal(0);
+  }
   const amount = new Prisma.Decimal(event.payload.amount);
   return event.payload.direction === 'INFLOW' ? amount : amount.neg();
 };
@@ -119,7 +124,9 @@ export class CashLedgerCommandSupport {
   constructor(private readonly repository: LedgerV2Repository) {}
 
   async assertAccountWritable(context: AccountLedgerWriteContext, currency: string) {
-    const account = await context.transaction.account.findUnique({ where: { id: context.accountId } });
+    const account = await context.transaction.account.findUnique({
+      where: { id: context.accountId },
+    });
     if (!account)
       throw cashLedgerConflict('LEDGER_VALIDATION_FAILED', '账户不存在', context.accountId);
     if (!account.active)
@@ -149,8 +156,7 @@ export class CashLedgerCommandSupport {
     desiredTip: CashFlowLedgerEvent,
   ) {
     const desiredPayload = desiredTip.revisionAction === 'VOID' ? undefined : desiredTip.payload;
-    const currentPayload =
-      currentTip?.revisionAction === 'VOID' ? undefined : currentTip?.payload;
+    const currentPayload = currentTip?.revisionAction === 'VOID' ? undefined : currentTip?.payload;
     const currency = desiredPayload?.currency ?? currentPayload?.currency;
     if (!currency) return;
     if (desiredPayload && currentPayload && desiredPayload.currency !== currentPayload.currency)
@@ -159,9 +165,12 @@ export class CashLedgerCommandSupport {
         '现金流修正不能改变币种',
         context.accountId,
       );
-    const currentBalance = await this.settledBalance(context, currency);
-    const currentImpact = currentTip ? signedCashImpact(currentTip) : new Prisma.Decimal(0);
-    const desiredImpact = signedCashImpact(desiredTip);
+    const targetAt = new Date();
+    const currentBalance = await this.settledBalance(context, currency, targetAt);
+    const currentImpact = currentTip
+      ? signedCashImpact(currentTip, targetAt)
+      : new Prisma.Decimal(0);
+    const desiredImpact = signedCashImpact(desiredTip, targetAt);
     const nextBalance = currentBalance.minus(currentImpact).plus(desiredImpact);
     if (nextBalance.isNegative())
       throw cashLedgerConflict(
@@ -190,11 +199,7 @@ export class CashLedgerCommandSupport {
       );
     const event = toLedgerEventV2(stored);
     if (event.type !== 'CASH_FLOW')
-      throw cashLedgerConflict(
-        'LEDGER_VALIDATION_FAILED',
-        '目标事件不是现金流',
-        context.accountId,
-      );
+      throw cashLedgerConflict('LEDGER_VALIDATION_FAILED', '目标事件不是现金流', context.accountId);
     return event as CashFlowLedgerEvent;
   }
 
@@ -222,11 +227,7 @@ export class CashLedgerCommandSupport {
         accountId,
       );
     if (action !== 'RESTORE' && target.revisionAction === 'VOID')
-      throw cashLedgerConflict(
-        'LEDGER_CORRECTION_NOT_CHAIN_TIP',
-        '已作废事实只能恢复',
-        accountId,
-      );
+      throw cashLedgerConflict('LEDGER_CORRECTION_NOT_CHAIN_TIP', '已作废事实只能恢复', accountId);
   }
 
   async findIdempotentReplay(
@@ -304,16 +305,19 @@ export class CashLedgerCommandSupport {
     };
   }
 
-  private async settledBalance(context: AccountLedgerWriteContext, currency: string) {
+  private async settledBalance(
+    context: AccountLedgerWriteContext,
+    currency: string,
+    targetAt: Date,
+  ) {
     const stored = await context.transaction.ledgerEvent.findMany({
       where: { accountId: context.accountId },
       orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
     });
-    const projected = projectCashMaterialization(stored);
+    const projected = projectCashMaterialization(stored, targetAt);
     return (
       projected.balances.find(
-        (balance) =>
-          balance.accountId === context.accountId && balance.currency === currency,
+        (balance) => balance.accountId === context.accountId && balance.currency === currency,
       )?.settledAmount ?? new Prisma.Decimal(0)
     );
   }

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it } from 'vitest';
+import { ToastProvider } from '../src/components/ui/toast.js';
 import type { StrategyRecord } from '../src/features/strategy/strategy.types.js';
 
 const { StrategyEditorPage } = await import('../src/features/strategy/StrategyEditorPage.js');
@@ -50,7 +51,7 @@ const renderDataRoute = (path: string, routePattern: string, element: React.Reac
   const router = createMemoryRouter([{ path: routePattern, element }], { initialEntries: [path] });
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <ToastProvider><RouterProvider router={router} /></ToastProvider>
     </QueryClientProvider>,
   );
 };

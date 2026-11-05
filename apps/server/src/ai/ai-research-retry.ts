@@ -38,7 +38,7 @@ export class AiResearchRetry {
 
   private async source(id: string): Promise<RetrySourceRun> {
     const source = (await this.prisma.aiRun.findUnique({
-      where: { id },
+      where: { id, researchOwnerId: null },
       select: {
         id: true,
         promptVersion: true,

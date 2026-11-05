@@ -28,12 +28,12 @@ const renderFeature = (account: Account = fundAccount) => {
   );
 };
 
-describe('成交记录基金定投', () => {
+describe('账户定投计划', () => {
   it('真实基金账户显示定投入口和待确认语义', () => {
     const markup = renderFeature();
-    expect(markup).toContain('基金定投');
+    expect(markup).toContain('定投计划');
     expect(markup).toContain('新建定投');
-    expect(markup).toContain('待确认成交');
+    expect(markup).toContain('暂无待确认成交');
     expect(markup).toContain('确认前不会改变持仓或现金');
   });
 
@@ -44,6 +44,6 @@ describe('成交记录基金定投', () => {
     { active: false },
   ])('账户范围 %j 不显示基金定投', (scope) => {
     const markup = renderFeature({ ...fundAccount, ...scope });
-    expect(markup).not.toContain('基金定投');
+    expect(markup).toBe('');
   });
 });

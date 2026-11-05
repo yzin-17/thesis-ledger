@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { Controller, Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import type { BarSeries, IndicatorCalculateRequest } from '@thesis-ledger/schemas';
 import { MarketController } from '../../src/market/market.controller.js';
 import { barSeriesInputFingerprint, sliceBarSeries, type BarReadInput } from '../../src/market/market-bar-reader.js';
@@ -33,6 +35,63 @@ const fixture = () => {
 };
 
 describe('指标预热和部分成功回归', () => {
+  it('HTTP明确绑定calculationAnchor并保留截止点后的数据隔离', async () => {
+    const { series, read, calculate } = fixture();
+    @Controller('api/market')
+    class TestController extends MarketController {
+      constructor() {
+        super({ readChartV3: read } as never, { calculateIndicators: calculate } as never,
+          undefined, { resolveIdentity: async () => ({ symbol: series.identity.symbol,
+            assetType: 'ETF', source: 'asset', status: 'confirmed' }) } as never);
+      }
+    }
+    @Module({ controllers: [TestController] })
+    class TestModule {}
+    const app = await NestFactory.create(TestModule, { logger: false });
+    try {
+      await app.listen(0, '127.0.0.1');
+      const anchor = series.points.at(-5)!.timestamp;
+      const url = new URL(`${await app.getUrl()}/api/market/510300.SH/detail`);
+      url.search = new URLSearchParams({ include: 'bars,indicator:MA', barsLimit: '90',
+        calculationAnchor: anchor, chartContractVersion: '3' }).toString();
+      const response = await fetch(url);
+      expect(response.status).toBe(200);
+      const result = await response.json();
+      expect(result.barSeries.points.at(-1).timestamp).toBe(anchor);
+      expect(read.mock.calls[0]![0].window.end).toBe(anchor);
+      read.mockClear(); calculate.mockClear();
+      url.searchParams.set('calculationAnchor', '2026-11-04');
+      expect((await fetch(url)).status).toBe(400);
+      expect(read).not.toHaveBeenCalled();
+      expect(calculate).not.toHaveBeenCalled();
+    } finally { await app.close(); }
+  });
+  it('显式截止点同时裁剪价格与预热，90至180根扩窗保持同一截止', async () => {
+    const { controller, series, calculate, read } = fixture();
+    const anchor = series.points.at(-5)!.timestamp;
+    for (const limit of ['90', '180']) {
+      const result = await controller.detail('510300.SH', 'bars,indicator:MA', limit, undefined,
+        'qfq', undefined, anchor.slice(0, 10), undefined, undefined, undefined, '3', '1d', anchor);
+      expect(read.mock.calls.at(-1)![0].window.end).toBe(anchor);
+      expect(result.barSeries?.points).toHaveLength(Number(limit));
+      expect(result.barSeries?.points.at(-1)?.timestamp).toBe(anchor);
+      expect(calculate.mock.calls.at(-1)![0].points.at(-1)?.timestamp).toBe(anchor);
+      expect(calculate.mock.calls.at(-1)![0].points).toHaveLength(Number(limit) + 59);
+      const indicator = result.sections['indicator:MA'];
+      if (indicator?.capability !== 'indicator:MA' || !indicator.data) throw new Error('缺少指标');
+      expect(indicator.data.calculationInput?.actualEnd).toBe(anchor);
+      expect(indicator.data.points.at(-1)?.timestamp).toBe(anchor);
+    }
+  });
+
+  it('无效截止点及冲突末日在来源读取前拒绝', async () => {
+    const { controller, read, calculate } = fixture();
+    for (const anchor of ['2026-05-20', '2026-02-30T00:00:00Z', '2026-05-19T00:00:00Z'])
+      await expect(controller.detail('510300.SH', 'bars,indicator:MA', '90', undefined,
+        'qfq', undefined, '2026-05-20', undefined, undefined, undefined, '3', '1d', anchor)).rejects.toThrow('calculationAnchor');
+    expect(read).not.toHaveBeenCalled();
+    expect(calculate).not.toHaveBeenCalled();
+  });
   it('30 根显示窗口计算 MA60 时包含 59 根预热，并公开两种指纹的对应关系', async () => {
     const { controller, read, calculate } = fixture();
     const result = await controller.detail('510300.SH', 'bars,indicator:MA', '30', undefined, 'qfq',

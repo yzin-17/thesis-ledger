@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { MarketService } from '../../src/market/market.service.js';
 import { quoteControlFixture } from './quote-control-fixture.js';
+import { DsaError } from '../../src/integration/dsa/dsa.client.js';
 
 const time = '2026-10-01T00:00:00Z';
 const nav = { version: 3, symbol: '000001.OF', unitNav: 1.1, navDate: time,
@@ -64,4 +65,26 @@ it.each(cases)('$capability 晚到结果不能写缓存或返回', async (item) 
   await expect(item.read(h.service)).rejects.toMatchObject({ code: 'stale-revision' });
   expect(h.values.size).toBe(0);
   expect(h.dsa.get).toHaveBeenCalledOnce();
+});
+
+it.each([
+  new DsaError('不应暴露 https://provider.test?token=private', 'timeout'),
+  new DsaError('不应暴露来源响应', 'unavailable', 429),
+  new DsaError('不应暴露来源响应', 'invalid-response'),
+])('基金净值与历史缓存回退保留安全的结构化根因 %s', async (error) => {
+  for (const item of cases.filter((value) => value.capability.startsWith('FUND_NAV'))) {
+    const h = harness(item.value);
+    await item.read(h.service);
+    for (const key of h.values.keys()) if (key.endsWith(':fresh')) h.values.delete(key);
+    h.dsa.get.mockRejectedValue(error);
+    const result = await item.read(h.service);
+    const points = Array.isArray(result) ? result : [result];
+    const labels: Record<string, string> = { timeout: 'timeout', unavailable: 'rate_limited', 'invalid-response': 'invalid_response' };
+    const expected = labels[error.code];
+    for (const point of points) {
+      expect(point).toMatchObject({ freshness: 'stale', servedFromCache: true, staleReason: { code: expected } });
+      expect(JSON.stringify(point)).not.toContain('private');
+      expect(JSON.stringify(point)).not.toContain('provider.test');
+    }
+  }
 });

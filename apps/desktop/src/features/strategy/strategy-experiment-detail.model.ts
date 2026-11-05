@@ -1,3 +1,4 @@
+export { canSelectCandidateForTest, canRevealTestMetrics, candidateAdoptionEligibility } from '@thesis-ledger/schemas';
 import type {
   OptimizationCostSummary,
   OptimizationTradingCostReadModel,
@@ -35,24 +36,6 @@ export const metricRecord = (value: unknown) => {
 export const candidateMetric = (candidate: OptimizationCandidate, split: 'validation' | 'test') =>
   metricRecord(metricRecord(candidate.metrics)[split]);
 
-export const canSelectCandidateForTest = (
-  experiment: OptimizationExperimentSummary,
-  candidate: OptimizationCandidate,
-  retryRequired: boolean,
-) => {
-  if (experiment.stage !== 'awaiting_finalization' || retryRequired) return false;
-  if (candidate.validationStatus === 'valid') return true;
-  if (
-    candidate.validationStatus !== 'restricted' ||
-    candidate.readEligibility?.state !== 'restricted'
-  )
-    return false;
-  const metrics = metricRecord(candidate.metrics);
-  return (
-    metricRecord(metrics.development).status === 'valid' &&
-    metricRecord(metrics.validation).status === 'valid'
-  );
-};
 
 export const metricValue = (metrics: Record<string, unknown>, keys: string[]) => {
   for (const key of keys) {
@@ -61,26 +44,7 @@ export const metricValue = (metrics: Record<string, unknown>, keys: string[]) =>
   return '不可用';
 };
 
-export const canRevealTestMetrics = (
-  experiment: OptimizationExperimentSummary,
-  candidate?: OptimizationCandidate,
-) => {
-  if (experiment.readEligibility?.state !== 'readable') return false;
-  if (candidate && candidate.readEligibility?.state !== 'readable') return false;
-  return true;
-};
 
-export const candidateAdoptionEligibility = (
-  experiment: OptimizationExperimentSummary,
-  candidate: OptimizationCandidate,
-) => {
-  if (!canRevealTestMetrics(experiment, candidate)) return '封存测试结果尚未揭示';
-  if (experiment.status !== 'succeeded' || experiment.stage !== 'completed')
-    return '实验尚未完成封存测试';
-  if (candidate.validationStatus === 'test_valid') return null;
-  if (!experiment.lockedCandidateIds?.includes(candidate.id)) return '未进入封存测试';
-  return '候选未通过封存测试';
-};
 
 export const experimentCostText = (summary: OptimizationCostSummary) => {
   const amount = summary.knownAmount;

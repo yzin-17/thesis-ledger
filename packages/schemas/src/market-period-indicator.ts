@@ -5,7 +5,7 @@ import {
   indicatorRequestSchema,
   refineUniqueIndicatorRequests,
 } from './market-bar-series.js';
-import { marketDerivedTimeframeSchema } from './market-period.js';
+import { marketDisplayDerivedTimeframeSchema } from './market-period.js';
 
 export const MARKET_PERIOD_INDICATOR_PROTOCOL = 'market-period-indicator-v1' as const;
 export const MARKET_PERIOD_INDICATOR_MAX_POINTS = 3650;
@@ -31,7 +31,7 @@ export const marketPeriodIndicatorRequestSchema = z
     identity: barSeriesIdentitySchema
       .extend({
         assetType: z.enum(['STOCK', 'ETF']),
-        timeframe: marketDerivedTimeframeSchema,
+        timeframe: marketDisplayDerivedTimeframeSchema,
       })
       .strict(),
     inputFingerprint: fingerprint,
@@ -47,11 +47,16 @@ export const marketPeriodIndicatorRequestSchema = z
       .min(1),
     periodContext: marketPeriodIndicatorContextSchema,
   })
-  .superRefine(refineUniqueIndicatorRequests);
+  .superRefine(refineUniqueIndicatorRequests)
+  .superRefine((value, context) => {
+    if (['5m', '15m', '30m', '60m'].includes(value.identity.timeframe) &&
+      (!/\.(HK|US)$/.test(value.identity.symbol) || value.identity.adjustment !== 'none'))
+      context.addIssue({ code: 'custom', path: ['identity'], message: '分钟指标仅支持港美股票／ETF不复权' });
+  });
 export type MarketPeriodIndicatorRequest = z.infer<typeof marketPeriodIndicatorRequestSchema>;
 
 const periodCapabilitySchema = z.strictObject({
-  timeframe: marketDerivedTimeframeSchema,
+  timeframe: marketDisplayDerivedTimeframeSchema,
   kind: z.literal('derived'),
   maxInputPoints: z.literal(MARKET_PERIOD_INDICATOR_MAX_POINTS),
   parameterRange: z.strictObject({ minimum: z.literal(2), maximum: z.literal(200) }),
@@ -69,11 +74,11 @@ export const marketPeriodIndicatorCapabilitiesSchema = z
     calculation: z.literal('provided-points'),
     periodProtocol: z.literal(MARKET_PERIOD_INDICATOR_PROTOCOL),
     nativeTimeframes: z.tuple([z.literal('1m'), z.literal('1d')]),
-    periods: z.array(periodCapabilitySchema).length(4),
+    periods: z.array(periodCapabilitySchema).length(8),
   })
   .superRefine((value, ctx) => {
-    if (new Set(value.periods.map((period) => period.timeframe)).size !== 4)
-      ctx.addIssue({ code: 'custom', path: ['periods'], message: '必须分别声明四种派生周期' });
+    if (new Set(value.periods.map((period) => period.timeframe)).size !== 8)
+      ctx.addIssue({ code: 'custom', path: ['periods'], message: '必须分别声明八种派生周期' });
   });
 export type MarketPeriodIndicatorCapabilities = z.infer<
   typeof marketPeriodIndicatorCapabilitiesSchema

@@ -1,4 +1,11 @@
+import { assertRouteReasoningEfforts } from './ai-route-reasoning-options.js';
 import { readVerifiedRoutes } from './ai-provider-validation-policy.js';
+import {
+  assertModelRequestOptions,
+  mergeModelRequestOptionsDefaults,
+  modelRequestOptionsFields,
+} from './ai-model-request-options.js';
+import { runtimeAdapterForSelection } from './ai-provider-upstream.js';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ProviderConfig } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -8,7 +15,11 @@ import {
   type AiGenerationMode,
 } from '@thesis-ledger/schemas';
 import type { ProviderConfigService } from '../providers/provider-config.service.js';
-import { aiProviderCapabilities, parseAiProviderSettings } from './ai-provider-summary.js';
+import {
+  aiProviderCapabilities,
+  parseAiProviderSettings,
+  resolveCompatibilityProfile,
+} from './ai-provider-summary.js';
 import {
   asRecord,
   type AiProviderInput,
@@ -16,6 +27,10 @@ import {
   type AiProviderModelPricingView,
 } from './ai-provider.contracts.js';
 import { configurationFingerprint, type AiProviderRouteSnapshot } from './ai-provider-readiness.js';
+import {
+  assertResearchReasoningRoutes,
+  mergeResearchReasoningRoutes,
+} from './ai-research-reasoning-options.js';
 
 const pricingVersionFor = (model: string, pricing: AiProviderModelPricingInput) =>
   `pricing-${createHash('sha256')
@@ -55,7 +70,7 @@ const legacyPricing = (
   };
 };
 
-const modelPricingFromInput = (
+export const modelPricingFromInput = (
   input: AiProviderInput,
   models: readonly string[],
   existing: ReturnType<typeof parseAiProviderSettings>,
@@ -94,11 +109,29 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
       ? {}
       : { chatImplementation: input.chatImplementation }),
   });
-  const executionRoutes =
-    input.executionRoutes !== undefined ? input.executionRoutes : existing?.executionRoutes;
-  const modelDefaults = input.modelDefaults ?? existing?.modelDefaults;
+  assertRouteReasoningEfforts(input);
+  const executionRoutes = mergeResearchReasoningRoutes(
+    input.executionRoutes,
+    existing?.executionRoutes,
+  );
+  const modelDefaults = mergeModelRequestOptionsDefaults(
+    input.modelDefaults,
+    existing?.modelDefaults,
+    input.models,
+  );
+  const modelCatalog =
+    input.modelCatalog === undefined ? existing?.modelCatalog : input.modelCatalog;
+  const compatibilityExtensionProfile = resolveCompatibilityProfile(input, existingSettings);
+  assertResearchReasoningRoutes(
+    { ...selection, compatibilityExtensionProfile },
+    executionRoutes ?? [],
+  );
   const models = [...new Set(input.models.map((model) => model.trim()))];
   const modelPricing = modelPricingFromInput(input, models, existing);
+  assertModelRequestOptions(
+    { ...input, ...(modelDefaults ? { modelDefaults } : {}), modelPricing },
+    runtimeAdapterForSelection(selection, compatibilityExtensionProfile),
+  );
   const legacySettingsFields =
     input.modelPricing === undefined
       ? {
@@ -112,14 +145,13 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
   return {
     baseUrl: input.baseUrl,
     models,
+    ...(modelCatalog ? { modelCatalog } : {}),
     authMode: input.authMode,
     upstreamFormat: selection.upstreamFormat,
     ...(selection.upstreamFormat === 'chat-completions'
       ? { chatImplementation: selection.chatImplementation }
       : {}),
-    ...(existing?.compatibilityExtensionProfile
-      ? { compatibilityExtensionProfile: existing.compatibilityExtensionProfile }
-      : {}),
+    ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
     ...(executionRoutes === undefined ? {} : { executionRoutes }),
     ...(modelDefaults === undefined ? {} : { modelDefaults }),
     modelPricing,
@@ -204,6 +236,7 @@ export const routeSnapshotsFromProviderRow = (
         adapter: settings.adapter ?? null,
         models: settings.models,
         route,
+        ...modelRequestOptionsFields(settings.modelDefaults, route.model),
         ...(settings.firstOutputTimeoutMs === undefined
           ? {}
           : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),

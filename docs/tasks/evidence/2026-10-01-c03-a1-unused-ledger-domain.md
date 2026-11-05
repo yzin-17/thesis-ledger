@@ -1,6 +1,6 @@
 # C03-a.1 旧 Ledger 领域导出清理证据
 
-> 所属任务：[Canonical Task](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md) C03；合同依据：[Canonical Spec](../../specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) §3，以及 [C01 库存](2026-10-01-parallel-c01-runtime-inventory.md)。
+> 所属任务：[Canonical Task](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) C03；合同依据：[Canonical Spec](../../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md) §3，以及 [C01 库存](2026-10-01-parallel-c01-runtime-inventory.md)。
 > 用户已确认进入 C03-a；共享主 Task、Spec、handoff 继续只读。状态由本文件提供给主线汇合，不自动勾选 C03 父项。
 
 ## 执行包与粒度核对

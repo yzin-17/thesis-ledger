@@ -8,7 +8,7 @@
 本 Review 对比以下两组文档和当前实现：
 
 - 原始投资复盘 Spec 与任务：[`2026-08-25-journal-review-interaction-design.md`](../specs/2026-08-25-journal-review-interaction-design.md)、[`2026-08-25-journal-review-interaction-design.md`](../tasks/2026-08-25-journal-review-interaction-design.md)。
-- 现行交易系统及 Journal 迁移文档：[`2026-08-26-trade-execution-ledger-system.md`](../../specs/2026-08-26-trade-execution-ledger-system.md)、[`2026-08-26-trade-projection-read-model.md`](../../specs/2026-08-26-trade-projection-read-model.md)、[`2026-08-26-trade-journal-migration.md`](../../specs/2026-08-26-trade-journal-migration.md)、[`2026-08-26-trade-execution-ledger-system-follow-up.md`](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)。
+- 现行交易系统及 Journal 迁移文档：[`2026-08-26-trade-execution-ledger-system.md`](../../specs/2026-08-26-trade-execution-ledger-system.md)、[`2026-08-26-trade-projection-read-model.md`](../../specs/2026-08-26-trade-projection-read-model.md)、[`2026-08-26-trade-journal-migration.md`](../../specs/2026-08-26-trade-journal-migration.md)、[`2026-08-26-trade-execution-ledger-system-follow-up.md`](../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)。
 
 审查依据包括当前物化 `Trade`/`TradeCloseSlice` 模型、`TradeQueryService`、`JournalService` 和当前 API Schema。审查只更新词汇与 Review 记录，不改写原任务的历史证据。
 

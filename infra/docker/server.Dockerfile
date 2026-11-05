@@ -12,7 +12,7 @@ COPY patches ./patches
 RUN pnpm --filter thesis-ledger --filter @thesis-ledger/server... install --frozen-lockfile
 COPY . .
 RUN pnpm --filter @thesis-ledger/server exec prisma generate
-RUN pnpm --filter @thesis-ledger/server... build
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter @thesis-ledger/server... build
 RUN pnpm --filter @thesis-ledger/server deploy --prod /tmp/server-runtime --legacy
 
 FROM node:24-alpine AS runtime

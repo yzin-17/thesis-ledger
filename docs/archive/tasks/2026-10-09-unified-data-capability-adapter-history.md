@@ -116,7 +116,7 @@ Review已证明旧“已结算”研究约定不能用于新场内ETF权益模�
 
 原[共同价格Task](2026-09-25-multi-source-adjustment-aware-backtest.md)保留历史；取消/保留范围以[2026-10-08决定](../../specs/2026-10-03-multi-source-remaining-acceptance.md#scope-cancellation-20261008)为准。S05、旧HiThink M31全历史/高级准入、M32、专业Quote高级资格、指定旧资产追补和复杂回退不恢复。
 
-[按需历史数据](../../tasks/2026-10-09-history-data-on-demand.md)和[富途接入](../../tasks/2026-10-08-futu-openapi-full-integration.md)独立维护业务验收；本框架不成为其已完成切片的新前置，不覆盖其WIP/状态。盘口只交付契约与隔离扩展测试，真实二级行情/订阅/盘口UI/逐笔仓库不属于本轮。
+[按需历史数据](2026-10-09-history-data-on-demand.md)和[富途接入](2026-10-08-futu-openapi-full-integration.md)独立维护业务验收；本框架不成为其已完成切片的新前置，不覆盖其WIP/状态。盘口只交付契约与隔离扩展测试，真实二级行情/订阅/盘口UI/逐笔仓库不属于本轮。
 
 ### 0.1 本地文档阶段
 
@@ -217,7 +217,7 @@ A01 固定本轮精确迁移切片及回归集合，不将所有来源或现行�
 
 ### 8.2 退市证券相关来源差异（后续统一处理）
 
-原2026-10-09事实表与授权边界保留于[原§8.2](../reviews/2026-10-11-unified-data-capability-initial-evidence.md#record-8-2)，业务证据仍由[按需历史数据Task](../../tasks/2026-10-09-history-data-on-demand.md)及其报告拥有。当前适配与消费继续遵守：
+原2026-10-09事实表与授权边界保留于[原§8.2](../reviews/2026-10-11-unified-data-capability-initial-evidence.md#record-8-2)，业务证据仍由[按需历史数据Task](2026-10-09-history-data-on-demand.md)及其报告拥有。当前适配与消费继续遵守：
 
 - HiThink选定证券身份失败与参数错误、窗口无覆盖、暂不可用分别表达，不能推断全部退市证券不支持；原1002精确Unknown thscode修复复用。
 - 腾讯退市前价格可得不证明最后交易日、跨源等价或所有消费资格；未知单位/覆盖/时钟不补造。

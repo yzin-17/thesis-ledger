@@ -4,6 +4,7 @@ import {
   decimalStringSchema,
   nonNegativeDecimalStringSchema,
   positiveDecimalStringSchema,
+  positiveRatioStringSchema,
 } from './monetary-values.js';
 import { corporateActionTypeSchema, type CorporateActionType } from './backtest-data.js';
 import {
@@ -272,24 +273,19 @@ const validateBooleanExpression = (
   issue(ctx, [...path, 'type'], '未知或不支持的布尔 AST 节点');
 };
 
-const isRatioAtMostOne = (value: string) => {
-  const [whole, fraction = ''] = value.split('.');
-  return whole === '0' || (whole === '1' && /^0*$/.test(fraction));
-};
-
 export const sizingRuleSchema = z.union([
   z.object({ type: z.literal('fixedAmount'), amount: positiveDecimalStringSchema }).strict(),
   z
     .object({
       type: z.literal('percentOfEquity'),
-      percent: positiveDecimalStringSchema.refine(isRatioAtMostOne, 'ratio 必须小于或等于 1'),
+      percent: positiveRatioStringSchema,
     })
     .strict(),
   z.object({ type: z.literal('fixedQuantity'), quantity: positiveDecimalStringSchema }).strict(),
   z
     .object({
       type: z.literal('targetWeight'),
-      weight: positiveDecimalStringSchema.refine(isRatioAtMostOne, 'ratio 必须小于或等于 1'),
+      weight: positiveRatioStringSchema,
     })
     .strict(),
 ]);
@@ -299,13 +295,13 @@ export const riskRuleSchema = z.union([
   z
     .object({
       type: z.literal('fixedStop'),
-      percent: positiveDecimalStringSchema.refine(isRatioAtMostOne, 'ratio 必须小于或等于 1'),
+      percent: positiveRatioStringSchema,
     })
     .strict(),
   z
     .object({
       type: z.literal('fixedTakeProfit'),
-      percent: positiveDecimalStringSchema.refine(isRatioAtMostOne, 'ratio 必须小于或等于 1'),
+      percent: positiveRatioStringSchema,
     })
     .strict(),
   z.object({ type: z.literal('maxHoldingPeriod'), periods: positiveIntegerSchema }).strict(),

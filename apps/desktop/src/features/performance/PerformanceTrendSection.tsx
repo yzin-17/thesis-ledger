@@ -1,3 +1,5 @@
+import { pnlReasonLabels, type PnlChartPoint } from './performance-pnl-model.js';
+import { TableContainer } from '@/components/ui/table';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -174,12 +176,12 @@ function TrendPointDetails({ points }: { points: PerformanceSeriesPoint[] }) {
   return (
     <details className="mt-3 rounded-lg bg-muted/20 px-3 py-2 text-sm">
       <summary className="cursor-pointer text-muted-foreground">查看估值点明细</summary>
-      <div className="table-wrap mt-2">
+      <TableContainer className="mt-2">
         <table>
           <thead>
             <tr>
               <th>时间</th>
-              <th>资产总值</th>
+              <th className="text-right">资产总值</th>
               <th>口径</th>
               <th>覆盖率</th>
               <th>质量</th>
@@ -189,7 +191,7 @@ function TrendPointDetails({ points }: { points: PerformanceSeriesPoint[] }) {
             {points.map((point) => (
               <tr key={`${point.at}-${point.sourceSnapshotId ?? 'series'}`}>
                 <td>{formatDate(point.at)}</td>
-                <td>{formatMoney(point.value, point.currency)}</td>
+                <td className="text-right">{formatMoney(point.value, point.currency)}</td>
                 <td>{point.valuationBasis === 'OFFICIAL' ? '正式' : '估算'}</td>
                 <td>
                   披露 {formatCoverage(point.disclosureCoverage)} / 定价{' '}
@@ -208,7 +210,7 @@ function TrendPointDetails({ points }: { points: PerformanceSeriesPoint[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableContainer>
     </details>
   );
 }
@@ -224,9 +226,7 @@ const EmptyTrend = ({
   if (hasHistory) {
     return (
       <Empty className="min-h-20 rounded-lg border-0 bg-muted/30 px-4 py-6" aria-live="polite">
-        <EmptyDescription>
-          该区间暂无估值点。盘中历史会从功能启用后逐步积累，不会按当前持仓倒推。
-        </EmptyDescription>
+        <EmptyDescription>该区间暂无估值点。</EmptyDescription>
       </Empty>
     );
   }
@@ -236,9 +236,7 @@ const EmptyTrend = ({
       aria-live="polite"
     >
       <EmptyTitle>暂无收益历史</EmptyTitle>
-      <EmptyDescription>
-        自动估值快照生成后，即可查看资产曲线、时间加权收益率和资金加权收益率。
-      </EmptyDescription>
+      <EmptyDescription>自动估值快照生成后可查看收益。</EmptyDescription>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {onCompleteDataSetup ? (
           <Button type="button" size="sm" onClick={onCompleteDataSetup}>
@@ -256,7 +254,7 @@ const EmptyTrend = ({
       </div>
       {showCalculationInfo ? (
         <p className="m-0 text-xs text-muted-foreground" role="note">
-          时间加权收益率使用完整快照计算，资金加权收益率还会结合账本的外部现金流。
+          时间加权收益率基于完整快照；资金加权收益率结合外部现金流。
         </p>
       ) : null}
     </Empty>
@@ -275,6 +273,7 @@ export function PerformanceSnapshotTable({
   onRetry,
   onCompleteDataSetup,
   groupedByCurrency = false,
+  pnl,
 }: {
   loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
   snapshots: SnapshotRecord[];
@@ -287,6 +286,16 @@ export function PerformanceSnapshotTable({
   onRetry?: (() => void) | undefined;
   onCompleteDataSetup?: (() => void) | undefined;
   groupedByCurrency?: boolean;
+  pnl?: {
+    points: PnlChartPoint[];
+    currency: Currency;
+    loading: boolean;
+    error: boolean;
+    historyEmpty: boolean;
+    truncated: boolean;
+    currentUnavailable: boolean;
+    onRetry: () => void;
+  };
 }) {
   const visibleSnapshots = useMemo(() => snapshotsForRange(snapshots, range), [snapshots, range]);
   const seriesPoints = series?.points ?? [];
@@ -299,8 +308,17 @@ export function PerformanceSnapshotTable({
       groups.set(currency, current);
     }
   }
+  if (groupedByCurrency && pnl && pnl.points.length > 0 && !groups.has(pnl.currency))
+    groups.set(pnl.currency, []);
+  const pnlAvailable = pnl?.points.some((point) => point.value !== null) === true;
+  const missingPnl = pnl?.points.filter((point) => point.value === null) ?? [];
+  const pnlReasons = [
+    ...new Set(
+      missingPnl.flatMap((point) => (point.reason ? [pnlReasonLabels[point.reason]] : [])),
+    ),
+  ];
   let content: ReactNode;
-  if (loadState === 'loading' && seriesPoints.length === 0 && !groupedByCurrency) {
+  if (loadState === 'loading' && seriesPoints.length === 0 && groups.size === 0 && !pnlAvailable) {
     content = <Skeleton className="h-52 w-full rounded-lg" aria-label="资产走势加载中" />;
   } else if (groups.size > 0) {
     content = (
@@ -311,6 +329,8 @@ export function PerformanceSnapshotTable({
             <PerformanceTrendChart
               seriesPoints={group.map(snapshotSeriesPoint)}
               interval={interval}
+              pnlPoints={pnl?.currency === currency ? pnl.points : undefined}
+              pnlCurrency={pnl?.currency}
             />
           </div>
         ))}
@@ -319,26 +339,48 @@ export function PerformanceSnapshotTable({
   } else if (seriesPoints.length > 0) {
     content = (
       <>
-        <PerformanceTrendChart seriesPoints={seriesPoints} interval={interval} />
+        <PerformanceTrendChart
+          seriesPoints={seriesPoints}
+          interval={interval}
+          pnlPoints={pnl?.points}
+          pnlCurrency={pnl?.currency}
+        />
         <TrendPointDetails points={seriesPoints} />
       </>
     );
-  } else {
+  } else if (pnl && pnl.points.length > 0) {
+    content = (
+      <PerformanceTrendChart
+        seriesPoints={[]}
+        interval={interval}
+        pnlPoints={pnl.points}
+        pnlCurrency={pnl.currency}
+      />
+    );
+  } else if (loadState === 'empty' || loadState === 'ready') {
     content = (
       <EmptyTrend
         hasHistory={snapshots.length > 0 || series !== undefined}
         onCompleteDataSetup={onCompleteDataSetup}
       />
     );
+  } else {
+    content = null;
   }
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="m-0 text-xl font-semibold tracking-tight">资产走势</h2>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
-            周、月、年线取周期内最后一个有效估值；盘中历史从启用后逐步积累。
-          </p>
+          <h2 className="m-0 text-xl font-semibold tracking-tight">
+            {pnl ? '资产总值与累计盈亏' : '资产走势'}
+          </h2>
+          <details className="mt-1 text-xs text-muted-foreground">
+            <summary className="cursor-pointer">计算口径</summary>
+            <p className="mt-2">
+              资产取周期末有效估值。
+              {pnl ? '盈亏为收盘记录与当前估值。' : ''}
+            </p>
+          </details>
         </div>
         <TrendControls
           range={range}
@@ -350,9 +392,63 @@ export function PerformanceSnapshotTable({
         />
       </div>
       {loadState !== 'ready' && loadState !== 'empty' && loadState !== 'loading' ? (
-        <DataStateBanner state={loadState} onRetry={onRetry} />
+        <DataStateBanner
+          state={loadState}
+          description={loadState === 'stale' ? '刷新失败，当前保留上次读取的估值数据。' : undefined}
+          onRetry={onRetry}
+        />
       ) : null}
+      {pnl?.error && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm" role="alert">
+          <span>历史盈亏读取失败，已保留可用数据。</span>
+          <Button type="button" variant="outline" size="sm" onClick={pnl.onRetry}>
+            重试盈亏历史
+          </Button>
+        </div>
+      )}
+      {pnl?.loading && (
+        <p className="m-0 text-xs text-muted-foreground" aria-label="正在读取盈亏历史">
+          正在读取盈亏历史…
+        </p>
+      )}
       {content}
+      {pnl &&
+        pnl.points.length > 0 &&
+        seriesPoints.length === 0 &&
+        visibleSnapshots.length === 0 &&
+        (loadState === 'empty' || loadState === 'ready') && (
+          <EmptyTrend
+            hasHistory={snapshots.length > 0 || series !== undefined}
+            onCompleteDataSetup={onCompleteDataSetup}
+          />
+        )}
+      {pnl && (
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground" aria-live="polite">
+          {pnl.points.some((point) => point.current) && (
+            <p className="m-0">
+              当前累计盈亏{' '}
+              <strong className="font-semibold text-foreground">
+                {pnl.points.at(-1)?.value === null || pnl.points.at(-1)?.value === undefined
+                  ? '—'
+                  : formatMoney(pnl.points.at(-1)!.value!, pnl.currency)}
+              </strong>
+            </p>
+          )}
+          {pnl.currentUnavailable && <p className="m-0">当前盈亏不可用。</p>}
+          {pnl.points.filter((point) => point.value !== null).length === 1 && (
+            <p className="m-0">当前仅有一个可用盈亏点。</p>
+          )}
+          {missingPnl.length > 0 && (
+            <p className="m-0">
+              {missingPnl.length} 个盈亏时点{pnlReasons.join('、')}，已留空。
+            </p>
+          )}
+          {pnl.historyEmpty && !pnl.error && !pnl.loading && pnl.points.length === 0 && (
+            <p className="m-0">暂无历史盈亏记录。</p>
+          )}
+          {pnl.truncated && <p className="m-0">仅展示最近 2000 个收盘记录。</p>}
+        </div>
+      )}
     </section>
   );
 }

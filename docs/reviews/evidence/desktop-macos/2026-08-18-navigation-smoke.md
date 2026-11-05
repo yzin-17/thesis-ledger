@@ -17,4 +17,4 @@
 
 同一窗口还验证了 Portfolio ready/stale/error 三态、Risk 页面字段和键盘 Tab 可到达刷新、表单控件及创建账户按钮。状态矩阵（含 loading、empty 及各页面的直接/共享证据边界）见同目录 `2026-08-18-state-matrix.md`。该烟测不替代 Windows 安装、签名、真实 Compose API 或完整 D1～D10 业务路径。
 
-2026-08-01 后续已在同一 macOS release 窗口连接真实 Docker Compose API，补齐账户/持仓录入、截图导入草稿与提交、Risk 规则、Strategy 版本与回测、Journal Review、AI 研究任务及 Provider 健康页面烟测；详细操作和截图见 [`2026-08-18-compose-release-e2e.md`](2026-08-18-compose-release-e2e.md)。该报告仍明确保留 Windows、全量键盘 D1-D10、全新数据库 onboarding 和签名发布边界。
+2026-08-01 后续已在同一 macOS release 窗口连接真实 Docker Compose API，补齐账户/持仓录入、Risk 规则、Strategy 版本与回测、Journal Review、AI 研究任务及 Provider 健康页面烟测；详细操作和截图见 [`2026-08-18-compose-release-e2e.md`](2026-08-18-compose-release-e2e.md)。该报告仍明确保留 Windows、全量键盘 D1-D10、全新数据库 onboarding 和签名发布边界。

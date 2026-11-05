@@ -37,13 +37,27 @@ export async function observeCase(api) {
   return createFailoverPlan(state, providerResponse.providers, catalog);
 }
 
-export async function executeCase(api, plan, checkpoint = () => {}) {
+async function readTimedSeries(api, target, routeIndex, revision, clock) {
+  const started = clock();
+  const raw = await api.get(barPath);
+  const elapsedMs = clock() - started;
+  assert(Number.isFinite(elapsedMs) && elapsedMs >= 0, '验收计时必须为有效单调时钟');
+  return { ...assertCaseSeries(raw, target, routeIndex, revision), elapsedMs };
+}
+
+function assertSeriesLatency(evidence, limitMs) {
+  assert(evidence.elapsedMs <= limitMs,
+    `真实整窗请求耗时 ${evidence.elapsedMs}ms，超过 ${limitMs}ms 验收上限`);
+}
+
+export async function executeCase(api, plan, checkpoint = () => {}, clock = () => performance.now()) {
   assertCase(plan);
   const before = desiredFromState(await api.get('/api/market-data/policy'));
   assert(before.revision === plan.baseline.revision && policyFingerprint(before) === plan.baselineFingerprint, '执行前政策已经改变');
   const source = (await api.get('/api/market-data/providers')).providers.find((row) => row.providerId === primary.providerId);
   assert(source?.enabled && source.configVersion === plan.baselineConfigVersion, '执行前来源配置已经改变');
-  const evidence = { baseline: assertCaseSeries(await api.get(barPath), primary, 0, before.revision) };
+  const evidence = { baseline: await readTimedSeries(api, primary, 0, before.revision, clock) };
+  assertSeriesLatency(evidence.baseline, 5000);
   const ownership = { policy: false, provider: false };
   // 写入恢复记录先于每个可能已经提交但响应丢失的变更。
   checkpoint({ phase: 'prepared', plan, evidence, ownership });
@@ -68,7 +82,8 @@ export async function executeCase(api, plan, checkpoint = () => {}) {
     const disabled = (await api.get('/api/market-data/providers')).providers.find((row) => row.providerId === primary.providerId);
     assert(disabled?.enabled === false && disabled.configVersion === plan.baselineConfigVersion + 1, '停用来源未确认');
     checkpoint({ phase: 'primary-disabled', plan, evidence, ownership });
-    evidence.backup = assertCaseSeries(await api.get(barPath), backup, 1, applied.revision);
+    evidence.backup = await readTimedSeries(api, backup, 1, applied.revision, clock);
+    assertSeriesLatency(evidence.backup, 10000);
   } catch (error) { failure = error; }
   finally {
     checkpoint({ phase: 'restoring', plan, evidence, ownership });
@@ -82,7 +97,8 @@ export async function executeCase(api, plan, checkpoint = () => {}) {
   }
   if (failure) throw failure;
   const restored = await api.get('/api/market-data/policy');
-  evidence.restored = assertCaseSeries(await api.get(barPath), primary, 0, restored.revision);
+  evidence.restored = await readTimedSeries(api, primary, 0, restored.revision, clock);
+  assertSeriesLatency(evidence.restored, 5000);
   checkpoint({ phase: 'verified', plan, evidence, ownership });
   return evidence;
 }

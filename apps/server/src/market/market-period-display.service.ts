@@ -1,5 +1,6 @@
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
-import type { MarketPeriod } from '@thesis-ledger/domain';
+import type { MarketPeriod, MarketMinutePeriod } from '@thesis-ledger/domain';
+import type { MinuteView } from './market-minute-view.js';
 import { inferAssetType } from '../ledger/asset-type.js';
 import { marketChartRequest } from './market-chart-request.js';
 import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
@@ -10,7 +11,7 @@ import { MarketPeriodWindowError, planMarketPeriodWindow } from './market-period
 import type { MarketIndicatorRequest } from './market-indicator-window.js';
 
 type Query = Record<string, string | undefined>;
-function unavailable(timeframe: MarketPeriod, reason: string): never {
+function unavailable(timeframe: MarketPeriod | MarketMinutePeriod, reason: string): never {
   throw new HttpException(
     {
       error: 'market_period_unavailable',
@@ -189,7 +190,7 @@ export class MarketPeriodDisplayService {
   }
 
   async calculate(
-    view: Awaited<ReturnType<MarketPeriodDisplayService['read']>>,
+    view: Awaited<ReturnType<MarketPeriodDisplayService['read']>> | MinuteView,
     requests: readonly MarketIndicatorRequest[],
     refresh = false,
   ) {

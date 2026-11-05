@@ -1,4 +1,5 @@
 import type { AiTestRuntimeInput } from './ai-provider.service.js';
+import { modelRequestOptionsFields } from './ai-model-request-options.js';
 
 export const aiTestRuntimeFingerprint = (input: AiTestRuntimeInput) => {
   return JSON.stringify({
@@ -21,5 +22,6 @@ export const aiTestRuntimeFingerprint = (input: AiTestRuntimeInput) => {
     chatImplementation: input.chatImplementation ?? null,
     compatibilityExtensionProfile: input.compatibilityExtensionProfile ?? null,
     executionRoutes: input.executionRoutes ?? null,
+    ...modelRequestOptionsFields(input.modelDefaults, input.testModel ?? input.models[0] ?? ''),
   });
 };

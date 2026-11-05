@@ -6,6 +6,8 @@ import { ThemeProvider } from '../ui/theme.js';
 import { MarketColorProvider } from '../ui/market-color.js';
 import { AppShell } from './AppShell.js';
 import { AppRoutes } from './routes.js';
+import { NavigationGuardProvider } from '../features/shared/navigation-guard.js';
+import { PortfolioModeProvider } from '../features/portfolio/portfolio-mode-context.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,9 +21,13 @@ function AppContent() {
       <MarketColorProvider>
         <Toaster>
           <ConfirmDialogProvider>
-            <AppShell>
-              <AppRoutes />
-            </AppShell>
+            <NavigationGuardProvider>
+              <PortfolioModeProvider>
+                <AppShell>
+                  <AppRoutes />
+                </AppShell>
+              </PortfolioModeProvider>
+            </NavigationGuardProvider>
           </ConfirmDialogProvider>
         </Toaster>
       </MarketColorProvider>

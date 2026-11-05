@@ -1,4 +1,5 @@
-import { DEFAULT_AI_TIMEOUT_MS, loadConfig } from '../platform/config.js';
+import { assertRouteReasoningEfforts } from './ai-route-reasoning-options.js';
+import { createAiTimeoutScope } from './timeout/ai-timeout-scope.js';
 import { AiProviderValidationJournal } from './ai-provider-validation-journal.js';
 import { assertValidationActive } from './ai-provider-validation-interruption.js';
 import {
@@ -20,7 +21,13 @@ import {
   type AiProviderInput,
   type AiProviderLifecycleOptions,
 } from './ai-provider.contracts.js';
-import { parseAiProviderSettings } from './ai-provider-summary.js';
+import { parseAiProviderSettings, resolveCompatibilityProfile } from './ai-provider-summary.js';
+import {
+  assertModelRequestOptions,
+  mergeModelRequestOptionsDefaults,
+} from './ai-model-request-options.js';
+import { modelPricingFromInput } from './ai-provider-readiness.persistence.js';
+import { runtimeAdapterForSelection } from './ai-provider-upstream.js';
 import {
   readVerifiedRoutes,
   effectiveRoute,
@@ -28,7 +35,8 @@ import {
   validationHash,
   VALIDATION_MAX_CALLS,
   VALIDATION_OUTPUT_TOKENS,
-  VALIDATION_DURATION_SECONDS,
+  validationTimeoutPolicy,
+  validationCallAuthorizationMatches,
   type VerifiedRoute,
 } from './ai-provider-validation-policy.js';
 import {
@@ -37,6 +45,10 @@ import {
   validationPricing,
   type ValidationRunContext,
 } from './ai-provider-validation-runner.js';
+import {
+  assertResearchReasoningRoutes,
+  mergeResearchReasoningRoutes,
+} from './ai-research-reasoning-options.js';
 
 @Injectable()
 export class AiProviderSaveService {
@@ -53,14 +65,6 @@ export class AiProviderSaveService {
 
   private async context(raw: unknown) {
     const parsed = aiProviderInputSchema.parse(raw);
-    // Resolve the deployed default once; test and saved runtime must use the same limit.
-    if (parsed.timeoutMs === undefined) {
-      try {
-        parsed.timeoutMs = Math.min(loadConfig().aiTimeoutMs, 120000);
-      } catch {
-        parsed.timeoutMs = DEFAULT_AI_TIMEOUT_MS;
-      }
-    }
     const row = await this.configs.findStored(parsed.name);
     if (row && parsed.expectedRevision !== row.updatedAt.toISOString())
       throw new ConflictException('配置版本已变化，请刷新后再验证');
@@ -79,14 +83,33 @@ export class AiProviderSaveService {
         : (credentialSupplied ?? (row ? await this.configs.readCredential(row) : ''));
     if (parsed.authMode === 'api_key' && !credential && parsed.enabled !== false)
       throw new BadRequestException('请填写 API Key');
-    const modelDefaults = parsed.modelDefaults ?? stored?.modelDefaults;
+    const modelDefaults = mergeModelRequestOptionsDefaults(
+      parsed.modelDefaults,
+      stored?.modelDefaults,
+      parsed.models,
+    );
+    const profile = resolveCompatibilityProfile(parsed, row?.settings);
     const input: AiProviderInput = {
       ...parsed,
       enabled: parsed.enabled ?? row?.enabled ?? true,
-      executionRoutes: parsed.executionRoutes ?? stored?.executionRoutes ?? [],
+      executionRoutes:
+        mergeResearchReasoningRoutes(parsed.executionRoutes, stored?.executionRoutes) ?? [],
       ...(modelDefaults ? { modelDefaults } : {}),
+      ...(profile ? { compatibilityExtensionProfile: profile } : {}),
     };
     input.executionRoutes = input.executionRoutes!.map((route) => effectiveRoute(input, route));
+    assertRouteReasoningEfforts(input);
+    assertResearchReasoningRoutes(input, input.executionRoutes);
+    assertModelRequestOptions(
+      { ...input, modelPricing: modelPricingFromInput(input, input.models, stored) },
+      runtimeAdapterForSelection(
+        {
+          upstreamFormat: input.upstreamFormat,
+          ...(input.chatImplementation ? { chatImplementation: input.chatImplementation } : {}),
+        },
+        profile,
+      ),
+    );
     const enabledRoutes =
       input.enabled === false
         ? []
@@ -98,18 +121,13 @@ export class AiProviderSaveService {
       ...(await this.journal.passed(parsed.name)),
     ];
     const routes = enabledRoutes.map((route) => {
-      const fingerprint = routeValidationFingerprint(
-        input,
-        route,
-        credential,
-        stored?.compatibilityExtensionProfile,
-      );
+      const fingerprint = routeValidationFingerprint(input, route, credential, profile);
       const record =
         verified.find((item) => item.fingerprint === fingerprint) ??
         this.successful.get(fingerprint);
       return { route, fingerprint, record };
     });
-    return { input, row, credential, routes, profile: stored?.compatibilityExtensionProfile };
+    return { input, row, credential, routes, profile };
   }
 
   private planFor(context: Awaited<ReturnType<AiProviderSaveService['context']>>) {
@@ -153,7 +171,8 @@ export class AiProviderSaveService {
       })),
       maxCalls,
       maxOutputTokensPerCall: VALIDATION_OUTPUT_TOKENS,
-      maxDurationSeconds: VALIDATION_DURATION_SECONDS,
+      maxDurationSeconds:
+        validationTimeoutPolicy(context.routes.map(({ route }) => route)).taskBudgetMs / 1000,
       estimatedCosts: [...costs].map(([currency, amount]) => ({
         currency,
         amount: String(amount),
@@ -194,28 +213,28 @@ export class AiProviderSaveService {
   async testAndSave(raw: unknown, authorization: AiProviderValidationAuthorization) {
     const context = await this.context(raw);
     const plan = this.planFor(context);
-    if (
-      authorization.planFingerprint !== plan.planFingerprint ||
-      authorization.maxCalls !== plan.maxCalls
-    )
+    if (!validationCallAuthorizationMatches(plan, authorization))
       throw new ConflictException('测试范围或费用已变化，请重新确认');
     if (this.active.has(context.input.name))
       throw new ConflictException('验证正在进行或该操作已使用，请勿重复请求');
     await this.journal.begin(context.input.name, authorization.operationId, plan.planFingerprint);
     const controller = new AbortController();
     this.active.set(context.input.name, { operationId: authorization.operationId, controller });
-    const signal = AbortSignal.any([
-      controller.signal,
-      AbortSignal.timeout(VALIDATION_DURATION_SECONDS * 1000),
-    ]);
+    const policy = validationTimeoutPolicy(context.routes.map(({ route }) => route));
+    const taskDeadlineAt = Date.now() + plan.maxDurationSeconds * 1000;
+    const scope = createAiTimeoutScope({ policy, taskDeadlineAt, signal: controller.signal });
+    const signal = scope.signal;
     const run: ValidationRunContext = {
       input: context.input,
       credential: context.credential,
       operationId: authorization.operationId,
       signal,
-      deadline: Date.now() + VALIDATION_DURATION_SECONDS * 1000,
+      deadline: taskDeadlineAt - policy.cleanupReserveMs,
+      policy,
+      taskDeadlineAt,
       remainingCalls: authorization.maxCalls,
       allowText: authorization.allowTextFallback,
+      stopOnFirstFailure: authorization.stopOnFirstFailure === true,
       ...(context.profile === undefined ? {} : { profile: context.profile }),
     };
     const records: VerifiedRoute[] = [];
@@ -246,6 +265,7 @@ export class AiProviderSaveService {
       // save() re-reads the revision, then persistence applies its existing CAS fence.
       return await this.persist(context, records);
     } finally {
+      scope.close();
       this.active.delete(context.input.name);
     }
   }

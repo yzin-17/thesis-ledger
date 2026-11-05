@@ -23,7 +23,8 @@ import { createAccountActionHandlers } from './portfolio.account-actions.js';
 import { createInstrumentActionHandlers } from './portfolio.instrument-actions.js';
 import { createPositionActionHandlers } from './portfolio.position-actions.js';
 
-export type PortfolioToastManager = Pick<ReturnType<typeof useToastManager>, 'add'>;
+export type PortfolioToastManager = Pick<ReturnType<typeof useToastManager>, 'add'> &
+  Partial<Pick<ReturnType<typeof useToastManager>, 'close'>>;
 export type PortfolioConfirmDialog = (options: ConfirmDialogOptions) => Promise<boolean>;
 
 export type PortfolioMutationBundle = {
@@ -63,7 +64,10 @@ export type PortfolioActionDependencies = {
   setAccountSheetOpen: Dispatch<SetStateAction<boolean>>;
   setPositionSheetOpen: (open: boolean) => void;
   markDirty: (nextDirty?: boolean) => void;
-  onSaved: (impact: PortfolioChangeImpact) => void;
+  onSaved: (impact: PortfolioChangeImpact) => void | Promise<unknown>;
+  refreshManagedAccounts?: () => Promise<unknown>;
+  accountSaveErrorToastId?: { current: string | null };
+  positionSaveErrorToastId?: { current: string | null };
   toastManager: PortfolioToastManager;
   confirm: PortfolioConfirmDialog;
   mutations: PortfolioMutationBundle;

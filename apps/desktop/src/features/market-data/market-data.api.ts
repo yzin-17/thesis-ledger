@@ -1,10 +1,10 @@
 import {
   marketPolicyClientResponseSchema,
-  marketRouteCatalogReadClientV3Schema,
   type MarketProviderProbeRoute,
+  type MarketProviderAccountLevel,
 } from '@thesis-ledger/schemas';
+import { ThesisLedgerContractError } from '@thesis-ledger/api-client';
 import { getDesktopApiClient } from '../../shared/api/client.js';
-import { parseCatalogJobResponse } from './catalog-job-response.js';
 import type {
   MarketPolicyDraftV3,
   MarketPolicyResponse,
@@ -24,11 +24,11 @@ export const parseMarketPolicyResponse = (value: unknown): MarketPolicyResponse 
 export const fetchMarketPolicy = () => api().market.getPolicy();
 
 export const fetchMarketRouteCapabilitiesV3 = async (): Promise<MarketRouteCatalogReadV3> => {
-  const response = await api().request<unknown>(
-    '/api/market-data/routes/capabilities?contractVersion=3',
-  );
-  const parsed = marketRouteCatalogReadClientV3Schema.safeParse(response);
-  if (parsed.success) return parsed.data;
+  try {
+    return await api().market.routeCapabilities();
+  } catch (error) {
+    if (!(error instanceof ThesisLedgerContractError)) throw error;
+  }
   return {
     contractVersion: 3,
     consumer: 'thesis-ledger',
@@ -43,37 +43,32 @@ export const fetchMarketRouteCapabilitiesV3 = async (): Promise<MarketRouteCatal
 export const fetchMarketProviders = async () =>
   (await api().market.getProviderRegistry()).providers;
 export const fetchCatalogStatus = () => api().market.getCatalogStatus();
-export const fetchCatalogJob = async (jobId: string) =>
-  parseCatalogJobResponse(
-    await api().request<unknown>(`/api/market-data/catalog/jobs/${encodeURIComponent(jobId)}`),
-    jobId,
-  );
+export const fetchCatalogJob = async (jobId: string) => api().market.catalogJob(jobId);
 
 export const saveMarketPolicy = async (policy: MarketPolicyDraftV3) =>
-  parseMarketPolicyResponse(
-    await api().request<unknown>('/api/market-data/policy', {
-      method: 'PUT',
-      body: JSON.stringify({
-        contractVersion: 3,
-        consumer: 'thesis-ledger',
-        requestId: crypto.randomUUID(),
-        revision: policy.revision + 1,
-        expectedRevision: policy.revision,
-        enabled: policy.enabled,
-        routes: policy.routes,
-      }),
-    }),
-  );
+  api().market.savePolicy({
+    contractVersion: 3,
+    consumer: 'thesis-ledger',
+    requestId: crypto.randomUUID(),
+    revision: policy.revision + 1,
+    expectedRevision: policy.revision,
+    enabled: policy.enabled,
+    routes: policy.routes,
+  });
 
-export const retryMarketPolicy = async () =>
-  parseMarketPolicyResponse(
-    await api().request<unknown>('/api/market-data/policy/retry', { method: 'POST' }),
-  );
+export const retryMarketPolicy = async () => api().market.retryPolicy();
 
 export const saveMarketProviderCredentials = (
   providerId: string,
-  credentials: ProviderCredentialDraft,
-) => api().market.configureProvider(providerId, { credentials });
+  credentials: ProviderCredentialDraft | undefined,
+  settings?: Record<string, unknown>,
+  expectedConfigVersion?: number,
+) =>
+  api().market.configureProvider(providerId, {
+    ...(credentials ? { credentials } : {}),
+    ...(settings ? { settings } : {}),
+    ...(expectedConfigVersion !== undefined ? { expectedConfigVersion } : {}),
+  });
 
 export const setMarketProviderEnabled = (providerId: string, enabled: boolean) =>
   api().market.configureProvider(providerId, { enabled });
@@ -87,6 +82,7 @@ export const testMarketProvider = (
   signal?: AbortSignal,
   route?: MarketProviderProbeRoute,
   purpose?: 'capability_read' | 'account_access',
+  accountLevel?: MarketProviderAccountLevel,
 ) =>
   api().market.testProvider(
     provider.providerId,
@@ -94,21 +90,17 @@ export const testMarketProvider = (
       ...(credentials ? { credentials } : {}),
       ...(route ? { route } : {}),
       ...(purpose ? { purpose } : {}),
+      ...(accountLevel ? { accountLevel } : {}),
     },
     signal,
   );
 
 export const removeMarketProvider = (providerId: string) => api().market.removeProvider(providerId);
 
-export const startCatalogSync = async () =>
-  parseCatalogJobResponse(
-    await api().request<unknown>('/api/market-data/catalog/sync', { method: 'POST' }),
-  );
+export const startCatalogSync = async () => api().market.startCatalogSync();
 
 export const searchMarketInstruments = (query: string) =>
   api().market.searchInstruments({ q: query, limit: 50 });
 
 export const confirmMarketInstrument = (instrumentId: string) =>
-  api().request(`/api/market-data/instruments/${encodeURIComponent(instrumentId)}/confirm`, {
-    method: 'POST',
-  });
+  api().market.confirmInstrument(instrumentId);

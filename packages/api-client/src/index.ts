@@ -1,43 +1,61 @@
+import { cashManagementClient } from './cash-management-client.js';
+import { aiProviderClient } from './ai-provider-client.js';
+import { marketPolicyClient } from './market-policy-client.js';
+import { fundValuationClient } from './fund-valuation-client.js';
+export type { FundValuation, FundValuationToday } from '@thesis-ledger/schemas';
+import { marketCatalogClient } from './market-catalog-client.js';
+export { marketPolicyClient } from './market-policy-client.js';
+export { marketCatalogClient } from './market-catalog-client.js';
+import { providerOAuthClient } from './provider-oauth-client.js';
+import { automationClient } from './automation-client.js';
+import { diagnosticsClient } from './diagnostics-client.js';
+export { automationClient } from './automation-client.js';
+export { diagnosticsClient } from './diagnostics-client.js';
+export { safeProviderOAuthUrl } from './provider-oauth-client.js';
+export { aiProviderClient } from './ai-provider-client.js';
+import { performanceClient } from './performance-client.js';
+import { riskManagementClient } from './risk-management-client.js';
+import { marketInformationClient } from './market-information-client.js';
+export { marketInformationClient } from './market-information-client.js';
+export {
+  requestPlannedMarketDetail,
+  readPlannedMarketDetail,
+  MarketChartUnavailableError,
+} from './planned-market-detail.js';
+export { riskManagementClient } from './risk-management-client.js';
+export { performanceClient } from './performance-client.js';
+import { marketChartOptionsClient } from './market-chart-options-client.js';
+import { ThesisLedgerContractError } from './api-error.js';
 import { marketDisplayClient } from './market-display-client.js';
-import { backtestRunClient } from './backtest-run-client.js';
+import { backtestClients } from './backtest-clients.js';
+import { strategyClients } from './strategy-clients.js';
 import { marketControlClient } from './market-control-client.js';
-import { backtestRunConfigClient } from './backtest-run-config-client.js';
-import { backtestNavRunClient } from './backtest-nav-run-client.js';
 import { journalReviewClient } from './journal-review-client.js';
+import { researchClient } from './research-client.js';
+import { researchRunClient } from './research-run-client.js';
+export { researchRunClient } from './research-run-client.js';
+export { strategyClients } from './strategy-clients.js';
+export { backtestClients } from './backtest-clients.js';
 import {
   apiErrorResponseSchema,
-  accountsResponseSchema,
   baselineReconciliationCandidatesResponseSchema,
-  instrumentSearchResponseSchema,
   importDraftCommandResponseSchema,
   importDraftRevisionResponseSchema,
   ledgerCommandResponseSchema,
   ledgerAuditResponseSchema,
   ledgerEventsResponseSchema,
   ledgerReplayResponseSchema,
-  marketChartOptionsV3Schema,
-  marketChartOptionsWindowV3Schema,
-  type MarketChartOptionsWindowV3,
-  marketChartPlanV3Schema,
-  type MarketChartPlanV3,
-  performanceSummaryResponseSchema,
   portfolioValuationResponseSchema,
-  riskEventsResponseSchema,
-  recurringCashDepositOccurrenceSchema,
-  recurringCashDepositOccurrencesResponseSchema,
-  recurringCashDepositPlanSchema,
-  recurringCashDepositPlansResponseSchema,
-  recurringFundInvestmentOccurrenceSchema,
-  recurringFundInvestmentOccurrencesResponseSchema,
-  recurringFundInvestmentPlanSchema,
-  recurringFundInvestmentPlansResponseSchema,
   tradeCloseSliceQueryResponseSchema,
   tradeDetailResponseSchema,
   tradeListResponseSchema,
+  tradeChartQuerySchema,
+  tradeChartResponseSchema,
+  type TradeChartQuery,
+  tradeInstrumentsQuerySchema,
+  tradeInstrumentsResponseSchema,
   tradeReferenceResolveResponseSchema,
   type ApiErrorResponse,
-  type AccountResponse,
-  type AccountMode,
   type CreateBaselineObservationBatchCommand,
   type CreateCashFlowCommand,
   type CreateCashTransferCommand,
@@ -69,20 +87,12 @@ import {
   type TradeCloseSliceQueryResponse,
   type TradeDetailResponse,
   type TradeListQuery,
+  type TradeInstrumentsQueryInput,
+  type TradeInstrumentsResponse,
   type TradeListResponse,
   type TradeReferenceResolveRequest,
   type TradeReferenceResolveResponse,
   type Currency,
-  type ConfirmRecurringCashDepositOccurrence,
-  type CreateRecurringCashDepositPlan,
-  type RecurringCashDepositOccurrence,
-  type RecurringCashDepositPlan,
-  type UpdateRecurringCashDepositPlan,
-  type ConfirmRecurringFundInvestmentOccurrence,
-  type CreateRecurringFundInvestmentPlan,
-  type RecurringFundInvestmentOccurrence,
-  type RecurringFundInvestmentPlan,
-  type UpdateRecurringFundInvestmentPlan,
 } from '@thesis-ledger/schemas';
 
 export type {
@@ -153,6 +163,8 @@ export type {
   TradeDetailResponse,
   TradeSummaryResponse,
   TradeListQuery,
+  TradeInstrumentsQueryInput,
+  TradeInstrumentsResponse,
   TradeListResponse,
   TradeReferenceResolveRequest,
   TradeReferenceResolveResponse,
@@ -207,7 +219,11 @@ export type {
   JournalLegacyReviewCandidate,
 } from '@thesis-ledger/schemas';
 
-export type { MarketDetailQuery, MarketChartQuery, MarketPeriodOptionsQuery } from './market-display-client.js';
+export type {
+  MarketDetailQuery,
+  MarketChartQuery,
+  MarketPeriodOptionsQuery,
+} from './market-display-client.js';
 
 type QueryValue = string | number | boolean | readonly string[] | undefined;
 
@@ -222,26 +238,26 @@ const queryString = (params: Record<string, QueryValue>) => {
 };
 
 import { ThesisLedgerApiError, retryAfterMilliseconds } from './api-error.js';
+import { accountManagementClient } from './account-management-client.js';
+import { ledgerImportClient } from './ledger-import-client.js';
+import { instrumentClient } from './instrument-client.js';
+import { positionManagementClient } from './position-management-client.js';
+export type { SaveAccountInput } from './account-management-client.js';
+export { draftIsFrozen, rowCanSubmit, reviewedDraftCommand } from './import-review-policy.js';
 export { ThesisLedgerApiError, retryAfterMilliseconds } from './api-error.js';
 
-export class ThesisLedgerContractError extends Error {
-  constructor(public readonly path: string) {
-    super(`ThesisLedger API 响应契约不匹配: ${path}`);
-  }
-}
+export { ThesisLedgerContractError } from './api-error.js';
 
 export class ThesisLedgerApiClient {
   private readonly baseUrl: string;
   private readonly fetcher: typeof fetch;
 
-  readonly accounts = {
-    list: (
-      params: { includeInactive?: boolean; mode?: AccountMode } = {},
-    ): Promise<AccountResponse[]> =>
-      this.requestParsed(`/accounts${queryString(params)}`, accountsResponseSchema),
-    permanentDelete: (accountId: string): Promise<void> =>
-      this.deleteNoContent(`/accounts/${encodeURIComponent(accountId)}/permanent`),
-  };
+  readonly accounts = accountManagementClient(
+    this.requestParsed.bind(this),
+    this.fetchResponse.bind(this),
+  );
+  readonly imports = ledgerImportClient(this.requestParsed.bind(this));
+  readonly positionManagement = positionManagementClient(this.fetchResponse.bind(this));
 
   readonly portfolio = {
     getValuation: (
@@ -252,13 +268,33 @@ export class ThesisLedgerApiClient {
         baseCurrency?: Currency;
         t?: number;
       } = {},
+      signal?: AbortSignal,
     ) =>
       this.requestParsed(
         `/portfolio/valuation${queryString(params)}`,
         portfolioValuationResponseSchema,
+        signal ? { signal } : undefined,
       ),
     getTrades: (params: Partial<TradeListQuery> = {}): Promise<TradeListResponse> =>
       this.requestParsed(`/portfolio/trades${queryString(params)}`, tradeListResponseSchema),
+    getTradeChart: (input: TradeChartQuery, signal?: AbortSignal) => {
+      const params = tradeChartQuerySchema.parse(input);
+      return this.requestParsed(`/portfolio/trades/chart${queryString(params)}`,
+        tradeChartResponseSchema.refine((result) => result.accountId === params.accountId &&
+          result.mode === params.mode && result.symbol === params.symbol &&
+          result.start === params.start && result.end === params.end),
+        { cache: 'no-store', ...(signal ? { signal } : {}) });
+    },
+    getTradeInstruments: (input: TradeInstrumentsQueryInput = {}, signal?: AbortSignal): Promise<TradeInstrumentsResponse> => {
+      const params = tradeInstrumentsQuerySchema.parse(input);
+      return this.requestParsed(`/portfolio/trades/instruments${queryString(params)}`, tradeInstrumentsResponseSchema, {
+        cache: 'no-store', ...(signal ? { signal } : {}),
+      }).then((result) => {
+        if (result.mode !== params.mode || result.accountId !== (params.accountId ?? null))
+          throw new ThesisLedgerContractError('/portfolio/trades/instruments');
+        return result;
+      });
+    },
     getTrade: (
       accountId: string,
       tradeId: string,
@@ -297,246 +333,24 @@ export class ThesisLedgerApiClient {
       ),
   };
 
-  readonly cashDeposits = {
-    getPlans: (
-      params: { accountId?: string; status?: 'ACTIVE' | 'PAUSED' | 'ENDED' } = {},
-    ): Promise<RecurringCashDepositPlan[]> =>
-      this.requestParsed(
-        `/cash-deposit-plans${queryString(params)}`,
-        recurringCashDepositPlansResponseSchema,
-      ),
-    createPlan: (input: CreateRecurringCashDepositPlan): Promise<RecurringCashDepositPlan> =>
-      this.postParsed('/cash-deposit-plans', input, recurringCashDepositPlanSchema),
-    updatePlan: (
-      id: string,
-      input: UpdateRecurringCashDepositPlan,
-    ): Promise<RecurringCashDepositPlan> =>
-      this.patchParsed(
-        `/cash-deposit-plans/${encodeURIComponent(id)}`,
-        input,
-        recurringCashDepositPlanSchema,
-      ),
-    pausePlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
-      this.postParsed(
-        `/cash-deposit-plans/${encodeURIComponent(id)}/pause`,
-        { expectedVersion },
-        recurringCashDepositPlanSchema,
-      ),
-    resumePlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
-      this.postParsed(
-        `/cash-deposit-plans/${encodeURIComponent(id)}/resume`,
-        { expectedVersion },
-        recurringCashDepositPlanSchema,
-      ),
-    endPlan: (id: string, expectedVersion: number): Promise<RecurringCashDepositPlan> =>
-      this.postParsed(
-        `/cash-deposit-plans/${encodeURIComponent(id)}/end`,
-        { expectedVersion },
-        recurringCashDepositPlanSchema,
-      ),
-    getOccurrences: (
-      params: {
-        accountId?: string;
-        planId?: string;
-        status?: 'PENDING' | 'CONFIRMED' | 'SKIPPED';
-      } = {},
-    ): Promise<RecurringCashDepositOccurrence[]> =>
-      this.requestParsed(
-        `/cash-deposit-occurrences${queryString(params)}`,
-        recurringCashDepositOccurrencesResponseSchema,
-      ),
-    confirmOccurrence: (
-      id: string,
-      input: ConfirmRecurringCashDepositOccurrence,
-    ): Promise<RecurringCashDepositOccurrence> =>
-      this.postParsed(
-        `/cash-deposit-occurrences/${encodeURIComponent(id)}/confirm`,
-        input,
-        recurringCashDepositOccurrenceSchema,
-      ),
-    skipOccurrence: (
-      id: string,
-      input: { expectedVersion: number; reason: string },
-    ): Promise<RecurringCashDepositOccurrence> =>
-      this.postParsed(
-        `/cash-deposit-occurrences/${encodeURIComponent(id)}/skip`,
-        input,
-        recurringCashDepositOccurrenceSchema,
-      ),
-    reopenOccurrence: (
-      id: string,
-      expectedVersion: number,
-    ): Promise<RecurringCashDepositOccurrence> =>
-      this.postParsed(
-        `/cash-deposit-occurrences/${encodeURIComponent(id)}/reopen`,
-        { expectedVersion },
-        recurringCashDepositOccurrenceSchema,
-      ),
-  };
+  private readonly cashManagement = cashManagementClient(this.requestParsed.bind(this));
+  readonly cash = this.cashManagement.cash;
+  readonly cashDeposits = this.cashManagement.cashDeposits;
+  readonly fundInvestments = this.cashManagement.fundInvestments;
 
-  readonly fundInvestments = {
-    getPlans: (
-      params: { accountId?: string; status?: 'ACTIVE' | 'PAUSED' | 'ENDED' } = {},
-    ): Promise<RecurringFundInvestmentPlan[]> =>
-      this.requestParsed(
-        `/fund-investment-plans${queryString(params)}`,
-        recurringFundInvestmentPlansResponseSchema,
-      ),
-    createPlan: (input: CreateRecurringFundInvestmentPlan): Promise<RecurringFundInvestmentPlan> =>
-      this.postParsed('/fund-investment-plans', input, recurringFundInvestmentPlanSchema),
-    updatePlan: (
-      id: string,
-      input: UpdateRecurringFundInvestmentPlan,
-    ): Promise<RecurringFundInvestmentPlan> =>
-      this.patchParsed(
-        `/fund-investment-plans/${encodeURIComponent(id)}`,
-        input,
-        recurringFundInvestmentPlanSchema,
-      ),
-    pausePlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
-      this.postParsed(
-        `/fund-investment-plans/${encodeURIComponent(id)}/pause`,
-        { expectedVersion },
-        recurringFundInvestmentPlanSchema,
-      ),
-    resumePlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
-      this.postParsed(
-        `/fund-investment-plans/${encodeURIComponent(id)}/resume`,
-        { expectedVersion },
-        recurringFundInvestmentPlanSchema,
-      ),
-    endPlan: (id: string, expectedVersion: number): Promise<RecurringFundInvestmentPlan> =>
-      this.postParsed(
-        `/fund-investment-plans/${encodeURIComponent(id)}/end`,
-        { expectedVersion },
-        recurringFundInvestmentPlanSchema,
-      ),
-    getOccurrences: (
-      params: {
-        accountId?: string;
-        planId?: string;
-        status?: 'PENDING' | 'CONFIRMED' | 'SKIPPED';
-      } = {},
-    ): Promise<RecurringFundInvestmentOccurrence[]> =>
-      this.requestParsed(
-        `/fund-investment-occurrences${queryString(params)}`,
-        recurringFundInvestmentOccurrencesResponseSchema,
-      ),
-    confirmOccurrence: (
-      id: string,
-      input: ConfirmRecurringFundInvestmentOccurrence,
-    ): Promise<RecurringFundInvestmentOccurrence> =>
-      this.postParsed(
-        `/fund-investment-occurrences/${encodeURIComponent(id)}/confirm`,
-        input,
-        recurringFundInvestmentOccurrenceSchema,
-      ),
-    skipOccurrence: (
-      id: string,
-      input: { expectedVersion: number; reason: string },
-    ): Promise<RecurringFundInvestmentOccurrence> =>
-      this.postParsed(
-        `/fund-investment-occurrences/${encodeURIComponent(id)}/skip`,
-        input,
-        recurringFundInvestmentOccurrenceSchema,
-      ),
-    reopenOccurrence: (
-      id: string,
-      expectedVersion: number,
-    ): Promise<RecurringFundInvestmentOccurrence> =>
-      this.postParsed(
-        `/fund-investment-occurrences/${encodeURIComponent(id)}/reopen`,
-        { expectedVersion },
-        recurringFundInvestmentOccurrenceSchema,
-      ),
-  };
+  readonly risk = riskManagementClient(this.requestParsed.bind(this));
 
-  readonly risk = {
-    getEvents: (
-      params: { mode?: 'actual' | 'shadow'; cursor?: string; limit?: number; t?: number } = {},
-    ) => this.requestParsed(`/risk/events${queryString(params)}`, riskEventsResponseSchema),
-  };
-
-  readonly performance = {
-    getSummary: (
-      params: {
-        accountId?: string;
-        start?: string;
-        end?: string;
-        mode?: 'actual' | 'shadow';
-        fxMerge?: boolean;
-        baseCurrency?: Currency;
-      } = {},
-    ) =>
-      this.requestParsed(
-        `/performance/summary${queryString(params)}`,
-        performanceSummaryResponseSchema,
-      ),
-  };
+  readonly performance = performanceClient(this.requestParsed.bind(this));
 
   readonly market = {
+    ...fundValuationClient(this.requestParsed.bind(this)),
+    ...marketPolicyClient(this.requestParsed.bind(this)),
+    ...marketCatalogClient(this.requestParsed.bind(this)),
     ...marketControlClient(this.requestParsed.bind(this)),
     ...marketDisplayClient(this.requestParsed.bind(this), queryString),
-    getPlannedChartOptions: async (
-      symbol: string,
-      input: MarketChartPlanV3,
-      signal?: AbortSignal,
-    ) => {
-      const plan = marketChartPlanV3Schema.parse(input);
-      const path = `/api/market/${encodeURIComponent(symbol)}/chart-options${queryString({
-        barsLimit: plan.barsLimit,
-        indicatorParams: JSON.stringify(plan.indicatorParams),
-        planEnd: plan.end,
-      })}`;
-      const response = await this.requestParsed(
-        path,
-        marketChartOptionsV3Schema,
-        signal ? { signal } : undefined,
-      );
-      const actual = response.plan;
-      if (
-        response.symbol !== symbol ||
-        !response.window ||
-        !actual ||
-        actual.barsLimit !== plan.barsLimit ||
-        actual.end !== plan.end ||
-        Object.keys(actual.indicatorParams).length !== Object.keys(plan.indicatorParams).length ||
-        Object.entries(plan.indicatorParams).some(
-          ([key, value]) => actual.indicatorParams[key] !== value,
-        )
-      ) {
-        throw new ThesisLedgerContractError(path);
-      }
-      return response;
-    },
-    getChartOptions: async (
-      symbol: string,
-      signal?: AbortSignal,
-      requestedWindow?: MarketChartOptionsWindowV3,
-    ) => {
-      const window = requestedWindow
-        ? marketChartOptionsWindowV3Schema.parse(requestedWindow)
-        : undefined;
-      const path = `/api/market/${encodeURIComponent(symbol)}/chart-options${queryString(window ?? {})}`;
-      const response = await this.requestParsed(
-        path,
-        marketChartOptionsV3Schema,
-        signal ? { signal } : undefined,
-      );
-      if (
-        response.symbol !== symbol ||
-        response.window?.start !== window?.start ||
-        response.window?.end !== window?.end
-      ) {
-        throw new ThesisLedgerContractError(path);
-      }
-      return response;
-    },
-    searchInstruments: (params: { q: string; limit?: number }) =>
-      this.requestParsed(
-        `/api/market-data/instruments/search${queryString(params)}`,
-        instrumentSearchResponseSchema,
-      ),
+    ...marketChartOptionsClient(this.requestParsed.bind(this), queryString),
+    ...marketInformationClient(this.requestParsed.bind(this)),
+    ...instrumentClient(this.requestParsed.bind(this), this.fetchResponse.bind(this)),
   };
 
   readonly journalReviews = journalReviewClient(
@@ -636,11 +450,15 @@ export class ThesisLedgerApiClient {
       this.postParsed('/ledger/reconciliations/restore', command, ledgerCommandResponseSchema),
   };
 
-  readonly backtests = {
-    ...backtestNavRunClient(this.requestParsed.bind(this), this.postParsed.bind(this)),
-    ...backtestRunConfigClient(this.postParsed.bind(this)),
-    ...backtestRunClient(this.requestParsed.bind(this), this.postParsed.bind(this)),
-  };
+  readonly research = researchClient(this.requestParsed.bind(this));
+  readonly aiProviders = aiProviderClient(this.requestParsed.bind(this));
+  readonly providerOAuth = providerOAuthClient(this.requestParsed.bind(this));
+  readonly automations = automationClient(this.requestParsed.bind(this));
+  readonly diagnostics = diagnosticsClient(this.requestParsed.bind(this));
+  readonly researchRuns = researchRunClient(this.requestParsed.bind(this));
+
+  readonly strategy = strategyClients(this.requestParsed.bind(this));
+  readonly backtests = backtestClients(this.requestParsed.bind(this));
 
   constructor(baseUrl: string, fetcher?: typeof fetch) {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
@@ -672,11 +490,6 @@ export class ThesisLedgerApiClient {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
-  }
-
-  private async deleteNoContent(path: string): Promise<void> {
-    const response = await this.fetchResponse(path, { method: 'DELETE' });
-    if (response.status !== 204) throw new ThesisLedgerContractError(path);
   }
 
   private async requestParsed<T>(
@@ -711,7 +524,9 @@ export class ThesisLedgerApiClient {
       payload = null;
     }
     throw new ThesisLedgerApiError(
-      response.status, payload, retryAfterMilliseconds(response.headers.get('retry-after')),
+      response.status,
+      payload,
+      retryAfterMilliseconds(response.headers.get('retry-after')),
     );
   }
 }

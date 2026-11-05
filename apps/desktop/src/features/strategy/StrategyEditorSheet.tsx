@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { strategySchema } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -76,15 +76,22 @@ export function StrategyEditorSheet({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const initializedSource = useRef<string | null>(null);
+  const sourceKey = `${mode}:${strategy?.id ?? ''}:${version?.id ?? ''}`;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedSource.current = null;
+      return;
+    }
+    if (initializedSource.current === sourceKey) return;
+    initializedSource.current = sourceKey;
     setDraft(initialSchema);
     setJsonText(JSON.stringify(initialSchema, null, 2));
     setActiveTab('common');
     setJsonError(null);
     setSchemaError(null);
-  }, [initialSchema, open]);
+  }, [initialSchema, open, sourceKey]);
 
   useEffect(() => {
     if (activeTab === 'advanced') setJsonText(JSON.stringify(draft, null, 2));
@@ -141,6 +148,7 @@ export function StrategyEditorSheet({
   };
 
   const submit = () => {
+    if (busy) return;
     const candidate = activeTab === 'advanced' ? validateJson() : draft;
     if (!candidate) return;
     const validated = strategySchema.safeParse(candidate);

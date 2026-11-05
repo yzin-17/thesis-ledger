@@ -645,6 +645,7 @@ Desktop 复用现有 Strategy Lab 的策略库、编辑 Sheet、回测配置 Dia
 - 分币种初始现金和估值基础币种；
 - “模拟交易”来源、Snapshot 和复现信息；
 - 非目标配置不可见且不能通过 Advanced JSON 绕过。
+- 手动仓位表单明确区分金额、数量与 0–1 比例；权益比例/目标权重说明 `0.25` 表示 25%，保留传给 Schema 的原始比例字符串，不把显示提示当作单位转换。
 
 回测结果只在 BacktestRun/BacktestResult 查询中展示，不进入实际账户、Portfolio Trade 或 Journal。
 

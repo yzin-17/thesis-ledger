@@ -68,6 +68,7 @@ export const aiExecutionReadModel = (metadata: unknown): AiExecutionReadModel | 
     contract: execution.contract,
     frozenPolicy: execution.frozenPolicy,
     deadlineAt: execution.deadlineAt,
+    ...(execution.timing ? { timing: execution.timing } : {}),
     generationStatus: execution.generationStatus,
     usageCompleteness: execution.usageCompleteness,
     requests: execution.requests.map((request) => {
@@ -75,6 +76,7 @@ export const aiExecutionReadModel = (metadata: unknown): AiExecutionReadModel | 
       return {
         requestId: request.requestId,
         sequence: request.sequence,
+        ...(request.timeoutDecision ? { timeoutDecision: request.timeoutDecision } : {}),
         state: request.state,
         reservation: {
           aiCalls: request.reservation.aiCalls,
@@ -96,6 +98,10 @@ export const aiExecutionReadModel = (metadata: unknown): AiExecutionReadModel | 
               phase: request.error.phase,
               externalResult: request.error.externalResult,
               requestId: request.error.requestId,
+              ...(request.error.timeout ? { timeout: request.error.timeout } : {}),
+              ...(request.error.upstreamStatus
+                ? { upstreamStatus: request.error.upstreamStatus }
+                : {}),
               ...(request.error.retryAfterMs === undefined
                 ? {}
                 : { retryAfterMs: request.error.retryAfterMs }),

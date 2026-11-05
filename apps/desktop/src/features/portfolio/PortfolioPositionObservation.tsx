@@ -1,3 +1,4 @@
+import { TableContainer } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,7 +21,7 @@ import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 
 import { money } from '../shared/display.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
-import { assetQuantityUnit, type Position } from './portfolio.types.js';
+import { assetQuantityUnit, positionSourceLabel, type Position } from './portfolio.types.js';
 
 const positionPnlClass = (value: number | null) => {
   return marketToneClass(marketToneForValue(value)) ?? 'text-foreground';
@@ -67,15 +68,9 @@ export function PositionOverviewMenu({
       />
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
-          {onOpenImport && (
-            <DropdownMenuItem disabled onClick={onOpenImport}>
-              导入持仓快照（暂未开放）
-            </DropdownMenuItem>
-          )}
+          {onOpenImport && <DropdownMenuItem onClick={onOpenImport}>导入持仓草稿</DropdownMenuItem>}
           {onOpenReconciliation && (
-            <DropdownMenuItem disabled onClick={onOpenReconciliation}>
-              对账候选（暂未开放）
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onOpenReconciliation}>对账候选</DropdownMenuItem>
           )}
           {positions.length > 0 && (
             <DropdownMenuItem
@@ -109,7 +104,7 @@ export function PositionObservationContent({
 }) {
   if (positions.length === 0) {
     return (
-      <Empty className="rounded-lg border p-8" role="status">
+      <Empty className="rounded-md border border-border p-8" role="status">
         <EmptyHeader>
           <EmptyTitle>暂无持仓快照</EmptyTitle>
           <EmptyDescription>记录一个快照后会显示在这里。</EmptyDescription>
@@ -124,7 +119,7 @@ export function PositionObservationContent({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <TableContainer>
       <table className="w-full min-w-[900px] table-fixed border-separate border-spacing-0 text-left text-sm">
         <caption className="sr-only">持仓快照列表</caption>
         <colgroup>
@@ -179,13 +174,13 @@ export function PositionObservationContent({
                 <Badge variant="outline">持仓快照</Badge>
               </td>
               <td className="truncate px-3 py-3 text-sm text-muted-foreground">
-                {position.source ?? '未知'}
+                {positionSourceLabel(position.source)}
               </td>
               <td className="whitespace-nowrap px-3 py-3">
                 <Badge variant="secondary">已记录快照</Badge>
               </td>
               <StickyTableActionCell className="w-auto min-w-0 px-3 py-2">
-                <div className="mx-auto flex w-fit flex-col items-center gap-1">
+                <div className="ml-auto flex w-fit flex-col items-end gap-1">
                   <Button
                     size="sm"
                     type="button"
@@ -218,7 +213,7 @@ export function PositionObservationContent({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableContainer>
   );
 }
 
@@ -244,7 +239,10 @@ export function StandardPositionContent({
   }
 
   return (
-    <div className="mt-2 divide-y border-y border-border" aria-label="持仓操作">
+    <div
+      className="mt-2 divide-y divide-border rounded-md border border-border px-3"
+      aria-label="持仓操作"
+    >
       {positions.map((position) => (
         <div
           key={position.id}
@@ -266,7 +264,9 @@ export function StandardPositionContent({
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">当前记录</Badge>
-            <span className="text-xs text-muted-foreground">来源：{position.source ?? '未知'}</span>
+            <span className="text-xs text-muted-foreground">
+              来源：{positionSourceLabel(position.source)}
+            </span>
           </div>
           <div className="form-actions justify-end">
             <Button

@@ -21,7 +21,7 @@ export type LatestPage = {
   response: MarketDetailResponse;
 };
 
-export type ChartWindowV3 = { barsLimit: number; timeframe?: MarketTimeframe };
+export type ChartWindowV3 = { barsLimit: number; timeframe?: MarketTimeframe; calculationAnchor?: string };
 
 export const latestDetailQueryKey = (
   symbol: string,
@@ -40,6 +40,7 @@ export const latestDetailQueryKey = (
     'chart-v3',
     chartWindowV3.barsLimit,
     chartWindowV3.timeframe ?? '1d',
+    ...(chartWindowV3.calculationAnchor ? ['calculation-anchor', chartWindowV3.calculationAnchor] : []),
   ] as const;
 
 export type LatestBoundaryOptions = {
@@ -158,7 +159,7 @@ export function useMarketChartLatestBoundary({
         if (queryKey) void queryClient.cancelQueries({ queryKey });
       });
     };
-  }, [queryClient, symbol, adjustment, chartWindowV3.barsLimit, chartWindowV3.timeframe]);
+  }, [queryClient, symbol, adjustment, chartWindowV3.barsLimit, chartWindowV3.timeframe, chartWindowV3.calculationAnchor]);
 
   const loadLater = (options: { force?: boolean } = {}) => {
     if (latestQueryKeyRef.current) return;

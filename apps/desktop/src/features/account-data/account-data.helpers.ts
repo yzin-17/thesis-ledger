@@ -4,8 +4,9 @@ import type {
   LedgerEvent,
 } from '@thesis-ledger/api-client';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 
-import type { InstrumentLookup } from '../portfolio/portfolio.types.js';
+import { accountCurrencyLabel, type InstrumentLookup } from '../portfolio/portfolio.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
 import type {
   ChargeCategory,
@@ -30,9 +31,9 @@ export const chargeCategoryLabel = (category: ChargeCategory) =>
   chargeCategoryOptions.find((option) => option.value === category)?.label ?? '其他';
 
 export const transactionFilters: Array<{ value: AccountDataEventFilter; label: string }> = [
-  { value: 'executions', label: '成交记录' },
-  { value: 'other', label: '其他账本事件' },
-  { value: 'all', label: '全部事件' },
+  { value: 'executions', label: '买卖成交' },
+  { value: 'other', label: '其他事件' },
+  { value: 'all', label: '全部' },
 ];
 
 export const isExecutionEvent = (event: LedgerEvent): event is ExecutionEvent =>
@@ -75,11 +76,7 @@ export const formatCurrencyAmount = (amount: number, currency: Currency) =>
     maximumFractionDigits: 8,
   }).format(amount);
 
-export const currencyLabel = (currency: Currency) => {
-  if (currency === 'CNY') return 'CNY · 人民币';
-  if (currency === 'HKD') return 'HKD · 港币';
-  return 'USD · 美元';
-};
+export const currencyLabel = accountCurrencyLabel;
 
 const sourceChannelLabels: Record<string, string> = {
   manual: '桌面端 · 资产录入',
@@ -89,6 +86,7 @@ const sourceChannelLabels: Record<string, string> = {
   'desktop-cash-deposit': '桌面端 · 现金入账',
   'desktop-cash-transfer': '桌面端 · 资金划转',
   'recurring-cash-deposit': '服务端 · 周期存款',
+  'recurring-fund-investment': '基金定投',
   'screenshot:rollback': '服务端 · 截图回滚',
 };
 
@@ -132,6 +130,20 @@ export const revisionBadgeVariant = (event: LedgerEvent): 'default' | 'secondary
 
 export const executionSideLabel = (event: ExecutionEvent) =>
   event.type === 'BUY_EXECUTION' ? '买入' : '卖出';
+
+const ledgerMoney = (amount: string, currency: string) => {
+  const symbols: Record<string, string> = { CNY: '¥', HKD: 'HK$', USD: 'US$' };
+  const prefix = symbols[currency] ?? `${currency} `;
+  if (amount.startsWith('-')) return `-${prefix}${amount.slice(1)}`;
+  return `${prefix}${amount}`;
+};
+
+export const executionDetailLabel = (event: ExecutionEvent) => {
+  const { symbol, quantity, price, currency } = event.payload;
+  if (symbol.endsWith('.OF'))
+    return `${executionSideLabel(event)} ${quantity} 份 · 单位净值 ${ledgerMoney(price, currency)}`;
+  return `${executionSideLabel(event)} · 数量 ${quantity} · 成交价 ${ledgerMoney(price, currency)}`;
+};
 
 export const instrumentNameLookup = (directory: InstrumentDirectory | undefined) => {
   const nameBySymbol = new Map(
@@ -215,24 +227,34 @@ export const transactionAmount = (event: LedgerEvent, execution: ExecutionEvent 
   if (execution) {
     try {
       const gross = multiplyDecimalStrings(execution.payload.quantity, execution.payload.price);
-      return `${gross} ${execution.payload.currency}`;
+      return ledgerMoney(gross, execution.payload.currency);
     } catch {
-      return `${formatDecimal(execution.payload.quantity)} ${execution.payload.currency}`;
+      return '金额暂不可用';
     }
   }
   if (event.revisionAction !== 'VOID' && event.type === 'POSITION_BASELINE_OBSERVATION') {
     const { quantity, averageCost, currency } = event.payload;
     if (averageCost !== undefined) {
       try {
-        return `${multiplyDecimalStrings(quantity, averageCost)} ${currency}`;
+        return ledgerMoney(multiplyDecimalStrings(quantity, averageCost), currency);
       } catch {
-        return `${formatDecimal(quantity)} ${currency}`;
+        return '金额暂不可用';
       }
     }
-    return `${formatDecimal(quantity)} ${currency}`;
+    return event.payload.symbol.endsWith('.OF') ? `${quantity} 份` : `数量 ${quantity}`;
   }
   if (event.revisionAction !== 'VOID' && event.type === 'CASH_BALANCE_OBSERVATION')
-    return formatDecimal(event.payload.amount);
+    return ledgerMoney(event.payload.amount, event.payload.currency);
+  if (event.revisionAction !== 'VOID' && event.type === 'CASH_FLOW') {
+    const sign = event.payload.direction === 'INFLOW' ? '+' : '-';
+    return `${sign}${ledgerMoney(event.payload.amount, event.payload.currency)}`;
+  }
+  if (event.revisionAction !== 'VOID' && event.type === 'DIVIDEND')
+    return ledgerMoney(event.payload.amount, event.payload.currency);
+  if (event.revisionAction !== 'VOID' && event.type === 'BONUS_SHARE')
+    return `数量 ${event.payload.quantity}`;
+  if (event.revisionAction !== 'VOID' && (event.type === 'SPLIT' || event.type === 'MERGE'))
+    return `比例 ${event.payload.fromUnits} : ${event.payload.toUnits}`;
   return '—';
 };
 
@@ -282,11 +304,7 @@ export const toCommandTime = (value: string, precision: TimePrecision) => {
   return new Date(value).toISOString();
 };
 
-export const errorMessage = (error: unknown, fallback: string) => {
-  if (error instanceof ThesisLedgerApiError) return error.payload?.message ?? fallback;
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-};
+export const errorMessage = requestFailureMessage;
 
 export const errorCode = (error: unknown) =>
   error instanceof ThesisLedgerApiError ? error.payload?.errorCode : undefined;
@@ -357,7 +375,7 @@ export const executionDraft = (
     currentLocalDateTime(),
   timePrecision: event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT',
   settledAt: localDateTimeValue(event?.payload.settledAt ?? event?.payload.expectedAt, 'INSTANT'),
-  capabilityVerification: event?.payload.capabilityVerification ?? 'UNVERIFIED',
+  capabilityVerification: 'UNVERIFIED',
   note: event?.payload.note ?? '',
   reason: '',
 });

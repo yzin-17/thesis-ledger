@@ -18,7 +18,10 @@ const fixture = JSON.parse(
 ) as {
   cases: Array<{ timeframe: string; aggregationEncoding: string; payload: unknown }>;
 };
-const cases = fixture.cases.map((item) => ({
+const minuteFixture = JSON.parse(readFileSync(
+  new URL('../fixtures/market-minute-indicator-v1.shared.json', import.meta.url), 'utf8',
+)) as typeof fixture;
+const cases = [...fixture.cases, ...minuteFixture.cases].map((item) => ({
   ...item,
   payload: marketPeriodIndicatorRequestSchema.parse(item.payload),
 }));
@@ -86,7 +89,7 @@ describe('派生指标跨运行时合同', () => {
     expect(indicatorCalculateRequestSchema.safeParse(native).success).toBe(true);
     expect(indicatorCalculateRequestSchema.safeParse(payload).success).toBe(false);
   });
-  it('能力明确四周期、上限及预热，不声明来源行情', () => {
+  it('能力明确八周期、上限及预热，不声明来源行情', () => {
     const raw: unknown = JSON.parse(
       readFileSync(
         new URL('../fixtures/market-period-indicator-capabilities-v1.shared.json', import.meta.url),
@@ -94,7 +97,7 @@ describe('派生指标跨运行时合同', () => {
       ),
     );
     const caps = marketPeriodIndicatorCapabilitiesSchema.parse(raw);
-    expect(caps.periods.map((item) => item.timeframe)).toEqual(['5d', '1w', '1mo', '1y']);
+    expect(caps.periods.map((item) => item.timeframe)).toEqual(['5d', '1w', '1mo', '1y', '5m', '15m', '30m', '60m']);
     expect(
       marketPeriodIndicatorCapabilitiesSchema.safeParse({
         ...caps,

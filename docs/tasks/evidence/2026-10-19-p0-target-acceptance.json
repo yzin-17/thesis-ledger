@@ -1,0 +1,558 @@
+{
+  "version": "p0-target-acceptance-v1",
+  "runId": "p0-09d2c490-8f7d-4244-a52e-97e481e825a0",
+  "project": "thesis-ledger-dev",
+  "startedAt": "2026-10-19T13:36:04.855Z",
+  "results": [
+    {
+      "gate": "RVCG",
+      "outcomes": [
+        "100 USD 与 700 CNY 按汇率 7 分别为 50%，独立账户为 100%；实际规则写入事件",
+        "missingPrice：既有风险状态及事件不被解除，独立账户/价格规则继续评估，历史保留原因",
+        "missingFx：既有风险状态及事件不被解除，独立账户/价格规则继续评估，历史保留原因",
+        "陈旧/未来/未知行情，以及陈旧/未来/未知年龄 FX 均不获得权重；完整单币账户独立可用",
+        "真实/模拟持仓分别估值；零分母不伪造零比例",
+        "正式 NAV 正向估值；陈旧/不可用 NAV 及币种不匹配保留未知"
+      ],
+      "externalDeliveries": 0,
+      "realModelCalls": 0
+    },
+    {
+      "gate": "IVAG",
+      "outcomes": [
+        "实际 Server 消费者拒绝 RSI/EMA 晚到种子及 ATR 晚到前收；批量与单 tick 一致",
+        "RSI：实际目标构建/冻结/执行/SQL 终态及离线重放通过；四种旧 Run 不重算、不改结果或快照",
+        "ATR：实际目标构建/冻结/执行/SQL 终态及离线重放通过；四种旧 Run 不重算、不改结果或快照"
+      ],
+      "realSourceReads": 0,
+      "realModelCalls": 0
+    },
+    {
+      "gate": "PFCG-backend",
+      "outcomes": [
+        "真实 targets HTTP 保存/读取成功；非法范围失败保留原活动版本",
+        "六次 HTTP 竞争保存版本连续，活动版本唯一",
+        "缺现金流边界及零净额流量保持 TTWROR 未知；严重亏损 XIRR 有限且满足现金流方程；原快照不变",
+        "实际计算 HTTP 分段收益为 10%；再平衡保留现金，partial 输入拒绝建议",
+        "现行现金命令写入当前信封，实际 layers/targets HTTP 读取成功，现金余额为 100 CNY"
+      ],
+      "realModelCalls": 0
+    }
+  ],
+  "bridgeTrace": [
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/history",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/series",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/layers",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "5d7dfe3653d6f564c7f37560afd2cf25bc4eb6078afb70e9e526b753f79eca91"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/history",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/series",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/layers",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "5d7dfe3653d6f564c7f37560afd2cf25bc4eb6078afb70e9e526b753f79eca91"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/history",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/series",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/layers",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "5d7dfe3653d6f564c7f37560afd2cf25bc4eb6078afb70e9e526b753f79eca91"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/targets",
+      "status": 503,
+      "controlledFailure": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/targets",
+      "status": 201,
+      "requestSha256": "928b0f51cb3d4f16952cf3371ff329e38e7700bf6b0994e9d88ab68c4b658aeb"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "5d7dfe3653d6f564c7f37560afd2cf25bc4eb6078afb70e9e526b753f79eca91"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "35cd46b69e570457a8a095ca4a12723043d568ccd523d0c0f75342b9a929f305"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/history",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/series",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/layers",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/history",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/series",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/layers",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "5d7dfe3653d6f564c7f37560afd2cf25bc4eb6078afb70e9e526b753f79eca91"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "35cd46b69e570457a8a095ca4a12723043d568ccd523d0c0f75342b9a929f305"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/history",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/series",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/layers",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/history",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/series",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/layers",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "35cd46b69e570457a8a095ca4a12723043d568ccd523d0c0f75342b9a929f305"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/history",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/series",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/summary",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/layers",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/performance/targets",
+      "status": 200,
+      "requestSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/performance/allocation",
+      "status": 201,
+      "requestSha256": "35cd46b69e570457a8a095ca4a12723043d568ccd523d0c0f75342b9a929f305"
+    }
+  ],
+  "maintenanceSha256": {
+    "entry": "f7071fb3d79e5cce3c5f620abb8a1c770f7ec33193e6d59c9bd194a7f63e0f27",
+    "runtime": "949125e8e932c327052187125b92f1274d4e1995721938028c175b608d23a73c",
+    "contract": "e5bab04063800f66e08954c69f9cd3baceed6c43f79a860f0154ce6594b1c764",
+    "probes": {
+      "protected-baseline": "1aa73ce3eb0ffb551bfc556fb0c1307d4d60307ccdc1bacc14a8eb52f9eb2488",
+      "automation-backup-projection": "268058afe1d4a8f9f98c31a8a0e6f3d6c6faadee6e980f7450149650360adc5d",
+      "risk-probe": "8301dfe52d384c27169efb4bd5a38098e5ff41b2a134191a7169f085d8235ecb",
+      "indicator-probe": "70b5a53c41979ee541654c10a404034cafe7d7c8d9a8b81aeddf76c30ce2e8f4",
+      "performance-probe": "bdfa767647d2dccf7ebe3e69157eb0bb8e9a40139ff7c4b1be29608151aaa589"
+    }
+  },
+  "targets": {
+    "thesis-ledger": {
+      "id": "3fab43518e3acdd9418f4651cd4439ca5987925b2257453cec14d231eff431cd",
+      "imageId": "sha256:c1f3c9d890e17f6ffa827aae9c80a8b21fd53e4d37d08ed4a51a3f3de8187eac",
+      "startedAt": "2026-10-19T13:10:49.360577714Z",
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-backtest-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+          "destination": "/app/var/backtest"
+        }
+      ]
+    },
+    "backtest-worker": {
+      "id": "dd7ad10a7c9c4531508e76f9dea77dd3166ab459988d6340be2b1b37dcea000d",
+      "imageId": "sha256:c1f3c9d890e17f6ffa827aae9c80a8b21fd53e4d37d08ed4a51a3f3de8187eac",
+      "startedAt": "2026-10-19T13:10:49.27866413Z",
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-backtest-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+          "destination": "/app/var/backtest"
+        }
+      ]
+    },
+    "postgres": {
+      "id": "d76d83b6dde32e8578a9c5e8d6b63e4736be6132b66617323a1f742ddaf29c9a",
+      "imageId": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+      "startedAt": "2026-10-18T17:43:22.377312173Z",
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-postgres-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
+          "destination": "/var/lib/postgresql/data"
+        }
+      ]
+    },
+    "redis": {
+      "id": "47bfd13c1d3835fac033616bd08a2f5e9b4ec32cadf6aa2fdead8ef1aae10fc0",
+      "imageId": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+      "startedAt": "2026-10-18T17:43:22.253044506Z",
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-redis-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
+          "destination": "/data"
+        }
+      ]
+    },
+    "dsa": {
+      "id": "e9237fe893c1ed3eea4b56bb1ec4707439017a316df40d7fea17163b5380234a",
+      "imageId": "sha256:ffba40664b7f59baab8c575ffef7f14c3a899ed49672156e692aac7c39385477",
+      "startedAt": "2026-10-19T12:09:20.462636715Z",
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-dsa-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
+          "destination": "/app/data"
+        },
+        {
+          "type": "volume",
+          "name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
+          "source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
+          "destination": "/app/logs"
+        },
+        {
+          "type": "volume",
+          "name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
+          "source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
+          "destination": "/app/reports"
+        }
+      ]
+    }
+  },
+  "operationalCursorAudit": {
+    "baseline": "formal-pre-upgrade-backup",
+    "rows": 5,
+    "allowedOperationalFields": [
+      "nextRunAt"
+    ],
+    "differences": [
+      {
+        "type": "valuation-intraday-sample",
+        "fields": [
+          "nextRunAt"
+        ]
+      }
+    ],
+    "backupDirectory": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra/.database-upgrades/run.OKALSe",
+    "backupSha256": "cabe0e8c800e89f5ab0a8798487e4c4af5d0888dc57bf87116dcb900c27a8b1f",
+    "consumersStoppedAt": "2026-10-19T13:10:34.218Z",
+    "backupCompletedAt": "2026-10-19T13:10:34.915Z"
+  },
+  "candidate": {
+    "files": 883,
+    "sha256": "275025e50797867df5eafd4aaafc65eb1d7bdd62fa651df79477de8bcc19f5ef",
+    "imageId": "sha256:c1f3c9d890e17f6ffa827aae9c80a8b21fd53e4d37d08ed4a51a3f3de8187eac",
+    "excludedHostBuildOrphans": [
+      "domain/backtest-analytics-v2.js",
+      "domain/backtest-v2.js",
+      "domain/backtest.js",
+      "domain/ledger-v2.js",
+      "domain/ledger.js",
+      "schemas/backtest-v2.js",
+      "schemas/ledger-v2.js",
+      "schemas/ledger.js",
+      "schemas/market-bar-series-v2.js",
+      "schemas/market-route-v2.js",
+      "schemas/strategy.js"
+    ]
+  },
+  "afterUpdate": {
+    "protectedTables": 78,
+    "protectedRows": 36537,
+    "protectedSnapshotFiles": 642,
+    "additions": {},
+    "schemaHead": "20261019020000_research_observation_versions"
+  },
+  "inputs": {
+    "sha256": "25f3f94447327a44d2a3ed3857579780b3796d9c82d8aad7313da5add0fb7a1a",
+    "bytes": 68898,
+    "cases": [
+      "RSI",
+      "ATR"
+    ]
+  },
+  "bridge": {
+    "origin": "http://127.0.0.1:54890",
+    "accountId": "8e1f20fb-bc80-417e-b858-0a52118466da",
+    "lossId": "11cd431e-3c0e-48e8-b29e-54d6e8a01d9d"
+  },
+  "browserTransport": {
+    "controlledFailures": 1,
+    "successfulSaves": 10
+  },
+  "completedAt": "2026-10-19T13:48:05.862Z",
+  "afterAcceptance": {
+    "protectedTables": 78,
+    "protectedRows": 36537,
+    "protectedSnapshotFiles": 642,
+    "additions": {}
+  },
+  "cleaned": true
+}

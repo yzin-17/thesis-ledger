@@ -1,3 +1,4 @@
+import { buildGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
 import { z } from 'zod';
 import { expressionSchema } from '@thesis-ledger/schemas';
 import type { AuthoringOperation } from './authoring-operation.repository.js';
@@ -23,7 +24,7 @@ export const authoringMessages = (operation: AuthoringOperation) => {
         'signalSources 只能有一个，其 id 必须与每个 series.sourceId 一致，信号源资产/周期与 confirmation 相同；首期不支持额外基准，必须省略 benchmark 字段。risk 是数组，比例复用已确认的小数比例字符串，不能将百分数原值写入比例字段。' +
         `条件 AST 合同：${JSON.stringify(z.toJSONSchema(expressionSchema, { io: 'output' }))}` +
         '局部修改以现有 definitionText 为基线，只修改 modificationTarget。risk 只改已有 fixedStop 的明确比例，其他风险、入场、退出、名称及元数据保持完全相同。不得顺便优化规则。' +
-        `输出合同：${JSON.stringify(z.toJSONSchema(contract.schema, { io: 'output' }))}`,
+        buildGenerationSchemaPrompt(contract.schema),
     },
     {
       role: 'user',

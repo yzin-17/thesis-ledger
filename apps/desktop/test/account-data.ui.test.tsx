@@ -19,8 +19,9 @@ import {
   instrumentNameLookup,
 } from '../src/features/account-data/account-data.helpers.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
-import { AccountManagementSection } from '../src/features/portfolio/PortfolioManagementSections.js';
+import { AccountManagementSection } from '../src/features/portfolio/PortfolioAccountManagement.js';
 import { shouldAutoOpenEmptyAccountForm } from '../src/features/portfolio/PortfolioManagement.js';
+import { accountTypeLabel } from '../src/features/portfolio/portfolio.types.js';
 import type { PortfolioManagementViewProps } from '../src/features/portfolio/PortfolioManagementView.types.js';
 import { portfolioKeys } from '../src/features/portfolio/portfolio.queries.js';
 import { accountDisplayLabel } from '../src/features/portfolio/portfolio.types.js';
@@ -221,10 +222,6 @@ describe('账户数据页面契约', () => {
       new URL('../src/features/account-data/useAccountDataNavigation.ts', import.meta.url),
       'utf8',
     );
-    const allAccountsSource = readFileSync(
-      new URL('../src/features/account-data/AccountDataAllAccountsView.tsx', import.meta.url),
-      'utf8',
-    );
     const accountDataSource = readFileSync(
       new URL('../src/features/account-data/AccountDataSections.tsx', import.meta.url),
       'utf8',
@@ -237,8 +234,10 @@ describe('账户数据页面契约', () => {
     expect(markup).toContain('录入成交');
     expect(markup).not.toMatch(/<button[^>]*disabled[^>]*>导入草稿（暂未开放）<\/button>/);
     expect(accountDataSource).toContain('aria-label="更多成交操作"');
-    expect(accountDataSource).toContain('导入草稿（暂未开放）');
-    expect(accountDataSource).toContain('打开对账（暂未开放）');
+    expect(accountDataSource).toContain('导入草稿');
+    expect(accountDataSource).toContain('打开对账');
+    expect(accountDataSource).not.toContain('导入草稿（暂未开放）');
+    expect(accountDataSource).not.toContain('打开对账（暂未开放）');
     expect(accountDataSource).toContain('min-w-[900px] table-fixed');
     expect(accountDataSource).toContain('className="w-auto min-w-0 px-3 py-3 align-top"');
     expect(markup).toContain('实际证券账户 · 证券 · CNY · 实际');
@@ -252,30 +251,29 @@ describe('账户数据页面契约', () => {
       /const selectManagedAccount[\s\S]*?transitionToAccount\(nextAccountId, \{ setup: null \}, true\)/,
     );
     expect(pageSource).toContain('void selectManagedAccount(nextAccountId);');
-    expect(allAccountsSource).not.toContain('onManageAccounts');
 
     const fundMarkup = renderPage('', [fundAccount], false);
     expect(fundMarkup).toContain('支付宝 · 基金 · CNY · 实际');
   });
 
-  it('选择全部账户时渲染只读组合汇总并保留 accountId=all 状态', () => {
+  it('旧全部账户地址进入具体账户，保留管理和录入入口', () => {
     const markup = renderPage('?accountId=all');
-
-    expect(markup).toContain('全部账户');
-    expect(markup).toContain('组合关键指标');
-    expect(markup).toContain('当前持仓');
-    expect(markup).not.toContain('管理账户');
-    expect(markup).not.toContain('成交记录');
+    expect(markup).toContain('实际证券账户 · 证券 · CNY · 实际');
+    expect(markup).toContain('管理账户');
+    expect(markup).toContain('成交记录');
+    expect(markup).not.toContain('组合关键指标');
+    expect(markup).not.toContain('当前持仓');
+    expect(markup).not.toContain('全部账户');
   });
 
-  it('账户选择可在 all 与具体账户之间双向切换', () => {
+  it('账户解析优先具体目标，旧 all 和失效目标回落到有效账户', () => {
     expect(
       resolveAccountSelection({
         accounts: [account, shadowAccount],
         accountId: account.id,
         requestedAccountId: 'all',
       }),
-    ).toBe('all');
+    ).toBe(account.id);
     expect(
       resolveAccountSelection({
         accounts: [account, shadowAccount],
@@ -283,47 +281,45 @@ describe('账户数据页面契约', () => {
         requestedAccountId: shadowAccount.id,
       }),
     ).toBe(shadowAccount.id);
+    expect(
+      resolveAccountSelection({
+        accounts: [account, shadowAccount],
+        accountId: 'all',
+        requestedAccountId: 'all',
+      }),
+    ).toBe(account.id);
+    expect(
+      resolveAccountSelection({ accounts: [], accountId: 'all', requestedAccountId: 'all' }),
+    ).toBe('');
+  });
 
-    const transition = accountSelectionTransition('all');
-    const search = new URLSearchParams('tab=positions');
+  it('具体账户切换在地址更新前保留当前账户，更新后解析新目标', () => {
+    const transition = accountSelectionTransition(shadowAccount.id);
+    expect('accountId' in transition).toBe(false);
+    const search = new URLSearchParams('tab=positions&entry=execution');
     for (const [key, value] of Object.entries(transition.locationUpdates)) {
       if (value === null) search.delete(key);
       else search.set(key, value);
     }
-    expect('accountId' in transition).toBe(false);
-    expect(transition.locationUpdates.accountId).toBe('all');
-    expect(search.toString()).toBe('tab=positions&accountId=all');
-
-    const concreteTransition = accountSelectionTransition(shadowAccount.id);
-    search.set('accountId', concreteTransition.locationUpdates.accountId);
     expect(search.get('accountId')).toBe(shadowAccount.id);
-  });
-
-  it('账户选择状态机在 URL 更新前不回退旧账户，更新后再同步新目标', () => {
-    const toAll = accountSelectionTransition('all');
-    expect('accountId' in toAll).toBe(false);
-    expect(toAll.locationUpdates.accountId).toBe('all');
+    expect(search.has('entry')).toBe(false);
     expect(
       resolveAccountSelection({
         accounts: [account, shadowAccount],
         accountId: account.id,
-        requestedAccountId: 'all',
+        requestedAccountId: account.id,
       }),
-    ).toBe('all');
-
-    const toShadow = accountSelectionTransition(shadowAccount.id);
-    expect('accountId' in toShadow).toBe(false);
-    expect(toShadow.locationUpdates.accountId).toBe(shadowAccount.id);
+    ).toBe(account.id);
     expect(
       resolveAccountSelection({
         accounts: [account, shadowAccount],
-        accountId: 'all',
+        accountId: account.id,
         requestedAccountId: shadowAccount.id,
       }),
     ).toBe(shadowAccount.id);
   });
 
-  it('账户目录从 pending/error 到 loaded 时保留 all 与具体账户深链目标', () => {
+  it('目录未就绪时延迟规范化，成功后只解析具体账户', () => {
     expect(
       shouldDeferAccountSelection({
         accountsReady: false,
@@ -338,23 +334,20 @@ describe('账户数据页面契约', () => {
         accountsError: true,
       }),
     ).toBe(true);
-
-    const loadedState = { accountsReady: true, accountsPending: false, accountsError: false };
-    expect(shouldDeferAccountSelection(loadedState)).toBe(false);
+    expect(
+      shouldDeferAccountSelection({
+        accountsReady: true,
+        accountsPending: false,
+        accountsError: false,
+      }),
+    ).toBe(false);
     expect(
       resolveAccountSelection({
-        accounts: [account, shadowAccount],
-        accountId: 'all',
-        requestedAccountId: 'all',
+        accounts: [account],
+        accountId: 'missing',
+        requestedAccountId: 'missing',
       }),
-    ).toBe('all');
-    expect(
-      resolveAccountSelection({
-        accounts: [account, shadowAccount],
-        accountId: shadowAccount.id,
-        requestedAccountId: shadowAccount.id,
-      }),
-    ).toBe(shadowAccount.id);
+    ).toBe(account.id);
   });
 
   it('现金账户只显示现金页签，并阻止成交和持仓入口', () => {
@@ -448,6 +441,7 @@ describe('账户数据页面契约', () => {
     const accountDataSource = [
       'AccountDataPage.tsx',
       'AccountDataExecutionSheet.tsx',
+      'ExecutionRuleReference.tsx',
       'AccountDataAuditSheets.tsx',
       'AccountDataReconciliationSheet.tsx',
     ]
@@ -488,7 +482,7 @@ describe('账户数据页面契约', () => {
     expect(executionSource).not.toContain('DatePickerInput');
     expect(accountDataSource).toContain('费用明细');
     expect(accountDataSource).toContain('交易规则未验证');
-    expect(executionSource).toContain('<Alert variant="subtle">');
+    expect(executionSource).toContain('<ExecutionRuleReference');
     expect(accountDataSource).toContain('重复重放不会重复写入');
     expect(accountDataSource).toContain('账本版本已变化');
     expect(executionSource).toContain('if (submitting) return;');
@@ -508,9 +502,7 @@ describe('账户数据页面契约', () => {
     expect(executionSource).not.toContain('实际成交');
     expect(executionSource).toContain('{accountSummary}');
     expect(executionSource).toContain('accountTypeLabel(account.type)');
-    expect(executionSource).toContain('证券账户');
-    expect(executionSource).toContain('基金账户');
-    expect(executionSource).toContain('现金账户');
+    expect(['securities', 'fund', 'cash'].map(type => `${accountTypeLabel(type as 'securities' | 'fund' | 'cash')}账户`)).toEqual(['证券账户', '基金账户', '现金账户']);
     expect(executionSource).not.toContain('{category}');
     expect(executionSource).not.toContain('<Separator />');
     expect(executionSource).toContain('min-h-0 flex-1 overflow-y-auto');
@@ -542,8 +534,8 @@ describe('账户数据页面契约', () => {
     expect(positionManagementSource).toContain(
       '...(onOpenReconciliation ? { onOpenReconciliation } : {})',
     );
-    expect(positionSource).toContain('导入持仓快照（暂未开放）');
-    expect(positionSource).toContain('对账候选（暂未开放）');
+    expect(positionSource).toContain('导入持仓草稿');
+    expect(positionSource).toContain('对账候选');
     expect(positionSource).toContain('directoryName');
     expect(positionMarkup).not.toMatch(
       /<button[^>]*disabled[^>]*>导入持仓快照（暂未开放）<\/button>/,
@@ -562,7 +554,7 @@ describe('账户数据页面契约', () => {
     expect(positionMarkup).toContain('min-w-0');
     expect(positionMarkup).toContain('data-sticky-table-action="cell"');
     // 操作列使用纵向两行，避免窄表格横向挤压。
-    expect(positionSource).toContain('mx-auto flex w-fit flex-col items-center gap-1');
+    expect(positionSource).toContain('ml-auto flex w-fit flex-col items-end gap-1');
     expect(positionSource).not.toContain('className="w-full"');
     expect(positionMarkup).toContain('h-8');
     expect(positionMarkup).toContain('修改快照');

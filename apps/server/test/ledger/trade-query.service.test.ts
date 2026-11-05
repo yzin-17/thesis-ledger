@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TradeQueryService } from '../../src/ledger/trade-query.service.js';
+import { displayPrisma } from '../instrument-display.fixture.js';
 
 const accountA = '11111111-1111-4111-8111-111111111111';
 const accountB = '22222222-2222-4222-8222-222222222222';
@@ -79,6 +80,7 @@ const createHarness = (initialTrades: unknown[]) => {
     [accountB, '1'],
   ]);
   const prisma = {
+    ...displayPrisma(),
     account: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
         [accountA, accountB].includes(where.id) ? { id: where.id } : null,
@@ -116,12 +118,39 @@ const createHarness = (initialTrades: unknown[]) => {
   };
   return {
     service: new TradeQueryService(prisma as never),
+    prisma,
     trades,
     generations,
   };
 };
 
 describe('Trade 查询 API 服务', () => {
+  it('当前交易名称来自目录，旧 Asset 和旧引用快照不被修改', async () => {
+    const trade = makeTrade({ id: 'trade-name' });
+    trade.asset.name = '旧资产名称';
+    const harness = createHarness([trade]);
+    expect((await harness.service.list({ accountId: accountA })).items[0]?.assetName).toBe('苹果公司');
+    expect(harness.prisma.instrument.findMany).toHaveBeenCalledTimes(1);
+    expect((await harness.service.get(accountA, trade.id)).assetName).toBe('苹果公司');
+    expect((await harness.service.listDetails({ accountId: accountA }))[0]?.assetName).toBe('苹果公司');
+    const transaction = { ...harness.prisma, accountLedgerState: {
+      findUnique: vi.fn(async () => ({ ledgerRevision: 8n, projectionGeneration: 1n })),
+    } };
+    const projection = await harness.service.readAccountProjection(
+      { accountId: accountA, mode: 'actual' }, transaction as never,
+    );
+    expect(projection.details[0]?.assetName).toBe('苹果公司');
+    expect(projection.version).toEqual({ ledgerRevision: '8', projectionGeneration: '1' });
+    expect(projection.details[0]).toMatchObject({ sourceQuantity: '10', remainingQuantity: '10',
+      lifecycle: 'ACTIVE', projectionFingerprint: null });
+    await expect(harness.service.resolveReference({ accountId: accountA, factIds: [factOne] }))
+      .resolves.toMatchObject({ status: 'RESOLVED', trade: { assetName: '苹果公司' } });
+    const snapshot = { assetName: '冻结旧名称', symbol: 'AAPL.US' };
+    await expect(harness.service.resolveReference({ accountId: accountA, factIds: [factTwo], snapshot }))
+      .resolves.toMatchObject({ status: 'LEGACY', snapshot });
+    expect(trade.asset.name).toBe('旧资产名称');
+  });
+
   it('按账户和模式隔离，并让游标绑定 Projection Generation', async () => {
     const harness = createHarness([
       makeTrade({ id: 'trade-a', openedAt: '2026-08-27T00:00:00.000Z' }),

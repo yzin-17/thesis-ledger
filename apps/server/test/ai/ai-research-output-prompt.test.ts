@@ -5,7 +5,7 @@ import { researchOutputInstructions } from '../../src/ai/ai-research-output-prom
 describe('研究生成字段的提示合同', () => {
   it('实际 Schema 进入文本消息，明确对象证据与必填根字段', () => {
     const instructions = researchOutputInstructions();
-    const schema = JSON.parse(instructions.split('RESEARCH_OUTPUT_JSON_SCHEMA:')[1]!);
+    const schema = JSON.parse(instructions.split('OUTPUT_JSON_SCHEMA:')[1]!);
     expect(schema.required).toEqual(
       expect.arrayContaining(['conclusion', 'evidence', 'risks', 'unknowns', 'disclaimer']),
     );
@@ -17,7 +17,7 @@ describe('研究生成字段的提示合同', () => {
   });
   it('模型合同不要求服务端元数据，旧实际失败仍被拒绝', () => {
     const schema = JSON.parse(
-      researchOutputInstructions().split('RESEARCH_OUTPUT_JSON_SCHEMA:')[1]!,
+      researchOutputInstructions().split('OUTPUT_JSON_SCHEMA:')[1]!,
     );
     for (const key of ['provider', 'version', 'createdAt', 'context'])
       expect(schema.properties).not.toHaveProperty(key);

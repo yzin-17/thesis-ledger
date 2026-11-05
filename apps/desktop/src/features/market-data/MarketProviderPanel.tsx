@@ -26,7 +26,7 @@ export function MarketProviderPanel({ providers, ...rowProps }: MarketProviderPa
         </div>
       </CardHeader>
       <CardContent>
-        <div className="divide-y" aria-label="DSA 市场数据源">
+        <div className="divide-y divide-border" aria-label="DSA 市场数据源">
           {providers.map((provider) => (
             <MarketProviderRow key={provider.providerId} {...rowProps} provider={provider} />
           ))}

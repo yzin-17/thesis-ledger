@@ -20,7 +20,9 @@ import {
 } from './investment-account-scope.js';
 import { calculatePortfolioDailyChange } from './portfolio-daily-change.js';
 import { valuePortfolioPosition } from './portfolio-position-valuation.js';
+import { portfolioQuoteBatch } from './portfolio-quote-batch.js';
 import { PortfolioValuationTrace } from './portfolio-valuation-trace.js';
+import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
 
 const isZeroDecimal = (value: string) => /^0(?:\.0+)?$/.test(value);
 
@@ -77,6 +79,7 @@ export class PortfolioService {
     @Optional() private readonly ledger?: LedgerService,
     @Optional() private readonly instruments?: InstrumentService,
     @Optional() private readonly trades?: TradeQueryService,
+    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {}
 
   private requireLedger() {
@@ -104,11 +107,11 @@ export class PortfolioService {
     );
   }
 
-  listPositions(accountId?: string, mode: 'actual' | 'shadow' = 'actual') {
-    return this.prisma.position.findMany({
+  async listPositions(accountId?: string, mode: 'actual' | 'shadow' = 'actual') {
+    return this.display.nameAssets(await this.prisma.position.findMany({
       where: accountId ? { accountId, account: { mode } } : investmentAccountRelationWhere(mode),
       include: { asset: true },
-    });
+    }));
   }
 
   async upsertPosition(input: unknown) {
@@ -150,10 +153,11 @@ export class PortfolioService {
         removed: true,
         sourceOfTruth: 'ledger' as const,
       };
-    return this.prisma.position.findUniqueOrThrow({
+    const position = await this.prisma.position.findUniqueOrThrow({
       where: { accountId_symbol: { accountId: data.accountId, symbol: data.symbol } },
       include: { asset: true },
     });
+    return (await this.display.nameAssets([position]))[0]!;
   }
 
   async setCashBalance(
@@ -216,10 +220,11 @@ export class PortfolioService {
     }
     if (isZeroDecimal(quantity))
       return { id, accountId, symbol, removed: true, sourceOfTruth: 'ledger' as const };
-    return this.prisma.position.findUniqueOrThrow({
+    const position = await this.prisma.position.findUniqueOrThrow({
       where: { accountId_symbol: { accountId, symbol } },
       include: { asset: true },
     });
+    return (await this.display.nameAssets([position]))[0]!;
   }
 
   async clearPositions(accountId: string) {
@@ -269,13 +274,14 @@ export class PortfolioService {
       options.baseCurrency ?? (accountId ? accountCurrencyMap.get(accountId) : undefined) ?? 'CNY';
     const valuationOptions = { ...options, fxMerge: options.fxMerge ?? true, baseCurrency };
     const valuedAt = new Date();
+    const positionMarket = portfolioQuoteBatch(positions, this.market);
     const valued = await Promise.all(
       positions.map(async (position) => {
         const currency =
           supportedCurrency(position.asset?.currency) ??
           accountCurrencyMap.get(position.accountId) ??
           baseCurrency;
-        return valuePortfolioPosition(position, currency, this.market);
+        return valuePortfolioPosition(position, currency, positionMarket);
       }),
     );
     valuationTrace.mark('position-valuation');
@@ -407,9 +413,9 @@ export class PortfolioService {
       amount: roundMoney(amount),
       convertedAmount: convertToBase(amount, currency),
     }));
-    const missingSymbols = valued
+    const missingSymbols = [...new Set(valued
       .filter((item) => item.marketValue === null)
-      .map((item) => item.symbol);
+      .map((item) => item.symbol))];
     const missingCurrencies = [
       ...new Set([
         ...marketAggregate.missingCurrencies,

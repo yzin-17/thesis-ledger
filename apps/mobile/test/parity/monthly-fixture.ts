@@ -1,0 +1,46 @@
+import { ledgerAccount, ledgerAccountId } from './ledger-fixture';
+export const monthlyAccount = {
+  ...ledgerAccount,
+  mode: 'actual' as const,
+  type: 'cash' as const,
+  currency: 'CNY' as const,
+};
+export const monthlyTime = '2026-10-23T01:00:00Z';
+export const monthlyPlan = {
+  id: '00000000-0000-4000-8000-000000000020',
+  accountId: ledgerAccountId,
+  name: '验收入账',
+  expectedAmount: '100',
+  currency: 'CNY',
+  dayOfMonth: 23,
+  timezone: 'Asia/Shanghai' as const,
+  startPeriod: '2026-10',
+  status: 'ACTIVE' as const,
+  nextDueAt: monthlyTime,
+  version: 2,
+  pausedAt: null,
+  endedAt: null,
+  createdAt: monthlyTime,
+  updatedAt: monthlyTime,
+};
+export const monthlyOccurrence = {
+  id: '00000000-0000-4000-8000-000000000021',
+  planId: monthlyPlan.id,
+  accountId: ledgerAccountId,
+  periodKey: '2026-10',
+  planName: monthlyPlan.name,
+  scheduledFor: monthlyTime,
+  expectedAmount: '100',
+  currency: 'CNY',
+  status: 'PENDING' as const,
+  actualAmount: null,
+  occurredAt: null,
+  ledgerEventId: null,
+  ledgerFactId: null,
+  version: 2,
+  skippedReason: null,
+  confirmedAt: null,
+  skippedAt: null,
+  createdAt: monthlyTime,
+  updatedAt: monthlyTime,
+};

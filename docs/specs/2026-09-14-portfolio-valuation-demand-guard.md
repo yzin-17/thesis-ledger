@@ -102,21 +102,21 @@ ThesisLedger 到 DSA 属于远程但自有的 seam：生产环境由 `DsaClient`
 
 - 账户目录可以由多个路由共享。
 - 全组合估值只在实际读取组合汇总的路由或视图状态启用；`/accounts` 不因根布局常驻 hook 自动请求全组合估值。
-- `/accounts` 选择具体且存在的账户时，只启用 `valuation(mode, accountId)`；选择“全部账户”时，只启用 `valuation(mode, all)`。两种估值查询互斥，不能同时 active。
-- `/accounts?accountId=all` 表示“全部账户”选择；该视图按当前 `PortfolioMode` 展示只读组合汇总和持仓明细，新增、编辑、删除等账户内操作仍要求先选择具体账户。
+- `/accounts` 解析当前模式下具体且存在的账户，只启用 `valuation(mode, accountId)`；历史“全部账户”地址兼容后同样遵循具体账户请求规则。
+- Desktop 账户数据仅处理当前 `PortfolioMode` 下的具体账户；旧 `/accounts?accountId=all` 按最近有效账户或当前范围首个账户兼容，不触发聚合估值。跨账户汇总由投资组合页面承担，选择、地址兼容和草稿保护见[单账户范围规格](2026-11-05-account-data-single-account.md)。
 - 离开消费路由后，未激活的查询可以保留在 TanStack Query cache，但不得因无关 mutation 立即 refetch。
 
 mutation 成功后的 query orchestration 只能有一个责任点。持仓、现金或 Ledger 变更根据服务端返回的影响范围执行精确失效：
 
 | 交互事件 | 立即失效并在有活跃消费者时重取 | 无活跃消费者时仅标记 stale、进入对应页面后再取 |
 | --- | --- | --- |
-| `/accounts` 新增或编辑持仓快照 | 受影响账户的 valuation、Ledger events、audit；若“全部账户”或其他组合汇总视图 active，则重取对应 mode 的全组合 valuation | 对应 mode 的全组合 valuation |
+| `/accounts` 新增或编辑持仓快照 | 受影响账户的 valuation、Ledger events、audit；若投资组合等汇总视图 active，则重取对应 mode 的全组合 valuation | 对应 mode 的全组合 valuation |
 | 持仓身份从账户 A 移到账户 B | A、B 两个账户的 valuation、Ledger events、audit；若组合汇总视图 active，则重取全组合 valuation | 对应 mode 的全组合 valuation |
 | 删除或清空持仓 | 受影响账户的 valuation、Ledger events、audit；若组合汇总视图 active，则重取全组合 valuation | 对应 mode 的全组合 valuation |
 | 保存现金余额或现金纠正 | 受影响账户的 valuation、Ledger events、audit/reconciliation；若组合汇总视图 active，则重取全组合 valuation | 对应 mode 的全组合 valuation |
 | 创建、停用或永久删除账户 | accounts；删除前后受影响的活动账户查询；若组合汇总视图 active，则重取全组合 valuation | 对应 mode 的全组合 valuation |
 
-持仓保存完成后，`/accounts` 选择具体账户时，网络层允许最多一次 selected-account valuation 请求且 all-account valuation 为 0；选择“全部账户”时，允许最多一次 all-account valuation 请求且 selected-account valuation 为 0。任何选择状态都不得执行 `invalidate root + onSaved refresh + explicit refetch` 叠加。编辑允许变更账户或标的身份时，mutation 结果或调用上下文必须包含新旧影响范围，不能只按新账户失效。
+持仓保存完成后，`/accounts` 的网络层允许最多一次 selected-account valuation 请求且 all-account valuation 为 0；历史“全部账户”地址兼容为具体账户后也遵循此规则。任何选择状态都不得执行 `invalidate root + onSaved refresh + explicit refetch` 叠加。编辑允许变更账户或标的身份时，mutation 结果或调用上下文必须包含新旧影响范围，不能只按新账户失效。
 
 `t=Date.now()` 与 `no-store` 不参与 TanStack Query 身份和业务失效；在 query 生命周期由 TanStack Query 统一管理后移除时间戳参数。是否保留 HTTP `no-store` 由现有安全缓存策略决定，不将其作为修复重复请求的手段。
 
@@ -165,7 +165,7 @@ mutation 成功后的 query orchestration 只能有一个责任点。持仓、�
 - 主单标的 Provider 失败时，只尝试下一合格单标的 Provider；全部失败时返回 unavailable 或 Server last-valid stale。
 - 同一 symbol 的并发请求在单进程和两个 Server 实例模拟中只产生一次 DSA 调用；等待者不会在 6 秒后自行调用上游。
 - DSA 重启后仍处于最小请求间隔时，不进行新的上游调用；显式刷新也不能突破保护。
-- `/accounts` 选择具体账户并保存持仓快照后，全组合 valuation 请求数为 0，选中账户 valuation 请求数不超过 1；选择“全部账户”后只请求一次全组合 valuation，不再请求单账户 valuation。
+- `/accounts` 选择具体账户并保存持仓快照后，全组合 valuation 请求数为 0，选中账户 valuation 请求数不超过 1；历史“全部账户”地址兼容后同样只请求具体账户。
 - 所有缓存、失败和 fallback 响应保留真实 freshness、Provider 和时间来源。
 
 ### 测试层级与证据边界
@@ -215,7 +215,7 @@ mutation 成功后的 query orchestration 只能有一个责任点。持仓、�
 - AC3：每个 ETF 单标的逻辑请求对每个合格 Provider 最多执行一次上游调用；Server 超时不自动重放仍可能执行中的 Quote，请求失败不会在多层 retry 中放大。
 - AC4：同 symbol 并发请求在单进程和多 Server 实例场景只产生一次 DSA 调用；未获锁的等待者重新读取缓存，等待结束后不会无条件执行上游工作。
 - AC5：fresh、last-valid、stale、unavailable、provider、upstreamSource 和时间来源保持真实；旧值不伪装实时值，缺失事实不填零。
-- AC6：`/accounts` 不常驻请求全组合估值；选择具体账户时 all-account valuation 为 0、selected-account valuation 不超过 1；选择“全部账户”时 all-account valuation 不超过 1、selected-account valuation 为 0；两套查询始终互斥。
+- AC6：`/accounts` 只解析具体账户；all-account valuation 为 0、selected-account valuation 不超过 1；历史“全部账户”地址兼容后也不发起聚合估值。
 - AC7：持仓、现金、Ledger 与账户变更按新旧影响范围精确失效账户 valuation、events、audit/reconciliation；全组合 valuation 有活跃消费者时最多重取一次、无活跃消费者时仅标记 stale；不存在 root invalidation 与父级 refresh 双轨。
 - AC8：Portfolio、MarketService、DSA 和 Desktop 请求证据可通过同一 trace 关联，能够区分数据库、锁等待、DSA、Provider、缓存和客户端触发次数，不记录敏感值。
 - AC9：DSA、Server、Desktop 的定向测试和包级检查通过；目标 Docker 冷/热/并发/重启门禁及浏览器保存路径 Network 门禁通过，且证据明确区分 fixture、构建、真实 Provider 与目标运行态。

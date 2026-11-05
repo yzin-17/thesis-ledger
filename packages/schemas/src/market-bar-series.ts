@@ -108,6 +108,7 @@ export const barSeriesSchema = z.object({
     requestedStart: z.iso.date(),
     requestedEnd: z.iso.date(),
     acquisitionFingerprint: z.string().min(1),
+    session: z.literal('regular').optional(),
   }).optional(),
 });
 export type BarSeries = z.infer<typeof barSeriesSchema>;

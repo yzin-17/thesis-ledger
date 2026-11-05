@@ -7,6 +7,8 @@ import { AiProviderSaveService } from '../../src/ai/ai-provider-save.service.js'
 import { aiProviderInputSchema } from '../../src/ai/ai-provider.contracts.js';
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { runProviderConnectionTest } from '../../src/ai/provider-connection-test.js';
+import * as validationPolicy from '../../src/ai/ai-provider-validation-policy.js';
+import { createAiTimeoutPolicy } from '../../src/ai/timeout/ai-timeout-policy.js';
 
 const report = {
   conclusion: '样例',
@@ -82,7 +84,7 @@ describe('用途验证真实 HTTP/SSE 超时与取消', () => {
     await once(server, 'close');
   });
 
-  const fixture = (first = 100, idle = 100) => {
+  const fixture = (first = 100, idle = 100, budgetSeconds = 600) => {
     requests = 0;
     const saved = { save: vi.fn(async () => ({ name: 'local-lifecycle' })) };
     const health = {
@@ -119,7 +121,7 @@ describe('用途验证真实 HTTP/SSE 超时与取消', () => {
     const operationId = randomUUID();
     const run = async () => {
       const plan = await service.plan(input);
-      expect(plan.maxDurationSeconds).toBe(300);
+      expect(plan.maxDurationSeconds).toBe(budgetSeconds);
       return service.testAndSave(input, {
         operationId,
         authorized: true,
@@ -155,25 +157,30 @@ describe('用途验证真实 HTTP/SSE 超时与取消', () => {
     await expect(f.run()).rejects.toThrow('超时');
     expect(requests).toBe(1);
     expect(f.saved.save).not.toHaveBeenCalled();
-    expect(f.health.recordHistory.mock.calls.at(-1)?.[3]).toBe('provider_timeout');
+    expect(f.health.recordHistory.mock.calls.at(-1)?.[3]).toBe(
+      kind === '首输出' ? 'provider_first_output_timeout' : 'provider_output_idle_timeout',
+    );
     expect(f.health.recordHistory.mock.calls.at(-1)?.[6]).toMatchObject({
       status: 'failed',
       usage: { status: 'unknown', inputTokens: null, outputTokens: null },
     });
   });
 
-  it('300 秒操作信号到期按总期限终止，持续输出也不能保存', async () => {
-    const nativeTimeout = AbortSignal.timeout.bind(AbortSignal);
-    const timeout = vi
-      .spyOn(AbortSignal, 'timeout')
-      .mockImplementation((ms) => nativeTimeout(ms === 300000 ? 80 : ms));
-    handle = continuous;
-    const f = fixture();
-    await expect(f.run()).rejects.toThrow('操作总期限');
-    expect(timeout).toHaveBeenCalledWith(300000);
+  it('计划和执行共享任务预算，持续输出也不能延长截止', async () => {
+    vi.spyOn(validationPolicy, 'validationTimeoutPolicy').mockReturnValue({
+      ...createAiTimeoutPolicy('research'),
+      taskBudgetMs: 6000,
+    });
+    handle = (response) => {
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      const timer = setInterval(() => frame(response, 'x'), 15);
+      response.on('close', () => clearInterval(timer));
+    };
+    const f = fixture(100, 100, 6);
+    await expect(f.run()).rejects.toThrow('预算');
     expect(requests).toBe(1);
     expect(f.saved.save).not.toHaveBeenCalled();
-    expect(f.health.recordHistory.mock.calls.at(-1)?.[3]).toBe('operation_timeout');
+    expect(f.health.recordHistory.mock.calls.at(-1)?.[3]).toBe('task_budget_exhausted');
   });
 
   it('用户主动取消与操作超时分开，未知用量不补零且不保存', async () => {

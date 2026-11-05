@@ -1,6 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
+import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
+import { assertLegacyAiContextAccess } from './ai-legacy-read-access.js';
 import {
   aiContextSchema,
   aiResearchListQuerySchema,
@@ -46,10 +48,6 @@ interface ResearchQueryRow {
 
 type ResearchContext = z.infer<typeof aiContextSchema>;
 
-type ModelWithFindUnique = {
-  findUnique?: (args: unknown) => Promise<unknown>;
-};
-
 const encodeCursor = (updatedAt: Date | string, id: string) => {
   const date = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
   return Buffer.from(JSON.stringify({ version: 1, updatedAt: date.toISOString(), id })).toString(
@@ -89,10 +87,13 @@ const dataVersion = (facts: unknown) =>
   createHash('sha256').update(JSON.stringify(facts)).digest('hex').slice(0, 24);
 
 export class AiResearchQuery {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly display = new InstrumentDisplayService(prisma),
+  ) {}
 
   private where(query: AiResearchListQuery, cursor: ReturnType<typeof decodeCursor>) {
-    const conditions: Prisma.Sql[] = [];
+    const conditions: Prisma.Sql[] = [Prisma.sql`r."researchOwnerId" IS NULL`];
     if (query.status) conditions.push(Prisma.sql`r."status"=${query.status}`);
     if (query.search) conditions.push(Prisma.sql`r."question" ILIKE ${`%${query.search}%`}`);
     if (cursor) {
@@ -165,7 +166,7 @@ export class AiResearchQuery {
       if (parsed.data.strategyVersionId) strategyVersionIds.add(parsed.data.strategyVersionId);
     }
 
-    const [toolCalls, accounts, assets, strategyVersions] = await Promise.all([
+    const [toolCalls, accounts, names, strategyVersions] = await Promise.all([
       ids.length > 0
         ? this.prisma.aiToolCall.findMany({
             where: { aiRunId: { in: ids } },
@@ -178,12 +179,7 @@ export class AiResearchQuery {
             select: { id: true, name: true, updatedAt: true },
           })
         : [],
-      symbols.size > 0
-        ? this.prisma.asset.findMany({
-            where: { symbol: { in: [...symbols] } },
-            select: { symbol: true, name: true, updatedAt: true },
-          })
-        : [],
+      this.display.resolve([...symbols]),
       strategyVersionIds.size > 0
         ? this.prisma.strategyVersion.findMany({
             where: { id: { in: [...strategyVersionIds] } },
@@ -204,7 +200,6 @@ export class AiResearchQuery {
       toolIdsByRun.set(call.aiRunId, current);
     }
     const accountById = new Map(accounts.map((account) => [account.id, account]));
-    const assetBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
     const strategyByVersionId = new Map(strategyVersions.map((version) => [version.id, version]));
 
     return rows.map((row, index) => {
@@ -234,7 +229,7 @@ export class AiResearchQuery {
       });
 
       const account = context?.accountId ? accountById.get(context.accountId) : undefined;
-      const asset = context?.symbol ? assetBySymbol.get(context.symbol) : undefined;
+      const instrumentName = context?.symbol ? names.name(context.symbol) : undefined;
       const strategyVersion = context?.strategyVersionId
         ? strategyByVersionId.get(context.strategyVersionId)
         : undefined;
@@ -244,18 +239,18 @@ export class AiResearchQuery {
         label: '研究对象',
       };
       if (context?.scope === 'portfolio') {
-        object = { type: 'portfolio', label: '当前投资组合' };
+        object = { type: 'portfolio', label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}投资组合` : '当前投资组合' };
       } else if (context?.scope === 'account') {
         object = {
           type: 'account',
-          label: '账户',
+          label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}账户` : '账户',
           ...(account?.name ? { name: account.name } : {}),
         };
       } else if (context?.scope === 'position') {
         object = {
           type: 'position',
-          label: '持仓',
-          ...(asset?.name ? { name: asset.name } : {}),
+          label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}持仓` : '持仓',
+          ...(instrumentName ? { name: instrumentName } : {}),
           ...(context.symbol ? { code: context.symbol } : {}),
         };
       } else if (context?.scope === 'strategy') {
@@ -283,7 +278,7 @@ export class AiResearchQuery {
         sourceName = account?.name;
       } else if (context?.scope === 'position') {
         sourceLabel = '持仓研究';
-        sourceName = asset?.name;
+        sourceName = instrumentName;
       } else if (context?.scope === 'strategy') {
         sourceLabel = '策略研究';
         sourceName = strategyVersion?.strategy.name;
@@ -295,7 +290,7 @@ export class AiResearchQuery {
         relation: row.relationExperimentId,
         toolCallIds: [...ownedToolCallIds].sort(),
         account: account ? [account.name, account.updatedAt.toISOString()] : null,
-        asset: asset ? [asset.name, asset.updatedAt.toISOString()] : null,
+        instrument: instrumentName ? [instrumentName, names.generation] : null,
         strategy: strategyVersion
           ? [
               strategyVersion.version,
@@ -330,43 +325,6 @@ export class AiResearchQuery {
         },
       } satisfies AiResearchDisplayProjection;
     });
-  }
-
-  private async assertAccess(contextValue: unknown) {
-    const parsed = aiContextSchema.safeParse(contextValue);
-    if (!parsed.success) return;
-    const models = this.prisma as unknown as {
-      account?: ModelWithFindUnique;
-      position?: ModelWithFindUnique;
-      strategyVersion?: ModelWithFindUnique;
-    };
-    const context = parsed.data;
-    if (context.accountId && models.account?.findUnique) {
-      const account = (await models.account.findUnique({
-        where: { id: context.accountId },
-        select: { id: true, active: true },
-      })) as { id?: string; active?: boolean } | null;
-      if (!account || account.active === false) throw new NotFoundException('研究上下文已不可访问');
-    }
-    if (
-      context.scope === 'position' &&
-      context.accountId &&
-      context.symbol &&
-      models.position?.findUnique
-    ) {
-      const position = await models.position.findUnique({
-        where: { accountId_symbol: { accountId: context.accountId, symbol: context.symbol } },
-        select: { id: true },
-      });
-      if (!position) throw new NotFoundException('研究上下文已不可访问');
-    }
-    if (context.strategyVersionId && models.strategyVersion?.findUnique) {
-      const version = await models.strategyVersion.findUnique({
-        where: { id: context.strategyVersionId },
-        select: { id: true },
-      });
-      if (!version) throw new NotFoundException('研究上下文已不可访问');
-    }
   }
 
   async listPage(input: unknown) {
@@ -422,12 +380,12 @@ export class AiResearchQuery {
         ORDER BY attempt."createdAt" DESC, attempt."id" DESC
         LIMIT 1
       ) AS relation ON TRUE
-      WHERE r."id"=${id}::uuid
+      WHERE r."id"=${id}::uuid AND r."researchOwnerId" IS NULL
       LIMIT 1
     `);
     const row = rows[0];
     if (!row) return null;
-    await this.assertAccess(row.context);
+    await assertLegacyAiContextAccess(this.prisma, row.context);
     const display = (await this.projections([row]))[0];
     const execution = aiExecutionReadModel(row.modelMetadata);
     return {

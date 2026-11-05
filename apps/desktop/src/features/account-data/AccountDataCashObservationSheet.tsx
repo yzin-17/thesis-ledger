@@ -45,7 +45,7 @@ export function CashObservationSheet({
   account: Account;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
 }) {
   const toastManager = useToastManager();
   const [dirty, setDirty] = useState(false);
@@ -54,6 +54,8 @@ export function CashObservationSheet({
   const [currency, setCurrency] = useState<Currency>(account.currency);
   const [capturedAt, setCapturedAt] = useState(currentLocalDateTime);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const busy = mutation.isPending || refreshing;
 
   useEffect(() => {
     if (!open) return;
@@ -66,7 +68,7 @@ export function CashObservationSheet({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (mutation.isPending) return;
+    if (busy) return;
     if (!isNonNegativeDecimal(amount)) {
       setError('现金余额必须是大于或等于 0 的数字。');
       return;
@@ -93,16 +95,19 @@ export function CashObservationSheet({
         currency,
         capturedAt: capturedAtIso,
       });
+      setRefreshing(true);
+      await Promise.resolve(onSaved()).catch(() => undefined);
       toastManager.add({
         title: '现金快照已记录',
         description: '这不是现金流成交，仅更新现金快照。',
         type: 'success',
         timeout: 2800,
       });
-      onSaved();
       handleOpenChange(false);
     } catch (caught) {
       setError(errorMessage(caught, '现金快照记录失败；当前输入已保留。'));
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -121,7 +126,7 @@ export function CashObservationSheet({
     open,
     draft: null,
     dirty,
-    busy: mutation.isPending,
+    busy,
     onOpenChange: handleOpenChange,
   });
 
@@ -199,11 +204,11 @@ export function CashObservationSheet({
               <Button type="button" variant="outline" onClick={() => void requestClose(false)}>
                 取消
               </Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending && (
+              <Button type="submit" disabled={busy}>
+                {busy && (
                   <Loader2Icon data-icon="inline-start" className="animate-spin" />
                 )}
-                {mutation.isPending ? '记录中…' : '记录现金快照'}
+                {busy ? '记录中…' : '记录现金快照'}
               </Button>
             </SheetFooter>
           </form>

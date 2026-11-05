@@ -1,18 +1,18 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { assetMarketsByTradingMarket, openTradingMarketsAt } from '@thesis-ledger/domain';
 import type {
-  FundHoldings,
   PerformanceSeriesInterval,
   PerformanceSeriesRange,
 } from '@thesis-ledger/schemas';
 import { MarketService } from '../market/market.service.js';
 import { MarketBarReader } from '../market/market-bar-reader.js';
-import { inferAssetType } from '../ledger/asset-type.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { investmentAccountWhere } from '../portfolio/investment-account-scope.js';
 import { PerformanceLayerService } from './performance-layer.service.js';
 import { PerformanceSnapshotService } from './performance-snapshot.service.js';
 import { aggregatePerformanceSeriesQuality } from './performance-series-quality.js';
+import { readFundNavEstimate } from '../market/fund-nav-estimator.js';
+import { MarketFundValuationService } from '../market/market-fund-valuation.service.js';
 import type { Currency, PortfolioMode } from './performance-types.js';
 
 const intervalMatrix: Record<PerformanceSeriesRange, readonly PerformanceSeriesInterval[]> = {
@@ -49,27 +49,6 @@ type SeriesPoint = {
   pricedCoverage: number;
   dataQuality: 'COMPLETE' | 'PARTIAL' | 'LOW_COVERAGE' | 'UNAVAILABLE';
   sourceSnapshotId: string | null;
-};
-
-export const estimateFundNavFromHoldings = (
-  anchorNav: number,
-  holdings: FundHoldings['holdings'],
-  returns: ReadonlyMap<string, number>,
-) => {
-  let contribution = 0;
-  let pricedCoverage = 0;
-  for (const holding of holdings) {
-    const change = returns.get(holding.symbol);
-    if (change === undefined || !Number.isFinite(change)) continue;
-    contribution += holding.weight * change;
-    pricedCoverage += holding.weight;
-  }
-  const disclosureCoverage = holdings.reduce((total, holding) => total + holding.weight, 0);
-  return {
-    estimatedNav: anchorNav * (1 + contribution),
-    disclosureCoverage,
-    pricedCoverage,
-  };
 };
 
 const rangeStart = (range: PerformanceSeriesRange, now: Date) => {
@@ -132,6 +111,7 @@ export class PerformanceValuationSeriesService {
     private readonly snapshots: PerformanceSnapshotService,
     private readonly market: MarketService,
     @Optional() private readonly bars?: MarketBarReader,
+    @Optional() private readonly fundValuations?: MarketFundValuationService,
   ) {}
 
   private openAssetMarkets(at: Date) {
@@ -176,18 +156,22 @@ export class PerformanceValuationSeriesService {
     at = new Date(),
     mode: PortfolioMode = 'actual',
     baseCurrency: Currency = 'CNY',
-    options: { marketGate?: boolean } = {},
+    options: { marketGate?: boolean; accountId?: string } = {},
   ) {
     const sampledAt = new Date(at);
     sampledAt.setUTCSeconds(0, 0);
     const openMarkets = options.marketGate ? this.openAssetMarkets(at) : undefined;
     const accounts = await this.prisma.account.findMany({
-      where: openMarkets
-        ? this.samplingAccountWhere(mode, openMarkets.assetMarkets)
-        : investmentAccountWhere(mode),
+      where: {
+        ...(openMarkets
+          ? this.samplingAccountWhere(mode, openMarkets.assetMarkets)
+          : investmentAccountWhere(mode)),
+        ...(options.accountId ? { id: options.accountId } : {}),
+      },
       select: { id: true },
     });
     const sampled = [];
+    const fundEstimates = new Map<string, ReturnType<typeof readFundNavEstimate>>();
     for (const account of accounts) {
       const result = await this.layers.layers(account.id, undefined, mode, {
         fxMerge: true,
@@ -195,7 +179,7 @@ export class PerformanceValuationSeriesService {
       });
       const value = result.account.find((item) => item.accountId === account.id);
       if (!value || value.marketValue === null || value.cashValue === null) continue;
-      const funds = await this.estimatedFundAdjustments(account.id, sampledAt);
+      const funds = await this.estimatedFundAdjustments(account.id, sampledAt, fundEstimates);
       const marketValue = value.marketValue + funds.marketValueAdjustment;
       let quality: 'COMPLETE' | 'PARTIAL' | 'LOW_COVERAGE' = value.partial ? 'PARTIAL' : 'COMPLETE';
       if (funds.hasFunds && funds.pricedCoverage < 0.5) quality = 'LOW_COVERAGE';
@@ -245,6 +229,10 @@ export class PerformanceValuationSeriesService {
           },
         }),
       );
+    }
+    const fundValuations = this.fundValuations;
+    if (fundValuations) {
+      await Promise.all([...fundEstimates.keys()].map((symbol) => fundValuations.current(symbol, sampledAt)));
     }
     const disclosureCoverage =
       sampled.length > 0
@@ -392,7 +380,11 @@ export class PerformanceValuationSeriesService {
     });
   }
 
-  private async estimatedFundAdjustments(accountId: string, at: Date) {
+  private async estimatedFundAdjustments(
+    accountId: string,
+    at: Date,
+    sharedEstimates = new Map<string, ReturnType<typeof readFundNavEstimate>>(),
+  ) {
     const positions = await this.prisma.position.findMany({
       where: { accountId, asset: { assetType: 'fund' } },
       select: { symbol: true, quantity: true },
@@ -411,55 +403,18 @@ export class PerformanceValuationSeriesService {
     const estimates = await Promise.all(
       positions.map(async (position) => {
         try {
-          const [nav, holdings] = await Promise.all([
-            this.market.getFundNav(position.symbol, { allowStale: true }),
-            this.market.getFundHoldings(position.symbol),
-          ]);
-          if (!holdings.disclosureDate || new Date(holdings.disclosureDate) > at)
-            throw new Error('披露时间未知或晚于估值时点');
-          const anchorStart = new Date(nav.navDate);
-          anchorStart.setUTCDate(anchorStart.getUTCDate() - 7);
-          const returns = new Map<string, number>();
-          await Promise.all(
-            holdings.holdings.map(async (holding) => {
-              try {
-                const [quote, bars] = await Promise.all([
-                  this.market.getQuote(holding.symbol, { allowStale: true }),
-                  barsReader.readChartV3({
-                    identity: {
-                      symbol: holding.symbol,
-                      assetType: inferAssetType(holding.symbol) === 'etf' ? 'ETF' : 'STOCK',
-                      timeframe: '1d',
-                      adjustment: 'none',
-                    },
-                    window: { start: anchorStart.toISOString(), end: nav.navDate },
-                    acceptance: 'interactive',
-                  }),
-                ]);
-                const anchor = bars.points.at(-1);
-                if (!anchor || anchor.close <= 0) return;
-                returns.set(holding.symbol, quote.price / anchor.close - 1);
-              } catch {
-                // 未定价持仓按零变动处理，覆盖率由结果显式反映。
-              }
-            }),
-          );
-          const estimate = estimateFundNavFromHoldings(nav.unitNav, holdings.holdings, returns);
+          let pending = sharedEstimates.get(position.symbol);
+          if (!pending) {
+            pending = readFundNavEstimate({ symbol: position.symbol, at, market: this.market, bars: barsReader });
+            sharedEstimates.set(position.symbol, pending);
+          }
+          const result = await pending;
+          const { nav, estimate, evidence } = result;
           return {
             adjustment: Number(position.quantity) * (estimate.estimatedNav - nav.unitNav),
             disclosureCoverage: estimate.disclosureCoverage,
             pricedCoverage: estimate.pricedCoverage,
-            evidence: {
-              symbol: position.symbol,
-              anchorNav: nav.unitNav,
-              anchorDate: nav.navDate,
-              estimatedNav: estimate.estimatedNav,
-              reportPeriod: holdings.reportPeriod,
-              disclosureDate: holdings.disclosureDate,
-              evidenceVersion: holdings.evidenceVersion,
-              disclosureCoverage: estimate.disclosureCoverage,
-              pricedCoverage: estimate.pricedCoverage,
-            },
+            evidence,
           };
         } catch (error) {
           return {

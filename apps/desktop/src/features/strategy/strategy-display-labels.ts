@@ -59,9 +59,9 @@ const comparisonOperatorLabels = {
 
 const sizingTypeLabels = {
   fixedAmount: '固定投入金额',
-  percentOfEquity: '权益比例',
+  percentOfEquity: '权益比例（0–1）',
   fixedQuantity: '固定数量',
-  targetWeight: '目标权重',
+  targetWeight: '目标权重（0–1）',
 } as const;
 
 const riskTypeLabels = {

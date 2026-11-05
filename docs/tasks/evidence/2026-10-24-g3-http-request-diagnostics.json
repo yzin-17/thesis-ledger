@@ -1,0 +1,1586 @@
+{
+  "phase": "g3-http-request-diagnostics",
+  "status": "http_diagnostic_accepted_g3_transport_unknown_v2_closed_waiting_confirmation",
+  "time": "2026-10-24T07:55:54.811Z",
+  "budget": {
+    "model": "openrouter/free",
+    "provider": "openrouter",
+    "maxRemainingCalls": 15,
+    "usedThisPhase": 1,
+    "remaining": 14,
+    "maxCost": "0",
+    "currency": "CNY",
+    "stopOnFirstFailure": true,
+    "automaticRetry": false,
+    "reservedCalls": 0,
+    "providerCost": null,
+    "providerCostStatus": "unknown"
+  },
+  "localEvidence": {
+    "schemasDirected": 5,
+    "schemasAiPackage": 26,
+    "schemasBuild": "passed",
+    "serverDirected": 32,
+    "serverAiPassed": 403,
+    "serverAiSkipped": 76,
+    "serverTypecheck": "passed",
+    "serverBuild": "passed",
+    "prettier": "passed",
+    "eslintErrors": 0,
+    "existingComplexityWarnings": {
+      "executionSettlement": 22,
+      "researchAttempt": 21,
+      "failureIntegration": 26
+    },
+    "newFunctionsComplexityAtMost": 20,
+    "boundaries": "passed",
+    "dependencies": "passed",
+    "fileSizeGuardrails": "passed_with_8_legacy_warnings",
+    "diffCheck": "passed",
+    "firstLintFailure": {
+      "errors": 2,
+      "complexityWarnings": 5,
+      "approvedFix": "类型归一化与同领域纯函数提取，未调整门限"
+    }
+  },
+  "sourceHashes": {
+    "packages/schemas/src/ai-generation-http-request-diagnostic.ts": "5ebd208ce7fdec041d7508b23eb55398259c4190a80c1a72f80f0827d5f30220",
+    "packages/schemas/src/ai-generation-error.ts": "41e9e966a7dc1b8f876131f0d12f4c3b6a6ca2fd9e3090e23bc412cf17e79e9c",
+    "packages/schemas/src/ai-execution.ts": "a3d344d6eb90157735fbd8a335e1e27552615b28d2f4af4e832a4258128bb325",
+    "packages/schemas/src/index.ts": "aba8452300b849c66efa13a66c37f5c563244a685d764750e40672a63735ba39",
+    "packages/schemas/test/ai-http-request-diagnostic.test.ts": "a8ff0a2e17a109df0e2c296547716100c3387d2695126e57fc6f5f127b5a20e0",
+    "apps/server/src/ai/ai-generation-http-request-diagnostics.ts": "6d592f070258105270b80a110be94b52a021afd426521baa3cc8d87074b7cb38",
+    "apps/server/src/ai/ai-generation-diagnostics.ts": "1bbc972fdc48cbe8e3d2bf191c4c0b3dc95e2edc82bb0042e2d2e2662eb3bbbc",
+    "apps/server/src/ai/ai-execution-request-diagnostic.ts": "472f73a5c2303071af07b7ac2b37acc6f9ab66a3a053923f92228f4601f43a97",
+    "apps/server/src/ai/ai-generation-failure-diagnostics.ts": "4e0df08588a9c814f56178f7a8f89246176394060ac14271e953e2a3223f88d3",
+    "apps/server/src/ai/ai-sdk-generation-model.ts": "4c5edbc2f5e461d4bee2694a0e1c0ddd8139dd7072a1710f68cda29688f7e8a1",
+    "apps/server/src/ai/ai-sdk-generation.adapter.ts": "b2a4add66d3525d1ed7d8a3cc1ffbd9f319050b5d0dca21d8f4db61df400a175",
+    "apps/server/src/ai/ai-execution-state.store.ts": "dbbb970da90908ce0a13fa96450023c33195ba26a24ef35ea1313bead855490c",
+    "apps/server/src/ai/ai-research-sdk-execution.ts": "700ac4414fc4515b65b7c2a4a462eda2b228c305491a381064f475164c65ab65",
+    "apps/server/test/ai/ai-http-request-diagnostics.test.ts": "d3f4f37330b334611480991f17689156234e3f496b9685208fa9b8d345f325ba",
+    "apps/server/test/ai/ai-http-request-diagnostics.integration.test.ts": "c7731859338ba19e07c1f318d8ffbf5dd0e1d1013a9faf1cab328ea3bf4bb8db",
+    "apps/server/test/ai/ai-generation-failure-diagnostics.integration.test.ts": "81c32d2338a06d50e049a0994f86ebffd515a5d7eee0d971ee417a63536a0a5f"
+  },
+  "baseline": {
+    "time": "2026-10-24T07:43:04.089Z",
+    "target": "thesis-ledger-dev",
+    "protection": {
+      "database": "thesis_ledger",
+      "owner": "thesis_ledger",
+      "head": "20261023010000_report_metadata_snapshots",
+      "activeBacktests": 0,
+      "tables": {
+        "Account": "db62d0149198f7ab2af32b71ecd1a190",
+        "AccountLedgerState": "32af70510f288de5b2568797fabba1d2",
+        "LedgerEvent": "13c6cb1565a3d8f75f668feb027c63da",
+        "PortfolioSnapshot": "63efc13403e64634b9e1d25cdf5eefcd",
+        "Strategy": "66ade0ae52be341c2c369ec7805e4d1d",
+        "StrategyVersion": "f8f8fbea51ec1a77eb6d45193df78b50",
+        "BacktestJob": "84a9c65fe08a12c1d2dfac9e7c3379b6"
+      },
+      "runs": [
+        {
+          "id": "00386c4b-8e1f-4ce6-9c3f-826446f5feae",
+          "checksum": "d18633131c68d86f"
+        },
+        {
+          "id": "1aed7e64-a408-4cab-90f5-9c6193f0a73a",
+          "checksum": "624f21d1b8a06af3"
+        },
+        {
+          "id": "1eac4850-39b5-47aa-b6b4-3098bee72a26",
+          "checksum": "0e1382b3b7059adf"
+        },
+        {
+          "id": "1ec5077b-5f3c-4a01-b827-b1953c477ae5",
+          "checksum": "39457c7e7b347067"
+        },
+        {
+          "id": "2a8fcb3a-e1b8-4017-94df-53f09f70dd6d",
+          "checksum": "f2d1fe04027e435f"
+        },
+        {
+          "id": "2f530d2c-f983-43ec-8097-1a909d7e22c6",
+          "checksum": "9175c7d24721f625"
+        },
+        {
+          "id": "2fdcbddc-092e-4c88-bb5c-28166849a4ca",
+          "checksum": "745734da7523ddce"
+        },
+        {
+          "id": "333472ae-e20e-43e7-8c91-97f0003ff611",
+          "checksum": "367cabb4354f1470"
+        },
+        {
+          "id": "34a21cda-54bd-48fb-ba13-3e085c3dad74",
+          "checksum": "60bb63adc67db115"
+        },
+        {
+          "id": "38ee3c6a-cdb0-4432-8313-86bb6466d8bb",
+          "checksum": "d89b0082bfed48af"
+        },
+        {
+          "id": "3b6018e8-506c-4846-bb59-66e3ee0f40ea",
+          "checksum": "02b2247f066b4d07"
+        },
+        {
+          "id": "3f3691ae-a025-40a9-8cc6-4ad1ee96ca81",
+          "checksum": "ff5b3e5ac1c2bff2"
+        },
+        {
+          "id": "42a02e02-2573-4157-8d38-eb3d75433a28",
+          "checksum": "44da59ef1eeb3912"
+        },
+        {
+          "id": "4343dc8b-0ffa-4fe8-82ec-86158aa4b2b1",
+          "checksum": "a2616f9a089915ac"
+        },
+        {
+          "id": "491d536b-6fc7-4fca-a43f-88d3a1b9f19e",
+          "checksum": "908cd21c50fed7e6"
+        },
+        {
+          "id": "4d50132c-39e8-4d73-840c-40011edcc7d2",
+          "checksum": "31e6fff394d9634d"
+        },
+        {
+          "id": "51c0025f-ebbd-4838-929c-3b492141b481",
+          "checksum": "10f4830b6918653b"
+        },
+        {
+          "id": "57def779-97d0-4562-9fe0-b613fe90269e",
+          "checksum": "ae94a77d4d9cc8ef"
+        },
+        {
+          "id": "5b2bb1c9-5fbc-4f71-a4a2-08657fbad72f",
+          "checksum": "f3692c2f4b88182c"
+        },
+        {
+          "id": "5bfdc5da-e5b2-4241-a22c-f397d5fcbe39",
+          "checksum": "43ef084dd249aa65"
+        },
+        {
+          "id": "6344d8ea-df8b-4f8d-b8d4-373509609ca5",
+          "checksum": "68d906df4d244a88"
+        },
+        {
+          "id": "66c783b4-bd9c-40b1-b9ad-cba7731d533d",
+          "checksum": "e3da5f14382141cc"
+        },
+        {
+          "id": "677da4a6-6a1c-4eff-a7ef-f3cf64e8f1e7",
+          "checksum": "aaccaddb45d93597"
+        },
+        {
+          "id": "693bc8bf-236b-43bc-bbb7-2208a316526f",
+          "checksum": "762d38c3c1b8bb66"
+        },
+        {
+          "id": "6ae73b70-bfce-4db2-9059-5ac35f9921bc",
+          "checksum": "cfcd9b4024f51730"
+        },
+        {
+          "id": "6c2e3330-8f24-4c6e-8729-b436ce62985a",
+          "checksum": "0adc95e58ac8300b"
+        },
+        {
+          "id": "6efb203b-c55f-4a40-a2ef-2887c9670a81",
+          "checksum": "0a9dd9a1d40e38e6"
+        },
+        {
+          "id": "70eda2d7-ab50-4c67-9ba4-a23ad874bfe1",
+          "checksum": "a8069a8e8cd3c551"
+        },
+        {
+          "id": "73f625c0-5844-429d-9c9b-80fd2fe857ba",
+          "checksum": "0d290d5fcff7c910"
+        },
+        {
+          "id": "80c7c941-8821-4bf4-8b4c-eabb4169b6d2",
+          "checksum": "ecd5b0ad20f65def"
+        },
+        {
+          "id": "8db8879d-e27d-4d8b-8df2-96eba083fee6",
+          "checksum": "a180c8307c637ac3"
+        },
+        {
+          "id": "9b088131-3874-4d32-940d-1884be271110",
+          "checksum": "8d8c305cdb65aac5"
+        },
+        {
+          "id": "9f2cfeaa-b8dc-4ba0-8b5f-2c275a04696c",
+          "checksum": "09741358529bd3a8"
+        },
+        {
+          "id": "a2274899-2d16-4a46-9b17-ad78c59c5f9a",
+          "checksum": "5d1a7d83d42a4004"
+        },
+        {
+          "id": "af19148a-5239-4165-91e5-08a6ee0cc73c",
+          "checksum": "304fe998eec9d148"
+        },
+        {
+          "id": "b049cd97-5404-49c2-85a8-c1de695afc65",
+          "checksum": "58b993fdf96df42d"
+        },
+        {
+          "id": "b1e13fab-9c74-48f7-9c7f-d65315fc7714",
+          "checksum": "5c50fb8ef59ca82f"
+        },
+        {
+          "id": "b60471f6-ec27-4a87-ac33-9652d35a9db4",
+          "checksum": "6b1d7a3a972e7951"
+        },
+        {
+          "id": "b655854d-fbb1-464d-bf7d-9bb69eb2728f",
+          "checksum": "7c41ca54ec1c7521"
+        },
+        {
+          "id": "b706a643-54bc-4ff2-b971-9f6552fbb5bf",
+          "checksum": "47c15656dffc1c5f"
+        },
+        {
+          "id": "b7fdb041-7951-4bb7-bc82-305ee5dd66fc",
+          "checksum": "3185f18aa41c7bcd"
+        },
+        {
+          "id": "b8de7bc7-cb62-41d8-8681-a2e1b0184462",
+          "checksum": "981757d2b91e80a1"
+        },
+        {
+          "id": "c1a51028-7117-4863-a307-ce523f5f494c",
+          "checksum": "2c730d72e0adb7c4"
+        },
+        {
+          "id": "cb8c5fdb-b16b-4d2b-aba7-3e9567446930",
+          "checksum": "62957fa06013f9a3"
+        },
+        {
+          "id": "d555954d-a545-4845-aaf6-e5be5cf245a3",
+          "checksum": "767245e2c4ddc33b"
+        },
+        {
+          "id": "d713d4da-646e-478b-ace1-d5564dcae835",
+          "checksum": "5e4ebbc2bceeb496"
+        },
+        {
+          "id": "d9ca0350-2438-4508-b126-d74339f47ed4",
+          "checksum": "ae439e55ec2e4a3c"
+        },
+        {
+          "id": "dc9feef7-ee5d-4da8-b093-13583f1825e2",
+          "checksum": "90d8cc1637c3921c"
+        },
+        {
+          "id": "e409bd5e-ee42-419a-8f53-168fcaf226b4",
+          "checksum": "32ce8f183091c25e"
+        },
+        {
+          "id": "e629fe80-56b6-4455-a82f-2ba5f73ddc2d",
+          "checksum": "3d4783e0265bd671"
+        },
+        {
+          "id": "e8816b1f-ad96-47b4-8ce3-e09fcd0fb5cc",
+          "checksum": "2125edb5b3f650cb"
+        },
+        {
+          "id": "ee7361da-a46a-4ac7-be93-895e6eff2ef5",
+          "checksum": "b4fa70fe6a43f74e"
+        },
+        {
+          "id": "ee7f16e7-8f60-4c8a-b072-5582af834f14",
+          "checksum": "6ba85b84d7de68df"
+        },
+        {
+          "id": "f5a2ca38-ae0c-410d-bf77-99bc005b8926",
+          "checksum": "2f862e941076cedb"
+        },
+        {
+          "id": "fc8bbae5-7fa1-42ad-a582-b15b9a80d116",
+          "checksum": "db476a5b951ceada"
+        },
+        {
+          "id": "ff4bbf86-2603-4a38-91ea-f4faf04e7846",
+          "checksum": "d8a77ac3a7259b2e"
+        },
+        {
+          "id": "fffda419-dd1d-447e-8191-e62e1aa0a4f2",
+          "checksum": "621aeeb4302d85f5"
+        }
+      ]
+    },
+    "protectedRows": {
+      "Account": {
+        "count": 26,
+        "hash": "db62d0149198f7ab2af32b71ecd1a190",
+        "rowHashes": [
+          "04f23fbde34a35563260694fe6ca6410",
+          "0533d128e61493600d06eb4858aeea95",
+          "0ae90a842450c7afbbf87f7997bf520c",
+          "11168a2661de236abcd76abc5f3ad987",
+          "15279b5c6e4fb07d7d6843bc4a502891",
+          "24ebe39b1e8799f756375244505b7262",
+          "2e7ba75f4544e323d2997ed2c1bd846e",
+          "35c3b56f829e89f5a78f5eb14575b02b",
+          "3fed037516afc92bc2b63038925605ab",
+          "41b40d00ccdac06c5f00980f747c847c",
+          "5410553e10ceb52d3cde93044aca74cf",
+          "6bb25145ea1b9918a6606cd3cec5ce69",
+          "9dd2f68c7b86e53f57dc97e6cdab863e",
+          "a40ea6de359c8ba07367c7f46e532fa1",
+          "a6b77ab262a4fa80148bc75813adef4c",
+          "ab1f0b941efdd1721275d8108fd66b4f",
+          "ab3db8867dae6c4a8ae714445575d223",
+          "b298ebcdec27f530f213d81b1855c6be",
+          "b38c3e9cffee8943e142bc7eb9c42d59",
+          "b842acb813e9922ee65afd128b7d6d83",
+          "c47db7c9437e8eb5f725c320448b2847",
+          "c4d3ecf9e1725d0e323a4fd6620d262c",
+          "cab5ff7643170cdcf6510ac99536b027",
+          "dd2e3ff7123bef19693bb26bde0e7479",
+          "dfb28a62f8a60b83918e98180769dc90",
+          "eb5cfc35b182613baa906d2a6cf6e861"
+        ]
+      },
+      "AccountLedgerState": {
+        "count": 22,
+        "hash": "32af70510f288de5b2568797fabba1d2",
+        "rowHashes": [
+          "016f55553c7a3107f1e2d24152467699",
+          "13a3d8c644301f1bc2ec6bf15e4d1796",
+          "16c19be70160d1ba17358e6e0ddf2510",
+          "1e1da6ac4c046fb556fb62ebcf463f20",
+          "37654cacd3bac0594e68b0bcc85bf2b8",
+          "45962d01c2bc20ddf7f16ad71793d632",
+          "4bf12643ecefa75ffc55b1fe8bad44d5",
+          "4e83cbd893cf04950151f84da45a1cc1",
+          "6b2dd5df7795a4503757c8feabd9101c",
+          "700b80199984b81b0badca6191e98d89",
+          "976e3f2daf677720b41d3446c704019c",
+          "9fd11c465d5f895964e89c218698bb02",
+          "afecc29fe4a2e29a93d5fa2025c1a3e0",
+          "b0bf190b42af8b91f75e39ebedbf97db",
+          "b6a281231e8b14ceed29b9f9c4b041cc",
+          "bf14c05e668d00a5d13763e4db753838",
+          "c4ab823c3472b6aeb840482de171b44f",
+          "d761acfd7aea8891898be37c994a8f0e",
+          "dad09dddd9e76c1e78279600527baba4",
+          "e5956dab10e9e4087da4cd5d68779d9f",
+          "f0e2b75b12114d8693eaae1126e80c08",
+          "f45705810ffa11af5015860d68d2035e"
+        ]
+      },
+      "LedgerEvent": {
+        "count": 138,
+        "hash": "13c6cb1565a3d8f75f668feb027c63da",
+        "rowHashes": [
+          "03d843a3fc0a97cfc64a893906650fc9",
+          "05bed812e6c052724b08ce4a04405953",
+          "0d9a054f90964353264f472d04d38232",
+          "10ae2ab86c0c245a140a6be3046fd627",
+          "11e49a21eeab92ad0c265f87c24e8fdf",
+          "1947093cd0514f8da95faa491a45f924",
+          "1c34576134e2de5e0f8e0f2376662795",
+          "1c8539aa545e282d676efca1da9502d2",
+          "2026498b28059250527efa0143b18d76",
+          "2328d67dc376a14532691b0b5f48a5a4",
+          "238d73bd70cfc9dd6564fd8cc8e01d63",
+          "23af7aea2d0ace5644177fa7e6861dec",
+          "25bcf1ca0f05c6a2e747d585714d2579",
+          "2627ea717ff3aefcbd7ea6d2ebc9cce5",
+          "2d817feb6437d5efa43827bc4190073d",
+          "30f5c0d63b7bb97db5d3295334e117a8",
+          "3223ac4b88ddb2316fbae8f81fc85fea",
+          "3265eae24e34de70b5198ea9faa54937",
+          "32f8b2d6109030805f27e029f2725b15",
+          "344f50690b914287f8685f52e268a914",
+          "345360eeca3f145eb5ae354b202d6932",
+          "3499b4c41f169ed645c941222ebf031c",
+          "38320144ae811ae19c3a53d7b09d3334",
+          "38a97a667a6639fc9c9916d2d42b2553",
+          "3906a502a158af35748b20b0eb48b3f6",
+          "39d60982869cbf68adcadd655716ee65",
+          "3b5dddb28dd85e443d39ab2381a41c52",
+          "3c6c9c0af48fce843777a5dc04c14590",
+          "3d6c799426b70dafc6875ef50df33814",
+          "3e207980833eb156eaaefd092e7a698d",
+          "3e824a82bddec6f92816985cc10e7311",
+          "3fa3148ade4f9dc3b89aeeadb03a70ae",
+          "40d721b38c3efca34e37f1f4f18c9226",
+          "41c540b525e0515b12d4f1925736436e",
+          "4321b7905eaadea4f08523a5ea75d61b",
+          "4602f60bfc974b3dbc251324dafc88c0",
+          "487d7000d1f4c2801765db1a63672611",
+          "4a0363e6d9e9b59f1903cc6e7f1e0734",
+          "4d17fc031f240e7a5c27a9be2f13d977",
+          "50ec2cc09368de11bf1f942d5e34a621",
+          "57b44b0a7c0a3f102d7d4339fb2f1f39",
+          "5c6970f32fd6b71630c3c2633ebb5a4e",
+          "5d69e3054330b2b5153ebc16d4af14a1",
+          "5d99f752f816fc21cebbfc5116e1bc12",
+          "5ea7ef15d19f22d987701a820ef3378d",
+          "5f60a753dfd679044533c4ab128507b1",
+          "5fdc9ef2b74fa746d7a5f1abb153fce2",
+          "6015233004fae870c817c8bc7398d9a8",
+          "662da211dbb03851ecf11bad4912f4cc",
+          "67ff91ef301fa060bbd03c6a0facb507",
+          "69294bb0c0fbf5c576d8d03ea2dd1957",
+          "692c823d4f59e6b8c1a8bd38e85f69ad",
+          "6c7ee2b170a88cd9c05eeda68c2d6b22",
+          "6f463373c695f55cc4f7a5d558f537da",
+          "7294080247f5fa345d583469c18b2b83",
+          "7380f39d2d20036f462b9b0b9bbc3a48",
+          "753b37e13502438ff3f1ce0b7e45c07c",
+          "75bcec9b0755c9f562686446fe3ede3d",
+          "7887213ef99ce17b543a99035ecb4e59",
+          "7896de37f58814bd1b6fef2a78468401",
+          "7b105bbc269a065683dc3922681b27e4",
+          "7be0d657abeb447388bb334f7e59160d",
+          "7c6741d69ce34f8d27df9b530f41f1eb",
+          "7cd370e1b94d5cfd24393c850bd6c030",
+          "7d43b71c614c89847f244f0907164a87",
+          "7e5606c6fe7cd6bc6e46611747530b1f",
+          "809c5101e69e7e246ac4c4c1e22c6d09",
+          "817de905973a46a34e4ff71d2b9252a8",
+          "81e49b8597bd9b283f40ef923442cb1a",
+          "8350a66ae26d19f948e5b5ab6e28a847",
+          "83fc84eb0e502d7f6bf77afe2965d04b",
+          "860bfb6e4b358e15ba53c09da5bbfd13",
+          "895e84792c9c35476c12ea205741e1aa",
+          "8aeb7502284af9741360d719dfd2118d",
+          "8e2e83b0ac628f503c25afe9a3543961",
+          "8e3a1b4189d68d6620b600930ee2ceb4",
+          "8e756804c166e171ebc4519d1ad468f1",
+          "8ff69ee3a64ddb10dfc7c5e8fb5498b7",
+          "9c065c7649335fd577d792f5e90394b3",
+          "a0599ed61b6c277a1980ffc2f2d8c7e7",
+          "a2000ea9e03cdb13e3be6fac04d4d84d",
+          "a3d02470748da87f352147baeac76099",
+          "a6ca465ebe8c9a634190e8092f338550",
+          "a6fa0dc98551cccddd70f003a0668bd8",
+          "a7fdc5e3fe01a692781e4971ccbe64a0",
+          "a831c0c670febebd58b97eaa4b1e7ba2",
+          "a88de1d4348f14c4f436da9c2ff28482",
+          "a8911b6a8d2c454b2dc826920b8a3d58",
+          "aa65f0faf6e82721019f66bbb9bf86b0",
+          "aa88ef9917fb3a5a3acba6f9823034dd",
+          "b156d3ef3774bef4a25448215471a796",
+          "b23a91f4078f54df2a9cc25aa86b35f0",
+          "b37ce6e24e39c37923a906444ea62702",
+          "b62649f9422d85d4dab19bbcf8ed57f9",
+          "b76d18b51ddd84852fde263cef092a7d",
+          "b8884f4abfb18fd12fddea255885017c",
+          "b92eeac35dae366edafb5525e52a7e12",
+          "b9cbee4b027d7e82061eb71e27da0055",
+          "b9e3f154c4217e63afe69d200b173071",
+          "bd2a0e08dcb6700e21abe57d9411b5ac",
+          "c13b90994f9a519760455f25f6fe24b5",
+          "c1dabad524d5c24bf56c99f5877c31d3",
+          "c2d1e386a72eb17eaa28501d784defb4",
+          "c733ad5bd5d75e2d2ff13da3abbe0e21",
+          "c7cfdad3255380c5bd8a8601b2aa2477",
+          "c9b0c952edda63929c14cd58067f50c4",
+          "ca0345810e4cf6df3a8181662146b3ec",
+          "cd4b9a20bf4c0f182f595f567ee436b7",
+          "cdcecd7fc10b01b78cba8c352a68b2c6",
+          "ce6f5548168c3827bc46873d9f864062",
+          "d02e88d57b7f1148cf188fe2088372d6",
+          "d16b1e7bcd3139897eb98ce38191c52b",
+          "d7499e387517b459bca41dbbf70151b0",
+          "dd2353fdb9294a0bc03b2efdfe8d25fc",
+          "ddaa82aea398f6184004579d173c3a41",
+          "df4866a8eadfb0a5277c7e24230a45a0",
+          "e0a783f64647f969008c27c555e25072",
+          "e152fcaa31645af1545023c2e9857978",
+          "e1a2e47d18f48eb76c739a9df43a169b",
+          "e25432f19f6bd096cee9c627ba09a7be",
+          "e2933b1d56372896766f8ad4620ac6df",
+          "e4b83bccf6f83f131e024da91c7281af",
+          "e51c4b830ad807dfc83bd20779703d86",
+          "e8123845042e844acd76bcca3983fbab",
+          "e8eca27bdce4aabc4402b528b40d29bf",
+          "e935a71c89e260ee9b83d5bcc150e16a",
+          "ea11fe8eacb18462f817c43d3637e6ae",
+          "eade17fc8342b10e8b9e05cf26b8a614",
+          "eb3b614c1b4587abbb3aac93be30895f",
+          "ecdf0b0e5b136e4abdbbb104b770ddd2",
+          "ef20b403f54f5e5dfa0d287a888d8f22",
+          "ef42bbf44014c0a52f613f2fb348fd27",
+          "f0c92df11211468df69c267d970e46b4",
+          "f411cb26c316eee6f30e6dd36b59f81b",
+          "f5ac7933099077474f7b3df73bc4308c",
+          "f71276c26af7161179aff79d9973c0e0",
+          "f8f8f241b6f050aadb40256c99649120",
+          "fef7c4cedd6e0f67a11039f43999e041"
+        ]
+      },
+      "Asset": {
+        "count": 4,
+        "hash": "5f43476371746ee6e0f55dfd0d7c5512",
+        "rowHashes": [
+          "49da6e3d813e0df3bf348bdec418ae34",
+          "952e475f005e37f999d5db6802668465",
+          "9578564fba671d1405f707844bbc73ef",
+          "fb16a48817e45359841cdec48aaaf865"
+        ]
+      },
+      "Trade": {
+        "count": 20,
+        "hash": "587c0343d29f0d57bfad63357fca3f0d",
+        "rowHashes": [
+          "0bc145f8c9316494050bed475aa8247a",
+          "0c0ca1d063da8a87ae98343eea5a96e9",
+          "0ef5868bfc3a8418c18bdf8af4288d6a",
+          "2baba59ea8f3da64dc3bfda9cdf413ad",
+          "4029d16b8bf1c9efc948eeff9c03d74f",
+          "4681199dcfa4080b819dfad7e48f0daf",
+          "5dd360273767773c1b38cee57a051444",
+          "726bd4154396ac1256d8cf2b65c58ef5",
+          "7ba814703e0a091058072ac15d7e6214",
+          "7eb44a5fb47f72189cf5e7952294c654",
+          "86c26ee4567de27341ee9e2d0e4d5970",
+          "9553db73bde42de3da80ee9f25585765",
+          "add1a806716d45ed25a46babe725d6e8",
+          "b906c51a8242b2b942640ea6be8f1f7b",
+          "c089bbcd57c158070f36f992c14b7ec2",
+          "cc056222f6378597fd48b577dce431dd",
+          "d00cc499f356da1c5008a90af5720321",
+          "db45413fac0870219524ec196dcfa47d",
+          "dc84f33c4d4d51cd4f81e494b4f5db44",
+          "e291d352e0f4150675cf81d3475cc6a3"
+        ]
+      },
+      "CashBalance": {
+        "count": 18,
+        "hash": "c2440f8db3cd9438e5b54bccd2db6e69",
+        "rowHashes": [
+          "0a6c54953e1871dee1122429488b96b7",
+          "2c4803fc1c4d7d50d57e48e203706d46",
+          "32996c5fe1bf77902bc921b6a348cae6",
+          "49de215a6a05f42c137d9e3c6d0ad5f9",
+          "7142af4044b09b7ba7fbd6f659927f82",
+          "839ee3f5731b8dfd6958e5d83109e5ec",
+          "8555d87771e9efbda64b4b64ca0f5a45",
+          "9d3bcda1443705e3a610c46c87bd6128",
+          "9d7a47d725a9a8f0738906250a253448",
+          "a4c31fbed12f3fb8135a953940ecf30b",
+          "ad68c4a377401ac6ee3277553670fa13",
+          "b45a69bbf381f8f4e9091acb26135be5",
+          "bf5afd8c6f23e66c771b5ea341998a86",
+          "c6db27c46b35a8932b2b2ae321f76902",
+          "c8141269adbef201c6ebea86af599d6d",
+          "d3c48181975b89f83e3c6363d7490538",
+          "e025f3aaa665d0769dd66c4971f384bd",
+          "fcf41061b4af2901cef21d8864d08d44"
+        ]
+      },
+      "PortfolioSnapshot": {
+        "count": 6,
+        "hash": "63efc13403e64634b9e1d25cdf5eefcd",
+        "rowHashes": [
+          "54e6cb19172464c6ad19009c81a887e0",
+          "556bc428848265d46b36ea35799ab1ad",
+          "b03199c09a2e6d3c9ffb24471b3d64f8",
+          "d619a8a652d96e58005af3d8672f0293",
+          "d66fec580ce14d624bb0be36d7a5c644",
+          "db333be9d76aacd5935b7ce459808eb9"
+        ]
+      },
+      "Strategy": {
+        "count": 91,
+        "hash": "66ade0ae52be341c2c369ec7805e4d1d",
+        "rowHashes": [
+          "00fe0f10fe2bd91da2a935cb623f6020",
+          "032a4707055880deeb79d75f459516ac",
+          "04800f77f0a62b102c8670ad4a070c7b",
+          "055661aad0d56206e293be697e082b42",
+          "057e7a44a868604d85accb00c435b4fd",
+          "060254a7ebd9283dc7cc35890541ed89",
+          "0aa21d62c3c6d50be2973ff606f1153d",
+          "115f4543d3e0635543a90673aba7595a",
+          "1941c287745b6c97928509143c35a150",
+          "21519ef89d3704b71d8a28ad42923075",
+          "22179bb4780ac6d01e346e6e8dfe9911",
+          "22d062f9eb3b9c14afdd07f91432bfec",
+          "26432f30850bc965adfcefc882c0ba3a",
+          "271a3029b6d1215ebc5c3cfcbecb1153",
+          "2f96e44169002be135f35d354b66f279",
+          "2fd631378521d258dea3bee90dd9e639",
+          "32dd514cd7d2a51ea7e130bb033cd274",
+          "39d8c0370c44f5b98db69cb8816e30f2",
+          "3b8d5fbfeff46d967e19259b4d4bb2db",
+          "3cc0d26b1055989894677bf2ab3ade23",
+          "4121fb3d99b6b943aa8db036bfec20bc",
+          "4792a240246899b9c50049d9038ed272",
+          "497909874cba3a795f95c1ca8d37edf3",
+          "49ea5b76e22440ac9b51fd8484132ce7",
+          "4b8d0e840e82f3400e02aec38545842e",
+          "59c89b41cddb9b0536963164a5a3de09",
+          "622ced42228b21ee22c79397353f9875",
+          "65e5e8740cba87da777a13da2ad0d047",
+          "6664c0071e6bd81787694caff3a1e3e8",
+          "7029acf8eb6b9cde9bdd017f22f33ede",
+          "71c371b48aa9973d545decb95504a635",
+          "78509620b1b3a29e780a95aa4bd1dce9",
+          "78e79a7648ba3dc95fb1d54e4443a9b1",
+          "7f5c54c9d0d0f550e6f6b53070bdd58f",
+          "823c99df9141ef80eb0bf52cc0f7eee6",
+          "8291e76dacdc34bd2a6402f252386867",
+          "85a0d421c1f20eec56010546fcebc28a",
+          "865c9a35ace137cae20ee4a70232c3fb",
+          "891c3a4fd9555fb3a71b9a9e3d554c72",
+          "8bb97a274b85cd67051302c1107a7fbb",
+          "8c6891d350cc983117bdace575ce96f1",
+          "8c76e28f438beb92fc6e4b0bfe1b0903",
+          "8e3905a18bfc773c6ecfb0a3cc50c754",
+          "97f4fdb5f8722bbbadfa3f7fb062d4c8",
+          "997cf7d63ddfa07aa865f9262456848d",
+          "99e497851ac8a845fb9aecc28604e11d",
+          "9c50e252983e2c89fafb05089340a6a4",
+          "9cfad9211fe229a4e0461ab9883dbad0",
+          "9fa40a766bf94e8f566a82afc66c4d5d",
+          "a60aa7020b9a19fdf52c827e0c5d9888",
+          "a696b39325c91ac7229d488fdb7d9f3d",
+          "a7694b8033f5b0dd2311d015e35e76b0",
+          "aa54d940d64e360af831c58452eb20e8",
+          "aabb1b77e6745f174395c6310043ac49",
+          "aacef2ac59ce552d7d085fbefb7034c3",
+          "ac9fd6601bbb7d38b0c120ae3359b391",
+          "b287807995b2e1cd02299a196115ea1c",
+          "b3064638042310787607cfbf41380a6e",
+          "b3476c1ec0413e91c9cae0bf0ac3b49d",
+          "b3bde09d1c2753f17d691287b1722e97",
+          "b504b23dc326af67fb147a0f2a9dcf8a",
+          "b735693202565cf38741e7f25adbebec",
+          "bb0fe529563c393109845ae5fec90ac1",
+          "bdf050af860ea41bfd1125995b89005d",
+          "c2703a121a01bb3b8b1638ef0aac8b16",
+          "c6a4308f8d0c3f11821a979f2f5c7c6f",
+          "ce9926a5b54a02f405b41f2ef5461f7e",
+          "ced82a651f92c5950381ecaa6c938e4c",
+          "d25295f40af9fb431e8f1e6a5dd218a3",
+          "d456380def1d87058037da35416f0f0e",
+          "d7bfc5a0ae545805bb8e27660d5f2f6c",
+          "da2ec1f069245f22e31d6f142f60c94f",
+          "da3543ee8c0149ec467524d8b83fa910",
+          "db841555128a062102b84cec6c2a1fd1",
+          "dc599969cbdd110c63017331dd77bff5",
+          "dda20fc420275c91fc729491d19b1a04",
+          "e04b89733f85d235d13180b37c80cb94",
+          "e0b7758985599e64caf38c9e67dac8ed",
+          "e1a3094df62b65cbef445248841c7b2f",
+          "e23eed3d4fc7041a482c3a4c8f595d61",
+          "e40fc2a07f2345634d341d11572135aa",
+          "e4e010ad06bd302b0e229196ff5cdc85",
+          "e8c8bd3639ac50426370f3351f0fdd4f",
+          "eccc14b419fe706d6fd6e53d2bb34f3e",
+          "ee87f52b13e364cb6e69f86547f9067b",
+          "f450164b784ffc9655e31fe26e4f8f48",
+          "f757a89d27c0750ee6119d34f65424db",
+          "f9cec735d8f49216f1931e75ddcbad29",
+          "fb37533668d3a38003947ca18f6ce142",
+          "fd71ca3b7d68e2a494574d9fe5e3270c",
+          "fda3b90e26a76fdf39afbfb924541443"
+        ]
+      },
+      "StrategyVersion": {
+        "count": 92,
+        "hash": "f8f8fbea51ec1a77eb6d45193df78b50",
+        "rowHashes": [
+          "00475fa256313f4ffe89c253be4c0f6e",
+          "0167496722cbd5b7bab0267450f3731c",
+          "04a07b7220ccd9cebf31cdc94caaf87f",
+          "1547cb5bd3d1dac692c9763f99795cef",
+          "15c7a22293c8c0ce2284c4535308b94e",
+          "16e0ff0aab4f26ce187314b15ae56bd5",
+          "1969bc652376b307b2d3a56966f12058",
+          "28dcbb12c5aa9caf3bdd9f79e926fb68",
+          "2addabd42e6268902a0437c85992ab79",
+          "2e84eb3054fc8489a6773007c3fcf813",
+          "2f40cbf17515194b88a919ae7df390b1",
+          "2f668abd3b6202e5147d33185abdd0f4",
+          "2fa6e5aea833d325db3c3a8b510e4f5c",
+          "338a24e30e3d29969ace182c66d32274",
+          "395ba69bc290b2b7669abd8978383900",
+          "3baad83b1868d10426870e96fba80036",
+          "3cf393ebad0214ed6ef4a0dcf0cf8e0c",
+          "3f5aec21a1ae0cae736a35b1047aa5c1",
+          "408f5937491583ae3cf6441e816e3de2",
+          "4175cfeaefbccf349d1d9e7d18298a47",
+          "45e1c3503e416f2745a630298dd2b40f",
+          "481d5e9fc8807715a4435ffa046f138a",
+          "48786e9f15050c83fe091500cbbc9b00",
+          "4a6e23114e8412bee1e13f1b8db9bc44",
+          "4cf7379f9becabb525b46858c335c27a",
+          "4d5c616b027453a98677c6715fb655ac",
+          "5291652449cabaaf036924be876eeeb9",
+          "535ab3a17a2f6ffd1ca74dd232146877",
+          "53de00c8d772c770202650da41bfbb7a",
+          "560d2e6dd36053f8deb7a7bbc6cd8c68",
+          "5b71905160b05769459fc79457537dc2",
+          "5c263c6fcf9f94ac9a90a55b44bcfaa8",
+          "5c34ef80df1a665596a714ce6168d85b",
+          "5da182fadacc2beeaeb531c4ae7d11fa",
+          "6025a21d69a027e59aa35ec7f569000a",
+          "6665367201bbbf1e5e13619cdf4c418f",
+          "6affe7f6c4a84e12fa4fd78ef907de55",
+          "6d37b99c1e4f43b0d507d13806f7d592",
+          "6debd59f6c95a0ff66c529aacfdf2ceb",
+          "6e497301008eecc700d6ce79cd4606f9",
+          "6e9d929cae0c5f8808fd26405b3384bf",
+          "6f8d3e98b57e5158e128d096ec807991",
+          "73c97afdcd438f2e7538685543beea3d",
+          "7423d0e8db3559caa02eed04ad282751",
+          "7669ac2265c309a33cc68d481a0c1bb3",
+          "79d0cb8e753297585c41cc21e3016e78",
+          "7e85514843a9a674c74b74296083d57c",
+          "80f7bd44020b9cd93b76da55dd699d88",
+          "81bb4b9d885d5879693f529ac62abff7",
+          "825f67b93f64c2074ddbacc7cfe2d325",
+          "8394bb78ff213447e7fa358d54918936",
+          "84cfa4370c1a7902387831f79df2212e",
+          "8b5424c7eaa89c6db8262af25f100903",
+          "8dd5d4f10154792de9c33f0cb86b7fbe",
+          "900e6b128c941ef2bc10b47f8a89ba96",
+          "90160429a7401da2bb977916211daeca",
+          "929915a15862a977572487fde704b6c4",
+          "93d4d36367e151245629d279e175cae8",
+          "9deb94bf16534c78f5fa909e43a97240",
+          "a58ef0bf6e1b299a0afe447c37484076",
+          "b32d76a27e0cd6c16228997449ee8156",
+          "b355ec6af0cb6318da8b696ce5c666de",
+          "b3613255f6875d171df046c303996a60",
+          "b621e1ea2957dc0edb1dcbda83a22b1d",
+          "b6545116d423466564c13c88f7fe92de",
+          "b806e2758ddf6aeb3e9bb37d46ad74e4",
+          "b9149e542158900b5d82821d9c011de6",
+          "bcc0d535544ec4963bb23500fd2e0c3f",
+          "bf428453774a70425e79e20932960e95",
+          "c12064c6c2cf7d13c839a0bed6bfae47",
+          "c74eb7017787e35d85f5fa9d38aabff5",
+          "d0765f6147e5199b421ef9c385762d36",
+          "d2ed54e7cfe3f9746f40717c8fdd2727",
+          "d5418fe97c72e4933d5bfe030658c27e",
+          "d86349c0cddcfc8a13b5c079d7f3bc8a",
+          "db5a5ab1ae62b71fd2e38579a15f11c9",
+          "dd680befa0f7e776f6f24cb1aa4920c0",
+          "ddcb4aa87ceaf20ecf058aaecea5a542",
+          "ddf3566cad2c8cbf7a3512ab071a12d2",
+          "e45c266939e90e16eca38d46b46b5963",
+          "e54cf6b0ac591f4d29290b931b26bca5",
+          "e75c5461c7fb98899a6346b3c93d656f",
+          "e82897fe4f3b905b00d2ba552683a6c2",
+          "eac20b6104b0c4fa9277f987b76f13ae",
+          "f4b8de20b935d244ad68c3a75c90cddb",
+          "f7045bdf8952c0ca71f88eb050d05435",
+          "f89025717b7af1a20ec1cdb57054933a",
+          "fae755f74f36bdff4a6fceaf3f816379",
+          "fb0b5f06778a5495da11d503f4e9a2da",
+          "fb8dd48f9e9be18bc4af78f2047cfaea",
+          "ff44af5072a12286050cb28a4f1137be",
+          "ff7d15b68d5df1257bccbf2bac416b14"
+        ]
+      },
+      "BacktestJob": {
+        "count": 71,
+        "hash": "84a9c65fe08a12c1d2dfac9e7c3379b6",
+        "rowHashes": [
+          "0038b1d9f8be57fe22c3dcb12776bcf6",
+          "01ddb010fd97c3a844610dc315262292",
+          "020d45f0ce73a3f60c80dfb29c9e9d16",
+          "02f354f8710800792d1bb4a8b9b0d3a2",
+          "04398a06cc6357fd5cf89a6190c7c64f",
+          "0980da8ea1026e3fe093058502b37f63",
+          "0d786446880ca3868718b9fcb53df542",
+          "0d8efa29d5b2b1a834fe3774d5d89ff3",
+          "157e94cd03d2577dcbd5f2043458354b",
+          "174e5a436b00f40eb9312445c4f26dc4",
+          "187e566363ad2809d138b74ca5a1485c",
+          "1997f141f62bd337460c6e57201f0929",
+          "210124356fc3ce51308e276ad5f9a0a6",
+          "24e0194f0a5b1d436b75030e23921afc",
+          "27f823f919c7ccf5f02a7bed866f132c",
+          "3047dd431deaa472594a4271d7e4be3d",
+          "3784a5e677e872da634e4ac25c724c0f",
+          "384ecb9e6651bf920ce6cd4c07eb6098",
+          "3a132edef6288094c4f85b38948c3b2f",
+          "3e3b2b3de4bfe667d70777b35874b943",
+          "41b01a354ea6ed3bfdfd9f9ad36a21a5",
+          "429a57ad0d726a35113c746ec5566b2d",
+          "43226b72f16b3d3ae7b8813217b80f7d",
+          "46a11cb15576d1234e50c83e6a9ab81f",
+          "48c4ed967d5dae57668b7f70091dda84",
+          "4ab5c2f440a74f4fb5fbd06ca698b6bf",
+          "54a88a04c3d46847429ffe659213a2ad",
+          "55a3d41ddc1b95814262075cf5722489",
+          "56e99ca44b2ceaec7dad390a71b9e077",
+          "5842b16b7a1618917def615da99deea2",
+          "59dca295d24f54a75f0c4d61da377d2f",
+          "5b7c1822bda824f733bcc854eb4f983f",
+          "5d89362e50817e79fda48ba2e7aeb114",
+          "5f15cdc52753d66935d2d966fc28d917",
+          "64649b1ad35b3530c720c0cbf7b3097e",
+          "72695f438bab2912471b762ca54cc8e7",
+          "772307911b26551faa1a6b6a3c5f032b",
+          "779610261a57ec7267ba7dd624b01ef2",
+          "7a5af954f73388c3996b38eefb63a70c",
+          "7f91899e5a8863302297dc53ff081db6",
+          "8308c9d264671421ab9f0297f4b10b3d",
+          "8384d544d78097043920d50c9c04d6ad",
+          "8a0b847cfd3bb0e4409ee3e4a88dc3b9",
+          "8d5bd2ab1c183b1ad064420dabfee115",
+          "8e8c3c90d19c3dba153e20982d341f01",
+          "90316c06a987df729508002ccca962ca",
+          "9038c44f09020ac8517c25eb9f0232b8",
+          "9b1754c1a6f7cbafea93e34a232f8747",
+          "9dbbb28de174c041bcf5b29b336a0ecc",
+          "9e0cf0640380613c87940205e593cf06",
+          "a138ab6c8146c8b45b1e90289f83d115",
+          "a827f99546c5575b00da1528129189fc",
+          "a9e04b641cf36225c0119133bf31ed97",
+          "aa4cd72029e2fa7886359f15bd57ca17",
+          "ae6a2d73ac4cad1e3eae31d878546054",
+          "b71005723c8a4e9263b8aa8bf2d8466d",
+          "bd2d8f2220de168b6a2563177b328ca1",
+          "c76f1ca085c1261dbc2d1ea2cee8bded",
+          "c8bc653b48b2f582b01ae9991fc4718b",
+          "ced88d10bf50768496cf3eaa2d3503da",
+          "d0b1fd4e1ffcc3cce7f1290cfcef2265",
+          "d14aff98eff08ac5170b613f4053d738",
+          "d404ac569c473d5ad29a6d30eb485055",
+          "deca814b80d6e26cde18161509968835",
+          "df1698fac2c889970113ba29b0546dbe",
+          "df99b0b45ae0a74d71b17228e5d53c50",
+          "e5628ac79b2440be630c4d5fc5edff1c",
+          "e57870344f47c94b4b12181edad00a42",
+          "ef0dba23810360af16c7722d0106e804",
+          "f32913eedc146971f4ac94deff35eec8",
+          "ffbf4d2d0aaa071230a5ac6aa7d762d3"
+        ]
+      },
+      "ResearchObservation": {
+        "count": 0,
+        "hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "rowHashes": []
+      },
+      "ResearchObservationVersion": {
+        "count": 0,
+        "hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "rowHashes": []
+      },
+      "ResearchObservationSubmission": {
+        "count": 0,
+        "hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "rowHashes": []
+      },
+      "JournalEntry": {
+        "count": 0,
+        "hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "rowHashes": []
+      },
+      "JournalReviewSnapshot": {
+        "count": 3,
+        "hash": "d99703b713f582ccf951f3714a4204da",
+        "rowHashes": [
+          "1d164c70222fee97f81fb8ae753be997",
+          "36137e2c62fcb9b65216203ddbdcf2bb",
+          "a38ba569f9dd91cc64022b74ed6379ae"
+        ]
+      },
+      "ProviderConfig": {
+        "count": 3,
+        "hash": "a3a8f9a6b3566034fed5ce4bcb363332",
+        "rowHashes": [
+          "3a4a726677cfaa7bb4930faca1d04064",
+          "407e68b101cb0ced2607cd048f4a53c4",
+          "49694c4509f82224fc6adfd786ea95dc"
+        ]
+      },
+      "AiRoutingSettings": {
+        "count": 1,
+        "hash": "8506e6f2661ac7b526406b8fdea08a5d",
+        "rowHashes": [
+          "8506e6f2661ac7b526406b8fdea08a5d"
+        ]
+      }
+    },
+    "ai": {
+      "rows": {
+        "18d76166-84d8-4fcf-9b03-c5a5fb33d068": "1f3e4fb670ed4601072272d3a53f8e4c",
+        "9b518a06-fcf1-4b35-9225-ad8e53b7f7ea": "05a00cd7a9390d343b80d92f40b38dbc",
+        "805cc84a-2333-4695-8aac-217ef57e7ac8": "e8bed09ac6ff9160460bbd7caee87c5a",
+        "e46a779e-e0f6-48f4-b5ce-49115c4da568": "3b77a20f2752db3afe12038e9f386061",
+        "be510735-c885-454d-9c37-82d23af785e1": "177cd899aae0e17af154191cefde0f64"
+      },
+      "count": 5
+    },
+    "counters": {
+      "runs": 5,
+      "tools": 55,
+      "observations": 0,
+      "invocations": 0,
+      "invocationFacts": 0
+    },
+    "original": {
+      "flags": {
+        "AI_RESEARCH_EXECUTION_ENABLED": "true",
+        "AI_RESEARCH_V2_WRITES_ENABLED": "false",
+        "STRATEGY_AI_OPTIMIZATION_ENABLED": "true"
+      },
+      "policyPresent": false,
+      "policy": null
+    },
+    "envHashes": {
+      "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
+      "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
+      "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+      "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+      "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+      "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+      "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
+      "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+      "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+      "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+      "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
+      "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+      "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
+      "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
+      "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
+    },
+    "mounts": {
+      "postgres": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-postgres-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
+          "destination": "/var/lib/postgresql/data",
+          "rw": true
+        }
+      ],
+      "redis": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-redis-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
+          "destination": "/data",
+          "rw": true
+        }
+      ],
+      "dsa": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-dsa-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
+          "destination": "/app/data",
+          "rw": true
+        },
+        {
+          "type": "volume",
+          "name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
+          "source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
+          "destination": "/app/logs",
+          "rw": true
+        },
+        {
+          "type": "volume",
+          "name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
+          "source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
+          "destination": "/app/reports",
+          "rw": true
+        }
+      ],
+      "thesis-ledger": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-backtest-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+          "destination": "/app/var/backtest",
+          "rw": true
+        }
+      ],
+      "backtest-worker": [
+        {
+          "type": "volume",
+          "name": "thesis-ledger-backtest-data",
+          "source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+          "destination": "/app/var/backtest",
+          "rw": true
+        }
+      ]
+    },
+    "dsaControl": {
+      "thesis_ledger_policy_history": {
+        "count": 172,
+        "hash": "1f1f566bad4681942914ae00f6ff432dc24b64996d1729d868d6ad5765394b05"
+      },
+      "thesis_ledger_policy_state": {
+        "count": 1,
+        "hash": "30423be68f8a6ba1b2f0e77224d7d5c7b6907b9057974879e470882d2efc8cde"
+      },
+      "thesis_ledger_provider_config": {
+        "count": 9,
+        "hash": "daed133dbcdc3817a0278d96534c340248020c9df2d2c959da20f0156ce3e90b"
+      },
+      "thesis_ledger_route_admission_v3": {
+        "count": 9,
+        "hash": "43f7943e44e185e9ae17b63d0ed12e4baab97fcbb5b3088ef1fab01fb2112e05"
+      }
+    },
+    "images": {
+      "postgres": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+      "redis": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+      "dsa": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec",
+      "thesis-ledger": "sha256:80441c20ca9435a96fb18ee3f10a6278d2de87aaf93f1b69e2e391800ead9670",
+      "backtest-worker": "sha256:80441c20ca9435a96fb18ee3f10a6278d2de87aaf93f1b69e2e391800ead9670"
+    },
+    "healthy": true
+  },
+  "previousProtectionComparison": {
+    "differences": [
+      {
+        "table": "Account",
+        "before": 24,
+        "after": 26,
+        "originalRowsPreserved": true,
+        "authorizedProjection": false
+      },
+      {
+        "table": "AccountLedgerState",
+        "before": 20,
+        "after": 22,
+        "originalRowsPreserved": true,
+        "authorizedProjection": true
+      },
+      {
+        "table": "LedgerEvent",
+        "before": 132,
+        "after": 138,
+        "originalRowsPreserved": true,
+        "authorizedProjection": false
+      },
+      {
+        "table": "Trade",
+        "before": 18,
+        "after": 20,
+        "originalRowsPreserved": true,
+        "authorizedProjection": true
+      },
+      {
+        "table": "CashBalance",
+        "before": 16,
+        "after": 18,
+        "originalRowsPreserved": true,
+        "authorizedProjection": true
+      },
+      {
+        "table": "JournalReviewSnapshot",
+        "before": 2,
+        "after": 3,
+        "originalRowsPreserved": true,
+        "authorizedProjection": false
+      }
+    ],
+    "oldAiPreserved": true,
+    "acceptedFinanceAppendsAndProjections": true,
+    "unconfirmedTable": null,
+    "delta": [
+      {
+        "id": "246eacb8-f712-4d01-9a94-b9377dae6db9",
+        "createdAt": "2026-10-24T07:42:17.849",
+        "updatedAt": "2026-10-24T07:42:17.849",
+        "rowHash": "a38ba569f9dd91cc64022b74ed6379ae"
+      }
+    ],
+    "journalAppendConfirmed": true,
+    "confirmedJournalRow": "246eacb8-f712-4d01-9a94-b9377dae6db9"
+  },
+  "target": {
+    "deployed": true,
+    "v2Writes": false,
+    "canCreate": false,
+    "liveCalls": 1,
+    "modules": {
+      "apps/server/dist/src/ai/ai-generation-diagnostics.js": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+      "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js": "ca37d2da5da1200f261a416499c200b7359f57b6b78c4d2b5f732f6db67e9e7f",
+      "apps/server/dist/src/ai/ai-execution-request-diagnostic.js": "c9cb50d6c48095a34241ef6764fe608f6468e480b41734b14acb9b74b2a14936",
+      "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+      "apps/server/dist/src/ai/ai-sdk-generation-model.js": "68d934e759796fb7e57c24b91687e5fe61d1d96696f56a44f49e2e0d4f4887be",
+      "apps/server/dist/src/ai/ai-sdk-generation.adapter.js": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+      "apps/server/dist/src/ai/ai-execution-state.store.js": "c27b34a23f55e756d11830a5a778f7719baf92883e38d1a05795410bf7715966",
+      "apps/server/dist/src/ai/ai-research-sdk-execution.js": "2d4085e48516da5f2138fa9bd3f03c8ef7faa52416cc9479911f693c4abbfe80",
+      "packages/schemas/dist/ai-generation-http-request-diagnostic.js": "5627b7837615c4025bc3acb17c935ce989c266051cecb1f31b62e8e9701ca35c",
+      "packages/schemas/dist/ai-generation-error.js": "c9ec3d4c08f9b15a5884f5e91b1889e7b315040e8abed4dae9fe2ee048cb7511",
+      "packages/schemas/dist/ai-execution.js": "981f5cf5cb945c7b0b66bc7ce9feb33094c0dd508325e75a084beca951676c9a"
+    }
+  },
+  "currentBlocker": {
+    "code": "upstream_stream_transport_unknown",
+    "summary": "Provider returned error",
+    "externalResult": "unknown",
+    "bodyAndReasoningFrames": 0,
+    "actualModel": null,
+    "usage": null,
+    "providerCost": null,
+    "next": "待用户确认：仅只读核对本次已留存错误日志和 SDK 错误映射，不改配置或代码，不新增调用；证据不足即汇报"
+  },
+  "next": "待用户确认：仅只读核对本次已留存错误日志和 SDK 错误映射，不改配置或代码，不新增调用；证据不足即汇报",
+  "officialSync": {
+    "action": "sync",
+    "code": 0,
+    "signal": null,
+    "stoppedOnFirstError": false,
+    "firstError": null,
+    "path": "/tmp/thesis-ledger-g3-http-sync-1792828006963.log",
+    "processGroup": 64601,
+    "tail": [
+      "容器内已替换 schemas dist。",
+      "容器内已替换 shared dist。",
+      "同步 ThesisLedger Backtest Worker 产物...",
+      "容器内已替换 Server dist。",
+      "容器内已替换 domain dist。",
+      "容器内已替换 schemas dist。",
+      "容器内已替换 shared dist。",
+      "重启目标容器: thesis-ledger backtest-worker",
+      " Container thesis-ledger-dev-backtest-worker-1 Restarting ",
+      " Container thesis-ledger-dev-thesis-ledger-1 Restarting ",
+      " Container thesis-ledger-dev-backtest-worker-1 Started ",
+      " Container thesis-ledger-dev-thesis-ledger-1 Started ",
+      "服务已就绪: thesis-ledger (healthy)",
+      "服务已就绪: backtest-worker (healthy)",
+      "镜像保持不变: thesis-ledger (sha256:80441c20ca9435a96fb18ee3f10a6278d2de87aaf93f1b69e2e391800ead9670)",
+      "镜像保持不变: backtest-worker (sha256:80441c20ca9435a96fb18ee3f10a6278d2de87aaf93f1b69e2e391800ead9670)",
+      "",
+      "仅代码更新完成：目标容器已使用当前源码，镜像 ID 保持不变。",
+      "脚本未执行数据库结构或外部卷变更操作。",
+      "本次更新位于容器可写层；容器重建后将恢复为镜像内代码。"
+    ]
+  },
+  "enable": {
+    "action": "enable",
+    "code": 0,
+    "signal": null,
+    "stoppedOnFirstError": false,
+    "firstError": null,
+    "path": "/tmp/thesis-ledger-g3-http-enable-1792828157867.log",
+    "processGroup": 66407,
+    "tail": [
+      "      \"createdAt\": 1792823946267,",
+      "      \"reasons\": [",
+      "        \"历史数量保留\"",
+      "      ],",
+      "      \"extraTags\": []",
+      "    }",
+      "  ],",
+      "  \"remove\": [",
+      "    {",
+      "      \"repository\": \"thesis-ledger\",",
+      "      \"reference\": \"thesis-ledger:rollback-43239ea993d5022e028dab33c09c2cd46add99cd2cba5513f14fb978fec86d11\",",
+      "      \"imageId\": \"sha256:43239ea993d5022e028dab33c09c2cd46add99cd2cba5513f14fb978fec86d11\",",
+      "      \"createdAt\": 1792823639239,",
+      "      \"reasons\": [],",
+      "      \"extraTags\": []",
+      "    }",
+      "  ]",
+      "}",
+      "已移除回滚标签: thesis-ledger:rollback-43239ea993d5022e028dab33c09c2cd46add99cd2cba5513f14fb978fec86d11",
+      "回滚镜像维护完成：移除 1 个标签，跳过 0 个候选；共享层释放量须另行实测。"
+    ]
+  },
+  "preSampleProtection": {
+    "time": "2026-10-24T07:52:02.959Z",
+    "healthy": true,
+    "differences": [],
+    "dsaPreserved": true,
+    "aiPreserved": true,
+    "envPreserved": true,
+    "mountsPreserved": true,
+    "v2": "true",
+    "policy": {
+      "version": "research-policy-v1",
+      "maxAiCalls": 1,
+      "maxInputTokens": 100000,
+      "maxOutputTokens": 20000,
+      "maxDurationSeconds": 300,
+      "maxCost": "0",
+      "costCurrency": null,
+      "paidRoutes": []
+    },
+    "canCreate": true,
+    "researchReadiness": [
+      {
+        "model": "openrouter/free",
+        "adapter": "openai-compatible-chat",
+        "compatibilityExtensionProfile": "openrouter-v1",
+        "mode": "native_schema",
+        "contract": {
+          "id": "research",
+          "version": "research-generation-v2"
+        },
+        "adapterEvidence": {
+          "adapter": "openai-compatible-chat",
+          "adapterVersion": "3.0.53",
+          "sdkVersion": "7.0.107",
+          "contract": {
+            "id": "research",
+            "version": "research-generation-v2"
+          },
+          "mode": "native_schema",
+          "releaseFingerprint": "d7947ee21acb3dec5d739bd5f44452cf298dc33dffe2dc1851ac50a8d25ad478"
+        },
+        "readiness": {
+          "state": "ready",
+          "reasons": [],
+          "configurationFingerprint": "54af17d91e5d190f7dee514a10f9c42bc70b119356ee79a5965f829f399a7372",
+          "evaluatedAt": "2026-10-24T07:52:02.957Z"
+        },
+        "liveValidation": {
+          "status": "passed",
+          "checkedAt": "2026-10-24T06:10:34.200Z",
+          "requestId": "de75791b-068b-4a14-a0f9-0286a6d2c725"
+        },
+        "firstOutputTimeoutMs": 30000,
+        "outputIdleTimeoutMs": 30000,
+        "firstOutputTimeoutSource": "system",
+        "outputIdleTimeoutSource": "system"
+      }
+    ]
+  },
+  "sample": {
+    "submissionId": "6b0bfd13-57e3-4bbf-a199-45d651976343",
+    "instrumentId": "86b1de50-d50d-4007-84c0-918e7e5409ca",
+    "model": "openrouter/free",
+    "maxAiCalls": 1,
+    "maxCost": "0",
+    "automaticRetry": false,
+    "runId": "428b6e10-4d9a-459b-a375-6abcd286c1ba",
+    "requestId": "d1b11eb3-f767-4482-9d01-d86adfcf0321",
+    "status": "failed",
+    "errorCode": "research_unknown_outcome",
+    "requests": 1,
+    "resultPresent": false,
+    "execution": {
+      "version": "sdk-execution-v1",
+      "contract": {
+        "id": "research",
+        "version": "research-generation-v2"
+      },
+      "requests": [
+        {
+          "error": {
+            "code": "transport_unknown",
+            "phase": "stream",
+            "summary": "Provider returned error",
+            "requestId": "d1b11eb3-f767-4482-9d01-d86adfcf0321",
+            "diagnostic": {
+              "runtime": {
+                "stream": {
+                  "sdk": {
+                    "text": {
+                      "chunks": 0,
+                      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                      "characters": 0
+                    },
+                    "reasoning": {
+                      "chunks": 0,
+                      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                      "characters": 0
+                    }
+                  },
+                  "provider": {
+                    "text": {
+                      "chunks": 0,
+                      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                      "characters": 0
+                    },
+                    "frames": 0,
+                    "samples": [],
+                    "reasoning": {
+                      "chunks": 0,
+                      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                      "characters": 0
+                    },
+                    "finishReasons": [],
+                    "omittedFrames": 0,
+                    "reportedUsage": null,
+                    "nonTextContentFrames": 0,
+                    "unrecognizedDeltaFrames": 0
+                  }
+                },
+                "version": "ai-runtime-diagnostic-v1",
+                "packages": {
+                  "ai": "7.0.107",
+                  "zod": "4.4.3",
+                  "providerPackage": "@ai-sdk/openai-compatible",
+                  "providerVersion": "3.0.53"
+                }
+              },
+              "version": "ai-failure-diagnostic-v1",
+              "truncated": false,
+              "errorClass": "unknown",
+              "jsonStatus": "missing",
+              "actualModel": null,
+              "httpRequest": {
+                "model": "openrouter/free",
+                "method": "POST",
+                "stream": true,
+                "version": "ai-http-request-diagnostic-v1",
+                "attempts": 1,
+                "boundary": "fetch_dispatch",
+                "endpoint": "chat_completions",
+                "bodyBytes": 22542,
+                "reasoning": null,
+                "toolCount": null,
+                "truncated": false,
+                "bodySha256": "e1d08b2fe1f909e21f27489cba5322a0d5aa977d45818dd988d0c93f5741b0ca",
+                "bodyStatus": "json",
+                "tokenLimits": {
+                  "max_tokens": 20000,
+                  "max_output_tokens": null,
+                  "max_completion_tokens": null
+                },
+                "includeUsage": true,
+                "schemaSha256": "a187946ebc719e5cf3797a2bab282c3564b721a28127bcd6ca3b9aa79b73ec34",
+                "schemaStrict": true,
+                "responseFormat": "json_schema",
+                "omittedRequests": 0,
+                "reasoningEffort": null,
+                "requireParameters": true
+              },
+              "finishReason": null,
+              "jsonRootType": null,
+              "outputSha256": null,
+              "generationMode": "native_schema",
+              "outputCharacters": null,
+              "structuralPreview": null
+            },
+            "externalResult": "unknown"
+          },
+          "state": "unknown",
+          "outcome": null,
+          "sequence": 1,
+          "requestId": "d1b11eb3-f767-4482-9d01-d86adfcf0321",
+          "preparedAt": "2026-10-24T07:52:43.746Z",
+          "completedAt": "2026-10-24T07:52:46.156Z",
+          "reservation": {
+            "cost": {
+              "amount": "0",
+              "source": "frozen_provider_pricing",
+              "status": "estimated",
+              "currency": "USD",
+              "pricingVersion": "pricing-bd1326cf8cba0366"
+            },
+            "model": "openrouter/free",
+            "aiCalls": 1,
+            "provider": "openrouter",
+            "inputTokens": 3412,
+            "outputTokens": 20000,
+            "configurationFingerprint": "54af17d91e5d190f7dee514a10f9c42bc70b119356ee79a5965f829f399a7372"
+          },
+          "dispatchingAt": "2026-10-24T07:52:43.761Z",
+          "usageRevisions": [
+            {
+              "cost": {
+                "amount": null,
+                "source": "provider_cost_unavailable",
+                "status": "unknown",
+                "currency": null,
+                "pricingVersion": null
+              },
+              "usage": {
+                "status": "unknown",
+                "inputTokens": null,
+                "outputTokens": null
+              },
+              "revision": 1,
+              "recordedAt": "2026-10-24T07:52:46.156Z"
+            }
+          ],
+          "settledRevision": 0,
+          "dispatchExecutionAttempt": 1
+        }
+      ],
+      "deadlineAt": "2026-10-24T07:57:43.713Z",
+      "frozenPolicy": {
+        "maxCost": "0",
+        "version": "research-policy-v1",
+        "maxAiCalls": 1,
+        "paidRoutes": [],
+        "costCurrency": null,
+        "maxInputTokens": 100000,
+        "maxOutputTokens": 20000,
+        "maxDurationSeconds": 300
+      },
+      "generationStatus": "unknown",
+      "usageCompleteness": "unknown",
+      "continuationBlockedReason": null
+    },
+    "frozenRoutes": [
+      {
+        "mode": "native_schema",
+        "model": "openrouter/free",
+        "adapter": "openai-compatible-chat",
+        "pricing": {
+          "costCurrency": "USD",
+          "costPer1kInput": 0,
+          "pricingVersion": "pricing-bd1326cf8cba0366",
+          "costPer1kOutput": 0
+        },
+        "provider": "openrouter",
+        "configurationFingerprint": "54af17d91e5d190f7dee514a10f9c42bc70b119356ee79a5965f829f399a7372"
+      }
+    ]
+  },
+  "close": {
+    "action": "close",
+    "code": 0,
+    "signal": null,
+    "stoppedOnFirstError": false,
+    "firstError": null,
+    "path": "/tmp/thesis-ledger-g3-http-close-1792828418129.log",
+    "processGroup": 69112,
+    "tail": [
+      "      \"createdAt\": 1792824319223,",
+      "      \"reasons\": [",
+      "        \"历史数量保留\"",
+      "      ],",
+      "      \"extraTags\": []",
+      "    }",
+      "  ],",
+      "  \"remove\": [",
+      "    {",
+      "      \"repository\": \"thesis-ledger\",",
+      "      \"reference\": \"thesis-ledger:rollback-3b4d828d353795438e58c38a28152a2c7a2166570ad9f5e2a052a37f43f766eb\",",
+      "      \"imageId\": \"sha256:3b4d828d353795438e58c38a28152a2c7a2166570ad9f5e2a052a37f43f766eb\",",
+      "      \"createdAt\": 1792823946267,",
+      "      \"reasons\": [],",
+      "      \"extraTags\": []",
+      "    }",
+      "  ]",
+      "}",
+      "已移除回滚标签: thesis-ledger:rollback-3b4d828d353795438e58c38a28152a2c7a2166570ad9f5e2a052a37f43f766eb",
+      "回滚镜像维护完成：移除 1 个标签，跳过 0 个候选；共享层释放量须另行实测。"
+    ]
+  },
+  "finalProtection": {
+    "time": "2026-10-24T07:55:54.811Z",
+    "healthy": true,
+    "differences": [],
+    "dsaPreserved": true,
+    "oldAiPreserved": true,
+    "envPreserved": true,
+    "mountsPreserved": true,
+    "originalPolicyRestored": true,
+    "v2": "false",
+    "canCreate": false,
+    "counters": {
+      "runs": 6,
+      "tools": 66,
+      "observations": 0,
+      "invocations": 0,
+      "invocationFacts": 0
+    },
+    "newSampleRowPreserved": true
+  },
+  "finalDiagnostic": {
+    "runId": "428b6e10-4d9a-459b-a375-6abcd286c1ba",
+    "rowHash": "5aea5b24944b69da19452c653f5b8c24",
+    "requestId": "d1b11eb3-f767-4482-9d01-d86adfcf0321",
+    "requests": 1,
+    "executionSchemaValid": true,
+    "errorSchemaValid": true,
+    "httpSchemaValid": true,
+    "httpBytes": 650,
+    "diagnosticBytes": 1713,
+    "runtimeBytes": 774,
+    "httpDiagnosticSha256": "3a9e597fd8c5903259741db0f8b4cdf96db3a77a683622732ab716530127d8d6",
+    "failureDiagnosticSha256": "7d7ece7570e7b84a94a37040dae2031e45c360d64722897ae84a5da0c366c370",
+    "modulesPreserved": true,
+    "httpRequest": {
+      "model": "openrouter/free",
+      "method": "POST",
+      "stream": true,
+      "version": "ai-http-request-diagnostic-v1",
+      "attempts": 1,
+      "boundary": "fetch_dispatch",
+      "endpoint": "chat_completions",
+      "bodyBytes": 22542,
+      "reasoning": null,
+      "toolCount": null,
+      "truncated": false,
+      "bodySha256": "e1d08b2fe1f909e21f27489cba5322a0d5aa977d45818dd988d0c93f5741b0ca",
+      "bodyStatus": "json",
+      "tokenLimits": {
+        "max_tokens": 20000,
+        "max_output_tokens": null,
+        "max_completion_tokens": null
+      },
+      "includeUsage": true,
+      "schemaSha256": "a187946ebc719e5cf3797a2bab282c3564b721a28127bcd6ca3b9aa79b73ec34",
+      "schemaStrict": true,
+      "responseFormat": "json_schema",
+      "omittedRequests": 0,
+      "reasoningEffort": null,
+      "requireParameters": true
+    },
+    "error": {
+      "code": "transport_unknown",
+      "phase": "stream",
+      "summary": "Provider returned error",
+      "externalResult": "unknown"
+    },
+    "runtime": {
+      "stream": {
+        "sdk": {
+          "text": {
+            "chunks": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "characters": 0
+          },
+          "reasoning": {
+            "chunks": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "characters": 0
+          }
+        },
+        "provider": {
+          "text": {
+            "chunks": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "characters": 0
+          },
+          "frames": 0,
+          "samples": [],
+          "reasoning": {
+            "chunks": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "characters": 0
+          },
+          "finishReasons": [],
+          "omittedFrames": 0,
+          "reportedUsage": null,
+          "nonTextContentFrames": 0,
+          "unrecognizedDeltaFrames": 0
+        }
+      },
+      "version": "ai-runtime-diagnostic-v1",
+      "packages": {
+        "ai": "7.0.107",
+        "zod": "4.4.3",
+        "providerPackage": "@ai-sdk/openai-compatible",
+        "providerVersion": "3.0.53"
+      }
+    }
+  },
+  "finalReview": {
+    "httpRequestDiagnostic": "accepted_on_target_and_after_recreation",
+    "g3": "incomplete",
+    "dataProtection": "passed",
+    "v2Writes": false,
+    "automaticRetry": false,
+    "gitStagingOrCommit": false
+  }
+}

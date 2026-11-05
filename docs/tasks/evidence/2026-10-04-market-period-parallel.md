@@ -6,7 +6,7 @@
 
 这是本地交付，完整产品尚未完成。AC1 的聚合、完成状态与确定性断言由 T2 直接验证；AC2 的来源字段和 AC3 的原始来源合同兼容由 T1.1 验证；AC5 仅覆盖纯计算不补造桶，窗口/预热/分页仍属于 T3。AC4、AC6–AC11 的消费端或运行态义务未通过，不能依据本报告勾选。
 
-权威需求仍为 [原主题 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md)，执行状态为 [原主题 Task](../2026-09-16-market-chart-period-aggregation.md)。本报告只保存证据与集成交接，不构成第二份任务事实源。
+权威需求仍为 [原主题 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md)，执行状态为 [原主题 Task](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md)。本报告只保存证据与集成交接，不构成第二份任务事实源。
 
 ## 工作区与基线
 
@@ -114,7 +114,7 @@ Domain 当前运行依赖仅有 shared。新聚合中的排序在新建数组上
 
 同步后复用已有标记账户：3 个正式对象、2 份历史快照、旧 Snapshot 保持 STALE 及原结果；确定性收益 4.6、反事实 -4.4，周期独立统计 1 个 Cycle/2 个 Slice。两个受保护账本及标记账户分析前后的 Ledger 哈希未变化。此复验保护既有 Journal 消费；派生行情 HTTP、DSA、Desktop、真实 Session 来源尚未接通，T1.2/T1.3、T3～T6、G1/P1/R1 不据此关闭。
 
-日志为 `/tmp/market-period-integrated-*.log` 与 `/tmp/parallel-integrated-*.log`；本段只记录实际执行范围。统一聚合见[父对话报告](../../reviews/2026-10-04-parallel-task-integration.md)。
+日志为 `/tmp/market-period-integrated-*.log` 与 `/tmp/parallel-integrated-*.log`；本段只记录实际执行范围。统一聚合见[父对话报告](../../archive/reviews/2026-10-04-parallel-task-integration.md)。
 
 ## 父对话继续实施 T1.2
 

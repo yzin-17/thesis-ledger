@@ -205,7 +205,7 @@ describe('风险中心 AB 交互契约', () => {
     expect(isPortfolioScanReady('stale')).toBe(true);
   });
 
-  it('跨页面模式入口统一使用实际/模拟 Switch 文案和可访问标签', () => {
+  it('跨页面账户范围显示实际和模拟双选项及可访问标签', () => {
     const actualHtml = renderToStaticMarkup(
       <PortfolioModeSwitch mode="actual" onModeChange={() => undefined} ariaLabel="估值范围" />,
     );
@@ -214,21 +214,19 @@ describe('风险中心 AB 交互契约', () => {
     );
 
     expect(actualHtml).toContain('估值范围');
-    expect(actualHtml).toContain('data-slot="switch"');
+    expect(actualHtml).toContain('data-slot="toggle-group"');
     expect(actualHtml).toContain('data-mode="actual"');
     expect(actualHtml).toContain('实际');
     expect(actualHtml).toContain('模拟');
     expect(actualHtml).toContain('当前实际，切换到模拟');
-    expect(actualHtml).toContain('left-2 px-1 opacity-100');
-    expect(actualHtml).toContain('right-2 px-1 opacity-0');
+    expect(actualHtml).toContain('账户范围');
     expect(shadowHtml).toContain('风险范围');
-    expect(shadowHtml).toContain('data-slot="switch"');
+    expect(shadowHtml).toContain('data-slot="toggle-group"');
     expect(shadowHtml).toContain('data-mode="shadow"');
     expect(shadowHtml).toContain('实际');
     expect(shadowHtml).toContain('模拟');
     expect(shadowHtml).toContain('当前模拟，切换到实际');
-    expect(shadowHtml).toContain('left-2 px-1 opacity-0');
-    expect(shadowHtml).toContain('right-2 px-1 opacity-100');
+    expect(shadowHtml).toContain('账户范围');
 
     const noteHtml = renderToStaticMarkup(
       <PortfolioModeNote>仅用于研究和模拟。</PortfolioModeNote>,
@@ -407,8 +405,8 @@ describe('风险中心 AB 交互契约', () => {
       <RiskNotificationTable loadState="ready" deliveries={[]} routes={[]} routingState="ready" />,
     );
 
-    expect(html).not.toContain('尚未配置可用的通知 Provider');
-    expect(html).not.toContain('配置通知 Provider');
+    expect(html).not.toContain('尚未配置可用的通知提供方');
+    expect(html).not.toContain('配置通知提供方');
   });
 
   it('路由读取失败时不误报为未配置', () => {
@@ -421,8 +419,8 @@ describe('风险中心 AB 交互契约', () => {
       />,
     );
 
-    expect(html).toContain('通知 Provider 状态暂不可用');
-    expect(html).not.toContain('尚未配置可用的通知 Provider');
+    expect(html).toContain('通知提供方状态暂不可用');
+    expect(html).not.toContain('尚未配置可用的通知提供方');
   });
 
   it('Provider 缺失提示在风险中心主上下文可见，模拟模式不重复警告', () => {
@@ -443,8 +441,8 @@ describe('风险中心 AB 交互契约', () => {
       />,
     );
 
-    expect(actual).toContain('尚未配置可用的通知 Provider');
-    expect(actual).toContain('配置通知 Provider');
+    expect(actual).toContain('尚未配置可用的通知提供方');
+    expect(actual).toContain('配置通知提供方');
     expect(shadow).toBe('');
   });
 
@@ -468,7 +466,7 @@ describe('风险中心 AB 交互契约', () => {
     });
     expect(riskActionFeedback('scan', 'actual', 'unconfigured', 1)).toMatchObject({
       type: 'warning',
-      description: expect.stringContaining('当前未配置通知 Provider，本次未发送通知'),
+      description: expect.stringContaining('当前未配置通知提供方，本次未发送通知'),
     });
     expect(riskActionFeedback('scan', 'shadow', 'available', 1)).toMatchObject({
       type: 'info',
@@ -479,11 +477,11 @@ describe('风险中心 AB 交互契约', () => {
   it('风险扫描反馈覆盖已配置、状态未知和无新事件三种结果', () => {
     expect(riskActionFeedback('scan', 'actual', 'available', 2)).toMatchObject({
       type: 'success',
-      description: expect.stringContaining('通知已按当前 Provider 配置处理'),
+      description: expect.stringContaining('通知已按当前提供方配置处理'),
     });
     expect(riskActionFeedback('scan', 'actual', 'unknown', 2)).toMatchObject({
       type: 'warning',
-      description: expect.stringContaining('暂时无法确认通知 Provider 状态'),
+      description: expect.stringContaining('暂时无法确认通知提供方状态'),
     });
     expect(riskActionFeedback('scan', 'actual', 'available', 0)).toMatchObject({
       type: 'success',

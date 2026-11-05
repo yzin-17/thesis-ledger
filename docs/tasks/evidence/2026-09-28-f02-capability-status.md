@@ -15,7 +15,7 @@
 - [DSA 能力目录](../../../../daily-stock-analysis/docs/thesis-ledger-source-capabilities.md)：本轮状态入口。
 - [DSA 目录来源证据](../../../../daily-stock-analysis/docs/thesis-ledger-catalog-source-evidence.md)：解析器、分页读取器、本地统计及三次超时边界。
 - [RQData 生产事件证据](2026-09-27-rqdata-event-runtime.md)：本地生产接线、目标 ready 为 0、缺准入零账号读取及实际 HTTP 拒绝；正向子叶开放。
-- [日历发布 Task](../2026-09-27-calendar-release-availability.md)：专项完成、实际目标链路及部署限制。
+- [日历发布 Task](../../archive/tasks/2026-09-27-calendar-release-availability.md)：专项完成、实际目标链路及部署限制。
 - [当前剩余清单](2026-09-26-remaining-work-current.md)与[剩余前沿](2026-09-28-remaining-frontier.md)：已有实现与尚缺条件分别记录。
 - [主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §12.3、§14.2、AC20：分层状态、跨仓文档责任及逐单元真实准入或明确待验证状态。
 

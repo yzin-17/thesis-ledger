@@ -12,7 +12,7 @@
 
 Fund NAV 作为 DSA Contract V1 的向后兼容扩展，由同级正式仓库 `daily-stock-analysis` 提供 `GET /api/v1/thesis-ledger/market/fund-nav`，并在 `capabilities` 中显式声明。主仓 `thesis-ledger` 只维护共享 Schema、客户端、缓存和估值消费逻辑，不直接接入基金数据源；`thesis-ledger-infra` 负责固定兼容镜像、源码 override 和三仓版本矩阵。仓库边界遵循 ADR-014。
 
-共享 Schema、Provider 路由、缓存、Portfolio 与 Performance 估值需要按 Asset 类型选择 Quote 或 Fund NAV。截图识别可以提供待审核的净值信息，但不能替代正式 Fund NAV Provider，也不能写入官方估值缓存。
+共享 Schema、Provider 路由、缓存、Portfolio 与 Performance 估值需要按 Asset 类型选择 Quote 或 Fund NAV。正式估值只采用 Fund NAV Provider 的可追溯净值事实。
 
 正式 DSA Fork 已位于同级仓库 `daily-stock-analysis`，并已提供 Fund NAV capability、确定性 fixture、真实 Provider 路径、Contract Test 和接口文档。主仓 Stub 仅用于确定性契约测试，不得升级为生产数据服务；三仓版本由基础设施矩阵锁定。
 

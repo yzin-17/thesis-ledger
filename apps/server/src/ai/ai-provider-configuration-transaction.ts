@@ -8,7 +8,7 @@ export type StoredProviderLifecycleAction =
 
 /** Default selection and configuration mutations share one cross-process transaction fence. */
 export const withAiProviderConfigurationTransaction = <T>(
-  prisma: PrismaService,
+  prisma: Pick<PrismaService, '$transaction'>,
   work: (transaction: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> =>
   prisma.$transaction(async (transaction) => {

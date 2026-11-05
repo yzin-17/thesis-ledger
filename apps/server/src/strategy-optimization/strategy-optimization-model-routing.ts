@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import type {
   OptimizationModelConfigSnapshot,
   OptimizationReasoningEffort,
+  AiGenerationContractRef,
 } from '@thesis-ledger/schemas';
 import type { AiProviderRegistry } from '../ai/provider-registry.js';
 import {
@@ -36,20 +37,23 @@ export const optimizationReasoningEffortSupported = (
 export const buildOptimizationModelConfig = (
   routes: readonly OptimizationModelRoute[],
   providers: AiProviderRegistry,
+  purpose: AiGenerationContractRef['id'] = 'parameter_optimization',
 ): OptimizationModelConfig[] =>
   routes.map((route) => {
     const provider = providers.strict(route.provider, route.model);
+    const configured = provider.metadata?.executionRoutes?.find((item) => item.model === route.model && item.contract.id === purpose && item.enabled !== false);
+    const reasoningEffort = route.reasoningEffort ?? configured?.reasoningEffort;
     const reasoning = provider.metadata?.modelReasoning?.[route.model];
-    if (!optimizationReasoningEffortSupported(reasoning, route.reasoningEffort))
+    if (!optimizationReasoningEffortSupported(reasoning, reasoningEffort))
       throw new BadRequestException(
-        `模型 ${route.provider}:${route.model} 未声明支持推理强度 ${route.reasoningEffort}`,
+        `模型 ${route.provider}:${route.model} 未声明支持推理强度 ${reasoningEffort}`,
       );
     const costFacts = optimizationCostFacts(provider.metadata, route.model);
     const pricing = optimizationPricingForModel(provider.metadata, route.model);
     return {
       provider: route.provider,
       model: route.model,
-      ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }),
+      ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
       ...costFacts,
       ...(pricing?.costPer1kInput === undefined
         ? {}

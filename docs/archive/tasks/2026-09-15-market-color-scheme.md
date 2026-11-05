@@ -1,6 +1,6 @@
 # 涨跌配色配置实施任务
 
-> 承接归档（2026-10-15）：本文的未通过验收已由[当前任务](../../tasks/2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#mobile-color-acceptance)逐条承接，状态为“已被承接、验收仍开放”，不记为 Completed。原实施、勾选、失败与证据保留；下文“当前”仅指原记录日期，当前执行以承接任务为准。
+> 补验完成（2026-10-16）：原 I1 的 Mobile 配色、持久化与固定状态色缺口，已由[两端完成记录](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#mobile-color-acceptance)在 10-15 补齐。现行合同继续由配色 Spec 维护；下文原实施、勾选、失败与证据保留，“当前”仅指原记录日期。
 
 
 > 状态对账（2026-10-03）：已实现待验收：Desktop 已有运行证据，I1 尚缺 Mobile 实际配色/持久化/状态边界产品验收；多源 ETF 浏览器与 Desktop 全包成功不覆盖 Mobile。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。

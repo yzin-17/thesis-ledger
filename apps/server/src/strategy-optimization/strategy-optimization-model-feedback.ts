@@ -74,10 +74,15 @@ export function optimizationModelResearchNotice(value: unknown): string {
     quantityBasis: protocol.priceBasis.quantityBasis,
     historyBasis: protocol.history.basis,
   };
-  return (
+  const notice =
     `冻结研究语义：${JSON.stringify(facts)}。` +
     (protocol.history.basis === 'fixed-provider-snapshot'
       ? '这是事后固定供应商序列研究，复权价格可能包含后来事件影响，不得描述为严格无前视样本外。'
-      : '严格历史时点语义仍须逐项证据验证，不得仅凭实验标签宣称通过。')
-  );
+      : '严格历史时点语义仍须逐项证据验证，不得仅凭实验标签宣称通过。');
+  if (protocol.accountingBasis === 'normalized-series')
+    return (
+      notice +
+      '归一化研究优先使用同一坐标内的相对价格、资金比例与持仓状态规则；绝对价格、真实股数或实物单位规则需要可核验的转换证据，未提供该证据时不得使用。'
+    );
+  return notice;
 }

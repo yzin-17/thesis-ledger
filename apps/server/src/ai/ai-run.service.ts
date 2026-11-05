@@ -1,3 +1,4 @@
+import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
 import {
   BadRequestException,
   Injectable,
@@ -13,18 +14,23 @@ import {
 import type { z } from 'zod';
 import { PrismaService } from '../platform/prisma.service.js';
 import { AiResearchQuery } from './ai-research-query.js';
+import { assertLegacyAiContextAccess } from './ai-legacy-read-access.js';
 import {
   aiRunReadProjection,
   aiUsageSummaryReadModel,
   safeFallbackSummary,
 } from './ai-execution-read-model.js';
 import { recoverStaleAiRuns } from './ai-run-recovery.js';
+import { claimAiRun } from './ai-run-claim.js';
 import type { AiToolCallAuditInput } from './tool-runtime.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
 import { AiResearchRetry } from './ai-research-retry.js';
 import type { AiRunPage, ResearchFinishRoute } from './ai-run.types.js';
 import { AiResearchSubmission } from './ai-research-submission.js';
+import { AiResearchSubmissionV2 } from './ai-research-submission-v2.js';
+import type { AiResearchSubmissionV2Access } from './ai-research-submission-v2.store.js';
+import type { AiFrozenResearchV2, ResearchSubmissionV2 } from '@thesis-ledger/schemas';
 import { readFrozenResearch, type AiFrozenResearch } from './ai-frozen-research.js';
 
 type AiResearchStartInput = z.infer<typeof aiResearchStartInputSchema>;
@@ -58,15 +64,31 @@ export class AiRunService {
   private readonly researchQuery: AiResearchQuery;
   private readonly researchRetry: AiResearchRetry;
   private readonly researchSubmission: AiResearchSubmission;
+  private readonly researchSubmissionV2: AiResearchSubmissionV2;
 
   constructor(
     private readonly prisma: PrismaService,
     @Optional() providers?: AiProviderRegistry,
     @Optional() routingSettings?: AiRoutingSettingsService,
+    @Optional() display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {
-    this.researchQuery = new AiResearchQuery(prisma);
+    this.researchQuery = new AiResearchQuery(prisma, display);
     this.researchRetry = new AiResearchRetry(prisma);
     this.researchSubmission = new AiResearchSubmission(prisma, providers, routingSettings);
+    this.researchSubmissionV2 = new AiResearchSubmissionV2(prisma, providers, routingSettings);
+  }
+
+  researchV2Default(revision: string) {
+    return this.researchSubmissionV2.inspectDefault(revision);
+  }
+  findResearchSubmissionV2(ownerId: string, input: ResearchSubmissionV2, access: AiResearchSubmissionV2Access) {
+    return this.researchSubmissionV2.find(ownerId, input, access);
+  }
+  cancelResearchSubmissionV2(ownerId: string, input: ResearchSubmissionV2, access: AiResearchSubmissionV2Access) {
+    return this.researchSubmissionV2.cancel(ownerId, input, access);
+  }
+  startResearchV2(ownerId: string, source: AiFrozenResearchV2, access: AiResearchSubmissionV2Access, signal?: AbortSignal) {
+    return this.researchSubmissionV2.start(ownerId, source, access, signal);
   }
 
   start(
@@ -107,10 +129,12 @@ export class AiRunService {
     if (context.accountId && models.account?.findUnique) {
       const account = (await models.account.findUnique({
         where: { id: context.accountId },
-        select: { id: true, active: true },
-      })) as { id?: string; active?: boolean } | null;
+        select: { id: true, active: true, mode: true },
+      })) as { id?: string; active?: boolean; mode?: string } | null;
       if (!account) throw new NotFoundException(`账户不存在: ${context.accountId}`);
       if (account.active === false) throw new BadRequestException('账户已停用，不能创建研究任务');
+      if (context.mode !== undefined && account.mode !== context.mode)
+        throw new BadRequestException('研究账户与提交时的账户模式不一致');
     }
 
     if (
@@ -140,42 +164,6 @@ export class AiRunService {
     return this.researchRetry.prefill(id);
   }
 
-  private async assertStoredRunAccess(contextValue: unknown) {
-    const parsed = aiContextSchema.safeParse(contextValue);
-    if (!parsed.success) return;
-    const models = this.prisma as unknown as {
-      account?: ModelWithFindUnique;
-      position?: ModelWithFindUnique;
-      strategyVersion?: ModelWithFindUnique;
-    };
-    const context = parsed.data;
-    if (context.accountId && models.account?.findUnique) {
-      const account = (await models.account.findUnique({
-        where: { id: context.accountId },
-        select: { id: true, active: true },
-      })) as { id?: string; active?: boolean } | null;
-      if (!account || account.active === false) throw new NotFoundException('研究上下文已不可访问');
-    }
-    if (
-      context.scope === 'position' &&
-      context.accountId &&
-      context.symbol &&
-      models.position?.findUnique
-    ) {
-      const position = await models.position.findUnique({
-        where: { accountId_symbol: { accountId: context.accountId, symbol: context.symbol } },
-        select: { id: true },
-      });
-      if (!position) throw new NotFoundException('研究上下文已不可访问');
-    }
-    if (context.strategyVersionId && models.strategyVersion?.findUnique) {
-      const version = await models.strategyVersion.findUnique({
-        where: { id: context.strategyVersionId },
-        select: { id: true },
-      });
-      if (!version) throw new NotFoundException('研究上下文已不可访问');
-    }
-  }
 
   async startResearch(input: AiResearchStartInput, frozen?: AiFrozenResearch) {
     const parsed = aiResearchStartInputSchema.parse(input);
@@ -185,14 +173,14 @@ export class AiRunService {
   }
 
   async frozenEvidence(id: string) {
-    const run = await this.prisma.aiRun.findUnique({ where: { id }, select: { modelMetadata: true, context: true } });
+    const run = await this.prisma.aiRun.findUnique({ where: { id, researchOwnerId: null }, select: { modelMetadata: true, context: true } });
     if (!run) return null;
-    await this.assertStoredRunAccess(run.context);
+    await assertLegacyAiContextAccess(this.prisma, run.context);
     return readFrozenResearch(run.modelMetadata);
   }
 
   checkpoint(id: string, checkpoint: object) {
-    return this.prisma.aiRun.update({ where: { id }, data: { checkpoint } });
+    return this.prisma.aiRun.update({ where: { id, researchOwnerId: null }, data: { checkpoint } });
   }
 
   /** Server-internal compatibility method; it still crosses the ResearchResult boundary. */
@@ -266,28 +254,7 @@ export class AiRunService {
 
   /** Atomically claims one queued run and assigns a short lease to the worker. */
   async claim(id: string, leaseMs = 60_000) {
-    const now = new Date();
-    const leaseUntil = new Date(now.getTime() + leaseMs);
-    const updateMany = (
-      this.prisma.aiRun as unknown as {
-        updateMany?: (args: unknown) => Promise<{ count: number }>;
-      }
-    ).updateMany;
-    if (!updateMany) return null;
-    const result = await updateMany({
-      where: { id, status: 'queued' },
-      data: {
-        status: 'running',
-        startedAt: now,
-        claimedAt: now,
-        leaseUntil,
-        executionAttempt: { increment: 1 },
-        errorCode: null,
-        errorSummary: null,
-      },
-    });
-    if (result.count !== 1) return null;
-    return this.prisma.aiRun.findUnique({ where: { id } });
+    return claimAiRun(this.prisma, id, leaseMs);
   }
 
   async fail(id: string, errorCode: string, errorSummary: string, durationMs?: number) {
@@ -330,7 +297,7 @@ export class AiRunService {
 
   async resume(id: string) {
     const run = await this.prisma.aiRun.findUnique({
-      where: { id },
+      where: { id, researchOwnerId: null },
       select: {
         id: true,
         provider: true,
@@ -356,7 +323,7 @@ export class AiRunService {
       },
     });
     if (!run) return null;
-    await this.assertStoredRunAccess(run.context);
+    await assertLegacyAiContextAccess(this.prisma, run.context);
     return {
       ...aiRunReadProjection(run),
       fallbackSummary: safeFallbackSummary(run.modelMetadata),
@@ -380,6 +347,7 @@ export class AiRunService {
     const decoded = decodeCursor(cursor);
     if (cursor && !decoded) throw new BadRequestException('研究任务游标无效');
     const where: Prisma.AiRunWhereInput = {
+      researchOwnerId: null,
       ...(status ? { status } : {}),
       ...(decoded
         ? {
@@ -438,11 +406,11 @@ export class AiRunService {
 
   async listToolCalls(runId: string, limit = 50, cursor?: string) {
     const run = await this.prisma.aiRun.findUnique({
-      where: { id: runId },
+      where: { id: runId, researchOwnerId: null },
       select: { id: true, context: true },
     });
     if (!run) throw new NotFoundException(`研究任务不存在: ${runId}`);
-    await this.assertStoredRunAccess(run.context);
+    await assertLegacyAiContextAccess(this.prisma, run.context);
     const bounded = Math.max(1, Math.min(limit, 100));
     const decoded = decodeCursor(cursor);
     if (cursor && !decoded) throw new BadRequestException('Tool 调用游标无效');

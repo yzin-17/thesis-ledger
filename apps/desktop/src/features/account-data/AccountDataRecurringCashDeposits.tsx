@@ -7,6 +7,7 @@ import { Loader2Icon, MoreHorizontalIcon, PlusIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
 import {
   DropdownMenu,
@@ -15,8 +16,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import {
   Sheet,
   SheetContent,
@@ -30,11 +32,13 @@ import { useToastManager } from '@/components/ui/toast';
 import type { Account } from '../portfolio/portfolio.types.js';
 import {
   currentLocalDateTime,
+  errorMessage,
   formatCurrencyAmount,
   formatDate,
   supportedCurrency,
 } from './account-data.helpers.js';
 import { useCashDepositQueries, useCashOperationsMutations } from './account-data.cash.queries.js';
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 
 type PlanEditor = { mode: 'create'; plan: null } | { mode: 'edit'; plan: RecurringCashDepositPlan };
 type OccurrenceAction = { type: 'confirm' | 'skip'; occurrence: RecurringCashDepositOccurrence };
@@ -90,7 +94,7 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
     } catch (error) {
       toastManager.add({
         title: '计划操作失败',
-        description: error instanceof Error ? error.message : '请刷新后重试。',
+        description: errorMessage(error, '请刷新后重试。'),
         type: 'error',
       });
     }
@@ -110,21 +114,29 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
     } catch (error) {
       toastManager.add({
         title: '恢复失败',
-        description: error instanceof Error ? error.message : '请刷新后重试。',
+        description: errorMessage(error, '请刷新后重试。'),
         type: 'error',
       });
     }
   };
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="recurring-cash-deposit-title">
+    <section
+      className="@container flex min-w-0 flex-col gap-4"
+      aria-labelledby="recurring-cash-deposit-title"
+    >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 id="recurring-cash-deposit-title" className="m-0 text-lg font-semibold">
-            定期入账
-          </h3>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 id="recurring-cash-deposit-title" className="m-0 text-base font-semibold">
+              定期入账
+            </h3>
+            {pending.length === 0 && queries.occurrences.data !== undefined && (
+              <span className="text-xs text-muted-foreground">暂无待确认入账</span>
+            )}
+          </div>
           <p className="m-0 mt-1 text-sm text-muted-foreground">
-            到期只生成待确认记录；确认后才写入现金 Ledger。
+            到期后核对金额和到账时间，确认后计入现金余额。
           </p>
         </div>
         <Button
@@ -139,7 +151,20 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
       {(queries.plans.isError || queries.occurrences.isError) && (
         <Alert variant="destructive">
           <AlertTitle>定期入账读取失败</AlertTitle>
-          <AlertDescription>计划或待确认记录未更新，请重试。</AlertDescription>
+          <AlertDescription>
+            计划或待确认记录未更新。已成功保存或确认的操作无需再次提交，请重新读取。
+          </AlertDescription>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={queries.plans.isFetching || queries.occurrences.isFetching}
+            onClick={() =>
+              void Promise.all([queries.plans.refetch(), queries.occurrences.refetch()])
+            }
+          >
+            重新读取定期入账
+          </Button>
         </Alert>
       )}
       {overdue.length > 0 && (
@@ -150,20 +175,14 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
           </AlertDescription>
         </Alert>
       )}
-      <div className="divide-y border-y">
-        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-          <div>
-            <h4 className="m-0 text-sm font-semibold">待确认</h4>
-            <p className="m-0 mt-1 text-xs text-muted-foreground">
-              核对实际金额和到账时间后再写入 Ledger。
-            </p>
-          </div>
-          <span className="text-sm font-medium text-muted-foreground">{pending.length} 条</span>
-        </div>
-        {pending.length === 0 ? (
-          <div className="py-3 text-sm text-muted-foreground">暂无待确认入账</div>
-        ) : (
-          <div className="divide-y">
+      {pending.length > 0 && (
+        <Card size="sm" role="region" aria-labelledby="recurring-cash-pending-title">
+          <CardHeader>
+            <CardTitle id="recurring-cash-pending-title" className="flex items-baseline gap-2">
+              待确认入账 <span className="text-xs text-muted-foreground">{pending.length} 条</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
             {pending.map((occurrence) => (
               <div
                 key={occurrence.id}
@@ -204,144 +223,191 @@ export function RecurringCashDeposits({ account }: { account: Account }) {
                 </div>
               </div>
             ))}
-          </div>
-        )}
-        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-          <div>
-            <h4 className="m-0 text-sm font-semibold">计划</h4>
-            <p className="m-0 mt-1 text-xs text-muted-foreground">
-              每月到期后生成待确认记录，不会自动改变现金余额。
-            </p>
-          </div>
-          <span className="text-sm font-medium text-muted-foreground">{plans.length} 个</span>
-        </div>
-        {plans.length === 0 ? (
-          <div className="py-3 text-sm text-muted-foreground">
-            暂无定期入账计划。创建计划后，到期会生成待确认记录。
-          </div>
-        ) : (
-          <div className="divide-y">
-            {plans.map((plan) => (
-              <div key={plan.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <strong className="truncate text-sm font-medium">{plan.name}</strong>
-                    <Badge variant={plan.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                      {planStatus(plan.status)}
-                    </Badge>
-                  </div>
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    每月 {plan.dayOfMonth} 日 ·{' '}
-                    {formatCurrencyAmount(
-                      Number(plan.expectedAmount),
-                      supportedCurrency(plan.currency),
-                    )}
-                    {plan.nextDueAt ? ` · 下次 ${formatDate(plan.nextDueAt)}` : ''}
-                  </span>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={`管理计划：${plan.name}`}
-                      >
-                        <MoreHorizontalIcon />
-                      </Button>
-                    }
-                  />
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuGroup>
-                      {plan.status !== 'ENDED' && (
-                        <DropdownMenuItem onClick={() => setEditor({ mode: 'edit', plan })}>
-                          修改计划
-                        </DropdownMenuItem>
-                      )}
-                      {plan.status === 'ACTIVE' && (
-                        <DropdownMenuItem onClick={() => void changePlanState(plan, 'pause')}>
-                          暂停计划
-                        </DropdownMenuItem>
-                      )}
-                      {plan.status === 'PAUSED' && (
-                        <DropdownMenuItem onClick={() => void changePlanState(plan, 'resume')}>
-                          恢复计划
-                        </DropdownMenuItem>
-                      )}
-                      {plan.status !== 'ENDED' && (
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => void changePlanState(plan, 'end')}
-                        >
-                          结束计划
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
-          </div>
-        )}
-        {confirmed.length > 0 && (
-          <>
-            <div className="flex items-center justify-between gap-2 py-3">
-              <h4 className="m-0 text-sm font-semibold">已确认历史</h4>
-              <span className="text-sm font-medium text-muted-foreground">
-                {confirmed.length} 条
+          </CardContent>
+        </Card>
+      )}
+      <div className="grid min-w-0 items-start gap-4 @3xl:grid-cols-2">
+        <Card size="sm" role="region" aria-labelledby="recurring-cash-plans-title">
+          <CardHeader>
+            <CardTitle id="recurring-cash-plans-title" className="flex items-baseline gap-2">
+              入账计划
+              <span className="text-xs text-muted-foreground">
+                {queries.plans.data === undefined ? '—' : plans.length} 个
               </span>
-            </div>
-            <div className="divide-y">
-              {confirmed.map((occurrence) => (
-                <div
-                  key={occurrence.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
-                >
-                  <div>
-                    <strong className="block text-sm font-medium">
-                      {occurrence.planName} · {occurrence.periodKey}
-                    </strong>
-                    <span className="text-xs text-muted-foreground">
-                      实际{' '}
-                      {formatCurrencyAmount(
-                        Number(occurrence.actualAmount ?? occurrence.expectedAmount),
-                        supportedCurrency(occurrence.currency),
-                      )}{' '}
-                      · 入账 {formatDate(occurrence.occurredAt)}
-                    </span>
-                  </div>
-                  <Badge variant="secondary">已确认</Badge>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-        {skipped.length > 0 && (
-          <>
-            <div className="flex items-center justify-between gap-2 py-3">
-              <h4 className="m-0 text-sm font-semibold">已跳过记录</h4>
-              <span className="text-sm font-medium text-muted-foreground">{skipped.length} 条</span>
-            </div>
-            <div className="divide-y">
-              {skipped.map((occurrence) => (
-                <div key={occurrence.id} className="flex items-center justify-between gap-3 py-3">
-                  <span className="text-sm">
-                    {occurrence.planName} · {occurrence.periodKey}
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void reopen(occurrence)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {plans.length === 0 ? (
+              <Empty className="items-start p-0">
+                <EmptyDescription>
+                  {queries.plans.data === undefined ? '计划尚未加载' : '暂无定期入账计划'}
+                </EmptyDescription>
+              </Empty>
+            ) : (
+              <div className="divide-y divide-border">
+                {plans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className="flex min-w-0 items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
                   >
-                    恢复待确认
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong className="truncate text-sm font-medium" title={plan.name}>
+                          {plan.name}
+                        </strong>
+                        <Badge variant={plan.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                          {planStatus(plan.status)}
+                        </Badge>
+                      </div>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        每月 {plan.dayOfMonth} 日
+                        {plan.nextDueAt ? ` · 下次 ${formatDate(plan.nextDueAt)}` : ''}
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 shrink-0 items-center gap-2">
+                      <strong className="text-sm font-medium tabular-nums">
+                        {formatCurrencyAmount(
+                          Number(plan.expectedAmount),
+                          supportedCurrency(plan.currency),
+                        )}
+                      </strong>
+                      {plan.status !== 'ENDED' && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                type="button"
+                                size="icon-sm"
+                                variant="ghost"
+                                aria-label={`管理计划：${plan.name}`}
+                              >
+                                <MoreHorizontalIcon />
+                              </Button>
+                            }
+                          />
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuGroup>
+                              <DropdownMenuItem onClick={() => setEditor({ mode: 'edit', plan })}>
+                                修改计划
+                              </DropdownMenuItem>
+                              {plan.status === 'ACTIVE' && (
+                                <DropdownMenuItem
+                                  onClick={() => void changePlanState(plan, 'pause')}
+                                >
+                                  暂停计划
+                                </DropdownMenuItem>
+                              )}
+                              {plan.status === 'PAUSED' && (
+                                <DropdownMenuItem
+                                  onClick={() => void changePlanState(plan, 'resume')}
+                                >
+                                  恢复计划
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => void changePlanState(plan, 'end')}
+                              >
+                                结束计划
+                              </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card size="sm" role="region" aria-labelledby="recurring-cash-history-title">
+          <CardHeader>
+            <CardTitle id="recurring-cash-history-title" className="flex items-baseline gap-2">
+              入账历史
+              <span className="text-xs text-muted-foreground">
+                {queries.occurrences.data === undefined ? '—' : confirmed.length + skipped.length}{' '}
+                条
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex min-w-0 flex-col gap-4">
+            {confirmed.length + skipped.length === 0 && (
+              <Empty className="items-start p-0">
+                <EmptyDescription>
+                  {queries.occurrences.data === undefined ? '入账记录尚未加载' : '暂无入账记录'}
+                </EmptyDescription>
+              </Empty>
+            )}
+            {confirmed.length > 0 && (
+              <div role="group" aria-label="已确认历史" className="divide-y divide-border">
+                {confirmed.map((occurrence) => (
+                  <div
+                    key={occurrence.id}
+                    className="flex min-w-0 flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong
+                          className="min-w-0 truncate text-sm font-medium"
+                          title={occurrence.planName}
+                        >
+                          {occurrence.planName}
+                        </strong>
+                        <Badge variant="secondary">已确认</Badge>
+                      </div>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {occurrence.periodKey} · 入账 {formatDate(occurrence.occurredAt)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <strong className="block text-sm font-medium tabular-nums">
+                        {formatCurrencyAmount(
+                          Number(occurrence.actualAmount ?? occurrence.expectedAmount),
+                          supportedCurrency(occurrence.currency),
+                        )}
+                      </strong>
+                      <span className="text-xs text-muted-foreground">实际入账</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {skipped.length > 0 && (
+              <div role="group" aria-label="已跳过记录" className="divide-y divide-border">
+                {skipped.map((occurrence) => (
+                  <div
+                    key={occurrence.id}
+                    className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong
+                          className="min-w-0 truncate text-sm font-medium"
+                          title={occurrence.planName}
+                        >
+                          {occurrence.planName}
+                        </strong>
+                        <Badge variant="secondary">已跳过</Badge>
+                      </div>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {occurrence.periodKey}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void reopen(occurrence)}
+                    >
+                      恢复待确认
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
       {editor && (
         <PlanEditorSheet
@@ -379,6 +445,7 @@ function PlanEditorSheet({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const toastManager = useToastManager();
   const mutations = useCashOperationsMutations(account.id, account.mode);
   const [name, setName] = useState(editor.plan?.name ?? '工资入账');
   const [amount, setAmount] = useState(editor.plan?.expectedAmount ?? '');
@@ -386,8 +453,15 @@ function PlanEditorSheet({
   const [startPeriod, setStartPeriod] = useState(currentPeriod);
   const [error, setError] = useState('');
   const pending = mutations.createPlan.isPending || mutations.updatePlan.isPending;
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: { name, amount, dayOfMonth, startPeriod },
+    busy: pending,
+    onOpenChange,
+  });
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (pending) return;
     setError('');
     try {
       if (editor.mode === 'create')
@@ -409,13 +483,14 @@ function PlanEditorSheet({
             dayOfMonth: Number(dayOfMonth),
           },
         });
+      toastManager.add({ title: '定期入账计划已保存', type: 'success' });
       onSaved();
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : '计划保存失败。');
+      setError(errorMessage(submissionError, '计划保存失败，输入已保留，请重试。'));
     }
   };
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>
@@ -468,14 +543,19 @@ function PlanEditorSheet({
                   />
                 </Field>
               )}
-              {error && <FieldError>{error}</FieldError>}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTitle>计划保存失败</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
             </FieldGroup>
           </div>
           <SheetFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => void requestClose(false)}
               disabled={pending}
             >
               取消
@@ -501,6 +581,7 @@ function OccurrenceActionSheet({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const toastManager = useToastManager();
   const occurrence = action.occurrence;
   const mutations = useCashOperationsMutations(occurrence.accountId, 'actual');
   const [actualAmount, setActualAmount] = useState(occurrence.expectedAmount);
@@ -508,8 +589,15 @@ function OccurrenceActionSheet({
   const [reason, setReason] = useState('本期未到账');
   const [error, setError] = useState('');
   const pending = mutations.confirmOccurrence.isPending || mutations.skipOccurrence.isPending;
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: { actualAmount, occurredAt, reason },
+    busy: pending,
+    onOpenChange,
+  });
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (pending) return;
     setError('');
     try {
       if (action.type === 'confirm')
@@ -527,15 +615,17 @@ function OccurrenceActionSheet({
           expectedVersion: occurrence.version,
           reason,
         });
+      toastManager.add({
+        title: action.type === 'confirm' ? '实际入账已确认' : '本期入账已跳过',
+        type: 'success',
+      });
       onSaved();
     } catch (submissionError) {
-      setError(
-        submissionError instanceof Error ? submissionError.message : '操作失败，请刷新后重试。',
-      );
+      setError(errorMessage(submissionError, '操作失败，输入已保留，请重试。'));
     }
   };
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>{action.type === 'confirm' ? '确认实际入账' : '跳过本期入账'}</SheetTitle>
@@ -586,14 +676,19 @@ function OccurrenceActionSheet({
                   />
                 </Field>
               )}
-              {error && <FieldError>{error}</FieldError>}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTitle>入账操作失败</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
             </FieldGroup>
           </div>
           <SheetFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => void requestClose(false)}
               disabled={pending}
             >
               取消

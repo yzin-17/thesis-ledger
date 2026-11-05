@@ -20,6 +20,9 @@ export type PortfolioManagementViewProps = {
   onOpenReconciliation?: () => void;
   accountFormInline?: boolean;
   managedAccounts: Account[];
+  managedAccountsError?: boolean;
+  managedAccountsPending?: boolean;
+  onRetryManagedAccounts?: () => void;
   onAccountEntry: ((accountId: string) => void) | undefined;
   selectedAccount: Account | undefined;
   entryAccountLocked: boolean;

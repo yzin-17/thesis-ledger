@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import { PortfolioDashboard } from '../src/features/portfolio/PortfolioDashboard.js';
+import { PerformanceWorkspace } from '../src/app/PerformanceWorkspace.js';
 import {
   nextPortfolioPositionSort,
   PortfolioPositionTable,
@@ -121,10 +121,13 @@ describe('Portfolio table contract', () => {
     });
     const html = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
-        <PortfolioDashboard
+        <PerformanceWorkspace
+          tab="overview"
+          onTabChange={vi.fn()}
           state="ready"
           mode="actual"
-          onModeChange={vi.fn()}
+          accountId=""
+          onAccountChange={vi.fn()}
           onRetry={vi.fn()}
           onNavigate={vi.fn()}
           accounts={[
@@ -193,6 +196,7 @@ describe('Portfolio table contract', () => {
 
     expect(headers).toEqual([
       '标的',
+      '账户',
       '持有',
       '现价',
       '市值',
@@ -202,14 +206,23 @@ describe('Portfolio table contract', () => {
       '操作',
     ]);
     expect(cells).toHaveLength(headers.length);
+    const headerTags = [...table![1]!.matchAll(/<th\b[^>]*>/g)].map((match) => match[0]);
+    const cellTags = [...table![2]!.matchAll(/<td\b[^>]*>/g)].map((match) => match[0]);
+    for (const index of [2, 3, 4, 5, 6, 8]) {
+      expect(headerTags[index]).toContain('text-right');
+      expect(cellTags[index]).toContain('text-right');
+    }
+    expect(headerTags[7]).not.toContain('text-right');
+    expect(cellTags[7]).not.toContain('text-right');
     expect(cells[0]).toContain('贵州茅台');
-    expect(cells[1]).toContain('成本');
-    expect(cells[2]).toContain('今日 +0.54%');
-    expect(cells[3]).toContain('仓位 100.00%');
-    expect(cells[4]).toContain('+¥80.00');
-    expect(cells[5]).toContain('+2.62%');
-    expect(cells[6]).toContain('最新');
-    expect(cells[7]).toContain('行情详情');
+    expect(cells[1]).toBe('测试账户');
+    expect(cells[2]).toContain('成本');
+    expect(cells[3]).toContain('今日 +0.54%');
+    expect(cells[4]).toContain('仓位 100.00%');
+    expect(cells[5]).toContain('+¥80.00');
+    expect(cells[6]).toContain('+2.62%');
+    expect(cells[7]).toContain('已估值');
+    expect(cells[8]).toContain('行情详情');
     expect(html).toContain('今日收益');
     expect(html).toContain('累计盈亏');
     expect(html).toContain('已实现盈亏');
@@ -242,6 +255,7 @@ describe('Portfolio table contract', () => {
               dailyPnl: 80,
               dailyReturn: 0.005405,
               baseDailyPnl: 80,
+              source: 'ledger',
               stale: false,
               asset: { name: '贵州茅台', assetType: 'stock' },
             },
@@ -282,12 +296,14 @@ describe('Portfolio table contract', () => {
       dailyPnl: 80,
       dailyReturn: 0.005405,
       pnlRatio: 0.0262069,
+      source: 'ledger',
     });
   });
 
   it('只读组合表格隐藏无效的行情详情操作列', () => {
     const html = renderToStaticMarkup(
       <PortfolioPositionTable
+        accounts={[]}
         portfolio={{
           totalMarketValue: 100,
           totalCost: 90,

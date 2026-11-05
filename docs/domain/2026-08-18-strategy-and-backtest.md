@@ -34,7 +34,7 @@ DSA → DataSnapshot → Simulation Event Engine → SimulationLedger → Backte
 
 ## 历史目标与当前能力边界
 
-下列是原 V2 方案的目标范围，保留作设计追溯，不表示当前所有市场或分钟周期已经实现或通过验收。当前执行协议为 V3；富途历史 `1m/none/regular` 子集由[富途任务 FAPI-M1～M4](../tasks/2026-10-08-futu-openapi-full-integration.md)承接，其余分钟范围见 [TODO](../TODO.md)。历史目标包括：
+下列是原 V2 方案的目标范围，保留作设计追溯，不表示当前所有市场或分钟周期已经实现或通过验收。当前执行协议为 V3；已交付的富途历史 `1m/none/regular` 子集见[现行富途合同](../specs/2026-10-08-futu-openapi-full-integration.md)，其余分钟范围见 [TODO](../TODO.md)。历史目标包括：
 
 - 中国内地、香港、美国 Stock / ETF；中国内地 NAV Fund；
 - 场内 `1d/60m/30m/15m/5m/1m`，CN NAV Fund 日频；

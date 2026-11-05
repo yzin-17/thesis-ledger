@@ -6,6 +6,7 @@ import {
   journalStoredSnapshotViewSchema,
 } from '@thesis-ledger/schemas';
 import { JournalSnapshotHistory } from '../src/features/journal/review/JournalSnapshotHistory.js';
+import { formatDateTime } from '../src/lib/date-display.js';
 import {
   journalClick,
   journalMountedCandidate,
@@ -53,8 +54,9 @@ describe('历史快照交互', () => {
     api.history.mockResolvedValue({ items: [row], nextCursor: null });
     api.snapshot.mockResolvedValue(row);
     const view = await mountJournal(<JournalSnapshotHistory {...props} />);
-    const label = '2026-01-05T00:00:00Z · AAPL.US · 完整交易周期 · 证据已变化';
+    const label = `${formatDateTime('2026-01-05T00:00:00Z')} · AAPL.US · 完整交易周期 · 证据已变化`;
     await journalWait(() => expect(view.host.textContent).toContain(label));
+    expect(view.host.querySelector('button')?.textContent).not.toContain('T00:00:00Z');
     await journalClick(label);
     await journalWait(() => expect(view.host.textContent).toContain('历史结果 · 证据已变化'));
     expect(view.host.textContent).toContain('真实退出成交');
@@ -79,7 +81,7 @@ describe('历史快照交互', () => {
     await journalWait(() => expect(view.host.textContent).toContain('历史列表读取失败'));
     expect(view.host.textContent).not.toContain('没有复盘快照');
     await journalClick('重新读取');
-    const label = '2026-01-05T00:00:00Z · AAPL.US · 完整交易周期 · 证据已变化';
+    const label = `${formatDateTime('2026-01-05T00:00:00Z')} · AAPL.US · 完整交易周期 · 证据已变化`;
     await journalWait(() => expect(view.host.textContent).toContain(label));
     await journalClick(label);
     await journalWait(() => expect(view.host.textContent).toContain('历史快照读取失败'));
@@ -100,7 +102,7 @@ describe('历史快照交互', () => {
     api.snapshot.mockResolvedValue(legacy);
     const view = await mountJournal(<JournalSnapshotHistory {...props} />);
     await journalWait(() => expect(view.host.textContent).toContain('旧快照待确认'));
-    await journalClick('2026-01-05T00:00:00Z · 旧快照待确认');
+    await journalClick(`${formatDateTime('2026-01-05T00:00:00Z')} · 旧快照待确认`);
     await journalWait(() => expect(view.host.textContent).toContain('高级调试：旧快照原始记录'));
     expect(view.host.querySelector('pre')?.closest('details')?.open).toBe(false);
     expect(view.host.textContent).not.toContain('确定性复盘结果');

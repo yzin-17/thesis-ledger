@@ -1,5 +1,7 @@
 import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
 import type { ImportDraftRecord, ImportRow } from './import.types.js';
+import type { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
+import { getDesktopApiClient } from '../../shared/api/client.js';
 
 const noStore = { cache: 'no-store' as const };
 
@@ -12,7 +14,7 @@ export const fetchImportDrafts = (accountId: string, client?: DesktopRequestClie
 
 export const uploadScreenshotImport = (
   input: { file: File; accountId: string; source: ImportDraftRecord['source'] },
-  client?: DesktopRequestClient,
+  client: Pick<ThesisLedgerApiClient, 'imports'> = getDesktopApiClient(),
 ) => {
   const body = new FormData();
   body.set('file', input.file);
@@ -20,15 +22,7 @@ export const uploadScreenshotImport = (
   body.set('source', input.source);
   body.set('sourceConfidence', input.source === 'unknown' ? '0' : '1');
   body.set('extracted', '[]');
-  return requestDesktopJson<ImportDraftRecord>(
-    '/imports/screenshot',
-    {
-      ...noStore,
-      method: 'POST',
-      body,
-    },
-    client,
-  );
+  return client.imports.uploadScreenshot(body, input.accountId);
 };
 
 export const commitImportDraft = (

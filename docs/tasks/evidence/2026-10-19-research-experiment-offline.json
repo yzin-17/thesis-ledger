@@ -1,0 +1,721 @@
+{
+  "version": "research-experiment-report-v1",
+  "mode": "controlled-offline",
+  "activation": "not_evaluated",
+  "stageProtocol": {
+    "version": "research-experiment-stage-v1",
+    "fingerprint": "1ac7562bfec758b14084a489fbce29d235e5fd0f2f7f2176fc5e3fabcf0d819e"
+  },
+  "protocolFingerprint": "350810486b5106256ec62a584aa9fb13687721e4ff91a701ca7d03af24aef16c",
+  "model": {
+    "providerId": "controlled-research-experiment",
+    "id": "controlled-model-v1",
+    "revision": "controlled-responses-v1"
+  },
+  "activationCriteria": {
+    "minimumCases": 20,
+    "minimumQualityDelta": 0.05,
+    "maximumFailureRateDelta": 0,
+    "maximumCostRatio": 1.5,
+    "maximumLatencyRatio": 1.5,
+    "zeroCriticalViolations": true
+  },
+  "passed": true,
+  "cases": [
+    {
+      "caseId": "controlled-shadow",
+      "frozenInputFingerprint": "e2b7c8b213e3169701c657cc25f58f8616918a1fe3621b215694d71021a3f567",
+      "assumptionsFingerprint": "e06e67929be5067a7efa7f1782b0d1e249352236274433a82cc7c66925bad40c",
+      "financialReference": {
+        "status": "aligned",
+        "periods": 2,
+        "strategyExcessMean": "0.0024",
+        "benchmarkExcessMean": "0.0014"
+      },
+      "single": {
+        "arm": "single",
+        "status": "complete",
+        "reason": null,
+        "durationMs": 23,
+        "frozenInputFingerprint": "e2b7c8b213e3169701c657cc25f58f8616918a1fe3621b215694d71021a3f567",
+        "assumptionsFingerprint": "e06e67929be5067a7efa7f1782b0d1e249352236274433a82cc7c66925bad40c",
+        "modelRevision": "controlled-responses-v1",
+        "finalOutputFingerprint": "f97083d43d1dabf4fa4c0f9c636fe57434d813d96496a1872d3dcad74fa6309b",
+        "qualityGrade": null,
+        "returnGrade": null,
+        "stages": [
+          {
+            "stage": "single",
+            "inputFingerprint": "fb57bb6e581233d6c313ffb6453febb943e3a65e2a06870cbff21919a99ad328",
+            "outputFingerprint": "f97083d43d1dabf4fa4c0f9c636fe57434d813d96496a1872d3dcad74fa6309b",
+            "accepted": true
+          }
+        ],
+        "requests": [
+          {
+            "requestId": "a7b87a6d-3e9c-4ad5-9635-a9b51015b889",
+            "stage": "single",
+            "inputFingerprint": "fb57bb6e581233d6c313ffb6453febb943e3a65e2a06870cbff21919a99ad328",
+            "preparedAt": "2026-10-19T11:17:40.538Z",
+            "completedAt": "2026-10-19T11:17:40.559Z",
+            "reservation": {
+              "inputTokens": 628,
+              "outputTokens": 600,
+              "cost": {
+                "status": "estimated",
+                "amount": "0.001828",
+                "currency": "USD",
+                "source": "frozen_provider_pricing",
+                "pricingVersion": "controlled-pricing-v1"
+              }
+            },
+            "facts": [
+              {
+                "eventKey": "557dfe79-bdd3-4a91-98f4-170ef4c26fd4",
+                "kind": "dispatching",
+                "actualModel": null,
+                "usage": null,
+                "cost": {
+                  "status": "unknown",
+                  "amount": null,
+                  "currency": null,
+                  "source": null,
+                  "pricingVersion": null
+                },
+                "errorCode": null,
+                "outputFingerprint": null
+              },
+              {
+                "eventKey": "f474e76b-4200-4678-810b-713c92d32fb1",
+                "kind": "received",
+                "actualModel": "controlled-model-v1",
+                "usage": {
+                  "status": "reported",
+                  "inputTokens": 70,
+                  "outputTokens": 30
+                },
+                "cost": {
+                  "status": "estimated",
+                  "amount": "0.00013",
+                  "currency": "USD",
+                  "source": "frozen_provider_pricing",
+                  "pricingVersion": "controlled-pricing-v1"
+                },
+                "errorCode": null,
+                "outputFingerprint": "f97083d43d1dabf4fa4c0f9c636fe57434d813d96496a1872d3dcad74fa6309b"
+              }
+            ]
+          }
+        ],
+        "totals": {
+          "requests": 1,
+          "knownInput": 70,
+          "knownOutput": 30,
+          "unknownInput": 0,
+          "unknownOutput": 0,
+          "unknownCost": 0,
+          "estimatedCostRequests": 1,
+          "knownCostRequests": 0,
+          "actualCostComplete": false,
+          "actualTotals": null,
+          "costs": [
+            {
+              "currency": "USD",
+              "known": "0",
+              "estimated": "0.00013"
+            }
+          ]
+        }
+      },
+      "staged": {
+        "arm": "staged",
+        "status": "complete",
+        "reason": null,
+        "durationMs": 13,
+        "frozenInputFingerprint": "e2b7c8b213e3169701c657cc25f58f8616918a1fe3621b215694d71021a3f567",
+        "assumptionsFingerprint": "e06e67929be5067a7efa7f1782b0d1e249352236274433a82cc7c66925bad40c",
+        "modelRevision": "controlled-responses-v1",
+        "finalOutputFingerprint": "f0b467fb8d6427af104f1ddab220654805d85790333bd7c354563f3b17a54fee",
+        "qualityGrade": null,
+        "returnGrade": null,
+        "stages": [
+          {
+            "stage": "organize",
+            "inputFingerprint": "e407364638edaeb53f4140184b3654df03dd94fab6686628fa0361894b5ce6e5",
+            "outputFingerprint": "f4d4a1c7a3877fc361ea57bc899f0698bffb82a3f5dc2570d985cc7d4b7c835a",
+            "accepted": true
+          },
+          {
+            "stage": "challenge",
+            "inputFingerprint": "ef9e19ee5479616d8efb9152c55259874d4c0e989aee7d3df8c682efabab8843",
+            "outputFingerprint": "097ae33565756fd7b320f3d736851c36baa0d812aea6c1f6b25d84d69e8a9cb7",
+            "accepted": true
+          },
+          {
+            "stage": "synthesize",
+            "inputFingerprint": "3bc00dcc9e3bf49d35ad1a891a663aa07147249b43351e41aa1bc1d76a7c866a",
+            "outputFingerprint": "f0b467fb8d6427af104f1ddab220654805d85790333bd7c354563f3b17a54fee",
+            "accepted": true
+          }
+        ],
+        "requests": [
+          {
+            "requestId": "1cec0dc9-6b6a-405c-9cdb-a99c454bbf95",
+            "stage": "organize",
+            "inputFingerprint": "e407364638edaeb53f4140184b3654df03dd94fab6686628fa0361894b5ce6e5",
+            "preparedAt": "2026-10-19T11:17:40.561Z",
+            "completedAt": "2026-10-19T11:17:40.564Z",
+            "reservation": {
+              "inputTokens": 634,
+              "outputTokens": 200,
+              "cost": {
+                "status": "estimated",
+                "amount": "0.001034",
+                "currency": "USD",
+                "source": "frozen_provider_pricing",
+                "pricingVersion": "controlled-pricing-v1"
+              }
+            },
+            "facts": [
+              {
+                "eventKey": "7fb1c518-f197-4a61-86af-426cca731a69",
+                "kind": "dispatching",
+                "actualModel": null,
+                "usage": null,
+                "cost": {
+                  "status": "unknown",
+                  "amount": null,
+                  "currency": null,
+                  "source": null,
+                  "pricingVersion": null
+                },
+                "errorCode": null,
+                "outputFingerprint": null
+              },
+              {
+                "eventKey": "a16de608-53a0-439a-bd2d-1466d3cd202b",
+                "kind": "received",
+                "actualModel": "controlled-model-v1",
+                "usage": {
+                  "status": "reported",
+                  "inputTokens": 70,
+                  "outputTokens": 30
+                },
+                "cost": {
+                  "status": "estimated",
+                  "amount": "0.00013",
+                  "currency": "USD",
+                  "source": "frozen_provider_pricing",
+                  "pricingVersion": "controlled-pricing-v1"
+                },
+                "errorCode": null,
+                "outputFingerprint": "f4d4a1c7a3877fc361ea57bc899f0698bffb82a3f5dc2570d985cc7d4b7c835a"
+              }
+            ]
+          },
+          {
+            "requestId": "fdbef4c7-2ba8-492f-b434-da4996168324",
+            "stage": "challenge",
+            "inputFingerprint": "ef9e19ee5479616d8efb9152c55259874d4c0e989aee7d3df8c682efabab8843",
+            "preparedAt": "2026-10-19T11:17:40.565Z",
+            "completedAt": "2026-10-19T11:17:40.568Z",
+            "reservation": {
+              "inputTokens": 1135,
+              "outputTokens": 285,
+              "cost": {
+                "status": "estimated",
+                "amount": "0.001705",
+                "currency": "USD",
+                "source": "frozen_provider_pricing",
+                "pricingVersion": "controlled-pricing-v1"
+              }
+            },
+            "facts": [
+              {
+                "eventKey": "c5a6f256-7e19-4513-8ff0-ecd0ece06060",
+                "kind": "dispatching",
+                "actualModel": null,
+                "usage": null,
+                "cost": {
+                  "status": "unknown",
+                  "amount": null,
+                  "currency": null,
+                  "source": null,
+                  "pricingVersion": null
+                },
+                "errorCode": null,
+                "outputFingerprint": null
+              },
+              {
+                "eventKey": "84a1beee-b9c3-4a33-8038-c090945364e8",
+                "kind": "received",
+                "actualModel": "controlled-model-v1",
+                "usage": {
+                  "status": "reported",
+                  "inputTokens": 70,
+                  "outputTokens": 30
+                },
+                "cost": {
+                  "status": "estimated",
+                  "amount": "0.00013",
+                  "currency": "USD",
+                  "source": "frozen_provider_pricing",
+                  "pricingVersion": "controlled-pricing-v1"
+                },
+                "errorCode": null,
+                "outputFingerprint": "097ae33565756fd7b320f3d736851c36baa0d812aea6c1f6b25d84d69e8a9cb7"
+              }
+            ]
+          },
+          {
+            "requestId": "1c811eb1-8996-47bf-af2e-164f8290a1fb",
+            "stage": "synthesize",
+            "inputFingerprint": "3bc00dcc9e3bf49d35ad1a891a663aa07147249b43351e41aa1bc1d76a7c866a",
+            "preparedAt": "2026-10-19T11:17:40.569Z",
+            "completedAt": "2026-10-19T11:17:40.573Z",
+            "reservation": {
+              "inputTokens": 1636,
+              "outputTokens": 540,
+              "cost": {
+                "status": "estimated",
+                "amount": "0.002716",
+                "currency": "USD",
+                "source": "frozen_provider_pricing",
+                "pricingVersion": "controlled-pricing-v1"
+              }
+            },
+            "facts": [
+              {
+                "eventKey": "c2aefc23-854f-483f-ba8c-cec89f014ec1",
+                "kind": "dispatching",
+                "actualModel": null,
+                "usage": null,
+                "cost": {
+                  "status": "unknown",
+                  "amount": null,
+                  "currency": null,
+                  "source": null,
+                  "pricingVersion": null
+                },
+                "errorCode": null,
+                "outputFingerprint": null
+              },
+              {
+                "eventKey": "0c51afbd-6cb3-47ef-a42d-f4702032ce9b",
+                "kind": "received",
+                "actualModel": "controlled-model-v1",
+                "usage": {
+                  "status": "reported",
+                  "inputTokens": 70,
+                  "outputTokens": 30
+                },
+                "cost": {
+                  "status": "estimated",
+                  "amount": "0.00013",
+                  "currency": "USD",
+                  "source": "frozen_provider_pricing",
+                  "pricingVersion": "controlled-pricing-v1"
+                },
+                "errorCode": null,
+                "outputFingerprint": "f0b467fb8d6427af104f1ddab220654805d85790333bd7c354563f3b17a54fee"
+              }
+            ]
+          }
+        ],
+        "totals": {
+          "requests": 3,
+          "knownInput": 210,
+          "knownOutput": 90,
+          "unknownInput": 0,
+          "unknownOutput": 0,
+          "unknownCost": 0,
+          "estimatedCostRequests": 3,
+          "knownCostRequests": 0,
+          "actualCostComplete": false,
+          "actualTotals": null,
+          "costs": [
+            {
+              "currency": "USD",
+              "known": "0",
+              "estimated": "0.00039"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "caseId": "controlled-actual",
+      "frozenInputFingerprint": "4568cfdd3ec73cff1e6dfca950c6eb946449747298ef65ef953940a4760dfb77",
+      "assumptionsFingerprint": "e06e67929be5067a7efa7f1782b0d1e249352236274433a82cc7c66925bad40c",
+      "financialReference": {
+        "status": "unknown",
+        "periods": null,
+        "strategyExcessMean": null,
+        "benchmarkExcessMean": null
+      },
+      "single": {
+        "arm": "single",
+        "status": "complete",
+        "reason": null,
+        "durationMs": 5,
+        "frozenInputFingerprint": "4568cfdd3ec73cff1e6dfca950c6eb946449747298ef65ef953940a4760dfb77",
+        "assumptionsFingerprint": "e06e67929be5067a7efa7f1782b0d1e249352236274433a82cc7c66925bad40c",
+        "modelRevision": "controlled-responses-v1",
+        "finalOutputFingerprint": "57ef9d1ff0afb7faa0ffdb8e2e4751b79cb39f2b6e6b06348bf1792f83e2707b",
+        "qualityGrade": null,
+        "returnGrade": null,
+        "stages": [
+          {
+            "stage": "single",
+            "inputFingerprint": "de7893a85f5dc922cb61d38901abe50e5ec12a8eb5e4f930edba7d0fe5c5a1ac",
+            "outputFingerprint": "57ef9d1ff0afb7faa0ffdb8e2e4751b79cb39f2b6e6b06348bf1792f83e2707b",
+            "accepted": true
+          }
+        ],
+        "requests": [
+          {
+            "requestId": "62eb2da3-5b16-4622-bc6e-b9b221b9aa58",
+            "stage": "single",
+            "inputFingerprint": "de7893a85f5dc922cb61d38901abe50e5ec12a8eb5e4f930edba7d0fe5c5a1ac",
+            "preparedAt": "2026-10-19T11:17:40.573Z",
+            "completedAt": "2026-10-19T11:17:40.577Z",
+            "reservation": {
+              "inputTokens": 628,
+              "outputTokens": 600,
+              "cost": {
+                "status": "estimated",
+                "amount": "0.001828",
+                "currency": "USD",
+                "source": "frozen_provider_pricing",
+                "pricingVersion": "controlled-pricing-v1"
+              }
+            },
+            "facts": [
+              {
+                "eventKey": "df65272f-1916-4d17-99b8-d69a5cf08c52",
+                "kind": "dispatching",
+                "actualModel": null,
+                "usage": null,
+                "cost": {
+                  "status": "unknown",
+                  "amount": null,
+                  "currency": null,
+                  "source": null,
+                  "pricingVersion": null
+                },
+                "errorCode": null,
+                "outputFingerprint": null
+              },
+              {
+                "eventKey": "a150afe4-0373-4e5d-9763-210e8510884d",
+                "kind": "received",
+                "actualModel": "controlled-model-v1",
+                "usage": {
+                  "status": "reported",
+                  "inputTokens": 70,
+                  "outputTokens": 30
+                },
+                "cost": {
+                  "status": "estimated",
+                  "amount": "0.00013",
+                  "currency": "USD",
+                  "source": "frozen_provider_pricing",
+                  "pricingVersion": "controlled-pricing-v1"
+                },
+                "errorCode": null,
+                "outputFingerprint": "57ef9d1ff0afb7faa0ffdb8e2e4751b79cb39f2b6e6b06348bf1792f83e2707b"
+              }
+            ]
+          }
+        ],
+        "totals": {
+          "requests": 1,
+          "knownInput": 70,
+          "knownOutput": 30,
+          "unknownInput": 0,
+          "unknownOutput": 0,
+          "unknownCost": 0,
+          "estimatedCostRequests": 1,
+          "knownCostRequests": 0,
+          "actualCostComplete": false,
+          "actualTotals": null,
+          "costs": [
+            {
+              "currency": "USD",
+              "known": "0",
+              "estimated": "0.00013"
+            }
+          ]
+        }
+      },
+      "staged": {
+        "arm": "staged",
+        "status": "complete",
+        "reason": null,
+        "durationMs": 11,
+        "frozenInputFingerprint": "4568cfdd3ec73cff1e6dfca950c6eb946449747298ef65ef953940a4760dfb77",
+        "assumptionsFingerprint": "e06e67929be5067a7efa7f1782b0d1e249352236274433a82cc7c66925bad40c",
+        "modelRevision": "controlled-responses-v1",
+        "finalOutputFingerprint": "57aeb46762da468ab94033a3e50c9338106650a35e493f32c3b5c414c3b2b5d5",
+        "qualityGrade": null,
+        "returnGrade": null,
+        "stages": [
+          {
+            "stage": "organize",
+            "inputFingerprint": "25d8267419bb671da02478fbfc962b8214aae983ba4229762349c22f784af7ec",
+            "outputFingerprint": "2f70765715479fac265df44625c4d98a2110aed0f53ecfb6ff5d3d934d94a8fd",
+            "accepted": true
+          },
+          {
+            "stage": "challenge",
+            "inputFingerprint": "12860ef5e0700369fc6076304e775718c1e91a5ff1ad0c1b3e0ec3b1b3816bbc",
+            "outputFingerprint": "c1332cc5ba4f232eed5c49b20f9064dd5e02f1e04397061ff58dd7a7c4cc0e4a",
+            "accepted": true
+          },
+          {
+            "stage": "synthesize",
+            "inputFingerprint": "23c71ead1ca5082d2eb1f200334ad833e88d1b435d688c85677a2387c56623cb",
+            "outputFingerprint": "57aeb46762da468ab94033a3e50c9338106650a35e493f32c3b5c414c3b2b5d5",
+            "accepted": true
+          }
+        ],
+        "requests": [
+          {
+            "requestId": "cf1a5b6a-8a67-4224-893c-b5fba2bf34c2",
+            "stage": "organize",
+            "inputFingerprint": "25d8267419bb671da02478fbfc962b8214aae983ba4229762349c22f784af7ec",
+            "preparedAt": "2026-10-19T11:17:40.578Z",
+            "completedAt": "2026-10-19T11:17:40.581Z",
+            "reservation": {
+              "inputTokens": 634,
+              "outputTokens": 200,
+              "cost": {
+                "status": "estimated",
+                "amount": "0.001034",
+                "currency": "USD",
+                "source": "frozen_provider_pricing",
+                "pricingVersion": "controlled-pricing-v1"
+              }
+            },
+            "facts": [
+              {
+                "eventKey": "00feaec7-0ff7-4f42-8e31-7d9f1359a303",
+                "kind": "dispatching",
+                "actualModel": null,
+                "usage": null,
+                "cost": {
+                  "status": "unknown",
+                  "amount": null,
+                  "currency": null,
+                  "source": null,
+                  "pricingVersion": null
+                },
+                "errorCode": null,
+                "outputFingerprint": null
+              },
+              {
+                "eventKey": "a9d9c280-1590-406a-89e0-a3a777befa14",
+                "kind": "received",
+                "actualModel": "controlled-model-v1",
+                "usage": {
+                  "status": "reported",
+                  "inputTokens": 70,
+                  "outputTokens": 30
+                },
+                "cost": {
+                  "status": "estimated",
+                  "amount": "0.00013",
+                  "currency": "USD",
+                  "source": "frozen_provider_pricing",
+                  "pricingVersion": "controlled-pricing-v1"
+                },
+                "errorCode": null,
+                "outputFingerprint": "2f70765715479fac265df44625c4d98a2110aed0f53ecfb6ff5d3d934d94a8fd"
+              }
+            ]
+          },
+          {
+            "requestId": "2f53f45f-f8f6-4b54-8797-d2850ae9be4b",
+            "stage": "challenge",
+            "inputFingerprint": "12860ef5e0700369fc6076304e775718c1e91a5ff1ad0c1b3e0ec3b1b3816bbc",
+            "preparedAt": "2026-10-19T11:17:40.582Z",
+            "completedAt": "2026-10-19T11:17:40.585Z",
+            "reservation": {
+              "inputTokens": 1135,
+              "outputTokens": 285,
+              "cost": {
+                "status": "estimated",
+                "amount": "0.001705",
+                "currency": "USD",
+                "source": "frozen_provider_pricing",
+                "pricingVersion": "controlled-pricing-v1"
+              }
+            },
+            "facts": [
+              {
+                "eventKey": "7c53388e-b899-4ffd-9e9a-3a0e8c98183b",
+                "kind": "dispatching",
+                "actualModel": null,
+                "usage": null,
+                "cost": {
+                  "status": "unknown",
+                  "amount": null,
+                  "currency": null,
+                  "source": null,
+                  "pricingVersion": null
+                },
+                "errorCode": null,
+                "outputFingerprint": null
+              },
+              {
+                "eventKey": "5920891f-3bdf-4c3d-bd56-6b594365c78b",
+                "kind": "received",
+                "actualModel": "controlled-model-v1",
+                "usage": {
+                  "status": "reported",
+                  "inputTokens": 70,
+                  "outputTokens": 30
+                },
+                "cost": {
+                  "status": "estimated",
+                  "amount": "0.00013",
+                  "currency": "USD",
+                  "source": "frozen_provider_pricing",
+                  "pricingVersion": "controlled-pricing-v1"
+                },
+                "errorCode": null,
+                "outputFingerprint": "c1332cc5ba4f232eed5c49b20f9064dd5e02f1e04397061ff58dd7a7c4cc0e4a"
+              }
+            ]
+          },
+          {
+            "requestId": "c3f660c5-1c24-43ac-bd65-6fd107556b4f",
+            "stage": "synthesize",
+            "inputFingerprint": "23c71ead1ca5082d2eb1f200334ad833e88d1b435d688c85677a2387c56623cb",
+            "preparedAt": "2026-10-19T11:17:40.586Z",
+            "completedAt": "2026-10-19T11:17:40.589Z",
+            "reservation": {
+              "inputTokens": 1636,
+              "outputTokens": 540,
+              "cost": {
+                "status": "estimated",
+                "amount": "0.002716",
+                "currency": "USD",
+                "source": "frozen_provider_pricing",
+                "pricingVersion": "controlled-pricing-v1"
+              }
+            },
+            "facts": [
+              {
+                "eventKey": "5d7e545d-67bb-4c6b-9456-be6f80183e6b",
+                "kind": "dispatching",
+                "actualModel": null,
+                "usage": null,
+                "cost": {
+                  "status": "unknown",
+                  "amount": null,
+                  "currency": null,
+                  "source": null,
+                  "pricingVersion": null
+                },
+                "errorCode": null,
+                "outputFingerprint": null
+              },
+              {
+                "eventKey": "193fa0cc-ca74-44d2-a605-fca9826527eb",
+                "kind": "received",
+                "actualModel": "controlled-model-v1",
+                "usage": {
+                  "status": "reported",
+                  "inputTokens": 70,
+                  "outputTokens": 30
+                },
+                "cost": {
+                  "status": "estimated",
+                  "amount": "0.00013",
+                  "currency": "USD",
+                  "source": "frozen_provider_pricing",
+                  "pricingVersion": "controlled-pricing-v1"
+                },
+                "errorCode": null,
+                "outputFingerprint": "57aeb46762da468ab94033a3e50c9338106650a35e493f32c3b5c414c3b2b5d5"
+              }
+            ]
+          }
+        ],
+        "totals": {
+          "requests": 3,
+          "knownInput": 210,
+          "knownOutput": 90,
+          "unknownInput": 0,
+          "unknownOutput": 0,
+          "unknownCost": 0,
+          "estimatedCostRequests": 3,
+          "knownCostRequests": 0,
+          "actualCostComplete": false,
+          "actualTotals": null,
+          "costs": [
+            {
+              "currency": "USD",
+              "known": "0",
+              "estimated": "0.00039"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "implementation": {
+    "research-experiment-driver.js": "1d42aff515bbe148003932b09cb37f066dcecf3d4120b1bffb58b248d80ef21b",
+    "research-experiment-protocol.js": "497a502b711da4b01df9b407ab1cabfa571726c5cae68af560a96e37a45143e2",
+    "ai-sdk-generation.adapter.js": "b87d613fab369afc2e139987f081a6fd64ff6382777d2af9953b65464d2c8bc1"
+  },
+  "fixedInputSha256": "c5447a0bfd6af2f55ecfe96ae23090bf0070725ac5c829139364b69c6f5b2fdd",
+  "transport": {
+    "receivedRequests": 8,
+    "auditedRequests": 8,
+    "reconciled": true,
+    "calls": [
+      {
+        "caseId": "controlled-shadow",
+        "arm": "single",
+        "stage": "single"
+      },
+      {
+        "caseId": "controlled-shadow",
+        "arm": "staged",
+        "stage": "organize"
+      },
+      {
+        "caseId": "controlled-shadow",
+        "arm": "staged",
+        "stage": "challenge"
+      },
+      {
+        "caseId": "controlled-shadow",
+        "arm": "staged",
+        "stage": "synthesize"
+      },
+      {
+        "caseId": "controlled-actual",
+        "arm": "single",
+        "stage": "single"
+      },
+      {
+        "caseId": "controlled-actual",
+        "arm": "staged",
+        "stage": "organize"
+      },
+      {
+        "caseId": "controlled-actual",
+        "arm": "staged",
+        "stage": "challenge"
+      },
+      {
+        "caseId": "controlled-actual",
+        "arm": "staged",
+        "stage": "synthesize"
+      }
+    ]
+  }
+}

@@ -67,4 +67,38 @@ describe('图表可用性窗口传输', () => {
       ThesisLedgerContractError,
     );
   });
+  it('分钟能力与日线分开传递并拒绝周期串用', async () => {
+    const data = { ...response(), symbol: 'SPY.US', timeframe: '1m' };
+    delete (data as { window?: unknown }).window;
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(data), { status: 200 }));
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+    await client.market.getChartOptions('SPY.US', undefined, undefined, '1m');
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('timeframe=1m');
+    fetcher.mockResolvedValue(new Response(JSON.stringify({ ...data, timeframe: '1d' }), { status: 200 }));
+    await expect(client.market.getChartOptions('SPY.US', undefined, undefined, '1m'))
+      .rejects.toBeInstanceOf(ThesisLedgerContractError);
+  });
+  it('分钟规划校验周期及全部原参数回显', async () => {
+    const plan = { barsLimit: 90, indicatorParams: {}, timeframe: '1m' as const };
+    const data = { ...response(), symbol: 'SPY.US', timeframe: '1m', plan };
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(data), { status: 200 }));
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+    await client.market.getPlannedChartOptions('SPY.US', plan);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('timeframe=1m');
+    fetcher.mockResolvedValue(new Response(JSON.stringify({ ...data, plan: { ...plan, timeframe: '1d' } }), { status: 200 }));
+    await expect(client.market.getPlannedChartOptions('SPY.US', plan)).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  });
+
+  it('显式港美类型进入规划请求且不能接受不同类型或缺少回显', async () => {
+    const plan = { barsLimit: 180, indicatorParams: {}, timeframe: '1m' as const, assetType: 'ETF' as const };
+    const data = { ...response(), symbol: 'SPY.US', timeframe: '1m', plan };
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(data), { status: 200 }));
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+    await client.market.getPlannedChartOptions('SPY.US', plan);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('assetType=ETF');
+    for (const assetType of ['STOCK', undefined]) {
+      fetcher.mockResolvedValue(new Response(JSON.stringify({ ...data, plan: { ...plan, assetType } }), { status: 200 }));
+      await expect(client.market.getPlannedChartOptions('SPY.US', plan)).rejects.toBeInstanceOf(ThesisLedgerContractError);
+    }
+  });
 });

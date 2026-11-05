@@ -1,16 +1,17 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import { MarketPeriodSelection, useMarketPeriodControls } from './MarketPeriodSelection.js';
+import { MarketPeriodSelection, useMarketPeriodControls, useMarketPeriodDataReady, useMarketPeriodNotice } from './MarketPeriodSelection.js';
 
-const { useQueryMock, getPeriodOptions } = vi.hoisted(() => ({ useQueryMock: vi.fn(), getPeriodOptions: vi.fn() }));
+const { useQueryMock, getPeriodOptions, getMinuteOptions } = vi.hoisted(() => ({ useQueryMock: vi.fn(), getPeriodOptions: vi.fn(), getMinuteOptions: vi.fn() }));
 vi.mock('@tanstack/react-query', () => ({ useQuery: (options: unknown): unknown => useQueryMock(options) }));
-vi.mock('../../shared/api/client.js', () => ({ getDesktopApiClient: () => ({ market: { getPeriodOptions } }) }));
+vi.mock('../../shared/api/client.js', () => ({ getDesktopApiClient: () => ({ market: { getPeriodOptions, getMinuteOptions } }) }));
 vi.mock('@/components/ui/toggle-group', () => ({
   ToggleGroup: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   ToggleGroupItem: ({ children, value }: { children: ReactNode; value: string }) => <button data-period={value}>{children}</button>,
 }));
 function Controls() { return <>{useMarketPeriodControls()}</>; }
+function Readiness() { return <><output>{String(useMarketPeriodDataReady())}</output>{useMarketPeriodNotice()}</>; }
 const render = (enabled = true, adjustment: 'none' | 'qfq' | 'hfq' = 'qfq') => renderToStaticMarkup(
   <MarketPeriodSelection symbol="159516.SZ" enabled={enabled} adjustment={adjustment}>
     {(period) => <><output>{period}</output><Controls /></>}
@@ -48,6 +49,37 @@ describe('周期能力与偏好消费', () => {
     const html = render(false);
     expect(html).toBe('<output>1d</output>');
     expect(useQueryMock.mock.calls[0]?.[0]).toMatchObject({ enabled: false });
+  });
+  it.each([false, true])('分钟能力待确认或失败时保留选择并关闭价格读取（失败=%s）', (isError) => {
+    storage.set('thesis-ledger:market-period-preference', '5m');
+    useQueryMock.mockReturnValue({ isSuccess: false, isError });
+    const html = renderToStaticMarkup(<MarketPeriodSelection symbol="SPY.US" enabled>
+      {(period) => <><span>{period}</span><Readiness /></>}
+    </MarketPeriodSelection>);
+    expect(html).toContain('<span>5m</span>');
+    expect(html).toContain('<output>false</output>');
+    expect(html).toContain(isError ? '重试周期能力' : '正在确认分钟周期');
+  });
+  it('港美分钟周期复用中文标签并以独立QueryKey及取消信号规划', async () => {
+    useQueryMock.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+      if (queryKey[1] === 'market-derived-minute-options') return { isSuccess: true,
+        data: { version: 'market-minute-options-v1', symbol: 'SPY.US', options: [{ timeframe: '5m', available: true }, { timeframe: '60m', available: false }] } };
+      return { isSuccess: true };
+    });
+    storage.set('thesis-ledger:market-period-preference', '5m');
+    const html = renderToStaticMarkup(<MarketPeriodSelection symbol="SPY.US" enabled>
+      {(period) => <><output>{period}</output><Controls /></>}
+    </MarketPeriodSelection>);
+    expect(html).toContain('<output>5m</output>');
+    expect(html).toContain('5 分钟');
+    expect(html).not.toContain('60 分钟');
+    const options = useQueryMock.mock.calls.find(([value]) => (value as { queryKey: readonly unknown[] }).queryKey[1] === 'market-derived-minute-options')![0] as {
+      queryKey: readonly unknown[]; queryFn: (context: { signal: AbortSignal }) => Promise<unknown>;
+    };
+    const signal = new AbortController().signal;
+    await options.queryFn({ signal });
+    expect(getMinuteOptions).toHaveBeenCalledWith('SPY.US', { barsLimit: 90, signal });
+    expect(options.queryKey).toEqual(['desktop', 'market-derived-minute-options', 'SPY.US', 90]);
   });
   it.each(['none', 'qfq', 'hfq'] as const)('能力查询与当前 %s 口径同键同请求', async (adjustment) => {
     render(true, adjustment);

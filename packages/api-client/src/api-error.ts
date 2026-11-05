@@ -1,5 +1,11 @@
 import type { ApiErrorResponse } from '@thesis-ledger/schemas';
 
+export class ThesisLedgerContractError extends Error {
+  constructor(public readonly path: string) {
+    super(`ThesisLedger API 响应契约不匹配: ${path}`);
+  }
+}
+
 export function retryAfterMilliseconds(value: string | null, now = Date.now()): number | null {
   if (!value?.trim()) return null;
   const seconds = Number(value);

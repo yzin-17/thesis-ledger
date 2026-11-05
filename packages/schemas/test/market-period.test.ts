@@ -117,10 +117,10 @@ describe('行情周期公共合同', () => {
       ).toBe(true);
     },
   );
-  it('展示枚举覆盖六种周期，派生枚举拒绝日线与分钟线', () => {
-    expect(marketTimeframeSchema.options).toEqual(['1m', '1d', '5d', '1w', '1mo', '1y']);
+  it('展示枚举覆盖十种周期，日线派生枚举保持独立', () => {
+    expect(marketTimeframeSchema.options).toEqual(['1m', '5m', '15m', '30m', '60m', '1d', '5d', '1w', '1mo', '1y']);
     expect(marketDerivedTimeframeSchema.safeParse('1d').success).toBe(false);
-    expect(marketTimeframeSchema.safeParse('5m').success).toBe(false);
+    expect(marketTimeframeSchema.safeParse('5m').success).toBe(true);
   });
   it('原生身份与来源路由仍仅接收 1m/1d，旧身份解析无新增字段', () => {
     const identity = { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'none' };

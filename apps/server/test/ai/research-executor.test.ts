@@ -136,6 +136,40 @@ const sdkFixture = () => {
 };
 
 describe('AI 研究执行器', () => {
+  it('损坏的显式模式拒绝执行，不降级为未限定组合读取', async () => {
+    const { runs, executions } = runRecorder({ scope: 'portfolio', mode: 'all' });
+    const prisma = prismaFixture(); const sdk = sdkFixture();
+    new AiResearchExecutor(runs as never, prisma as never, new AiProviderRegistry(), promptRegistry(), executions as never, sdk as never).dispatch(runId);
+    await vi.waitFor(() => expect(executions.failOwned).toHaveBeenCalledOnce());
+    expect(prisma.account.findMany).not.toHaveBeenCalled(); expect(sdk.execute).not.toHaveBeenCalled();
+  });
+  it.each(['actual', 'shadow'] as const)('账户研究只读 Tool 固定提交时的 %s 模式', async (mode) => {
+    const { runs, executions } = runRecorder({ scope: 'account', accountId: 'account-1', mode });
+    const prisma = prismaFixture();
+    const sdk = sdkFixture();
+    const executor = new AiResearchExecutor(runs as never, prisma as never, new AiProviderRegistry(), promptRegistry(), executions as never, sdk as never);
+    executor.dispatch(runId);
+    await vi.waitFor(() => expect(sdk.execute).toHaveBeenCalledOnce());
+    expect(prisma.account.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'account-1', active: true, mode } }));
+    expect(prisma.position.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { account: { mode }, accountId: 'account-1' } }));
+    expect(prisma.riskEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { mode, accountId: 'account-1' } }));
+    expect(prisma.journalEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { account: { mode }, accountId: 'account-1' } }));
+    expect(executions.failOwned).not.toHaveBeenCalled();
+  });
+
+  it('全组合模式固定，不受另一次研究的相反模式影响', async () => {
+    const prisma = prismaFixture(); const sdk = sdkFixture();
+    const first = runRecorder({ scope: 'portfolio', mode: 'shadow' });
+    const shadow = new AiResearchExecutor(first.runs as never, prisma as never, new AiProviderRegistry(), promptRegistry(), first.executions as never, sdk as never);
+    shadow.dispatch(runId); await vi.waitFor(() => expect(sdk.execute).toHaveBeenCalledTimes(1));
+    const second = runRecorder({ scope: 'portfolio', mode: 'actual' });
+    const actual = new AiResearchExecutor(second.runs as never, prisma as never, new AiProviderRegistry(), promptRegistry(), second.executions as never, sdk as never);
+    actual.dispatch(runId); await vi.waitFor(() => expect(sdk.execute).toHaveBeenCalledTimes(2));
+    expect(prisma.account.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: { active: true, mode: 'shadow' } }));
+    expect(prisma.account.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: { active: true, mode: 'actual' } }));
+    expect(prisma.journalEntry.findMany).not.toHaveBeenCalled();
+  });
+
   it('冻结来源只执行一笔审计读取，不回读当前组合，Prompt 使用提交版本', async () => {
     const { runs, executions } = runRecorder({ scope: 'account', accountId: 'account-1' });
     const original = await runs.claim();
@@ -153,8 +187,8 @@ describe('AI 研究执行器', () => {
     expect(sdk.execute.mock.calls[0]![0].messages[0]!.content).toBe('只解读冻结证据。');
     expect(JSON.stringify(sdk.execute.mock.calls[0]![0].messages)).toContain('2.000000000000000001');
     const schemaMessage = sdk.execute.mock.calls[0]![0].messages.find((message) =>
-      message.role === 'system' && message.content.includes('RESEARCH_OUTPUT_JSON_SCHEMA:'))!.content;
-    const outputSchema = JSON.parse(schemaMessage.split('RESEARCH_OUTPUT_JSON_SCHEMA:')[1]!);
+      message.role === 'system' && message.content.includes('OUTPUT_JSON_SCHEMA:'))!.content;
+    const outputSchema = JSON.parse(schemaMessage.split('OUTPUT_JSON_SCHEMA:')[1]!);
     expect(outputSchema.required).toEqual(expect.arrayContaining(['conclusion', 'evidence', 'risks', 'unknowns', 'disclaimer']));
     expect(outputSchema.properties.evidence.items.type).toBe('object');
     expect(runs.recordToolCall).toHaveBeenCalledTimes(1);

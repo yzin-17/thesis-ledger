@@ -5,12 +5,14 @@ interface MarketDataSectionTabsProps {
   providerPanel: ReactNode;
   policyPanel: ReactNode;
   catalogPanel: ReactNode;
+  monitorPanel?: ReactNode;
 }
 
 export function MarketDataSectionTabs({
   providerPanel,
   policyPanel,
   catalogPanel,
+  monitorPanel,
 }: MarketDataSectionTabsProps) {
   return (
     <Tabs defaultValue="routing" className="mt-6 gap-4">
@@ -28,11 +30,13 @@ export function MarketDataSectionTabs({
         <TabsTrigger value="catalog" className="shrink-0">
           标的目录
         </TabsTrigger>
+        <TabsTrigger value="monitor" className="shrink-0">规则监测</TabsTrigger>
       </TabsList>
 
       <TabsContent value="routing">{policyPanel}</TabsContent>
       <TabsContent value="providers">{providerPanel}</TabsContent>
       <TabsContent value="catalog">{catalogPanel}</TabsContent>
+      <TabsContent value="monitor">{monitorPanel}</TabsContent>
     </Tabs>
   );
 }

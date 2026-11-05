@@ -4,7 +4,7 @@
 
 ## 依据与写入边界
 
-依据主 [Spec §4](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)、主 [Task §12.9](../2026-09-25-multi-source-adjustment-aware-backtest.md) 执行包及 [共享合同证据](2026-09-28-cont-m26-identity-wire.md)。已读取 RTK、Codex、工作区/项目 AGENTS、`spec-driven-workflow` 实施指导与 `recommend`。Context Mode 未暴露，使用 RTK 与限定输出。当前 Server 实际依赖 `es-toolkit 1.51.0` 的运行时出口没有 hash/SHA/UTF/byte 候选，摘要计算和字节计数沿用 Node 原生 `createHash`、`Buffer.byteLength`，没有新增依赖或通用工具函数。
+依据主 [Spec §4](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)、主 [Task §12.9](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) 执行包及 [共享合同证据](2026-09-28-cont-m26-identity-wire.md)。已读取 RTK、Codex、工作区/项目 AGENTS、`spec-driven-workflow` 实施指导与 `recommend`。Context Mode 未暴露，使用 RTK 与限定输出。当前 Server 实际依赖 `es-toolkit 1.51.0` 的运行时出口没有 hash/SHA/UTF/byte 候选，摘要计算和字节计数沿用 Node 原生 `createHash`、`Buffer.byteLength`，没有新增依赖或通用工具函数。
 
 HEAD：`fe0e871e37a09964f7a113b82e7d09f6d4d95f7e`；保留大量脏 WIP。新增专属验证器、两份测试和共享 fixture 消费辅助；既有 selector 和 SnapshotEvents 只增加验证器 import/call。协调者在首轮格式失败后另行授权 selector 的唯一纯格式修复，主 Task 已记录；没有逻辑重构、撤回 WIP、暂存或提交。Schemas、dist、Store、既有 RQData/EastMoney/split 实现与测试均只读。
 

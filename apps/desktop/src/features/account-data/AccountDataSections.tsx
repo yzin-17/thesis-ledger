@@ -1,3 +1,4 @@
+import { TableContainer } from '@/components/ui/table';
 import type { LedgerEvent } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -22,9 +23,8 @@ import {
   eventTypeLabel,
   eventSubjectDetail,
   eventSymbol,
-  executionSideLabel,
+  executionDetailLabel,
   formatDate,
-  formatDecimal,
   isExecutionEvent,
   revisionBadgeVariant,
   revisionLabel,
@@ -38,7 +38,8 @@ import {
   type ExecutionEvent,
 } from './account-data.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
-import { RecurringFundInvestments } from './AccountDataRecurringFundInvestments.js';
+import { AccountDataEventActions } from './AccountDataEventActions.js';
+import { fundInvestmentOccurrenceId } from './account-data.fund-investment.display.js';
 import { LedgerContractFailure, ledgerContractRejected } from './account-data.ledger-contract.js';
 
 type QueryLike = {
@@ -64,6 +65,7 @@ export function TransactionSection({
   onAudit,
   onOpenImport,
   onOpenReconciliation,
+  onOpenFundInvestment,
   findSnapshotPosition,
   onEditSnapshot,
   onRemoveSnapshot,
@@ -80,6 +82,7 @@ export function TransactionSection({
   onCorrectTransfer: (event: CashTransferEvent) => void;
   onVoidTransfer: (event: CashTransferEvent) => void;
   onAudit: (event: LedgerEvent) => void;
+  onOpenFundInvestment?: ((occurrenceId: string | null) => void) | undefined;
   onOpenImport: () => void;
   onOpenReconciliation: () => void;
   findSnapshotPosition: (event: LedgerEvent) => Position | undefined;
@@ -96,42 +99,8 @@ export function TransactionSection({
   });
   const emptyTitle = filter === 'executions' ? '暂无成交记录' : '暂无其他账本事件';
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="account-data-transactions-title">
+    <section className="flex flex-col gap-4" aria-label="成交记录">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 id="account-data-transactions-title" className="m-0 text-xl font-semibold">
-            成交记录
-          </h2>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
-            这里显示当前有效版本；修正链保留在审计面板中，不会重复计数。
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button type="button" onClick={onCreate} disabled={account.type === 'cash'}>
-            录入成交
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button type="button" size="icon-sm" variant="ghost" aria-label="更多成交操作">
-                  <MoreHorizontalIcon />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end">
-              <DropdownMenuGroup>
-                <DropdownMenuItem disabled onClick={onOpenImport}>
-                  导入草稿（暂未开放）
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled onClick={onOpenReconciliation}>
-                  打开对账（暂未开放）
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
         <ToggleGroup
           value={[filter]}
           aria-label="账本事件筛选"
@@ -146,10 +115,39 @@ export function TransactionSection({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        {query.isFetching && query.data && <Badge variant="secondary">正在更新</Badge>}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button type="button" onClick={onCreate} disabled={account.type === 'cash'}>
+            录入成交
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button type="button" size="icon-sm" variant="ghost" aria-label="更多成交操作">
+                  <MoreHorizontalIcon />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                <DropdownMenuItem disabled={account.type === 'cash'} onClick={onOpenImport}>
+                  导入草稿
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={account.type === 'cash'} onClick={onOpenReconciliation}>
+                  打开对账
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+      {query.isFetching && query.data && (
+        <Badge variant="secondary" className="self-start">
+          正在更新
+        </Badge>
+      )}
       <TransactionResults
         query={query}
+        onOpenFundInvestment={onOpenFundInvestment}
         filter={filter}
         emptyTitle={emptyTitle}
         filteredEvents={filteredEvents}
@@ -167,16 +165,25 @@ export function TransactionSection({
         <Alert>
           <AlertTitle>显示的是上次成功读取的结果</AlertTitle>
           <AlertDescription>
-            本次刷新失败。你可以继续查看，但提交修正前应重新加载最新账本版本。
+            本次刷新失败。已成功提交的操作无需再次提交；提交修正前请重新读取最新账本版本。
           </AlertDescription>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            重新读取账本
+          </Button>
         </Alert>
       )}
-      <RecurringFundInvestments account={account} />
     </section>
   );
 }
 
 function TransactionResults({
+  onOpenFundInvestment,
   query,
   filter,
   emptyTitle,
@@ -204,12 +211,17 @@ function TransactionResults({
   onCorrectTransfer: (event: CashTransferEvent) => void;
   onVoidTransfer: (event: CashTransferEvent) => void;
   onAudit: (event: LedgerEvent) => void;
+  onOpenFundInvestment?: ((occurrenceId: string | null) => void) | undefined;
 }) {
   if (query.isError && ledgerContractRejected(query.error))
     return <LedgerContractFailure onRetry={query.refetch} />;
   if (query.isPending && !query.data) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="正在加载成交记录">
+      <div
+        className="flex flex-col gap-3 rounded-md border border-border p-3"
+        aria-busy="true"
+        aria-label="正在加载成交记录"
+      >
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-56 w-full" />
       </div>
@@ -229,10 +241,10 @@ function TransactionResults({
   if (filteredEvents.length === 0) {
     const emptyDescription =
       filter === 'executions'
-        ? '录入第一笔真实成交后，BUY/SELL 会在这里按当前有效版本展示。'
+        ? '录入或确认第一笔成交后，会在这里显示。'
         : '持仓快照、余额快照、公司行动、分红和现金流会在产生后显示。';
     return (
-      <Empty className="min-h-56 rounded-xl border bg-card p-8">
+      <Empty className="min-h-56 rounded-md border border-border bg-card p-8">
         <EmptyHeader>
           <EmptyTitle>{emptyTitle}</EmptyTitle>
           <EmptyDescription>{emptyDescription}</EmptyDescription>
@@ -241,9 +253,9 @@ function TransactionResults({
     );
   }
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card">
+    <TableContainer className="bg-card">
       <table className="w-full min-w-[900px] table-fixed text-left text-sm">
-        <caption className="sr-only">{emptyTitle}</caption>
+        <caption className="sr-only">账本事件</caption>
         <colgroup>
           <col className="w-[30%]" />
           <col className="w-[20%]" />
@@ -252,11 +264,13 @@ function TransactionResults({
           <col className="w-[10%]" />
           <col className="w-[15%]" />
         </colgroup>
-        <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
+        <thead className="border-b text-xs text-muted-foreground">
           <tr>
-            <th className="px-3 py-3 font-medium">事实</th>
+            <th className="px-3 py-3 font-medium">标的 / 成交内容</th>
             <th className="px-3 py-3 font-medium">发生时间</th>
-            <th className="px-3 py-3 font-medium">金额/数量</th>
+            <th className="px-3 py-3 font-medium text-right">
+              {filter === 'executions' ? '成交金额' : '金额 / 数量'}
+            </th>
             <th className="px-3 py-3 font-medium">来源</th>
             <th className="px-3 py-3 font-medium">状态</th>
             <StickyTableActionHeader className="w-auto min-w-0 px-3 py-3 font-medium">
@@ -269,6 +283,7 @@ function TransactionResults({
             <TransactionRow
               key={event.eventId}
               event={event}
+              onOpenFundInvestment={onOpenFundInvestment}
               findSnapshotPosition={findSnapshotPosition}
               onEditSnapshot={onEditSnapshot}
               onRemoveSnapshot={onRemoveSnapshot}
@@ -282,11 +297,12 @@ function TransactionResults({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableContainer>
   );
 }
 
 function TransactionRow({
+  onOpenFundInvestment,
   event,
   onCorrect,
   onVoid,
@@ -304,6 +320,7 @@ function TransactionRow({
   onCorrectTransfer: (event: CashTransferEvent) => void;
   onVoidTransfer: (event: CashTransferEvent) => void;
   onAudit: (event: LedgerEvent) => void;
+  onOpenFundInvestment?: ((occurrenceId: string | null) => void) | undefined;
   findSnapshotPosition: (event: LedgerEvent) => Position | undefined;
   onEditSnapshot: (event: LedgerEvent) => void;
   onRemoveSnapshot: (event: LedgerEvent) => void;
@@ -316,10 +333,23 @@ function TransactionRow({
   const instrumentName = symbol ? resolveInstrumentName(symbol) : undefined;
   const title = instrumentName ?? symbol ?? eventTypeLabel(event);
   const baseDetail = execution
-    ? `${executionSideLabel(event)} · ${formatDecimal(event.payload.quantity)} · ${formatDecimal(event.payload.price)} ${event.payload.currency}`
+    ? executionDetailLabel(event)
     : (eventSubjectDetail(event) ?? sourceChannelLabel(event.source.channel));
   const detail = instrumentName && symbol ? `${symbol} · ${baseDetail}` : baseDetail;
   const amount = transactionAmount(event, execution ? event : null);
+  let primary: { label: string; run: () => void } | undefined;
+  let destructive: { label: string; run: () => void } | undefined;
+  if (execution) {
+    primary = { label: '更正', run: () => onCorrect(event) };
+    destructive = { label: '作废', run: () => onVoid(event) };
+  } else if (snapshotPosition) {
+    primary = { label: '修改', run: () => onEditSnapshot(event) };
+    destructive = { label: '移除快照', run: () => onRemoveSnapshot(event) };
+  } else if (cashTransfer) {
+    primary = { label: '更正划转', run: () => onCorrectTransfer(event) };
+    destructive = { label: '作废划转', run: () => onVoidTransfer(event) };
+  }
+
   return (
     <tr data-ledger-event-id={event.eventId}>
       <td className="min-w-0 max-w-0 whitespace-normal px-3 py-3 align-top">
@@ -330,81 +360,35 @@ function TransactionRow({
         {formatDate(event.occurredAt)}
         <span className="mt-1 block text-xs">记录于 {formatDate(event.recordedAt)}</span>
       </td>
-      <td className="whitespace-nowrap px-3 py-3 align-top font-mono text-xs text-muted-foreground">
+      <td className="whitespace-nowrap px-3 py-3 text-right align-top font-mono text-xs text-muted-foreground">
         {amount}
       </td>
       <td className="truncate px-3 py-3 align-top">
         <span className="block text-xs text-muted-foreground">
           {sourceChannelLabel(event.source.channel)}
         </span>
-        {event.source.sourceRowId && (
-          <span className="mt-1 block truncate text-xs text-muted-foreground">
-            来源行 {event.source.sourceRowId}
-          </span>
+        {event.source.channel === 'recurring-fund-investment' && onOpenFundInvestment && (
+          <Button
+            type="button"
+            size="xs"
+            variant="link"
+            className="h-auto p-0"
+            onClick={() => onOpenFundInvestment(fundInvestmentOccurrenceId(event.source))}
+          >
+            查看定投计划
+          </Button>
         )}
       </td>
       <td className="whitespace-nowrap px-3 py-3 align-top">
         <Badge variant={revisionBadgeVariant(event)}>{revisionLabel(event)}</Badge>
       </td>
       <StickyTableActionCell className="w-auto min-w-0 px-3 py-3 align-top">
-        <div className="mx-auto flex w-fit flex-col items-center gap-1">
-          <div className="flex gap-1">
-            {execution && (
-              <>
-                <Button type="button" size="sm" variant="outline" onClick={() => onCorrect(event)}>
-                  更正
-                </Button>
-                <Button type="button" size="sm" variant="destructive" onClick={() => onVoid(event)}>
-                  作废
-                </Button>
-              </>
-            )}
-            {snapshotPosition && (
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onEditSnapshot(event)}
-                >
-                  修改
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => onRemoveSnapshot(event)}
-                >
-                  移除
-                </Button>
-              </>
-            )}
-            {cashTransfer && (
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button type="button" size="icon-sm" variant="ghost" aria-label="管理现金划转">
-                      <MoreHorizontalIcon />
-                    </Button>
-                  }
-                />
-                <DropdownMenuContent align="end">
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => onCorrectTransfer(event)}>
-                      更正划转
-                    </DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive" onClick={() => onVoidTransfer(event)}>
-                      作废划转
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-          <Button type="button" size="sm" variant="ghost" onClick={() => onAudit(event)}>
-            查看修正链
-          </Button>
-        </div>
+        <AccountDataEventActions
+          subject={title}
+          primary={primary}
+          destructive={destructive}
+          onHistory={() => onAudit(event)}
+        />
       </StickyTableActionCell>
     </tr>
   );
@@ -417,6 +401,7 @@ export function PositionCalibrationSection({
   cashValue,
   valuationQuery,
   onDirtyChange,
+  onBusyChange,
   onSaved,
   onOpenImport,
   onOpenReconciliation,
@@ -432,7 +417,8 @@ export function PositionCalibrationSection({
   cashValue: number;
   valuationQuery: ReturnType<typeof useAccountValuationQuery>;
   onDirtyChange: (dirty: boolean) => void;
-  onSaved: () => void;
+  onBusyChange: (busy: boolean) => void;
+  onSaved: () => void | Promise<unknown>;
   onOpenImport: () => void;
   onOpenReconciliation: () => void;
   resolveInstrumentName: (symbol: string) => string | undefined;
@@ -466,26 +452,46 @@ export function PositionCalibrationSection({
     );
   }
   return (
-    <PortfolioManagement
-      key={account.id}
-      accounts={accounts}
-      positions={positions}
-      cashValue={cashValue}
-      step="position"
-      defaultAccountId={account.id}
-      entryAccountLocked
-      showCash={false}
-      calibrationMode
-      embedded
-      entrySheetOpen={entrySheetOpen}
-      onEntrySheetOpenChange={onEntrySheetOpenChange}
-      editingPosition={editingPosition}
-      onEditingPositionChange={onEditingPositionChange}
-      resolveInstrumentName={resolveInstrumentName}
-      onOpenImport={onOpenImport}
-      onOpenReconciliation={onOpenReconciliation}
-      onDirtyChange={onDirtyChange}
-      onSaved={onSaved}
-    />
+    <>
+      {valuationQuery.isError && valuationQuery.data && (
+        <Alert>
+          <AlertTitle>持仓快照暂未更新</AlertTitle>
+          <AlertDescription>
+            显示的是上次成功读取的结果；已成功保存的快照无需再次提交。
+          </AlertDescription>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={valuationQuery.isFetching}
+            onClick={() => void valuationQuery.refetch()}
+          >
+            重新读取持仓快照
+          </Button>
+        </Alert>
+      )}
+      <PortfolioManagement
+        key={account.id}
+        accounts={accounts}
+        positions={positions}
+        cashValue={cashValue}
+        step="position"
+        defaultAccountId={account.id}
+        entryAccountLocked
+        showCash={false}
+        calibrationMode
+        embedded
+        entrySheetOpen={entrySheetOpen}
+        onEntrySheetOpenChange={onEntrySheetOpenChange}
+        editingPosition={editingPosition}
+        onEditingPositionChange={onEditingPositionChange}
+        resolveInstrumentName={resolveInstrumentName}
+        onOpenImport={onOpenImport}
+        onOpenReconciliation={onOpenReconciliation}
+        onDirtyChange={onDirtyChange}
+        onBusyChange={onBusyChange}
+        onSaved={onSaved}
+      />
+    </>
   );
 }

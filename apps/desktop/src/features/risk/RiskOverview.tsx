@@ -28,25 +28,33 @@ export function RiskOverview({
   portfolioValueAt,
   portfolioState,
   loadState,
+  rulesState,
+  notificationsState,
   rules,
   events,
   deliveries,
   lastUpdatedAt,
   scanning,
+  scanDisabled = false,
   onScan,
   onSelectTab,
+  onRetryEvents,
 }: {
   mode: PortfolioMode;
   portfolioValueAt: string | null;
   portfolioState: LoadState;
   loadState: LoadState;
+  rulesState: LoadState;
+  notificationsState: LoadState;
   rules: RiskRuleRecord[];
   events: RiskEventRecord[];
   deliveries: NotificationRecord[];
   lastUpdatedAt: string | null;
   scanning: boolean;
+  scanDisabled?: boolean;
   onScan: () => void;
   onSelectTab: (tab: SummaryTab, filter?: string) => void;
+  onRetryEvents?: (() => void) | undefined;
 }) {
   const enabledRules = rules.filter((rule) => rule.enabled).length;
   const criticalEvents = events.filter((event) => event.severity === 'critical').length;
@@ -71,7 +79,7 @@ export function RiskOverview({
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button
             type="button"
-            disabled={!scanReady || scanning}
+            disabled={!scanReady || scanning || scanDisabled}
             onClick={onScan}
             aria-busy={scanning}
           >
@@ -96,16 +104,18 @@ export function RiskOverview({
       </section>
 
       <section className="metrics" aria-label="风险关键指标">
-        <SummaryMetric label="启用规则" value={enabledRules} onClick={() => onSelectTab('rules')} />
+        <SummaryMetric label="启用规则" value={enabledRules} state={rulesState} onClick={() => onSelectTab('rules')} />
         <SummaryMetric
           label="严重事件"
           value={criticalEvents}
+          state={loadState}
           {...(criticalEvents > 0 ? { tone: 'negative' as const } : {})}
           onClick={() => onSelectTab('events', 'critical')}
         />
         <SummaryMetric
           label="通知失败"
           value={failedNotifications}
+          state={notificationsState}
           {...(failedNotifications > 0 ? { tone: 'negative' as const } : {})}
           onClick={() => onSelectTab('notifications', 'failed')}
         />
@@ -113,6 +123,7 @@ export function RiskOverview({
 
       <RiskEventTable
         loadState={loadState}
+        onRetry={onRetryEvents}
         events={events}
         limit={4}
         title="最近风险事件"
@@ -136,18 +147,33 @@ export function RiskOverview({
 function SummaryMetric({
   label,
   value,
+  state,
   tone,
   onClick,
 }: {
   label: string;
   value: number;
+  state: LoadState;
   tone?: 'negative';
   onClick: () => void;
 }) {
+  let valueLabel: number | string = value;
+  let statusLabel: string | null = null;
+  const unavailable = state === 'loading' || state === 'error';
+  if (state === 'loading') {
+    valueLabel = '—';
+    statusLabel = '加载中';
+  } else if (state === 'error') {
+    valueLabel = '—';
+    statusLabel = '读取失败';
+  } else if (state === 'stale') {
+    statusLabel = '旧数据，刷新失败';
+  }
   return (
-    <Button type="button" variant="metric" tone={tone} onClick={onClick}>
+    <Button type="button" variant="metric" tone={tone} onClick={onClick} disabled={unavailable}>
       <p>{label}</p>
-      <strong>{value}</strong>
+      <strong>{valueLabel}</strong>
+      {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
     </Button>
   );
 }

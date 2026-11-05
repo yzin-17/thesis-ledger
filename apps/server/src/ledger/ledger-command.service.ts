@@ -17,16 +17,14 @@ import {
   type VoidExecutionCommand,
 } from '@thesis-ledger/schemas';
 import { isEqual } from 'es-toolkit';
-import { assertAccountCanHoldAsset } from '../portfolio/accounts.service.js';
 import {
   LedgerV2Repository,
   toLedgerEventV2,
   type AccountLedgerWriteContext,
 } from './ledger-v2.repository.js';
 import { ledgerEventSymbol } from './ledger-event-v2.js';
-import { inferAssetType } from './asset-type.js';
-import { assertSymbolMatchesAssetType, assertWritableAccount } from './ledger.service.js';
 import { rebuildLedgerProjection } from './ledger-projection.js';
+import { assertExecutionWriteAllowed } from './execution-write-admission.js';
 
 type ExecutionCorrectionCommand =
   ReplaceExecutionCommand | RestoreExecutionCommand | VoidExecutionCommand;
@@ -168,37 +166,6 @@ const createExecutionRevision = (input: ExecutionRevisionInput): ExecutionPayloa
 export class LedgerCommandService {
   constructor(private readonly repository: LedgerV2Repository) {}
 
-  private async assertExecutionWriteAllowed(
-    context: AccountLedgerWriteContext,
-    event: ExecutionPayloadEvent,
-  ) {
-    const account = await context.transaction.account.findUnique({
-      where: { id: context.accountId },
-    });
-    if (!account) throw ledgerConflict('LEDGER_VALIDATION_FAILED', '账户不存在', context.accountId);
-    try {
-      assertWritableAccount(account, inferAssetType(event.payload.symbol));
-    } catch (error) {
-      throw ledgerConflict(
-        'LEDGER_VALIDATION_FAILED',
-        error instanceof Error ? error.message : '账户不可写',
-        context.accountId,
-      );
-    }
-    const asset = await context.transaction.asset.findUnique({
-      where: { symbol: event.payload.symbol },
-    });
-    if (!asset || asset.identityStatus !== 'confirmed')
-      throw ledgerConflict(
-        'LEDGER_VALIDATION_FAILED',
-        '成交资产必须先完成身份确认',
-        context.accountId,
-      );
-    const assetType = inferAssetType(event.payload.symbol, asset.assetType);
-    assertSymbolMatchesAssetType(event.payload.symbol, assetType);
-    assertAccountCanHoldAsset(account, assetType);
-  }
-
   async createExecution(rawCommand: unknown): Promise<LedgerCommandResponse> {
     return (await this.createExecutionWithEffect(rawCommand)).response;
   }
@@ -223,7 +190,7 @@ export class LedgerCommandService {
           },
           advanceRevision: false,
         };
-      await this.assertExecutionWriteAllowed(context, desired);
+      await assertExecutionWriteAllowed(context, desired);
 
       const event = await this.repository.appendRevision(context, desired);
       const effectResult = effect ? await effect(context.transaction, event) : undefined;
@@ -296,7 +263,7 @@ export class LedgerCommandService {
             advanceAccountIds: [],
           };
         }
-        await this.assertExecutionWriteAllowed(targetContext, targetCreate);
+        await assertExecutionWriteAllowed(targetContext, targetCreate);
 
         await this.assertChainTip(sourceContext, target.eventId);
         assertExpectedRevision(sourceContext, command.expectedSourceLedgerRevision);
@@ -359,8 +326,7 @@ export class LedgerCommandService {
             },
             advanceRevision: false,
           };
-        if (desired.revisionAction !== 'VOID')
-          await this.assertExecutionWriteAllowed(context, desired);
+        if (desired.revisionAction !== 'VOID') await assertExecutionWriteAllowed(context, desired);
 
         await this.assertChainTip(context, target.eventId);
         if (action === 'RESTORE' && target.revisionAction !== 'VOID')

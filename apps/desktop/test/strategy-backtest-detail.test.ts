@@ -133,12 +133,16 @@ describe('回测独立详情模型', () => {
   });
 
   it('分组接口支持按精确任务 ID 定位来源', async () => {
-    const request = vi.fn().mockResolvedValue({ items: [] });
+    const request = vi.fn().mockResolvedValue({
+      items: [],
+      totalCount: 0,
+      pageInfo: { hasNextPage: false, nextCursor: null },
+    });
     const client = { request } as unknown as DesktopRequestClient;
     await fetchStrategyBacktestGroups({ limit: 1, jobId: 'job/id' }, client);
     expect(request).toHaveBeenCalledWith(
       '/strategy-optimization/backtests/groups?limit=1&jobId=job%2Fid',
-      { cache: 'no-store' },
+      { cache: 'no-store', signal: null },
     );
   });
 

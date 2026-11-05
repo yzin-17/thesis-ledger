@@ -92,7 +92,7 @@ export class StrategyOptimizationService implements OnModuleInit {
   async create(input: unknown) {
     this.assertEnabled();
     const parsed = optimizationExperimentCreateSchema.parse(input);
-    const modelConfig = buildOptimizationModelConfig(parsed.models, this.providers);
+    const modelConfig = buildOptimizationModelConfig(parsed.models, this.providers, parsed.sourceMode === 'discovery' ? 'strategy_discovery' : 'parameter_optimization');
     assertOptimizationModelConfigCost(modelConfig);
     const previous = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
       SELECT * FROM "OptimizationExperiment" WHERE "idempotencyKey"=${parsed.idempotencyKey} LIMIT 1

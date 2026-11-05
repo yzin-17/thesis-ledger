@@ -1,3 +1,4 @@
+import { displayPrisma } from '../instrument-display.fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import { RiskService } from '../../src/risk/risk.service.js';
 
@@ -42,6 +43,55 @@ describe('风险事件与通知解耦', () => {
         ruleVersion: 2,
         action: 'disable',
         actor: 'local-user',
+      }),
+    });
+  });
+  it.each([
+    [false, false, 'update'],
+    [true, true, 'update'],
+    [false, true, 'enable'],
+    [true, false, 'disable'],
+  ] as const)('编辑规则从启用 %s 到 %s 时记录 %s', async (enabled, nextEnabled, action) => {
+    const stored = {
+      id: 'rule-audit',
+      version: 1,
+      kind: 'drawdown',
+      scope: 'portfolio',
+      severity: 'warning',
+      threshold: 0.317,
+      enabled,
+      symbol: null,
+      accountId: null,
+      condition: null,
+      parameters: null,
+      config: null,
+      effectiveAt: new Date('2026-10-17T00:00:00Z'),
+    };
+    const transaction = {
+      riskRule: {
+        findUniqueOrThrow: vi.fn(async () => stored),
+        update: vi.fn(async () => ({
+          ...stored,
+          version: 2,
+          enabled: nextEnabled,
+          threshold: 0.318,
+        })),
+      },
+      riskRuleAudit: { create: vi.fn(async () => ({})) },
+    };
+    const prisma = {
+      $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
+    };
+    await new RiskService(prisma as never, {} as never).updateRule(stored.id, {
+      enabled: nextEnabled,
+      threshold: 0.318,
+    });
+    expect(transaction.riskRuleAudit.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action,
+        ruleVersion: 2,
+        before: expect.objectContaining({ enabled, threshold: 0.317 }),
+        after: expect.objectContaining({ enabled: nextEnabled, threshold: 0.318 }),
       }),
     });
   });
@@ -246,6 +296,7 @@ describe('风险事件与通知解耦', () => {
     };
     const riskEvent = { create: vi.fn(async () => ({ id: 'event-context' })) };
     const prisma = {
+      ...displayPrisma({ '600519.SH': '贵州茅台' }),
       riskRule: { findMany: vi.fn(async () => [rule]) },
       riskEvent,
       asset: {
@@ -364,7 +415,7 @@ describe('风险事件与通知解耦', () => {
     ).resolves.toMatchObject({ results: [{ ruleId: rule.id, eventId: 'label-fallback-event' }] });
   });
 
-  it('规则列表附带 Asset 标的名', async () => {
+  it('规则列表附带目录标的名', async () => {
     const rule = {
       id: 'rule-name',
       version: 1,
@@ -378,14 +429,16 @@ describe('风险事件与通知解耦', () => {
       archivedAt: null,
     };
     const prisma = {
+      ...displayPrisma({ '600519.SH': '贵州茅台' }),
       riskRule: { findMany: vi.fn(async () => [rule]) },
       asset: { findMany: vi.fn(async () => [{ symbol: '600519.SH', name: '贵州茅台' }]) },
     };
     const rules = await new RiskService(prisma as never, {} as never).listRules();
-    expect(rules).toEqual([expect.objectContaining({ symbol: '600519.SH', assetName: '贵州茅台' })]);
-    expect(prisma.asset.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { symbol: { in: ['600519.SH'] } } }),
-    );
+    expect(rules).toEqual([
+      expect.objectContaining({ symbol: '600519.SH', assetName: '贵州茅台' }),
+    ]);
+    expect(prisma.asset.findMany).not.toHaveBeenCalled();
+    expect(prisma.instrument.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('归档写入 archivedAt、记录 archive 审计，并从默认列表排除', async () => {

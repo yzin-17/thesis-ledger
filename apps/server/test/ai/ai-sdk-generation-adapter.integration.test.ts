@@ -1,3 +1,4 @@
+import { buildGenerationSchemaPrompt } from '../../src/ai/ai-generation-schema-prompt.js';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
@@ -64,7 +65,7 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     apiKey: 'local-secret',
     model: 'fixture-model',
     messages: [
-      { role: 'system', content: 'Return only the requested JSON.' },
+      { role: 'system', content: buildGenerationSchemaPrompt(outputSchema) },
       { role: 'user', content: 'Return JSON.' },
     ],
     contract: aiGenerationContracts.research.ref,
@@ -117,7 +118,7 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     expect(lastBody).toMatchObject({ model: 'fixture-model' });
     expect(lastBody).toMatchObject({
       messages: [
-        { role: 'system', content: 'Return only the requested JSON.' },
+        { role: 'system', content: buildGenerationSchemaPrompt(outputSchema) },
         { role: 'user', content: 'Return JSON.' },
       ],
     });

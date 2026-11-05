@@ -1,6 +1,6 @@
 # 11 — 执行发布、回滚和最终追踪 Review
 
-> 承接归档（2026-10-15）：本文的未通过验收已由[当前任务](../../tasks/2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#native-parent-review)逐条承接，状态为“已被承接、验收仍开放”，不记为 Completed。原实施、勾选、失败与证据保留；下文“当前”仅指原记录日期，当前执行以承接任务为准。
+> 补验完成（2026-10-16）：原 AC-09/10/11 仅因原生缺口开放的范围，已由[两端完成记录](2026-08-18-market-data-provider-v1-2-closure-09-mobile-native-acceptance.md#native-parent-review)在 10-15 补齐。下文表格、结论、勾选与失败保留原时点证据；历史发布/回滚不重跑，不据此关闭其他现行 Task 的部署门禁。
 
 
 > 状态对账（2026-10-03）：已实现待验收：本文件只消费 closure-09 的原生证据，不另要求重跑已完成的发布/回滚。旧 Data/Control 入口已由 Canonical 替代；剩余原生义务未被浏览器或包级测试覆盖。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。

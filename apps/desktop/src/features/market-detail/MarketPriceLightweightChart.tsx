@@ -1,3 +1,6 @@
+import { initialChartTimeRange } from './market-chart-range.js';
+import { toChartTime, chartTimeData, chartInteractionKey, marketChartTimeOptions } from './market-chart-time.js';
+export { rangeMonths, rangeCoverage, visibleBarsForRange } from './market-chart-range.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MarketChartBar, MarketChartIndicator } from './market-chart-types.js';
 import {
@@ -24,6 +27,8 @@ import {
 } from './market-chart-history-gesture.js';
 import { hasLeftHistoryBlank, hasReachedLatestBoundary } from './market-chart-viewport.js';
 import { marketChartPaneLabels } from './market-chart-pane-labels.js';
+import { attachTradingOverlays } from './market-trading-overlay-resources.js';
+import type { TradingOverlayModel } from './market-trading-overlay-model.js';
 
 export const auxiliaryLatestValueOptions = {
   lastValueVisible: false,
@@ -35,40 +40,6 @@ export const marketChartLayoutOptions = {
   textColor: '#64748b',
   attributionLogo: false,
 } as const;
-
-export const rangeMonths = (range: number): number | null => {
-  if (range === 30) return 1;
-  if (range === 90) return 3;
-  if (range === 180) return 6;
-  if (range === 365) return 12;
-  return null;
-};
-
-export const visibleBarsForRange = (bars: MarketChartBar[], range: number) => {
-  const latest = bars.at(-1);
-  if (!latest) return [];
-  const months = rangeMonths(range);
-  if (months === null) return bars;
-  const cutoffDate = new Date(latest.timestamp);
-  cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - months);
-  const cutoff = cutoffDate.getTime();
-  return bars.filter((bar) => Date.parse(bar.timestamp) >= cutoff);
-};
-
-export const rangeCoverage = (bars: MarketChartBar[], range: number) => {
-  const months = rangeMonths(range);
-  const earliest = bars[0];
-  const latest = bars.at(-1);
-  if (months === null || !earliest || !latest) return null;
-  const cutoffDate = new Date(latest.timestamp);
-  cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - months);
-  return {
-    available: Date.parse(earliest.timestamp) <= cutoffDate.getTime(),
-    earliest: earliest.timestamp.slice(0, 10),
-    latest: latest.timestamp.slice(0, 10),
-    months,
-  };
-};
 
 export function LightweightMarketChart({
   bars,
@@ -97,6 +68,7 @@ export function LightweightMarketChart({
   onHover,
   onClick,
   lockedTimestamp,
+  tradingOverlays,
 }: {
   bars: MarketChartBar[];
   indicators: MarketChartIndicator[];
@@ -124,6 +96,7 @@ export function LightweightMarketChart({
   onHover: (timestamp: string | null) => void;
   onClick: (timestamp: string | null) => void;
   lockedTimestamp?: string | null;
+  tradingOverlays?: TradingOverlayModel | undefined;
 }) {
   type ChartApi = ReturnType<typeof createChart>;
   type TimeScaleApi = ReturnType<ChartApi['timeScale']>;
@@ -251,18 +224,19 @@ export function LightweightMarketChart({
     });
     const crosshairHandler = (param: { time?: unknown }) => {
       if (lockedTimestampRef.current) return;
-      onHoverRef.current(typeof param.time === 'string' ? param.time : null);
+      onHoverRef.current(chartInteractionKey(param.time));
     };
     const clickHandler = (param: { time?: unknown }) =>
-      onClickRef.current(typeof param.time === 'string' ? param.time : null);
+      onClickRef.current(chartInteractionKey(param.time));
     chart.subscribeCrosshairMove(crosshairHandler);
     chart.subscribeClick(clickHandler);
     const visibleRangeHandler = () => {
       const range = chart.timeScale().getVisibleRange();
-      if (range && typeof range.from === 'string' && typeof range.to === 'string') {
+      const from = chartInteractionKey(range?.from), to = chartInteractionKey(range?.to);
+      if (range && from && to) {
         if (firstLayoutPendingRef.current) return;
         previousVisibleRangeRef.current = range;
-        onVisibleRangeChangeRef.current?.({ from: range.from, to: range.to });
+        onVisibleRangeChangeRef.current?.({ from, to });
       }
     };
     const visibleLogicalRangeHandler = (range: { from: number; to: number } | null) =>
@@ -347,7 +321,8 @@ export function LightweightMarketChart({
       usedSeries.add(key);
       return series;
     };
-    const setData = (series: DataSeries, data: unknown[]) => series.setData(data as never[]);
+    const setData = (series: DataSeries, data: unknown[]) => series.setData(chartTimeData(data) as never[]);
+    chart.applyOptions(marketChartTimeOptions(chartPoints[0]?.bar));
 
     const candles = addSeries('candles', CandlestickSeries, {
       upColor: positiveColor,
@@ -591,23 +566,10 @@ export function LightweightMarketChart({
     const latestDate = chartPoints.at(-1)?.date;
     if (!latestDate) return;
     if (shouldReset || shouldChangeRange || !previous) {
-      const cutoffDate = new Date(`${latestDate}T00:00:00Z`);
-      const months = rangeMonths(visibleRange);
-      if (months === null) {
-        const firstDate = chartPoints[0]?.date;
-        if (firstDate) {
-          chart.timeScale().setVisibleRange({ from: firstDate, to: latestDate });
-          requestedInitialRangeRef.current = { from: firstDate, to: latestDate };
-        }
-      } else {
-        cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - months);
-        chart
-          .timeScale()
-          .setVisibleRange({ from: cutoffDate.toISOString().slice(0, 10), to: latestDate });
-        requestedInitialRangeRef.current = {
-          from: cutoffDate.toISOString().slice(0, 10),
-          to: latestDate,
-        };
+      const range = initialChartTimeRange(chartPoints, visibleRange);
+      if (range) {
+        chart.timeScale().setVisibleRange(range);
+        requestedInitialRangeRef.current = range;
       }
       if (previous) firstLayoutPendingRef.current = false;
     } else if (shouldFocusLatest || isLatestBoundaryReached) {
@@ -680,8 +642,17 @@ export function LightweightMarketChart({
     const point = chartPoints.find((item) => item.date === lockedTimestamp);
     const bar = point?.bar;
     const series = seriesRef.current.get(chartMode === 'candles' ? 'candles' : 'close');
-    if (point && bar && series) chart.setCrosshairPosition(bar.close, point.date, series);
+    if (point && bar && series) chart.setCrosshairPosition(bar.close, toChartTime(point.date), series);
   }, [chartMode, chartPoints, lockedTimestamp]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = seriesRef.current.get(chartMode === 'candles' ? 'candles' : 'close');
+    if (!chartReady || !chart || !series || !tradingOverlays ||
+      (!tradingOverlays.markers.length && !tradingOverlays.lines.length && !tradingOverlays.measurement)) return;
+    const detach = attachTradingOverlays(chart, series, tradingOverlays);
+    return () => { if (chartRef.current === chart) detach(); };
+  }, [chartReady, chartMode, chartPoints, tradingOverlays]);
 
   return (
     <div className="relative">

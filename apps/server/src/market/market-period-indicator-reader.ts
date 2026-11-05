@@ -14,11 +14,12 @@ import {
   type MarketIndicatorRequest,
 } from './market-indicator-window.js';
 import type { buildMarketPeriodView } from './market-period-view.js';
+import type { MinuteView } from './market-minute-view.js';
 import { compareDecisionClockV3 } from './market-pit-decision-window-calendar-v3.js';
 import { ZodError } from 'zod';
 import { periodContentFingerprint } from './market-period-source.js';
 
-type View = ReturnType<typeof buildMarketPeriodView>;
+type View = ReturnType<typeof buildMarketPeriodView> | MinuteView;
 type Payload = ReturnType<typeof marketPeriodIndicatorRequestSchema.parse>;
 
 function validatePeriodIndicatorResult(raw: unknown, input: Payload) {

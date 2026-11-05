@@ -2,7 +2,7 @@
 
 ## 状态
 
-已接受。
+已接受。2026-10-16 对账：共享读模型、只读能力权威与分段交互继续有效；初始 V1 路径及兼容发布假设已由 [Canonical V3](../architecture/canonical-runtime.md)与[现行详情规格](../specs/2026-08-21-market-detail-read-model.md)替代。
 
 ## 背景
 
@@ -10,9 +10,9 @@ Desktop 当前在持仓详情组件中直接组合多个市场接口，并在客
 
 ## 决策
 
-由 ThesisLedger Server 提供客户端无关的 `GET /api/v1/market/:symbol/detail` 读模型。Server 根据已确认资产类型、Instrument Catalog 和 Effective Provider Policy 计算能力，按 section 返回 `ready`、`stale`、`empty`、`unsupported` 或 `unavailable` 状态；客户端只负责请求、展示和重试，不复制 Provider 路由规则。
+由 ThesisLedger Server 提供客户端无关的 `GET /api/market/:symbol/detail` 读模型。Server 根据已确认资产类型、Instrument Catalog 和 Effective Provider Policy 计算能力，按 section 返回 `ready`、`stale`、`empty`、`unsupported` 或 `unavailable` 状态；客户端只负责请求、展示和重试，不复制 Provider 路由规则。
 
-Market Detail 与 Position 分离：Position 仍由 Portfolio/Position 数据提供数量和成本，Market Detail 只提供市场数据。股票、ETF 和场外基金使用各自正确的能力矩阵；不支持能力不触发 Provider 请求。Indicator 继续通过 DSA Contract V1 从统一 `DAILY_BAR` 派生，本阶段不新增 DSA 批量详情接口、不迁移指标计算，也不通过隐式 fallback 绕过现有 Contract。
+Market Detail 与 Position 分离：Position 仍由 Portfolio/Position 数据提供数量和成本，Market Detail 只提供市场数据。股票、ETF 和场外基金使用各自正确的能力矩阵；不支持能力不触发 Provider 请求。当前经由 V3 Market Reader 消费来源；指标与同一受核验价格序列一致，不新增 DSA 批量详情接口，也不通过隐式 fallback 绕过现行合同。
 
 Desktop 通过共享读模型消费详情，并使用 in-flight 去重、请求取消、分段部分成功和局部重试。Mobile 本阶段不新增 UI，仅保持共享 schema/API client 和现有只读边界兼容。
 
@@ -20,7 +20,7 @@ Desktop 通过共享读模型消费详情，并使用 in-flight 去重、请求�
 
 - 浏览器从多个底层请求收敛为一个客户端详情入口，且无效能力不会被请求。
 - 未来 Mobile、AI 或策略系统可以复用同一份客户端无关的 Market Detail 语义。
-- 旧 Data Contract V1 路径保持兼容，能够增量发布和回滚。
+- 当前 Server 与客户端按 V3 成套部署与回滚；不再要求保留旧 V1 入口。
 - Server 需要维护能力解析、section 状态和聚合错误映射；详情接口的内部 DSA 调用数不在本阶段承诺完全减少。
 - `unsupported`、`empty` 和 `unavailable` 成为需要长期保持稳定的用户可见语义。
 

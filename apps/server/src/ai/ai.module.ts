@@ -1,3 +1,4 @@
+import { MarketModule } from '../market/market.module.js';
 import { Module } from '@nestjs/common';
 import { AiProviderValidationJournal } from './ai-provider-validation-journal.js';
 import { AiProviderSaveService } from './ai-provider-save.service.js';
@@ -14,31 +15,41 @@ import { AiSdkGenerationAdapter } from './ai-sdk-generation.adapter.js';
 import { AiResearchSdkExecution } from './ai-research-sdk-execution.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { PromptVersionRegistry } from './prompt-registry.js';
-import { createConfiguredAiProviders } from './provider-adapters.js';
-import { loadConfig } from '../platform/config.js';
 import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
+import { researchPromptsV2 } from './ai-research-prompts-v2.js';
+import { AiResearchReportsQuery } from './ai-research-reports.query.js';
+import { PrismaService } from '../platform/prisma.service.js';
+import { AiTraceCaptureService } from './trace/ai-trace-capture.service.js';
+import { RedisService } from '../platform/redis.service.js';
+import { AiAdaptiveExecution } from './adaptive/ai-adaptive-execution.js';
+import { RedisAdaptiveObservationStore } from './adaptive/ai-adaptive-history.store.js';
 
 @Module({
-  imports: [ProviderModule],
+  imports: [ProviderModule, MarketModule],
   controllers: [AiController, AiProviderController, AiSettingsController],
   providers: [
+    AiResearchReportsQuery,
     AiRunService,
     AiExecutionStateStore,
     AiInvocationStore,
     AiSdkGenerationAdapter,
+    {
+      provide: AiAdaptiveExecution,
+      inject: [RedisService],
+      useFactory: (redis: RedisService) =>
+        new AiAdaptiveExecution(new RedisAdaptiveObservationStore(redis.client)),
+    },
     AiResearchSdkExecution,
     AiProviderService,
     AiProviderSaveService,
     AiProviderValidationJournal,
     AiRoutingSettingsService,
+    AiProviderRegistry,
     {
-      provide: AiProviderRegistry,
-      useFactory: () => {
-        const registry = new AiProviderRegistry();
-        for (const provider of createConfiguredAiProviders(loadConfig()))
-          registry.register(provider);
-        return registry;
-      },
+      provide: AiTraceCaptureService,
+      inject: [PrismaService, AiExecutionStateStore],
+      useFactory: (prisma: PrismaService, executions: AiExecutionStateStore) =>
+        new AiTraceCaptureService(prisma, executions),
     },
     {
       provide: PromptVersionRegistry,
@@ -51,12 +62,14 @@ import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
             '你是研究助手。只基于已提供的服务端证据作答，输出 ResearchResult V1 JSON；不得生成订单或执行指令。',
           changedAt: new Date().toISOString(),
         });
+        for (const prompt of researchPromptsV2) registry.register(prompt);
         return registry;
       },
     },
     AiResearchExecutor,
   ],
   exports: [
+    AiResearchReportsQuery,
     AiRunService,
     AiExecutionStateStore,
     AiInvocationStore,

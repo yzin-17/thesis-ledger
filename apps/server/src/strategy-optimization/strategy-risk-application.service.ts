@@ -140,7 +140,10 @@ export class StrategyRiskApplicationService {
       this.strategyVersion(parsed.strategyVersionId),
       this.monitoringPlan(parsed.strategyVersionId),
     ]);
-    const actual = await this.contexts.load(parsed.accountId, parsed.symbol, version.strategy);
+    const actual = await this.contexts.load(parsed.accountId, parsed.symbol, {
+      ...version.strategy,
+      requiresHoldingPeriods: plan.rules.some((rule) => rule.metric === 'holdingPeriods'),
+    });
     return {
       previewHash: this.previewHash({
         plan,

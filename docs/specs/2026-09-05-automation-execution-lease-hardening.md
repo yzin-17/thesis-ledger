@@ -206,6 +206,10 @@ manual run 不会被 scheduler 自动接管。多实例可以同时进入 reconc
 
 ## 12. 测试与工程门禁
 
+目标进程验收采用同一 Compose Server 内的专用 Node 执行子进程，加载当前镜像编译后的 Scheduler、AutomationService 和 ExecutionStore；不硬杀正常 Server 或 Worker。数据库使用同网段独立 PostgreSQL 临时容器、独立 owner/库及 tmpfs，全量应用当前 migration，运行前核对身份。验收入口须校验 Compose 项目/服务、镜像与编译输入、临时资源所有权和清理边界；只终止自己创建的子进程及临时容器，不删除持久卷。
+
+使用无外部副作用的处理器检查实际定时触发、SIGKILL 后租约到期、另一实例恢复、双实例竞争、旧 owner fencing 以及 unknown-outcome 不重放。现金分支复用真实 `AutomationRuntimeHandlers` 和 `RecurringCashDepositService`，在隔离库验证补期、暂停和恢复幂等；unknown-outcome 分支使用固定 handler。通知只捕获入队参数，不替代外部通知投递或行情 Provider 验收。
+
 仓库验证覆盖：
 
 - 同一 `jobId + scheduledAt` 只生成一个 canonical run；

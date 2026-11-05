@@ -196,12 +196,16 @@ describe('普通回测配置准备与披露', () => {
     expect(submitted.preparationStamp).toEqual(stamp);
     const queueMutation = { mutateAsync: vi.fn().mockResolvedValue({ id: 'run-current', status: 'queued' }) };
     const load = vi.fn().mockResolvedValue(undefined);
+    const toast = vi.fn(() => 'backtest-toast');
+    const close = vi.fn();
+    const queueErrorToastId = { current: null as string | null };
     const handlers = createStrategyActionHandlers({
       name: '',
       schemaText: '{}',
       busyAction: null,
       setBusyAction: vi.fn(),
-      toastManager: { add: vi.fn() },
+      toastManager: { add: toast, close },
+      queueErrorToastId,
       createMutation: { mutateAsync: vi.fn() },
       queueMutation,
       runMutation: { mutateAsync: vi.fn() },
@@ -224,6 +228,16 @@ describe('普通回测配置准备与披露', () => {
       expect.objectContaining({ contractVersion: 3, preparationStamp: stamp }),
     );
     await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+    queueMutation.mutateAsync.mockRejectedValueOnce(new Error('creation-response-lost'));
+    expect(await handlers.startBacktest(version, setup)).toBe(true);
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    expect(toast).toHaveBeenLastCalledWith(expect.objectContaining({
+      title: '回测排队失败', description: 'creation-response-lost',
+    }));
+    expect(queueErrorToastId.current).toBe('backtest-toast');
+    expect(await handlers.startBacktest(version, setup)).toBe(true);
+    expect(close).toHaveBeenCalledExactlyOnceWith('backtest-toast');
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(3));
     for (const changed of [
       { ...setup, initialCash: 20000 },
       { ...setup, adjustment: 'hfq' as const },

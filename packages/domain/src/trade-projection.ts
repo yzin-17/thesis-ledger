@@ -5,6 +5,11 @@ import type {
   LedgerEventSource,
 } from './ledger-contract.js';
 import { DecimalValue } from './decimal.js';
+import { baselineObservationReductions } from './baseline-observation-remainders.js';
+import {
+  compareLedgerEventRevision as compareRevision,
+  selectEffectiveLedgerEvents as effectiveEvents,
+} from './ledger-effective-events.js';
 
 export type TradeAccountMode = 'actual' | 'shadow';
 export type TradeLifecycle = 'ACTIVE' | 'ENDED';
@@ -249,38 +254,6 @@ const defaultAlgorithmVersion = 'trade-projection-v1';
 const decimal = (value: string) => DecimalValue.from(value);
 const zero = () => decimal('0');
 
-const compareLedgerEventOrder = (left: LedgerEvent, right: LedgerEvent) => {
-  if (left.occurredAt === null && right.occurredAt !== null) return -1;
-  if (left.occurredAt !== null && right.occurredAt === null) return 1;
-  if (left.occurredAt !== right.occurredAt)
-    return (left.occurredAt ?? '').localeCompare(right.occurredAt ?? '');
-  return (
-    left.economicOrderKey.localeCompare(right.economicOrderKey) ||
-    left.eventId.localeCompare(right.eventId)
-  );
-};
-
-const compareRevision = (left: LedgerEvent, right: LedgerEvent) => {
-  const leftRevision = BigInt(left.ledgerRevision);
-  const rightRevision = BigInt(right.ledgerRevision);
-  return leftRevision === rightRevision
-    ? left.eventId.localeCompare(right.eventId)
-    : leftRevision < rightRevision
-      ? -1
-      : 1;
-};
-
-const effectiveEvents = (events: readonly LedgerEvent[]) => {
-  const latestByFact = new Map<string, LedgerEvent>();
-  for (const event of events) {
-    const current = latestByFact.get(event.factId);
-    if (!current || compareRevision(current, event) < 0) latestByFact.set(event.factId, event);
-  }
-  return [...latestByFact.values()]
-    .filter((event) => event.revisionAction !== 'VOID')
-    .sort(compareLedgerEventOrder);
-};
-
 export const selectEffectiveLedgerEvents = (events: readonly LedgerEvent[]) =>
   effectiveEvents(events);
 
@@ -487,6 +460,8 @@ const processBaseline = (input: {
   const difference = observedQuantity.minus(existingQuantity);
   const contributedQuantity = difference.isNegative() ? zero() : difference;
   if (difference.isNegative()) addIssue(trade, 'QUANTITY_CONFLICT');
+  for (const reduction of baselineObservationReductions(trade.sources, observedQuantity))
+    trade.sources[reduction.sourceIndex]!.remainingQuantity = reduction.remainingQuantity;
   const source = createBaselineSource({ event, contributedQuantity });
   addSource(trade, source);
   if (contributedQuantity.isPositive()) {

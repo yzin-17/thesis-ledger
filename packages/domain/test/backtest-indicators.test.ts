@@ -84,6 +84,59 @@ describe('backtest Series and Indicator domain', () => {
     });
   });
 
+  it('retains the delayed first observation through recursive RSI state', () => {
+    const input = [
+      point('2025-01-01', '100', '2025-01-10T00:00:00Z'),
+      point('2025-01-02', '90'),
+      point('2025-01-03', '91'),
+      point('2025-01-04', '92'),
+      point('2025-01-05', '93'),
+    ];
+    const result = evaluateIndicator('RSI', input, { period: 2 }).points.at(-1)!;
+    const aligned = alignSeriesAt({ ...series(input), points: [result] }, [input.at(-1)!.occurredAt])[0]!;
+
+    expect(result.value).toBe('41.17647058823529411765');
+    expect(result.availableAt).toBe('2025-01-10T00:00:00Z');
+    expect(aligned.status).toBe('unavailable');
+
+    const changedSeed = evaluateIndicator(
+      'RSI',
+      [{ ...input[0]!, value: '1000', close: '1000' }, ...input.slice(1)],
+      { period: 2 },
+    ).points.at(-1)!;
+    expect(changedSeed.value).toBe('0.7633587786259541987');
+    expect(changedSeed.availableAt).toBe('2025-01-10T00:00:00Z');
+  });
+
+  it('retains the delayed previous close through ATR true range', () => {
+    const input = [
+      { ...point('2025-01-01', '100', '2025-01-10T00:00:00Z'), high: '101', low: '99' },
+      { ...point('2025-01-02', '11'), high: '12', low: '10' },
+    ];
+    const result = evaluateIndicator('ATR', input, { period: 1 }).points.at(-1)!;
+    const aligned = alignSeriesAt({ ...series(input), points: [result] }, [input.at(-1)!.occurredAt])[0]!;
+
+    expect(result.value).toBe('90');
+    expect(result.availableAt).toBe('2025-01-10T00:00:00Z');
+    expect(aligned.status).toBe('unavailable');
+  });
+
+  it('does not revive OHLC fields carried by an unavailable point', () => {
+    const input = [
+      {
+        ...point('2025-01-01', '11'),
+        high: '12',
+        low: '10',
+        status: 'unavailable' as const,
+      },
+    ];
+
+    expect(evaluateIndicator('ATR', input, { period: 1 }).points[0]).toMatchObject({
+      status: 'unavailable',
+      reason: expect.stringContaining('输入'),
+    });
+  });
+
   it('derives lookback and keeps insufficient warmup explicitly unavailable', () => {
     const expression = {
       type: 'indicator' as const,

@@ -12,9 +12,9 @@ const { useQueryMock, useQueryClientMock } = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: { queryKey: unknown[] }): unknown => {
-    if (options.queryKey[1] === 'market-period-options') {
-      return { isSuccess: true, data: { options: [] } };
-    }
+    if (options.queryKey[1] === 'fund-valuation') return { isPending: true };
+    if (options.queryKey[1] !== 'market-detail')
+      return { data: undefined, isPending: false, isError: false, isFetching: false };
     return useQueryMock(options);
   },
   useQueryClient: useQueryClientMock,
@@ -405,5 +405,17 @@ describe('MarketDetailDialog UI contract', () => {
     renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
     expect(useQueryMock.mock.calls.find(([options]) => (options as { queryKey: unknown[] }).queryKey[1] === 'market-detail')?.[0])
       .toMatchObject({ refetchOnMount: 'always' });
+  });
+  it('分钟能力尚未确认时不派发详情，也不改成日线请求', () => {
+    vi.stubGlobal('window', { localStorage: { getItem: () => '5m' } });
+    useQueryMock.mockReturnValue({ data: undefined, isPending: true, isError: false, isFetching: false });
+    try {
+      renderToStaticMarkup(<MarketDetailDialog position={{ symbol: 'SPY.US', asset: { name: '受控ETF', assetType: 'etf' } }} onClose={vi.fn()} />);
+      const options = useQueryMock.mock.calls.find(([raw]) => (raw as { queryKey: unknown[] }).queryKey[1] === 'market-detail')?.[0] as { enabled: boolean; queryKey: unknown[] };
+      expect(options.enabled).toBe(false);
+      expect(options.queryKey).toContain('5m');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

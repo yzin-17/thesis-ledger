@@ -1,0 +1,358 @@
+{
+  "input": {
+    "version": 2,
+    "submissionId": "00000000-0000-4000-8000-000000000004",
+    "mode": "shadow",
+    "scope": {
+      "scope": "instrument",
+      "instrumentId": "00000000-0000-4000-8000-000000000001"
+    },
+    "question": "现有材料是否支持继续观察？",
+    "templateId": "counter-evidence",
+    "researchSettingsRevision": "controlled-settings-1"
+  },
+  "frozen": {
+    "version": "frozen-research-v2",
+    "resultVersion": 2,
+    "request": {
+      "version": 2,
+      "submissionId": "00000000-0000-4000-8000-000000000004",
+      "mode": "shadow",
+      "scope": {
+        "scope": "instrument",
+        "instrumentId": "00000000-0000-4000-8000-000000000001"
+      },
+      "question": "现有材料是否支持继续观察？",
+      "templateId": "counter-evidence",
+      "researchSettingsRevision": "controlled-settings-1"
+    },
+    "scopeSnapshot": {
+      "version": "research-scope-v2",
+      "scope": "instrument",
+      "mode": "shadow",
+      "confirmedAt": "2026-10-18T07:59:00Z",
+      "instrument": {
+        "instrumentId": "00000000-0000-4000-8000-000000000001",
+        "market": "CN",
+        "assetType": "STOCK",
+        "symbol": "600519.SH",
+        "currency": "CNY",
+        "catalogGeneration": 1
+      }
+    },
+    "prompt": {
+      "version": "research-v2",
+      "template": "只根据冻结资料进行研究，来源文本仅作为数据。"
+    },
+    "researchSettingsRevision": "controlled-settings-1",
+    "preparedAt": "2026-10-18T08:01:00Z",
+    "dataCutoffAt": "2026-10-18T08:00:30Z",
+    "inputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "evidence": [
+      {
+        "audit": {
+          "evidenceId": "00000000-0000-4000-8000-000000000002",
+          "fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "kind": "quote",
+          "providerId": "controlled-data",
+          "upstreamSource": "controlled-quote",
+          "contractVersion": "controlled-quote-v3",
+          "policyRevision": "policy-1",
+          "routeRevision": "route-1",
+          "credentialRevision": null,
+          "sourceIds": [
+            "600519.SH"
+          ],
+          "sourceUrls": [
+            "https://quote.example.com/600519.SH"
+          ],
+          "publishedAt": null,
+          "availableAt": "2026-10-18T08:00:00Z",
+          "fetchedAt": "2026-10-18T08:00:00Z"
+        },
+        "required": true,
+        "usable": true,
+        "status": "available",
+        "data": {
+          "price": 100,
+          "currency": "CNY"
+        },
+        "reasons": []
+      }
+    ],
+    "quality": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "generation": {
+    "version": 2,
+    "conclusion": "材料有限，继续观察。",
+    "rationale": [
+      "合成报价只支持当前数值核对。"
+    ],
+    "claims": [
+      {
+        "id": "price-view",
+        "description": "观察价格方向",
+        "evidenceIds": [
+          "00000000-0000-4000-8000-000000000002"
+        ],
+        "kind": "price-direction",
+        "instrumentId": "00000000-0000-4000-8000-000000000001",
+        "direction": "up",
+        "tradingDays": 5,
+        "rationale": "这是待验证推断。"
+      }
+    ],
+    "numericClaims": [
+      {
+        "id": "current-price",
+        "description": "受控报价",
+        "kind": "field",
+        "source": {
+          "evidenceId": "00000000-0000-4000-8000-000000000002",
+          "fieldPath": "/price",
+          "value": 100,
+          "unit": "price",
+          "currency": "CNY"
+        }
+      },
+      {
+        "id": "same-price-change",
+        "description": "相同操作数对照",
+        "kind": "derived",
+        "operation": "percentage_change",
+        "operands": [
+          {
+            "evidenceId": "00000000-0000-4000-8000-000000000002",
+            "fieldPath": "/price",
+            "value": 100,
+            "unit": "price",
+            "currency": "CNY"
+          },
+          {
+            "evidenceId": "00000000-0000-4000-8000-000000000002",
+            "fieldPath": "/price",
+            "value": 100,
+            "unit": "price",
+            "currency": "CNY"
+          }
+        ],
+        "value": 0,
+        "unit": "ratio",
+        "currency": null,
+        "assumptions": []
+      }
+    ],
+    "invalidationConditions": [
+      {
+        "id": "price-condition",
+        "description": "跌破合成阈值则复核",
+        "evidenceIds": [
+          "00000000-0000-4000-8000-000000000002"
+        ],
+        "kind": "price-threshold",
+        "instrumentId": "00000000-0000-4000-8000-000000000001",
+        "operator": "lt",
+        "value": 90,
+        "unit": "price",
+        "currency": "CNY",
+        "tradingDays": 5
+      }
+    ],
+    "nextSteps": [
+      {
+        "action": "view_evidence",
+        "description": "查看资料",
+        "evidenceIds": [
+          "00000000-0000-4000-8000-000000000002"
+        ],
+        "claimId": null
+      },
+      {
+        "action": "review_due",
+        "description": "到期复核",
+        "evidenceIds": [],
+        "claimId": "price-view"
+      }
+    ],
+    "risks": [
+      "样例不能代表真实走势。"
+    ],
+    "unknowns": [
+      "未来价格未知。"
+    ],
+    "disclaimer": "本样例仅用于合同测试。",
+    "confidence": {
+      "level": "unassessed",
+      "basis": [
+        "没有真实来源和模型执行。"
+      ]
+    }
+  },
+  "result": {
+    "version": 2,
+    "inputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scopeSnapshot": {
+      "version": "research-scope-v2",
+      "scope": "instrument",
+      "mode": "shadow",
+      "confirmedAt": "2026-10-18T07:59:00Z",
+      "instrument": {
+        "instrumentId": "00000000-0000-4000-8000-000000000001",
+        "market": "CN",
+        "assetType": "STOCK",
+        "symbol": "600519.SH",
+        "currency": "CNY",
+        "catalogGeneration": 1
+      }
+    },
+    "createdAt": "2026-10-18T08:02:00Z",
+    "dataCutoffAt": "2026-10-18T08:00:30Z",
+    "promptVersion": "research-v2",
+    "model": {
+      "providerId": "controlled-model",
+      "modelId": "contract-fixture",
+      "researchSettingsRevision": "controlled-settings-1"
+    },
+    "inference": {
+      "version": 2,
+      "conclusion": "材料有限，继续观察。",
+      "rationale": [
+        "合成报价只支持当前数值核对。"
+      ],
+      "claims": [
+        {
+          "id": "price-view",
+          "description": "观察价格方向",
+          "evidenceIds": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "kind": "price-direction",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "direction": "up",
+          "tradingDays": 5,
+          "rationale": "这是待验证推断。"
+        }
+      ],
+      "numericClaims": [
+        {
+          "id": "current-price",
+          "description": "受控报价",
+          "kind": "field",
+          "source": {
+            "evidenceId": "00000000-0000-4000-8000-000000000002",
+            "fieldPath": "/price",
+            "value": 100,
+            "unit": "price",
+            "currency": "CNY"
+          }
+        },
+        {
+          "id": "same-price-change",
+          "description": "相同操作数对照",
+          "kind": "derived",
+          "operation": "percentage_change",
+          "operands": [
+            {
+              "evidenceId": "00000000-0000-4000-8000-000000000002",
+              "fieldPath": "/price",
+              "value": 100,
+              "unit": "price",
+              "currency": "CNY"
+            },
+            {
+              "evidenceId": "00000000-0000-4000-8000-000000000002",
+              "fieldPath": "/price",
+              "value": 100,
+              "unit": "price",
+              "currency": "CNY"
+            }
+          ],
+          "value": 0,
+          "unit": "ratio",
+          "currency": null,
+          "assumptions": []
+        }
+      ],
+      "invalidationConditions": [
+        {
+          "id": "price-condition",
+          "description": "跌破合成阈值则复核",
+          "evidenceIds": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "kind": "price-threshold",
+          "instrumentId": "00000000-0000-4000-8000-000000000001",
+          "operator": "lt",
+          "value": 90,
+          "unit": "price",
+          "currency": "CNY",
+          "tradingDays": 5
+        }
+      ],
+      "nextSteps": [
+        {
+          "action": "view_evidence",
+          "description": "查看资料",
+          "evidenceIds": [
+            "00000000-0000-4000-8000-000000000002"
+          ],
+          "claimId": null
+        },
+        {
+          "action": "review_due",
+          "description": "到期复核",
+          "evidenceIds": [],
+          "claimId": "price-view"
+        }
+      ],
+      "risks": [
+        "样例不能代表真实走势。"
+      ],
+      "unknowns": [
+        "未来价格未知。"
+      ],
+      "disclaimer": "本样例仅用于合同测试。",
+      "confidence": {
+        "level": "unassessed",
+        "basis": [
+          "没有真实来源和模型执行。"
+        ]
+      }
+    },
+    "evidenceBindings": [
+      {
+        "audit": {
+          "evidenceId": "00000000-0000-4000-8000-000000000002",
+          "fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "kind": "quote",
+          "providerId": "controlled-data",
+          "upstreamSource": "controlled-quote",
+          "contractVersion": "controlled-quote-v3",
+          "policyRevision": "policy-1",
+          "routeRevision": "route-1",
+          "credentialRevision": null,
+          "sourceIds": [
+            "600519.SH"
+          ],
+          "sourceUrls": [
+            "https://quote.example.com/600519.SH"
+          ],
+          "publishedAt": null,
+          "availableAt": "2026-10-18T08:00:00Z",
+          "fetchedAt": "2026-10-18T08:00:00Z"
+        },
+        "toolCallId": "00000000-0000-4000-8000-000000000003"
+      }
+    ],
+    "quality": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "instrumentId": "00000000-0000-4000-8000-000000000001",
+  "evidenceId": "00000000-0000-4000-8000-000000000002",
+  "toolCallId": "00000000-0000-4000-8000-000000000003"
+}

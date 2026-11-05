@@ -1,3 +1,4 @@
+import { TableContainer } from '@/components/ui/table';
 import { useEffect, useMemo } from 'react';
 import { AuthoringVersionSource } from '../strategy-authoring/AuthoringVersionSource.js';
 import { AuthoringIdentity } from '../strategy-authoring/AuthoringIdentity.js';
@@ -40,7 +41,11 @@ import {
   strategyCenterPath,
   strategyCenterTriggerId,
 } from './strategy-center.navigation.js';
-import { StrategyLibraryToolbar, StrategyRecentBacktest } from './StrategyListPresentation.js';
+import {
+  StrategyLibraryAction,
+  StrategyLibraryToolbar,
+  StrategyRecentBacktest,
+} from './StrategyListPresentation.js';
 import {
   strategyStatusLabel,
   strategyVersionDisplayLabel,
@@ -141,7 +146,7 @@ export function StrategyLibraryPage({
       <StrategyLibraryToolbar search={search} onSearchChange={updateSearch} />
       <AuthoringIdentity />
       {!loading && visible.length === 0 ? (
-        <Empty className="border border-dashed">
+        <Empty className="rounded-md border border-border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <Search />
@@ -161,15 +166,18 @@ export function StrategyLibraryPage({
           ) : null}
         </Empty>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
+        <TableContainer>
           <table className="w-full table-fixed text-sm">
-            <thead className="border-b bg-muted/30 text-left">
+            <thead className="border-b text-left">
               <tr>
-                <th className="w-[34%] px-4 py-3 font-medium">策略名称 / 标的</th>
-                <th className="w-[16%] px-4 py-3 font-medium">最新版本</th>
-                <th className="w-[20%] px-4 py-3 font-medium">最近回测</th>
-                <th className="w-[18%] px-4 py-3 font-medium">更新时间</th>
-                <th data-table-action-static className="w-[12%] px-4 py-3 text-right font-medium">
+                <th className="w-[34%] px-2 py-3 font-medium sm:px-4">策略名称 / 标的</th>
+                <th className="hidden w-[16%] px-4 py-3 font-medium sm:table-cell">最新版本</th>
+                <th className="w-[20%] px-2 py-3 font-medium sm:px-4">最近回测</th>
+                <th className="hidden w-[18%] px-4 py-3 font-medium sm:table-cell">更新时间</th>
+                <th
+                  data-table-action-static
+                  className="w-24 px-1 py-3 text-right font-medium whitespace-nowrap sm:px-3"
+                >
                   操作
                 </th>
               </tr>
@@ -177,7 +185,6 @@ export function StrategyLibraryPage({
             <tbody>
               {visible.map((strategy) => {
                 const latest = latestStrategyVersion(strategy.versions);
-                const navSymbol = latest ? navFundSymbolForStrategyVersion(latest) : null;
                 const recentJob = latest
                   ? (jobs
                       .filter((job) => job.strategyVersionId === latest.id)
@@ -187,16 +194,17 @@ export function StrategyLibraryPage({
                   : null;
                 return (
                   <tr key={strategy.id} className="border-b last:border-0 hover:bg-muted/20">
-                    <td className="min-w-0 px-4 py-3">
+                    <td className="min-w-0 px-2 py-3 sm:px-4">
                       {latest ? (
                         <Link
-                          className="font-medium text-foreground hover:underline"
+                          className="block truncate font-medium text-foreground hover:underline"
+                          title={strategy.name}
                           to={strategyCenterPath.strategyVersion(strategy.id, latest.id)}
                         >
                           {strategy.name}
                         </Link>
                       ) : (
-                        <span className="font-medium">{strategy.name}</span>
+                        <span className="block truncate font-medium">{strategy.name}</span>
                       )}
                       <div className="mt-1 max-w-md truncate text-xs text-muted-foreground">
                         {schemaSymbols(latest?.schema).join('、') ||
@@ -204,50 +212,34 @@ export function StrategyLibraryPage({
                           '未填写执行范围'}
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-top">
+                    <td className="hidden px-4 py-3 align-top whitespace-normal sm:table-cell">
                       {latest ? `v${latest.version}` : '无版本'}
                       <div className="mt-1 text-xs text-muted-foreground">
                         共 {strategy.versions.length} 个版本
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-top">
+                    <td className="px-2 py-3 align-top sm:px-4">
                       <StrategyRecentBacktest job={recentJob} />
                     </td>
                     <td
-                      className="px-4 py-3 align-top text-muted-foreground"
+                      className="hidden px-4 py-3 align-top whitespace-normal text-muted-foreground sm:table-cell"
                       title={formatDateTime(latest?.createdAt ?? strategy.updatedAt, '未知')}
                     >
                       {formatDateTime(latest?.createdAt ?? strategy.updatedAt, '时间未记录')}
                     </td>
-                    <td className="px-4 py-3 text-right align-top">
-                      {latest && navSymbol ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          nativeButton={false}
-                          render={
-                            <Link to={strategyCenterPath.navBacktestSetup(strategy.id, latest.id)}>
-                              基金净值回测
-                            </Link>
-                          }
-                        />
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={!latest}
-                          onClick={() => latest && onBacktest(strategy, latest)}
-                        >
-                          回测
-                        </Button>
-                      )}
+                    <td className="px-1 py-3 text-right align-top whitespace-nowrap sm:px-3">
+                      <StrategyLibraryAction
+                        strategy={strategy}
+                        version={latest}
+                        onBacktest={onBacktest}
+                      />
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
       )}
       {filtered.length > PAGE_SIZE ? (
         <div className="flex items-center justify-between text-sm">
@@ -503,12 +495,12 @@ export function StrategyVersionPage({
           </details>
         </TabsContent>
         <TabsContent value="versions" className="mt-4">
-          <div className="overflow-x-auto rounded-lg border">
+          <TableContainer>
             <table className="w-full table-fixed text-sm">
-              <thead className="border-b bg-muted/30 text-left">
+              <thead className="border-b text-left">
                 <tr>
                   <th className="w-2/3 px-4 py-3 font-medium">版本</th>
-                  <th className="w-1/3 px-4 py-3 text-right font-medium">创建时间</th>
+                  <th className="w-1/3 px-4 py-3 font-medium">创建时间</th>
                 </tr>
               </thead>
               <tbody>
@@ -522,14 +514,14 @@ export function StrategyVersionPage({
                         v{candidate.version}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {formatDateTime(candidate.createdAt, '未知')}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         </TabsContent>
         <TabsContent value="backtests" className="mt-4">
           <Card>

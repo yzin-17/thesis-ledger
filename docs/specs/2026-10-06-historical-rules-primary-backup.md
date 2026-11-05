@@ -5,7 +5,7 @@
 > 适用项目：ThesisLedger / DSA。  
 > 对应任务：[主备数据源实施任务](../archive/tasks/2026-10-06-historical-rules-primary-backup.md)。已核对当前代码接缝；各项实际实施与运行验收状态以 Task 为准。
 
-> 2026-10-09 后续入口：股票结构化状态、基础生命周期与有界 ETF 分红候选的按需扩展由[新 Spec](2026-10-09-history-data-on-demand.md)及[Task](../tasks/2026-10-09-history-data-on-demand.md)承接。原费用/P6 的完成范围保持；新主题不重开本页已完成任务，也不新增完整历史证明义务。
+> 2026-10-09 后续入口：股票结构化状态、基础生命周期与有界 ETF 分红候选的按需扩展由[新 Spec](2026-10-09-history-data-on-demand.md)及[Task](../archive/tasks/2026-10-09-history-data-on-demand.md)承接。原费用/P6 的完成范围保持；新主题不重开本页已完成任务，也不新增完整历史证明义务。
 
 ## 1. 最终决策
 

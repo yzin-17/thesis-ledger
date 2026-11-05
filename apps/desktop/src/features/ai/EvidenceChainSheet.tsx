@@ -151,7 +151,7 @@ export function EvidenceChainSheet({
                 {item.citations.map((citation) => (
                   <div
                     key={`${citation.tool}-${citation.sourceId}-${citation.observedAt}`}
-                    className="rounded-lg border bg-muted/30 p-3 text-xs"
+                    className="rounded-md border border-border bg-muted/30 p-3 text-xs"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">{citation.tool}</Badge>

@@ -4,9 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
 import { accountDataKeys } from '../src/features/account-data/account-data.queries.js';
 import { invalidatePortfolioChange } from '../src/features/account-data/portfolio-change.js';
-import {
-  accountChangeImpact,
-} from '../src/features/portfolio/portfolio.account-actions.js';
+import { accountChangeImpact } from '../src/features/portfolio/portfolio.account-actions.js';
 import {
   cashSaveImpact,
   clearPositionsImpact,
@@ -43,6 +41,25 @@ const makeRequestClient = () => {
 };
 
 describe('组合估值按消费路由与影响范围失效', () => {
+  it('页面账户范围进入估值请求与缓存键，恢复全部时省略账户参数', async () => {
+    const requestClient = makeRequestClient();
+    const selected = portfolioValuationQueryOptions(
+      'actual',
+      true,
+      requestClient.client,
+      'account-a',
+    );
+    const all = portfolioValuationQueryOptions('actual', true, requestClient.client);
+    expect(selected.queryKey).toEqual(portfolioKeys.valuation('actual', 'account-a'));
+    expect(all.queryKey).toEqual(portfolioKeys.valuation('actual'));
+    await selected.queryFn();
+    await all.queryFn();
+    expect(requestClient.request.mock.calls.map((call) => call[0])).toEqual([
+      '/portfolio/valuation?mode=actual&accountId=account-a',
+      '/portfolio/valuation?mode=actual',
+    ]);
+  });
+
   it('标的搜索失败后不因观察者重新挂载而自动重试', () => {
     const client = makeClient();
     const query = new QueryObserver(
@@ -58,37 +75,45 @@ describe('组合估值按消费路由与影响范围失效', () => {
   });
 
   it('只在实际消费组合摘要的路由启用 all valuation', () => {
-    expect(isPortfolioSummaryConsumerRoute('/portfolio')).toBe(true);
+    expect(isPortfolioSummaryConsumerRoute('/portfolio')).toBe(false);
+    expect(isPortfolioSummaryConsumerRoute('/performance')).toBe(true);
     expect(isPortfolioSummaryConsumerRoute('/risk-center')).toBe(true);
     expect(isPortfolioSummaryConsumerRoute('/accounts')).toBe(false);
     expect(isPortfolioSummaryConsumerRoute('/position-entry')).toBe(false);
   });
 
-  it.each(['/portfolio', '/risk-center'] as const)('%s 的 all valuation 只请求一次', async (route) => {
-    const client = makeClient();
-    const requestClient = makeRequestClient();
-    const query = new QueryObserver(client, {
-      ...portfolioValuationQueryOptions(
-        'actual',
-        isPortfolioSummaryConsumerRoute(route),
-        requestClient.client,
-      ),
-    });
+  it.each(['/performance', '/risk-center'] as const)(
+    '%s 的 all valuation 只请求一次',
+    async (route) => {
+      const client = makeClient();
+      const requestClient = makeRequestClient();
+      const query = new QueryObserver(client, {
+        ...portfolioValuationQueryOptions(
+          'actual',
+          isPortfolioSummaryConsumerRoute(route),
+          requestClient.client,
+        ),
+      });
 
-    await query.refetch();
+      await query.refetch();
 
-    expect(requestClient.request).toHaveBeenCalledTimes(1);
-    expect(requestClient.request).toHaveBeenCalledWith(
-      '/portfolio/valuation?mode=actual',
-      expect.objectContaining({ cache: 'no-store' }),
-    );
-  });
+      expect(requestClient.request).toHaveBeenCalledTimes(1);
+      expect(requestClient.request).toHaveBeenCalledWith(
+        '/portfolio/valuation?mode=actual',
+        expect.objectContaining({ cache: 'no-store' }),
+      );
+    },
+  );
 
   it('/accounts 的 shell 不请求 all，selected account 最多请求一次', async () => {
     const client = makeClient();
     const requestClient = makeRequestClient();
     const allQuery = new QueryObserver(client, {
-      ...portfolioValuationQueryOptions('actual', isPortfolioSummaryConsumerRoute('/accounts'), requestClient.client),
+      ...portfolioValuationQueryOptions(
+        'actual',
+        isPortfolioSummaryConsumerRoute('/accounts'),
+        requestClient.client,
+      ),
     });
     const selectedQuery = new QueryObserver(client, {
       ...accountValuationQueryOptions('account-a', 'actual', true, requestClient.client),
@@ -136,7 +161,11 @@ describe('组合估值按消费路由与影响范围失效', () => {
   it.each([
     ['新增持仓', positionSaveImpact('actual', 'account-a'), ['account-a']],
     ['同账户编辑持仓', positionSaveImpact('actual', 'account-a', 'account-a'), ['account-a']],
-    ['A→B 编辑持仓', positionSaveImpact('actual', 'account-b', 'account-a'), ['account-a', 'account-b']],
+    [
+      'A→B 编辑持仓',
+      positionSaveImpact('actual', 'account-b', 'account-a'),
+      ['account-a', 'account-b'],
+    ],
     ['删除持仓', removePositionImpact('actual', 'account-a'), ['account-a']],
     ['清空持仓', clearPositionsImpact('actual', 'account-a'), ['account-a']],
     ['现金变更', cashSaveImpact('actual', 'account-a'), ['account-a']],
@@ -191,12 +220,12 @@ describe('组合估值按消费路由与影响范围失效', () => {
     expect(calls).toEqual(['account-a']);
     expect(client.getQueryState(accountB)?.isInvalidated).toBe(true);
     expect(client.getQueryState(all)?.isInvalidated).toBe(true);
-    expect(client.getQueryState(accountDataKeys.events('account-a', 'actual', 'all'))?.isInvalidated).toBe(
-      true,
-    );
-    expect(client.getQueryState(accountDataKeys.events('account-a', 'shadow', 'all'))?.isInvalidated).toBe(
-      false,
-    );
+    expect(
+      client.getQueryState(accountDataKeys.events('account-a', 'actual', 'all'))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(accountDataKeys.events('account-a', 'shadow', 'all'))?.isInvalidated,
+    ).toBe(false);
     expect(client.getQueryState(accountDataKeys.audit('account-b', 'actual'))?.isInvalidated).toBe(
       true,
     );

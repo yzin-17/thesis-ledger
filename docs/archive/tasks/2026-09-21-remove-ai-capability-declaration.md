@@ -1,12 +1,12 @@
 # 移除 AI 执行路由能力声明配置实施任务
 
-> 归档说明（2026-10-14）：能力声明移除范围及本地验收完成；[Spec](../../specs/2026-09-21-remove-ai-capability-declaration.md)继续保留。本任务未执行的真实 Provider/Electron 记录仍保留，更广的 AI 业务合同与客户端验收由[AI 接入任务](../../tasks/2026-09-19-vercel-ai-sdk-integration.md)及[当前任务索引](../../tasks/README.md)承接，不在本任务重复实施。
+> 归档说明（2026-10-14）：能力声明移除范围及本地验收完成；[Spec](../../specs/2026-09-21-remove-ai-capability-declaration.md)继续保留。本任务未执行的真实 Provider/Electron 记录仍保留，更广的 AI 业务合同与客户端验收由[AI 接入任务](2026-09-19-vercel-ai-sdk-integration.md)及[当前任务索引](../../tasks/README.md)承接，不在本任务重复实施。
 
 对应 Spec：[移除 AI 执行路由能力声明 Spec](../../specs/2026-09-21-remove-ai-capability-declaration.md)
 
 > 状态：已完成本地实现与验证；未执行 Electron 实机视觉验收和真实外部 Provider 验收；保留工作区既有未提交修改，不创建提交。
 
-后续范围修订（2026-09-21）：上游服务限制和免费依据分别由[移除 AI 执行路由上游服务限制任务](2026-09-21-remove-ai-upstream-restriction.md)与[移除 AI 执行路由免费依据任务](../../tasks/2026-09-21-remove-ai-free-evidence.md)负责；本任务中对应“保留”表述是历史完成边界。
+后续范围修订（2026-09-21）：上游服务限制和免费依据分别由[移除 AI 执行路由上游服务限制任务](2026-09-21-remove-ai-upstream-restriction.md)与[移除 AI 执行路由免费依据任务](2026-09-21-remove-ai-free-evidence.md)负责；本任务中对应“保留”表述是历史完成边界。
 
 ## 任务
 

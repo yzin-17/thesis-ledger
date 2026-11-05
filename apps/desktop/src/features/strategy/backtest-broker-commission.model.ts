@@ -20,6 +20,7 @@ export function applyBrokerCommission(model: BacktestExecutionModelV3, profile: 
   return backtestExecutionModelSchemaV3.parse({ ...model, segments: model.segments.map((segment) => {
     if (!segment.fees || segment.execution.mode !== 'exchange') throw new Error('券商预设只支持交易所执行');
     return { ...segment, source: { kind: 'userConfiguration', revision: 'futu-cost-v1',
+      historicalKnownAt: segment.source.kind === 'historicalFact' ? segment.source.knownAt : segment.source.historicalKnownAt,
       configuredAt: clock, description: '富途香港券商成本研究配置', references: [...segment.source.references, profile.sourceUrl] },
       assumptions: [...segment.assumptions.filter((item) => !item.startsWith('券商成本：')),
         '券商成本：当前标准网上交易及固定式平台费；一单一次成交，公共收费另算，不证明历史账户费率。',

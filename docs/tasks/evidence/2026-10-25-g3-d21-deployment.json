@@ -1,0 +1,1217 @@
+{
+  "date": "2026-10-25",
+  "task": "G3-D24",
+  "scope": "D21 正式代码快更与零模型运行态核查",
+  "authorization": {
+    "target": "thesis-ledger",
+    "modelCallsAllowed": 0,
+    "researchV2MustStayClosed": true,
+    "preserveWip": true,
+    "preserveDataAndConfiguration": true,
+    "stageAllowed": false,
+    "commitAllowed": false,
+    "remainingModelCallsFrozen": 8
+  },
+  "selection": {
+    "entry": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra/scripts/sync-code.sh",
+    "cwd": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra",
+    "target": "thesis-ledger",
+    "services": ["thesis-ledger", "backtest-worker"],
+    "compatibilityPassed": true,
+    "checks": [
+      "目标容器运行，镜像引用与当前镜像一致",
+      "Server 与 domain／schemas／shared package.json 一致",
+      "Prisma Schema／migration／raw-owned inventory 整目录一致"
+    ],
+    "updateShUsed": false,
+    "entrySyntaxExitCode": 0
+  },
+  "attempts": [
+    {
+      "invocation": "rtk proxy ./scripts/sync-code.sh thesis-ledger",
+      "exitCode": 1,
+      "compatibilityPassed": true,
+      "deploymentStarted": false,
+      "reason": "升级权限执行环境缺少 node，构建在第一个 shared 包处失败；未同步或重启容器"
+    },
+    {
+      "invocation": "rtk proxy env PATH=\"/Users/yzin/.volta/bin:$PATH\" ./scripts/sync-code.sh thesis-ledger",
+      "exitCode": 0,
+      "compatibilityPassed": true,
+      "deploymentStarted": true,
+      "reason": "仅为本次宿主进程选择已存在的 Volta Node v24.18.0；四包构建、双面同步／重启／健康和镜像不变检查完成"
+    }
+  ],
+  "deployment": {
+    "successfulRuns": 1,
+    "mode": "container_writable_layer",
+    "imagesUpdated": false,
+    "rebuildPersistent": false,
+    "serverAndWorkerUpdated": true,
+    "sourcePackagesBuilt": [
+      "@thesis-ledger/shared",
+      "@thesis-ledger/domain",
+      "@thesis-ledger/schemas",
+      "@thesis-ledger/server"
+    ],
+    "modelCalls": 0,
+    "businessApiWrites": 0,
+    "configurationWrites": 0
+  },
+  "localArtifact": {
+    "node": "v24.18.0",
+    "versions": {
+      "ai": "7.0.107",
+      "@ai-sdk/openai-compatible": "3.0.53",
+      "zod": "4.4.3"
+    },
+    "modules": {
+      "apps/server/dist/src/ai/ai-sdk-generation.adapter.js": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+      "apps/server/dist/src/ai/ai-sdk-generation-model.js": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+      "apps/server/dist/src/ai/ai-sdk-generation-facts.js": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+      "apps/server/dist/src/ai/ai-generation-diagnostics.js": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+      "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+      "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+      "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+      "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+      "apps/server/dist/src/ai/ai-generation-http-response-error.js": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+      "apps/server/dist/src/ai/ai-sdk-runtime-versions.js": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+      "apps/server/dist/src/research/research.controller.js": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+      "apps/server/dist/src/research/research-submission.service.js": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+      "@thesis-ledger/schemas/dist/index.js": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+      "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+      "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57"
+    },
+    "runtimeHasHttpResponse": true
+  },
+  "targets": [
+    {
+      "name": "thesis-ledger-dev-thesis-ledger-1",
+      "before": {
+        "node": "v24.21.0",
+        "flags": {
+          "researchV2": "false",
+          "temporaryPolicyPresent": false
+        },
+        "envHashes": {
+          "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
+          "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "AI_RESEARCH_V2_WRITES_ENABLED": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+          "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
+          "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+          "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+          "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+          "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+          "HOME": "182702cbb52a8dfe8df7ca9807917e3aaf0cafaa6d4b2b5f21dc76c959384fac",
+          "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+          "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
+          "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
+          "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
+          "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+          "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
+          "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+          "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+          "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
+        },
+        "modules": {
+          "apps/server/dist/src/ai/ai-sdk-generation.adapter.js": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "apps/server/dist/src/ai/ai-sdk-generation-model.js": "31c852474ef897a815e7bdc90253d1645cafe60e30cda3fba7c8415c7b878e7c",
+          "apps/server/dist/src/ai/ai-sdk-generation-facts.js": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "apps/server/dist/src/ai/ai-generation-diagnostics.js": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js": "b86735d99bf59abd694dfad51ae5ee59568344d221946a926695b945865cf288",
+          "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js": "ca37d2da5da1200f261a416499c200b7359f57b6b78c4d2b5f732f6db67e9e7f",
+          "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js": null,
+          "apps/server/dist/src/ai/ai-generation-http-response-error.js": null,
+          "apps/server/dist/src/ai/ai-sdk-runtime-versions.js": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "apps/server/dist/src/research/research.controller.js": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "apps/server/dist/src/research/research-submission.service.js": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "@thesis-ledger/schemas/dist/index.js": "9307df4614428eb7b67ad998c8ebe224893fa0bcda79facebd6a2e88a539495e",
+          "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js": null,
+          "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js": "4de3230dab34b6e7257b70ddfe08475bf11d73335ec531cfb5e2b77c3fc60e38"
+        },
+        "schemaEntry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+        "runtimeHasHttpResponse": false,
+        "versions": {
+          "ai": "7.0.107",
+          "@ai-sdk/openai-compatible": "3.0.53",
+          "zod": "4.4.3"
+        }
+      },
+      "after": {
+        "node": "v24.21.0",
+        "flags": {
+          "researchV2": "false",
+          "temporaryPolicyPresent": false
+        },
+        "envHashes": {
+          "AI_GENERATION_RUNTIME": "a9d0df1873a041a6e38e2c461ffc6b53d216fd7cfab9bece3e9b5bc5c69b4203",
+          "AI_RESEARCH_EXECUTION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "AI_RESEARCH_V2_WRITES_ENABLED": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+          "CORS_ORIGINS": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
+          "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+          "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+          "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+          "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+          "HOME": "182702cbb52a8dfe8df7ca9807917e3aaf0cafaa6d4b2b5f21dc76c959384fac",
+          "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+          "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
+          "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
+          "PORT": "a176eeb31e601c3877c87c2843a2f584968975269e369d5c86788b4c2f92d2a2",
+          "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+          "SERVER_BIND_HOST": "19e36255972107d42b8cecb77ef5622e842e8a50778a6ed8dd1ce94732daca9e",
+          "STRATEGY_AI_OPTIMIZATION_ENABLED": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+          "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+          "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
+        },
+        "modules": {
+          "apps/server/dist/src/ai/ai-sdk-generation.adapter.js": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "apps/server/dist/src/ai/ai-sdk-generation-model.js": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "apps/server/dist/src/ai/ai-sdk-generation-facts.js": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "apps/server/dist/src/ai/ai-generation-diagnostics.js": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "apps/server/dist/src/ai/ai-generation-http-response-error.js": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "apps/server/dist/src/ai/ai-sdk-runtime-versions.js": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "apps/server/dist/src/research/research.controller.js": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "apps/server/dist/src/research/research-submission.service.js": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "@thesis-ledger/schemas/dist/index.js": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+          "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+          "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57"
+        },
+        "schemaEntry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+        "runtimeHasHttpResponse": true,
+        "versions": {
+          "ai": "7.0.107",
+          "@ai-sdk/openai-compatible": "3.0.53",
+          "zod": "4.4.3"
+        }
+      },
+      "moduleComparison": [
+        {
+          "module": "apps/server/dist/src/ai/ai-sdk-generation.adapter.js",
+          "localSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "targetSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-sdk-generation-model.js",
+          "localSha256": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "targetSha256": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-sdk-generation-facts.js",
+          "localSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "targetSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-diagnostics.js",
+          "localSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "targetSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js",
+          "localSha256": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "targetSha256": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js",
+          "localSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "targetSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js",
+          "localSha256": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "targetSha256": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js",
+          "localSha256": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "targetSha256": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-http-response-error.js",
+          "localSha256": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "targetSha256": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-sdk-runtime-versions.js",
+          "localSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "targetSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/research/research.controller.js",
+          "localSha256": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "targetSha256": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/research/research-submission.service.js",
+          "localSha256": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "targetSha256": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "matches": true
+        },
+        {
+          "module": "@thesis-ledger/schemas/dist/index.js",
+          "localSha256": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+          "targetSha256": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+          "matches": true
+        },
+        {
+          "module": "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js",
+          "localSha256": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+          "targetSha256": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+          "matches": true
+        },
+        {
+          "module": "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js",
+          "localSha256": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57",
+          "targetSha256": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57",
+          "matches": true
+        }
+      ],
+      "environmentUnchanged": true
+    },
+    {
+      "name": "thesis-ledger-dev-backtest-worker-1",
+      "before": {
+        "node": "v24.21.0",
+        "flags": {
+          "researchV2": null,
+          "temporaryPolicyPresent": false
+        },
+        "envHashes": {
+          "BACKTEST_WORKER_CONCURRENCY": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+          "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
+          "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+          "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+          "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+          "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+          "HOME": "182702cbb52a8dfe8df7ca9807917e3aaf0cafaa6d4b2b5f21dc76c959384fac",
+          "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+          "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
+          "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
+          "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+          "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+          "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+          "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
+        },
+        "modules": {
+          "apps/server/dist/src/ai/ai-sdk-generation.adapter.js": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "apps/server/dist/src/ai/ai-sdk-generation-model.js": "31c852474ef897a815e7bdc90253d1645cafe60e30cda3fba7c8415c7b878e7c",
+          "apps/server/dist/src/ai/ai-sdk-generation-facts.js": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "apps/server/dist/src/ai/ai-generation-diagnostics.js": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js": "b86735d99bf59abd694dfad51ae5ee59568344d221946a926695b945865cf288",
+          "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js": "ca37d2da5da1200f261a416499c200b7359f57b6b78c4d2b5f732f6db67e9e7f",
+          "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js": null,
+          "apps/server/dist/src/ai/ai-generation-http-response-error.js": null,
+          "apps/server/dist/src/ai/ai-sdk-runtime-versions.js": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "apps/server/dist/src/research/research.controller.js": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "apps/server/dist/src/research/research-submission.service.js": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "@thesis-ledger/schemas/dist/index.js": "9307df4614428eb7b67ad998c8ebe224893fa0bcda79facebd6a2e88a539495e",
+          "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js": null,
+          "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js": "4de3230dab34b6e7257b70ddfe08475bf11d73335ec531cfb5e2b77c3fc60e38"
+        },
+        "schemaEntry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+        "runtimeHasHttpResponse": false,
+        "versions": {
+          "ai": "7.0.107",
+          "@ai-sdk/openai-compatible": "3.0.53",
+          "zod": "4.4.3"
+        }
+      },
+      "after": {
+        "node": "v24.21.0",
+        "flags": {
+          "researchV2": null,
+          "temporaryPolicyPresent": false
+        },
+        "envHashes": {
+          "BACKTEST_WORKER_CONCURRENCY": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+          "CREDENTIAL_ENCRYPTION_KEY": "e0322a1a122e099076ec45b79f17fd6cec45a3bcfe41f97bdda4cbd7a6ccd16c",
+          "CREDENTIAL_ENCRYPTION_KEY_VERSION": "3bfc269594ef649228e9a74bab00f042efc91d5acc6fbee31a382e80d42388fe",
+          "CREDENTIAL_ENCRYPTION_PREVIOUS_KEYS": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "DATABASE_URL": "be1e10580765886de5acaea5fa8b125a99d339cebaad285ab56b0dc4e1010b91",
+          "DSA_BASE_URL": "ba728fce45292ec14364e18478f560f4b933dc9c0c05db0051e2dabbc401a47e",
+          "DSA_TIMEOUT_MS": "4f9f73b34c5b89879aad65a48025f3187dd9ce6dc3d4e88eecb2fc79227350f1",
+          "HOME": "182702cbb52a8dfe8df7ca9807917e3aaf0cafaa6d4b2b5f21dc76c959384fac",
+          "NODE_ENV": "ab8e18ef4ebebeddc0b3152ce9c9006e14fc05242e3fc9ce32246ea6a9543074",
+          "NODE_VERSION": "07a8533ef4d8265fe6c7e676c7e8c265075888ba6046b5755df43b1cd9f6fb92",
+          "PATH": "ce908b8efad4aed2432c6201f968c8a5033499e2d0276764ec023b8249a90429",
+          "REDIS_URL": "ad61ff0e3b584132152ecb96310025b3ac8db2b59d26c9e3247880cfd01ec924",
+          "THESIS_LEDGER_CONTROL_TOKEN": "afc4b7cc4cae7ba8edc70c15aa3843e7b8283b452fa55b72b78802ddf35fddfc",
+          "THESIS_LEDGER_DSA_TOKEN": "88f34660b182ccf50227ffa4fd978ed9a5c1feba0c16d649354aabe1920b501c",
+          "YARN_VERSION": "feb97ccb8fb16be6aabb7e25a3434679be448969f8ea27b677d44a0b6ea294ba"
+        },
+        "modules": {
+          "apps/server/dist/src/ai/ai-sdk-generation.adapter.js": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "apps/server/dist/src/ai/ai-sdk-generation-model.js": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "apps/server/dist/src/ai/ai-sdk-generation-facts.js": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "apps/server/dist/src/ai/ai-generation-diagnostics.js": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "apps/server/dist/src/ai/ai-generation-http-response-error.js": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "apps/server/dist/src/ai/ai-sdk-runtime-versions.js": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "apps/server/dist/src/research/research.controller.js": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "apps/server/dist/src/research/research-submission.service.js": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "@thesis-ledger/schemas/dist/index.js": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+          "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+          "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57"
+        },
+        "schemaEntry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+        "runtimeHasHttpResponse": true,
+        "versions": {
+          "ai": "7.0.107",
+          "@ai-sdk/openai-compatible": "3.0.53",
+          "zod": "4.4.3"
+        }
+      },
+      "moduleComparison": [
+        {
+          "module": "apps/server/dist/src/ai/ai-sdk-generation.adapter.js",
+          "localSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "targetSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-sdk-generation-model.js",
+          "localSha256": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "targetSha256": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-sdk-generation-facts.js",
+          "localSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "targetSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-diagnostics.js",
+          "localSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "targetSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js",
+          "localSha256": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "targetSha256": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js",
+          "localSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "targetSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js",
+          "localSha256": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "targetSha256": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js",
+          "localSha256": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "targetSha256": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-generation-http-response-error.js",
+          "localSha256": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "targetSha256": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/ai/ai-sdk-runtime-versions.js",
+          "localSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "targetSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/research/research.controller.js",
+          "localSha256": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "targetSha256": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+          "matches": true
+        },
+        {
+          "module": "apps/server/dist/src/research/research-submission.service.js",
+          "localSha256": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "targetSha256": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+          "matches": true
+        },
+        {
+          "module": "@thesis-ledger/schemas/dist/index.js",
+          "localSha256": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+          "targetSha256": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+          "matches": true
+        },
+        {
+          "module": "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js",
+          "localSha256": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+          "targetSha256": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+          "matches": true
+        },
+        {
+          "module": "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js",
+          "localSha256": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57",
+          "targetSha256": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57",
+          "matches": true
+        }
+      ],
+      "environmentUnchanged": true
+    }
+  ],
+  "containers": {
+    "before": [
+      {
+        "id": "70e9eee9e22abf58323fe22582ac0042204ba42eac4d4cae0391fc3d4e9bd36d",
+        "name": "/thesis-ledger-dev-thesis-ledger-1",
+        "imageId": "sha256:42d12136ad41bb4c2af4b56974d8ecc9ffcacc23e75d225397c70c888eb07ce3",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:15.793267003Z",
+        "mounts": [
+          {
+            "Destination": "/app/var/backtest",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "thesis-ledger-backtest-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {
+          "3000/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "3000"
+            }
+          ]
+        }
+      },
+      {
+        "id": "4d3fdd133f45e75f16e509a85002b653d3d6218a5924856cc84993c57906b35d",
+        "name": "/thesis-ledger-dev-backtest-worker-1",
+        "imageId": "sha256:42d12136ad41bb4c2af4b56974d8ecc9ffcacc23e75d225397c70c888eb07ce3",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:15.923878878Z",
+        "mounts": [
+          {
+            "Destination": "/app/var/backtest",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "thesis-ledger-backtest-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {}
+      },
+      {
+        "id": "d76d83b6dde32e8578a9c5e8d6b63e4736be6132b66617323a1f742ddaf29c9a",
+        "name": "/thesis-ledger-dev-postgres-1",
+        "imageId": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:03.109419803Z",
+        "mounts": [
+          {
+            "Destination": "/var/lib/postgresql/data",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "thesis-ledger-postgres-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {
+          "5432/tcp": null
+        }
+      },
+      {
+        "id": "47bfd13c1d3835fac033616bd08a2f5e9b4ec32cadf6aa2fdead8ef1aae10fc0",
+        "name": "/thesis-ledger-dev-redis-1",
+        "imageId": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:03.257771344Z",
+        "mounts": [
+          {
+            "Destination": "/data",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "thesis-ledger-redis-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {
+          "6379/tcp": null
+        }
+      },
+      {
+        "id": "4405d6171283af3eafae34748f422afb3e23a8848c7ac5dc6d17ff72a0a1eb86",
+        "name": "/thesis-ledger-dev-dsa-1",
+        "imageId": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:09.509367916Z",
+        "mounts": [
+          {
+            "Destination": "/app/data",
+            "Driver": "local",
+            "Mode": "z",
+            "Name": "thesis-ledger-dsa-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/app/logs",
+            "Driver": "local",
+            "Mode": "z",
+            "Name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/app/reports",
+            "Driver": "local",
+            "Mode": "z",
+            "Name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {
+          "60355/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "60355"
+            }
+          ],
+          "8000/tcp": [
+            {
+              "HostIp": "0.0.0.0",
+              "HostPort": "8000"
+            },
+            {
+              "HostIp": "::",
+              "HostPort": "8000"
+            }
+          ]
+        }
+      }
+    ],
+    "after": [
+      {
+        "id": "70e9eee9e22abf58323fe22582ac0042204ba42eac4d4cae0391fc3d4e9bd36d",
+        "name": "/thesis-ledger-dev-thesis-ledger-1",
+        "imageId": "sha256:42d12136ad41bb4c2af4b56974d8ecc9ffcacc23e75d225397c70c888eb07ce3",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-25T06:23:43.750197217Z",
+        "mounts": [
+          {
+            "Destination": "/app/var/backtest",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "thesis-ledger-backtest-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {
+          "3000/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "3000"
+            }
+          ]
+        }
+      },
+      {
+        "id": "4d3fdd133f45e75f16e509a85002b653d3d6218a5924856cc84993c57906b35d",
+        "name": "/thesis-ledger-dev-backtest-worker-1",
+        "imageId": "sha256:42d12136ad41bb4c2af4b56974d8ecc9ffcacc23e75d225397c70c888eb07ce3",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-25T06:23:43.757909675Z",
+        "mounts": [
+          {
+            "Destination": "/app/var/backtest",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "thesis-ledger-backtest-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-backtest-data/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {}
+      },
+      {
+        "id": "d76d83b6dde32e8578a9c5e8d6b63e4736be6132b66617323a1f742ddaf29c9a",
+        "name": "/thesis-ledger-dev-postgres-1",
+        "imageId": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:03.109419803Z",
+        "mounts": [
+          {
+            "Destination": "/var/lib/postgresql/data",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "thesis-ledger-postgres-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-postgres-data/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {
+          "5432/tcp": null
+        }
+      },
+      {
+        "id": "47bfd13c1d3835fac033616bd08a2f5e9b4ec32cadf6aa2fdead8ef1aae10fc0",
+        "name": "/thesis-ledger-dev-redis-1",
+        "imageId": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:03.257771344Z",
+        "mounts": [
+          {
+            "Destination": "/data",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "thesis-ledger-redis-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-redis-data/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {
+          "6379/tcp": null
+        }
+      },
+      {
+        "id": "4405d6171283af3eafae34748f422afb3e23a8848c7ac5dc6d17ff72a0a1eb86",
+        "name": "/thesis-ledger-dev-dsa-1",
+        "imageId": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:09.509367916Z",
+        "mounts": [
+          {
+            "Destination": "/app/data",
+            "Driver": "local",
+            "Mode": "z",
+            "Name": "thesis-ledger-dsa-data",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/thesis-ledger-dsa-data/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/app/logs",
+            "Driver": "local",
+            "Mode": "z",
+            "Name": "599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/599903abb5be8079f8d4279528f106b20ccbd5e1cf0678ae47e3230335ccfcd4/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/app/reports",
+            "Driver": "local",
+            "Mode": "z",
+            "Name": "32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/32477b9586909ccdd76546d18db79872e3f49ee7d3c37db6df78131be426a7d0/_data",
+            "Type": "volume"
+          }
+        ],
+        "ports": {
+          "60355/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "60355"
+            }
+          ],
+          "8000/tcp": [
+            {
+              "HostIp": "0.0.0.0",
+              "HostPort": "8000"
+            },
+            {
+              "HostIp": "::",
+              "HostPort": "8000"
+            }
+          ]
+        }
+      }
+    ],
+    "comparison": [
+      {
+        "name": "/thesis-ledger-dev-thesis-ledger-1",
+        "containerIdUnchanged": true,
+        "imageUnchanged": true,
+        "mountsUnchanged": true,
+        "health": "healthy",
+        "restarted": true
+      },
+      {
+        "name": "/thesis-ledger-dev-backtest-worker-1",
+        "containerIdUnchanged": true,
+        "imageUnchanged": true,
+        "mountsUnchanged": true,
+        "health": "healthy",
+        "restarted": true
+      },
+      {
+        "name": "/thesis-ledger-dev-postgres-1",
+        "containerIdUnchanged": true,
+        "imageUnchanged": true,
+        "mountsUnchanged": true,
+        "health": "healthy",
+        "restarted": false
+      },
+      {
+        "name": "/thesis-ledger-dev-redis-1",
+        "containerIdUnchanged": true,
+        "imageUnchanged": true,
+        "mountsUnchanged": true,
+        "health": "healthy",
+        "restarted": false
+      },
+      {
+        "name": "/thesis-ledger-dev-dsa-1",
+        "containerIdUnchanged": true,
+        "imageUnchanged": true,
+        "mountsUnchanged": true,
+        "health": "healthy",
+        "restarted": false
+      }
+    ]
+  },
+  "database": {
+    "readOnlyTransaction": true,
+    "repeatableRead": true,
+    "before": {
+      "database": {
+        "database": "thesis_ledger",
+        "role": "thesis_ledger_app",
+        "owner": "thesis_ledger"
+      },
+      "schemaVersion": "20261023010000_report_metadata_snapshots",
+      "tables": {
+        "Account": {
+          "count": 28,
+          "hash": "13e6b7a7077847b77f046c9630b88eaa"
+        },
+        "AccountLedgerState": {
+          "count": 22,
+          "hash": "d37976441f50092c84e086b5dffcefeb"
+        },
+        "AiDecisionLog": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "AiInvocation": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "AiInvocationFact": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "AiRoutingSettings": {
+          "count": 1,
+          "hash": "a35beab6591d9b85d1af3134cfc3e64a"
+        },
+        "AiRun": {
+          "count": 7,
+          "hash": "6bc730132f416cfe3cf921495d3435bd"
+        },
+        "AiToolCall": {
+          "count": 77,
+          "hash": "a9024185f33aac5ae9abc0c8a2fefe0c"
+        },
+        "Asset": {
+          "count": 4,
+          "hash": "72d3169764b3d525e8fea60b64c7791a"
+        },
+        "BacktestJob": {
+          "count": 71,
+          "hash": "a451cee8e3f882d85df36995ece104a0"
+        },
+        "CashBalance": {
+          "count": 18,
+          "hash": "d5aff2fd514150c1901c61fd71bbede6"
+        },
+        "JournalEntry": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "JournalReviewSnapshot": {
+          "count": 4,
+          "hash": "fa1398f19b5b7658f1facc0b36690d0b"
+        },
+        "LedgerEvent": {
+          "count": 138,
+          "hash": "544c50cfe55593d35f1b7de8c8d8fc4d"
+        },
+        "PortfolioSnapshot": {
+          "count": 6,
+          "hash": "c6d7fb743a063d568ac18c256140c185"
+        },
+        "ProviderConfig": {
+          "count": 3,
+          "hash": "9010e83965add65b8259aa367135967d"
+        },
+        "ResearchObservation": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "ResearchObservationSubmission": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "ResearchObservationVersion": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "Strategy": {
+          "count": 99,
+          "hash": "405dedd5f3721550870739ac43bf6b7e"
+        },
+        "StrategyVersion": {
+          "count": 108,
+          "hash": "f92d6f492128960f0fc26764149d9725"
+        },
+        "Trade": {
+          "count": 20,
+          "hash": "167ddb4947a6fbdffe72e12950018095"
+        }
+      },
+      "statuses": {
+        "AiRun": [
+          {
+            "status": "failed",
+            "count": 6
+          },
+          {
+            "status": "succeeded",
+            "count": 1
+          }
+        ],
+        "BacktestJob": [
+          {
+            "status": "failed",
+            "count": 14
+          },
+          {
+            "status": "succeeded",
+            "count": 57
+          }
+        ],
+        "OptimizationAttempt": [],
+        "OptimizationExperiment": [],
+        "StrategyAuthoringOperation": [],
+        "StrategyAuthoringProposal": []
+      },
+      "d20": [
+        {
+          "id": "238c6c7e-54f7-4f46-9fc6-c7ffb0188a81",
+          "status": "failed",
+          "errorCode": "research_unknown_outcome",
+          "resultPresent": false,
+          "hash": "d5f9ca41c5b5bf72895025c1f0c3cbca"
+        }
+      ]
+    },
+    "after": {
+      "database": {
+        "database": "thesis_ledger",
+        "role": "thesis_ledger_app",
+        "owner": "thesis_ledger"
+      },
+      "schemaVersion": "20261023010000_report_metadata_snapshots",
+      "tables": {
+        "Account": {
+          "count": 28,
+          "hash": "13e6b7a7077847b77f046c9630b88eaa"
+        },
+        "AccountLedgerState": {
+          "count": 22,
+          "hash": "d37976441f50092c84e086b5dffcefeb"
+        },
+        "AiDecisionLog": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "AiInvocation": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "AiInvocationFact": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "AiRoutingSettings": {
+          "count": 1,
+          "hash": "a35beab6591d9b85d1af3134cfc3e64a"
+        },
+        "AiRun": {
+          "count": 7,
+          "hash": "6bc730132f416cfe3cf921495d3435bd"
+        },
+        "AiToolCall": {
+          "count": 77,
+          "hash": "a9024185f33aac5ae9abc0c8a2fefe0c"
+        },
+        "Asset": {
+          "count": 4,
+          "hash": "72d3169764b3d525e8fea60b64c7791a"
+        },
+        "BacktestJob": {
+          "count": 71,
+          "hash": "a451cee8e3f882d85df36995ece104a0"
+        },
+        "CashBalance": {
+          "count": 18,
+          "hash": "d5aff2fd514150c1901c61fd71bbede6"
+        },
+        "JournalEntry": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "JournalReviewSnapshot": {
+          "count": 4,
+          "hash": "fa1398f19b5b7658f1facc0b36690d0b"
+        },
+        "LedgerEvent": {
+          "count": 138,
+          "hash": "544c50cfe55593d35f1b7de8c8d8fc4d"
+        },
+        "PortfolioSnapshot": {
+          "count": 6,
+          "hash": "c6d7fb743a063d568ac18c256140c185"
+        },
+        "ProviderConfig": {
+          "count": 3,
+          "hash": "9010e83965add65b8259aa367135967d"
+        },
+        "ResearchObservation": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "ResearchObservationSubmission": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "ResearchObservationVersion": {
+          "count": 0,
+          "hash": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "Strategy": {
+          "count": 99,
+          "hash": "405dedd5f3721550870739ac43bf6b7e"
+        },
+        "StrategyVersion": {
+          "count": 108,
+          "hash": "f92d6f492128960f0fc26764149d9725"
+        },
+        "Trade": {
+          "count": 20,
+          "hash": "167ddb4947a6fbdffe72e12950018095"
+        }
+      },
+      "statuses": {
+        "AiRun": [
+          {
+            "status": "failed",
+            "count": 6
+          },
+          {
+            "status": "succeeded",
+            "count": 1
+          }
+        ],
+        "BacktestJob": [
+          {
+            "status": "failed",
+            "count": 14
+          },
+          {
+            "status": "succeeded",
+            "count": 57
+          }
+        ],
+        "OptimizationAttempt": [],
+        "OptimizationExperiment": [],
+        "StrategyAuthoringOperation": [],
+        "StrategyAuthoringProposal": []
+      },
+      "d20": [
+        {
+          "id": "238c6c7e-54f7-4f46-9fc6-c7ffb0188a81",
+          "status": "failed",
+          "errorCode": "research_unknown_outcome",
+          "resultPresent": false,
+          "hash": "d5f9ca41c5b5bf72895025c1f0c3cbca"
+        }
+      ]
+    },
+    "all22TablesExact": true,
+    "d20Exact": true,
+    "noNonterminalJobs": true
+  },
+  "infraFiles": {
+    "before": {
+      ".env": "77e8cb903020b8c6afc19dd6908bb08d481f0db45e505f406a287e08ee89efe0",
+      ".env.example": "dff1263a2019a9f4cc3bb28637e50f6acdb8d49d2dc9e8f269f41ba034f33a0b",
+      "compose.yml": "3cbdd9d50609c4986f1626ee195dc1062f47d8c07d14006307b3233c0cab194b",
+      "compose.dev.yml": "1e195168bfad7ea6eadbdc631e931354226e1d6aa60ae3e74379718dae2848ab",
+      "scripts/sync-code.sh": "9e20d978fc894c60d1fcb24e520dbd70baa50f3703248f9649a94879229b9f83",
+      "scripts/update.sh": "72e71291c780fdfd88c59259452d7ab8aff7a5960e6229d49e86b616c46d7514",
+      "scripts/update-lock.sh": "5b2ea3bfdfd36a84bbb387124b28ea49f33cfd53567e7ee729b7f7e373b7eec8"
+    },
+    "after": {
+      ".env": "77e8cb903020b8c6afc19dd6908bb08d481f0db45e505f406a287e08ee89efe0",
+      ".env.example": "dff1263a2019a9f4cc3bb28637e50f6acdb8d49d2dc9e8f269f41ba034f33a0b",
+      "compose.yml": "3cbdd9d50609c4986f1626ee195dc1062f47d8c07d14006307b3233c0cab194b",
+      "compose.dev.yml": "1e195168bfad7ea6eadbdc631e931354226e1d6aa60ae3e74379718dae2848ab",
+      "scripts/sync-code.sh": "9e20d978fc894c60d1fcb24e520dbd70baa50f3703248f9649a94879229b9f83",
+      "scripts/update.sh": "72e71291c780fdfd88c59259452d7ab8aff7a5960e6229d49e86b616c46d7514",
+      "scripts/update-lock.sh": "5b2ea3bfdfd36a84bbb387124b28ea49f33cfd53567e7ee729b7f7e373b7eec8"
+    },
+    "unchanged": true
+  },
+  "capabilities": {
+    "status": 200,
+    "version": "research-capabilities-v2",
+    "canCreate": false,
+    "scopeCount": 5,
+    "bytes": 124,
+    "sha256": "962b56cc67ec701a493ead67228bb6dc5abbece9d0889e9ea81622538cd9fe20",
+    "proxyMode": "explicit_direct"
+  },
+  "startupLogs": [
+    {
+      "container": "thesis-ledger-dev-thesis-ledger-1",
+      "exitCode": 0,
+      "observedLines": 301,
+      "errorLevelLines": 0,
+      "missingModule": false,
+      "missingRelation": false
+    },
+    {
+      "container": "thesis-ledger-dev-backtest-worker-1",
+      "exitCode": 0,
+      "observedLines": 2,
+      "errorLevelLines": 0,
+      "missingModule": false,
+      "missingRelation": false
+    }
+  ],
+  "priorValidation": {
+    "d22InputsMatched": 30,
+    "d23InputsMatched": true,
+    "reused": "D22 错误路径／D23 手机夹具及边界按未变输入复用，未重复全量测试",
+    "hostHead": "da002744bd317b7754832c6ac41d169bcf005e27",
+    "infraHead": "3f661df1deb3de894755dcc66e584abb4165d014",
+    "stagedFiles": []
+  },
+  "remaining": {
+    "formalG3Accepted": false,
+    "realD21ResponseObserved": false,
+    "d20ActualHttpResponseKnown": false,
+    "d20ActualCostKnown": false,
+    "imageRebuildReadbackAccepted": false,
+    "next": "模型继续冻结；真实响应、正式 V2 报告／引用／历史及镜像重建反读另按原 G3 授权与标准执行"
+  },
+  "worktreeProtection": {
+    "before": {
+      "thesisLedgerWip": 1214,
+      "infraWip": 105
+    },
+    "after": {
+      ".": {
+        "head": "da002744bd317b7754832c6ac41d169bcf005e27",
+        "wip": 1216,
+        "staged": []
+      },
+      "../thesis-ledger-infra": {
+        "head": "3f661df1deb3de894755dcc66e584abb4165d014",
+        "wip": 105,
+        "staged": []
+      }
+    },
+    "d22InputDrift": [],
+    "d23InputDrift": [],
+    "stageActions": 0,
+    "commitActions": 0
+  },
+  "modifiedSourceFiles": [
+    "docs/specs/2026-10-18-research-evidence-evolution.md",
+    "docs/tasks/2026-10-18-research-evidence-evolution.md",
+    "docs/tasks/evidence/2026-10-25-g3-http-response-local.md",
+    "docs/tasks/evidence/2026-10-25-g3-d21-preflight.md",
+    "docs/tasks/evidence/2026-10-25-g3-d21-deployment.md",
+    "docs/tasks/evidence/2026-10-25-g3-d21-deployment.json"
+  ],
+  "finalConsistency": {
+    "localFileLinksChecked": 84,
+    "missingLocalFiles": 0,
+    "formatExitCode": 0,
+    "d24ScopeComplete": true,
+    "d8D20D21bRemainUnchecked": true,
+    "actualModelCalls": 0,
+    "remainingModelCallsFrozen": 8,
+    "moduleMatchesPerTarget": 15,
+    "protectedTablesExact": 22
+  }
+}

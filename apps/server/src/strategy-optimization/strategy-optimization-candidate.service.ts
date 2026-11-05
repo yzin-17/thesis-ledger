@@ -1,3 +1,5 @@
+import { aiGenerationContracts } from '@thesis-ledger/schemas';
+import { assertGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -266,6 +268,7 @@ export class StrategyOptimizationCandidateService {
       configurationFingerprint: resolved.execution.readiness.configurationFingerprint,
     };
     const provider = resolved.provider;
+    if (resolved.execution.mode === 'json_validated') assertGenerationSchemaPrompt(experiment.sourceMode === 'discovery' ? aiGenerationContracts.strategyDiscovery.schema : aiGenerationContracts.parameterOptimization.schema, messages);
     const inputTokenReservation = this.runs.conservativeInputTokenReservation(messages);
     const outputTokenReservation = this.runs.outputTokenReservation(experiment);
     const pricing = optimizationPricingForExperimentRoute(

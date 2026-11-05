@@ -1,3 +1,4 @@
+import { TableContainer } from '@/components/ui/table';
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,7 +62,7 @@ export function StrategyBacktestEquityDetails({
   };
 
   return (
-    <details className="group rounded-lg border bg-card">
+    <details className="group rounded-md border border-border bg-card">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
         <span>
           <span className="font-medium">查看权益明细（{points.length} 个时点）</span>
@@ -101,9 +102,9 @@ export function StrategyBacktestEquityDetails({
             {model.limitation}导出仅包含已返回记录，不代表全部历史数据。
           </p>
         )}
-        <div className="overflow-x-auto rounded-md border">
+        <TableContainer frame="plain">
           <table className="w-full min-w-[760px] text-sm">
-            <thead className="border-b bg-muted/30 text-left">
+            <thead className="border-b text-left">
               <tr>
                 <th className="px-3 py-2 font-medium">时间（{model.timezone}）</th>
                 <th className="px-3 py-2 text-right font-medium">组合权益</th>
@@ -141,7 +142,7 @@ export function StrategyBacktestEquityDetails({
               )}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
             第 {safePage} / {totalPages} 页

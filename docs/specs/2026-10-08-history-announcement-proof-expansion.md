@@ -1,6 +1,6 @@
 # 历史公告事实扩展与原文核验
 
-对应[已完成实施记录](../archive/tasks/2026-10-08-history-announcement-proof-expansion.md)及[原文验收](../tasks/evidence/2026-10-08-history-announcement-proof-expansion.md)。本次完成现有中国内地四证券公告链的实际缺口；其范围外的后续需求由 2026-10-09 [历史数据按需获取 Spec](2026-10-09-history-data-on-demand.md)及[Task](../tasks/2026-10-09-history-data-on-demand.md)承接，本页原验收范围保持，不重新启用此前取消的严格 PIT、复权因子派生或已跳过收费来源。
+对应[已完成实施记录](../archive/tasks/2026-10-08-history-announcement-proof-expansion.md)及[原文验收](../tasks/evidence/2026-10-08-history-announcement-proof-expansion.md)。本次完成现有中国内地四证券公告链的实际缺口；其范围外的后续需求由 2026-10-09 [历史数据按需获取 Spec](2026-10-09-history-data-on-demand.md)及[Task](../archive/tasks/2026-10-09-history-data-on-demand.md)承接，本页原验收范围保持，不重新启用此前取消的严格 PIT、复权因子派生或已跳过收费来源。
 
 ## 目标与行为
 

@@ -7,6 +7,11 @@ import {
 } from './market-data-wire-v3.js';
 import { marketRouteKeyIdV3 } from './market-route-v3.js';
 
+const supportedChartRoute = (key: { timeframe: string; market: string; assetType: string; adjustment: string }) =>
+  key.timeframe === '1d' ||
+  (key.timeframe === '1m' && ['HK', 'US'].includes(key.market) &&
+    ['STOCK', 'ETF'].includes(key.assetType) && key.adjustment === 'none');
+
 /** Interactive observations never constitute a complete backtest window. */
 export const marketChartBarsRequestV3Schema = marketDataBarSeriesRequestV3Schema
   .safeExtend({
@@ -14,8 +19,8 @@ export const marketChartBarsRequestV3Schema = marketDataBarSeriesRequestV3Schema
     routeTarget: marketDataRouteTargetPinV3Schema,
   })
   .superRefine((request, context) => {
-    if (request.routeKey.timeframe !== '1d') {
-      context.addIssue({ code: 'custom', path: ['routeKey'], message: '交互图表当前仅支持日线' });
+    if (!supportedChartRoute(request.routeKey)) {
+      context.addIssue({ code: 'custom', path: ['routeKey'], message: '分钟图表仅支持港美股票/ETF不复权正常时段' });
     }
   });
 export type MarketChartBarsRequestV3 = z.infer<typeof marketChartBarsRequestV3Schema>;
@@ -33,11 +38,14 @@ export const marketChartBarsResponseV3Schema = z
     sourcePriceBasis: completeShape.sourcePriceBasis,
     provenance: completeShape.provenance,
     inputFingerprint: completeShape.inputFingerprint,
+    session: z.literal('regular').optional(),
   })
   .superRefine((response, context) => {
     const issue = (path: (string | number)[], message: string) =>
       context.addIssue({ code: 'custom', path, message });
-    if (response.routeKey.timeframe !== '1d') issue(['routeKey'], '交互图表当前仅支持日线');
+    if (!supportedChartRoute(response.routeKey)) issue(['routeKey'], '分钟图表仅支持港美股票/ETF不复权正常时段');
+    const minute = response.routeKey.timeframe === '1m';
+    if (minute && response.session !== 'regular') issue(['session'], '分钟图表必须声明正常交易时段');
     if (response.sourcePriceBasis.adjustment !== response.routeKey.adjustment) {
       issue(['sourcePriceBasis', 'adjustment'], '来源价格口径必须匹配路由');
     }
@@ -55,20 +63,25 @@ export const marketChartBarsResponseV3Schema = z
       );
       const date = `${parts.get('year')}-${parts.get('month')}-${parts.get('day')}`;
       if (date < response.coverage.requestedStart || date > response.coverage.requestedEnd) {
-        issue(['bars', index, 'timestamp'], '日线必须处于请求日期窗口');
+        issue(['bars', index, 'timestamp'], 'K线必须处于请求日期窗口');
       }
-      if (date === previousDate) issue(['bars', index, 'timestamp'], '同一交易日不得重复');
+      if (!minute && date === previousDate) issue(['bars', index, 'timestamp'], '同一交易日不得重复');
       previousDate = date;
-      if (point.completionStatus === 'complete') latestComplete = date;
+      if (minute && Date.parse(point.timestamp) % 60_000 !== 0) issue(['bars', index, 'timestamp'], '分钟时间必须对齐整分钟');
+      if (minute && point.completionStatus === 'complete' &&
+        Date.parse(point.timestamp) + 60_000 > Date.parse(response.sourcePriceBasis.observedAt)) {
+        issue(['bars', index, 'completionStatus'], '分钟结束晚于观察时间，不能声明完成');
+      }
+      if (!minute && point.completionStatus === 'complete') latestComplete = date;
       if (Date.parse(point.availableAt) > Date.parse(response.sourcePriceBasis.observedAt)) {
         issue(['bars', index, 'availableAt'], '可用时间不能晚于本次来源观测时间');
       }
     }
     if (response.coverage.actualStart !== (response.bars[0]?.timestamp ?? null)) {
-      issue(['coverage', 'actualStart'], '实际起点必须匹配首条日线');
+      issue(['coverage', 'actualStart'], '实际起点必须匹配首条K线');
     }
     if (response.coverage.actualEnd !== (response.bars.at(-1)?.timestamp ?? null)) {
-      issue(['coverage', 'actualEnd'], '实际终点必须匹配末条日线');
+      issue(['coverage', 'actualEnd'], '实际终点必须匹配末条K线');
     }
     if (response.coverage.latestCompleteTradingDate !== latestComplete) {
       issue(['coverage', 'latestCompleteTradingDate'], '最近完整交易日必须来自返回的完整日线');

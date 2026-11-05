@@ -22,7 +22,7 @@
 3. RiskEvent 引用原规则版本、触发值、阈值和行情时点。
 4. AI 只解释 Tool 提供的确定性结果，不重新计算风险触发条件。
 5. Redis 丢失不影响事实完整性。
-6. Account 不保存持仓录入来源；手动或截图来源属于 Ledger 事件或 ImportDraft。
+6. Account 不保存持仓录入来源；录入来源属于 Ledger 事件或 ImportDraft。
 7. 真实账户与影子账户使用独立 Ledger 和估值范围，默认聚合不得混合。
 
 V0.1 的截图直接写 Position 是过渡路径；迁移到 Ledger 前不得作为 V1 完成状态。

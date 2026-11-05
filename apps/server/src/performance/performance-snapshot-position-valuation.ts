@@ -1,10 +1,10 @@
+import type { FundNav } from '@thesis-ledger/schemas';
 import type { MarketService } from '../market/market.service.js';
 import type { MarketBarReader } from '../market/market-bar-reader.js';
 import type { Currency, SnapshotCaptureContext } from './performance-types.js';
 
 type SnapshotPosition = {
   symbol: string;
-  accountId: string;
   quantity: unknown;
   costPrice: unknown;
   asset: { assetType: string };
@@ -15,6 +15,11 @@ const marketForSymbol = (symbol: string): 'CN' | 'HK' | 'US' => {
   if (/\.HK$/.test(symbol)) return 'HK';
   if (/\.US$/.test(symbol)) return 'US';
   throw new Error(`无法识别正式估值市场: ${symbol}`);
+};
+
+const assertUsableFundNav = (nav: Pick<FundNav, 'unitNav' | 'freshness'>) => {
+  if (!Number.isFinite(nav.unitNav) || nav.unitNav <= 0 || nav.freshness !== 'delayed')
+    throw new Error('基金净值尚不可用于本次估值');
 };
 
 const basePositionValue = (position: SnapshotPosition, currency: Currency) => ({
@@ -45,15 +50,25 @@ export async function valueSnapshotPosition(
         );
         const official = history.find((point) => point.navDate.slice(0, 10) === valuationDateKey);
         if (!official) throw new Error(`${valuationDateKey} 正式净值尚未发布`);
+        if (official.freshness === 'stale')
+          throw new Error(`${valuationDateKey} 正式净值证据已陈旧`);
+        assertUsableFundNav(official);
         return {
           ...base,
           marketValue: base.quantity * official.unitNav,
           provider: official.provider,
           stale: false,
           freshness: official.freshness,
+          valuationEvidence: {
+            kind: 'fund-nav',
+            date: valuationDateKey,
+            unitNav: official.unitNav,
+            provider: official.provider,
+          },
         };
       }
       const nav = await market.getFundNav(position.symbol, { allowStale: false });
+      assertUsableFundNav(nav);
       return {
         ...base,
         marketValue: base.quantity * nav.unitNav,
@@ -70,14 +85,19 @@ export async function valueSnapshotPosition(
         market: marketCode,
         symbol: position.symbol,
         routeKey: {
-          kind: 'bar', market: marketCode, assetType,
-          capability: 'DAILY_BAR', timeframe: '1d', adjustment: 'none',
+          kind: 'bar',
+          market: marketCode,
+          assetType,
+          capability: 'DAILY_BAR',
+          timeframe: '1d',
+          adjustment: 'none',
         },
         window: { start: valuationDateKey, end: valuationDateKey },
       });
       if (selected.status !== 'selected') throw new Error(`${valuationDateKey} 正式收盘价不可用`);
       const official = selected.selection.response.bars.find(
-        (bar) => bar.timestamp.slice(0, 10) === valuationDateKey && bar.completionStatus === 'complete',
+        (bar) =>
+          bar.timestamp.slice(0, 10) === valuationDateKey && bar.completionStatus === 'complete',
       );
       if (!official) throw new Error(`${valuationDateKey} 正式收盘价尚未发布`);
       return {
@@ -86,6 +106,14 @@ export async function valueSnapshotPosition(
         provider: selected.selection.response.provenance.providerId,
         stale: false,
         freshness: 'delayed' as const,
+        valuationEvidence: {
+          kind: 'bar-close',
+          date: valuationDateKey,
+          close: official.close,
+          timestamp: official.timestamp,
+          provider: selected.selection.response.provenance.providerId,
+          upstreamSource: selected.selection.response.provenance.upstreamSource,
+        },
       };
     }
     const quote = await market.getQuote(position.symbol, { allowStale: false });

@@ -73,6 +73,10 @@ export class ImportService {
     return this.drafts.history(accountId);
   }
 
+  reviewHistory(accountId: string) {
+    return this.drafts.reviewHistory(accountId);
+  }
+
   rollback(id: string) {
     return this.rollbacks.rollback(id);
   }

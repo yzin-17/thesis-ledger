@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
+import { workspaceLintSources } from './workspace-lint-sources.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -18,22 +18,7 @@ if (
 }
 const guardrails = argumentsList.includes('--guardrails');
 
-async function discover(directory) {
-  const files = [];
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      if (!(await eslint.isPathIgnored(join(path, '__lint_directory_probe__.ts')))) {
-        files.push(...(await discover(path)));
-      }
-    } else if (/\.(?:tsx?|mts)$/u.test(entry.name) && !(await eslint.isPathIgnored(path))) {
-      files.push(relative(root, path));
-    }
-  }
-  return files;
-}
-
-const files = (await discover(root))
+const files = (await workspaceLintSources(root, eslint))
   .filter((file) => !guardrails || ['apps', 'packages', 'services'].includes(file.split(sep)[0]))
   .sort();
 if (!files.length) throw new Error('未发现配置内的 TypeScript 文件，停止 lint');
@@ -65,9 +50,7 @@ if (argumentsList.includes('--list')) {
             'max-lines-per-function:[warn,{max:220,skipBlankLines:true,skipComments:true}]',
           ]
         : ['--max-warnings=0'];
-      let targets = entries;
-      if (!['root', 'apps', 'packages', 'services'].includes(scope)) targets = [scope];
-      execFileSync(process.execPath, [eslintCli, ...targets, ...options], {
+      execFileSync(process.execPath, [eslintCli, ...entries, ...options], {
         cwd: root,
         stdio: 'inherit',
       });

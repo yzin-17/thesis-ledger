@@ -24,7 +24,7 @@ Portfolio / Journal / AI Review
 
 - [`交易与成交记录系统`](../../specs/2026-08-26-trade-execution-ledger-system.md)；
 - [`交易与成交记录系统实施任务`](../tasks/2026-08-26-trade-execution-ledger-system.md)；
-- [`交易系统返工任务`](../../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)；
+- [`交易系统返工任务`](../tasks/2026-08-26-trade-execution-ledger-system-follow-up.md)；
 - `packages/domain/src/ledger-v2.ts`、`trade-projection.ts`、`trade-costs.ts`；
 - `docs/operations/2026-08-28-trade-projection-cutover.md`。
 

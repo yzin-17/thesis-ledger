@@ -11,6 +11,13 @@ apps/mobile/release/
 apps/mobile/.expo/
 apps/mobile/android/keystore.properties
 apps/mobile/android/*.keystore
+apps/mobile/config/release.local.json
+apps/mobile/config/signing.env
+*.p12
+*.p8
+*.jks
+*.mobileprovision
+*.xcarchive/
 *.apk
 *.aab
 *.ipa

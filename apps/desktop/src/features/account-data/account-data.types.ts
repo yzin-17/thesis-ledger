@@ -3,7 +3,7 @@ import type { LedgerAuditResponse, LedgerEvent } from '@thesis-ledger/api-client
 import type { Account } from '../portfolio/portfolio.types.js';
 import type { TransferEvent } from './account-data.cash.api.js';
 
-export type AccountDataTab = 'positions' | 'transactions' | 'cash';
+export type AccountDataTab = 'positions' | 'transactions' | 'cash' | 'fund-investments';
 export type ExecutionSide = 'BUY' | 'SELL';
 export type TimePrecision = 'INSTANT' | 'DATE';
 export type Currency = Account['currency'];

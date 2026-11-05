@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { PrismaClient } from '@prisma/client';
@@ -10,6 +11,7 @@ import {
   RecurringFundInvestmentPlanController,
 } from '../../src/fund-plans/recurring-fund-investment.controller.js';
 import { RecurringFundInvestmentService } from '../../src/fund-plans/recurring-fund-investment.service.js';
+import { CashLedgerCommandService } from '../../src/ledger/cash-ledger-command.service.js';
 import { LedgerCommandService } from '../../src/ledger/ledger-command.service.js';
 import { LedgerV2Repository } from '../../src/ledger/ledger-v2.repository.js';
 import { LedgerQueryService } from '../../src/ledger/ledger-query.service.js';
@@ -49,10 +51,9 @@ export async function createFundPostgresFixture() {
     },
   });
   const repository = new LedgerV2Repository(prisma as never);
-  const plans = new RecurringFundInvestmentService(
-    prisma as never,
-    new LedgerCommandService(repository),
-  );
+  const commands = new LedgerCommandService(repository);
+  const cashCommands = new CashLedgerCommandService(repository);
+  const plans = new RecurringFundInvestmentService(prisma as never, commands);
   const queries = new LedgerQueryService(
     prisma as never,
     repository,
@@ -130,8 +131,22 @@ export async function createFundPostgresFixture() {
     });
     return { account: owner, plan, occurrence };
   };
+  const fund = (accountId: string, amount: string) =>
+    cashCommands.createCashFlow({
+      command: 'CREATE_CASH_FLOW',
+      accountId,
+      occurredAt: '2025-01-01T00:00:00Z',
+      timePrecision: 'INSTANT',
+      sourceTimezone: 'UTC',
+      economicOrderKey: 'fixture-funding',
+      payload: { direction: 'INFLOW', category: 'DEPOSIT', amount, currency: 'CNY' },
+      source: { category: 'MANUAL', channel: 'isolated-funding', externalId: randomUUID() },
+      actorId: 'fixture-owner',
+    });
   return {
     prisma,
+    commands,
+    fund,
     plans,
     queries,
     scheduler,

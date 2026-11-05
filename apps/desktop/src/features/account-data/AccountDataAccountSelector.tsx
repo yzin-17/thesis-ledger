@@ -21,13 +21,8 @@ export function AccountDataAccountSelector({
   onSelectAccount: (accountId: string) => void | Promise<unknown>;
   onManageAccounts?: () => void;
 }) {
-  const allAccountsSelected = accountId === 'all';
-  let accountSelectionLabel = '选择账户';
-  if (allAccountsSelected) accountSelectionLabel = '全部账户';
-  else {
-    const selectedAccount = accounts.find((account) => account.id === accountId);
-    if (selectedAccount) accountSelectionLabel = accountDisplayLabel(selectedAccount);
-  }
+  const selectedAccount = accounts.find((account) => account.id === accountId);
+  const accountSelectionLabel = selectedAccount ? accountDisplayLabel(selectedAccount) : '选择账户';
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -46,7 +41,6 @@ export function AccountDataAccountSelector({
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="all">全部账户</SelectItem>
               {accounts.map((account) => (
                 <SelectItem key={account.id} value={account.id}>
                   {accountDisplayLabel(account)}
@@ -56,7 +50,7 @@ export function AccountDataAccountSelector({
           </SelectContent>
         </Select>
       </Field>
-      {!allAccountsSelected && onManageAccounts && (
+      {onManageAccounts && (
         <div className="flex shrink-0">
           <Button type="button" variant="outline" onClick={onManageAccounts}>
             管理账户

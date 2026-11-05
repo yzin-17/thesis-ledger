@@ -8,6 +8,7 @@ import {
   StickyTableActionCell,
   StickyTableActionHeader,
 } from '../src/features/shared/StickyTableActions.js';
+import { TableCell, TableHead } from '../src/components/ui/table.js';
 
 const featureRoot = fileURLToPath(new URL('../src/features', import.meta.url));
 
@@ -34,12 +35,37 @@ describe('表格操作列统一契约', () => {
         if (ts.isJsxElement(node)) {
           const tag = node.openingElement.tagName.getText(source);
           const attributes = node.openingElement.attributes.getText(source);
+          const row = node.parent;
+          const lastInRow =
+            ts.isJsxElement(row) &&
+            /^(tr|TableRow)$/.test(row.openingElement.tagName.getText(source)) &&
+            row.children.filter(ts.isJsxElement).at(-1) === node;
           if (
-            tag === 'th' &&
-            /操作|调整/.test(node.getText(source)) &&
+            (tag === 'th' || tag === 'TableHead') &&
+            lastInRow &&
+            /操作|调整|选择/.test(node.getText(source)) &&
             !attributes.includes('data-table-action-static')
           ) {
             violations.push(path);
+          }
+          if ((tag === 'td' || tag === 'TableCell') && !attributes.includes('colSpan')) {
+            if (lastInRow) {
+              let table: ts.Node | undefined = row.parent;
+              while (
+                table &&
+                !(
+                  ts.isJsxElement(table) &&
+                  /^(table|Table)$/.test(table.openingElement.tagName.getText(source))
+                )
+              )
+                table = table.parent;
+              const staticActions = table?.getText(source).includes('data-table-action-static');
+              if (
+                /onClick=|<Link\b|<DropdownMenuTrigger\b/.test(node.getText(source)) &&
+                !staticActions
+              )
+                violations.push(path);
+            }
           }
         }
         ts.forEachChild(node, visit);
@@ -59,11 +85,23 @@ describe('表格操作列统一契约', () => {
     expect(header).toContain('bg-muted');
     expect(header).toContain('before:w-px');
     expect(header).toContain('before:bg-border');
+    expect(header).toContain('text-right');
     expect(cell).toContain('data-sticky-table-action="cell"');
     expect(cell).toContain('sticky');
     expect(cell).toContain('right-0');
     expect(cell).toContain('bg-background');
     expect(cell).toContain('before:w-px');
     expect(cell).toContain('before:bg-border');
+    expect(cell).toContain('text-right');
+  });
+
+  it('共享文字列默认方向相同，数字列可以同时覆盖表头和内容', () => {
+    for (const Component of [TableHead, TableCell]) {
+      const textColumn = renderToStaticMarkup(<Component>状态</Component>);
+      const numberColumn = renderToStaticMarkup(<Component className="text-right">数量</Component>);
+      expect(textColumn).toContain('text-left');
+      expect(numberColumn).toContain('text-right');
+      expect(numberColumn).not.toContain('text-left');
+    }
   });
 });

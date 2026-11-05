@@ -1,12 +1,8 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createOpenAICompatible, type MetadataExtractor } from '@ai-sdk/openai-compatible';
 import {
   generateText,
   modelMessageSchema,
   streamText,
   type FinishReason,
-  type LanguageModel,
   type LanguageModelUsage,
   type TextStreamPart,
 } from 'ai';
@@ -17,17 +13,32 @@ import {
   type AiGenerationMode,
   type AiUsageFacts,
   type AiAuthMode,
+  type AiGenerationHttpRequestDiagnostic,
+  type AiModelRequestOptions,
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
+import { sdkSemanticProgress, sdkStreamAbortError } from './ai-sdk-stream-lifecycle.js';
+import type { AdaptiveTimeoutDecision } from './adaptive/ai-adaptive-policy.js';
+import type { AiExecutionTimeoutDecision } from './timeout/ai-timeout-policy.js';
+import { AiGenerationTiming } from './timeout/ai-generation-timing.js';
+import { traceSdkGeneration } from './trace/ai-trace-sdk.js';
+import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
+import { createGenerationModel } from './ai-sdk-generation-model.js';
 import {
-  AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
-  type AiCompatibilityExtensionProfile,
-} from './ai-provider-upstream.js';
+  createGenerationDiagnostics,
+  generationDiagnosticSnapshots,
+  generationHttpRequestFields,
+  type AiGenerationDiagnostics,
+} from './ai-generation-diagnostics.js';
 import {
   generationOutput,
   parseGenerationOutput,
   validateGenerationRequest,
 } from './ai-generation-output.js';
+import {
+  schemaGenerationFailure,
+  withGenerationRuntimeDiagnostic,
+} from './ai-generation-failure-diagnostics.js';
 import {
   AiSdkGenerationError,
   assertFinishReason,
@@ -42,7 +53,7 @@ export { AiSdkGenerationError } from './ai-sdk-generation-facts.js';
 type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export type AiSdkProgress = {
-  type: 'reasoning' | 'text' | 'heartbeat';
+  type: 'reasoning' | 'text' | 'tool' | 'heartbeat';
   at: string;
 };
 
@@ -61,7 +72,9 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   mode: AiGenerationMode;
   transport: 'single' | 'stream';
   maxOutputTokens?: number;
+  requestOptions?: AiModelRequestOptions;
   reasoningEffort?: ReasoningEffort;
+  reasoningEnabled?: boolean;
   timeout: {
     /** 总时长上限；流式请求可以不设，此时由 firstChunkMs / chunkMs 判活。 */
     totalMs?: number;
@@ -70,6 +83,11 @@ export type AiSdkGenerationRequest<OUTPUT> = {
   };
   signal: AbortSignal;
   onProgress?: (progress: AiSdkProgress) => void;
+  /** 传输边界可注入原生 HTTP 或受控响应适配器；SDK 解析逻辑保持一致。 */
+  httpClient?: typeof fetch;
+  adaptiveExecution?: AdaptiveTimeoutDecision;
+  timeoutDecision?: AiExecutionTimeoutDecision;
+  executionIdentity?: { runId: string; executionAttempt: number };
 };
 
 export type AiSdkGenerationResult<OUTPUT> = {
@@ -82,6 +100,8 @@ export type AiSdkGenerationResult<OUTPUT> = {
   providerCostCurrency: string | null;
   timeToFirstEventMs: number | null;
   timeToFirstTextMs: number | null;
+  httpRequest?: AiGenerationHttpRequestDiagnostic;
+  timing?: ReturnType<AiGenerationTiming['snapshot']>;
 };
 
 const telemetry = { isEnabled: false, recordInputs: false, recordOutputs: false } as const;
@@ -90,120 +110,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-
-const openRouterCostMetadata = (value: unknown) => {
-  const usage = asRecord(asRecord(value)?.usage);
-  const cost = usage?.cost;
-  if (typeof cost !== 'number' || !Number.isFinite(cost) || cost < 0) return undefined;
-  return { openrouter: { usage: { cost } } };
-};
-
-const openRouterMetadataExtractor: MetadataExtractor = {
-  extractMetadata: ({ parsedBody }) => Promise.resolve(openRouterCostMetadata(parsedBody)),
-  createStreamExtractor: () => {
-    let metadata: ReturnType<typeof openRouterCostMetadata>;
-    return {
-      processChunk: (parsedChunk) => {
-        metadata = openRouterCostMetadata(parsedChunk) ?? metadata;
-      },
-      buildMetadata: () => metadata,
-    };
-  },
-};
-
-const convertCompatibleUsage = (
-  usage:
-    | {
-        prompt_tokens?: number | null | undefined;
-        completion_tokens?: number | null | undefined;
-        prompt_tokens_details?: { cached_tokens?: number | null | undefined } | null | undefined;
-        completion_tokens_details?:
-          { reasoning_tokens?: number | null | undefined } | null | undefined;
-      }
-    | null
-    | undefined,
-) => ({
-  inputTokens: {
-    total: usage?.prompt_tokens ?? undefined,
-    noCache: undefined,
-    cacheRead: usage?.prompt_tokens_details?.cached_tokens ?? undefined,
-    cacheWrite: undefined,
-  },
-  outputTokens: {
-    total: usage?.completion_tokens ?? undefined,
-    text: undefined,
-    reasoning: usage?.completion_tokens_details?.reasoning_tokens ?? undefined,
-  },
-});
-
-const compatibilityProfile = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) =>
-  input.compatibilityExtensionProfile ??
-  (input.adapter === 'openrouter' ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 : undefined);
-
-const openRouterTransform = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
-  if (compatibilityProfile(input) !== AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1)
-    return undefined;
-  return (body: Record<string, unknown>) => {
-    if (input.mode !== 'native_schema') return body;
-    return { ...body, provider: { require_parameters: true } };
-  };
-};
-
-const noAuthFetch = async (
-  input: Parameters<typeof fetch>[0],
-  init?: Parameters<typeof fetch>[1],
-) => {
-  const headers = new Headers(init?.headers);
-  for (const header of ['authorization', 'x-api-key', 'api-key']) headers.delete(header);
-  return globalThis.fetch(input, { ...init, headers });
-};
-
-const modelFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>): LanguageModel => {
-  if (
-    compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 &&
-    input.reasoningEffort === 'max'
-  )
-    throw new AiSdkGenerationError(
-      aiGenerationErrorSchema.parse({
-        code: 'capability_unsupported',
-        phase: 'preflight',
-        summary: 'OpenRouter 兼容扩展不支持 max reasoning effort',
-        externalResult: 'not_sent',
-        requestId: input.requestId,
-      }),
-      { status: 'unknown', inputTokens: null, outputTokens: null },
-    );
-  const noAuth = input.authMode === 'none' ? { fetch: noAuthFetch } : {};
-  if (input.adapter === 'openai-chat') {
-    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).chat(
-      input.model,
-    );
-  }
-  if (input.adapter === 'openai-responses') {
-    return createOpenAI({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).responses(
-      input.model,
-    );
-  }
-  if (input.adapter === 'anthropic-messages') {
-    return createAnthropic({ baseURL: input.baseURL, apiKey: input.apiKey, ...noAuth }).messages(
-      input.model,
-    );
-  }
-  const transformRequestBody = openRouterTransform(input);
-  return createOpenAICompatible({
-    name: 'compatible',
-    baseURL: input.baseURL,
-    apiKey: input.apiKey,
-    ...noAuth,
-    includeUsage: true,
-    supportsStructuredOutputs: input.mode === 'native_schema',
-    convertUsage: convertCompatibleUsage,
-    ...(transformRequestBody === undefined ? {} : { transformRequestBody }),
-    ...(compatibilityProfile(input) === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
-      ? { metadataExtractor: openRouterMetadataExtractor }
-      : {}),
-  }).chatModel(input.model);
-};
 
 const providerOptionsFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
   if (input.reasoningEffort === undefined) return {};
@@ -255,8 +161,9 @@ const sdkPrompt = (messages: unknown[]) => {
 const commonOptions = <OUTPUT>(
   input: AiSdkGenerationRequest<OUTPUT>,
   onUsage: (usage: LanguageModelUsage) => void,
+  diagnostics?: AiGenerationDiagnostics,
 ) => ({
-  model: modelFor(input),
+  model: createGenerationModel(input, diagnostics?.stream, diagnostics?.http),
   ...sdkPrompt(input.messages),
   maxRetries: 0,
   abortSignal: input.signal,
@@ -264,11 +171,19 @@ const commonOptions = <OUTPUT>(
   telemetry,
   ...providerOptionsFor(input),
   onLanguageModelCallEnd: ({ usage }: { usage: LanguageModelUsage }) => onUsage(usage),
-  ...(input.maxOutputTokens === undefined ? {} : { maxOutputTokens: input.maxOutputTokens }),
+  ...(input.maxOutputTokens === undefined || input.requestOptions?.outputTokenLimit === 'upstream'
+    ? {}
+    : { maxOutputTokens: input.maxOutputTokens }),
 });
 
 export class AiSdkGenerationAdapter {
   async generate<OUTPUT>(
+    input: AiSdkGenerationRequest<OUTPUT>,
+  ): Promise<AiSdkGenerationResult<OUTPUT>> {
+    return traceSdkGeneration(input, () => this.generateObserved(input));
+  }
+
+  private async generateObserved<OUTPUT>(
     input: AiSdkGenerationRequest<OUTPUT>,
   ): Promise<AiSdkGenerationResult<OUTPUT>> {
     try {
@@ -281,45 +196,70 @@ export class AiSdkGenerationAdapter {
         { cause: error },
       );
     }
-    const startedAt = Date.now();
+    const diagnostics = createGenerationDiagnostics(input);
+    const startedAt = performance.now();
+    const timing = new AiGenerationTiming(input);
+    const onProgress = input.onProgress;
+    input = {
+      ...input,
+      onProgress: (progress) => {
+        if (progress.type !== 'heartbeat') timing.progress();
+        onProgress?.(progress);
+      },
+    };
     let observedUsage: AiUsageFacts = { status: 'unknown', inputTokens: null, outputTokens: null };
+    let completion: ReturnType<typeof resultMetadata> | undefined;
     const captureUsage = (usage: LanguageModelUsage) => {
       observedUsage = usageFacts(usage);
     };
     try {
-      if (input.transport === 'stream') return await this.stream(input, startedAt, captureUsage);
+      if (input.transport === 'stream') {
+        const result = await this.stream(input, startedAt, captureUsage, (value) => {
+          completion = value;
+        }, diagnostics);
+        return { ...result, ...(input.timeoutDecision ? { timing: timing.snapshot(true) } : {}) };
+      }
       const result = await generateText({
-        ...commonOptions(input, captureUsage),
+        ...commonOptions(input, captureUsage, diagnostics),
         output: generationOutput(input.mode, input.schema),
       });
       captureUsage(result.usage);
+      completion = resultMetadata(result.usage, result.finishReason, result.rawFinishReason,
+        result.response, result.providerMetadata, { firstEvent: null, firstText: null });
       assertFinishReason(result.finishReason, input.requestId, observedUsage);
       return {
         output: parseGenerationOutput(input.mode, input.schema, result.output),
-        ...resultMetadata(
-          result.usage,
-          result.finishReason,
-          result.rawFinishReason,
-          result.response,
-          result.providerMetadata,
-          { firstEvent: null, firstText: null },
-        ),
+        ...(input.timeoutDecision ? { timing: timing.snapshot(true) } : {}),
+        ...generationHttpRequestFields(diagnostics),
+        ...completion,
       };
     } catch (error) {
-      if (input.signal.aborted) {
-        throw new AiSdkGenerationError(
-          aiGenerationErrorSchema.parse({
-            code: 'cancelled',
-            phase: 'cancellation',
-            summary: '生成请求已取消',
-            externalResult: 'unknown',
-            requestId: input.requestId,
-          }),
-          error instanceof AiSdkGenerationError ? error.usage : observedUsage,
-          { cause: error },
+      const interruption = timing.interruption(error);
+      if (interruption) {
+        throw withGenerationRuntimeDiagnostic(
+          new AiSdkGenerationError(
+            interruption,
+            error instanceof AiSdkGenerationError ? error.usage : observedUsage,
+            { cause: error, completion },
+          ),
+          input.mode,
+          ...generationDiagnosticSnapshots(diagnostics),
         );
       }
-      if (error instanceof AiSdkGenerationError) throw error;
+      if (error instanceof AiSdkGenerationError) {
+        const observed =
+          timing.hasProgress() && error.fact.externalResult === 'rejected_before_generation'
+            ? new AiSdkGenerationError({ ...error.fact, externalResult: 'unknown' }, error.usage, {
+                cause: error, completion: error.completion ?? completion,
+              })
+            : error;
+        throw withGenerationRuntimeDiagnostic(
+          observed,
+          input.mode,
+          ...generationDiagnosticSnapshots(diagnostics),
+          completion,
+        );
+      }
       const name = error instanceof Error ? error.name : asRecord(error)?.name;
       const summary = sanitize(error);
       if (
@@ -328,22 +268,22 @@ export class AiSdkGenerationAdapter {
         (typeof name === 'string' && name.includes('NoOutputGeneratedError')) ||
         summary.startsWith('No object generated')
       ) {
-        throw new AiSdkGenerationError(
-          aiGenerationErrorSchema.parse({
-            code: 'schema_invalid',
-            phase: 'validation',
-            summary,
-            externalResult: 'complete',
-            requestId: input.requestId,
-          }),
+        throw schemaGenerationFailure(
+          error,
+          input,
           observedUsage,
-          { cause: error },
+          ...generationDiagnosticSnapshots(diagnostics),
+          completion,
         );
       }
-      throw new AiSdkGenerationError(
-        errorFact(error, input.requestId, 'request', true),
-        observedUsage,
-        { cause: error },
+      throw withGenerationRuntimeDiagnostic(
+        new AiSdkGenerationError(
+          errorFact(error, input.requestId, 'request', true),
+          observedUsage,
+          { cause: error },
+        ),
+        input.mode,
+        ...generationDiagnosticSnapshots(diagnostics),
       );
     }
   }
@@ -352,6 +292,8 @@ export class AiSdkGenerationAdapter {
     input: AiSdkGenerationRequest<OUTPUT>,
     startedAt: number,
     onUsage: (usage: LanguageModelUsage) => void,
+    onCompletion: (value: ReturnType<typeof resultMetadata>) => void,
+    diagnostics?: AiGenerationDiagnostics,
   ): Promise<AiSdkGenerationResult<OUTPUT>> {
     let observedUsage: AiUsageFacts = { status: 'unknown', inputTokens: null, outputTokens: null };
     const captureUsage = (usage: LanguageModelUsage) => {
@@ -362,10 +304,10 @@ export class AiSdkGenerationAdapter {
     let firstEvent: number | null = null;
     let firstText: number | null = null;
     const result = streamText({
-      ...commonOptions(input, captureUsage),
+      ...commonOptions(input, captureUsage, diagnostics),
       output: generationOutput(input.mode, input.schema),
       onError: ({ error }) => {
-        streamError = error;
+        streamError ??= error;
       },
     });
     // Consume rejection immediately; await the value only after terminal facts are captured.
@@ -376,17 +318,17 @@ export class AiSdkGenerationAdapter {
     for await (const part of result.stream as AsyncIterable<
       TextStreamPart<Record<string, never>>
     >) {
-      if (part.type === 'error') streamError = part.error;
-      if (part.type === 'abort')
-        throw new DOMException(part.reason ?? 'Provider stream aborted', 'AbortError');
-      if (part.type === 'reasoning-delta' || part.type === 'text-delta') {
-        const elapsed = Date.now() - startedAt;
+      diagnostics?.stream.observeSdkPart(part);
+      if (part.type === 'error') streamError ??= part.error;
+      if (part.type === 'abort') {
+        throw sdkStreamAbortError(streamError, part.reason, input.signal);
+      }
+      const progress = sdkSemanticProgress(part);
+      if (progress !== null) {
+        const elapsed = performance.now() - startedAt;
         firstEvent ??= elapsed;
-        input.onProgress?.({
-          type: part.type === 'reasoning-delta' ? 'reasoning' : 'text',
-          at: new Date().toISOString(),
-        });
-        if (part.type === 'text-delta') firstText ??= elapsed;
+        input.onProgress?.({ type: progress, at: new Date().toISOString() });
+        if (progress === 'text') firstText ??= elapsed;
       }
     }
     if (streamError)
@@ -403,15 +345,16 @@ export class AiSdkGenerationAdapter {
       result.providerMetadata,
     ]);
     captureUsage(usage);
+    const completion = resultMetadata(usage, finishReason, rawFinishReason, response,
+      providerMetadata, { firstEvent, firstText });
+    onCompletion(completion);
     assertFinishReason(finishReason, input.requestId, observedUsage);
     const complete = await completedOutput;
     if (!complete.ok) throw complete.error;
     return {
       output: parseGenerationOutput(input.mode, input.schema, complete.value),
-      ...resultMetadata(usage, finishReason, rawFinishReason, response, providerMetadata, {
-        firstEvent,
-        firstText,
-      }),
+      ...generationHttpRequestFields(diagnostics),
+      ...completion,
     };
   }
 }

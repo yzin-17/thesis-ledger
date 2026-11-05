@@ -2,7 +2,7 @@
 
 ## 1. 合同与结果
 
-任务 `R06.12-request-scope-guard`，按 [主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §3.3、[主 Task](../2026-09-25-multi-source-adjustment-aware-backtest.md) §12.9 和 [请求作用域发现](2026-09-28-cont-m3-flow-contract.md) §7 实施。结果 `worker_done`：只有完整 ASCII 六位 `.SH/.SZ` 输入生成明确 stock/market 的单次 individual 请求；缺场所、来源失败或空表不请求默认证券或 stock_main。
+任务 `R06.12-request-scope-guard`，按 [主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §3.3、[主 Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) §12.9 和 [请求作用域发现](2026-09-28-cont-m3-flow-contract.md) §7 实施。结果 `worker_done`：只有完整 ASCII 六位 `.SH/.SZ` 输入生成明确 stock/market 的单次 individual 请求；缺场所、来源失败或空表不请求默认证券或 stock_main。
 
 完整金额单位合同仍为 skip；该保护不证明金额单位、日期选择、主力算法、响应身份、资产类型、覆盖完整性或真实准入。原首行/关键词值映射保持未验证状态。普通 Manager 仍剥离后缀，因此该消费者的股票资金流安全拒绝；没有自行恢复场所或按号码前缀推断场所。行业块独立保留，不能用聚合 ok 当作股票请求成功。
 

@@ -82,7 +82,7 @@ LedgerEvent 使用统一不可变信封和类型化 JSONB payload：
 
 ### 3. Historical Baseline 与导入
 
-一次截图或完整持仓校准创建 Baseline Observation Batch：
+一次持仓校准创建 Baseline Observation Batch：
 
 - 批次记录账户、业务观察时间、采集时间、写入时间、来源及 `FULL / PARTIAL` 范围。
 - 每个资产生成独立 Baseline Observation 事件并共享 `batchId`。

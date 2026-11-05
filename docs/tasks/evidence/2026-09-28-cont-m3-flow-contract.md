@@ -2,7 +2,7 @@
 
 ## 1. 范围与结论
 
-任务 `CONT-M3-flow-contract`；基线为 [主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §3.3、§4、§9、AC20，[主 Task](../2026-09-25-multi-source-adjustment-aware-backtest.md) §12.9 和 [前沿发现](2026-09-28-m3-r04-r07-frontier.md) §3.2。能力事实仍由 DSA [能力目录](../../../../daily-stock-analysis/docs/thesis-ledger-source-capabilities.md) R06.12 所有。
+任务 `CONT-M3-flow-contract`；基线为 [主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §3.3、§4、§9、AC20，[主 Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) §12.9 和 [前沿发现](2026-09-28-m3-r04-r07-frontier.md) §3.2。能力事实仍由 DSA [能力目录](../../../../daily-stock-analysis/docs/thesis-ledger-source-capabilities.md) R06.12 所有。
 
 已自主选择 `stock_individual_fund_flow`，只核实 CN STOCK 最新可用日主力金额。结论：发现完成，实施跳过，ready 叶 0。两次查证仍缺该 endpoint 金额单位及完整公开主力金额样本；不把未知单位登记为 CNY 元，不构造 raw fixture。此结论不是重新要求用户选择 endpoint，也不关闭 R06.12、G0-M、AC20。
 

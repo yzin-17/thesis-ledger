@@ -18,6 +18,8 @@ export const marketDataKeys = {
   catalog: () => [...marketDataKeys.root, 'catalog'] as const,
   catalogJob: (jobId: string) => [...marketDataKeys.catalog(), 'job', jobId] as const,
   search: (query: string) => [...marketDataKeys.root, 'instruments', query] as const,
+  securityStaticInfo: (symbol: string | undefined, assetType: string | undefined) =>
+    [...marketDataKeys.root, 'security-static-info', symbol, assetType] as const,
 };
 
 export const useMarketDataQueries = () => {

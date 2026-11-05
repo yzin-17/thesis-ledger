@@ -1,0 +1,709 @@
+{
+  "date": "2026-10-25",
+  "task": "G3-D23",
+  "scope": "D21 部署前置核查与手机合成合同夹具边界修复",
+  "limits": {
+    "modelCalls": 0,
+    "deployments": 0,
+    "targetConfigurationWrites": 0,
+    "businessWrites": 0,
+    "localCapabilitiesGetAttempts": 4,
+    "remainingModelCallsFrozen": 8,
+    "formalG3Accepted": false,
+    "d21Deployed": false
+  },
+  "baseline": {
+    "head": "da002744bd317b7754832c6ac41d169bcf005e27",
+    "wipEntriesAtStart": 1212,
+    "stagedFilesAtEnd": [],
+    "boundaryExitCode": 1,
+    "violations": [
+      "apps/mobile/release/acceptance-batch4-2026-10-24/controlled-fixtures.test.ts -> ../../../server/test/backtest/nav-preparation.fixtures",
+      "apps/mobile/release/acceptance-batch4-2026-10-24/controlled-fixtures.test.ts -> ../../../server/src/backtest/backtest-nav-preparation",
+      "apps/mobile/release/acceptance-batch4-2026-10-24/controlled-fixtures.test.ts -> ../../../server/src/backtest/backtest-nav-preparation-result"
+    ],
+    "generatorSha256": "42cc4f66e367bccf749e40bce96915205b974d43f35c064a69a1343e5fb3b756"
+  },
+  "fix": {
+    "ownership": "手机测试自有的四份合成请求／响应字段，仅经共享 Schema 解析；Server 准备算法继续由 Server 拥有",
+    "newSources": [
+      "apps/mobile/test/parity/batch4-nav.fixture.json",
+      "apps/mobile/test/parity/batch4-nav-fixture.ts",
+      "apps/mobile/test/parity/batch4-nav-fixture.test.ts"
+    ],
+    "modifiedIgnoredGenerator": "apps/mobile/release/acceptance-batch4-2026-10-24/controlled-fixtures.test.ts",
+    "boundaryScriptChanged": false,
+    "artifactProof": {
+      "originalArtifactSha256": "5d6d5ee6c13688aa725fa83ad835c7722e7501b89243f099b60c6737fc3cfac3",
+      "fields": [
+        {
+          "field": "navDefinition",
+          "snapshotEqualsOriginal": true,
+          "parsedEqualsOriginal": true
+        },
+        {
+          "field": "navRequest",
+          "snapshotEqualsOriginal": true,
+          "parsedEqualsOriginal": true
+        },
+        {
+          "field": "navPrepared",
+          "snapshotEqualsOriginal": true,
+          "parsedEqualsOriginal": true
+        },
+        {
+          "field": "navResult",
+          "snapshotEqualsOriginal": true,
+          "parsedEqualsOriginal": true
+        }
+      ]
+    }
+  },
+  "validation": {
+    "mobileTargetedTests": {
+      "files": 2,
+      "tests": 9,
+      "exitCode": 0,
+      "command": "rtk proxy pnpm --filter @thesis-ledger/mobile exec vitest run --dir test test/parity/batch4-nav-fixture.test.ts test/parity/batch4-state.test.ts"
+    },
+    "mobileSourceTypecheck": {
+      "exitCode": 0,
+      "note": "项目脚本只覆盖 src，未据此声称测试文件已纳入包级类型检查"
+    },
+    "fixtureFocusedTypecheck": {
+      "files": 2,
+      "diagnostics": 0,
+      "note": "用现有手机编译选项，扩大仅内存 rootDir 并 noEmit 检查新增夹具／测试及其依赖"
+    },
+    "generatorSyntaxDiagnostics": 0,
+    "targetedLint": {
+      "exitCode": 0,
+      "files": 2
+    },
+    "boundary": {
+      "exitCode": 0,
+      "result": "Import boundaries: OK",
+      "sha256": "77aaefb6ec93a195d43541d515e28d7a11c818eba87b19f834d0e20c18d249ba"
+    },
+    "format": {
+      "exitCode": 0,
+      "projectConfigResolved": true,
+      "ignoredGeneratorExplicitlyChecked": true
+    },
+    "finalConsistency": {
+      "localFileLinksChecked": 90,
+      "missingLocalFiles": [],
+      "d22InputsMatched": 30,
+      "d22InputDrift": [],
+      "states": {
+        "G3-D8": false,
+        "G3-D20": false,
+        "G3-D21b": false,
+        "G3-D23": true,
+        "G3-D23a": true,
+        "G3-D23b": true,
+        "G3-D23c": true
+      },
+      "originalArtifactSha256": "5d6d5ee6c13688aa725fa83ad835c7722e7501b89243f099b60c6737fc3cfac3",
+      "finalBoundaryExitCode": 0
+    }
+  },
+  "capabilities": {
+    "nativeShell": {
+      "pythonExecutable": "/Users/yzin/.local/bin/python3",
+      "pythonVersion": "3.14.7",
+      "environmentProxyKeys": ["ALL_PROXY", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY"],
+      "resolvedProxyEndpoints": {
+        "all": {
+          "scheme": "socks5",
+          "host": "127.0.0.1",
+          "port": 7890
+        },
+        "https": {
+          "scheme": "http",
+          "host": "127.0.0.1",
+          "port": 7890
+        },
+        "http": {
+          "scheme": "http",
+          "host": "127.0.0.1",
+          "port": 7890
+        }
+      },
+      "proxyBypassLocalPort": true,
+      "results": [
+        {
+          "mode": "default_proxy_selection",
+          "transport": [
+            {
+              "connect": {
+                "scheme": "http",
+                "host": "127.0.0.1",
+                "port": 3000
+              },
+              "proxySelected": false,
+              "absoluteSelector": false
+            }
+          ],
+          "status": 200,
+          "contentType": "application/json",
+          "observedBytes": 124,
+          "bodyTruncated": false,
+          "bodySha256": "962b56cc67ec701a493ead67228bb6dc5abbece9d0889e9ea81622538cd9fe20",
+          "serverHeaderClass": "express",
+          "capabilities": {
+            "version": "research-capabilities-v2",
+            "canCreate": false
+          },
+          "scopeCount": 5
+        },
+        {
+          "mode": "explicit_direct",
+          "transport": [
+            {
+              "connect": {
+                "scheme": "http",
+                "host": "127.0.0.1",
+                "port": 3000
+              },
+              "proxySelected": false,
+              "absoluteSelector": false
+            }
+          ],
+          "status": 200,
+          "contentType": "application/json",
+          "observedBytes": 124,
+          "bodyTruncated": false,
+          "bodySha256": "962b56cc67ec701a493ead67228bb6dc5abbece9d0889e9ea81622538cd9fe20",
+          "serverHeaderClass": "express",
+          "capabilities": {
+            "version": "research-capabilities-v2",
+            "canCreate": false
+          },
+          "scopeCount": 5
+        }
+      ]
+    },
+    "contextMode": {
+      "pythonExecutable": "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+      "pythonVersion": "3.9.6",
+      "environmentProxyKeys": [],
+      "resolvedProxyEndpoints": {
+        "http": {
+          "scheme": "http",
+          "host": "127.0.0.1",
+          "port": 7890
+        },
+        "https": {
+          "scheme": "http",
+          "host": "127.0.0.1",
+          "port": 7890
+        }
+      },
+      "proxyBypassLocalPort": false,
+      "results": [
+        {
+          "mode": "default_proxy_selection",
+          "transport": [
+            {
+              "connect": {
+                "scheme": "http",
+                "host": "127.0.0.1",
+                "port": 7890
+              },
+              "proxySelected": true,
+              "absoluteSelector": true
+            }
+          ],
+          "status": 502,
+          "contentType": "text/plain",
+          "observedBytes": 0,
+          "bodyTruncated": false,
+          "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "serverHeaderClass": "other_or_missing"
+        },
+        {
+          "mode": "explicit_direct",
+          "transport": [
+            {
+              "connect": {
+                "scheme": "http",
+                "host": "127.0.0.1",
+                "port": 3000
+              },
+              "proxySelected": false,
+              "absoluteSelector": false
+            }
+          ],
+          "status": 200,
+          "contentType": "application/json",
+          "observedBytes": 124,
+          "bodyTruncated": false,
+          "bodySha256": "962b56cc67ec701a493ead67228bb6dc5abbece9d0889e9ea81622538cd9fe20",
+          "serverHeaderClass": "express",
+          "capabilities": {
+            "version": "research-capabilities-v2",
+            "canCreate": false
+          },
+          "scopeCount": 5
+        }
+      ]
+    },
+    "proxySource": {
+      "environmentProxyCountInContext": 0,
+      "macosSystemProxyResolver": true,
+      "defaultEqualsSystemProxies": true,
+      "loopbackBypassInContext": false
+    },
+    "finding": "同一 Context Mode Python 默认通过 macOS 系统 HTTP 代理 127.0.0.1:7890 得到空 502；仅将该次只读请求改为明确直连后为 200，canCreate=false，响应摘要与宿主 Shell 两次直连一致",
+    "historicalLimit": "旧 502 未保存原响应／连接信息，本轮复现定位当前同类代理路径，不能补造旧响应或归责 Provider；没有修改系统代理、环境配置或目标服务"
+  },
+  "runtime": {
+    "instances": [
+      {
+        "id": "70e9eee9e22abf58323fe22582ac0042204ba42eac4d4cae0391fc3d4e9bd36d",
+        "workingDir": "/app",
+        "imageId": "sha256:42d12136ad41bb4c2af4b56974d8ecc9ffcacc23e75d225397c70c888eb07ce3",
+        "imageName": "thesis-ledger:dev",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:15.793267003Z",
+        "ports": {
+          "3000/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "3000"
+            }
+          ]
+        }
+      },
+      {
+        "id": "4d3fdd133f45e75f16e509a85002b653d3d6218a5924856cc84993c57906b35d",
+        "workingDir": "/app",
+        "imageId": "sha256:42d12136ad41bb4c2af4b56974d8ecc9ffcacc23e75d225397c70c888eb07ce3",
+        "imageName": "thesis-ledger:dev",
+        "state": "running",
+        "health": "healthy",
+        "startedAt": "2026-10-24T20:03:15.923878878Z",
+        "ports": {}
+      }
+    ],
+    "localNode": "v24.18.0",
+    "localVersions": {
+      "ai": "7.0.107",
+      "@ai-sdk/openai-compatible": "3.0.53",
+      "zod": "4.4.3"
+    },
+    "localSchema": {
+      "entry": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger/packages/schemas/dist/index.js",
+      "directory": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger/packages/schemas/dist",
+      "hashes": {
+        "index.js": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+        "ai-generation-http-response-diagnostic.js": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+        "ai-generation-runtime-diagnostic.js": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57"
+      },
+      "responseExport": false,
+      "runtimeHasHttpResponse": true,
+      "exports": {
+        "entry": "/Users/yzin/code/thesis-ledger-workspace/thesis-ledger/packages/schemas/dist/index.js",
+        "responseSchemaExportExists": false,
+        "runtimeHasHttpResponse": true
+      }
+    },
+    "targets": [
+      {
+        "name": "thesis-ledger-dev-thesis-ledger-1",
+        "node": "v24.21.0",
+        "versions": {
+          "ai": "7.0.107",
+          "@ai-sdk/openai-compatible": "3.0.53",
+          "zod": "4.4.3"
+        },
+        "flags": {
+          "researchV2": "false",
+          "temporaryPolicyPresent": false
+        },
+        "schema": {
+          "entry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+          "directory": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist",
+          "hashes": {
+            "index.js": "9307df4614428eb7b67ad998c8ebe224893fa0bcda79facebd6a2e88a539495e",
+            "ai-generation-http-response-diagnostic.js": null,
+            "ai-generation-runtime-diagnostic.js": "4de3230dab34b6e7257b70ddfe08475bf11d73335ec531cfb5e2b77c3fc60e38"
+          },
+          "responseExport": false,
+          "runtimeHasHttpResponse": false,
+          "exports": {
+            "entry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+            "responseSchemaExportExists": false,
+            "runtimeHasHttpResponse": false
+          }
+        },
+        "modules": [
+          {
+            "module": "apps/server/dist/src/ai/ai-sdk-generation.adapter.js",
+            "localSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+            "targetSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-sdk-generation-model.js",
+            "localSha256": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+            "targetSha256": "31c852474ef897a815e7bdc90253d1645cafe60e30cda3fba7c8415c7b878e7c",
+            "status": "不同"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-sdk-generation-facts.js",
+            "localSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+            "targetSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-diagnostics.js",
+            "localSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+            "targetSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js",
+            "localSha256": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+            "targetSha256": "b86735d99bf59abd694dfad51ae5ee59568344d221946a926695b945865cf288",
+            "status": "不同"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js",
+            "localSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+            "targetSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js",
+            "localSha256": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+            "targetSha256": "ca37d2da5da1200f261a416499c200b7359f57b6b78c4d2b5f732f6db67e9e7f",
+            "status": "不同"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js",
+            "localSha256": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+            "targetSha256": null,
+            "status": "目标缺失"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-http-response-error.js",
+            "localSha256": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+            "targetSha256": null,
+            "status": "目标缺失"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-sdk-runtime-versions.js",
+            "localSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+            "targetSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/research/research.controller.js",
+            "localSha256": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+            "targetSha256": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/research/research-submission.service.js",
+            "localSha256": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+            "targetSha256": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+            "status": "一致"
+          },
+          {
+            "module": "@thesis-ledger/schemas/dist/index.js",
+            "localSha256": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+            "targetSha256": "9307df4614428eb7b67ad998c8ebe224893fa0bcda79facebd6a2e88a539495e",
+            "status": "不同"
+          },
+          {
+            "module": "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js",
+            "localSha256": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+            "targetSha256": null,
+            "status": "目标缺失"
+          },
+          {
+            "module": "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js",
+            "localSha256": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57",
+            "targetSha256": "4de3230dab34b6e7257b70ddfe08475bf11d73335ec531cfb5e2b77c3fc60e38",
+            "status": "不同"
+          }
+        ]
+      },
+      {
+        "name": "thesis-ledger-dev-backtest-worker-1",
+        "node": "v24.21.0",
+        "versions": {
+          "ai": "7.0.107",
+          "@ai-sdk/openai-compatible": "3.0.53",
+          "zod": "4.4.3"
+        },
+        "flags": {
+          "researchV2": null,
+          "temporaryPolicyPresent": false
+        },
+        "schema": {
+          "entry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+          "directory": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist",
+          "hashes": {
+            "index.js": "9307df4614428eb7b67ad998c8ebe224893fa0bcda79facebd6a2e88a539495e",
+            "ai-generation-http-response-diagnostic.js": null,
+            "ai-generation-runtime-diagnostic.js": "4de3230dab34b6e7257b70ddfe08475bf11d73335ec531cfb5e2b77c3fc60e38"
+          },
+          "responseExport": false,
+          "runtimeHasHttpResponse": false,
+          "exports": {
+            "entry": "/app/node_modules/.pnpm/@thesis-ledger+schemas@file+packages+schemas/node_modules/@thesis-ledger/schemas/dist/index.js",
+            "responseSchemaExportExists": false,
+            "runtimeHasHttpResponse": false
+          }
+        },
+        "modules": [
+          {
+            "module": "apps/server/dist/src/ai/ai-sdk-generation.adapter.js",
+            "localSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+            "targetSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-sdk-generation-model.js",
+            "localSha256": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+            "targetSha256": "31c852474ef897a815e7bdc90253d1645cafe60e30cda3fba7c8415c7b878e7c",
+            "status": "不同"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-sdk-generation-facts.js",
+            "localSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+            "targetSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-diagnostics.js",
+            "localSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+            "targetSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js",
+            "localSha256": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+            "targetSha256": "b86735d99bf59abd694dfad51ae5ee59568344d221946a926695b945865cf288",
+            "status": "不同"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js",
+            "localSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+            "targetSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js",
+            "localSha256": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+            "targetSha256": "ca37d2da5da1200f261a416499c200b7359f57b6b78c4d2b5f732f6db67e9e7f",
+            "status": "不同"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js",
+            "localSha256": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+            "targetSha256": null,
+            "status": "目标缺失"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-generation-http-response-error.js",
+            "localSha256": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+            "targetSha256": null,
+            "status": "目标缺失"
+          },
+          {
+            "module": "apps/server/dist/src/ai/ai-sdk-runtime-versions.js",
+            "localSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+            "targetSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/research/research.controller.js",
+            "localSha256": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+            "targetSha256": "4594cadd882323f0de0189192a4cde2f831befe5928688ee1042e0a6efca3afb",
+            "status": "一致"
+          },
+          {
+            "module": "apps/server/dist/src/research/research-submission.service.js",
+            "localSha256": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+            "targetSha256": "7e929d37b7af3a00baaf8169d1209dd30fdaa39b077eda3155f6aa74b542dbf6",
+            "status": "一致"
+          },
+          {
+            "module": "@thesis-ledger/schemas/dist/index.js",
+            "localSha256": "a8e14759d0b384733ccd826488524470bb943c5cb114bfb5dc298d02914e6f6a",
+            "targetSha256": "9307df4614428eb7b67ad998c8ebe224893fa0bcda79facebd6a2e88a539495e",
+            "status": "不同"
+          },
+          {
+            "module": "@thesis-ledger/schemas/dist/ai-generation-http-response-diagnostic.js",
+            "localSha256": "b840129f6f8dd32eefc6c9d6d3bffbf0f176df29cbbe7b0d7e4e8991eb778b39",
+            "targetSha256": null,
+            "status": "目标缺失"
+          },
+          {
+            "module": "@thesis-ledger/schemas/dist/ai-generation-runtime-diagnostic.js",
+            "localSha256": "86ff5288bea734ee7849809eaf94915c5c09c947b28c75cebf7e9acd15586a57",
+            "targetSha256": "4de3230dab34b6e7257b70ddfe08475bf11d73335ec531cfb5e2b77c3fc60e38",
+            "status": "不同"
+          }
+        ]
+      }
+    ],
+    "localCompilerProof": {
+      "typescript": "5.9.2",
+      "method": "使用项目 NodeNext 编译器及内存 writeFile 回调，不写宿主产物",
+      "results": [
+        {
+          "source": "apps/server/src/ai/ai-sdk-generation.adapter.ts",
+          "sourceSha256": "3f37d6f0fa6696d373a9713a459caf9c13cfd83c4c8ebb69422fc7e58218d352",
+          "target": "apps/server/dist/src/ai/ai-sdk-generation.adapter.js",
+          "distSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "inMemoryEmitSha256": "ebfbf047ba8770b106254cbce7f76d0a7edc5cd50511f1b047e5d0db2e1b0fae",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-sdk-generation-model.ts",
+          "sourceSha256": "84b8f502d1ddbe17e5f93bc53bcb69df9de876158f7b7cc77149045893acc7f8",
+          "target": "apps/server/dist/src/ai/ai-sdk-generation-model.js",
+          "distSha256": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "inMemoryEmitSha256": "751cf9200164b2947f86ebf7e5cb9f4c58cdceed84ec51db4b02f17253e72918",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-sdk-generation-facts.ts",
+          "sourceSha256": "df437ed91dbc68213e019d81c2980a5fb9f441879cb5d460a875c93a04e16237",
+          "target": "apps/server/dist/src/ai/ai-sdk-generation-facts.js",
+          "distSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "inMemoryEmitSha256": "17da919f5afa3579e129c428b3e76c8375cc3663085bf7a8ae3cf6a968ca787d",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-generation-diagnostics.ts",
+          "sourceSha256": "1bbc972fdc48cbe8e3d2bf191c4c0b3dc95e2edc82bb0042e2d2e2662eb3bbbc",
+          "target": "apps/server/dist/src/ai/ai-generation-diagnostics.js",
+          "distSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "inMemoryEmitSha256": "ecde8789417f824163d5250b19c7c9f99f429505465312e1c70c638fee546a97",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-generation-stream-diagnostics.ts",
+          "sourceSha256": "f751e781e40ad47a0dc28712f96065bc606c8e9170f2c757ea054fb4edaeb16c",
+          "target": "apps/server/dist/src/ai/ai-generation-stream-diagnostics.js",
+          "distSha256": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "inMemoryEmitSha256": "7123d80c6268567cc1495107079f3da7711abf59dab911b565618cd360a86869",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-generation-failure-diagnostics.ts",
+          "sourceSha256": "4e0df08588a9c814f56178f7a8f89246176394060ac14271e953e2a3223f88d3",
+          "target": "apps/server/dist/src/ai/ai-generation-failure-diagnostics.js",
+          "distSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "inMemoryEmitSha256": "556e22811790de82bcaa00941527dfb56829fc74cd9a3db05be2fd48ba27692e",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-generation-http-request-diagnostics.ts",
+          "sourceSha256": "45ed0488846c61e69702335072f5ba51fc32ac88fa083000561453ee0fe3d2e6",
+          "target": "apps/server/dist/src/ai/ai-generation-http-request-diagnostics.js",
+          "distSha256": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "inMemoryEmitSha256": "503e789c63059fcd46bc1099345a09e8cd01132f057f79f845a3198150c379c4",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-generation-http-response-diagnostics.ts",
+          "sourceSha256": "514f226424932b94adcf0946730bae813d2a82d114afbff633bd0a711e54269c",
+          "target": "apps/server/dist/src/ai/ai-generation-http-response-diagnostics.js",
+          "distSha256": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "inMemoryEmitSha256": "377c40e6486d5537f3a39da6dc202e25a99e2eb133bcf58399870bde0ca78ed7",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-generation-http-response-error.ts",
+          "sourceSha256": "174b3f968f1b59ad530fd89e4def9e1f389c1cf912a4d3960ec9e789a6590dad",
+          "target": "apps/server/dist/src/ai/ai-generation-http-response-error.js",
+          "distSha256": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "inMemoryEmitSha256": "824abc735878325e16a43f02686ff138396b96cf85f8845aa9ce6956039c2c31",
+          "matches": true,
+          "emitDiagnostics": 0
+        },
+        {
+          "source": "apps/server/src/ai/ai-sdk-runtime-versions.ts",
+          "sourceSha256": "f3c4f9732476673f09ef94112068a5ffbe012dbac8021dd7e7739112aa2a494d",
+          "target": "apps/server/dist/src/ai/ai-sdk-runtime-versions.js",
+          "distSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "inMemoryEmitSha256": "5a4934e098136c05c025967e1c4b4013f734f319a40e04d495aa22358d6d5fbd",
+          "matches": true,
+          "emitDiagnostics": 0
+        }
+      ]
+    },
+    "finding": "Server 与 Worker 缺少 D21 的两份应用响应诊断及实际包内响应 Schema；模型／请求／流及运行 Schema 仍旧。容器健康、版本一致与 capabilities 正常均不代表 D21 已部署"
+  },
+  "modifiedFiles": [
+    "apps/mobile/release/acceptance-batch4-2026-10-24/controlled-fixtures.test.ts",
+    "apps/mobile/test/parity/batch4-nav.fixture.json",
+    "apps/mobile/test/parity/batch4-nav-fixture.ts",
+    "apps/mobile/test/parity/batch4-nav-fixture.test.ts",
+    "docs/specs/2026-10-18-research-evidence-evolution.md",
+    "docs/tasks/2026-10-18-research-evidence-evolution.md",
+    "docs/tasks/2026-10-22-web-mobile-feature-parity.md",
+    "docs/tasks/evidence/2026-10-25-g3-http-response-local.md",
+    "docs/tasks/evidence/2026-10-25-g3-d21-preflight.md",
+    "docs/tasks/evidence/2026-10-25-g3-d21-preflight.json"
+  ],
+  "inputSha256": {
+    "apps/mobile/test/parity/batch4-nav.fixture.json": "7bb2308e01379ba845a9772f76cec3a3fff21be7de97e37a420af47c48709b2b",
+    "apps/mobile/test/parity/batch4-nav-fixture.ts": "3ee8590e1e79db0fdad9394cb3ee2737af220b5cc7df61858e2ebb013a974890",
+    "apps/mobile/test/parity/batch4-nav-fixture.test.ts": "078ef77a1a2c55d2a18a2d4a9e01602db866919261a434e1ecddbb3c6de36aef",
+    "apps/mobile/release/acceptance-batch4-2026-10-24/controlled-fixtures.test.ts": "7ecad776a9e3796ca41985b70c12e98b6208b7d327986db3d8d2b472e06ca944",
+    "apps/mobile/release/acceptance-batch4-2026-10-24/controlled-fixtures.json": "5d6d5ee6c13688aa725fa83ad835c7722e7501b89243f099b60c6737fc3cfac3",
+    "scripts/check-boundaries.mjs": "77aaefb6ec93a195d43541d515e28d7a11c818eba87b19f834d0e20c18d249ba",
+    "scripts/mobile-boundaries.mjs": "4b7d14ef2aa1898cb0d1597b828ecc61075ba37ebc1952a73d0b4626fd3a3f12",
+    "apps/mobile/package.json": "c1da51d80613c7f0fdbfb4da9e6df6193800f0847619625a7f8f59e8f9507bf7",
+    "apps/mobile/tsconfig.json": "85a29512b57115961492d61c03a19b82075468d729dc7eea91bccaf742e93a1d",
+    "pnpm-lock.yaml": "e23bfc6db622a150f436884399e082352acd7357b66b8bdf37cf5a661c6fc496"
+  },
+  "d22InputDrift": [],
+  "unexpectedFindings": [
+    {
+      "fact": "一次读取尝试 apps/mobile/vitest.config.ts；该文件不存在，实际项目使用 package.json 的 --dir test 入口",
+      "resolution": "检查实际配置与脚本后使用既有入口，不新增或修改测试排除规则"
+    },
+    {
+      "fact": "首次命令未加 --dir test，目标两文件九项通过，但意外扫到 release 验收包中两份缺少 ledger-fixture 的冻结源码，整体退出 1",
+      "resolution": "停止类型／边界推进并先纠正为既有 --dir test 入口，最终仅两文件九项通过；未改验收包或断言"
+    },
+    {
+      "fact": "最初按宿主 packages/schemas 路径探测容器包文件，路径不适用",
+      "resolution": "按 require.resolve 得到实际 pnpm file 包入口后核查，不把原错误路径计为缺模块"
+    },
+    {
+      "fact": "transpileModule 不读取 NodeNext 所在 package 的 type=module，内存输出为 CJS，与 ESM 产物表面不同",
+      "resolution": "改用实际项目 TypeScript createProgram 和内存 writeFile 回调，十模块与宿主产物逐字节一致；未写构建输出或重建镜像"
+    },
+    {
+      "fact": "首次内存格式化未读取项目 Prettier 配置，CLI 对新增三文件报警",
+      "resolution": "改用 resolveConfig 及项目配置格式化后，重新通过定向九项、ESLint、边界和格式检查；未修改格式或忽略规则"
+    }
+  ],
+  "notRun": [
+    "infra sync-code.sh／update.sh",
+    "真实模型、用途验证或 Provider 直连",
+    "数据库保护全表复核、业务写请求",
+    "原生编译／设备验收／远程 CI",
+    "D21 实际部署、正式 V2 报告／引用／历史及发布重建反读"
+  ]
+}

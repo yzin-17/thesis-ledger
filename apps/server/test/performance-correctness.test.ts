@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PerformanceService } from '../src/performance/performance.service.js';
+import { PerformanceAnalysisService } from '../src/performance/performance-analysis.service.js';
 
 type Snapshot = {
   id: string;
@@ -77,6 +78,93 @@ const summaryService = (snapshots: Snapshot[], events: ExternalEvent[] = []) => 
 };
 
 describe('Performance correctness regressions', () => {
+  it('真实计算服务区分精确10%与缺边界不可用，XIRR仍独立返回', () => {
+    const service = new PerformanceService({} as never, {} as never);
+    const cashFlows = [{ date: '2025-01-01', amount: -100 }, { date: '2026-01-01', amount: 110 }];
+    expect(service.calculate({ valuations: [{ date: '2025-01-01', value: 100 },
+      { date: '2025-01-03', value: 220, externalFlow: 100 }], cashFlows })).toMatchObject({
+      ttwror: null, ttwrorReason: expect.stringContaining('边界'), xirr: expect.any(Number),
+    });
+    const result = service.calculate({ valuations: [{ date: '2025-01-01', value: 100 },
+      { date: '2025-01-02', value: 200, externalFlow: 100, flowBoundary: { before: 100, after: 200 } },
+      { date: '2025-01-03', value: 220 }], cashFlows });
+    expect(result.ttwror).toBeCloseTo(0.1, 12);
+    expect(result.ttwrorReason).toBeNull();
+  });
+
+  it('实际计算消费者返回严重亏损解，根歧义不会成为可用收益', () => {
+    const service = new PerformanceService({} as never, {} as never);
+    const result = service.calculate({ valuations: [{ date: '2025-01-01', value: 100 },
+      { date: '2026-01-01', value: 10 }], cashFlows: [{ date: '2025-01-01', amount: -100 },
+      { date: '2026-01-01', amount: 10 }] });
+    expect(result.xirr).not.toBeNull();
+    expect(Math.abs(-100 + 10 / (1 + result.xirr!) ** (365 / 365.25))).toBeLessThan(1e-7);
+    expect(result.xirrReason).toBeNull();
+  });
+
+  it('实际配置消费者保留现金来源，partial 仍隐藏比例并暂停建议', () => {
+    const service = new PerformanceService({} as never, {} as never);
+    const input = { positions: [{ category: 'stock', marketValue: 500 }, { category: 'cash', marketValue: 500 }], targets: { stock: 1 } };
+    expect(service.allocate(input).rebalance).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'stock', amountGap: 500 }),
+      expect.objectContaining({ category: 'cash', amountGap: -500 }),
+    ]));
+    const partial = service.allocate({ ...input, dataQuality: { partial: true, missingSymbols: ['TEST'] } });
+    expect(partial.rebalance).toEqual([]);
+    expect(partial.allocation.every((row) => row.weight === null)).toBe(true);
+    expect(partial.allocation.map((row) => row.value)).toEqual([500, 500]);
+  });
+
+  it('真实负现金配置按净资产读取，目标计算沿用原差额公式', () => {
+    const service = new PerformanceService({} as never, {} as never);
+    const positions = [{ category: 'fund', marketValue: 88.38 }, { category: '基金', marketValue: 88.38 }, { category: '现金', marketValue: -82 }];
+    const result = service.allocate({ positions });
+    expect(result.allocation).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'fund', value: 176.76 }),
+      expect.objectContaining({ category: 'cash', value: -82 }),
+    ]));
+    expect(result.allocation.find((row) => row.category === 'fund')?.weight).toBeCloseTo(176.76 / 94.76, 12);
+    expect(result.allocation.find((row) => row.category === 'cash')?.weight).toBeCloseTo(-82 / 94.76, 12);
+    expect(result.rebalance).toEqual([]);
+    expect(service.allocate({ positions, targets: { fund: 1 } }).rebalance).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'fund', amountGap: -82 }),
+      expect.objectContaining({ category: 'cash', amountGap: 82 }),
+    ]));
+    expect(() => service.allocate({ positions: [{ category: 'fund', marketValue: -1 }] })).toThrow('资产市值不能为负数');
+  });
+  it('负现金不绕过估值缺失或非正净资产的不可用状态', () => {
+    const service = new PerformanceService({} as never, {} as never);
+    for (const input of [
+      { positions: [{ category: 'fund', marketValue: 100 }, { category: 'cash', marketValue: -100 }] },
+      { positions: [{ category: 'fund', marketValue: 100 }, { category: 'cash', marketValue: -120 }] },
+      { positions: [{ category: 'fund', marketValue: 100 }, { category: 'cash', marketValue: -82 }], dataQuality: { partial: true, missingSymbols: ['TEST'] } },
+    ]) {
+      const result = service.allocate({ ...input, targets: { fund: 1 } });
+      expect(result.allocation.every((row) => row.weight === null)).toBe(true);
+      expect(result.rebalance).toEqual([]);
+    }
+  });
+  it('零净额的真实现金流不伪装成无流量区间', async () => {
+    const { service } = summaryService([
+      snapshot('2025-01-01T00:00:00Z', 100), snapshot('2025-01-02T00:00:00Z', 110),
+    ], [event('CASH_DEPOSIT', 100), event('CASH_WITHDRAW', 100)]);
+    expect(await service.summary('a')).toMatchObject({ ttwror: null, ttwrorReason: expect.stringContaining('边界') });
+  });
+
+  it('组合内有明确对手账户的划转不计外部流量，范围外划转仍保留', async () => {
+    const rows = [snapshot('2025-01-01T00:00:00Z', 100), snapshot('2025-01-02T00:00:00Z', 110)]
+      .map((row) => ({ ...row, accountId: null, currency: 'CNY' }));
+    const flow = event('TRANSFER_OUT', 10);
+    const transfer = { ...flow, payload: { ...flow.payload,
+      transfer: { transferId: 'transfer', leg: 'OUTFLOW', counterpartyAccountId: 'b' } } };
+    const data = { accountCurrencies: async () => new Map([['a', 'CNY'], ['b', 'CNY']]),
+      resolveFx: async () => ({ meta: { enabled: false, status: 'not_needed', missingCurrencies: [], rates: [] }, rates: new Map() }) };
+    const analysis = new PerformanceAnalysisService({ ledgerEvent: { findMany: async () => [transfer] } } as never,
+      data as never, { history: async () => rows } as never);
+    expect((await analysis.summary()).ttwror).toBeCloseTo(0.1);
+    transfer.payload.transfer.counterpartyAccountId = 'outside';
+    expect(await analysis.summary()).toMatchObject({ ttwror: null, ttwrorReason: expect.stringContaining('边界') });
+  });
   it('persists partial valuation as known market value instead of pretending missing quotes are zero', async () => {
     const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => data);
     const prisma = {
@@ -162,7 +250,8 @@ describe('Performance correctness regressions', () => {
         [event(type, amount)],
       );
 
-      await expect(service.summary('a')).resolves.toMatchObject({ ttwror: 0 });
+      await expect(service.summary('a')).resolves.toMatchObject({ ttwror: null,
+        ttwrorReason: expect.stringContaining('边界') });
     },
   );
 
@@ -197,7 +286,8 @@ describe('Performance correctness regressions', () => {
     );
 
     const result = await service.summary('a');
-    expect(result.ttwror).toBeCloseTo(0);
+    expect(result.ttwror).toBeNull();
+    expect(result.ttwrorReason).toContain('边界');
     expect(result.xirr).toBeCloseTo(0, 6);
     expect(result.xirrReason).toBeNull();
   });

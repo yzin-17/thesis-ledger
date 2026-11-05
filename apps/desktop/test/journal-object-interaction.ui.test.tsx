@@ -50,6 +50,24 @@ describe('单笔复盘交互', () => {
     await journalWait(() => expect(view.host.textContent).toContain('真实退出成交'));
     return view;
   };
+  it('主要操作位于摘要标题区，成交来源默认收起且可展开，返回不重建结果', async () => {
+    const onReturnToCandidates = vi.fn();
+    const view = await mountJournal(<JournalObjectReview {...props} onReturnToCandidates={onReturnToCandidates} />);
+    await journalWait(() => expect(view.host.textContent).toContain('成交与计划来源'));
+    expect(journalButton('开始复盘').closest('[data-slot="card-header"]')).not.toBeNull();
+    const source = [...view.host.querySelectorAll('details')].find(row => row.querySelector('summary')?.textContent === '成交与计划来源')!;
+    expect(source.open).toBe(false);
+    await act(async () => source.querySelector('summary')!.click());
+    expect(source.open).toBe(true);
+    await journalClick('开始复盘');
+    await journalWait(() => expect(journalButton('保存复盘快照').disabled).toBe(false));
+    await journalClick('返回对象列表');
+    expect(onReturnToCandidates).toHaveBeenCalledOnce();
+    expect(view.host.textContent).toContain('确定性复盘结果');
+    expect(source.open).toBe(true);
+    expect(api.analyze).toHaveBeenCalledTimes(1);
+    expect(api.save).not.toHaveBeenCalled();
+  });
   it('读取失败只有局部错误，重试后读取事实，未分析不能保存或触发 AI', async () => {
     api.object.mockRejectedValueOnce(new Error('服务暂不可用'));
     const view = await mountJournal(<JournalObjectReview {...props} />);
@@ -69,6 +87,13 @@ describe('单笔复盘交互', () => {
     await journalWait(() => expect(document.querySelector('[role="dialog"]')).not.toBeNull());
     await journalFill('计划退出价', '13');
     await journalClick('取消');
+    await journalWait(() => expect(document.querySelector('[role="alertdialog"]')).not.toBeNull());
+    await journalClick('继续编辑');
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="计划退出价"]')!.value).toBe(
+      '13',
+    );
+    await journalClick('取消');
+    await journalClick('放弃修改并关闭');
     await journalClick('开始复盘');
     await journalWait(() => expect(api.analyze).toHaveBeenCalledTimes(1));
     expect(api.analyze.mock.calls[0]![0].analysisDraft).toEqual({});
@@ -111,6 +136,24 @@ describe('单笔复盘交互', () => {
     await journalClick('开始复盘');
     await journalWait(() => expect(view.host.textContent).toContain('分析未完成'));
     expect(view.host.textContent).toContain('确定性复盘结果');
+  });
+  it('快照已保存但对象重读失败仍保留成功和结果；只重读恢复，不重复写入', async () => {
+    const view = await mount();
+    await journalClick('开始复盘');
+    await journalWait(() => expect(journalButton('保存复盘快照').disabled).toBe(false));
+    api.object.mockRejectedValueOnce(new Error('保存后读取失败'));
+    await journalClick('保存复盘快照');
+    await journalWait(() => expect(view.host.textContent).toContain('当前对象暂未更新'));
+    expect(view.host.textContent).toContain('复盘快照已保存');
+    expect(view.host.textContent).toContain('确定性复盘结果');
+    expect(journalButton('保存复盘快照').disabled).toBe(true);
+    expect(journalButton('开始复盘').disabled).toBe(true);
+    await journalClick('重新读取');
+    await journalWait(() => expect(journalButton('开始复盘').disabled).toBe(false));
+    expect(view.host.textContent).toContain('复盘快照已保存');
+    expect(api.save).toHaveBeenCalledOnce();
+    expect(api.analyze).toHaveBeenCalledOnce();
+    expect(api.explain).not.toHaveBeenCalled();
   });
   it('当前事实变化后旧结果保留，但保存与 AI 均要求重新分析', async () => {
     const view = await mount();
@@ -172,13 +215,16 @@ describe('单笔复盘交互', () => {
     expect(document.activeElement).toBe(stop);
     await journalFill('计划退出价', '不是价格');
     await journalClick('应用草稿');
-    expect(document.body.textContent).toContain('草稿尚未应用');
+    expect(document.body.textContent).toContain('计划退出价必须是大于零的有效十进制价格');
+    expect(document.querySelector('input[aria-label="计划退出价"]')?.getAttribute('aria-invalid')).toBe('true');
     expect(api.analyze).not.toHaveBeenCalled();
     await act(async () =>
       document.activeElement!.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }),
       ),
     );
+    await journalWait(() => expect(document.querySelector('[role="alertdialog"]')).not.toBeNull());
+    await journalClick('放弃修改并关闭');
     await journalWait(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
     await journalWait(() => expect(document.activeElement).toBe(trigger));
     await journalClick('开始复盘');

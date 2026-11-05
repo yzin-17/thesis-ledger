@@ -1,3 +1,4 @@
+import { TableContainer } from '@/components/ui/table';
 import type { ReactNode } from 'react';
 import type { TradeDetailResponse } from '@thesis-ledger/api-client';
 import { Badge } from '@/components/ui/badge';
@@ -34,9 +35,9 @@ function DetailMetric({ label, value }: { label: string; value: string }) {
 
 function DetailTable({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <div className="overflow-x-auto rounded-md border border-border" aria-label={label}>
+    <TableContainer aria-label={label}>
       <table className="w-full min-w-[36rem] text-left text-xs">{children}</table>
-    </div>
+    </TableContainer>
   );
 }
 
@@ -165,14 +166,14 @@ function EntryLegs({ detail }: { detail: TradeDetailResponse }) {
         <EmptyDetail>暂无建仓成交。</EmptyDetail>
       ) : (
         <DetailTable label="建仓明细">
-          <thead className="border-b bg-muted/30 text-muted-foreground">
+          <thead className="border-b text-muted-foreground">
             <tr>
               <th className="px-3 py-2">时间</th>
               <th className="px-3 py-2">币种</th>
-              <th className="px-3 py-2">价格</th>
-              <th className="px-3 py-2">数量</th>
-              <th className="px-3 py-2">剩余数量</th>
-              <th className="px-3 py-2">剩余成本</th>
+              <th className="px-3 py-2 text-right">价格</th>
+              <th className="px-3 py-2 text-right">数量</th>
+              <th className="px-3 py-2 text-right">剩余数量</th>
+              <th className="px-3 py-2 text-right">剩余成本</th>
             </tr>
           </thead>
           <tbody>
@@ -182,10 +183,12 @@ function EntryLegs({ detail }: { detail: TradeDetailResponse }) {
                   {formatTradeDateTime(entry.occurredAt)}
                 </td>
                 <td className="px-3 py-2">{entry.currency}</td>
-                <td className="px-3 py-2 font-mono">{entry.price}</td>
-                <td className="px-3 py-2 font-mono">{entry.quantity}</td>
-                <td className="px-3 py-2 font-mono">{entry.remainingQuantity}</td>
-                <td className="px-3 py-2 font-mono">{formatTradeDecimal(entry.remainingCost)}</td>
+                <td className="px-3 py-2 text-right font-mono">{entry.price}</td>
+                <td className="px-3 py-2 text-right font-mono">{entry.quantity}</td>
+                <td className="px-3 py-2 text-right font-mono">{entry.remainingQuantity}</td>
+                <td className="px-3 py-2 text-right font-mono">
+                  {formatTradeDecimal(entry.remainingCost)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -206,14 +209,14 @@ function BaselineComponents({ detail }: { detail: TradeDetailResponse }) {
         description="快照是来源证据，不代表真实买入。"
       />
       <DetailTable label="持仓快照组成">
-        <thead className="border-b bg-muted/30 text-muted-foreground">
+        <thead className="border-b text-muted-foreground">
           <tr>
             <th className="px-3 py-2">批次</th>
             <th className="px-3 py-2">范围</th>
-            <th className="px-3 py-2">快照数量</th>
-            <th className="px-3 py-2">已纳入数量</th>
-            <th className="px-3 py-2">剩余数量</th>
-            <th className="px-3 py-2">平均成本</th>
+            <th className="px-3 py-2 text-right">快照数量</th>
+            <th className="px-3 py-2 text-right">已纳入数量</th>
+            <th className="px-3 py-2 text-right">剩余数量</th>
+            <th className="px-3 py-2 text-right">平均成本</th>
           </tr>
         </thead>
         <tbody>
@@ -221,10 +224,12 @@ function BaselineComponents({ detail }: { detail: TradeDetailResponse }) {
             <tr key={component.id} className="border-b last:border-0">
               <td className="px-3 py-2 font-mono">{component.batchId}</td>
               <td className="px-3 py-2">{tradeBatchScopeLabel(component.batchScope)}</td>
-              <td className="px-3 py-2 font-mono">{component.observedQuantity}</td>
-              <td className="px-3 py-2 font-mono">{component.quantity}</td>
-              <td className="px-3 py-2 font-mono">{component.remainingQuantity}</td>
-              <td className="px-3 py-2 font-mono">{formatTradeDecimal(component.averageCost)}</td>
+              <td className="px-3 py-2 text-right font-mono">{component.observedQuantity}</td>
+              <td className="px-3 py-2 text-right font-mono">{component.quantity}</td>
+              <td className="px-3 py-2 text-right font-mono">{component.remainingQuantity}</td>
+              <td className="px-3 py-2 text-right font-mono">
+                {formatTradeDecimal(component.averageCost)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -251,14 +256,14 @@ function CloseSlices({
         <EmptyDetail>暂无真实卖出记录。</EmptyDetail>
       ) : (
         <DetailTable label="平仓明细">
-          <thead className="border-b bg-muted/30 text-muted-foreground">
+          <thead className="border-b text-muted-foreground">
             <tr>
               <th className="px-3 py-2">时间</th>
               <th className="px-3 py-2">币种</th>
-              <th className="px-3 py-2">退出价格</th>
-              <th className="px-3 py-2">数量</th>
-              <th className="px-3 py-2">剩余数量</th>
-              <th className="px-3 py-2">净实现盈亏</th>
+              <th className="px-3 py-2 text-right">退出价格</th>
+              <th className="px-3 py-2 text-right">数量</th>
+              <th className="px-3 py-2 text-right">剩余数量</th>
+              <th className="px-3 py-2 text-right">净实现盈亏</th>
               <StickyTableActionHeader className="px-3 py-2">操作</StickyTableActionHeader>
             </tr>
           </thead>
@@ -269,10 +274,14 @@ function CloseSlices({
                   {formatTradeDateTime(slice.occurredAt)}
                 </td>
                 <td className="px-3 py-2">{slice.currency}</td>
-                <td className="px-3 py-2 font-mono">{formatTradeDecimal(slice.price)}</td>
-                <td className="px-3 py-2 font-mono">{slice.quantity}</td>
-                <td className="px-3 py-2 font-mono">{slice.remainingQuantityAfter}</td>
-                <td className="px-3 py-2 font-mono">{formatTradeDecimal(slice.netRealizedPnl)}</td>
+                <td className="px-3 py-2 text-right font-mono">
+                  {formatTradeDecimal(slice.price)}
+                </td>
+                <td className="px-3 py-2 text-right font-mono">{slice.quantity}</td>
+                <td className="px-3 py-2 text-right font-mono">{slice.remainingQuantityAfter}</td>
+                <td className="px-3 py-2 text-right font-mono">
+                  {formatTradeDecimal(slice.netRealizedPnl)}
+                </td>
                 <StickyTableActionCell className="px-3 py-2">
                   <Button
                     type="button"
@@ -357,7 +366,7 @@ function TradeEvidence({ detail }: { detail: TradeDetailResponse }) {
           ))}
         </EvidenceList>
       </section>
-      <details open className="rounded-md border border-border bg-muted/20 p-3 text-xs">
+      <details className="rounded-md border border-border bg-muted/20 p-3 text-xs">
         <summary className="cursor-pointer font-medium">技术信息</summary>
         <dl className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
           <div>

@@ -40,7 +40,7 @@ export class MarketResultCache {
     parse: (value: unknown) => T;
     load: () => Promise<T>;
     markCached: (value: T) => T;
-    markStale: (value: T) => T;
+    markStale: (value: T, error: unknown) => T;
     policy: MarketCachePolicy;
   }): Promise<T> {
     const client = this.redis?.client;
@@ -76,7 +76,7 @@ export class MarketResultCache {
     } catch (error) {
       try {
         const lastValid = await client.get(redisKey('cache', `${input.key}:last-valid`));
-        if (lastValid) return input.markStale(input.parse(JSON.parse(lastValid)));
+        if (lastValid) return input.markStale(input.parse(JSON.parse(lastValid)), error);
       } catch {
         // 保留原始上游错误，不让缓存故障覆盖诊断信息。
       }

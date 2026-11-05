@@ -1,51 +1,16 @@
 import { getDesktopApiClient } from '../../shared/api/client.js';
+export { safeProviderOAuthUrl as safeOAuthUrl } from '@thesis-ledger/api-client';
 import type { ProviderOAuthSession } from '@thesis-ledger/schemas';
 export type { ProviderOAuthSession } from '@thesis-ledger/schemas';
-
-const base = '/api/market-data/providers/longbridge/oauth/sessions';
 export const createProviderOAuth = (clientId: string) =>
-  getDesktopApiClient().request<ProviderOAuthSession>(base, {
-    method: 'POST',
-    body: JSON.stringify({ clientId }),
-  });
+  getDesktopApiClient().providerOAuth.create(clientId);
 export const currentProviderOAuth = (signal?: AbortSignal) =>
-  getDesktopApiClient().request<{ session: ProviderOAuthSession | null }>(`${base}/current`, {
-    signal: signal ?? null,
-  });
+  getDesktopApiClient().providerOAuth.current(signal);
 export const getProviderOAuth = (id: string, signal?: AbortSignal) =>
-  getDesktopApiClient().request<ProviderOAuthSession>(`${base}/${encodeURIComponent(id)}`, {
-    signal: signal ?? null,
-  });
-export const cancelProviderOAuth = (id: string) =>
-  getDesktopApiClient().request<ProviderOAuthSession>(`${base}/${encodeURIComponent(id)}/cancel`, {
-    method: 'POST',
-  });
-
+  getDesktopApiClient().providerOAuth.get(id, signal);
+export const cancelProviderOAuth = (id: string) => getDesktopApiClient().providerOAuth.cancel(id);
 export const oauthPending = (session?: ProviderOAuthSession | null) =>
   session?.status === 'starting' || session?.status === 'authorizing';
-
-export function safeOAuthUrl(value: string | null | undefined): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    if (
-      url.protocol !== 'https:' ||
-      ![
-        'openapi.longbridge.com',
-        'openapi.longbridge.cn',
-        'openapi-global.longbridge.xyz',
-      ].includes(url.hostname) ||
-      url.pathname !== '/oauth2/authorize' ||
-      url.username ||
-      url.password ||
-      (url.port && url.port !== '443')
-    )
-      return null;
-    return url.href;
-  } catch {
-    return null;
-  }
-}
 
 export const oauthErrorLabels: Record<string, string> = {
   OAUTH_SDK_UNAVAILABLE: '当前服务尚未安装授权组件，请更新 DSA 服务或使用三项密钥。',

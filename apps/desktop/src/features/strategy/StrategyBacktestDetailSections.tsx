@@ -1,3 +1,4 @@
+import { TableContainer } from '@/components/ui/table';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,18 +74,23 @@ function CompactTable({
   headers,
   rows,
   empty,
+  numericColumns = [],
 }: {
   headers: string[];
   rows: string[][];
   empty: string;
+  numericColumns?: number[];
 }) {
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <TableContainer>
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="border-b bg-muted/30 text-left">
+        <thead className="border-b text-left">
           <tr>
-            {headers.map((header) => (
-              <th key={header} className="px-3 py-2 font-medium">
+            {headers.map((header, index) => (
+              <th
+                key={header}
+                className={`px-3 py-2 font-medium ${numericColumns.includes(index) ? 'text-right' : 'text-left'}`}
+              >
                 {header}
               </th>
             ))}
@@ -101,7 +107,10 @@ function CompactTable({
             rows.map((row, index) => (
               <tr key={`${row[0] ?? 'row'}-${index}`} className="border-b last:border-0">
                 {row.map((cell, cellIndex) => (
-                  <td key={`${cellIndex}-${cell}`} className="px-3 py-2">
+                  <td
+                    key={`${cellIndex}-${cell}`}
+                    className={`px-3 py-2 ${numericColumns.includes(cellIndex) ? 'text-right tabular-nums' : 'text-left'}`}
+                  >
                     {cell}
                   </td>
                 ))}
@@ -110,7 +119,7 @@ function CompactTable({
           )}
         </tbody>
       </table>
-    </div>
+    </TableContainer>
   );
 }
 
@@ -256,6 +265,7 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
         <h3 className="font-medium">已平仓交易</h3>
         <CompactTable
           headers={['时间', '标的', '方向或原因', '数量']}
+          numericColumns={[3]}
           rows={tradeRows}
           empty="没有已平仓交易"
         />
@@ -264,6 +274,7 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
         <h3 className="font-medium">成交</h3>
         <CompactTable
           headers={['时间', '标的', '方向', '数量', '价格']}
+          numericColumns={[3, 4]}
           rows={fillRows}
           empty="没有成交记录"
         />

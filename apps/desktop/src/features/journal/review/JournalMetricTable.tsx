@@ -24,7 +24,7 @@ export function JournalMetricTable({ metrics }: { metrics: Record<string, Journa
       <TableHeader>
         <TableRow>
           <TableHead>指标</TableHead>
-          <TableHead>值</TableHead>
+          <TableHead className="text-right">值</TableHead>
           <TableHead>证据说明</TableHead>
         </TableRow>
       </TableHeader>
@@ -32,7 +32,7 @@ export function JournalMetricTable({ metrics }: { metrics: Record<string, Journa
         {Object.entries(metrics).map(([key, metric]) => (
           <TableRow key={key}>
             <TableCell>{metricLabels[key] ?? key}</TableCell>
-            <TableCell className="font-mono tabular-nums whitespace-normal break-all">
+            <TableCell className="text-right font-mono tabular-nums whitespace-normal break-all">
               {metricText(metric)}
             </TableCell>
             <TableCell className="whitespace-normal">

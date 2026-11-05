@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { tradingCalendarFromFact, type MarketPeriodCalendarFact } from '@thesis-ledger/domain';
+import { tradingCalendarFromFact, marketCivilInstant, type MarketPeriodCalendarFact } from '@thesis-ledger/domain';
 import {
   backtestCalendarResponseSchema,
   marketPeriodCalendarSchema,
@@ -11,7 +11,7 @@ import {
 } from './market-pit-evidence-instant-v1.js';
 
 export interface MarketPeriodCalendarRequest {
-  market: 'CN';
+  market: 'CN' | 'HK' | 'US';
   start: string;
   end: string;
   evaluationAsOf: string;
@@ -48,7 +48,7 @@ export function validatePeriodCalendarRequest(input: MarketPeriodCalendarRequest
   const instant = parseMarketPitEvidenceInstantV1(input.evaluationAsOf);
   const evaluationDay = Math.floor((Number(instant.seconds) * 1000) / DAY) * DAY;
   if (
-    input.market !== 'CN' ||
+    !['CN', 'HK', 'US'].includes(input.market) ||
     end < start ||
     (end - start) / DAY + 1 > MAX_CALENDAR_DAYS ||
     start > evaluationDay ||
@@ -116,12 +116,12 @@ function projectSessions(
   const result: Array<MarketPeriodCalendarFact['sessions'][number]> = [];
   for (let day = dateMillis(input.start); day <= dateMillis(input.end); day += DAY) {
     const tradingDate = new Date(day).toISOString().slice(0, 10);
-    const probe = new Date(day + 4 * 60 * 60 * 1000);
+    const probe = marketCivilInstant(tradingDate, 12 * 60, fact.timezone);
     for (const session of calendar.sessionsForDate(probe)) {
       result.push({
         tradingDate,
-        startAt: new Date(day + (session.start - 480) * 60_000).toISOString(),
-        endAt: new Date(day + (session.end - 480) * 60_000).toISOString(),
+        startAt: marketCivilInstant(tradingDate, session.start, fact.timezone),
+        endAt: marketCivilInstant(tradingDate, session.end, fact.timezone),
       });
     }
   }
@@ -154,7 +154,8 @@ export function projectPeriodCalendar(
       fact.providerRevision !== response.providerRevision
     )
       return { status: 'unavailable', reason: 'calendar_invalid' };
-    if (fact.market !== input.market || fact.timezone !== 'Asia/Shanghai')
+    const timezones = { CN: 'Asia/Shanghai', HK: 'Asia/Hong_Kong', US: 'America/New_York' };
+    if (fact.market !== input.market || fact.timezone !== timezones[input.market])
       return { status: 'unavailable', reason: 'calendar_model_unsupported' };
     if (
       !fact.range.start ||

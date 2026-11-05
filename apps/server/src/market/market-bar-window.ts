@@ -1,3 +1,4 @@
+import { marketCivilInstant } from '@thesis-ledger/domain';
 import { createHash } from 'node:crypto';
 import {
   barSeriesSchema,
@@ -16,42 +17,7 @@ const marketTimeZone = (symbol: string) => {
   return 'Asia/Shanghai';
 };
 
-const localMidnight = (date: string, timeZone: string) => {
-  const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = date.split('-').map(Number);
-  const wanted = Date.UTC(year, month - 1, day);
-  if (new Date(wanted).toISOString().slice(0, 10) !== date)
-    throw new Error('行情窗口必须使用有效日历日期');
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  });
-  let candidate = wanted;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const parts = Object.fromEntries(
-      formatter
-        .formatToParts(new Date(candidate))
-        .filter((part) => part.type !== 'literal')
-        .map((part) => [part.type, part.value]),
-    );
-    const rendered = Date.UTC(
-      Number(parts.year),
-      Number(parts.month) - 1,
-      Number(parts.day),
-      Number(parts.hour),
-      Number(parts.minute),
-      Number(parts.second),
-    );
-    if (rendered === wanted) return candidate;
-    candidate += wanted - rendered;
-  }
-  throw new Error('行情窗口时区边界无法确定');
-};
+const localMidnight = (date: string, timeZone: string) => Date.parse(marketCivilInstant(date, 0, timeZone));
 
 const normalizeBoundary = (value: string, symbol: string, end: boolean) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {

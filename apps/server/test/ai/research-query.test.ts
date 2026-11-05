@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { AiController } from '../../src/ai/ai.controller.js';
 import { AiRunService } from '../../src/ai/ai.service.js';
+import { displayPrisma } from '../instrument-display.fixture.js';
 
 const runId = '11111111-1111-4111-8111-111111111111';
 const toolCallId = '21111111-1111-4111-8111-111111111111';
@@ -62,17 +63,41 @@ const fixture = (rows = [row]) => {
     return rows;
   });
   const aiToolCallFindMany = vi.fn(async () => [{ id: toolCallId, aiRunId: runId }]);
+  const directory = displayPrisma();
   const service = new AiRunService({
+    ...directory,
     $queryRaw: queryRaw,
     aiToolCall: { findMany: aiToolCallFindMany },
     account: { findMany: vi.fn(async () => []) },
     asset: { findMany: vi.fn(async () => []) },
     strategyVersion: { findMany: vi.fn(async () => []) },
   } as never);
-  return { service, queryRaw, aiToolCallFindMany };
+  return { service, queryRaw, aiToolCallFindMany, directory };
 };
 
 describe('研究助手只读查询', () => {
+  it('持仓对象和来源使用当前目录，改名更新展示版本并保留研究结果', async () => {
+    const position = { ...row, context: { scope: 'position', symbol: '000001.OF' } };
+    const { service, directory } = fixture([position as typeof row]);
+    const first = await service.listResearchPage({ view: 'research' });
+    expect(first.items[0]?.display).toMatchObject({
+      object: { name: '华夏成长混合', code: '000001.OF' },
+      source: { name: '华夏成长混合' },
+    });
+    expect(directory.instrument.findMany).toHaveBeenCalledTimes(1);
+    const items = await directory.instrument.findMany({});
+    directory.instrument.findMany.mockResolvedValue(items.map((item) => ({
+      ...item, displayName: '目录更新名称',
+    })));
+    const detail = await service.researchDetail(runId);
+    if (!detail) throw new Error('研究详情缺失');
+    expect(detail.display?.object.name).toBe('目录更新名称');
+    expect(detail.display?.dataVersion).not.toBe(first.items[0]?.display?.dataVersion);
+    expect(detail.result).toEqual(result);
+    expect(position.result).toEqual(result);
+    expect(position.context).toEqual({ scope: 'position', symbol: '000001.OF' });
+  });
+
   it('新查询模式按 updatedAt + id 排序，在服务端应用搜索和范围条件', async () => {
     const { service, queryRaw } = fixture();
     const page = await service.listResearchPage({

@@ -221,11 +221,11 @@ function EquityCurveCard({ result }: { result: BacktestNavResultV3 }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
+        <Table frame="plain">
           <TableHeader>
             <TableRow>
               <TableHead>估值日期</TableHead>
-              <TableHead>权益</TableHead>
+              <TableHead className="text-right">权益</TableHead>
               <TableHead>可见时间</TableHead>
             </TableRow>
           </TableHeader>
@@ -233,7 +233,7 @@ function EquityCurveCard({ result }: { result: BacktestNavResultV3 }) {
             {points.map((point) => (
               <TableRow key={point.occurredAt}>
                 <TableCell>{formatDateOnly(point.occurredAt)}</TableCell>
-                <TableCell>{`${point.value.amount} ${point.value.currency}`}</TableCell>
+                <TableCell className="text-right">{`${point.value.amount} ${point.value.currency}`}</TableCell>
                 <TableCell>{formatDateTime(point.availableAt, '未单独提供')}</TableCell>
               </TableRow>
             ))}
@@ -255,16 +255,16 @@ function RequestTable({ result }: { result: BacktestNavResultV3 }) {
       </CardHeader>
       <CardContent>
         {result.requests.length > 0 ? (
-          <Table>
+          <Table frame="plain">
             <TableHeader>
               <TableRow>
                 <TableHead>申请</TableHead>
                 <TableHead>申请时间</TableHead>
                 <TableHead>状态</TableHead>
-                <TableHead>净值</TableHead>
-                <TableHead>申请金额/份额</TableHead>
-                <TableHead>确认份额</TableHead>
-                <TableHead>费用</TableHead>
+                <TableHead className="text-right">净值</TableHead>
+                <TableHead className="text-right">申请金额/份额</TableHead>
+                <TableHead className="text-right">确认份额</TableHead>
+                <TableHead className="text-right">费用</TableHead>
                 <TableHead>确认与可用时间</TableHead>
                 <TableHead>说明</TableHead>
               </TableRow>
@@ -279,17 +279,17 @@ function RequestTable({ result }: { result: BacktestNavResultV3 }) {
                       {requestStatusLabel(request.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     {request.nav ? `${request.nav} 元` : '待定价'}
                     {request.valuationDate ? (
                       <p className="text-xs text-muted-foreground">{request.valuationDate}</p>
                     ) : null}
                   </TableCell>
-                  <TableCell>{requestedValue(request)}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">{requestedValue(request)}</TableCell>
+                  <TableCell className="text-right">
                     {request.confirmedShares ? `${request.confirmedShares} 份` : '未确认'}
                   </TableCell>
-                  <TableCell>{`${request.fee} CNY`}</TableCell>
+                  <TableCell className="text-right">{`${request.fee} CNY`}</TableCell>
                   <TableCell>{settlementTimes(request)}</TableCell>
                   <TableCell className="max-w-72 whitespace-normal">
                     {request.reason ?? '—'}

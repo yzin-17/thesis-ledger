@@ -1,4 +1,5 @@
 import type { JournalReviewEvidenceInput } from '@thesis-ledger/schemas';
+import { formatDateTime } from '@/lib/date-display';
 import {
   Table,
   TableBody,
@@ -31,22 +32,22 @@ export function JournalSourceFacts({ input }: { input: JournalReviewEvidenceInpu
           <TableHeader>
             <TableRow>
               <TableHead>时间</TableHead>
-              <TableHead>数量</TableHead>
-              <TableHead>价格</TableHead>
-              <TableHead>费用</TableHead>
-              <TableHead>净收益</TableHead>
+              <TableHead className="text-right">数量</TableHead>
+              <TableHead className="text-right">价格</TableHead>
+              <TableHead className="text-right">费用</TableHead>
+              <TableHead className="text-right">净收益</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {slices.map((row) => (
               <TableRow key={row.id}>
-                <TableCell>{row.occurredAt ?? '未知'}</TableCell>
-                <TableCell className="font-mono">{row.quantity}</TableCell>
-                <TableCell className="font-mono">
+                <TableCell>{formatDateTime(row.occurredAt, '未知')}</TableCell>
+                <TableCell className="text-right font-mono">{row.quantity}</TableCell>
+                <TableCell className="text-right font-mono">
                   {row.price ?? '未知'} {row.currency}
                 </TableCell>
-                <TableCell className="whitespace-normal">{charges(row.charges)}</TableCell>
-                <TableCell className="font-mono">
+                <TableCell className="text-right whitespace-normal">{charges(row.charges)}</TableCell>
+                <TableCell className="text-right font-mono">
                   {row.netRealizedPnl ?? '证据不足'} {row.currency}
                 </TableCell>
               </TableRow>
@@ -61,20 +62,20 @@ export function JournalSourceFacts({ input }: { input: JournalReviewEvidenceInpu
           <TableHeader>
             <TableRow>
               <TableHead>时间</TableHead>
-              <TableHead>原始数量</TableHead>
-              <TableHead>价格</TableHead>
-              <TableHead>费用</TableHead>
+              <TableHead className="text-right">原始数量</TableHead>
+              <TableHead className="text-right">价格</TableHead>
+              <TableHead className="text-right">费用</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.map((row) => (
               <TableRow key={row.id}>
-                <TableCell>{row.occurredAt ?? '未知'}</TableCell>
-                <TableCell className="font-mono">{row.originalQuantity}</TableCell>
-                <TableCell className="font-mono">
+                <TableCell>{formatDateTime(row.occurredAt, '未知')}</TableCell>
+                <TableCell className="text-right font-mono">{row.originalQuantity}</TableCell>
+                <TableCell className="text-right font-mono">
                   {row.price ?? '未知'} {row.currency}
                 </TableCell>
-                <TableCell className="whitespace-normal">{charges(row.charges)}</TableCell>
+                <TableCell className="text-right whitespace-normal">{charges(row.charges)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -85,7 +86,8 @@ export function JournalSourceFacts({ input }: { input: JournalReviewEvidenceInpu
           <h3 className="text-sm font-medium">基线观察（不是成交）</h3>
           {baselines.map((row) => (
             <p className="break-all text-sm" key={row.id}>
-              观察时间：{row.occurredAt ?? '未知'}；数量：{row.observedQuantity}；参考成本：
+              观察时间：{formatDateTime(row.occurredAt, '未知')}；数量：{row.observedQuantity}
+              ；参考成本：
               {row.averageCost ?? '未知'} {row.currency}；
               {row.rawCostEstimated ? '估算成本' : '已有成本证据'}
             </p>
@@ -126,7 +128,7 @@ export function JournalSourceFacts({ input }: { input: JournalReviewEvidenceInpu
           <h3 className="text-sm font-medium">关联 Journal 说明</h3>
           {input.journalEntries.map((row) => (
             <p className="text-sm" key={row.id}>
-              {row.createdAt} · {row.content ?? row.notes ?? row.reason}
+              {formatDateTime(row.createdAt, '未知')} · {row.content ?? row.notes ?? row.reason}
             </p>
           ))}
         </div>

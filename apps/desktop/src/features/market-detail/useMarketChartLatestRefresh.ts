@@ -108,6 +108,7 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
             ? { include: ['fund-nav', 'fund-nav-history'] as MarketDetailCapability[] }
             : {}),
           ...(adjustment ? { adjustment } : {}),
+          ...(chartWindowV3.calculationAnchor ? { calculationAnchor: chartWindowV3.calculationAnchor } : {}),
           barsLimit: chartWindowV3.barsLimit,
           ...(chartWindowV3.timeframe ? { timeframe: chartWindowV3.timeframe } : {}),
           chartContractVersion: 3,
@@ -143,6 +144,7 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
       paramsKey,
       adjustment ?? null,
       'chart-v3', chartWindowV3.barsLimit, chartWindowV3.timeframe ?? '1d',
+      ...(chartWindowV3.calculationAnchor ? ['calculation-anchor', chartWindowV3.calculationAnchor] : []),
     ] as const;
     const requestToken = lifecycle.beginRequest();
     retryQueryKeysRef.current.push(queryKey);
@@ -159,6 +161,7 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
               ...(adjustment ? { adjustment } : {}),
               include: capability === 'bars' || capability.startsWith('indicator:')
                 ? ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] : [capability],
+              ...(chartWindowV3.calculationAnchor ? { calculationAnchor: chartWindowV3.calculationAnchor } : {}),
               barsLimit: chartWindowV3.barsLimit,
               ...(chartWindowV3.timeframe ? { timeframe: chartWindowV3.timeframe } : {}),
               chartContractVersion: 3,

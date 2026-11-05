@@ -51,6 +51,8 @@ export const performanceCalculateInputSchema = z.object({
       date: z.iso.datetime({ offset: true }),
       value: z.number().finite(),
       externalFlow: z.number().finite().optional(),
+      externalFlowCount: z.number().int().nonnegative().optional(),
+      flowBoundary: z.object({ before: z.number().finite().nonnegative(), after: z.number().finite().nonnegative() }).optional(),
     }),
   ),
   cashFlows: z.array(
@@ -73,4 +75,7 @@ export const performanceTargetsInputSchema = z.object({
   scope: z.enum(['account', 'portfolio']),
   accountId: z.uuid().optional(),
   targets: z.record(z.string(), z.number().finite()),
+}).superRefine((value, context) => {
+  if ((value.scope === 'account' && !value.accountId) || (value.scope === 'portfolio' && value.accountId))
+    context.addIssue({ code: 'custom', path: ['accountId'], message: '目标 scope 与账户身份不一致' });
 });

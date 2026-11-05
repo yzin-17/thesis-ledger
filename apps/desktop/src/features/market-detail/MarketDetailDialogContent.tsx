@@ -7,13 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MarketColorMenu } from '@/components/market-color-menu';
 import { marketToneForValue } from '@/ui/market-color';
 import { BarsSection, ChipSection, DetailMetric, FundNavHistorySection, FundNavSection, IndicatorSection, MarketDetailLoadingSections, MarketDetailNotice, QuoteSection, sectionIsVisible, type MarketDetailNoticeState } from './MarketDetailSections.js';
 import type { MarketIndicatorParams } from './MarketDetailCharts.js';
 import { marketDetailSectionTitle, type MarketDetailPosition } from './market-detail.types.js';
 import type { MarketChartIndicator } from './market-chart-types.js';
 import type { ChartPoint } from './market-chart-model.js';
+import type { MarketTradingOverlayState } from './useMarketTradingOverlays.js';
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
@@ -52,9 +52,11 @@ export function MarketDetailDialogContent({
   onRetryAll,
   onRetrySection,
   onClose,
+  tradingOverlay,
 }: {
   chartControls?: ReactNode;
   position: MarketDetailPosition;
+  tradingOverlay?: MarketTradingOverlayState | undefined;
   unit: string;
   queryNotice: ReactNode;
   loading: boolean;
@@ -96,7 +98,7 @@ export function MarketDetailDialogContent({
         aria-describedby="market-detail-description"
         className="flex max-h-[calc(100dvh-2rem)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1120px]"
       >
-        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-14 text-left">
+        <DialogHeader className="shrink-0 px-5 py-4 pr-14 text-left">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="m-0 text-xs font-medium tracking-[0.16em] text-muted-foreground">
@@ -106,16 +108,16 @@ export function MarketDetailDialogContent({
                 {position.asset.name} · {position.symbol}
               </DialogTitle>
             </div>
-            <div className="flex items-center gap-2">{chartControls}<MarketColorMenu /></div>
+            {chartControls}
           </div>
           <DialogDescription id="market-detail-description" className="sr-only">
             查看按资产能力加载的市场数据和已有持仓信息。
           </DialogDescription>
         </DialogHeader>
-        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5">
+        <div className="grid min-h-0 min-w-0 flex-1 auto-rows-max grid-cols-1 gap-6 overflow-y-auto p-5">
           {position.quantity !== undefined && position.costPrice !== undefined && (
             <div
-              className="grid rounded-lg border border-border bg-border sm:grid-cols-3 sm:gap-px"
+              className="grid gap-4 sm:grid-cols-3 sm:gap-6"
               data-market-detail-position-context
             >
               <DetailMetric label="持仓数量" value={`${number.format(position.quantity)} ${unit}`} />
@@ -158,6 +160,7 @@ export function MarketDetailDialogContent({
               {sectionIsVisible(barsSection) ? (
                 <BarsSection
                   section={barsSection}
+                  tradingOverlay={tradingOverlay}
                   indicators={chartIndicators}
                   {...(chartPoints ? { chartPoints } : {})}
                   onIndicatorParamsChange={onIndicatorParamsChange}
@@ -200,6 +203,7 @@ export function MarketDetailDialogContent({
               ) : null}
               {sectionIsVisible(fundNavHistorySection) ? (
                 <FundNavHistorySection
+                  position={position}
                   section={fundNavHistorySection}
                   onRetry={() => void onRetrySection('fund-nav-history')}
                   retrying={retrying === 'fund-nav-history'}
@@ -207,7 +211,7 @@ export function MarketDetailDialogContent({
               ) : null}
               {visibleDetail.capabilities.unsupported.length > 0 ? (
                 <details
-                  className="rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground"
+                  className="rounded-md bg-muted/20 p-3 text-sm text-muted-foreground"
                   data-market-detail-capabilities
                 >
                   <summary className="cursor-pointer font-medium text-foreground">

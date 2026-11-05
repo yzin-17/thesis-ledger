@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   authoringStrategySchema,
+  canGenerateAuthoringContent as canGenerate,
   type AuthoringContent,
   type AuthoringModificationTarget,
 } from '@thesis-ledger/schemas';
@@ -14,18 +15,8 @@ import {
 } from './authoring.api.js';
 import { useAuthoringDraft } from './use-authoring-draft.js';
 import { authoringRequestFailure, submitAuthoringIntent } from './authoring-submission.js';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 
-function canGenerate(content: AuthoringContent) {
-  return Boolean(
-    content.confirmation &&
-    content.description.trim() &&
-    content.requirements.length &&
-    content.questions.every((question) => question.answerState === 'confirmed') &&
-    content.requirements.every(
-      (requirement) => !['unresolved', 'unsupported'].includes(requirement.state),
-    ),
-  );
-}
 export function useAuthoringEditor({
   id,
   ownerId,
@@ -103,6 +94,7 @@ export function useAuthoringEditor({
     },
   });
   const busy = perform.isPending || draft.busy;
+  useNavigationGuard({ dirty: false, busy });
   const editing = draft.query.data?.state === 'editing';
   useEffect(() => {
     onDirtyChange(draft.dirty || draft.busy || perform.isPending);

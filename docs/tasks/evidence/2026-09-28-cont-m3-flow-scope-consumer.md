@@ -2,7 +2,7 @@
 
 ## 1. 合同与结果
 
-任务 `R06.12-explicit-scope-consumer`，按 [主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §3.3 和 [主 Task](../2026-09-25-multi-source-adjustment-aware-backtest.md) §12.9 执行。沿用 [请求保护](2026-09-28-cont-m3-flow-request-scope.md) 的严格 ASCII `.SH/.SZ` 参数出口。结果 `worker_done`：两个 Manager 入口保存原输入，只将原输入传给资金流，其他财务 getter 继续接收规范裸码。
+任务 `R06.12-explicit-scope-consumer`，按 [主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §3.3 和 [主 Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) §12.9 执行。沿用 [请求保护](2026-09-28-cont-m3-flow-request-scope.md) 的严格 ASCII `.SH/.SZ` 参数出口。结果 `worker_done`：两个 Manager 入口保存原输入，只将原输入传给资金流，其他财务 getter 继续接收规范裸码。
 
 首次源码核实：`get_fundamental_context` 和 `get_capital_flow_context` 的 public stock_code 参数在 normalize 前仍为调用方原值，不需要外部查询、恢复已丢失身份或按号码猜场所。单行并行赋值保存 `original_stock_code` 与既有规范码，不改变公共签名、market/ETF过滤或非 CN 路径。
 

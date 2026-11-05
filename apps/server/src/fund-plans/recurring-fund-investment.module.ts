@@ -1,3 +1,4 @@
+import { MarketModule } from '../market/market.module.js';
 import { Module } from '@nestjs/common';
 import { LedgerModule } from '../ledger/ledger.module.js';
 import {
@@ -7,7 +8,7 @@ import {
 import { RecurringFundInvestmentService } from './recurring-fund-investment.service.js';
 
 @Module({
-  imports: [LedgerModule],
+  imports: [LedgerModule, MarketModule],
   controllers: [RecurringFundInvestmentPlanController, RecurringFundInvestmentOccurrenceController],
   providers: [RecurringFundInvestmentService],
   exports: [RecurringFundInvestmentService],

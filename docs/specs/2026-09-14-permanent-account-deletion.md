@@ -2,12 +2,12 @@
 
 > 任务标识：`permanent-account-deletion`
 > 日期：2026-09-14
-> 状态：代码实现与 Server/数据库运行验收完成；Desktop 浏览器和 Mobile 原生验收未完成
-> 对应任务：[账户永久删除实施任务](../tasks/2026-09-14-permanent-account-deletion.md)
+> 状态：现行合同；实现与数据库、Server、浏览器、两端原生分层验收完成（2026-10-16）
+> 完成记录：[账户永久删除实施任务](../archive/tasks/2026-09-14-permanent-account-deletion.md)
 
 ## 背景与问题
 
-现有 `DELETE /accounts/:id` 表示停用账户，桌面端可以停用或重新启用账户，但两个客户端都没有永久删除入口。账户余额归零或当前无持仓并不能证明账户未使用；流水、历史状态、导入草稿、定投、风险、日志及其他引用都必须保留完整性，不能因用户请求删除账户而被级联清理。
+本功能实施前，`DELETE /accounts/:id` 仅表示停用账户，两个客户端均无永久删除入口。账户余额归零或当前无持仓并不能证明账户未使用；流水、历史状态、导入草稿、定投、风险、日志及其他引用都必须保留完整性，不能因用户请求删除账户而被级联清理。
 
 本功能在保留现有停用语义的前提下，为从未产生任何关联业务记录的空账户提供显式、不可恢复的永久删除能力，并以数据库约束和事务内检查共同防止并发写入产生悬空引用。
 
@@ -27,15 +27,6 @@
 - 不在 Mobile 增加账户创建、编辑、停用或重新启用功能。
 - 不改变 Mobile 现有 Portfolio、Risk 数据加载机制，只在删除成功后触发其既有刷新入口。
 - 不把开发数据库重建当作正式升级或本功能迁移验收。
-
-## 现状与约束
-
-- 截至 2026-09-14，`AccountsController` 的 `DELETE /accounts/:id` 调用现有停用服务；停用只检查当前持仓和投影现金余额。
-- Prisma 中大部分账户关联已有 `onDelete: Restrict`，但 `TargetAllocation`、`RiskEvent`、`JournalEntry`、`JournalReviewSnapshot`、`AiDecisionLog` 的 `accountId` 尚无账户外键。
-- raw-owned 的 `StrategyRiskApplication.accountId` 已有 `ON DELETE RESTRICT`；其审计记录通过应用关系间接阻止账户删除。
-- Desktop 账户管理列表已经请求 `includeInactive=true` 并可复用全局确认弹窗。
-- Mobile 当前只有 Portfolio/Risk 页签，尚未使用 TanStack Query；新增账户数据路径必须独立接入 TanStack Query，不替换已有读取 store。
-- 当前工作区存在其他未提交修改，尤其涉及 Server 平台数据库门禁、`packages/api-client`、Desktop `package.json`、migration matrix 和锁文件；实施必须保留并兼容这些改动。
 
 ## 设计方案
 

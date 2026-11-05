@@ -14,6 +14,7 @@ import {
 } from './backtest-snapshot.js';
 import type { ArtifactRow } from './backtest-artifact-store.js';
 import { runBacktestAttempt } from './backtest-run-attempt.js';
+import { indicatorEngineChanged, indicatorEngineVersionMessage } from './backtest-indicator-engine-version.js';
 import type {
   BacktestSnapshotV3BuildInput,
   BacktestSnapshotV3BuildResult,
@@ -245,6 +246,8 @@ export class BacktestRunService {
       throw new BadRequestException('旧 Run 持久化合同拒绝重试');
     if (job.status === 'succeeded') return job;
     if (job.status !== 'failed') throw new BadRequestException('只有 failed Run 可以 retry');
+    if (indicatorEngineChanged(job.engineVersion, this.defaultV3Runner?.id))
+      throw new BadRequestException({ code: 'INDICATOR_ENGINE_VERSION_CHANGED', message: indicatorEngineVersionMessage });
     await verifyBacktestRunRetrySnapshot({
       job,
       prisma: this.prisma,

@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { MarketChartAttribution } from './MarketChartAttribution.js';
 import { MarketChartNavigationControls } from './MarketChartNavigationControls.js';
 import { MarketChartReadout } from './MarketChartReadout.js';
+import { chartPointKey as timestampOf } from './market-chart-time.js';
+import { chartRangeLabel as rangeLabel } from './market-chart-range.js';
 import { MarketChartToolbar } from './MarketChartToolbar.js';
 import { chartPeriodTitle, chartPeriodSourceLabel, chartCompletionLabel } from './market-chart-period-label.js';
 import { MarketIndicatorSettingsMenu } from './MarketIndicatorSettingsMenu.js';
+import { MarketTradingOverlayControls } from './MarketTradingOverlayControls.js';
+import type { MarketTradingOverlayState } from './useMarketTradingOverlays.js';
 import {
   LightweightMarketChart,
   rangeCoverage,
@@ -29,16 +33,6 @@ export type { ChartPreference, MarketIndicatorParams } from './market-chart-pref
 
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
-const rangeLabel = (range: number) => {
-  if (range === 0) return '全部已加载';
-  if (range === 30) return '1月';
-  if (range === 90) return '3月';
-  if (range === 180) return '6月';
-  return '1年';
-};
-
-const timestampOf = (timestamp: string) => timestamp.slice(0, 10);
-
 export function MarketPriceChart({
   bars,
   indicators = [],
@@ -55,6 +49,7 @@ export function MarketPriceChart({
   latestLoading,
   latestNotice,
   latestError,
+  tradingOverlay,
 }: {
   bars: MarketChartBar[];
   indicators?: MarketChartIndicator[];
@@ -71,9 +66,16 @@ export function MarketPriceChart({
   latestLoading?: boolean;
   latestNotice?: string | null;
   latestError?: string | null;
+  tradingOverlay?: MarketTradingOverlayState | undefined;
 }) {
   const [preference, setPreference] = useState<ChartPreference>(readPreference);
   const [expanded, setExpanded] = useState(false);
+  const fullscreenTrigger = useRef<HTMLButtonElement>(null);
+  const fullscreenWasOpen = useRef(false);
+  useEffect(() => {
+    if (fullscreenWasOpen.current && !expanded) fullscreenTrigger.current?.focus();
+    fullscreenWasOpen.current = expanded;
+  }, [expanded]);
   const [macdDraft, setMacdDraft] = useState<Record<'fast' | 'slow' | 'signal', string>>(() => ({
     fast: String(defaultPreference.macdParams.fast),
     slow: String(defaultPreference.macdParams.slow),
@@ -101,7 +103,7 @@ export function MarketPriceChart({
   const viewportBars = useMemo(() => {
     if (!viewport) return visible;
     return bars.filter((bar) => {
-      const date = timestampOf(bar.timestamp);
+      const date = timestampOf(bar.timestamp, bar.timeframe);
       return date >= viewport.from && date <= viewport.to;
     });
   }, [bars, viewport, visible]);
@@ -111,9 +113,9 @@ export function MarketPriceChart({
   const currency = latestBar?.symbol?.match(/\.(SH|SZ|BJ)$/) ? 'CNY' : undefined;
   const change = first && last && first.close !== 0 ? last.close / first.close - 1 : null;
   const selectedTimestamp = lockedTimestamp ?? hoveredTimestamp;
-  const selectedBar = bars.find((bar) => timestampOf(bar.timestamp) === selectedTimestamp) ?? last;
+  const selectedBar = bars.find((bar) => timestampOf(bar.timestamp, bar.timeframe) === selectedTimestamp) ?? last;
   const selectedChartPoint = chartPoints.find(
-    (point) => point.date === timestampOf(selectedBar?.timestamp ?? ''),
+    (point) => point.date === timestampOf(selectedBar?.timestamp ?? '', selectedBar?.timeframe),
   );
 
   useEffect(() => {
@@ -141,7 +143,7 @@ export function MarketPriceChart({
     }
     const action = canLoadEarlier ? '可加载更早数据以覆盖' : '当前数据源未覆盖';
     setRangeNotice(
-      `当前仅已加载 ${coverage.earliest} 至 ${coverage.latest}，${action}${rangeLabel(preference.visibleRange)}。`,
+      `当前仅已加载 ${coverage.earliest} 至 ${coverage.latest}，${action}${rangeLabel(preference.visibleRange, bars.at(-1)?.timeframe)}。`,
     );
   }, [bars, canLoadEarlier, preference.visibleRange]);
 
@@ -203,13 +205,14 @@ export function MarketPriceChart({
 
   const triggerViewAction = (type: NonNullable<typeof viewAction>['type']) =>
     setViewAction((current) => ({ type, revision: (current?.revision ?? 0) + 1 }));
+  const ChartTitle = expanded ? DialogTitle : 'h4';
 
   const panel = (
-    <div className="grid gap-3 rounded-lg bg-muted/30 p-3">
+    <div className="grid min-w-0 grid-cols-1 gap-3 rounded-lg bg-muted/30 p-3">
       <div className="flex flex-col gap-3">
         <div>
-          <h4 className="m-0 text-sm font-medium">{chartPeriodTitle(latestBar)}</h4>
-          <p className="m-0 text-xs text-muted-foreground">K线、均线、成交量与指标共用日期轴</p>
+          <ChartTitle className="m-0 pr-8 text-sm font-medium">{chartPeriodTitle(latestBar)}</ChartTitle>
+          <p className="sr-only">K线、均线、成交量与指标共用日期轴</p>
         </div>
         <MarketChartToolbar
           chartControls={
@@ -232,7 +235,7 @@ export function MarketPriceChart({
             >
               {[0, 30, 90, 180, 365].map((range) => (
                 <ToggleGroupItem key={range} value={String(range)}>
-                  {rangeLabel(range)}
+                  {rangeLabel(range, bars.at(-1)?.timeframe)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
@@ -331,29 +334,28 @@ export function MarketPriceChart({
                   setLockedTimestamp(null);
                   setHoveredTimestamp(null);
                   updatePreference(defaultPreference);
+                  tradingOverlay?.update({ trades: false, cost: false, risk: '', measuring: false, from: null, to: null });
                   setResetRevision((value) => value + 1);
                 }}
               >
                 重置
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setExpanded((value) => !value)}
-              >
-                {expanded ? '退出全屏' : '全屏'}
-              </Button>
-              <MarketChartNavigationControls
-                onZoomIn={() => triggerViewAction('zoomIn')}
-                onZoomOut={() => triggerViewAction('zoomOut')}
-                onPanEarlier={() => triggerViewAction('panEarlier')}
-                onPanLater={() => triggerViewAction('panLater')}
-              />
+              <div className="flex items-center gap-2">
+                <Button ref={expanded ? undefined : fullscreenTrigger} type="button" size="sm" variant="outline" onClick={() => setExpanded((value) => !value)}>
+                  {expanded ? '退出全屏' : '全屏'}
+                </Button>
+                <MarketChartNavigationControls
+                  onZoomIn={() => triggerViewAction('zoomIn')}
+                  onZoomOut={() => triggerViewAction('zoomOut')}
+                  onPanEarlier={() => triggerViewAction('panEarlier')}
+                  onPanLater={() => triggerViewAction('panLater')}
+                />
+              </div>
             </>
           }
         />
       </div>
+      {tradingOverlay ? <MarketTradingOverlayControls overlay={tradingOverlay} /> : null}
       {visible.length > 0 ? (
         <LightweightMarketChart
           bars={bars}
@@ -380,7 +382,13 @@ export function MarketPriceChart({
           {...(canLoadLater !== undefined ? { canLoadLater } : {})}
           {...(latestLoading !== undefined ? { latestLoading } : {})}
           onHover={setHoveredTimestamp}
-          onClick={setLockedTimestamp}
+          onClick={(key) => {
+            if (tradingOverlay?.consumeClick(key)) {
+              setLockedTimestamp(null);
+              setHoveredTimestamp(key);
+            } else setLockedTimestamp(key);
+          }}
+          {...(tradingOverlay ? { tradingOverlays: tradingOverlay.model } : {})}
           lockedTimestamp={lockedTimestamp}
         />
       ) : (
@@ -452,16 +460,14 @@ export function MarketPriceChart({
   );
 
   return (
-    <figure className="m-0 grid gap-2" data-market-price-chart>
+    <figure className="m-0 grid min-w-0 grid-cols-1 gap-2" data-market-price-chart>
       {expanded ? (
         <Dialog open onOpenChange={setExpanded}>
           <DialogContent
-            className="h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none sm:max-w-none overflow-y-auto p-4"
+            finalFocus={false}
+            className="h-dvh max-h-dvh w-screen max-w-none overflow-y-auto rounded-none p-2 sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-none sm:rounded-lg sm:p-4"
             showCloseButton
           >
-            <DialogHeader>
-              <DialogTitle>{chartPeriodTitle(latestBar)}</DialogTitle>
-            </DialogHeader>
             {panel}
           </DialogContent>
         </Dialog>

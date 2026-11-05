@@ -105,7 +105,7 @@ type CashTiming = {
   expectedAt?: string | undefined;
 };
 
-const cashEffectiveAt = (payload: unknown, occurredAt: string | null) => {
+export const cashEffectiveAt = (payload: unknown, occurredAt: string | null) => {
   if (typeof payload !== 'object' || payload === null) return occurredAt;
   const timing = payload as CashTiming;
   return timing.settledAt ?? timing.expectedAt ?? occurredAt;

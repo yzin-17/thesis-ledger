@@ -1,11 +1,11 @@
 # 定期现金入账计划 Spec
 
 - 日期：2026-08-30
-- 状态：T1–T4 本地实现与确定性验证完成；真实 Scheduler、通知与客户端验收仍开放
+- 状态：实现、Scheduler 恢复、客户端及模拟/真实飞书通知均已验收；当前合同保留，Task 已完成归档
 - 适用项目：`thesis-ledger`
 - 类型：增量设计
 - 依赖：[`2026-08-30-cash-account-funding-and-transfer.md`](2026-08-30-cash-account-funding-and-transfer.md)
-- 当前验收：[现金任务中的定期入账](../tasks/2026-08-30-cash-account-funding-and-transfer.md#recurring-cash-acceptance)；[原实施记录](../archive/tasks/2026-08-30-recurring-cash-deposit-plan.md)保留。
+- 当前验收：[现金任务中的定期入账](../archive/tasks/2026-08-30-cash-account-funding-and-transfer.md#recurring-cash-acceptance)；[原实施记录](../archive/tasks/2026-08-30-recurring-cash-deposit-plan.md)保留。
 
 ## 背景与问题
 
@@ -48,11 +48,18 @@
 
 通知模块提供通用 Outbox 接口，持久化 subject、消息快照、去重键和投递状态。RiskEvent 迁移为该接口的一个调用方。正常到期按计划通知；一次补齐多个历史月份时，每个计划只排队一条汇总通知。通知未配置或发送失败不回滚实例，只记录失败和重试状态。
 
+2026-11-01 用户授权构造模拟 Provider 验证。该验收在独立 PostgreSQL、Redis 与回环 HTTP 接收端运行，使用目标编译后的现金 handler、Outbox、Dispatcher 及飞书消息适配器；仅在隔离进程将合成 Webhook 的传输定向至回环接收端，不修改生产 URL 校验、正常配置或全局路由。必须验证实际 HTTP 请求与回执、补期合并、失败恢复、业务错误、三次上限、重复扫描/竞争投递及待确认实例与账本隔离。模拟结果单独标识，不作为真实飞书群送达或用户未提供的渠道凭据证明。[本轮证据](../tasks/evidence/2026-11-01-cash-notification-mock-provider.md)已覆盖上述模拟条件，真实外部通知条件保持。
+
+用户随后提供 `~/.zshrc` 中的 `FEISHU_HOOK`，用于接续真实通知验收。最小范围为该 Webhook 绑定群、一个隔离计划、三期明确标注的验收样本，最多一次真实 HTTP 请求，失败即停，不自动重发。凭据只从本机固定来源解析并经标准输入传入隔离进程，不执行 `.zshrc`、不输出凭据、不写入日志或正常配置；生产飞书地址校验继续执行，正常路由保持。真实链路须有服务端业务成功回执、持久化 `delivered` 及零重复请求；失败/重试机制继续复用模拟证据。飞书成功回执证明服务端接收，不宣称群成员已阅读。
+
+上述真实验收已取得 HTTP 200、业务码 0 及一次 `delivered`，正常 12 表和空路由保持，见[真实通知与最终复核](../tasks/evidence/2026-11-01-cash-notification-feishu-acceptance.md)。
+
 ## 对外行为或接口变化
 
 - 提供计划列表、创建、修改、暂停、恢复和结束接口。
 - 提供实例列表、确认、跳过和恢复接口；所有变更携带预期版本。
 - Desktop 现金页显示待确认数量、逾期状态、计划列表和历史实例；计划操作放在上下文菜单中。
+- 计划保存、确认或跳过失败时，在原表单显示错误并保留金额、日期和原因，允许修改或重试；失败不能使整个页面退出。
 
 ## 数据、状态或兼容性影响
 

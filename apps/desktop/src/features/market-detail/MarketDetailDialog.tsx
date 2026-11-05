@@ -1,29 +1,27 @@
+import { isMarketMinuteTimeframe, marketCalculationAnchor } from '@thesis-ledger/schemas';
+import { useMarketTradingOverlays } from './useMarketTradingOverlays.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   MarketDisplayDetailResponse as MarketDetailResponse,
 } from '@thesis-ledger/api-client';
-import type { Quote } from '@thesis-ledger/schemas';
 import { MarketDetailDialogContent } from './MarketDetailDialogContent.js';
 import { MarketChartAdjustment } from './MarketChartAdjustment.js';
-import { MarketPeriodSelection, useMarketPeriodNotice, type ChartPeriod } from './MarketPeriodSelection.js';
+import { useMarketPeriodNotice, useMarketPeriodDataReady, type ChartPeriod } from './MarketPeriodSelection.js';
+import { MarketDetailSelection } from './MarketDetailSelection.js';
 import { clearIndicatorSections } from './market-detail-generation.js';
 export { commitIfCurrentGeneration } from './market-detail-generation.js';
-import { useMarketChartSelection } from './useMarketChartSelection.js';
 import {
   MarketDetailNotice,
   sectionIsVisible,
-  type MarketDetailNoticeState,
 } from './MarketDetailSections.js';
 import type { MarketIndicatorParams } from './MarketDetailCharts.js';
 import {
-  MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS,
-  isQuoteWithinUpstreamRefreshWindow,
   mergeMarketDetail,
-  quoteServedAgeMs,
   getVisibleMarketDetail,
   type MarketDetailPosition,
 } from './market-detail.types.js';
+import { marketDetailNotices } from './market-detail-notices.js';
 import { chartPageFromResponse } from './market-chart-types.js';
 import { canCombineChartSeries } from './market-chart-acquisition.js';
 import type { MarketChartPage } from './market-chart-types.js';
@@ -39,12 +37,10 @@ const indicatorParamsKey = (params: MarketIndicatorParams) => JSON.stringify(par
 
 type DetailDialogProps = { position: MarketDetailPosition; onClose: () => void; adjustment?: 'none' | 'qfq' | 'hfq' };
 export function MarketDetailDialog(props: DetailDialogProps) {
-  const { adjustment, select } = useMarketChartSelection(props.position.symbol, props.adjustment);
-  return <MarketPeriodSelection symbol={props.position.symbol} {...(adjustment ? { adjustment } : {})}
-    enabled={props.position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ)$/.test(props.position.symbol)}>
-    {(timeframe) => <MarketDetailDialogView position={props.position} onClose={props.onClose}
+  return <MarketDetailSelection position={props.position} initial={props.adjustment}>
+    {({ timeframe, adjustment, select }) => <MarketDetailDialogView position={props.position} onClose={props.onClose}
       {...(adjustment ? { adjustment } : {})} select={select} timeframe={timeframe} key={`${props.position.symbol}:${timeframe}`} />}
-  </MarketPeriodSelection>;
+  </MarketDetailSelection>;
 }
 
 function MarketDetailDialogView({
@@ -61,10 +57,15 @@ function MarketDetailDialogView({
   timeframe: ChartPeriod;
 }) {
   const periodNotice = useMarketPeriodNotice();
+  const periodDataReady = useMarketPeriodDataReady();
   const queryClient = useQueryClient();
   const [refreshSequence, setRefreshSequence] = useState(0);
   const [chartBarsLimit, setChartBarsLimit] = useState(timeframe === '1y' ? 2 : 90);
-  const chartWindowV3 = { barsLimit: chartBarsLimit, timeframe };
+  const historyScope = JSON.stringify([position.symbol, timeframe, adjustment ?? null]);
+  const [historyAnchorState, setHistoryAnchor] = useState<{ scope: string; timestamp: string }>();
+  const historyAnchor = historyAnchorState?.scope === historyScope ? historyAnchorState.timestamp : undefined;
+  const historyEnd = marketCalculationAnchor({ symbol: position.symbol, calculationAnchor: historyAnchor })?.end;
+  const chartWindowV3 = { barsLimit: chartBarsLimit, timeframe, ...(historyAnchor ? { calculationAnchor: historyAnchor } : {}) };
   const [detail, setDetail] = useState<MarketDetailResponse | null>(null);
   const [indicatorParams, setIndicatorParams] = useState<MarketIndicatorParams>({
     fast: 12,
@@ -102,7 +103,14 @@ function MarketDetailDialogView({
     detail,
     chartPointsRef,
     requestGeneration,
-    onLatestDetail: (next) => setDetail((current) => mergeMarketDetail(current, next)),
+    onLatestDetail: (next) => {
+      if (historyAnchor) {
+        queryClient.setQueryData(latestDetailQueryKey(position.symbol, refreshSequence, indicatorParams, adjustment,
+          { barsLimit: chartBarsLimit, timeframe }), next);
+        setHistoryAnchor(undefined);
+      }
+      setDetail((current) => mergeMarketDetail(current, next));
+    },
     onSectionRetry: (next) => {
       setDetail((current) => mergeMarketDetail(current, next));
     },
@@ -116,6 +124,7 @@ function MarketDetailDialogView({
       chartWindowV3,
     ),
     queryFn: latestRefresh.queryFn,
+    enabled: periodDataReady,
     staleTime: 15_000,
     retry: false,
     // 详情重新挂载即使命中客户端 fresh cache 也要执行一次最新检查；缓存只负责先展示。
@@ -125,6 +134,7 @@ function MarketDetailDialogView({
   useEffect(() => {
     activeSymbolRef.current = position.symbol;
     setDetail(null);
+    setHistoryAnchor(undefined);
   }, [position.symbol, adjustment]);
 
   useEffect(() => {
@@ -166,6 +176,7 @@ function MarketDetailDialogView({
 
   const retryAll = () => {
     latestRefresh.cancelLatest();
+    setHistoryAnchor(undefined);
     setRefreshSequence((value) => {
       const next = value + 1;
       latestRefresh.markRefreshSequence(next);
@@ -202,8 +213,18 @@ function MarketDetailDialogView({
     [chartPages],
   );
   chartPointsRef.current = chartPoints;
+  const overlayBars = useMemo(() => chartPoints.flatMap((point) => point.bar ? [point.bar] : []), [chartPoints]);
+  const tradingOverlay = useMarketTradingOverlays(overlayBars, position);
   const loadEarlier = () => {
     if (query.isFetching) return;
+    const last = visibleDetail?.barSeries?.points.at(-1);
+    let timestamp = historyAnchor;
+    if (!timestamp && last) {
+      if ('observedEndAt' in last && typeof last.observedEndAt === 'string') timestamp = last.observedEndAt;
+      else if ('bucketEndAt' in last && typeof last.bucketEndAt === 'string') timestamp = last.bucketEndAt;
+      else timestamp = last.timestamp;
+    }
+    if (typeof timestamp === 'string' && timestamp) setHistoryAnchor({ scope: historyScope, timestamp });
     setChartBarsLimit((limit) => Math.min(3000, limit + 90));
   };
   const canLoadEarlier = Boolean(
@@ -222,28 +243,7 @@ function MarketDetailDialogView({
   const loading = query.isPending && !visibleDetail;
   const queryError = query.isError && !visibleDetail;
   const refreshError = query.isError && Boolean(visibleDetail);
-  const stale =
-    Boolean(
-      visibleDetail &&
-      Object.values(visibleDetail.sections).some((section) => section.status === 'stale'),
-    ) ||
-    (query.isFetching && Boolean(visibleDetail));
-
-  // 只有「行情分段」因上游刷新间隔回退，且回退数据仍在该间隔内时，
-  // 才把提示降级为中性说明：此时它已是上游允许的最新结果，不是故障。
-  const staleCapabilities = visibleDetail
-    ? Object.values(visibleDetail.sections)
-        .filter((section) => section.status === 'stale')
-        .map((section) => section.capability)
-    : [];
-  const quoteWithinUpstreamWindow =
-    quoteSection?.status === 'stale' &&
-    isQuoteWithinUpstreamRefreshWindow(quoteSection.data as Quote | undefined);
-  const staleWithinUpstreamWindowOnly =
-    !query.isFetching &&
-    staleCapabilities.length > 0 &&
-    staleCapabilities.every((capability) => capability === 'quote') &&
-    quoteWithinUpstreamWindow;
+  const { stale, staleNotice, quoteUpstreamNotice } = marketDetailNotices(visibleDetail, query.isFetching, retryAll);
 
   const queryNotice = () => {
     if (loading)
@@ -275,45 +275,13 @@ function MarketDetailDialogView({
     return null;
   };
 
-  const quoteAge = quoteServedAgeMs(quoteSection?.data as Quote | undefined);
-  const remainingMinutes = Math.max(
-    1,
-    Math.ceil(
-      (MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS * 1_000 - (quoteAge ?? 0)) / 60_000,
-    ),
-  );
-  // 上游刷新间隔内的回退不是故障：提示放进「实时行情」分段（分界线下、标题上），
-  // 不再占用弹窗级横幅位置。弹窗级横幅只保留刷新中与真正的陈旧告警。
-  const quoteUpstreamNotice = staleWithinUpstreamWindowOnly ? (
-    <MarketDetailNotice
-      flush
-      state="info"
-      title="行情按上游刷新间隔更新"
-      description={`上游对单标的行情有约 ${
-        MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS / 60
-      } 分钟最小刷新间隔，当前已是该间隔内的最新结果；约 ${remainingMinutes} 分钟后可再次刷新。`}
-      onRetry={retryAll}
-    />
-  ) : null;
-
-  const staleNotice: MarketDetailNoticeState = query.isFetching
-    ? {
-        state: 'stale',
-        title: '正在刷新行情详情',
-        description: '已保留当前可见内容，正在尝试获取更新数据。',
-      }
-    : {
-        state: 'stale',
-        title: '行情详情可能陈旧',
-        description: '部分数据来自陈旧回退结果，仍可查看并可主动刷新。',
-      };
-
   return (
     <MarketDetailDialogContent
-      chartControls={position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ)$/.test(position.symbol)
+      chartControls={position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ|HK|US)$/.test(position.symbol)
         ? <MarketChartAdjustment symbol={position.symbol} value={adjustment} onChange={select}
-          plan={{ barsLimit: chartBarsLimit, indicatorParams }} refreshSequence={refreshSequence} /> : undefined}
+          plan={{ barsLimit: chartBarsLimit, indicatorParams, ...(historyEnd ? { end: historyEnd } : {}), ...(isMarketMinuteTimeframe(timeframe) ? { timeframe: '1m' } : {}) }} refreshSequence={refreshSequence} /> : undefined}
       position={position}
+      tradingOverlay={tradingOverlay}
       unit={unit}
       queryNotice={<>{periodNotice}{queryNotice()}</>}
       loading={loading}

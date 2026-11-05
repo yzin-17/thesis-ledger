@@ -51,6 +51,26 @@ function requireReady(response = responseFixture()) {
 }
 
 describe('周期日历事实投影', () => {
+  it.each([
+    ['US', '2026-07-08', 'America/New_York', 960, '13:30', '20:00'],
+    ['US', '2026-11-04', 'America/New_York', 960, '14:30', '21:00'],
+    ['US', '2026-11-27', 'America/New_York', 780, '14:30', '18:00'],
+    ['HK', '2026-10-08', 'Asia/Hong_Kong', 960, '01:30', '08:00'],
+  ] as const)('%s的%s使用实际Session与时区换算', (market, date, timezone, closing, open, close) => {
+    const response = responseFixture();
+    response.coverage = { start: date, end: date, complete: true };
+    response.facts[0] = { ...response.facts[0]!, market, timezone,
+      range: { start: date, end: date }, holidays: [], sessionOverrides: [],
+      sessions: market === 'HK'
+        ? [{ startMinute: 570, endMinute: 720 }, { startMinute: 780, endMinute: 960 }]
+        : [{ startMinute: 570, endMinute: closing }],
+    };
+    const result = projectPeriodCalendar(response, { market, start: date, end: date,
+      evaluationAsOf: `${date}T23:59:59Z` });
+    if (result.status !== 'ready') throw new Error(result.reason);
+    expect(result.calendar.sessions[0]!.startAt).toBe(`${date}T${open}:00.000Z`);
+    expect(result.calendar.sessions.at(-1)!.endAt).toBe(`${date}T${close}:00.000Z`);
+  });
   it('使用明确事实保留假日、闭市覆盖和半日 Session，固定输入可回放', () => {
     const calendar = requireReady();
     expect(calendar).toEqual(requireReady());

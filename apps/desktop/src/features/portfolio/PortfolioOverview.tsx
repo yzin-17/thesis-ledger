@@ -1,3 +1,5 @@
+import { TableContainer } from '@/components/ui/table';
+import { valuationPositionLabel } from '@thesis-ledger/domain';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -120,7 +122,7 @@ function SortablePositionHeader({
   if (active && sort.direction === 'asc') SortIcon = ChevronUpIcon;
   else if (active) SortIcon = ChevronDownIcon;
   return (
-    <th scope="col" aria-sort={ariaSort}>
+    <th scope="col" aria-sort={ariaSort} className="text-right">
       <Button
         type="button"
         variant="ghost"
@@ -190,10 +192,7 @@ export function PortfolioSummary({ portfolio }: { portfolio: Portfolio }) {
   const realizedPnl = portfolio.realizedPnl ?? null;
   const realizedTone = tone(realizedPnl);
   return (
-    <section
-      className="grid grid-cols-1 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-2 xl:grid-cols-4"
-      aria-label="组合关键指标"
-    >
+    <section className="grid grid-cols-2 gap-x-6 gap-y-4 xl:grid-cols-4" aria-label="组合关键指标">
       <Metric
         label="总资产"
         value={formatMoney(portfolio.totalMarketValue, currency)}
@@ -227,14 +226,18 @@ export function PortfolioSummary({ portfolio }: { portfolio: Portfolio }) {
 
 export function PortfolioPositionTable({
   portfolio,
+  accounts,
   onSelectPosition,
 }: {
   portfolio: Portfolio;
+  accounts: Account[];
   onSelectPosition?: (position: Position) => void;
 }) {
   const [sort, setSort] = useState<PortfolioPositionSortState>(null);
   const effectiveSort = sort ?? defaultPositionSort;
   const sortedPositions = sortPortfolioPositions(portfolio.positions, effectiveSort);
+  const accountsById = new Map(accounts.map((account) => [account.id, account.name]));
+  const instrumentCount = new Set(portfolio.positions.map((position) => position.symbol)).size;
   const handleSort = (key: PortfolioPositionSortKey) => {
     setSort((current) => nextPortfolioPositionSort(current, key));
   };
@@ -244,18 +247,20 @@ export function PortfolioPositionTable({
         <div>
           <h2>当前持仓</h2>
           <p>
-            {portfolio.positions.length} 个标的，按{positionSortLabels[effectiveSort.key]}
+            {instrumentCount} 个标的 · {portfolio.positions.length} 笔账户持仓，按
+            {positionSortLabels[effectiveSort.key]}
             {effectiveSort.direction === 'desc' ? '降序' : '升序'}
           </p>
         </div>
       </div>
-      <div className="table-wrap">
+      <TableContainer>
         <table>
           <thead>
             <tr>
               <th>标的</th>
-              <th>持有</th>
-              <th>现价</th>
+              <th className="text-left">账户</th>
+              <th className="text-right">持有</th>
+              <th className="text-right">现价</th>
               <SortablePositionHeader
                 label="市值"
                 sortKey="marketValue"
@@ -283,7 +288,7 @@ export function PortfolioPositionTable({
           </thead>
           <tbody>
             {sortedPositions.length === 0 ? (
-              <EmptyTableRow colSpan={onSelectPosition ? 8 : 7} />
+              <EmptyTableRow colSpan={onSelectPosition ? 9 : 8} />
             ) : (
               sortedPositions.map((position) => {
                 const currency = position.currency ?? portfolio.baseCurrency ?? 'CNY';
@@ -294,11 +299,15 @@ export function PortfolioPositionTable({
                       <strong>{position.asset.name}</strong>
                       <span>{position.symbol}</span>
                     </td>
-                    <td>
+                    <td className="text-left whitespace-normal break-words">
+                      {accountsById.get(position.accountId) ??
+                        `账户信息不可用（${position.accountId}）`}
+                    </td>
+                    <td className="text-right">
                       <strong>{position.quantity}</strong>
                       <span>成本 {formatMoney(position.costPrice, currency)}</span>
                     </td>
-                    <td>
+                    <td className="text-right">
                       <strong>
                         {position.marketPrice === null || position.marketPrice === undefined
                           ? '—'
@@ -310,7 +319,7 @@ export function PortfolioPositionTable({
                           : `今日 ${formatSignedPercent(position.dailyReturn)}`}
                       </span>
                     </td>
-                    <td>
+                    <td className="text-right">
                       <strong>
                         {position.marketValue === null
                           ? '—'
@@ -318,12 +327,12 @@ export function PortfolioPositionTable({
                       </strong>
                       <span>{weight === null ? '仓位 —' : `仓位 ${formatPercent(weight)}`}</span>
                     </td>
-                    <td className={marketToneClass(tone(position.dailyPnl))}>
+                    <td className={cn('text-right', marketToneClass(tone(position.dailyPnl)))}>
                       {position.dailyPnl === null || position.dailyPnl === undefined
                         ? '—'
                         : formatSignedMoney(position.dailyPnl, currency)}
                     </td>
-                    <td>
+                    <td className="text-right">
                       <strong className={marketToneClass(tone(position.pnl))}>
                         {position.pnl === null ? '—' : formatSignedMoney(position.pnl, currency)}
                       </strong>
@@ -335,7 +344,8 @@ export function PortfolioPositionTable({
                     </td>
                     <td>
                       <Badge className={cn('tag', position.stale && 'warning')} variant="secondary">
-                        {position.stale ? '陈旧' : '最新'}
+                        {valuationPositionLabel(position)}
+                        {position.navDate ? ` · 净值 ${position.navDate.slice(0, 10)}` : ''}
                       </Badge>
                     </td>
                     {onSelectPosition && (
@@ -357,7 +367,7 @@ export function PortfolioPositionTable({
             )}
           </tbody>
         </table>
-      </div>
+      </TableContainer>
     </section>
   );
 }

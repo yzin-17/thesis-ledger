@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { MoreHorizontalIcon } from 'lucide-react';
 
 import type { Account } from '../portfolio/portfolio.types.js';
@@ -160,10 +161,7 @@ export const pendingCash = (events: LedgerEvent[], now = new Date()): PendingCas
   return rows.sort(compareAscending);
 };
 
-export const settledCashFlows = (
-  events: LedgerEvent[],
-  now = new Date(),
-): SettledCashFlowRow[] => {
+export const settledCashFlows = (events: LedgerEvent[], now = new Date()): SettledCashFlowRow[] => {
   const nowTime = now.getTime();
   const rows: SettledCashFlowRow[] = [];
   for (const event of events) {
@@ -242,29 +240,25 @@ function CashSummaryMetric({
   title,
   count,
   rows,
-  emptyLabel,
   direction,
 }: {
   title: string;
   count: number;
   rows: PendingSummaryRow[];
-  emptyLabel: string;
   direction: CashSettlementDirection;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 bg-card p-4">
+    <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium">{title}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{count} 笔</span>
       </div>
-      {rows.length === 0 ? (
-        <span className="text-sm text-muted-foreground">{emptyLabel}</span>
-      ) : (
+      {rows.length > 0 && (
         <div className="flex min-w-0 flex-col gap-2">
           {rows.map((row) => (
             <div key={row.currency} className="flex min-w-0 items-baseline justify-between gap-3">
               <span className="text-xs text-muted-foreground">{row.currency}</span>
-              <strong className="whitespace-nowrap font-mono text-xl font-semibold">
+              <strong className="min-w-0 break-all tabular-nums text-lg font-semibold">
                 {formatSignedCashAmount(row.amount, row.currency, direction)}
               </strong>
             </div>
@@ -303,65 +297,63 @@ function CashOverview({
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby="account-data-cash-overview-title">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 id="account-data-cash-overview-title" className="m-0 text-base font-semibold">
-            现金总览
-          </h3>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
-            可用现金按币种保留；本位币合计仅在有可靠折算值时显示。
-          </p>
-        </div>
-        <Badge variant={evidencePartial ? 'secondary' : 'outline'}>
-          证据完整度：{evidencePartial ? '部分' : '完整'}
-        </Badge>
-      </div>
-      <div className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-3 bg-card p-4">
-          <div className="flex items-center justify-between gap-3">
+      <h3 id="account-data-cash-overview-title" className="m-0 text-base font-semibold">
+        现金总览
+      </h3>
+      <div className="grid gap-4 rounded-md bg-muted/30 p-4 sm:p-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-sm font-medium">可用现金</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {settledRows.length} 个币种
-            </span>
+            <Badge
+              variant={evidencePartial ? 'secondary' : 'ghost'}
+              title="现金证据完整度：根据当前估值与流水读取结果判断。"
+            >
+              现金数据：{evidencePartial ? '部分' : '完整'}
+            </Badge>
           </div>
           <div className="flex min-w-0 flex-col gap-2">
             {settledRows.map((row) => (
-              <div key={row.currency} className="flex min-w-0 items-baseline justify-between gap-3">
-                <span className="text-xs text-muted-foreground">{row.currency}</span>
-                <strong className="whitespace-nowrap font-mono text-xl font-semibold">
+              <div
+                key={row.currency}
+                className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"
+              >
+                <strong className="min-w-0 break-all text-3xl font-semibold tracking-tight tabular-nums">
                   {formatCurrencyAmount(row.amount, row.currency)}
                 </strong>
+                <span className="text-xs text-muted-foreground">{row.currency}</span>
               </div>
             ))}
           </div>
           {!hasAvailableCash && <span className="text-xs text-muted-foreground">暂无可用现金</span>}
-          <div className="border-t pt-2 text-xs text-muted-foreground">
-            {convertedTotal !== null && baseCurrency ? (
-              <span>
+          {convertedTotal !== null && baseCurrency ? (
+            (settledRows.length > 1 || settledRows[0]?.currency !== baseCurrency) && (
+              <span className="text-xs text-muted-foreground">
                 本位币合计 · {baseCurrency}{' '}
-                <strong className="font-mono font-medium text-foreground">
+                <strong className="font-medium text-foreground tabular-nums">
                   {formatCurrencyAmount(convertedTotal, baseCurrency)}
                 </strong>
               </span>
-            ) : (
-              <span>本位币合计暂不可用（缺少可靠汇率）</span>
-            )}
-          </div>
+            )
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              本位币合计暂不可用（缺少可靠汇率）
+            </span>
+          )}
         </div>
-        <CashSummaryMetric
-          title="待结算应收"
-          count={pendingRows.filter((row) => row.direction === '应收').length}
-          rows={receivableRows}
-          emptyLabel="暂无待结算应收"
-          direction="应收"
-        />
-        <CashSummaryMetric
-          title="待结算应付"
-          count={pendingRows.filter((row) => row.direction === '应付').length}
-          rows={payableRows}
-          emptyLabel="暂无待结算应付"
-          direction="应付"
-        />
+        <div className="grid min-w-0 grid-cols-2 gap-4 border-t border-border pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+          <CashSummaryMetric
+            title="待结算应收"
+            count={pendingRows.filter((row) => row.direction === '应收').length}
+            rows={receivableRows}
+            direction="应收"
+          />
+          <CashSummaryMetric
+            title="待结算应付"
+            count={pendingRows.filter((row) => row.direction === '应付').length}
+            rows={payableRows}
+            direction="应付"
+          />
+        </div>
       </div>
     </section>
   );
@@ -381,22 +373,25 @@ function PendingCashSection({
           <h3 id="cash-pending-title" className="m-0 text-base font-semibold">
             待结算
           </h3>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">未来已明确结算时间的资金</p>
         </div>
-        <span className="shrink-0 text-sm font-medium text-muted-foreground">{rows.length} 笔</span>
+        {rows.length === 0 ? (
+          <Empty className="w-auto flex-none items-end p-0">
+            <EmptyDescription>暂无待结算资金</EmptyDescription>
+          </Empty>
+        ) : (
+          <span className="shrink-0 text-xs text-muted-foreground">{rows.length} 笔</span>
+        )}
       </div>
-      {rows.length === 0 ? (
-        <div className="border-y py-4 text-sm text-muted-foreground">暂无待结算资金</div>
-      ) : (
-        <div className="divide-y border-y">
+      {rows.length > 0 && (
+        <div className="divide-y divide-border">
           {rows.map((row) => {
             const instrumentName = row.symbol ? resolveInstrumentName(row.symbol) : undefined;
             return (
               <div
                 key={row.id}
-                className="grid gap-3 px-1 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_auto] sm:items-center"
+                className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_auto] sm:items-center"
               >
-                <div className="flex flex-col gap-1">
+                <div className="row-span-2 flex flex-col gap-1 sm:row-span-1">
                   <strong className="text-sm font-medium">
                     {formatCashShortDate(row.settledAt)}
                   </strong>
@@ -422,8 +417,8 @@ function PendingCashSection({
                     </span>
                   )}
                 </div>
-                <div className="text-left sm:text-right">
-                  <strong className="block whitespace-nowrap font-mono text-base font-semibold">
+                <div className="col-start-2 sm:col-start-auto sm:text-right">
+                  <strong className="block whitespace-nowrap tabular-nums text-base font-semibold">
                     {formatSignedCashAmount(row.amount, row.currency, row.direction)}
                   </strong>
                   <span className="text-xs text-muted-foreground">待结算 · {row.direction}</span>
@@ -448,8 +443,8 @@ export function RecentCashFlowSection({ rows }: { rows: SettledCashFlowRow[] }) 
           <h3 id="cash-recent-title" className="m-0 text-base font-semibold">
             最近流水
           </h3>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
-            默认显示最近 5 条已结算现金流水。
+          <p className="m-0 mt-1 text-xs text-muted-foreground">
+            已结算 · 最近 {visibleRows.length} 条
           </p>
         </div>
         {hasMore && (
@@ -465,20 +460,22 @@ export function RecentCashFlowSection({ rows }: { rows: SettledCashFlowRow[] }) 
         )}
       </div>
       {rows.length === 0 ? (
-        <div className="border-y py-4 text-sm text-muted-foreground">暂无现金流水</div>
+        <Empty className="items-start px-0 py-2">
+          <EmptyDescription>暂无现金流水</EmptyDescription>
+        </Empty>
       ) : (
-        <div className="divide-y border-y">
+        <div className="divide-y divide-border">
           {visibleRows.map((row) => (
             <div
               key={row.id}
-              className="grid gap-3 px-1 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_auto] sm:items-center"
+              className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_auto]"
             >
-              <strong className="text-sm font-medium">{formatCashShortDate(row.settledAt)}</strong>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {formatCashShortDate(row.settledAt)}
+              </span>
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <strong className="min-w-0 truncate text-sm font-medium">{row.label}</strong>
-                  <span className="text-xs text-muted-foreground">{row.currency}</span>
-                  <span className="text-xs text-muted-foreground">已结算</span>
                 </div>
                 {row.note && (
                   <span className="mt-1 block max-w-[36rem] truncate text-xs text-muted-foreground">
@@ -486,9 +483,12 @@ export function RecentCashFlowSection({ rows }: { rows: SettledCashFlowRow[] }) 
                   </span>
                 )}
               </div>
-              <strong className="whitespace-nowrap text-left font-mono text-base font-semibold sm:text-right">
-                {formatSignedCashAmount(row.amount, row.currency, row.direction)}
-              </strong>
+              <div className="flex min-w-0 flex-wrap items-baseline justify-end gap-x-2 gap-y-1 text-right">
+                <span className="text-xs text-muted-foreground">{row.currency}</span>
+                <strong className="block break-all text-sm font-semibold tabular-nums sm:text-base">
+                  {formatSignedCashAmount(row.amount, row.currency, row.direction)}
+                </strong>
+              </div>
             </div>
           ))}
         </div>
@@ -536,15 +536,13 @@ export function CashSection({
     return <LedgerContractFailure onRetry={eventsQuery.refetch} />;
 
   return (
-    <section className="flex flex-col gap-8" aria-labelledby="account-data-cash-title">
+    <section className="flex min-w-0 flex-col gap-6" aria-labelledby="account-data-cash-title">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 id="account-data-cash-title" className="m-0 text-xl font-semibold">
             现金
           </h2>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
-            已结算余额、待结算资金和最近现金流水。
-          </p>
+          <p className="m-0 mt-1 text-sm text-muted-foreground">查看余额、结算安排和现金流水。</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {canCreateCashDeposit && (
@@ -587,10 +585,21 @@ export function CashSection({
         evidencePartial={evidencePartial}
         resolveInstrumentName={resolveInstrumentName}
       />
-      {eventsQuery.isError && eventsQuery.data && (
+      {(eventsQuery.isError || (valuationQuery.isError && valuationQuery.data)) && (
         <Alert>
-          <AlertTitle>现金流水可能陈旧</AlertTitle>
-          <AlertDescription>余额仍保留上次成功结果；请刷新账本后再操作。</AlertDescription>
+          <AlertTitle>现金数据暂未更新</AlertTitle>
+          <AlertDescription>
+            保留上次成功结果。已成功记录的入账、快照或划转无需再次提交，请重新读取余额与流水。
+          </AlertDescription>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={eventsQuery.isFetching || valuationQuery.isFetching}
+            onClick={() => void Promise.all([eventsQuery.refetch(), valuationQuery.refetch()])}
+          >
+            重新读取现金数据
+          </Button>
         </Alert>
       )}
       <RecurringCashDeposits account={account} />
@@ -651,7 +660,7 @@ export function CashResults({
     );
   }
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-5">
       <CashOverview
         account={account}
         valuation={valuation}

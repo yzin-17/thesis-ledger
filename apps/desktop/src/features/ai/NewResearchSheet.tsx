@@ -24,20 +24,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
-import { fetchAccounts, fetchPortfolioValuation } from '../portfolio/portfolio.api.js';
-import { portfolioKeys } from '../portfolio/portfolio.queries.js';
-import { accountDisplayLabel, type Account } from '../portfolio/portfolio.types.js';
+import { researchContextForScope, useResearchAccountScope } from './research-account-scope.js';
 import { fetchStrategies } from '../strategy/strategy.api.js';
 import { strategyKeys } from '../strategy/strategy.queries.js';
 import type { StrategyRecord } from '../strategy/strategy.types.js';
 import { useToastManager } from '@/components/ui/toast';
 import { useCreateAiRunMutation } from './ai.mutations.js';
-import {
-  useAiCapabilitiesQuery,
-  useAiResearchRetryPrefillQuery,
-  useAiRoutingSettingsQuery,
-} from './ai.queries.js';
+import { useAiCapabilitiesQuery, useAiResearchRetryPrefillQuery } from './ai.queries.js';
 import { researchQuestionTemplates } from './ai.templates.js';
+import { ResearchDefaultModelField } from './ResearchDefaultModelField.js';
+import { useResearchDefaultModel } from './use-research-default-model.js';
 import type { AiResearchScope, AiRunResult, StartResearchInput } from './ai.types.js';
 
 const scopeOptions: Array<{ value: AiResearchScope; label: string }> = [
@@ -55,24 +51,6 @@ const questionErrorFor = (value: string) => {
   if (length === 0) return '请先描述需要回答的问题。';
   if (length > 2000) return '研究问题不能超过 2000 个字符。';
   return null;
-};
-
-const buildContext = ({
-  scope,
-  accountId,
-  symbol,
-  strategyVersionId,
-}: {
-  scope: AiResearchScope;
-  accountId: string | null;
-  symbol: string | null;
-  strategyVersionId: string | null;
-}): StartResearchInput['context'] => {
-  if (scope === 'portfolio') return { scope };
-  if (scope === 'account') return { scope, accountId: accountId as string };
-  if (scope === 'position')
-    return { scope, accountId: accountId as string, symbol: symbol as string };
-  return { scope, strategyVersionId: strategyVersionId as string };
 };
 
 export function NewResearchSheet({
@@ -101,7 +79,8 @@ export function NewResearchSheet({
   const [unknownRiskConfirmed, setUnknownRiskConfirmed] = useState(false);
   const mutation = useCreateAiRunMutation();
   const capabilitiesQuery = useAiCapabilitiesQuery(open);
-  const routingSettingsQuery = useAiRoutingSettingsQuery(open);
+  const researchModel = useResearchDefaultModel(open);
+  const routingSettingsQuery = researchModel.query;
   const retryPrefillQuery = useAiResearchRetryPrefillQuery(retryOfRunId, open);
   const toastManager = useToastManager();
 
@@ -131,17 +110,19 @@ export function NewResearchSheet({
     setTemplateId(prefill.templateId ?? undefined);
   }, [open, retryOfRunId, retryPrefillQuery.data]);
 
-  const accountsQuery = useQuery({
-    queryKey: portfolioKeys.accounts(),
-    queryFn: () => fetchAccounts(),
-    enabled: open && (scope === 'account' || scope === 'position'),
-    staleTime: 30_000,
-  });
-  const positionsQuery = useQuery({
-    queryKey: portfolioKeys.valuation('actual', accountId ?? 'all'),
-    queryFn: () => fetchPortfolioValuation('actual', accountId ?? undefined),
-    enabled: open && scope === 'position' && Boolean(accountId),
-    staleTime: 15_000,
+  const {
+    mode,
+    accountsQuery,
+    positionsQuery,
+    positions,
+    accountOptions,
+    effectiveAccountId,
+    retryModeMismatch,
+  } = useResearchAccountScope({
+    open,
+    scope,
+    accountId,
+    ...(retryPrefillQuery.data ? { retryContext: retryPrefillQuery.data.context } : {}),
   });
   const strategiesQuery = useQuery({
     queryKey: strategyKeys.strategies(),
@@ -150,8 +131,6 @@ export function NewResearchSheet({
     staleTime: 15_000,
   });
 
-  const accounts: Account[] = accountsQuery.data ?? [];
-  const positions = positionsQuery.data?.positions ?? [];
   const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
   const strategyVersions = useMemo(
     () =>
@@ -159,6 +138,14 @@ export function NewResearchSheet({
     [strategies],
   );
   const selectedStrategy = strategyVersions.find((item) => item.version.id === strategyVersionId);
+  const positionOptions = positions.map((position) => ({
+    value: position.symbol,
+    label: `${position.symbol} · ${position.asset.name}`,
+  }));
+  const strategyOptions = strategyVersions.map(({ strategy, version }) => ({
+    value: version.id,
+    label: `${strategy.name} · v${version.version}`,
+  }));
   const questionError = questionErrorFor(question);
   let entityError: string | null = null;
   if (scope === 'account' && !accountId) entityError = '请选择一个账户。';
@@ -172,6 +159,9 @@ export function NewResearchSheet({
   const visibleQuestionError = hasAttemptedSubmit ? questionError : null;
   const visibleEntityError = hasAttemptedSubmit ? entityError : null;
   const canSubmit =
+    !retryModeMismatch &&
+    ((scope !== 'account' && scope !== 'position') ||
+      (Boolean(effectiveAccountId) && !accountsQuery.isError && !accountsQuery.isPending)) &&
     !questionError &&
     !entityError &&
     !mutation.isPending &&
@@ -180,12 +170,7 @@ export function NewResearchSheet({
     (!retryOfRunId || retryConfirmed) &&
     (!retryPrefillQuery.data?.requiresUnknownOutcomeAcknowledgement || unknownRiskConfirmed) &&
     capabilitiesQuery.data?.canStart === true;
-  const hasResearchDefault = routingSettingsQuery.data?.researchDefault !== null;
-  const canSubmitWithDefault =
-    canSubmit &&
-    !routingSettingsQuery.isPending &&
-    !routingSettingsQuery.isError &&
-    hasResearchDefault;
+  const canSubmitWithDefault = canSubmit && researchModel.ready;
 
   const expectedTools = {
     portfolio: ['getPortfolio', 'getPositions', 'getRisk'],
@@ -237,7 +222,13 @@ export function NewResearchSheet({
   const submit = async () => {
     setHasAttemptedSubmit(true);
     if (!canSubmitWithDefault) return;
-    let context = buildContext({ scope, accountId, symbol, strategyVersionId });
+    let context = researchContextForScope({
+      scope,
+      accountId: effectiveAccountId,
+      symbol,
+      strategyVersionId,
+      mode,
+    });
     if (retryPrefillQuery.data && !retryContextReselected) {
       context = retryPrefillQuery.data.context;
     }
@@ -277,6 +268,7 @@ export function NewResearchSheet({
     open,
     draft: null,
     dirty:
+      researchModel.dirty ||
       question !== initialQuestion ||
       scope !== 'portfolio' ||
       Boolean(
@@ -287,7 +279,7 @@ export function NewResearchSheet({
         retryConfirmed ||
         unknownRiskConfirmed,
       ),
-    busy: mutation.isPending,
+    busy: mutation.isPending || researchModel.saving,
     onOpenChange,
   });
 
@@ -305,6 +297,7 @@ export function NewResearchSheet({
         </SheetHeader>
         <div className="flex flex-col gap-6">
           <FieldGroup>
+            <ResearchDefaultModelField model={researchModel} disabled={mutation.isPending} />
             <Field>
               <FieldLabel>研究范围</FieldLabel>
               <ToggleGroup
@@ -325,7 +318,8 @@ export function NewResearchSheet({
               <Field invalid={Boolean(visibleEntityError)}>
                 <FieldLabel htmlFor="ai-account">研究账户</FieldLabel>
                 <Select
-                  value={accountId ?? ''}
+                  items={accountOptions}
+                  value={effectiveAccountId ?? ''}
                   onValueChange={(value) => {
                     setAccountId(value || null);
                     if (retryOfRunId) setRetryContextReselected(true);
@@ -340,9 +334,9 @@ export function NewResearchSheet({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      {accounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {accountDisplayLabel(account)}
+                      {accountOptions.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -350,10 +344,12 @@ export function NewResearchSheet({
                 </Select>
                 {accountsQuery.isPending && <FieldDescription>正在加载账户…</FieldDescription>}
                 {accountsQuery.isError && <FieldError>账户读取失败，请重试后再提交。</FieldError>}
-                {!accountsQuery.isPending && !accountsQuery.isError && accounts.length === 0 && (
-                  <FieldError>暂无可用账户，请先完成账户配置。</FieldError>
-                )}
-                {!accountsQuery.isError && accounts.length > 0 && (
+                {!accountsQuery.isPending &&
+                  !accountsQuery.isError &&
+                  accountOptions.length === 0 && (
+                    <FieldError>暂无可用账户，请先完成账户配置。</FieldError>
+                  )}
+                {!accountsQuery.isError && accountOptions.length > 0 && (
                   <FieldError>{visibleEntityError}</FieldError>
                 )}
               </Field>
@@ -363,7 +359,8 @@ export function NewResearchSheet({
                 <Field invalid={Boolean(visibleEntityError && !accountId)}>
                   <FieldLabel htmlFor="ai-position-account">持仓账户</FieldLabel>
                   <Select
-                    value={accountId ?? ''}
+                    items={accountOptions}
+                    value={effectiveAccountId ?? ''}
                     onValueChange={(value) => {
                       setAccountId(value || null);
                       setSymbol(null);
@@ -379,9 +376,9 @@ export function NewResearchSheet({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {accounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {accountDisplayLabel(account)}
+                        {accountOptions.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -393,6 +390,7 @@ export function NewResearchSheet({
                 <Field invalid={Boolean(visibleEntityError && Boolean(accountId))}>
                   <FieldLabel htmlFor="ai-position-symbol">实际持仓</FieldLabel>
                   <Select
+                    items={positionOptions}
                     value={symbol ?? ''}
                     onValueChange={(value) => {
                       setSymbol(value || null);
@@ -409,9 +407,9 @@ export function NewResearchSheet({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {positions.map((position) => (
-                          <SelectItem key={position.id} value={position.symbol}>
-                            {position.symbol} · {position.asset.name}
+                        {positionOptions.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -439,6 +437,7 @@ export function NewResearchSheet({
               <Field invalid={Boolean(visibleEntityError)}>
                 <FieldLabel htmlFor="ai-strategy-version">策略版本</FieldLabel>
                 <Select
+                  items={strategyOptions}
                   value={strategyVersionId ?? ''}
                   onValueChange={(value) => {
                     setStrategyVersionId(value || null);
@@ -453,15 +452,13 @@ export function NewResearchSheet({
                     <SelectValue placeholder="选择策略版本" />
                   </SelectTrigger>
                   <SelectContent>
-                    {strategies.map((strategy) => (
-                      <SelectGroup key={strategy.id}>
-                        {strategy.versions.map((version) => (
-                          <SelectItem key={version.id} value={version.id}>
-                            {strategy.name} · v{version.version}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ))}
+                    <SelectGroup>
+                      {strategyOptions.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
                 {strategiesQuery.isPending && (
@@ -527,32 +524,14 @@ export function NewResearchSheet({
           <Alert>
             <AlertTitle>本次预计读取</AlertTitle>
             <AlertDescription>
+              {scope === 'strategy'
+                ? '策略版本按自身对象读取。'
+                : `当前为${mode === 'shadow' ? '模拟' : '实际'}账户范围。`}
+              {retryModeMismatch && '原任务属于另一模式，请先通过全局开关切换至原范围后再重试。'}
               {boundary}。来源是否可用以服务端实际返回为准，缺失来源会在结果中明确标注。
               {` ${capabilityMessage}`}
             </AlertDescription>
           </Alert>
-          {routingSettingsQuery.isPending ? (
-            <Alert>
-              <AlertTitle>正在读取研究默认模型</AlertTitle>
-              <AlertDescription>提交前会固定当前显示的 Provider、模型和设置版本。</AlertDescription>
-            </Alert>
-          ) : routingSettingsQuery.isError || !hasResearchDefault ? (
-            <Alert variant="destructive">
-              <AlertTitle>尚未选择研究默认模型</AlertTitle>
-              <AlertDescription>
-                请先在数据与自动化的 Provider 设置中选择研究默认模型；系统不会按列表顺序自动替换。
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <Alert>
-              <AlertTitle>本次研究默认</AlertTitle>
-              <AlertDescription>
-                {routingSettingsQuery.data?.researchDefault?.providerId} /{' '}
-                {routingSettingsQuery.data?.researchDefault?.model}
-                。提交时会校验设置版本，变化后需要重新确认。
-              </AlertDescription>
-            </Alert>
-          )}
           {retryOfRunId && retryPrefillQuery.isPending && (
             <Alert>
               <AlertTitle>正在核对来源任务</AlertTitle>

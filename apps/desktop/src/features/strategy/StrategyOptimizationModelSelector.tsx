@@ -35,7 +35,7 @@ export const isReasoningEffortValid = (
   );
 };
 const reasoningLabels: Record<OptimizationReasoningEffort, string> = {
-  none: 'none',
+  none: '关闭',
   minimal: '最小',
   low: '低',
   medium: '中',
@@ -78,7 +78,7 @@ export function StrategyOptimizationModelSelector({
   return (
     <div className="flex flex-col gap-2">
       <div className="text-sm text-muted-foreground">
-        模型（最多 3 个；可搜索，严格 Provider + Model，不自动 fallback）
+        模型（最多 3 个）
       </div>
       <Combobox
         items={routes.map((route) => routeKey(route.provider, route.model))}
@@ -130,9 +130,12 @@ export function StrategyOptimizationModelSelector({
         </ComboboxContent>
       </Combobox>
       <p className="text-sm text-muted-foreground">
-        可选项来自 Provider 页面已启用并配置的模型；若当前只有一个模型，不会凭空出现更多模型。已选择{' '}
-        {selectedModels.length}/3 个模型；路由按结构化 Provider/Model 保存。
+        已选择 {selectedModels.length}/3 个模型 · 当前可用 {routes.length} 个
       </p>
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer">模型来源与推理说明</summary>
+        <p className="mt-2">可选模型来自数据与自动化中的已启用配置。每项同时指定提供方和模型；没有可选推理强度时使用模型默认设置。</p>
+      </details>
       {selectedRoutes.length > 0 ? (
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {selectedRoutes.map((route) => {
@@ -184,14 +187,14 @@ export function StrategyOptimizationModelSelector({
                     </Select>
                     <FieldDescription>
                       未显式选择时由模型决定
-                      {defaultEffort ? `（Provider 默认：${reasoningLabels[defaultEffort]}）` : ''}
+                      {defaultEffort ? `（提供方默认：${reasoningLabels[defaultEffort]}）` : ''}
                     </FieldDescription>
                   </>
                 ) : (
                   <FieldDescription>
                     由模型默认决定
-                    {defaultEffort ? `（Provider 默认：${reasoningLabels[defaultEffort]}）` : ''}
-                    {hasDeclaredCapabilities ? '' : '（Provider 未声明可选强度，显式指定将被拒绝）'}
+                    {defaultEffort ? `（提供方默认：${reasoningLabels[defaultEffort]}）` : ''}
+                    {hasDeclaredCapabilities ? '' : '（未提供可选强度）'}
                   </FieldDescription>
                 )}
               </Field>
@@ -201,7 +204,7 @@ export function StrategyOptimizationModelSelector({
       ) : null}
       {hasInvalidReasoningSelection ? (
         <p className="text-sm text-destructive">
-          所选模型的推理强度不可用，请按 Provider 能力配置选择。
+          所选模型的推理强度不可用，请按模型能力配置选择。
         </p>
       ) : null}
     </div>

@@ -69,9 +69,9 @@ export function LocalHistoryDocumentsSheet({
               {incomplete && (
                 <p className="text-sm text-muted-foreground">部分来源尚未提供公告清单。</p>
               )}
-              <ul className="flex flex-col gap-3" aria-label="已收录公告与规则文档">
+              <ul className="divide-y divide-border" aria-label="已收录公告与规则文档">
                 {visible.map(({ document, references }) => (
-                  <li key={document.url} className="flex flex-col gap-3 rounded-md border p-3">
+                  <li key={document.url} className="flex flex-col gap-3 py-3 first:pt-0">
                     <a
                       href={document.url}
                       target="_blank"

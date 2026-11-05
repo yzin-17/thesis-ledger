@@ -9,7 +9,11 @@ export function MobileRiskScreen({
   state: MobileDashboardState;
   styles: MobileStyles;
 }) {
-  if (state.riskEvents.length === 0) return <Text style={styles.emptyText}>暂无风险事件。</Text>;
+  if (state.riskEvents.length === 0) {
+    const message =
+      state.status === 'error' ? '暂时无法读取风险事件，请刷新重试。' : '暂无风险事件。';
+    return <Text style={styles.emptyText}>{message}</Text>;
+  }
   return (
     <View>
       {state.riskEvents.map((event) => (

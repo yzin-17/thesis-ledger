@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { barSeriesSchema } from './market-bar-series.js';
 import { marketPeriodBarSeriesSchema } from './market-period.js';
+import { marketMinuteBarSeriesSchema } from './market-minute-period.js';
 import {
   marketDetailResponseEnvelopeSchema,
   refineMarketDetailResponse,
@@ -10,7 +11,7 @@ import {
   type MarketDetailSection,
 } from './market.js';
 
-export const marketDisplayBarSeriesSchema = z.union([barSeriesSchema, marketPeriodBarSeriesSchema]);
+export const marketDisplayBarSeriesSchema = z.union([barSeriesSchema, marketPeriodBarSeriesSchema, marketMinuteBarSeriesSchema]);
 export type MarketDisplayBarSeries = z.infer<typeof marketDisplayBarSeriesSchema>;
 export type MarketDisplayDetailSection =
   | Exclude<MarketDetailSection, { capability: 'bars' }>

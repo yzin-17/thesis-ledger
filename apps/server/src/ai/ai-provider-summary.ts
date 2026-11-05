@@ -1,11 +1,14 @@
 import type { ProviderConfig } from '@prisma/client';
-import type { AiProvider } from './contracts.js';
+import { invalidStoredModelRequestOptions } from './ai-model-request-options.js';
 import {
   aiLegacyAdapterSchema,
+  aiProviderModelCatalogConfigSchema,
+  aiProviderModelCatalogOriginAllowed,
   aiUpstreamSelectionSchema,
   type AiAdapter,
   type AiChatImplementation,
   type AiUpstreamFormat,
+  type AiProviderModelCatalogConfig,
 } from '@thesis-ledger/schemas';
 import {
   AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1,
@@ -36,6 +39,7 @@ import type { AiAuthMode } from '@thesis-ledger/schemas';
 export interface ParsedAiProviderSettings {
   baseUrl: string;
   models: string[];
+  modelCatalog?: AiProviderModelCatalogConfig;
   authMode: AiAuthMode;
   upstreamFormat: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
@@ -61,8 +65,15 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   const baseUrl = record.baseUrl;
   const models = stringArray(record.models);
   if (typeof baseUrl !== 'string' || !httpUrl.safeParse(baseUrl).success || !models) return null;
+  if (invalidStoredModelRequestOptions(record.modelDefaults, models)) return null;
   const authMode = aiAuthModeSchema.safeParse(record.authMode ?? 'api_key');
   if (!authMode.success) return null;
+  const modelCatalog = aiProviderModelCatalogConfigSchema.nullish().safeParse(record.modelCatalog);
+  if (
+    !modelCatalog.success ||
+    !aiProviderModelCatalogOriginAllowed(baseUrl, modelCatalog.data, authMode.data)
+  )
+    return null;
   const modelReasoning = parseModelReasoning(record.modelReasoning, models);
   const modelPricing = parseAiProviderModelPricing(record.modelPricing, models);
   const legacyAdapter = aiLegacyAdapterSchema.safeParse(record.adapter);
@@ -100,6 +111,7 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   return {
     baseUrl,
     models,
+    ...(modelCatalog.data ? { modelCatalog: modelCatalog.data } : {}),
     authMode: authMode.data,
     upstreamFormat: selection.upstreamFormat,
     ...(selection.upstreamFormat === 'chat-completions'
@@ -187,6 +199,24 @@ const parseModelReasoning = (
 
 export const aiProviderCapabilities = (value: unknown) => stringArray(value) ?? ['chat'];
 
+export const resolveCompatibilityProfile = (
+  input: {
+    compatibilityExtensionProfile?: AiCompatibilityExtensionProfile | undefined;
+    upstreamFormat?: AiUpstreamFormat | undefined;
+    chatImplementation?: AiChatImplementation | undefined;
+  },
+  settings: unknown,
+) => {
+  if (input.compatibilityExtensionProfile !== undefined) return input.compatibilityExtensionProfile;
+  const stored = parseAiProviderSettings(settings);
+  const format = input.upstreamFormat ?? stored?.upstreamFormat;
+  let implementation = input.chatImplementation;
+  if (implementation === undefined && input.upstreamFormat === undefined)
+    implementation = stored?.chatImplementation;
+  if (format !== 'chat-completions' || implementation === 'openai-native') return undefined;
+  return stored?.compatibilityExtensionProfile;
+};
+
 type HealthSnapshot = {
   state: string;
   checkedAt?: Date | null;
@@ -198,6 +228,7 @@ const settingsSummary = (settings: ParsedAiProviderSettings | null) => {
   const modelPricing = settings?.modelPricing;
   return {
     authMode: settings?.authMode ?? 'api_key',
+    ...(settings?.modelCatalog ? { modelCatalog: settings.modelCatalog } : {}),
     ...(settings?.upstreamFormat === undefined ? {} : { upstreamFormat: settings.upstreamFormat }),
     ...(settings?.chatImplementation === undefined
       ? {}
@@ -272,55 +303,6 @@ export const aiProviderSummaryFromRow = (
   latencyMs: health?.latencyMs ?? null,
   errorCode: health?.errorCode ?? null,
   ...(settings ? {} : { configError: '保存的 AI Provider 配置无效' }),
-});
-
-export const aiProviderSummaryFromProvider = (provider: AiProvider): AiProviderSummary => ({
-  name: provider.id,
-  type: 'ai',
-  source: 'environment',
-  enabled: true,
-  priority: provider.metadata?.priority ?? 100,
-  capabilities: [...(provider.metadata?.capabilities ?? ['chat'])],
-  baseUrl: provider.metadata?.baseURL ?? null,
-  models: [...provider.models],
-  authMode: provider.metadata?.authMode ?? 'api_key',
-  ...(provider.metadata?.upstreamFormat === undefined
-    ? {}
-    : { upstreamFormat: provider.metadata.upstreamFormat }),
-  ...(provider.metadata?.chatImplementation === undefined
-    ? {}
-    : { chatImplementation: provider.metadata.chatImplementation }),
-  ...(provider.metadata?.executionRoutes === undefined
-    ? {}
-    : { executionRouteConfigs: [...provider.metadata.executionRoutes] }),
-  ...(provider.metadata?.modelPricing === undefined
-    ? {}
-    : { modelPricing: provider.metadata.modelPricing }),
-  ...(provider.metadata?.timeoutMs === undefined ? {} : { timeoutMs: provider.metadata.timeoutMs }),
-  ...(provider.metadata?.firstOutputTimeoutMs === undefined
-    ? {}
-    : { firstOutputTimeoutMs: provider.metadata.firstOutputTimeoutMs }),
-  ...(provider.metadata?.outputIdleTimeoutMs === undefined
-    ? {}
-    : { outputIdleTimeoutMs: provider.metadata.outputIdleTimeoutMs }),
-  ...(provider.metadata?.costPer1kInput === undefined
-    ? {}
-    : { costPer1kInput: provider.metadata.costPer1kInput }),
-  ...(provider.metadata?.costPer1kOutput === undefined
-    ? {}
-    : { costPer1kOutput: provider.metadata.costPer1kOutput }),
-  ...(provider.metadata?.costCurrency === undefined
-    ? {}
-    : { costCurrency: provider.metadata.costCurrency }),
-  ...(provider.metadata?.pricingVersion === undefined
-    ? {}
-    : { pricingVersion: provider.metadata.pricingVersion }),
-  credentialConfigured: true,
-  health: provider.metadata?.health ?? 'unknown',
-  updatedAt: null,
-  checkedAt: null,
-  latencyMs: null,
-  errorCode: null,
 });
 
 export { healthValue };

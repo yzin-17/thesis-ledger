@@ -13,6 +13,7 @@ import { PortfolioService } from '../../src/portfolio/portfolio.service.js';
 import { TradeQueryService } from '../../src/ledger/trade-query.service.js';
 import { RiskService } from '../../src/risk/risk.service.js';
 import { cashFlowEvent, fixtureUuid } from '../ledger/ledger-event-fixtures.js';
+import { displayPrisma } from '../instrument-display.fixture.js';
 
 const fxResponse = (asOf: string) => ({
   version: 1 as const,
@@ -70,6 +71,7 @@ describe('V0.1 核心 E2E', () => {
       $transaction: <T>(callback: (transaction: unknown) => Promise<T>) => Promise<T>;
     };
     const prisma: E2ePrisma = {
+      ...displayPrisma({ '600519.SH': '贵州茅台' }),
       account: {
         findUnique: vi.fn(async () => null),
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -364,7 +366,7 @@ describe('账户与组合', () => {
       totalPnl: 0,
       partial: true,
     });
-    expect(result.positions[2]).toMatchObject({ marketValue: null, stale: true });
+    expect(result.positions[2]).toMatchObject({ marketValue: null, stale: false, availabilityReason: 'unavailable' });
     expect(result.dailyChange).toMatchObject({
       pnl: null,
       returnRate: null,

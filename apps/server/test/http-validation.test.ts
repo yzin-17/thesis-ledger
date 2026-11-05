@@ -100,12 +100,21 @@ describe('HTTP runtime validation', () => {
 
   it('Trade 建仓时间补录在进入服务前拒绝 malformed body', () => {
     const service = { createOpeningBoundary: vi.fn() };
-    const controller = new TradeController({} as never, service as never);
+    const controller = new TradeController({} as never, service as never, {} as never);
 
     expect(() =>
       controller.createOpeningBoundary('trade-id', { command: 'CREATE_EXECUTION' }),
     ).toThrow(z.ZodError);
     expect(service.createOpeningBoundary).not.toHaveBeenCalled();
+  });
+
+  it('交易标的查询校验账户和模式后调用只读服务', () => {
+    const instruments = { list: vi.fn() };
+    const controller = new TradeController({} as never, {} as never, instruments as never);
+    expect(() => controller.listInstruments({ mode: 'invalid' })).toThrow(z.ZodError);
+    expect(instruments.list).not.toHaveBeenCalled();
+    controller.listInstruments({ mode: 'shadow' });
+    expect(instruments.list).toHaveBeenCalledWith({ mode: 'shadow' });
   });
 
   it('Ledger 查询在 Controller 层拒绝非法 Revision，避免把字符串直接交给数据库', () => {

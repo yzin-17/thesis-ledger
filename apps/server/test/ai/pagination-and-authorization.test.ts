@@ -56,6 +56,7 @@ describe('AI 研究分页与上下文授权', () => {
     expect(findMany.mock.calls[1]?.[0]).toEqual(
       expect.objectContaining({
         where: {
+          researchOwnerId: null,
           OR: [
             { createdAt: { lt: new Date('2026-08-26T02:00:00.000Z') } },
             {

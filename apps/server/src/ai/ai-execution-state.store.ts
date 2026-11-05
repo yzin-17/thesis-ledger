@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { traceAiOperation } from './trace/ai-trace-context.js';
 import { Prisma } from '@prisma/client';
 import {
   aiExecutionSummarySchema,
@@ -11,6 +12,14 @@ import {
   type AiRequestAttempt,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { aiExecutionPublication } from './ai-execution-publication.js';
+import { failedAiExecution } from './ai-execution-failure.js';
+import { researchExecutionDeadline } from './timeout/ai-execution-clock.js';
+import { recordAiTimeoutDecision } from './timeout/ai-timeout-receipt.js';
+import {
+  mergeRequestHttpDiagnostic,
+  parseRequestHttpDiagnostic,
+} from './ai-execution-request-diagnostic.js';
 
 type Database = PrismaService | Prisma.TransactionClient;
 
@@ -27,6 +36,14 @@ export type AiExecutionOwnership = {
   executionAttempt: number;
 };
 
+type AiRunFailure = {
+  errorCode: string;
+  errorSummary: string;
+  durationMs?: number;
+  continuationBlockedReason?: AiExecutionSummary['continuationBlockedReason'];
+  requestError?: AiGenerationError;
+};
+
 export type AiRequestPreparation = AiExecutionOwnership & {
   requestId: string;
   reservation: unknown;
@@ -37,6 +54,7 @@ export type AiRequestCompletion = AiExecutionOwnership & {
   requestId: string;
   revision: unknown;
   outcome: unknown;
+  httpRequest?: unknown;
   error?: unknown;
   completedAt?: Date;
   checkpoint?: unknown;
@@ -46,6 +64,7 @@ export type AiRequestCompletion = AiExecutionOwnership & {
     provider: string;
     model: string;
     durationMs?: number;
+    receivedAt?: Date;
   };
 };
 
@@ -59,7 +78,9 @@ export type AiExecutionSettlementContext = {
 };
 
 export type AiExecutionSettlementParticipant = {
-  settle(context: AiExecutionSettlementContext): Promise<AiExecutionSummary['continuationBlockedReason']>;
+  settle(
+    context: AiExecutionSettlementContext,
+  ): Promise<AiExecutionSummary['continuationBlockedReason']>;
   commit?(context: AiExecutionSettlementContext): Promise<void>;
 };
 
@@ -190,16 +211,22 @@ export class AiExecutionStateStore {
     });
   }
 
-  async authorizeDispatch(
-    ownership: AiExecutionOwnership,
-    requestId: string,
-    now = new Date(),
-  ) {
+  recordTimeoutDecision(ownership: AiExecutionOwnership, requestId: string, decision: unknown) {
+    return recordAiTimeoutDecision(this.prisma, ownership, requestId, decision);
+  }
+
+  async authorizeDispatch(ownership: AiExecutionOwnership, requestId: string, now = new Date()) {
     return this.prisma.$transaction(async (transaction) => {
       const run = (await this.lockRun(transaction, ownership.runId))[0];
-      if (!run || !activeOwner(run, ownership, now)) return false;
+      const authorizedAt = new Date(Math.max(now.getTime(), Date.now()));
+      if (!run || !activeOwner(run, ownership, authorizedAt)) return false;
       const execution = executionFrom(run.modelMetadata);
       if (!execution) return false;
+      if (
+        execution.contract.id === 'research' &&
+        (!execution.deadlineAt || researchExecutionDeadline(execution) <= authorizedAt.getTime())
+      )
+        return false;
       const index = requestIndex(execution, requestId);
       const request = execution.requests[index];
       if (!request || request.state !== 'prepared') return false;
@@ -208,7 +235,7 @@ export class AiExecutionStateStore {
         ...request,
         state: 'dispatching',
         dispatchExecutionAttempt: ownership.executionAttempt,
-        dispatchingAt: now.toISOString(),
+        dispatchingAt: authorizedAt.toISOString(),
       };
       const updated = aiExecutionSummarySchema.parse({ ...execution, requests });
       await transaction.aiRun.update({
@@ -219,11 +246,7 @@ export class AiExecutionStateStore {
     });
   }
 
-  async renewLease(
-    ownership: AiExecutionOwnership,
-    leaseMs: number,
-    now = new Date(),
-  ) {
+  async renewLease(ownership: AiExecutionOwnership, leaseMs: number, now = new Date()) {
     const result = await this.prisma.aiRun.updateMany({
       where: {
         id: ownership.runId,
@@ -260,9 +283,7 @@ export class AiExecutionStateStore {
         state: 'unknown',
         completedAt: now.toISOString(),
         error,
-        ...(revision === null
-          ? {}
-          : { usageRevisions: [...request.usageRevisions, revision] }),
+        ...(revision === null ? {} : { usageRevisions: [...request.usageRevisions, revision] }),
       };
       const aggregate = aggregateRequestFacts(requests);
       const updated = aiExecutionSummarySchema.parse({
@@ -292,8 +313,20 @@ export class AiExecutionStateStore {
     input: AiRequestCompletion,
     participant?: AiExecutionSettlementParticipant,
   ): Promise<AiRequestSettlementResult | null> {
+    return traceAiOperation(
+      'business.persistence',
+      { operation: 'completeAndSettle', input },
+      () => this.completeObserved(input, participant),
+    );
+  }
+
+  private async completeObserved(
+    input: AiRequestCompletion,
+    participant?: AiExecutionSettlementParticipant,
+  ): Promise<AiRequestSettlementResult | null> {
     const revision = aiUsageRevisionSchema.parse(input.revision);
     const outcome = aiGenerationOutcomeSchema.parse(input.outcome);
+    const httpRequest = parseRequestHttpDiagnostic(input.httpRequest);
     const error: AiGenerationError | null =
       input.error === undefined ? null : aiGenerationErrorSchema.parse(input.error);
     const completedAt = input.completedAt ?? new Date();
@@ -305,6 +338,7 @@ export class AiExecutionStateStore {
       const index = requestIndex(execution, input.requestId);
       const currentRequest = execution.requests[index];
       if (!currentRequest) return null;
+      const httpRequestFields = mergeRequestHttpDiagnostic(currentRequest, httpRequest);
       const existingRevision = currentRequest.usageRevisions[revision.revision - 1];
       if (existingRevision && !sameJson(existingRevision, revision))
         throw new Error('同一计量修订包含冲突事实');
@@ -317,7 +351,7 @@ export class AiExecutionStateStore {
         };
       }
       if (
-        !activeOwner(run, input, completedAt) ||
+        !activeOwner(run, input, new Date()) ||
         !['dispatching', 'completed'].includes(currentRequest.state)
       )
         return null;
@@ -328,6 +362,7 @@ export class AiExecutionStateStore {
         state: 'completed',
         completedAt: completedAt.toISOString(),
         outcome,
+        ...httpRequestFields,
         error,
         usageRevisions: existingRevision
           ? currentRequest.usageRevisions
@@ -343,6 +378,8 @@ export class AiExecutionStateStore {
         execution,
       } satisfies AiExecutionSettlementContext;
       if (participant) blocked = (await participant.settle(settlementContext)) ?? blocked;
+      const publication = aiExecutionPublication(execution, input, completedAt);
+      blocked = publication.blocked ?? blocked;
       request = { ...request, settledRevision: revision.revision };
       const requests = [...execution.requests];
       requests[index] = request;
@@ -359,21 +396,9 @@ export class AiExecutionStateStore {
         inputTokens: aggregate.inputTokens,
         outputTokens: aggregate.outputTokens,
         cost: aggregate.cost,
+        ...publication.data,
         ...(input.checkpoint === undefined ? {} : { checkpoint: asJson(input.checkpoint) }),
       };
-      if (input.result !== undefined) {
-        data.status = 'succeeded';
-        data.result = asJson(input.result);
-        data.completedAt = completedAt;
-        data.claimedAt = null;
-        data.leaseUntil = null;
-      }
-      if (input.finalization) {
-        data.provider = input.finalization.provider;
-        data.model = input.finalization.model;
-        if (input.finalization.durationMs !== undefined)
-          data.durationMs = input.finalization.durationMs;
-      }
       await transaction.aiRun.update({ where: { id: input.runId }, data });
       if (participant?.commit) await participant.commit(settlementContext);
       return {
@@ -387,27 +412,22 @@ export class AiExecutionStateStore {
 
   async failOwned(
     ownership: AiExecutionOwnership,
-    input: {
-      errorCode: string;
-      errorSummary: string;
-      durationMs?: number;
-      continuationBlockedReason?: AiExecutionSummary['continuationBlockedReason'];
-    },
+    input: AiRunFailure,
     now = new Date(),
   ) {
+    return traceAiOperation(
+      'business.persistence',
+      { operation: 'failOwned', ownership, input, now },
+      () => this.failObserved(ownership, input, now),
+    );
+  }
+
+  private async failObserved(ownership: AiExecutionOwnership, input: AiRunFailure, now: Date) {
     return this.prisma.$transaction(async (transaction) => {
       const run = (await this.lockRun(transaction, ownership.runId))[0];
       if (!run || !activeOwner(run, ownership, now)) return false;
       const execution = executionFrom(run.modelMetadata);
-      const updated = execution
-        ? aiExecutionSummarySchema.parse({
-            ...execution,
-            generationStatus:
-              execution.generationStatus === 'pending' ? 'incomplete' : execution.generationStatus,
-            continuationBlockedReason:
-              input.continuationBlockedReason ?? execution.continuationBlockedReason,
-          })
-        : null;
+      const updated = execution ? failedAiExecution(execution, input, now) : null;
       await transaction.aiRun.update({
         where: { id: ownership.runId },
         data: {

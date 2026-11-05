@@ -1,8 +1,10 @@
+import { InstrumentDisplayService, type InstrumentDisplayNames } from '../market/instruments/instrument-display.service.js';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   confirmRecurringFundInvestmentOccurrenceSchema,
@@ -34,18 +36,20 @@ export class RecurringFundInvestmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledgerCommands: LedgerCommandService,
+    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {}
 
   async create(rawInput: unknown) {
     const input = createRecurringFundInvestmentPlanSchema.parse(rawInput);
     const account = await this.requireFundAccount(input.accountId);
     const asset = await this.requireFundAsset(input.symbol);
+    const names = await this.display.resolve([asset.symbol]);
     return this.prisma.recurringFundInvestmentPlan.create({
       data: {
         accountId: account.id,
         name: input.name,
         symbol: asset.symbol,
-        fundName: asset.name,
+        fundName: names.name(asset.symbol),
         expectedAmount: input.expectedAmount,
         currency: account.currency,
         dayOfMonth: input.dayOfMonth,
@@ -56,15 +60,15 @@ export class RecurringFundInvestmentService {
     });
   }
 
-  list(rawQuery: unknown = {}) {
+  async list(rawQuery: unknown = {}) {
     const query = recurringFundInvestmentPlanQuerySchema.parse(rawQuery);
-    return this.prisma.recurringFundInvestmentPlan.findMany({
+    return this.namePlans(await this.prisma.recurringFundInvestmentPlan.findMany({
       where: {
         ...(query.accountId === undefined ? {} : { accountId: query.accountId }),
         ...(query.status === undefined ? {} : { status: query.status }),
       },
       orderBy: [{ status: 'asc' }, { nextDueAt: 'asc' }, { createdAt: 'asc' }],
-    });
+    }));
   }
 
   async update(id: string, rawInput: unknown) {
@@ -217,12 +221,13 @@ export class RecurringFundInvestmentService {
       where: { status: 'ACTIVE', nextDueAt: { lte: now } },
       orderBy: [{ nextDueAt: 'asc' }, { id: 'asc' }],
     });
+    const names = await this.display.resolve(plans.map((plan) => plan.symbol));
     const results = [];
-    for (const plan of plans) results.push(await this.materializePlan(plan.id, now));
+    for (const plan of plans) results.push(await this.materializePlan(plan.id, now, names));
     return { planCount: plans.length, results };
   }
 
-  private async materializePlan(id: string, now: Date) {
+  private async materializePlan(id: string, now: Date, names: InstrumentDisplayNames) {
     return this.prisma.$transaction(async (transaction) => {
       const plan = await transaction.recurringFundInvestmentPlan.findUnique({ where: { id } });
       if (!plan || plan.status !== 'ACTIVE' || !plan.nextDueAt || plan.nextDueAt > now)
@@ -243,7 +248,7 @@ export class RecurringFundInvestmentService {
             periodKey: item.periodKey,
             planName: plan.name,
             symbol: plan.symbol,
-            fundName: plan.fundName,
+            fundName: names.name(plan.symbol),
             scheduledFor: item.scheduledFor,
             expectedAmount: plan.expectedAmount,
             currency: plan.currency,
@@ -318,7 +323,12 @@ export class RecurringFundInvestmentService {
   private async requirePlan(id: string) {
     const plan = await this.prisma.recurringFundInvestmentPlan.findUnique({ where: { id } });
     if (!plan) throw new NotFoundException('基金定投计划不存在');
-    return plan;
+    return (await this.namePlans([plan]))[0]!;
+  }
+
+  private async namePlans<T extends { symbol: string; fundName: string }>(plans: T[]) {
+    const names = await this.display.resolve(plans.map((plan) => plan.symbol));
+    return plans.map((plan) => ({ ...plan, fundName: names.name(plan.symbol) }));
   }
 
   private async requireOccurrence(id: string) {

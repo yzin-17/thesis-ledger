@@ -1,11 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { AiGenerationSettings } from '../src/features/providers/AiGenerationSettings.js';
-import { newAiProviderDraft } from '../src/features/providers/providers.types.js';
+import {
+  newAiProviderDraft,
+  providerDraftForType,
+} from '../src/features/providers/providers.types.js';
 import { newAiProviderExecutionRouteDraft } from '../src/features/providers/ai-provider-execution.js';
 import {
   aiProviderDraftFromRecord,
   aiProviderInputFromDraft,
+  providerDraftFromRecord,
 } from '../src/features/providers/ai-provider.actions.js';
 import { saveWithValidation } from '../src/features/providers/ai-provider-validated-save.js';
 
@@ -24,8 +28,54 @@ const plan = (count = 1) => ({
   maxDurationSeconds: 300,
   estimatedCosts: count ? [{ currency: 'USD', amount: '0' }] : [],
 });
+const savedProvider = {
+  name: 'local',
+  type: 'ai',
+  enabled: true,
+  priority: 100,
+  capabilities: ['chat'],
+  health: 'unknown',
+};
 
 describe('automatic generation and test-save UX', () => {
+  it.each(['market', 'notification'])('数据库 %s 配置转为 AI 后提交原配置版本', (type) => {
+    const revision = '2026-10-17T00:00:00.000Z';
+    const stored = providerDraftFromRecord({
+      name: '转换验收',
+      type,
+      enabled: false,
+      capabilities: ['quote'],
+      priority: 999,
+      health: 'disabled',
+      updatedAt: revision,
+    });
+    const converted = providerDraftForType('ai', stored);
+    const input = aiProviderInputFromDraft({
+      ...converted,
+      baseUrl: 'http://127.0.0.1:9/v1',
+      modelsText: 'model',
+    });
+    expect(input.expectedRevision).toBe(revision);
+    expect(input.enabled).toBe(false);
+  });
+  it('数据库 AI 草稿双向切换保留版本，同时清理类型专属字段', () => {
+    const revision = '2026-10-17T00:00:00.000Z';
+    const stored = providerDraftFromRecord({
+      name: '转换验收',
+      type: 'ai',
+      enabled: false,
+      capabilities: ['chat'],
+      priority: 999,
+      health: 'disabled',
+      updatedAt: revision,
+      models: ['old-model'],
+      baseUrl: 'https://example.test/v1',
+    });
+    const converted = providerDraftForType('ai', providerDraftForType('market', stored));
+    expect(converted.updatedAt).toBe(revision);
+    expect(converted.modelsText).toBe('');
+    expect(converted.baseUrl).toBe('');
+  });
   it('shows automatic selection without asking the user to choose JSON formats', () => {
     const html = renderToStaticMarkup(
       <AiGenerationSettings
@@ -102,7 +152,7 @@ describe('automatic generation and test-save UX', () => {
   });
   it('confirms costs then calls the server test-and-save once', async () => {
     const request = vi.fn(async (path: string) =>
-      path.endsWith('validation-plan') ? plan() : { name: 'local' },
+      path.endsWith('validation-plan') ? plan() : savedProvider,
     );
     const confirm = vi.fn(async () => true);
     await saveWithValidation(
@@ -122,7 +172,7 @@ describe('automatic generation and test-save UX', () => {
   });
   it('reuses valid evidence without a confirmation or model probe', async () => {
     const request = vi.fn(async (path: string) =>
-      path.endsWith('validation-plan') ? plan(0) : { name: 'local' },
+      path.endsWith('validation-plan') ? plan(0) : savedProvider,
     );
     const confirm = vi.fn(async () => true);
     await saveWithValidation(

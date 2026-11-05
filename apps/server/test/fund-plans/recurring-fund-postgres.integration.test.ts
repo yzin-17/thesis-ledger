@@ -66,6 +66,7 @@ isolated('基金定投隔离 PostgreSQL HTTP 与 Scheduler 最小闭环', () => 
 
   it('并发确认及重放只写一个当前买入事实，投影和读取同步可见', async () => {
     const { account, occurrence } = await fixture.pending();
+    await fixture.fund(account.id, '126');
     const path = `fund-investment-occurrences/${occurrence.id}/confirm`;
     const responses = await Promise.all([
       fixture.http(path, fundConfirmation),
@@ -84,7 +85,9 @@ isolated('基金定投隔离 PostgreSQL HTTP 与 Scheduler 最小闭环', () => 
       confirmed.ledgerEventId,
     );
     expect((await fixture.http(path, fundConfirmation)).status).toBe(201);
-    const stored = await fixture.prisma.ledgerEvent.findMany({ where: { accountId: account.id } });
+    const stored = await fixture.prisma.ledgerEvent.findMany({
+      where: { accountId: account.id, type: 'BUY_EXECUTION' },
+    });
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({
       id: confirmed.ledgerEventId,
@@ -93,8 +96,8 @@ isolated('基金定投隔离 PostgreSQL HTTP 与 Scheduler 最小闭环', () => 
       envelopeVersion: 3,
     });
     const read = await fixture.queries.effectiveEvents(account.id);
-    expect(read.events).toHaveLength(1);
-    expect(read.events[0]).toMatchObject({
+    expect(read.events).toHaveLength(2);
+    expect(read.events.find((event) => event.type === 'BUY_EXECUTION')).toMatchObject({
       type: 'BUY_EXECUTION',
       eventId: confirmed.ledgerEventId,
     });
@@ -107,17 +110,17 @@ isolated('基金定投隔离 PostgreSQL HTTP 与 Scheduler 最小闭环', () => 
       (
         await fixture.prisma.cashBalance.findFirstOrThrow({ where: { accountId: account.id } })
       ).settledAmount.toString(),
-    ).toBe('-126');
+    ).toBe('0');
     expect(
       await fixture.prisma.accountLedgerState.findUniqueOrThrow({
         where: { accountId: account.id },
       }),
-    ).toMatchObject({ ledgerRevision: 1n, projectionGeneration: 1n });
+    ).toMatchObject({ ledgerRevision: 2n, projectionGeneration: 2n });
   });
 
   it('确认等待账户锁时跳过获胜，确认冲突回滚全部账本和投影', async () => {
     const { account, occurrence } = await fixture.pending();
-    await fixture.prisma.accountLedgerState.create({ data: { accountId: account.id } });
+    await fixture.fund(account.id, '126');
     let release = () => {};
     let acquired = () => {};
     const ready = new Promise<void>((resolve) => {
@@ -178,13 +181,13 @@ isolated('基金定投隔离 PostgreSQL HTTP 与 Scheduler 最小闭环', () => 
       ledgerFactId: null,
       actualQuantity: null,
     });
-    expect(await fixture.prisma.ledgerEvent.count({ where: { accountId: account.id } })).toBe(0);
+    expect(await fixture.prisma.ledgerEvent.count({ where: { accountId: account.id } })).toBe(1);
     expect(await fixture.prisma.position.count({ where: { accountId: account.id } })).toBe(0);
-    expect(await fixture.prisma.cashBalance.count({ where: { accountId: account.id } })).toBe(0);
+    expect(await fixture.prisma.cashBalance.count({ where: { accountId: account.id } })).toBe(1);
     expect(
       await fixture.prisma.accountLedgerState.findUniqueOrThrow({
         where: { accountId: account.id },
       }),
-    ).toMatchObject({ ledgerRevision: 0n, projectionGeneration: 0n });
+    ).toMatchObject({ ledgerRevision: 1n, projectionGeneration: 1n });
   });
 });

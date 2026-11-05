@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { TableContainer } from '@/components/ui/table';
+import { useEffect, useRef, useState } from 'react';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
 import { Copy, FlaskConical, MoreHorizontal, Pencil, Plus } from 'lucide-react';
@@ -31,6 +33,7 @@ import {
 } from '@/components/ui/select';
 import { useToastManager } from '@/components/ui/toast';
 import { formatDateTime } from '@/lib/date-display';
+import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import {
   cloneOptimizationExperiment,
   fetchOptimizationExperiments,
@@ -75,6 +78,10 @@ export function StrategyExperimentListPage() {
   const [draftSearch, setDraftSearch] = useState(search);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [savedRename, setSavedRename] = useState<{ id: string; name: string } | null>(null);
+  const [renameReadFailed, setRenameReadFailed] = useState(false);
+  const renameFlightRef = useRef(false);
+  const renameReadFlightRef = useRef(false);
 
   useEffect(() => setDraftSearch(search), [search]);
   useEffect(() => {
@@ -103,21 +110,61 @@ export function StrategyExperimentListPage() {
     staleTime: 5_000,
   });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: optimizationKey });
+  const refreshRenamedList = async (id: string) => {
+    if (renameReadFlightRef.current) return;
+    renameReadFlightRef.current = true;
+    setRenameReadFailed(false);
+    try {
+      await experiments.refetch({ throwOnError: true });
+      setRenamingId((currentId) => (currentId === id ? null : currentId));
+      setSavedRename(null);
+      renameFlightRef.current = false;
+      toast.add({ title: '实验名称已更新' });
+    } catch {
+      setRenameReadFailed(true);
+      toast.add({
+        title: '实验名称已保存',
+        description: '保存后的列表确认读取失败，请重新加载。',
+        type: 'error',
+      });
+    } finally {
+      renameReadFlightRef.current = false;
+    }
+  };
   const renameMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       renameOptimizationExperiment(id, name),
-    onSuccess: async () => {
-      setRenamingId(null);
-      await invalidate();
-      toast.add({ title: '实验名称已更新' });
+    onSuccess: async (updated, { id, name }) => {
+      const confirmedName = updated.name || name;
+      setRenameValue(confirmedName);
+      setSavedRename({ id, name: confirmedName });
+      await queryClient.invalidateQueries({
+        queryKey: optimizationKey,
+        refetchType: 'none',
+      });
+      await refreshRenamedList(id);
     },
-    onError: (error) =>
+    onError: (error) => {
+      renameFlightRef.current = false;
       toast.add({
         title: '改名失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
+        description: requestFailureMessage(error),
         type: 'error',
-      }),
+      });
+    },
   });
+  const submitRename = (id: string, name: string) => {
+    if (!name || renameFlightRef.current || renameMutation.isPending || savedRename !== null)
+      return;
+    renameFlightRef.current = true;
+    renameMutation.mutate({ id, name });
+  };
+  const cancelRename = () => {
+    if (renameFlightRef.current || renameMutation.isPending || savedRename !== null) return;
+    setRenamingId(null);
+    setRenameValue('');
+    renameMutation.reset();
+  };
   const cloneMutation = useMutation({
     mutationFn: (id: string) => cloneOptimizationExperiment(id),
     onSuccess: async () => {
@@ -130,7 +177,7 @@ export function StrategyExperimentListPage() {
     onError: (error) =>
       toast.add({
         title: '克隆失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
+        description: requestFailureMessage(error),
         type: 'error',
       }),
   });
@@ -165,7 +212,7 @@ export function StrategyExperimentListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(18rem,1fr)_max-content_max-content_auto] md:items-center">
+      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(12rem,1fr)_max-content_max-content_auto] lg:items-center">
         <StrategyListSearchField
           value={draftSearch}
           onChange={setDraftSearch}
@@ -224,8 +271,29 @@ export function StrategyExperimentListPage() {
           }
         />
       </div>
-      {!experiments.isPending && items.length === 0 ? (
-        <Empty className="border border-dashed">
+      {!experiments.data && experiments.isPending ? (
+        <DataStateBanner state="loading" description="正在读取策略实验列表。" />
+      ) : null}
+      {!experiments.data && experiments.isError ? (
+        <DataStateBanner
+          state="error"
+          description="策略实验列表读取失败，当前筛选和分页范围已保留。"
+          onRetry={() => void experiments.refetch()}
+        />
+      ) : null}
+      {savedRename ? (
+        <DataStateBanner
+          state={renameReadFailed ? 'stale' : 'loading'}
+          description={
+            renameReadFailed
+              ? `实验「${savedRename.name}」已保存；保存后的列表确认读取失败，无需重复提交。`
+              : `实验「${savedRename.name}」已保存，正在重新读取当前列表。`
+          }
+          onRetry={renameReadFailed ? () => void refreshRenamedList(savedRename.id) : undefined}
+        />
+      ) : null}
+      {experiments.data && items.length === 0 ? (
+        <Empty className="rounded-md border border-border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <FlaskConical />
@@ -240,10 +308,11 @@ export function StrategyExperimentListPage() {
             />
           </EmptyContent>
         </Empty>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full table-fixed text-sm">
-            <thead className="border-b bg-muted/30 text-left">
+      ) : null}
+      {experiments.data && items.length > 0 ? (
+        <TableContainer>
+          <table className="w-full min-w-[900px] table-fixed text-sm">
+            <thead className="border-b text-left">
               <tr>
                 <th className="w-[38%] px-4 py-3 font-medium">实验名称 / 来源</th>
                 <th className="w-[19%] px-4 py-3 font-medium">状态</th>
@@ -259,35 +328,55 @@ export function StrategyExperimentListPage() {
                 <tr key={experiment.id} className="border-b last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     {renamingId === experiment.id ? (
-                      <div className="flex max-w-sm gap-2">
+                      <div className="flex w-full max-w-sm flex-col items-stretch gap-2">
                         <Input
                           autoFocus
+                          className="w-full"
                           aria-label="新的实验名称"
-                          value={renameValue}
-                          onChange={(event) => setRenameValue(event.target.value)}
+                          value={savedRename?.id === experiment.id ? savedRename.name : renameValue}
+                          disabled={renameMutation.isPending || savedRename?.id === experiment.id}
+                          onChange={(event) => {
+                            if (renameFlightRef.current || savedRename?.id === experiment.id)
+                              return;
+                            setRenameValue(event.target.value);
+                          }}
                           onKeyDown={(event) => {
-                            if (event.key === 'Enter' && renameValue.trim())
-                              renameMutation.mutate({
-                                id: experiment.id,
-                                name: renameValue.trim(),
-                              });
-                            if (event.key === 'Escape') setRenamingId(null);
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              submitRename(experiment.id, renameValue.trim());
+                            }
+                            if (event.key === 'Escape') {
+                              event.preventDefault();
+                              cancelRename();
+                            }
                           }}
                         />
+                        {savedRename?.id !== experiment.id ? (
+                          <Button
+                            size="sm"
+                            className="w-fit"
+                            disabled={!renameValue.trim() || renameMutation.isPending}
+                            onClick={() => submitRename(experiment.id, renameValue.trim())}
+                          >
+                            {renameMutation.isPending ? '保存中…' : '保存'}
+                          </Button>
+                        ) : null}
                         <Button
                           size="sm"
-                          disabled={!renameValue.trim() || renameMutation.isPending}
-                          onClick={() =>
-                            renameMutation.mutate({ id: experiment.id, name: renameValue.trim() })
-                          }
+                          variant="outline"
+                          className="w-fit"
+                          aria-label="取消重命名"
+                          disabled={renameMutation.isPending || savedRename !== null}
+                          onClick={cancelRename}
                         >
-                          保存
+                          取消
                         </Button>
                       </div>
                     ) : (
                       <>
                         <Link
-                          className="font-medium text-foreground hover:underline"
+                          className="block truncate font-medium text-foreground hover:underline"
+                          title={experiment.name}
                           to={strategyCenterPath.experiment(experiment.id)}
                         >
                           {experiment.name}
@@ -306,10 +395,10 @@ export function StrategyExperimentListPage() {
                       {experimentStageLabel(experiment.stage)}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="px-4 py-3 whitespace-normal text-muted-foreground">
                     {experimentProgressLabel(experiment)}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="px-4 py-3 whitespace-normal text-muted-foreground">
                     {formatDateTime(experiment.updatedAt, '时间未记录')}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -320,6 +409,10 @@ export function StrategyExperimentListPage() {
                             variant="ghost"
                             size="icon"
                             aria-label={`管理 ${experiment.name}`}
+                            disabled={
+                              renamingId === experiment.id &&
+                              (renameMutation.isPending || savedRename?.id === experiment.id)
+                            }
                           >
                             <MoreHorizontal />
                           </Button>
@@ -328,9 +421,16 @@ export function StrategyExperimentListPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuGroup>
                           <DropdownMenuItem
+                            disabled={
+                              renamingId !== null ||
+                              renameMutation.isPending ||
+                              savedRename !== null
+                            }
                             onClick={() => {
                               setRenamingId(experiment.id);
                               setRenameValue(experiment.name);
+                              setSavedRename(null);
+                              setRenameReadFailed(false);
                             }}
                           >
                             <Pencil />
@@ -351,11 +451,11 @@ export function StrategyExperimentListPage() {
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+        </TableContainer>
+      ) : null}
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
-          共 {experiments.data?.totalCount ?? 0} 条
+          {experiments.data ? `共 ${experiments.data.totalCount} 条` : '总数暂不可用'}
           {trail.length > 0 ? `，第 ${trail.length + 1} 页` : ''}
         </span>
         <div className="flex gap-2">

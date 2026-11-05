@@ -9,6 +9,9 @@ import { LedgerQueryService } from './ledger-query.service.js';
 import { LedgerV2Repository } from './ledger-v2.repository.js';
 import { LedgerService } from './ledger.service.js';
 import { TradeQueryService } from './trade-query.service.js';
+import { TradeChartQueryService } from './trade-chart-query.service.js';
+import { TradeInstrumentQueryService } from './trade-instrument-query.service.js';
+import { TradeRealizedPnlHistoryService } from './trade-realized-pnl-history.service.js';
 import { TradeOpeningBoundaryCommandService } from './trade-opening-boundary-command.service.js';
 
 @Module({
@@ -21,6 +24,9 @@ import { TradeOpeningBoundaryCommandService } from './trade-opening-boundary-com
     CashLedgerCommandService,
     LedgerQueryService,
     TradeQueryService,
+    TradeChartQueryService,
+    TradeInstrumentQueryService,
+    TradeRealizedPnlHistoryService,
     TradeOpeningBoundaryCommandService,
     BaselineImportService,
     BaselineReconciliationService,
@@ -32,6 +38,9 @@ import { TradeOpeningBoundaryCommandService } from './trade-opening-boundary-com
     CashLedgerCommandService,
     LedgerQueryService,
     TradeQueryService,
+    TradeChartQueryService,
+    TradeInstrumentQueryService,
+    TradeRealizedPnlHistoryService,
     TradeOpeningBoundaryCommandService,
     BaselineImportService,
     BaselineReconciliationService,

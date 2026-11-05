@@ -1,3 +1,5 @@
+import { assertGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
+import { aiRouteReasoningFields } from '../ai/ai-route-reasoning-options.js';
 import { HttpException, Logger } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
@@ -135,6 +137,7 @@ export class AuthoringAttemptRunner {
     const runtime = route.provider.sdkRuntime?.();
     if (!runtime) throw new Error('AUTHORING_MODEL_UNAVAILABLE');
     const messages = authoringMessages(operation);
+    if (route.execution.mode === 'json_validated') assertGenerationSchemaPrompt(contract.schema, messages);
     if (Buffer.byteLength(JSON.stringify(messages), 'utf8') > AUTHORING_LIMITS.snapshotBytes)
       throw new Error('AUTHORING_INPUT_TOO_LARGE');
     return { contract, route, runtime, messages };
@@ -186,6 +189,8 @@ export class AuthoringAttemptRunner {
       contract: contract.ref,
       schema: contract.schema,
       mode: route.execution.mode,
+      ...aiRouteReasoningFields(route.execution),
+      ...(route.execution.requestOptions ? { requestOptions: route.execution.requestOptions } : {}),
       transport: 'stream',
       maxOutputTokens: AUTHORING_LIMITS.outputTokens,
       timeout: {
@@ -264,13 +269,15 @@ export class AuthoringAttemptRunner {
           this.provider,
           this.operation.input.selection.model,
           error.usage,
+          error.completion?.providerCost ?? null,
+          error.completion?.providerCostCurrency ?? null,
         );
     }
     if (this.prepared && !this.factWritten) {
       await this.dependencies.audit.append(this.requestId, {
         eventKey: randomUUID(),
         kind: this.dispatched ? this.result.externalResult : 'not_sent',
-        actualModel: null,
+        actualModel: error instanceof AiSdkGenerationError ? error.completion?.actualModel ?? null : null,
         usage: this.result.externalResult === 'not_sent' ? null : this.result.usage,
         cost: this.result.cost,
         errorCode: this.result.errorCode,

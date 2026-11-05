@@ -1,4 +1,6 @@
-import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
+import { strategyClients, backtestClients } from '@thesis-ledger/api-client';
+import { omitUndefinedDeep } from '@thesis-ledger/schemas';
+import { parsedDesktopRequest, type DesktopRequestClient } from '../shared/request.js';
 import type {
   BacktestJob,
   BacktestJobSummary,
@@ -7,77 +9,31 @@ import type {
   QueueBacktestV3Input,
   StrategyRecord,
 } from './strategy.types.js';
-
-export const fetchStrategies = (client?: DesktopRequestClient) =>
-  requestDesktopJson<StrategyRecord[]>('/backtests/strategies', undefined, client);
-
-export const fetchBacktestJobs = (client?: DesktopRequestClient) =>
-  requestDesktopJson<BacktestJobSummary[]>('/backtests/runs', undefined, client);
-
-export const fetchBacktestJob = (jobId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<BacktestJob>(
-    `/backtests/runs/${encodeURIComponent(jobId)}`,
-    undefined,
-    client,
-  );
-
-export const createStrategy = (input: CreateStrategyInput, client?: DesktopRequestClient) =>
-  requestDesktopJson<StrategyRecord>(
-    '/backtests/strategies',
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-    client,
-  );
-
+const definitions = (client?: DesktopRequestClient) =>
+  strategyClients(parsedDesktopRequest(client)).definitions;
+const runs = (client?: DesktopRequestClient) => backtestClients(parsedDesktopRequest(client));
+export const fetchStrategies = (client?: DesktopRequestClient): Promise<StrategyRecord[]> =>
+  definitions(client).list().then(omitUndefinedDeep);
+export const fetchBacktestJobs = (client?: DesktopRequestClient): Promise<BacktestJobSummary[]> =>
+  runs(client).listRuns().then(omitUndefinedDeep);
+export const fetchBacktestJob = (id: string, client?: DesktopRequestClient): Promise<BacktestJob> =>
+  runs(client).getRun(id).then(omitUndefinedDeep);
+export const createStrategy = (
+  input: CreateStrategyInput,
+  client?: DesktopRequestClient,
+): Promise<StrategyRecord> => definitions(client).create(input).then(omitUndefinedDeep);
 export const createStrategyVersion = (
   input: CreateStrategyVersionInput,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<StrategyRecord['versions'][number]>(
-    `/backtests/strategies/${encodeURIComponent(input.strategyId)}/versions`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ schema: input.schema }),
-    },
-    client,
-  );
-
-export const queueBacktest = (input: QueueBacktestV3Input, client?: DesktopRequestClient) =>
-  requestDesktopJson<BacktestJob>(
-    '/backtests/runs',
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-    client,
-  );
-
-export const runBacktest = (jobId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<BacktestJob>(
-    `/backtests/runs/${encodeURIComponent(jobId)}/run`,
-    {
-      method: 'POST',
-    },
-    client,
-  );
-
-export const cancelBacktest = (jobId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<BacktestJob>(
-    `/backtests/runs/${encodeURIComponent(jobId)}/cancel`,
-    {
-      method: 'POST',
-    },
-    client,
-  );
-
-export const retryBacktest = (runId: string, client?: DesktopRequestClient) =>
-  requestDesktopJson<BacktestJob>(
-    `/backtests/runs/${encodeURIComponent(runId)}/retry`,
-    { method: 'POST' },
-    client,
-  );
+): Promise<StrategyRecord['versions'][number]> =>
+  definitions(client).createVersion(input.strategyId, input.schema).then(omitUndefinedDeep);
+export const queueBacktest = (
+  input: QueueBacktestV3Input,
+  client?: DesktopRequestClient,
+): Promise<BacktestJob> => runs(client).createRun(input).then(omitUndefinedDeep);
+export const runBacktest = (id: string, client?: DesktopRequestClient): Promise<BacktestJob> =>
+  runs(client).dispatchRun(id).then(omitUndefinedDeep);
+export const cancelBacktest = (id: string, client?: DesktopRequestClient): Promise<BacktestJob> =>
+  runs(client).cancelRun(id).then(omitUndefinedDeep);
+export const retryBacktest = (id: string, client?: DesktopRequestClient): Promise<BacktestJob> =>
+  runs(client).retryRun(id).then(omitUndefinedDeep);

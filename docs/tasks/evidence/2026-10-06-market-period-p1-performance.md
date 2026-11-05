@@ -1,6 +1,6 @@
 # 行情周期 P1 性能验收证据
 
-验收日期：2026-10-06（Asia/Shanghai）；记录时间：01:24:50。对应[原 Task](../2026-09-16-market-chart-period-aggregation.md) 的 P1 与[完整 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md) 的 AC11。
+验收日期：2026-10-06（Asia/Shanghai）；记录时间：01:24:50。对应[原 Task](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md) 的 P1 与[完整 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md) 的 AC11。
 
 ## 结论
 
@@ -104,7 +104,9 @@ UA 中的 Intel 与旧 macOS 字样是浏览器报告值，设备与操作系统
 
 | 截图 | SHA-256 |
 | --- | --- |
-| [500 点完整图表](/private/tmp/tl-p1-500-points-full.jpg) | `95a695e5f3750cc70a3396cffdbb40e06a5fa8e28b1cd324693349893e4df89d` |
-| [生产页面窗口](/private/tmp/tl-p1-production-window.jpg) | `78ae46f01dfbbc7b65f965382d555d048daa0e4459e47d5dac810d57d8dbfe8a` |
+| 500 点完整图表：`/private/tmp/tl-p1-500-points-full.jpg` | `95a695e5f3750cc70a3396cffdbb40e06a5fa8e28b1cd324693349893e4df89d` |
+| 生产页面窗口：`/private/tmp/tl-p1-production-window.jpg` | `78ae46f01dfbbc7b65f965382d555d048daa0e4459e47d5dac810d57d8dbfe8a` |
+
+10-17 留存核对：上述两个临时截图已不存在，保留原路径与摘要追溯，移除失效点击链接。核心数值、采样方法、请求和原始 JSON 仍在本仓；不将旧截图列作今天可打开的证据，也不伪造替代截图。
 
 本轮改动仅补强性能基准、增加其类型检查配置并更新证据与 P1 状态。Electron 安装包、设备与正式发布验收仍按各自任务管理；没有提交或推送。最终一致性 Review 由 R1 继续负责。

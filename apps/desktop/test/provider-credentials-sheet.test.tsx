@@ -10,12 +10,14 @@ const api = vi.hoisted(() => ({
   save: vi.fn(),
   clear: vi.fn(),
   test: vi.fn(),
+  providers: vi.fn(),
   oauthCurrent: vi.fn(),
 }));
 vi.mock('../src/features/market-data/market-data.api.js', () => ({
   saveMarketProviderCredentials: api.save,
   clearMarketProviderCredential: api.clear,
   testMarketProvider: api.test,
+  fetchMarketProviders: api.providers,
 }));
 vi.mock('../src/components/ui/confirm-dialog.js', () => ({
   useConfirmDialog: () => ({ confirm: async () => true }),
@@ -194,6 +196,7 @@ describe('凭证配置状态与更换交互', () => {
 });
 
 const tushare: ProviderManifest = { ...provider, providerId: 'tushare', displayName: 'Tushare', accountAccessSupported: true,
+  settings: { accountLevel: { points: 120, independentApis: [] } },
   credentialMethod: 'token', credentialFieldsConfigured: { token: true },
   credentialSchema: { methods: [{ method: 'token', fields: [{ name: 'token', secret: true, required: true }] }] } };
 const accountResult = (context: 'draft' | 'current', configVersion = 1) => {
@@ -205,12 +208,20 @@ const accountResult = (context: 'draft' | 'current', configVersion = 1) => {
       { target, key: { kind: 'bar', market: 'CN', assetType: 'STOCK', capability: 'DAILY_BAR', timeframe: '1d', adjustment: 'none' },
         access: { state: 'allowed', attempted: true, ...time } },
       { target, key: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'CASH_DISTRIBUTION' },
-        access: { state: 'permission_missing', attempted: true, errorCode: 'permission_denied', ...time } },
+        access: { state: 'not_included', attempted: false, errorCode: 'account_level_insufficient', ...time } },
     ],
   } };
 };
 
 describe('账户功能权限的草稿和保存流程', () => {
+  it('本地 JSON 键顺序变化不将当前账号刷新误判为草稿', async () => {
+    api.test.mockResolvedValue(accountResult('current'));
+    await render({ ...tushare, settings: { accountLevel: { independentApis: [], points: 120 } } });
+    await click('检查功能权限');
+    expect(api.test.mock.calls[0]![1]).toBeUndefined();
+    expect(api.test.mock.calls[0]![5]).toBeUndefined();
+    expect(document.body.textContent).toContain('当前账户可访问');
+  });
   it('检查当前输入逐功能显示，不保存密钥且修改输入后撤销旧结果', async () => {
     api.test.mockResolvedValue(accountResult('draft'));
     await render(tushare);
@@ -220,25 +231,27 @@ describe('账户功能权限的草稿和保存流程', () => {
     expect(api.test.mock.calls[0]![1]).toEqual({ method: 'token', values: { token: 'synthetic-account-draft' } });
     expect(api.test.mock.calls[0]![4]).toBe('account_access');
     expect(document.body.textContent).toContain('当前账户可访问');
-    expect(document.body.textContent).toContain('当前账户缺少权限');
+    expect(document.body.textContent).toContain('当前等级未包含 1 项功能');
+    expect(document.body.textContent).not.toContain('当前账户缺少权限');
     expect(api.save).not.toHaveBeenCalled();
     expect(JSON.stringify(client!.getMutationCache().getAll().map((m) => m.state.variables))).not.toContain('synthetic-account-draft');
     await input('synthetic-changed-draft');
     expect(document.body.textContent).not.toContain('当前账户可访问');
   });
-  it('保存后只检查当前配置并绑定新代次，测试请求不再次传入草稿', async () => {
+  it('保存提交等级与原配置代次，客户端不在保存后重复检查', async () => {
     api.save.mockResolvedValue({ ...tushare, configVersion: 2 });
     api.test.mockResolvedValue(accountResult('current', 2));
     await render(tushare);
     await click('更换');
     await input('synthetic-new-account');
-    await click('保存并检查权限');
+    await click('检查权限并保存');
     expect(api.save).toHaveBeenCalledTimes(1);
-    expect(api.test).toHaveBeenCalledTimes(1);
-    expect(api.test.mock.calls[0]![1]).toBeUndefined();
-    expect(api.test.mock.calls[0]![4]).toBe('account_access');
-    expect(document.body.textContent).toContain('当前账户缺少权限');
-    expect(document.querySelector('input')).toBeNull();
+    expect(api.save).toHaveBeenCalledWith('tushare', { method: 'token', values: { token: 'synthetic-new-account' } },
+      { accountLevel: { points: 120, independentApis: [] } }, 1);
+    expect(api.test).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('账号等级和功能权限已保存');
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    expect(document.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe('120');
   });
   it('输入变化后迟到的许可结果不显示', async () => {
     let finish: ((result: ReturnType<typeof accountResult>) => void) | undefined;
@@ -251,5 +264,26 @@ describe('账户功能权限的草稿和保存流程', () => {
     await act(async () => { finish!(accountResult('draft')); await new Promise((resolve) => setTimeout(resolve, 20)); });
     expect(document.body.textContent).not.toContain('当前账户可访问');
     expect(api.save).not.toHaveBeenCalled();
+  });
+  it('未填写积分时不发起权限检查或保存', async () => {
+    await render({ ...tushare, settings: {} });
+    await click('更换');
+    await input('synthetic-pending-account');
+    await click('检查权限并保存');
+    expect(document.body.textContent).toContain('请填写当前账号的有效积分');
+    expect(api.save).not.toHaveBeenCalled();
+    expect(api.test).not.toHaveBeenCalled();
+  });
+  it('只修改积分时复用已保存凭证，不重新提交密钥', async () => {
+    api.save.mockResolvedValue({ ...tushare, configVersion: 2, settings: { accountLevel: { points: 5000, independentApis: [] } } });
+    await render(tushare);
+    const field = document.querySelector('input[type="number"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '5000');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await click('检查权限并保存');
+    expect(api.save).toHaveBeenCalledWith('tushare', undefined, { accountLevel: { points: 5000, independentApis: [] } }, 1);
+    expect(api.test).not.toHaveBeenCalled();
   });
 });

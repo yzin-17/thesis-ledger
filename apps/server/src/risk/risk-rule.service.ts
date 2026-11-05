@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import {
   requiresRiskRuleAccount,
   riskRuleInputSchema,
@@ -7,10 +7,14 @@ import {
 } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
+import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
 
 @Injectable()
 export class RiskRuleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
+  ) {}
 
   async createRule(input: unknown) {
     const rule = riskRuleInputSchema.parse(input);
@@ -38,20 +42,11 @@ export class RiskRuleService {
     return this.withAssetNames(rules);
   }
 
-  // 证券规则的 symbol 只有代码，展示层需要 Asset.name 作为标的名
   private async withAssetNames<T extends { symbol: string | null }>(rules: T[]) {
-    const symbols = [
-      ...new Set(rules.map((rule) => rule.symbol).filter((symbol): symbol is string => !!symbol)),
-    ];
-    if (symbols.length === 0) return rules.map((rule) => ({ ...rule, assetName: null }));
-    const assets = await this.prisma.asset.findMany({
-      where: { symbol: { in: symbols } },
-      select: { symbol: true, name: true },
-    });
-    const names = new Map(assets.map((asset) => [asset.symbol, asset.name]));
+    const names = await this.display.resolve(rules.flatMap((rule) => rule.symbol ? [rule.symbol] : []));
     return rules.map((rule) => ({
       ...rule,
-      assetName: rule.symbol ? (names.get(rule.symbol) ?? null) : null,
+      assetName: rule.symbol ? names.name(rule.symbol) : null,
     }));
   }
 
@@ -78,8 +73,7 @@ export class RiskRuleService {
       (input as Record<string, unknown>).enabled === true;
     return this.prisma.$transaction(async (transaction) => {
       const stored = await transaction.riskRule.findUniqueOrThrow({ where: { id } });
-      if (stored.archivedAt)
-        throw new BadRequestException('规则已归档，请先恢复后再编辑或启停');
+      if (stored.archivedAt) throw new BadRequestException('规则已归档，请先恢复后再编辑或启停');
       const mergedInput = {
         kind: stored.kind,
         scope: stored.scope,
@@ -121,7 +115,8 @@ export class RiskRuleService {
           version: { increment: 1 },
         },
       });
-      const action = patch.enabled === undefined ? 'update' : patch.enabled ? 'enable' : 'disable';
+      let action = 'update';
+      if (updated.enabled !== stored.enabled) action = updated.enabled ? 'enable' : 'disable';
       await transaction.riskRuleAudit.create({
         data: {
           ruleId: id,

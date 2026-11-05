@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { aiGenerationContracts, type AiAdapter } from '@thesis-ledger/schemas';
+import { runProviderConnectionTest } from '../../src/ai/provider-connection-test.js';
+import { buildGenerationSchemaPrompt } from '../../src/ai/ai-generation-schema-prompt.js';
 import {
   AiSdkGenerationAdapter,
   type AiSdkGenerationRequest,
@@ -65,7 +67,10 @@ describe('explicit API JSON mode and complete-stream validation', () => {
   ): AiSdkGenerationRequest<{ answer: string }> => ({
     requestId: randomUUID(), adapter: 'openai-compatible-chat', providerId: 'local-fixture',
     baseURL: `${baseURL}/v1`, apiKey: 'test-key', model: 'fixture-model',
-    messages: [{ role: 'user', content: 'Return only JSON with an answer string.' }],
+    messages: [
+      { role: 'system', content: buildGenerationSchemaPrompt(schema) },
+      { role: 'user', content: 'Return only JSON with an answer string.' },
+    ],
     contract: aiGenerationContracts.research.ref, schema, mode: 'json_mode', transport: 'single',
     timeout: { totalMs: 5_000, firstChunkMs: 2_000, chunkMs: 2_000 },
     signal: new AbortController().signal, ...overrides,
@@ -100,9 +105,7 @@ describe('explicit API JSON mode and complete-stream validation', () => {
       expect(lastBody).toMatchObject({ response_format: { type: 'json_object' } });
       expect(JSON.stringify(lastBody)).not.toContain('json_schema');
       expect(lastBody).not.toHaveProperty('provider');
-      expect(lastBody).toHaveProperty('messages', [
-        { role: 'user', content: 'Return only JSON with an answer string.' },
-      ]);
+      expect(lastBody).toHaveProperty('messages', request().messages);
       expect(requestCount).toBe(1);
     },
   );
@@ -187,6 +190,59 @@ describe('explicit API JSON mode and complete-stream validation', () => {
     expect(requestCount).toBe(1);
   });
 
+  it.each(['single', 'stream'] as const)(
+    'classifies completed blank text JSON as validation failure with usage through %s',
+    async (transport) => {
+      handler = (response) => {
+        if (transport === 'single') sendJson(response, completion(' \n\t'));
+        else sendStream(response, [' ', '\n\t']);
+      };
+      await expect(adapter.generate(request({ mode: 'json_validated', transport })))
+        .rejects.toMatchObject({
+          fact: { code: 'schema_invalid', phase: 'validation', externalResult: 'complete' },
+          usage: { status: 'reported', inputTokens: 9, outputTokens: 5 },
+          completion: { finishReason: 'stop', rawFinishReason: 'stop', actualModel: 'fixture-model' },
+        });
+      expect(requestCount).toBe(1);
+    },
+  );
+
+  it('preserves provider-reported cost after an empty text response', async () => {
+    handler = (response) => sendJson(response, {
+      ...completion(''), usage: { ...usage, cost: 0.0012 },
+    });
+    await expect(adapter.generate(request({ mode: 'json_validated', adapter: 'openrouter' })))
+      .rejects.toMatchObject({
+        fact: { code: 'schema_invalid', externalResult: 'complete' },
+        usage: { inputTokens: 9, outputTokens: 5 },
+        completion: { finishReason: 'stop', providerCost: '0.0012', providerCostCurrency: 'USD' },
+      });
+    expect(requestCount).toBe(1);
+  });
+
+  it('sends the selected purpose effort in the actual SDK HTTP request', async () => {
+    handler = (response) => sendStream(response, [JSON.stringify({
+      conclusion: '通过', evidence: [], risks: [], unknowns: [], disclaimer: '格式测试',
+    })]);
+    await expect(runProviderConnectionTest({
+      sdk: adapter, adapter: 'openai-compatible-chat', providerId: 'local-fixture',
+      baseURL: `${baseURL}/v1`, authMode: 'none', apiKey: '', model: 'fixture-model',
+      purpose: 'research', mode: 'json_validated', reasoningEffort: 'high',
+    })).resolves.toMatchObject({ result: { finishReason: 'stop' } });
+    expect(lastBody).toMatchObject({ reasoning_effort: 'high', stream: true });
+    expect(requestCount).toBe(1);
+  });
+
+  it('keeps a blank truncated stream classified as truncation', async () => {
+    handler = (response) => sendStream(response, [' '], 'length');
+    await expect(adapter.generate(request({ mode: 'json_validated', transport: 'stream' })))
+      .rejects.toMatchObject({
+        fact: { code: 'output_truncated', phase: 'validation', externalResult: 'complete' },
+        usage: { status: 'reported', inputTokens: 9, outputTokens: 5 },
+      });
+    expect(requestCount).toBe(1);
+  });
+
   it('keeps legacy fenced text JSON working without enabling API JSON mode', async () => {
     handler = (response) => sendJson(response, completion('```json\n{"answer":"legacy"}\n```'));
     await expect(adapter.generate(request({ mode: 'json_validated' }))).resolves.toMatchObject({
@@ -205,6 +261,19 @@ describe('explicit API JSON mode and complete-stream validation', () => {
   it('requires a JSON instruction without appending unreserved prompt tokens', async () => {
     await expect(adapter.generate(request({ messages: [{ role: 'user', content: 'Say hello.' }] })))
       .rejects.toMatchObject({ fact: { code: 'configuration_invalid', externalResult: 'not_sent' } });
+    expect(requestCount).toBe(0);
+  });
+
+  it('rejects missing or stale text JSON fields without modifying or dispatching messages', async () => {
+    for (const messages of [
+      [{ role: 'system', content: 'Only return JSON.' }],
+      [{ role: 'system', content: buildGenerationSchemaPrompt(z.object({ obsolete: z.string() })) }],
+    ]) {
+      const before = structuredClone(messages);
+      await expect(adapter.generate(request({ mode: 'json_validated', messages })))
+        .rejects.toMatchObject({ fact: { code: 'configuration_invalid', phase: 'preflight', externalResult: 'not_sent' } });
+      expect(messages).toEqual(before);
+    }
     expect(requestCount).toBe(0);
   });
 

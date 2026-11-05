@@ -14,9 +14,8 @@ export type DesktopView =
 export type DesktopNavigationView = Exclude<DesktopView, 'position-detail' | 'automation'>;
 
 export const desktopRoutes = [
-  { view: 'portfolio', path: '/portfolio', label: '投资组合' },
-  { view: 'position-entry', path: '/accounts', label: '账户数据' },
   { view: 'performance', path: '/performance', label: '收益分析' },
+  { view: 'position-entry', path: '/accounts', label: '账户数据' },
   { view: 'risk-center', path: '/risk-center', label: '风险中心' },
   { view: 'strategy', path: '/strategy', label: '策略中心' },
   { view: 'journal', path: '/journal', label: '投资复盘' },
@@ -34,4 +33,5 @@ export const desktopNavigation: readonly DesktopNavigationView[] = desktopRoutes
 );
 
 export const desktopPathForView = (view: DesktopView) =>
-  desktopRoutes.find((route) => route.view === view)?.path ?? null;
+  desktopRoutes.find((route) => route.view === (view === 'portfolio' ? 'performance' : view))
+    ?.path ?? null;

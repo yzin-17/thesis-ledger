@@ -1,4 +1,5 @@
 import type { Currency } from '@thesis-ledger/schemas';
+import { DsaError } from '../integration/dsa/dsa.client.js';
 import { roundMoney } from '@thesis-ledger/shared';
 
 import { calculatePositionDailyChange, findPreviousFundNav } from './portfolio-daily-change.js';
@@ -11,7 +12,7 @@ type PositionInput = {
   costPrice: unknown;
 };
 
-type PortfolioMarketReader = {
+export type PortfolioMarketReader = {
   getQuote: (symbol: string) => Promise<{
     price: number;
     previousClose?: number;
@@ -66,6 +67,7 @@ export const valuePortfolioPosition = async <T extends PositionInput>(
         ...daily,
         stale: nav.freshness === 'stale',
         freshness: nav.freshness,
+        navDate: nav.navDate,
       };
     }
     const quote = await market.getQuote(position.symbol);
@@ -102,8 +104,17 @@ export const valuePortfolioPosition = async <T extends PositionInput>(
       pnlRatio: null,
       dailyPnl: null,
       dailyReturn: null,
-      stale: true,
+      stale: false,
+      availabilityReason: availabilityReason(error),
       error: error instanceof Error ? error.message : '行情不可用',
     };
   }
 };
+
+function availabilityReason(error: unknown): 'disabled' | 'not_selected' | 'not_eligible' | 'unavailable' {
+  if (error instanceof DsaError && error.code === 'control-rejected') {
+    const reason = error.sourceReason;
+    if (reason === 'disabled' || reason === 'not_selected' || reason === 'not_eligible') return reason;
+  }
+  return 'unavailable';
+}

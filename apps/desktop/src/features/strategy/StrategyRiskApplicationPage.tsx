@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { requestFailureMessage } from '@/shared/api/request-error';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { strategySchema } from '@thesis-ledger/schemas';
 import { AlertTriangle, ArrowLeft, Bell, ExternalLink, ShieldCheck } from 'lucide-react';
-import { Link, useBeforeUnload, useBlocker, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
+import { useOptionalPortfolioMode } from '../portfolio/portfolio-mode-context.js';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +40,7 @@ import {
   previewStrategyRiskApplication,
   type RiskApplicationPreview,
   type StrategyRiskNotification,
+  type StrategyRiskApplication,
 } from './strategy-optimization.api.js';
 import {
   strategyCenterPath,
@@ -97,19 +101,13 @@ export function StrategyRiskApplicationPage({
   const [previewInvalidated, setPreviewInvalidated] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [dirty, setDirty] = useState(false);
+  const [savedApplicationId, setSavedApplicationId] = useState<string | null>(null);
   const [closeRequested, setCloseRequested] = useState(false);
   const allowNavigationRef = useRef(false);
-  const blocker = useBlocker(() => dirty && !allowNavigationRef.current);
-  useBeforeUnload(
-    (event) => {
-      if (!dirty || allowNavigationRef.current) return;
-      event.preventDefault();
-    },
-    { capture: true },
-  );
-  useEffect(() => {
-    if (blocker.state === 'blocked') setCloseRequested(true);
-  }, [blocker.state]);
+  const operationBusy = useRef(false);
+  const saveErrorToastId = useRef<string | null>(null);
+  useNavigationGuard({ dirty, busy: operationBusy.current,
+    bypass: () => allowNavigationRef.current });
   const accounts = useQuery({
     queryKey: ['desktop', 'accounts'],
     queryFn: () => fetchAccounts(),
@@ -128,7 +126,8 @@ export function StrategyRiskApplicationPage({
     setNotificationChannel(nextChannel);
     if (!nextChannel) setNotificationEnabled(false);
   }, [notificationRoutes, notificationRoutingState, selectedNotificationRoute]);
-  const actualAccounts = (accounts.data ?? []).filter(
+  const globalMode = useOptionalPortfolioMode()?.mode ?? 'actual';
+  const actualAccounts = (globalMode === 'shadow' ? [] : accounts.data ?? []).filter(
     (account) => account.mode === 'actual' && account.active !== false && account.type !== 'cash',
   );
   const selectedAccount = actualAccounts.find((account) => account.id === accountId);
@@ -171,6 +170,8 @@ export function StrategyRiskApplicationPage({
     matchingIds: sameIdentityIds,
   });
   const previewMutation = useMutation({
+    onMutate: () => { operationBusy.current = true; },
+    onSettled: () => { operationBusy.current = false; },
     mutationFn: () => {
       if (!source || !accountId || !symbol) throw new Error('请选择可用账户');
       return previewStrategyRiskApplication({
@@ -189,11 +190,17 @@ export function StrategyRiskApplicationPage({
     onError: (error) =>
       toast.add({
         title: '预览失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
+        description: requestFailureMessage(error, '请稍后重试'),
         type: 'error',
       }),
   });
   const createMutation = useMutation({
+    onMutate: () => {
+      operationBusy.current = true;
+      if (saveErrorToastId.current) toast.close?.(saveErrorToastId.current);
+      saveErrorToastId.current = null;
+    },
+    onSettled: () => { operationBusy.current = false; },
     mutationFn: (enabled: boolean) => {
       const cooldown = parseCooldownMinutes(cooldownMinutes);
       if (!source || !preview || preview.fingerprint !== currentFingerprint)
@@ -221,12 +228,18 @@ export function StrategyRiskApplicationPage({
       });
     },
     onSuccess: async (application) => {
+      setSavedApplicationId(application.id);
+      queryClient.setQueryData<StrategyRiskApplication[]>(
+        [...riskApplicationKey, accountId, symbol],
+        (previous = []) => [...previous.filter((item) => item.id !== application.id), application],
+      );
       await queryClient.invalidateQueries({ queryKey: riskApplicationKey });
       toast.add({
         title: application.applicationResolution ? '已定位已有风险应用' : '风险应用已保存',
         description: application.enabled ? '应用当前已启用。' : '应用已保存为停用。',
       });
       setDirty(false);
+      if (queryClient.getQueryState([...riskApplicationKey, accountId, symbol])?.status === 'error') return;
       allowNavigationRef.current = true;
       const sourcePath = source
         ? strategyCenterPath.strategyVersion(source.strategy.id, source.version.id)
@@ -243,14 +256,15 @@ export function StrategyRiskApplicationPage({
         setPreviewInvalidated(true);
         setIdempotencyKey(crypto.randomUUID());
       }
-      toast.add({
+      saveErrorToastId.current = toast.add({
         title: '保存风险应用失败',
-        description: message,
+        description: requestFailureMessage(error, '请刷新状态后重试'),
         type: 'error',
       });
     },
   });
 
+  const busy = previewMutation.isPending || createMutation.isPending;
   if (!source) {
     return (
       <Alert variant="destructive">
@@ -292,11 +306,15 @@ export function StrategyRiskApplicationPage({
       : '当前无持仓';
   const submitDisabled =
     createMutation.isPending ||
+    previewMutation.isPending ||
+    accounts.isError || applications.isError ||
+    Boolean(savedApplicationId) ||
     !previewReady ||
     sameIdentity.length > 0 ||
     (notificationEnabled && !selectedNotificationRoute);
   const sourcePath = strategyCenterPath.strategyVersion(source.strategy.id, source.version.id);
   const requestClose = () => {
+    if (operationBusy.current) return;
     if (dirty) {
       setCloseRequested(true);
       return;
@@ -307,13 +325,10 @@ export function StrategyRiskApplicationPage({
     });
   };
   const discardAndClose = () => {
+    if (operationBusy.current) return;
     setDirty(false);
     setCloseRequested(false);
     allowNavigationRef.current = true;
-    if (blocker.state === 'blocked') {
-      blocker.proceed();
-      return;
-    }
     void navigate(sourcePath, {
       state: strategyCenterFocusState(strategyCenterTriggerId.riskApplication),
     });
@@ -365,6 +380,14 @@ export function StrategyRiskApplicationPage({
         </>
       ) : null}
 
+      {globalMode === 'shadow' && <Alert><AlertTitle>策略风险应用仅支持实际账户</AlertTitle><AlertDescription>当前为模拟范围。请先使用全局开关切换到实际，再选择账户；已保存应用的归属不变。</AlertDescription></Alert>}
+      {savedApplicationId ? (
+        <Alert>
+          <AlertTitle>风险应用已保存</AlertTitle>
+          <AlertDescription>无需再次保存。当前读取恢复后，可关闭本页查看来源版本。</AlertDescription>
+        </Alert>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>应用配置</CardTitle>
@@ -378,6 +401,7 @@ export function StrategyRiskApplicationPage({
               <FieldLabel>实际证券账户</FieldLabel>
               <Select
                 value={accountId}
+                disabled={busy || Boolean(savedApplicationId)}
                 onValueChange={(value) => {
                   if (!value) return;
                   setAccountId(value);
@@ -405,6 +429,7 @@ export function StrategyRiskApplicationPage({
               <FieldLabel>生效范围</FieldLabel>
               <Select
                 value={cycleMode}
+                disabled={busy || Boolean(savedApplicationId)}
                 onValueChange={(value) => {
                   if (!value) return;
                   setCycleMode(value);
@@ -441,7 +466,7 @@ export function StrategyRiskApplicationPage({
                   setNotificationEnabled(checked);
                   setDirty(true);
                 }}
-                disabled={!notificationEnabled && !selectedNotificationRoute}
+                disabled={busy || Boolean(savedApplicationId) || (!notificationEnabled && !selectedNotificationRoute)}
                 variant="risk"
                 aria-label="风险通知"
               >
@@ -457,6 +482,7 @@ export function StrategyRiskApplicationPage({
                   <FieldLabel>严重级别</FieldLabel>
                   <Select
                     value={notificationSeverity}
+                    disabled={busy || Boolean(savedApplicationId)}
                     onValueChange={(value) => {
                       if (!value) return;
                       setNotificationSeverity(value);
@@ -483,6 +509,7 @@ export function StrategyRiskApplicationPage({
                   <FieldLabel>冷却时间（分钟）</FieldLabel>
                   <Input
                     value={cooldownMinutes}
+                    disabled={busy || Boolean(savedApplicationId)}
                     type="number"
                     min="0"
                     max="10080"
@@ -495,6 +522,7 @@ export function StrategyRiskApplicationPage({
                 <Field>
                   <FieldLabel>通知渠道</FieldLabel>
                   <NotificationRouteSelect
+                    disabled={busy || Boolean(savedApplicationId)}
                     routes={notificationRoutes}
                     routingState={notificationRoutingState}
                     value={notificationChannel}
@@ -512,7 +540,14 @@ export function StrategyRiskApplicationPage({
           {accounts.isPending ? (
             <p className="text-sm text-muted-foreground">正在读取账户…</p>
           ) : null}
-          {actualAccounts.length === 0 && !accounts.isPending ? (
+          {accounts.isError || applications.isError ? (
+            <Alert variant="destructive">
+              <AlertTitle>账户或风险应用读取失败</AlertTitle>
+              <AlertDescription>已保存的应用无需再次提交；请先重新读取当前状态。</AlertDescription>
+              <Button variant="outline" disabled={accounts.isFetching || applications.isFetching} onClick={() => { void accounts.refetch(); if (accountId) void applications.refetch(); }}>重新读取应用状态</Button>
+            </Alert>
+          ) : null}
+          {actualAccounts.length === 0 && !accounts.isPending && !accounts.isError ? (
             <Alert>
               <AlertTitle>没有可用实际证券账户</AlertTitle>
               <AlertDescription>请先在账户数据中创建并启用实际证券账户。</AlertDescription>
@@ -530,7 +565,7 @@ export function StrategyRiskApplicationPage({
             <Badge variant="outline">执行标的 {symbol}</Badge>
             <Button
               variant="outline"
-              disabled={!accountId || previewMutation.isPending || sameIdentity.length > 0}
+              disabled={!selectedAccount || busy || accounts.isError || applications.isError || Boolean(savedApplicationId) || sameIdentity.length > 0}
               onClick={() => previewMutation.mutate()}
             >
               {previewMutation.isPending ? '正在预览…' : '预览风险规则'}
@@ -701,12 +736,11 @@ export function StrategyRiskApplicationPage({
                       size="sm"
                       onClick={() => {
                         setCloseRequested(false);
-                        if (blocker.state === 'blocked') blocker.reset();
                       }}
                     >
                       继续编辑
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={discardAndClose}>
+                    <Button variant="destructive" size="sm" disabled={busy} onClick={discardAndClose}>
                       放弃并关闭
                     </Button>
                   </div>

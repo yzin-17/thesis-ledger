@@ -1,12 +1,14 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import type { TradeListQuery } from '@thesis-ledger/api-client';
-import { fetchPortfolioTrade, fetchPortfolioTrades } from './portfolio-trade.api.js';
+import { fetchPortfolioTrade, fetchPortfolioTrades, fetchPortfolioTradeInstruments } from './portfolio-trade.api.js';
 import type { PortfolioMode } from './portfolio.types.js';
 
 export type PortfolioTradeLifecycle = 'ALL' | 'ACTIVE' | 'ENDED';
 
 export const portfolioTradeKeys = {
   root: ['desktop', 'portfolio-trades'] as const,
+  instruments: (mode: PortfolioMode, accountId: string) =>
+    [...portfolioTradeKeys.root, 'instruments', mode, accountId || 'all'] as const,
   list: (
     mode: PortfolioMode,
     accountId: string,
@@ -16,6 +18,13 @@ export const portfolioTradeKeys = {
   detail: (mode: PortfolioMode, accountId: string, tradeId: string) =>
     [...portfolioTradeKeys.root, 'detail', mode, accountId, tradeId] as const,
 };
+
+export const usePortfolioTradeInstrumentsQuery = (mode: PortfolioMode, accountId: string) => useQuery({
+  queryKey: portfolioTradeKeys.instruments(mode, accountId),
+  queryFn: ({ signal }) => fetchPortfolioTradeInstruments(mode, accountId || undefined, signal),
+  staleTime: 30_000,
+  retry: false,
+});
 
 export const usePortfolioTradesQuery = ({
   mode,

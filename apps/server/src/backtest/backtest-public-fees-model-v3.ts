@@ -5,6 +5,7 @@ import {
   type MarketPublicFeesResponseV3,
   type BacktestExecutionModelV3,
 } from '@thesis-ledger/schemas';
+import { DecimalValue } from '@thesis-ledger/domain';
 
 const shiftDate = (date: string, days: number) =>
   new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -17,6 +18,10 @@ export const combinePublicFeesExecutionModelV3 = (
   dataAsOf?: string,
 ): BacktestExecutionModelV3 => {
   const scope = model.scope;
+  if (scope.market === 'CN' && scope.instrumentType === 'ETF' &&
+      response.segments.some((segment) => segment.charges.length !== charges.length) &&
+      !response.provenance.coverageDescription?.trim())
+    throw new Error('ETF部分公共收费缺少覆盖说明');
   if (response.segments.some((segment) => segment.charges.some((charge) => charge.basis === 'actualShares')) &&
     model.segments.some((segment) => segment.execution.mode === 'exchange' && segment.execution.normalizedExecution))
     throw new Error('实际股数公共收费不能绑定归一化数量');
@@ -52,7 +57,7 @@ export const combinePublicFeesExecutionModelV3 = (
     }
     next = segment.range.endExclusive;
     if (
-      (scope.market === 'CN' && segment.charges.length !== charges.length) ||
+      (scope.market === 'CN' && scope.instrumentType === 'STOCK' && segment.charges.length !== charges.length) ||
       new Set(segment.charges.map((charge) => charge.code)).size !== segment.charges.length ||
       segment.charges.some((charge) => charge.currency !== scope.currency)
     ) {
@@ -74,8 +79,14 @@ export const combinePublicFeesExecutionModelV3 = (
       const fees: Record<string, unknown> = { ...original.fees };
       for (const charge of source.charges) {
         const selected = original.fees[charge.code];
-        if (!selected || selected.treatment === 'notApplicable') {
+        if (!selected) {
           throw new Error('已选模型缺少公共费项的金额计算设置');
+        }
+        if (selected.treatment === 'notApplicable') {
+          if (!DecimalValue.from(charge.rate).isZero())
+            throw new Error('已选模型缺少公共费项的金额计算设置');
+          fees[charge.code] = { ...selected, reason: `${selected.reason}；已选公共来源明确费率为0。` };
+          continue;
         }
         if (selected.treatment === 'charged') {
           fees[charge.code] = {

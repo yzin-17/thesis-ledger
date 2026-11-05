@@ -1,7 +1,15 @@
 import { z } from 'zod';
+import { aiTimeoutDurationSchema } from '@thesis-ledger/schemas';
 import {
+  aiProviderModelDefaultConfigSchema,
+  type AiProviderModelDefaultConfig,
   aiOutputPolicySchema,
+  aiProviderModelCatalogConfigSchema,
+  aiProviderModelCatalogInputSchema,
+  refineAiProviderModelCatalogOrigin,
+  type AiProviderModelCatalogConfig,
   aiChatImplementationSchema,
+  aiCompatibilityExtensionProfileSchema,
   aiAuthModeSchema,
   aiProviderTestKindSchema,
   aiGenerationContractRefSchema,
@@ -14,6 +22,7 @@ import {
 } from '@thesis-ledger/schemas';
 import type { AiAuthMode, AiProviderTestKind } from '@thesis-ledger/schemas';
 import type { ProviderState } from '../providers/provider-health.service.js';
+import { isResearchV2Contract } from './ai-research-reasoning-options.js';
 
 export const httpUrl = z.url().refine((value) => {
   try {
@@ -69,10 +78,8 @@ export const aiProviderModelPricingInputSchema = z
 
 export type AiProviderModelPricingInput = z.infer<typeof aiProviderModelPricingInputSchema>;
 
-export const aiProviderModelDefaultConfigSchema = z
-  .object({ mode: aiGenerationModeSchema, outputPolicy: aiOutputPolicySchema.optional() })
-  .strict();
-export type AiProviderModelDefaultConfig = z.infer<typeof aiProviderModelDefaultConfigSchema>;
+export { aiProviderModelDefaultConfigSchema };
+export type { AiProviderModelDefaultConfig };
 
 const modelDefaultsSchema = z
   .record(z.string().trim().min(1).max(200), aiProviderModelDefaultConfigSchema)
@@ -129,10 +136,18 @@ export const aiProviderExecutionRouteInputSchema = z.preprocess(
       enabled: z.boolean().optional(),
       modeOverridden: z.boolean().optional(),
       contract: aiGenerationContractRefSchema,
-      firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
-      outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
+      firstOutputTimeoutMs: aiTimeoutDurationSchema.optional(),
+      outputIdleTimeoutMs: aiTimeoutDurationSchema.optional(),
+      reasoningEnabled: z.boolean().optional(),
+      reasoningEffort: reasoningEffortSchema.optional(),
     })
-    .strict(),
+    .strict()
+    .refine(
+      (route) => route.reasoningEnabled === undefined || isResearchV2Contract(route.contract),
+      { path: ['reasoningEnabled'], message: '显式推理开关仅适用于研究 V2' },
+    )
+    .refine((route) => route.reasoningEnabled === undefined || route.reasoningEffort === undefined,
+      { path: ['reasoningEffort'], message: '推理开关和推理强度不能同时指定' }),
 );
 
 export type AiProviderExecutionRouteInput = z.infer<typeof aiProviderExecutionRouteInputSchema>;
@@ -155,9 +170,11 @@ export const aiProviderInputSchema = z
     name: z.string().trim().min(1).max(120),
     baseUrl: httpUrl,
     models: z.array(z.string().trim().min(1).max(200)).min(1).max(32),
+    modelCatalog: aiProviderModelCatalogConfigSchema.nullable().optional(),
     authMode: aiAuthModeSchema.default('api_key'),
     upstreamFormat: aiUpstreamFormatSchema.default('chat-completions'),
     chatImplementation: aiChatImplementationSchema.optional(),
+    compatibilityExtensionProfile: aiCompatibilityExtensionProfileSchema.optional(),
     executionRoutes: z.array(aiProviderExecutionRouteInputSchema).max(96).optional(),
     modelDefaults: modelDefaultsSchema,
     modelPricing: modelPricingSchema.optional(),
@@ -167,9 +184,9 @@ export const aiProviderInputSchema = z
     enabled: z.boolean().optional(),
     priority: z.number().int().nonnegative().optional().default(100),
     capabilities: z.array(z.string().trim().min(1).max(80)).min(1).max(32).optional(),
-    timeoutMs: z.number().int().positive().max(120_000).optional(),
-    firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
-    outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
+    timeoutMs: aiTimeoutDurationSchema.optional(),
+    firstOutputTimeoutMs: aiTimeoutDurationSchema.optional(),
+    outputIdleTimeoutMs: aiTimeoutDurationSchema.optional(),
     costPer1kInput: z.number().nonnegative().optional(),
     costPer1kOutput: z.number().nonnegative().optional(),
     costCurrency: z.string().trim().min(1).max(16).optional(),
@@ -178,6 +195,17 @@ export const aiProviderInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    refineAiProviderModelCatalogOrigin(value, context);
+    if (
+      value.compatibilityExtensionProfile &&
+      (value.upstreamFormat !== 'chat-completions' ||
+        (value.chatImplementation ?? 'compatible') !== 'compatible')
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['compatibilityExtensionProfile'],
+        message: 'OpenRouter 兼容扩展仅适用于兼容 Chat Completions 实现',
+      });
     const selection = aiUpstreamSelectionSchema.safeParse({
       upstreamFormat: value.upstreamFormat,
       ...(value.chatImplementation === undefined
@@ -284,23 +312,9 @@ export type AiProviderTestInput = z.infer<typeof aiProviderTestInputSchema>;
 
 export const aiProviderTestCancelInputSchema = z.object({ requestId: z.uuid() }).strict();
 
-export type AiProviderSource = 'database' | 'environment';
+export type AiProviderSource = 'database';
 
-export const aiProviderModelCatalogInputSchema = z
-  .object({
-    name: z.string().trim().min(1).max(120).optional(),
-    baseUrl: httpUrl,
-    authMode: aiAuthModeSchema.default('api_key'),
-    upstreamFormat: aiUpstreamFormatSchema.optional(),
-    apiKey: z.string().trim().min(1).max(10_000).optional(),
-    credentialsRef: z.string().trim().min(1).max(10_000).optional(),
-    timeoutMs: z.number().int().positive().max(120_000).optional(),
-  })
-  .strict()
-  .superRefine((value, context) => {
-    if (value.apiKey && value.credentialsRef)
-      context.addIssue({ code: 'custom', path: ['apiKey'], message: 'API Key 只能填写一个字段' });
-  });
+export { aiProviderModelCatalogInputSchema };
 
 export type AiProviderModelCatalogInput = z.infer<typeof aiProviderModelCatalogInputSchema>;
 
@@ -332,6 +346,7 @@ export interface AiProviderSummary {
   executionRoutes?: AiProviderModelExecution[];
   modelPricing?: Record<string, AiProviderModelPricingView> | undefined;
   modelReasoning?: Record<string, AiProviderModelReasoning>;
+  modelCatalog?: AiProviderModelCatalogConfig;
   timeoutMs?: number;
   firstOutputTimeoutMs?: number;
   outputIdleTimeoutMs?: number;
@@ -362,6 +377,7 @@ export interface AiProviderTestResult {
   mode?: z.infer<typeof aiGenerationModeSchema>;
   model?: string;
   latencyMs?: number;
+  actualModel?: string | null;
   usage?: AiUsageFacts;
   cost?: AiCostFacts;
   errorCode?: string;

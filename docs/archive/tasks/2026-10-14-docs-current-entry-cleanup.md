@@ -19,7 +19,7 @@
 
 通过。当前入口由[文档导航](../../README.md)和[任务索引](../../tasks/README.md)维护，当前 Task 正文由 49 份降为 33 份；原目录的 50 个短跳转不属于当前任务。归档保留全部历史正文，仓库证据总量不因本轮归档减少。
 
-状态修正包括策略编写、BarSeries 缓存、聚合快照和策略中心已完成范围；[历史按需任务](../../tasks/2026-10-09-history-data-on-demand.md#d-line-closeout)的 D1～D5 已闭合，当前只保留合格摘牌窗口的正向消费条件。[统一适配任务](../../tasks/2026-10-09-unified-data-capability-adapter.md)保留事件父项、RQ 与 Tushare 正向真实现金条件，不要求重新开户、采购或重复探测。Portfolio、Cash、Scheduler、AI、Market Consumer、RouteTarget 性能与富途 FAPI-M1～M4 的原验收仍由各正式任务拥有。
+状态修正包括策略编写、BarSeries 缓存、聚合快照和策略中心已完成范围；[历史按需任务](2026-10-09-history-data-on-demand.md#d-line-closeout)的 D1～D5 已闭合，当前只保留合格摘牌窗口的正向消费条件。[统一适配任务](../../tasks/2026-10-09-unified-data-capability-adapter.md)保留事件父项、RQ 与 Tushare 正向真实现金条件，不要求重新开户、采购或重复探测。Portfolio、Cash、Scheduler、AI、Market Consumer、RouteTarget 性能与富途 FAPI-M1～M4 的原验收仍由各正式任务拥有。
 
 [TODO](../../TODO.md)区分富途当前历史 1m 子集与通用分钟范围，校正分页、历史规则和 AI 的已有实现边界；仅新增已有 Spec 明确后续按需补充的规则来源更新监测。取消事项、正常范围排除和已有正式后继均不新增 TODO。
 

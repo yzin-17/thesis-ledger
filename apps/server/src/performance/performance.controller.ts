@@ -5,10 +5,12 @@ import {
   performanceCalculateInputSchema,
   performanceTargetsInputSchema,
   performanceSeriesQuerySchema,
+  performancePnlQuerySchema,
   currencySchema,
 } from '@thesis-ledger/schemas';
 import { PerformanceService } from './performance.service.js';
 import { PerformanceValuationSeriesService } from './performance-valuation-series.service.js';
+import { PerformancePnlSeriesService } from './performance-pnl-series.service.js';
 
 const parseFxMerge = (value?: string) => value === 'true';
 const parseBaseCurrency = (value?: string) => currencySchema.parse(value ?? 'CNY');
@@ -18,7 +20,13 @@ export class PerformanceController {
   constructor(
     private readonly performance: PerformanceService,
     private readonly valuationSeries: PerformanceValuationSeriesService,
+    private readonly pnlSeries: PerformancePnlSeriesService,
   ) {}
+
+  @Get('pnl-series')
+  pnl(@Query() query: unknown) {
+    return this.pnlSeries.series(performancePnlQuerySchema.parse(query));
+  }
 
   @Get('series')
   series(

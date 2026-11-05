@@ -1,12 +1,10 @@
 import { validateTargetDraft, type TargetRow } from './performance.target-draft.js';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch, SwitchThumb } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -18,10 +16,8 @@ import {
 import { AlertTriangle, Plus } from 'lucide-react';
 import { normalizeAllocationCategory, normalizeAllocationTargets } from '@thesis-ledger/domain';
 
-import { accountDisplayLabel, type Account } from '../portfolio/portfolio.types.js';
 import { PerformanceTargetActions } from './PerformanceTargetActions.js';
 import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
-import { money } from '../shared/display.js';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import type {
   AllocationCategory,
@@ -29,16 +25,15 @@ import type {
   PerformanceDataQuality,
   PerformanceFxMeta,
   PerformancePortfolioTotal,
-  PerformanceSummary,
-  PortfolioMode,
   RebalanceGapRecord,
-  SnapshotRecord,
   Currency,
 } from './performance.types.js';
 
+import { formatDate, formatMoney } from './performance-display.js';
+export { PerformanceMetrics } from './PerformanceMetrics.js';
+
 export { PerformanceSnapshotTable } from './PerformanceTrendSection.js';
 
-const ALL_ACCOUNTS_VALUE = '__all_accounts__';
 const CATEGORY_ORDER: AllocationCategory[] = ['stock', 'etf', 'fund', 'index', 'cash'];
 const CATEGORY_LABELS: Record<AllocationCategory, string> = {
   stock: '股票',
@@ -47,15 +42,6 @@ const CATEGORY_LABELS: Record<AllocationCategory, string> = {
   index: '指数',
   cash: '现金',
 };
-
-const moneyByCurrency: Record<Currency, Intl.NumberFormat> = {
-  CNY: money,
-  HKD: new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'HKD' }),
-  USD: new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'USD' }),
-};
-
-const formatMoney = (value: number, currency?: Currency) =>
-  (currency ? moneyByCurrency[currency] : money).format(value);
 
 const formatWeight = (weight: number | null | undefined) => {
   if (weight === null || weight === undefined || !Number.isFinite(weight)) return '—';
@@ -93,322 +79,7 @@ const WeightBar = ({
   );
 };
 
-const formatDate = (value?: string | null) => {
-  if (!value) return '尚无数据时点';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '尚无数据时点' : date.toLocaleString('zh-CN');
-};
-
-const snapshotValue = (snapshot: SnapshotRecord) => snapshot.marketValue + snapshot.cashValue;
-
-const signedMoney = (value: number, currency?: Currency) =>
-  value >= 0 ? `+${formatMoney(value, currency)}` : formatMoney(value, currency);
-
-const signedPercent = (value: number) => {
-  const formatted = `${Math.abs(value * 100).toFixed(2)}%`;
-  return value >= 0 ? `+${formatted}` : `-${formatted}`;
-};
-
-export function PerformanceAccountSelector({
-  accounts,
-  mode,
-  accountId,
-  mixedCurrencies,
-  latestSnapshotAt,
-  valuedAt,
-  onAccountChange,
-  fxMerge,
-  baseCurrency,
-  onFxMergeChange,
-  onBaseCurrencyChange,
-  onRetry,
-  fx,
-}: {
-  accounts: Account[];
-  mode: PortfolioMode;
-  accountId: string;
-  mixedCurrencies: boolean;
-  latestSnapshotAt?: string | undefined;
-  valuedAt?: string | undefined;
-  onAccountChange: (accountId: string) => void;
-  fxMerge?: boolean;
-  baseCurrency?: 'CNY' | 'HKD' | 'USD';
-  onFxMergeChange?: (checked: boolean) => void;
-  onBaseCurrencyChange?: (currency: 'CNY' | 'HKD' | 'USD') => void;
-  onRetry?: (() => void) | undefined;
-  fx?: PerformanceFxMeta | undefined;
-}) {
-  const resolvedFxMerge = fxMerge ?? false;
-  const resolvedBaseCurrency = baseCurrency ?? 'CNY';
-  const handleFxMergeChange = onFxMergeChange ?? (() => undefined);
-  const handleBaseCurrencyChange = onBaseCurrencyChange ?? (() => undefined);
-  const fxAvailable = mixedCurrencies && !accountId;
-  const modeAccounts = accounts.filter(
-    (account) => account.mode === mode && account.active !== false,
-  );
-  const selectedAccount = modeAccounts.find((account) => account.id === accountId);
-  const statusDate = latestSnapshotAt ?? valuedAt;
-  const statusLabel = statusDate
-    ? `数据截至 ${formatDate(statusDate)} · ${latestSnapshotAt ? '有收益快照' : '暂无收益快照'}`
-    : '数据截至 -- · 暂无估值快照';
-  const fxDate = fx?.asOf ? formatDate(fx.asOf) : undefined;
-  let fxStatusLabel = '当前无需换算';
-  if (fxAvailable && !resolvedFxMerge) fxStatusLabel = '分币种显示 · 未合并';
-  else if (fx?.status === 'ready') fxStatusLabel = `已换算至 ${resolvedBaseCurrency}`;
-  else if (fx?.status === 'stale')
-    fxStatusLabel = `已换算至 ${resolvedBaseCurrency} · 使用陈旧汇率`;
-  else if (fx?.status === 'blocked') fxStatusLabel = '无法获取汇率，保留分币种结果';
-  let mixedCurrencyHint = '';
-  if (mixedCurrencies && !fxAvailable)
-    mixedCurrencyHint = '当前模式包含多个币种；当前已选择单个账户，金额使用该账户原币种。';
-  else if (fxAvailable && resolvedFxMerge)
-    mixedCurrencyHint = '合并仅影响收益分析展示，不改变账本、持仓或目标配置的原始币种。';
-  else if (fxAvailable)
-    mixedCurrencyHint =
-      '当前模式包含多个币种；关闭汇率合并时按币种分组展示，不计算跨币种目标偏差或再平衡。';
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex min-w-0 basis-full items-center gap-2 text-sm text-muted-foreground sm:basis-auto">
-          <span className="shrink-0">账户</span>
-          <Select
-            value={accountId || ALL_ACCOUNTS_VALUE}
-            onValueChange={(value) => {
-              onAccountChange(value === ALL_ACCOUNTS_VALUE ? '' : (value ?? ''));
-            }}
-          >
-            <SelectTrigger aria-label="账户" className="w-full sm:w-72">
-              <SelectValue>
-                {selectedAccount ? accountDisplayLabel(selectedAccount) : '全部账户'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value={ALL_ACCOUNTS_VALUE}>全部账户</SelectItem>
-                {modeAccounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {accountDisplayLabel(account)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
-          <span>汇率合并</span>
-          <Switch
-            variant="risk"
-            checked={resolvedFxMerge}
-            disabled={!fxAvailable}
-            aria-label={fxAvailable ? '汇率合并' : '当前范围无需汇率换算'}
-            onCheckedChange={handleFxMergeChange}
-          >
-            <SwitchThumb variant="risk" aria-hidden="true" />
-          </Switch>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
-          <span>基准币种</span>
-          <Select
-            value={resolvedBaseCurrency}
-            disabled={!fxAvailable || !resolvedFxMerge}
-            onValueChange={(value) => {
-              if (value === 'CNY' || value === 'HKD' || value === 'USD')
-                handleBaseCurrencyChange(value);
-            }}
-          >
-            <SelectTrigger aria-label="基准币种" className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="CNY">CNY</SelectItem>
-                <SelectItem value="HKD">HKD</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground sm:justify-end">
-        <p className="m-0">
-          {fxStatusLabel}
-          {fxDate ? ` · 汇率截至 ${fxDate}` : ''}
-          {resolvedFxMerge && fx?.estimated ? ' · 按当前汇率回算 · 估算' : ''}
-          {` · ${statusLabel}`}
-        </p>
-        {fxAvailable && resolvedFxMerge && fx?.status === 'blocked' && onRetry ? (
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-7 px-0 text-xs"
-            onClick={onRetry}
-          >
-            重新获取汇率
-          </Button>
-        ) : null}
-      </div>
-      {mixedCurrencies ? (
-        <p className="m-0 text-xs text-muted-foreground">{mixedCurrencyHint}</p>
-      ) : null}
-    </div>
-  );
-}
-
-const performanceToneClass = (tone: 'up' | 'down' | undefined) => {
-  if (tone === 'up') return 'm-0 text-xs text-[var(--color-market-up)]';
-  if (tone === 'down') return 'm-0 text-xs text-[var(--color-market-down)]';
-  return 'm-0 text-xs text-muted-foreground';
-};
-
-const PerformanceKpiCard = ({
-  label,
-  value,
-  detail,
-  tone,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  tone: 'up' | 'down' | undefined;
-}) => (
-  <Card className="h-[120px] rounded-xl border border-border/70 bg-muted/25 py-0 shadow-none ring-0">
-    <CardContent className="flex h-full flex-col justify-between p-4">
-      <p className="m-0 text-xs text-muted-foreground">{label}</p>
-      <strong className="block text-2xl font-semibold tracking-tight text-foreground">
-        {value}
-      </strong>
-      <p className={performanceToneClass(tone)}>{detail}</p>
-    </CardContent>
-  </Card>
-);
-
-export function PerformanceMetrics({
-  latest,
-  summary,
-  snapshotCount,
-  summaryError,
-  latestPartial,
-  currentValue,
-  currentValuePartial,
-  currentPnl,
-  currentPnlRate,
-  currentCurrency,
-  currencyTotals = [],
-  fx,
-}: {
-  latest: SnapshotRecord | undefined;
-  summary: PerformanceSummary | null;
-  snapshotCount: number;
-  summaryError?: string | undefined;
-  latestPartial?: boolean | undefined;
-  currentValue?: number | undefined;
-  currentValuePartial?: boolean | undefined;
-  currentPnl?: number | null | undefined;
-  currentPnlRate?: number | null | undefined;
-  currentCurrency?: Currency | undefined;
-  currencyTotals?: PerformancePortfolioTotal[];
-  fx?: PerformanceFxMeta | undefined;
-}) {
-  const resolvedFx = fx ?? summary?.fx;
-  const hasCurrentValue = currentValue !== undefined && Number.isFinite(currentValue);
-  const hasSnapshotValue = latest !== undefined && !latest.partial;
-  const snapshotPartial = latestPartial ?? latest?.partial === true;
-  let assetValue = '—';
-  if (hasCurrentValue) assetValue = formatMoney(currentValue, currentCurrency);
-  else if (hasSnapshotValue) assetValue = formatMoney(snapshotValue(latest), latest.currency);
-
-  let assetDetail = '暂无即时估值';
-  if (currentValuePartial) assetDetail = '当前估值，行情不完整';
-  else if (hasCurrentValue) {
-    if (
-      currentPnl !== null &&
-      currentPnl !== undefined &&
-      currentPnlRate !== null &&
-      currentPnlRate !== undefined
-    ) {
-      assetDetail = `较持仓成本 ${signedMoney(currentPnl, currentCurrency)} · ${signedPercent(currentPnlRate)}`;
-    } else {
-      assetDetail = '当前估值';
-    }
-  } else if (hasSnapshotValue) {
-    if (snapshotPartial) {
-      assetDetail = `最近完整快照 ${formatDate(latest.capturedAt)} · 最新快照缺行情`;
-    } else {
-      assetDetail = `最近完整快照 ${formatDate(latest.capturedAt)}`;
-    }
-  } else if (currencyTotals.length > 1) assetDetail = '分币种估值 · 开启汇率合并查看合计';
-  else if (snapshotPartial) assetDetail = '行情不完整，尚无完整估值';
-  let assetTone: 'up' | 'down' | undefined;
-  if (currentPnlRate !== null && currentPnlRate !== undefined) {
-    if (currentPnlRate > 0) assetTone = 'up';
-    else if (currentPnlRate < 0) assetTone = 'down';
-  }
-  const canCalculateTtwror = summary !== null && summary.ttwror !== null && snapshotCount >= 2;
-  let ttwrorValue = '—';
-  if (summary && summary.ttwror !== null && snapshotCount >= 2)
-    ttwrorValue = `${(summary.ttwror * 100).toFixed(2)}%`;
-  let ttwrorDetail = '需要 ≥ 2 个快照';
-  if (summaryError) ttwrorDetail = summaryError;
-  else if (canCalculateTtwror) ttwrorDetail = '不混入外部现金流';
-  else if (summary?.xirrReason) ttwrorDetail = summary.xirrReason;
-  if (resolvedFx?.status === 'stale') ttwrorDetail = '按当前汇率回算 · 估算 · 使用陈旧汇率';
-  if (resolvedFx?.status === 'blocked') ttwrorDetail = '无法获取汇率，暂不可计算合并收益';
-  const canDisplayXirr = summary?.xirr !== null && summary?.xirr !== undefined;
-  let xirrValue = '—';
-  if (summary && summary.xirr !== null && summary.xirr !== undefined) {
-    xirrValue = `${(summary.xirr * 100).toFixed(2)}%`;
-  }
-  let xirrDetail = '现金流不足或无法收敛';
-  if (summaryError) xirrDetail = summaryError;
-  else if (canDisplayXirr) xirrDetail = '基于账本现金流';
-  else if (snapshotCount < 2) xirrDetail = '需要 ≥ 2 个现金流节点';
-  else if (summary?.xirrReason) xirrDetail = summary.xirrReason;
-  if (resolvedFx?.status === 'stale') xirrDetail = '按当前汇率回算 · 估算 · 使用陈旧汇率';
-  if (resolvedFx?.status === 'blocked') xirrDetail = '无法获取汇率，暂不可计算合并收益';
-  return (
-    <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <PerformanceKpiCard
-          label="总资产"
-          value={assetValue}
-          detail={assetDetail}
-          tone={assetTone}
-        />
-        <PerformanceKpiCard
-          label="时间加权收益率"
-          value={ttwrorValue}
-          detail={ttwrorDetail}
-          tone={undefined}
-        />
-        <PerformanceKpiCard
-          label="资金加权收益率"
-          value={xirrValue}
-          detail={xirrDetail}
-          tone={undefined}
-        />
-      </div>
-      {currencyTotals.length > 1 ? (
-        <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="分币种总资产">
-          {currencyTotals.map((total) => (
-            <Card
-              key={total.currency ?? 'unknown'}
-              className="rounded-lg border border-border/60 bg-muted/15 py-0 shadow-none ring-0"
-            >
-              <CardContent className="p-3">
-                <p className="m-0 text-xs text-muted-foreground">{total.currency ?? '未知币种'}</p>
-                <strong className="mt-1 block text-base font-semibold">
-                  {formatMoney(total.marketValue + total.cashValue, total.currency)}
-                </strong>
-                <p className="m-0 mt-1 text-xs text-muted-foreground">原币种估值</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : null}
-    </>
-  );
-}
+export { PerformanceAccountSelector } from './PerformanceScopeControls.js';
 
 type ComparisonRow = {
   category: AllocationCategory;
@@ -708,18 +379,21 @@ export function PerformanceAllocationSection({
         </div>
       ) : null}
       {loadState === 'loading' && rows.length === 0 ? (
-        <Skeleton className="h-[120px] w-full rounded-xl" aria-label="配置数据加载中" />
+        <Skeleton className="h-[120px] w-full rounded-md" aria-label="配置数据加载中" />
       ) : rows.length > 0 && !allocationUnavailable && !fxBlocked ? (
-        <div className="overflow-hidden rounded-xl border border-border/70 bg-card">
+        <div
+          data-list-frame="composite"
+          className="overflow-hidden rounded-md border border-border bg-card"
+        >
           <div className="table-wrap px-4">
             <table className="min-w-[680px] md:min-w-0">
               <thead>
                 <tr>
                   <th>分类</th>
-                  <th>当前金额</th>
-                  <th>当前权重</th>
-                  <th>目标权重</th>
-                  <th>权重偏差</th>
+                  <th className="text-right">当前金额</th>
+                  <th className="text-right">当前权重</th>
+                  <th className="text-right">目标权重</th>
+                  <th className="text-right">权重偏差</th>
                   <StickyTableActionHeader>调整</StickyTableActionHeader>
                 </tr>
               </thead>
@@ -737,17 +411,17 @@ export function PerformanceAllocationSection({
                   return (
                     <tr key={row.category}>
                       <td>{CATEGORY_LABELS[row.category]}</td>
-                      <td className="text-muted-foreground">
+                      <td className="text-right text-muted-foreground">
                         {formatMoney(row.value, displayCurrency)}
                       </td>
-                      <td>
+                      <td className="text-right">
                         <WeightBar
                           value={row.currentWeight}
                           label={`${CATEGORY_LABELS[row.category]}当前权重`}
                           unavailable={weightsUnavailable}
                         />
                       </td>
-                      <td>
+                      <td className="text-right">
                         {editingTargets ? (
                           draftRow ? (
                             <div className="flex min-w-40 items-center justify-end gap-1">
@@ -789,7 +463,9 @@ export function PerformanceAllocationSection({
                           />
                         )}
                       </td>
-                      <td>{formatWeight(weightsUnavailable ? null : row.weightGap)}</td>
+                      <td className="text-right">
+                        {formatWeight(weightsUnavailable ? null : row.weightGap)}
+                      </td>
                       <StickyTableActionCell className={`font-medium ${adjustment.className}`}>
                         {adjustment.text}
                       </StickyTableActionCell>
@@ -801,14 +477,17 @@ export function PerformanceAllocationSection({
           </div>
         </div>
       ) : (
-        <Empty
-          className="min-h-[120px] rounded-xl border border-border/60 bg-muted/20 px-4 py-6"
-          aria-live="polite"
-        >
-          <EmptyDescription>
-            {hasTargets ? '当前范围暂无可估值配置。' : '先设置目标配置，保存后可在这里比较。'}
-          </EmptyDescription>
-        </Empty>
+        (loadState === 'ready' || loadState === 'empty') &&
+        !targetsUnavailable && (
+          <Empty
+            className="min-h-[120px] rounded-md border border-border bg-muted/20 px-4 py-6"
+            aria-live="polite"
+          >
+            <EmptyDescription>
+              {hasTargets ? '当前范围暂无可估值配置。' : '先设置目标配置，保存后可在这里比较。'}
+            </EmptyDescription>
+          </Empty>
+        )
       )}
       {editingTargets &&
       draftRows.some(

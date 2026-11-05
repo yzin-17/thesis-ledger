@@ -1,0 +1,321 @@
+{
+  "version": "g3-news-range-evidence-v1",
+  "date": "2026-10-23",
+  "target": "thesis-ledger-dev",
+  "note": "本记录不包含凭据、模型原始响应或新闻正文；费用为配置估算，G3 仍未通过。",
+  "implementation": {
+    "tests": {
+      "node": 10,
+      "worker": 11,
+      "sqliteExtension": 6
+    },
+    "criticalPythonLintExit": 0,
+    "files": [
+      "scripts/nvidia-news-admission.mjs",
+      "scripts/nvidia-news-admission.py",
+      "scripts/news_admission_extension.py",
+      "scripts/news_admission_extension.test.py",
+      "scripts/nvidia-news-admission.test.mjs",
+      "scripts/nvidia-news-admission.test.py"
+    ],
+    "newsMarket": {
+      "status": "partial",
+      "count": 10,
+      "providerId": "hithink",
+      "upstreamSource": "hithink-news-stock-timeline",
+      "policyRevision": "effective:173",
+      "coverageComplete": false,
+      "truncated": true
+    },
+    "originalAkshareProbeCollectionError": {
+      "liveReadSucceeded": true,
+      "reason": "old-record lookup omitted exact route key and matched multiple capabilities",
+      "additionalProbe": 1,
+      "mutation": false
+    },
+    "otherAdmissionRowsUnchanged": 7
+  },
+  "admissions": [
+    {
+      "source": "hithink",
+      "arguments": [
+        "--source=hithink-timeline",
+        "--confirm=thesis-ledger-dev/hithink/600519.SH/account-news-metadata",
+        "--feed=/tmp/thesis-ledger-g3-news-hithink-20261023.json",
+        "--sha256=37da2fd97b3c10bc368f0e8ee8663aae3de21b816fffc9485fb2ea27c7ac6b0b",
+        "--observed-at=2026-10-23T11:05:55.426765+00:00",
+        "--start=2026-10-16",
+        "--end=2026-10-29",
+        "--recorded-by=g3-news-window-20261023",
+        "--extend-existing",
+        "--expected-record-version=1",
+        "--expected-record-sha256=b46a86e30be87eecba333ad6e9ec30949fded18894d248dc206c76f760a84bd8"
+      ],
+      "apply": {
+        "mode": "apply",
+        "operation": "extend-start",
+        "writes": true,
+        "providerId": "hithink",
+        "symbol": "600519.SH",
+        "previousRecordVersion": 1,
+        "previousRecordSha256": "b46a86e30be87eecba333ad6e9ec30949fded18894d248dc206c76f760a84bd8",
+        "recordVersion": 2,
+        "scopeDateFrom": "2026-10-16",
+        "scopeDateTo": "2026-10-29",
+        "validFrom": "2026-10-22T06:40:47.404212+00:00",
+        "validUntil": "2026-10-29T06:40:47.404212+00:00",
+        "evidenceSha256": "e3ec7d3b345e53d72db5f01037860ce5b7890bc2268bcc112326a295eb75cf69",
+        "evidencePath": "/app/data/thesis-ledger-route-evidence/e3ec7d3b345e53d72db5f01037860ce5b7890bc2268bcc112326a295eb75cf69.json"
+      },
+      "verify": {
+        "mode": "verify",
+        "operation": "extend-start",
+        "writes": false,
+        "providerId": "hithink",
+        "symbol": "600519.SH",
+        "previousRecordVersion": 1,
+        "previousRecordSha256": "b46a86e30be87eecba333ad6e9ec30949fded18894d248dc206c76f760a84bd8",
+        "recordVersion": 2,
+        "scopeDateFrom": "2026-10-16",
+        "scopeDateTo": "2026-10-29",
+        "validFrom": "2026-10-22T06:40:47.404212+00:00",
+        "validUntil": "2026-10-29T06:40:47.404212+00:00",
+        "evidenceSha256": "e3ec7d3b345e53d72db5f01037860ce5b7890bc2268bcc112326a295eb75cf69",
+        "evidencePath": "/app/data/thesis-ledger-route-evidence/e3ec7d3b345e53d72db5f01037860ce5b7890bc2268bcc112326a295eb75cf69.json"
+      }
+    },
+    {
+      "source": "akshare",
+      "arguments": [
+        "--source=akshare-eastmoney",
+        "--confirm=thesis-ledger-dev/akshare/600519.SH/public-metadata-research",
+        "--feed=/tmp/thesis-ledger-g3-news-akshare-20261023.json",
+        "--sha256=a7fc705fa2db0f81f35c870a76b6175e1b88e2d66d6f1c95510034b9c15af453",
+        "--observed-at=2026-10-23T11:06:47.402525+00:00",
+        "--start=2026-10-16",
+        "--end=2026-10-28",
+        "--recorded-by=g3-news-window-20261023",
+        "--extend-existing",
+        "--expected-record-version=1",
+        "--expected-record-sha256=9db0e55c637d5c82495a910353552c604452e35b872416db5298fcce93dbdd78"
+      ],
+      "apply": {
+        "mode": "apply",
+        "operation": "extend-start",
+        "writes": true,
+        "providerId": "akshare",
+        "symbol": "600519.SH",
+        "previousRecordVersion": 1,
+        "previousRecordSha256": "9db0e55c637d5c82495a910353552c604452e35b872416db5298fcce93dbdd78",
+        "recordVersion": 2,
+        "scopeDateFrom": "2026-10-16",
+        "scopeDateTo": "2026-10-28",
+        "validFrom": "2026-10-21T20:45:55.082552+00:00",
+        "validUntil": "2026-10-28T20:45:55.082552+00:00",
+        "evidenceSha256": "91a225942425820722885666ab909f735771895a1826bb934ed7c829a3f0e54d",
+        "evidencePath": "/app/data/thesis-ledger-route-evidence/91a225942425820722885666ab909f735771895a1826bb934ed7c829a3f0e54d.json"
+      },
+      "verify": {
+        "mode": "verify",
+        "operation": "extend-start",
+        "writes": false,
+        "providerId": "akshare",
+        "symbol": "600519.SH",
+        "previousRecordVersion": 1,
+        "previousRecordSha256": "9db0e55c637d5c82495a910353552c604452e35b872416db5298fcce93dbdd78",
+        "recordVersion": 2,
+        "scopeDateFrom": "2026-10-16",
+        "scopeDateTo": "2026-10-28",
+        "validFrom": "2026-10-21T20:45:55.082552+00:00",
+        "validUntil": "2026-10-28T20:45:55.082552+00:00",
+        "evidenceSha256": "91a225942425820722885666ab909f735771895a1826bb934ed7c829a3f0e54d",
+        "evidencePath": "/app/data/thesis-ledger-route-evidence/91a225942425820722885666ab909f735771895a1826bb934ed7c829a3f0e54d.json"
+      }
+    }
+  ],
+  "business": {
+    "runId": "18d76166-84d8-4fcf-9b03-c5a5fb33d068",
+    "requestId": "2c1ff405-c484-40b2-9af2-00b48b37d625",
+    "provider": "openrouter",
+    "model": "openrouter/free",
+    "contract": {
+      "id": "research",
+      "version": "research-generation-v2"
+    },
+    "status": "failed",
+    "errorCode": "research_schema_invalid",
+    "requestCount": 1,
+    "startedAt": "2026-10-23T11:13:30.895",
+    "completedAt": "2026-10-23T11:17:18.311",
+    "durationMs": 227416,
+    "frozenInputFingerprint": "aa25019bab49fcac7412a687f03badb2ccc4ea0dd04f8504931f40bd97e5a898",
+    "scope": {
+      "mode": "shadow",
+      "scope": "instrument",
+      "version": "research-scope-v2",
+      "instrument": {
+        "market": "CN",
+        "symbol": "600519.SH",
+        "currency": "CNY",
+        "assetType": "STOCK",
+        "instrumentId": "86b1de50-d50d-4007-84c0-918e7e5409ca",
+        "catalogGeneration": 1
+      },
+      "confirmedAt": "2026-10-23T11:13:25.203Z"
+    },
+    "usableEvidence": [
+      {
+        "kind": "quote",
+        "provider": "hithink",
+        "source": "a-share-prices-snapshot",
+        "required": true,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": true,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      },
+      {
+        "kind": "news",
+        "provider": "hithink",
+        "source": "hithink-news-stock-timeline",
+        "required": false,
+        "usable": true
+      }
+    ],
+    "usageRevisions": [
+      {
+        "cost": {
+          "amount": "0",
+          "source": "frozen_provider_pricing",
+          "status": "estimated",
+          "currency": "USD",
+          "pricingVersion": "pricing-bd1326cf8cba0366"
+        },
+        "usage": {
+          "status": "reported",
+          "inputTokens": 5644,
+          "outputTokens": 9441
+        },
+        "revision": 1,
+        "recordedAt": "2026-10-23T11:17:18.250Z"
+      }
+    ],
+    "requestOutcome": {
+      "status": "incomplete",
+      "contract": {
+        "id": "research",
+        "version": "research-generation-v2"
+      },
+      "finishReason": "schema_invalid",
+      "schemaAccepted": false
+    }
+  },
+  "deployment": {
+    "enable": {
+      "exitCode": 0,
+      "log": "/tmp/thesis-ledger-g3-news-v2-enable-update-20261023.log",
+      "time": {
+        "current_time": "2026-10-23 11:12:34 UTC"
+      }
+    },
+    "restore": {
+      "exitCode": 0,
+      "log": "/tmp/thesis-ledger-g3-news-v2-restore-update-20261023.log",
+      "time": {
+        "current_time": "2026-10-23 11:23:56 UTC"
+      }
+    }
+  },
+  "protection": {
+    "time": "2026-10-23T11:24:13.482Z",
+    "same": {
+      "protectedRows": true,
+      "dsaControl": true,
+      "mounts": true,
+      "serverEnvHashes": true,
+      "protection": true,
+      "policyMetadata": true
+    },
+    "failureRunUnchanged": true,
+    "countersUnchangedSinceFailure": true,
+    "flags": {
+      "AI_RESEARCH_EXECUTION_ENABLED": "true",
+      "AI_RESEARCH_V2_WRITES_ENABLED": "false",
+      "STRATEGY_AI_OPTIMIZATION_ENABLED": "true"
+    },
+    "counters": {
+      "runs": 1,
+      "tools": 11,
+      "observations": 0,
+      "invocations": 0,
+      "invocationFacts": 0
+    },
+    "images": {
+      "postgres": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+      "redis": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+      "thesis-ledger": "sha256:7985a748cebfb7a4bddffd69d6562a8aeb051c356d0908450163350d3093d81f",
+      "backtest-worker": "sha256:7985a748cebfb7a4bddffd69d6562a8aeb051c356d0908450163350d3093d81f",
+      "dsa": "sha256:e6ab2bd78a9d7a424355e3bbbb43b4ec777cbf7967cda06245c51eac1b0eafec"
+    }
+  }
+}

@@ -233,6 +233,7 @@ export class MarketControlService {
       ...(raw.credentials !== undefined ? { credentials: raw.credentials } : {}),
       ...(raw.route !== undefined ? { route: raw.route } : {}),
       ...(raw.purpose !== undefined ? { purpose: raw.purpose } : {}),
+      ...(raw.accountLevel !== undefined ? { accountLevel: raw.accountLevel } : {}),
     });
   }
 }

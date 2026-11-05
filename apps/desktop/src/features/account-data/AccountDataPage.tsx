@@ -1,27 +1,26 @@
 import { PageHeader } from '../shared/PageHeader.js';
-import { useCallback, useEffect, useState } from 'react';
+import { RefreshIconButton } from '../shared/RefreshIconButton.js';
+import { usePageRefresh } from '../shared/usePageRefresh.js';
+import { cashDepositKeys } from './account-data.cash.queries.js';
+import { fundInvestmentKeys } from './account-data.fund-investment.queries.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { LedgerEvent } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import type { Account, Position } from '../portfolio/portfolio.types.js';
-import { useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
+import { portfolioKeys, useAccountValuationQuery } from '../portfolio/portfolio.queries.js';
 import { useRemovePortfolioPositionMutation } from '../portfolio/portfolio.mutations.js';
 import { PortfolioManagement } from '../portfolio/PortfolioManagement.js';
-import { ScreenshotImportReview } from '../import/ScreenshotImportReview.js';
+import { ImportDraftReviewSheet } from '../import/ImportDraftReviewSheet.js';
 import {
   useAccountLedgerAuditQuery,
+  accountDataKeys,
   useAccountLedgerEventsQuery,
   useReconciliationCandidatesQuery,
   type AccountDataEventFilter,
@@ -46,9 +45,11 @@ import type {
 import { invalidatePortfolioChange } from './portfolio-change.js';
 import type { PortfolioChangeImpact } from '../portfolio/portfolio.types.js';
 import { AccountDataAccountSelector } from './AccountDataAccountSelector.js';
-import { AccountDataAllAccountsView } from './AccountDataAllAccountsView.js';
 import { AccountDataFrame, AccountDataLoading } from './AccountDataLayout.js';
 import { useAccountDataNavigation } from './useAccountDataNavigation.js';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
+import { RecurringFundInvestments } from './AccountDataRecurringFundInvestments.js';
+import { canManageFundInvestments } from './account-data.fund-investment.display.js';
 
 export {
   accountSelectionTransition,
@@ -56,21 +57,27 @@ export {
   shouldDeferAccountSelection,
 } from './account-data.selection.js';
 
-export function AccountDataPage({
-  accounts,
-  accountsReady = true,
-  accountsPending = false,
-  accountsError = false,
-  mode = 'actual',
-  onRetryAccounts,
-}: {
+type AccountDataPageProps = {
   accounts: Account[];
   accountsReady?: boolean;
   accountsPending?: boolean;
   accountsError?: boolean;
   mode?: Account['mode'];
   onRetryAccounts?: () => void;
-}) {
+};
+
+export function AccountDataPage(props: AccountDataPageProps) {
+  return <AccountDataPageContent key={props.mode ?? 'actual'} {...props} />;
+}
+
+function AccountDataPageContent({
+  accounts,
+  accountsReady = true,
+  accountsPending = false,
+  accountsError = false,
+  mode = 'actual',
+  onRetryAccounts,
+}: AccountDataPageProps) {
   const [transactionFilter, setTransactionFilter] = useState<AccountDataEventFilter>('executions');
   const [executionOpen, setExecutionOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ExecutionEvent | null>(null);
@@ -88,14 +95,34 @@ export function AccountDataPage({
     mode: 'replace' | 'void' | 'restore';
   } | null>(null);
   const [draftDirty, setDraftDirty] = useState(false);
+  const [accountManagerBusy, setAccountManagerBusy] = useState(false);
   const [positionSheetOpen, setPositionSheetOpen] = useState(false);
   const [positionSheetEditing, setPositionSheetEditing] = useState<Position | null>(null);
+  useNavigationGuard({ dirty: draftDirty, busy: accountManagerBusy });
   const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
   const queryClient = useQueryClient();
+  const pageRefresh = usePageRefresh([
+    { queryKey: portfolioKeys.root },
+    { queryKey: accountDataKeys.root },
+    { queryKey: cashDepositKeys.root },
+    { queryKey: fundInvestmentKeys.root },
+  ]);
+  const refreshAction = (
+    <RefreshIconButton
+      label="刷新账户数据"
+      refreshing={pageRefresh.refreshing}
+      onClick={() => void pageRefresh.refresh()}
+    />
+  );
   const removeSnapshotMutation = useRemovePortfolioPositionMutation();
+  const modeAccounts = useMemo(
+    () => accounts.filter((account) => account.mode === mode),
+    [accounts, mode],
+  );
 
   const confirmDiscard = useCallback(async () => {
+    if (accountManagerBusy) return false;
     if (!draftDirty) return true;
     return confirm({
       title: '放弃未保存修改？',
@@ -104,7 +131,7 @@ export function AccountDataPage({
       cancelLabel: '继续编辑',
       variant: 'destructive',
     });
-  }, [confirm, draftDirty]);
+  }, [accountManagerBusy, confirm, draftDirty]);
 
   const clearDraft = useCallback(() => {
     setDraftDirty(false);
@@ -120,6 +147,8 @@ export function AccountDataPage({
     setReconciliationOpen(false);
     setCashObservationOpen(false);
     setCashTransferAction(null);
+    setPositionSheetOpen(false);
+    setPositionSheetEditing(null);
   }, []);
 
   const resetTabContext = useCallback(() => {
@@ -140,8 +169,8 @@ export function AccountDataPage({
   const {
     accountId,
     accountManagerOpen,
-    allAccountsSelected,
     entryRequested,
+    fundOccurrenceId,
     handleAccountManagerOpenChange,
     isCashAccount,
     navigateToTab,
@@ -153,7 +182,8 @@ export function AccountDataPage({
     tab,
     updateLocation,
   } = useAccountDataNavigation({
-    accounts,
+    accounts: modeAccounts,
+    mode,
     accountsReady,
     accountsPending,
     accountsError,
@@ -167,13 +197,13 @@ export function AccountDataPage({
   const valuationQuery = useAccountValuationQuery(
     accountId,
     selectedAccount?.mode,
-    Boolean(selectedAccount) && !allAccountsSelected,
+    Boolean(selectedAccount),
   );
   const ledgerEventsQuery = useAccountLedgerEventsQuery(
     accountId,
     selectedAccount?.mode,
     transactionFilter,
-    Boolean(selectedAccount) && !allAccountsSelected,
+    Boolean(selectedAccount),
   );
   const auditQuery = useAccountLedgerAuditQuery(
     accountId,
@@ -185,7 +215,7 @@ export function AccountDataPage({
     selectedAccount?.mode,
     reconciliationOpen,
   );
-  const handlePortfolioChanged = useCallback(
+  const refreshPortfolio = useCallback(
     (impact?: PortfolioChangeImpact) => {
       const effectiveImpact =
         impact ??
@@ -195,14 +225,24 @@ export function AccountDataPage({
           events: true,
           audit: true,
         } satisfies PortfolioChangeImpact);
-      void invalidatePortfolioChange(queryClient, effectiveImpact);
+      return invalidatePortfolioChange(queryClient, effectiveImpact);
     },
     [accountId, queryClient, selectedAccount?.mode],
+  );
+  const handlePortfolioChanged = useCallback(
+    (impact?: PortfolioChangeImpact) => {
+      void refreshPortfolio(impact);
+    },
+    [refreshPortfolio],
   );
 
   useEffect(() => {
     if (entryRequested === 'execution') setExecutionOpen(true);
-    if (entryRequested === 'screenshot' && selectedAccount?.type !== 'cash') setImportOpen(true);
+    if (
+      (entryRequested === 'draft' || entryRequested === 'screenshot') &&
+      selectedAccount?.type !== 'cash'
+    )
+      setImportOpen(true);
   }, [entryRequested, selectedAccount?.type]);
 
   const openCreateExecution = () => {
@@ -237,7 +277,7 @@ export function AccountDataPage({
     if (!selectedAccount || selectedAccount.type === 'cash' || !(await confirmDiscard())) return;
     setDraftDirty(false);
     setImportOpen(true);
-    updateLocation({ tab: 'positions', entry: 'screenshot' });
+    updateLocation({ tab: 'positions', entry: 'draft' });
   };
 
   const closeImport = async (open: boolean) => {
@@ -262,6 +302,8 @@ export function AccountDataPage({
 
   const events = ledgerEventsQuery.data?.events ?? [];
   const currentLedgerRevision = ledgerEventsQuery.data?.ledgerRevision ?? '0';
+  const ledgerReady =
+    !ledgerEventsQuery.isPending && !ledgerEventsQuery.isError && !ledgerEventsQuery.isFetching;
   const accountPositions = valuationQuery.data?.positions ?? [];
   const cashValue = valuationQuery.data?.cashValue ?? 0;
   const resolveInstrumentName = instrumentNameLookup(ledgerEventsQuery.data?.instrumentDirectory);
@@ -283,6 +325,7 @@ export function AccountDataPage({
   };
 
   const removeSnapshot = async (event: LedgerEvent) => {
+    if (accountManagerBusy || removeSnapshotMutation.isPending) return;
     const position = findSnapshotPosition(event);
     if (!position) return;
     if (
@@ -295,16 +338,17 @@ export function AccountDataPage({
       }))
     )
       return;
+    setAccountManagerBusy(true);
     try {
       await removeSnapshotMutation.mutateAsync(position.id);
-      toastManager.add({ title: '持仓快照已移除', type: 'success', timeout: 2800 });
-      handlePortfolioChanged({
+      await refreshPortfolio({
         mode: selectedAccount?.mode ?? 'actual',
         accountIds: [position.accountId],
         events: true,
         audit: true,
         reconciliation: true,
-      });
+      }).catch(() => undefined);
+      toastManager.add({ title: '持仓快照已移除', type: 'success', timeout: 2800 });
     } catch (caught) {
       toastManager.add({
         title: '持仓快照移除失败',
@@ -312,17 +356,24 @@ export function AccountDataPage({
         type: 'error',
         timeout: 0,
       });
+    } finally {
+      setAccountManagerBusy(false);
     }
   };
 
-  if (accountsPending && accounts.length === 0) {
+  if (accountsPending && modeAccounts.length === 0) {
     return <AccountDataLoading />;
   }
 
-  if (accountsError && accounts.length === 0) {
+  if (accountsError && modeAccounts.length === 0) {
     return (
       <AccountDataFrame>
-        <PageHeader className="mb-0" eyebrow="ACCOUNT DATA" title="账户数据" />
+        <PageHeader
+          className="mb-0"
+          eyebrow="ACCOUNT DATA"
+          title="账户数据"
+          actions={refreshAction}
+        />
         <Alert variant="destructive">
           <AlertTitle>账户读取失败</AlertTitle>
           <AlertDescription>无法打开账户数据。请检查服务状态后重试。</AlertDescription>
@@ -336,13 +387,14 @@ export function AccountDataPage({
     );
   }
 
-  if (accounts.length === 0) {
+  if (modeAccounts.length === 0) {
     return (
       <AccountDataFrame>
         <PageHeader
           className="mb-0"
           eyebrow="ACCOUNT DATA"
           title="账户数据"
+          actions={refreshAction}
           description="先创建一个账户，再录入成交、持仓或现金。"
         />
         <PortfolioManagement
@@ -356,17 +408,6 @@ export function AccountDataPage({
     );
   }
 
-  if (allAccountsSelected) {
-    return (
-      <AccountDataAllAccountsView
-        accounts={accounts}
-        accountId={accountId}
-        mode={mode}
-        onSelectAccount={selectAccount}
-      />
-    );
-  }
-
   if (!selectedAccount) return <AccountDataLoading />;
 
   const activeTab = isCashAccount ? 'cash' : tab;
@@ -377,6 +418,7 @@ export function AccountDataPage({
         className="mb-0"
         eyebrow="ACCOUNT DATA"
         title="账户数据"
+        actions={refreshAction}
         description={
           isCashAccount
             ? '管理现金入账、账户划转和定期入账。'
@@ -385,7 +427,7 @@ export function AccountDataPage({
       />
 
       <AccountDataAccountSelector
-        accounts={accounts}
+        accounts={modeAccounts}
         accountId={accountId}
         onSelectAccount={selectAccount}
         onManageAccounts={openAccountManager}
@@ -396,6 +438,9 @@ export function AccountDataPage({
           {!isCashAccount && <TabsTrigger value="positions">持仓</TabsTrigger>}
           {!isCashAccount && <TabsTrigger value="transactions">成交记录</TabsTrigger>}
           <TabsTrigger value="cash">现金</TabsTrigger>
+          {canManageFundInvestments(selectedAccount) && (
+            <TabsTrigger value="fund-investments">定投计划</TabsTrigger>
+          )}
         </TabsList>
         {!isCashAccount && (
           <>
@@ -422,18 +467,25 @@ export function AccountDataPage({
                   void openImport();
                 }}
                 onOpenReconciliation={() => setReconciliationOpen(true)}
+                onOpenFundInvestment={
+                  canManageFundInvestments(selectedAccount)
+                    ? (occurrenceId) =>
+                        navigateToTab('fund-investments', null, { fundOccurrence: occurrenceId })
+                    : undefined
+                }
               />
             </TabsContent>
             <TabsContent value="positions" className="mt-0 pt-3">
               <PositionCalibrationSection
                 key={selectedAccount.id}
                 account={selectedAccount}
-                accounts={accounts}
+                accounts={modeAccounts}
                 positions={accountPositions}
                 cashValue={cashValue}
                 valuationQuery={valuationQuery}
                 onDirtyChange={setDraftDirty}
-                onSaved={handlePortfolioChanged}
+                onBusyChange={setAccountManagerBusy}
+                onSaved={refreshPortfolio}
                 entrySheetOpen={positionSheetOpen}
                 onEntrySheetOpenChange={(open) => {
                   setPositionSheetOpen(open);
@@ -453,7 +505,7 @@ export function AccountDataPage({
         <TabsContent value="cash" className="mt-0 pt-3">
           <CashSection
             account={selectedAccount}
-            accounts={accounts}
+            accounts={modeAccounts}
             valuation={valuationQuery.data}
             valuationQuery={valuationQuery}
             events={events}
@@ -462,6 +514,15 @@ export function AccountDataPage({
             resolveInstrumentName={resolveInstrumentName}
           />
         </TabsContent>
+        {canManageFundInvestments(selectedAccount) && (
+          <TabsContent value="fund-investments" className="mt-0 pt-3">
+            <RecurringFundInvestments
+              key={selectedAccount.id}
+              account={selectedAccount}
+              focusOccurrenceId={fundOccurrenceId}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       <ExecutionFormSheet
@@ -519,13 +580,14 @@ export function AccountDataPage({
         open={reconciliationOpen}
         query={reconciliationQuery}
         ledgerRevision={currentLedgerRevision}
+        ledgerReady={ledgerReady}
         onOpenChange={setReconciliationOpen}
       />
       <CashObservationSheet
         account={selectedAccount}
         open={cashObservationOpen}
         onOpenChange={setCashObservationOpen}
-        onSaved={handlePortfolioChanged}
+        onSaved={refreshPortfolio}
       />
       {cashTransferAction && (
         <CashTransferCorrectionSheet
@@ -541,31 +603,22 @@ export function AccountDataPage({
             : {})}
         />
       )}
-      <Sheet
+      <ImportDraftReviewSheet
         open={importOpen && !isCashAccount}
+        accountId={selectedAccount.id}
+        ledgerRevision={currentLedgerRevision}
+        ledgerReady={ledgerReady}
+        onDirtyChange={setDraftDirty}
+        onBusyChange={setAccountManagerBusy}
+        onPortfolioChanged={handlePortfolioChanged}
+        onReadLedger={async () => {
+          const result = await ledgerEventsQuery.refetch();
+          if (result.isError) throw result.error;
+        }}
         onOpenChange={(open) => {
           void closeImport(open);
         }}
-      >
-        <SheetContent side="right" size="detail" className="h-[100dvh] overflow-auto p-6">
-          <SheetHeader>
-            <SheetTitle>持仓快照导入草稿</SheetTitle>
-            <SheetDescription>
-              上传只创建可审阅草稿；原始证据、来源行、重复和冲突状态会保留，提交前不会写入持仓。
-            </SheetDescription>
-          </SheetHeader>
-          <div className="min-h-0">
-            <ScreenshotImportReview
-              accounts={accounts}
-              initialAccountId={selectedAccount.id}
-              accountLocked
-              embedded
-              onDirtyChange={setDraftDirty}
-              onPortfolioChanged={handlePortfolioChanged}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      />
       <Sheet
         open={accountManagerOpen}
         onOpenChange={(open) => {
@@ -589,6 +642,7 @@ export function AccountDataPage({
             onAccountEntry={(nextAccountId) => {
               void selectManagedAccount(nextAccountId);
             }}
+            onBusyChange={setAccountManagerBusy}
             onSaved={handlePortfolioChanged}
           />
         </SheetContent>

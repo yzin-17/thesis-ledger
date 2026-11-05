@@ -9,7 +9,7 @@ import { journalReviewWindow } from '@thesis-ledger/domain';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
 import {
   Select,
   SelectContent,
@@ -109,7 +109,7 @@ export function JournalPeriodReview({
         ...window,
         ...(symbol ? { symbol } : {}),
       });
-      if (!request.success) throw new Error('请输入带时区的有效开始和结束时间');
+      if (!request.success) throw new Error('请选择有效的开始和结束时间');
       journalReviewWindow(request.data);
       const data = await getDesktopApiClient().journalReviews.period(request.data);
       return { data, sequence: current };
@@ -121,8 +121,8 @@ export function JournalPeriodReview({
     result !== undefined &&
     (result.window.start !== window.start || result.window.end !== window.end);
   return (
-    <div className="flex flex-col gap-4">
-      <FieldGroup>
+    <div className="flex flex-col gap-3 pt-3">
+      <FieldGroup className="grid items-end gap-3 md:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
         <Field>
           <FieldLabel>统计窗口</FieldLabel>
           <Select
@@ -133,7 +133,7 @@ export function JournalPeriodReview({
               if (next !== 'custom') setWindow(recentWindow(Number(next)));
             }}
           >
-            <SelectTrigger aria-label="统计窗口">
+            <SelectTrigger aria-label="统计窗口" className="w-full">
               <SelectValue>{presetLabels[preset]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -148,35 +148,36 @@ export function JournalPeriodReview({
           </Select>
         </Field>
         <Field>
-          <FieldLabel>开始时间（含边界，ISO 8601）</FieldLabel>
-          <Input
+          <FieldLabel>开始时间</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="周期开始时间"
             value={window.start}
-            onChange={(event) => {
+            onValueChange={(start) => {
               setPreset('custom');
-              setWindow({ ...window, start: event.target.value });
+              setWindow({ ...window, start });
             }}
           />
         </Field>
         <Field>
-          <FieldLabel>结束时间（不含边界，ISO 8601）</FieldLabel>
-          <Input
+          <FieldLabel>结束时间</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="周期结束时间"
             value={window.end}
-            onChange={(event) => {
+            onValueChange={(end) => {
               setPreset('custom');
-              setWindow({ ...window, end: event.target.value });
+              setWindow({ ...window, end });
             }}
           />
         </Field>
+        <Button
+          className="self-end justify-self-start md:col-span-3 xl:col-span-1"
+          disabled={analysis.isPending}
+          onClick={() => analysis.mutate()}
+        >
+          {analysis.isPending ? '分析中…' : '分析周期'}
+        </Button>
       </FieldGroup>
-      <Button
-        className="self-start"
-        disabled={analysis.isPending}
-        onClick={() => analysis.mutate()}
-      >
-        {analysis.isPending ? '分析中…' : '分析周期'}
-      </Button>
+      <p className="text-xs text-muted-foreground">按本机时区输入，开始时刻计入、结束时刻不计入。</p>
       {analysis.isError && <JournalRequestError title="周期分析未完成" error={analysis.error} />}
       {result && (
         <>

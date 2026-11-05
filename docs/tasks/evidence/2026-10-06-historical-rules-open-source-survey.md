@@ -1,7 +1,7 @@
 # 历史收费规则公告监测开源方案调研
 
 > 调研日期：2026-10-06（Asia/Shanghai）。范围：GitHub 开源公告发现、网页修订监测，以及可用于历史收费整理的现成能力。
-> 对应：[原 Spec](../../specs/2026-09-16-backtest-real-historical-market-rules.md)、[原 Task](../2026-09-16-backtest-real-historical-market-rules.md)、[已有来源核验](2026-10-06-historical-rules-t1-qualification.md)。
+> 对应：[原 Spec](../../archive/specs/2026-09-16-backtest-real-historical-market-rules.md)、[原 Task](../../archive/tasks/2026-09-16-backtest-real-historical-market-rules.md)、[已有来源核验](2026-10-06-historical-rules-t1-qualification.md)。
 > 实际工作：读取项目 README、许可证和相关路由源码，检索官方项目文档；没有安装、启动、部署或创建定期任务。
 
 ## 调研结论

@@ -1,3 +1,4 @@
+import { TableContainer } from '@/components/ui/table';
 export {
   BacktestSetupDialog,
   defaultBacktestPeriod,
@@ -154,7 +155,7 @@ export function StrategyLibrary({
           onAction={onCreate}
         />
       ) : (
-        <div className="table-wrap">
+        <TableContainer>
           <table>
             <thead>
               <tr>
@@ -288,7 +289,7 @@ export function StrategyLibrary({
               {loadState === 'loading' && <EmptyTableRow colSpan={6} label="正在加载策略…" />}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
       )}
     </section>
   );
@@ -327,7 +328,7 @@ export function StrategyJobs({
         <h2 id="strategy-jobs-title">回测任务</h2>
         <p>任务状态会自动刷新；排队失败或启动失败都保留在这里，方便重试。</p>
       </div>
-      <div className="table-wrap">
+      <TableContainer>
         <table>
           <thead>
             <tr>
@@ -471,7 +472,7 @@ export function StrategyJobs({
             )}
           </tbody>
         </table>
-      </div>
+      </TableContainer>
     </section>
   );
 }

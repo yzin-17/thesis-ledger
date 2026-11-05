@@ -1,0 +1,87 @@
+name: 手机构建与工具检查
+
+on:
+  push:
+    branches: [codex/mobile-parity-ci-20261023]
+  pull_request:
+    paths:
+      - 'scripts/mobile-release*'
+      - 'scripts/mobile-release/**'
+      - 'apps/mobile/config/**'
+      - 'apps/mobile/android/app/build.gradle'
+      - 'apps/mobile/android/keystore.properties.example'
+      - 'apps/mobile/ios/ThesisLedger/Info.plist'
+      - 'apps/mobile/ios/ThesisLedger.xcodeproj/project.pbxproj'
+      - '.github/workflows/mobile-release-prepare.yml'
+  workflow_dispatch:
+    inputs:
+      prepare_unsigned:
+        description: '执行未签名原生编译（仅候选，不上传）'
+        type: boolean
+        default: false
+      platform:
+        description: '候选编译平台'
+        type: choice
+        options: [both, android, ios]
+        default: both
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: 配置与签名拒绝反例
+        run: node --test scripts/mobile-release/*.test.mjs
+      - name: 无凭据接续计划
+        run: |
+          node scripts/mobile-release.mjs plan android --config apps/mobile/config/release.example.json
+          node scripts/mobile-release.mjs plan ios --config apps/mobile/config/release.example.json
+
+  android-unsigned:
+    needs: check
+    if: github.event_name == 'workflow_dispatch' && inputs.prepare_unsigned && inputs.platform != 'ios'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: pnpm install --frozen-lockfile
+      - name: Android arm64 未签名候选
+        run: node scripts/mobile-release.mjs build android --unsigned --config apps/mobile/config/release.example.json --out "$RUNNER_TEMP/mobile-android-unsigned"
+
+  ios-unsigned:
+    needs: check
+    if: github.event_name == 'workflow_dispatch' && inputs.prepare_unsigned && inputs.platform != 'android'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 锁定安装 Pods
+        working-directory: apps/mobile/ios
+        run: |
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          pod install --deployment
+      - name: iPhoneOS 未签名候选
+        run: node scripts/mobile-release.mjs build ios --unsigned --config apps/mobile/config/release.example.json --out "$RUNNER_TEMP/mobile-ios-unsigned"

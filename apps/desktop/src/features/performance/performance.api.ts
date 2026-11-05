@@ -1,4 +1,5 @@
-import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
+import { parsedDesktopRequest, type DesktopRequestClient } from '../shared/request.js';
+import { performanceClient } from '@thesis-ledger/api-client';
 import type {
   PerformanceAllocationInput,
   PerformanceAllocationResponse,
@@ -20,7 +21,6 @@ import type {
   SnapshotRecord,
 } from './performance.types.js';
 
-const noStore = { cache: 'no-store' as const };
 const defaultPerformanceQueryOptions: PerformanceQueryOptions = {
   fxMerge: false,
   baseCurrency: 'CNY',
@@ -292,19 +292,17 @@ const layersResponse = (value: unknown): PerformanceLayersResponse => {
   };
 };
 
-const accountQuery = (
+const queryOptions = (
   mode: PortfolioMode,
   accountId: string | undefined,
   options: PerformanceQueryOptions,
-) => {
-  const params = new URLSearchParams({ mode });
-  if (accountId) params.set('accountId', accountId);
-  if (options.fxMerge || options.baseCurrency !== 'CNY') {
-    params.set('fxMerge', String(options.fxMerge));
-    params.set('baseCurrency', options.baseCurrency);
-  }
-  return `?${params.toString()}`;
-};
+) => ({
+  mode,
+  ...(accountId ? { accountId } : {}),
+  ...(options.fxMerge || options.baseCurrency !== 'CNY'
+    ? { fxMerge: options.fxMerge, baseCurrency: options.baseCurrency }
+    : {}),
+});
 
 const isRequestClient = (value: unknown): value is DesktopRequestClient =>
   Boolean(value && typeof value === 'object' && 'request' in value);
@@ -326,13 +324,10 @@ export function fetchPerformanceHistory(
   client?: DesktopRequestClient,
 ) {
   const resolved = resolveQueryArgs(clientOrOptions, client);
-  return requestDesktopJson<unknown[]>(
-    `/performance/history${accountQuery(mode, accountId, resolved.options)}`,
-    noStore,
-    resolved.client,
-  ).then((records) => records.map(snapshotRecord));
+  return performanceClient(parsedDesktopRequest(resolved.client))
+    .getHistory(queryOptions(mode, accountId, resolved.options))
+    .then((records) => records.map(snapshotRecord));
 }
-
 export function fetchPerformanceSeries(
   mode: PortfolioMode,
   accountId: string | undefined,
@@ -341,21 +336,17 @@ export function fetchPerformanceSeries(
   baseCurrency: Currency,
   client?: DesktopRequestClient,
 ) {
-  const params = new URLSearchParams({
-    scope: accountId ? 'account' : 'portfolio',
-    range,
-    interval,
-    mode,
-    baseCurrency,
-  });
-  if (accountId) params.set('accountId', accountId);
-  return requestDesktopJson<unknown>(
-    `/performance/series?${params.toString()}`,
-    noStore,
-    client,
-  ).then((value) => seriesResponse(value, range, interval));
+  return performanceClient(parsedDesktopRequest(client))
+    .getSeries({
+      scope: accountId ? 'account' : 'portfolio',
+      mode,
+      range,
+      interval,
+      baseCurrency,
+      ...(accountId ? { accountId } : {}),
+    })
+    .then((value) => seriesResponse(value, range, interval));
 }
-
 export function fetchPerformanceSummary(
   mode: PortfolioMode,
   accountId?: string,
@@ -363,13 +354,24 @@ export function fetchPerformanceSummary(
   client?: DesktopRequestClient,
 ): Promise<PerformanceSummary> {
   const resolved = resolveQueryArgs(clientOrOptions, client);
-  return requestDesktopJson<PerformanceSummary>(
-    `/performance/summary${accountQuery(mode, accountId, resolved.options)}`,
-    noStore,
-    resolved.client,
-  );
+  return performanceClient(parsedDesktopRequest(resolved.client))
+    .getSummary(queryOptions(mode, accountId, resolved.options))
+    .then((value) => ({
+      ttwror: value.ttwror,
+      xirr: value.xirr,
+      ...(value.ttwrorReason !== undefined ? { ttwrorReason: value.ttwrorReason } : {}),
+      ...(value.xirrReason !== undefined ? { xirrReason: value.xirrReason } : {}),
+      ...(value.currency ? { currency: value.currency } : {}),
+      ...(value.fx ? { fx: fxMeta(value.fx) } : {}),
+      ...(Array.isArray(value.fxEvidence) ? { fxEvidence: value.fxEvidence.map(fxMeta) } : {}),
+      ...(typeof value.estimated === 'boolean' ? { estimated: value.estimated } : {}),
+      ...(value.conversionMode === 'current-rate' || value.conversionMode === 'historical-rate'
+        ? { conversionMode: value.conversionMode }
+        : {}),
+      ...(typeof value.fxAsOf === 'string' ? { fxAsOf: value.fxAsOf } : {}),
+      ...(typeof value.fxStale === 'boolean' ? { fxStale: value.fxStale } : {}),
+    }));
 }
-
 export function fetchPerformanceLayers(
   mode: PortfolioMode,
   accountId?: string,
@@ -377,61 +379,46 @@ export function fetchPerformanceLayers(
   client?: DesktopRequestClient,
 ): Promise<PerformanceLayersResponse> {
   const resolved = resolveQueryArgs(clientOrOptions, client);
-  return requestDesktopJson<unknown>(
-    `/performance/layers${accountQuery(mode, accountId, resolved.options)}`,
-    noStore,
-    resolved.client,
-  ).then(layersResponse);
+  return performanceClient(parsedDesktopRequest(resolved.client))
+    .getLayers(queryOptions(mode, accountId, resolved.options))
+    .then(layersResponse);
 }
-
 export const fetchPerformanceTargets = (
   mode: PortfolioMode,
   accountId?: string,
   options: PerformanceQueryOptions = defaultPerformanceQueryOptions,
   client?: DesktopRequestClient,
-) => {
-  const params = new URLSearchParams({
-    scope: accountId ? 'account' : 'portfolio',
-    mode,
-  });
-  if (accountId) params.set('accountId', accountId);
-  if (options.fxMerge || options.baseCurrency !== 'CNY') {
-    params.set('fxMerge', String(options.fxMerge));
-    params.set('baseCurrency', options.baseCurrency);
-  }
-  return requestDesktopJson<PerformanceTargetsResponse>(
-    `/performance/targets?${params.toString()}`,
-    noStore,
-    client,
-  );
-};
-
+): Promise<PerformanceTargetsResponse> =>
+  performanceClient(parsedDesktopRequest(client))
+    .getTargets(queryOptions(mode, accountId, options))
+    .then((value) => ({
+      scope: value.scope,
+      accountId: value.accountId,
+      targets: value.targets,
+      ...(value.version !== undefined ? { version: value.version } : {}),
+      ...(value.source ? { source: value.source } : {}),
+      ...(value.createdAt ? { createdAt: value.createdAt } : {}),
+      ...(value.aggregatedAccountCount !== undefined
+        ? { aggregatedAccountCount: value.aggregatedAccountCount }
+        : {}),
+      ...(value.aggregationUnavailableReason
+        ? { aggregationUnavailableReason: value.aggregationUnavailableReason }
+        : {}),
+    }));
 export const fetchPerformanceAllocation = (
   input: PerformanceAllocationInput,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<PerformanceAllocationResponse>(
-    '/performance/allocation',
-    {
-      ...noStore,
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-    client,
-  );
-
+): Promise<PerformanceAllocationResponse> =>
+  performanceClient(parsedDesktopRequest(client))
+    .allocate(input)
+    .then((value) => ({
+      allocation: value.allocation,
+      rebalance: value.rebalance,
+      partial: value.partial,
+      missingSymbols: value.missingSymbols,
+      ...(value.fx ? { fx: fxMeta(value.fx) } : {}),
+    }));
 export const savePerformanceTargets = (
   input: SavePerformanceTargetsInput,
   client?: DesktopRequestClient,
-) =>
-  requestDesktopJson<unknown>(
-    '/performance/targets',
-    {
-      ...noStore,
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-    },
-    client,
-  );
+) => performanceClient(parsedDesktopRequest(client)).saveTargets(input);

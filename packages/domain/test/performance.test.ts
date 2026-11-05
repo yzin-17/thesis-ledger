@@ -15,7 +15,7 @@ describe('收益与配置', () => {
       ttwror([
         { date: '2025-01-01', value: 100 },
         { date: '2025-01-02', value: 110 },
-        { date: '2025-01-03', value: 130, externalFlow: 20 },
+        { date: '2025-01-03', value: 130, externalFlow: 20, flowBoundary: { before: 110, after: 130 } },
       ]),
     ).toBeCloseTo(0.1));
   it('计算 XIRR', () =>
@@ -45,10 +45,30 @@ describe('收益与配置', () => {
         { 股票: 0.6, 现金: 0.4 },
       ),
     ).toMatchObject([
-      { category: '股票', amountGap: -10, direction: 'decrease' },
-      { category: '现金', amountGap: 10, direction: 'increase' },
+      { category: 'stock', amountGap: -10, direction: 'decrease' },
+      { category: 'cash', amountGap: 10, direction: 'increase' },
     ]);
     expect(() => rebalanceGap([], { 股票: 0.8 })).toThrow('100%');
+  });
+  it('负现金按净资产参与配置与再平衡，原余额及差额守恒', () => {
+    const positions = [{ category: 'fund', marketValue: 176.76 }, { category: '现金', marketValue: -82 }];
+    const rows = allocation(positions);
+    expect(rows[0]?.weight).toBeCloseTo(176.76 / 94.76, 12);
+    expect(rows[1]).toMatchObject({ value: -82 });
+    expect(rows[1]?.weight).toBeCloseTo(-82 / 94.76, 12);
+    const rebalance = rebalanceGap(positions, { fund: 1, cash: 0 });
+    expect(rebalance).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'fund', amountGap: -82, direction: 'decrease' }),
+      expect.objectContaining({ category: 'cash', amountGap: 82, direction: 'increase' }),
+    ]));
+    expect(rebalance.reduce((sum, row) => sum + row.amountGap, 0)).toBe(0);
+    expect(positions[1]?.marketValue).toBe(-82);
+  });
+  it('负现金例外不放宽负证券市值、非有限金额和非正净资产约束', () => {
+    for (const position of [{ category: 'fund', marketValue: -82 }, { category: 'cash', marketValue: Number.NaN }, { category: '现金', marketValue: Number.NEGATIVE_INFINITY }]) {
+      expect(() => rebalanceGap([position], { cash: 1 })).toThrow('非负有限数字');
+    }
+    expect(() => rebalanceGap([{ category: 'fund', marketValue: 100 }, { category: 'cash', marketValue: -100 }], { fund: 1 })).toThrow('分母');
   });
   it('规范化配置类别并允许无持仓指数目标', () => {
     expect(normalizeAllocationCategory(' ETF ')).toBe('etf');

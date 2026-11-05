@@ -67,8 +67,12 @@ describe('策略编写合同与受控真实 HTTP Provider', () => {
       });
       throw new Error('受控期限必须中止');
     } catch (error) {
-      expect(error).toMatchObject({ fact: { code: 'cancelled', externalResult: 'unknown' } });
-      expect(authoringFailureCode(error, signal.reason)).toBe('AUTHORING_TIMEOUT');
+      expect(error).toMatchObject({
+        fact: { code: 'provider_completion_timeout', externalResult: 'unknown' },
+      });
+      expect(authoringFailureCode(error, signal.reason)).toBe(
+        'AUTHORING_PROVIDER_COMPLETION_TIMEOUT',
+      );
       expect(bodies).toHaveLength(count + 1);
     } finally {
       onDispatch = null;

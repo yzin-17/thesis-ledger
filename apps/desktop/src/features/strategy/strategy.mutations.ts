@@ -12,6 +12,7 @@ import type {
   CreateStrategyInput,
   CreateStrategyVersionInput,
   QueueBacktestV3Input,
+  StrategyRecord,
 } from './strategy.types.js';
 
 const invalidateStrategyData = (queryClient: ReturnType<typeof useQueryClient>) =>
@@ -21,7 +22,12 @@ export const useCreateStrategyMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateStrategyInput) => createStrategy(input),
-    onSuccess: () => invalidateStrategyData(queryClient),
+    onSuccess: (created) => {
+      queryClient.setQueryData<StrategyRecord[]>(strategyKeys.strategies(), (previous = []) =>
+        [...previous.filter((strategy) => strategy.id !== created.id), created],
+      );
+      return invalidateStrategyData(queryClient);
+    },
   });
 };
 
@@ -29,7 +35,14 @@ export const useCreateStrategyVersionMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateStrategyVersionInput) => createStrategyVersion(input),
-    onSuccess: () => invalidateStrategyData(queryClient),
+    onSuccess: (created, input) => {
+      queryClient.setQueryData<StrategyRecord[]>(strategyKeys.strategies(), (previous = []) =>
+        previous.map((strategy) => strategy.id === input.strategyId
+          ? { ...strategy, versions: [...strategy.versions.filter((version) => version.id !== created.id), created] }
+          : strategy),
+      );
+      return invalidateStrategyData(queryClient);
+    },
   });
 };
 

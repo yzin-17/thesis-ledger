@@ -6,12 +6,12 @@
 | --------------------------------------------------------- | --------- | ------- |
 | 主仓、DSA Fork、Docker、架构边界                          | T001-T018 | Phase 0 |
 | Asset / Quote / Bar / Indicator / Chip Contract           | T019-T029 | V0.1    |
-| Account / Position / Screenshot Import                    | T030-T045 | V0.1    |
+| Account / Position                    | T030-T045 | V0.1    |
 | Portfolio / Dashboard                                     | T046-T049 | V0.1    |
 | 基础止损、止盈、集中度、RiskEvent                         | T050-T056 | V0.1    |
 | 飞书 / cooldown / dedup / delivery result                 | T057-T059 | V0.1    |
 | AI 基础分析 / Tool / provenance                           | T060-T064 | V0.1    |
-| React Native 基础 / Screenshot 测试 / MVP E2E             | T065-T070 | V0.1    |
+| React Native 基础 / MVP E2E             | T065-T066、T069-T070 | V0.1    |
 | Provider / Fallback / Completeness / Freshness / Health   | T071-T084 | V0.2    |
 | 行情落库 / Trading Calendar / Backfill / Data Quality     | T085-T094 | V0.2    |
 | Ledger / Cost / Position Projection / Snapshot            | T095-T108 | V0.3    |
@@ -32,7 +32,6 @@
 
 ```text
 创建账户
-→ 截图导入并人工确认
 → 写入 Ledger
 → 重建 Position / Portfolio
 → 获取实时行情、指标、筹码

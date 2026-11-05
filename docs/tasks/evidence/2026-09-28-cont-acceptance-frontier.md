@@ -4,7 +4,7 @@
 
 ## 范围与证据性质
 
-使用 `spec-driven-workflow` 的任务边界与验收分层规则。已读取 RTK、Codex 规则、两仓 AGENTS、完整 [Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)、主 [Task](../2026-09-25-multi-source-adjustment-aware-backtest.md) 未完成条目及关联增量记录。唯一写集为本文；没有测试、来源请求、账号读取、数据库、部署、AI 或浏览器操作，没有读取正在实施的 M26 wire/runtime 模块。Context Mode 当前无可调用工具，使用 RTK 与有界输出。
+使用 `spec-driven-workflow` 的任务边界与验收分层规则。已读取 RTK、Codex 规则、两仓 AGENTS、完整 [Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)、主 [Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) 未完成条目及关联增量记录。唯一写集为本文；没有测试、来源请求、账号读取、数据库、部署、AI 或浏览器操作，没有读取正在实施的 M26 wire/runtime 模块。Context Mode 当前无可调用工具，使用 RTK 与有界输出。
 
 历史证据用于判断已有实施边界，不重签为本轮验证。父任务未勾选不能直接推断源码未实现；本地子叶完成也不能直接关闭父项。本文是执行前沿证据，不建立第二份能力矩阵，不改主台账、Spec 或 DSA SSOT。
 

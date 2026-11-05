@@ -1,23 +1,20 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { marketAnnouncementsSchema } from '@thesis-ledger/schemas';
+import { marketInformationClient } from '@thesis-ledger/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getDesktopApiClient } from '../../shared/api/client.js';
+import { parsedDesktopRequest } from '../shared/request.js';
 
 export function OfficialAnnouncements() {
   const [q, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: ['desktop', 'market-data', 'announcements', q, page],
-    queryFn: async ({ signal }) => {
-      const params = new URLSearchParams({ q, page: String(page), pageSize: '50' });
-      return marketAnnouncementsSchema.parse(
-        await getDesktopApiClient().request<unknown>(`/api/market-data/announcements?${params}`, {
-          signal,
-        }),
-      );
-    },
+    queryFn: ({ signal }) =>
+      marketInformationClient(parsedDesktopRequest()).getAnnouncements(
+        { q, page, pageSize: 50 },
+        signal,
+      ),
     retry: false,
   });
   const data = query.data;
@@ -40,7 +37,7 @@ export function OfficialAnnouncements() {
       {query.isError && (
         <div className="flex flex-col gap-2">
           <p role="alert" className="text-sm text-muted-foreground">
-            公告列表加载失败。
+            {data ? '公告刷新失败，当前保留上次成功读取的结果。' : '公告列表加载失败。'}
           </p>
           <Button variant="outline" onClick={() => void query.refetch()}>
             重试
@@ -52,9 +49,9 @@ export function OfficialAnnouncements() {
           <p role="status" className="text-xs text-muted-foreground">
             {q.trim() ? '匹配' : '共收录'} {data.total} 份原文，当前显示 {data.items.length} 份
           </p>
-          <ul className="flex flex-col gap-3" aria-label="已收录公告与规则文档">
+          <ul className="divide-y divide-border" aria-label="已收录公告与规则文档">
             {data.items.map((item) => (
-              <li key={item.id} className="flex flex-col gap-3 rounded-md border p-3">
+              <li key={item.id} className="flex flex-col gap-3 py-3 first:pt-0">
                 <a
                   href={item.url}
                   target="_blank"

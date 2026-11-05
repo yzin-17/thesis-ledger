@@ -89,11 +89,13 @@ describe('AI Provider 持久化管理', () => {
       testKind: 'generation',
       purpose: 'research',
       mode: 'native_schema',
+      modelReasoning: { 'target-model': { supportedEfforts: ['high'] } },
       executionRoutes: [
         {
           model: 'target-model',
           contract: aiGenerationContracts.research.ref,
           mode: 'native_schema',
+          reasoningEffort: 'high',
         },
       ],
       modelPricing: {
@@ -121,10 +123,10 @@ describe('AI Provider 持久化管理', () => {
     expect(messages.map((message) => message.role)).toEqual(['system', 'user']);
     expect(messages[0]?.content).toContain('只返回一个满足给定 JSON Schema 的 JSON 对象');
     expect(messages[0]?.content).toContain('不要输出 Markdown');
-    expect(messages[1]?.content).toContain('"conclusion"');
-    // 用途探针要真正产出契约实例，给推理模型保留安全输出预算；探针本身仍保持中性。
+    expect(messages[0]?.content).toContain('"conclusion"');
+    // 用途探针要真正产出契约实例，给推理模型保留安全输出预算；用途探针复用已选推理强度。
     expect(generated).toMatchObject({ maxOutputTokens: 8_192 });
-    expect(generated).not.toHaveProperty('reasoningEffort');
+    expect(generated).toHaveProperty('reasoningEffort', 'high');
   });
 
   it('连接探针保持单条最小 JSON 指令，不内联业务契约', async () => {
@@ -154,22 +156,23 @@ describe('AI Provider 持久化管理', () => {
     expect(result).toMatchObject({ status: 'healthy', testKind: 'connection' });
     const generated = sdk.generate.mock.calls[0]?.[0];
     expect(generated?.messages).toEqual([
-      { role: 'user', content: 'Return exactly this JSON object: {"ok":true}.' },
+      { role: 'user', content: expect.stringContaining('Return exactly this JSON object: {"ok":true}.') },
     ]);
-    expect(generated).toMatchObject({ maxOutputTokens: 1_024, timeout: { totalMs: 30_000 } });
+    expect(JSON.stringify(generated?.messages)).not.toContain('conclusion');
+    expect(generated).toMatchObject({ maxOutputTokens: 1_024 });
     expect(generated).not.toHaveProperty('reasoningEffort');
   });
 
-  it('探针超时报 provider_timeout，不冒充用户取消', async () => {
+  it('探针保留SDK完成等待超时，不冒充用户取消', async () => {
     const configs = createConfigStub();
     const sdk = {
       generate: vi.fn(async () =>
         Promise.reject(
           new AiSdkGenerationError(
             aiGenerationErrorSchema.parse({
-              code: 'cancelled',
-              phase: 'cancellation',
-              summary: '生成请求已取消',
+              code: 'provider_completion_timeout',
+              phase: 'request',
+              summary: '非流式完成等待超时',
               externalResult: 'unknown',
               requestId: '3f2f9f7e-8f2f-4f2f-9f2f-2f9f7e8f2f4f',
             }),
@@ -196,8 +199,8 @@ describe('AI Provider 持久化管理', () => {
 
     expect(result).toMatchObject({
       status: 'down',
-      errorCode: 'provider_timeout',
-      message: 'Provider 未在 1500 ms 内返回结果，已按超时中断',
+      errorCode: 'provider_completion_timeout',
+      message: '非流式完成等待超时',
     });
   });
 
@@ -467,7 +470,7 @@ describe('AI Provider 持久化管理', () => {
       generate: vi.fn(
         (input: { signal: AbortSignal }) =>
           new Promise((_resolve, reject) => {
-            input.signal.addEventListener('abort', () => reject(new Error('aborted')), {
+            input.signal.addEventListener('abort', () => reject(input.signal.reason), {
               once: true,
             });
           }),
@@ -974,106 +977,71 @@ describe('AI Provider 持久化管理', () => {
     }
   });
 
-  it('数据库来源覆盖环境来源，停用屏蔽且删除后揭示环境来源', async () => {
-    const environment = {
-      NODE_ENV: 'development',
-      DATABASE_URL: 'postgresql://user:pass@localhost:5432/test',
-      REDIS_URL: 'redis://localhost:6379',
-      DSA_BASE_URL: 'http://localhost:8000',
-      THESIS_LEDGER_DSA_TOKEN: 'test-token',
-      CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 8).toString('base64'),
-      AI_PROVIDER_CONFIGS_JSON: JSON.stringify([
-        {
-          id: 'shared',
-          baseUrl: 'https://env.example/v1',
-          apiKey: 'env-key',
-          models: ['env-model'],
-        },
-        {
-          id: 'env-only',
-          baseUrl: 'https://env-only.example/v1',
-          apiKey: 'env-key-2',
-          models: ['env-only-model'],
-          timeoutMs: 8_000,
-          costPer1kInput: 0.03,
-          costPer1kOutput: 0.09,
-          costCurrency: 'USD',
-          pricingVersion: 'env-v1',
-          adapter: 'openai-compatible',
-          executionRoutes: [
-            {
-              model: 'env-only-model',
-              mode: 'native_schema',
-              contract: aiGenerationContracts.research.ref,
-              freeEvidence: {
-                source: 'controlled_local',
-                sourceRef: 'environment-provider',
-                sourceVersion: 'env-v1',
-              },
-            },
-          ],
-        },
-      ]),
-    };
-    Object.entries(environment).forEach(([name, value]) => vi.stubEnv(name, value));
+  it('只加载数据库，停用和删除后不会恢复同名环境来源', async () => {
+    vi.stubEnv('AI_PROVIDER_CONFIGS_JSON', JSON.stringify([
+      { id: 'shared', baseUrl: 'https://env.example/v1', apiKey: 'env-key', models: ['env-model'] },
+      { id: 'env-only', baseUrl: 'https://env.example/v1', apiKey: 'env-key', models: ['env-only'] },
+    ]));
+    vi.stubEnv('AI_PROVIDER_ID', 'legacy');
+    vi.stubEnv('AI_BASE_URL', 'https://legacy.example/v1');
+    vi.stubEnv('AI_API_KEY', 'legacy-key');
+    vi.stubEnv('AI_MODEL', 'legacy-model');
+    vi.stubEnv('AI_FIXTURE_ENABLED', 'true');
     try {
-      const configs = createConfigStub([
-        createDbRow('shared', { settings: validSettings('https://db.example/v1', ['db-model']) }),
-      ]);
+      const configs = createConfigStub([createDbRow('shared')]);
       const registry = new AiProviderRegistry();
       const service = new AiProviderService(
-        configs.service as never,
-        createHealthStub() as never,
-        registry,
+        configs.service as never, createHealthStub() as never, registry,
       );
-      await service.refreshRegistry();
-      expect(
-        registry.list().map((provider) => ({ id: provider.id, models: provider.models })),
-      ).toEqual([
+      await service.onModuleInit();
+      expect(registry.list().map(({ id, models }) => ({ id, models }))).toEqual([
         { id: 'shared', models: ['db-model'] },
-        { id: 'env-only', models: ['env-only-model'] },
       ]);
-      expect((await service.list()).find((provider) => provider.name === 'shared')).toMatchObject({
-        source: 'database',
-      });
+      expect(await service.list()).toEqual([
+        expect.objectContaining({ name: 'shared', source: 'database' }),
+      ]);
+      await expect(service.setEnabled('env-only', false)).rejects.toThrow('配置不存在');
+      await expect(service.remove('env-only')).rejects.toThrow('配置不存在');
 
       const shared = await configs.service.findStored('shared');
-      if (!shared) throw new Error('missing shared provider');
       await service.setEnabled('shared', false, {
-        expectedRevision: shared.updatedAt.toISOString(),
+        expectedRevision: shared!.updatedAt.toISOString(),
       });
-      expect(registry.list().map((provider) => provider.id)).toEqual(['env-only']);
-      const disabledShared = await configs.service.findStored('shared');
-      if (!disabledShared) throw new Error('missing disabled shared provider');
-      await service.remove('shared', {
-        expectedRevision: disabledShared.updatedAt.toISOString(),
-      });
-      expect((await service.list()).find((provider) => provider.name === 'shared')).toMatchObject({
-        source: 'environment',
-        models: ['env-model'],
-      });
-      expect((await service.list()).find((provider) => provider.name === 'env-only')).toMatchObject(
-        {
-          timeoutMs: 8_000,
-          costPer1kInput: 0.03,
-          costPer1kOutput: 0.09,
-          costCurrency: 'USD',
-          pricingVersion: 'env-v1',
-          upstreamFormat: 'chat-completions',
-          chatImplementation: 'compatible',
-          executionRouteConfigs: [
-            expect.objectContaining({
-              model: 'env-only-model',
-              mode: 'native_schema',
-              contract: aiGenerationContracts.research.ref,
-            }),
-          ],
-          executionRoutes: [{ readiness: { state: 'blocked' } }],
-        },
+      expect(registry.list()).toEqual([]);
+      expect(await service.list()).toEqual([
+        expect.objectContaining({ name: 'shared', enabled: false, source: 'database' }),
+      ]);
+      const disabled = await configs.service.findStored('shared');
+      await service.remove('shared', { expectedRevision: disabled!.updatedAt.toISOString() });
+      expect(await service.list()).toEqual([]);
+      expect(registry.list()).toEqual([]);
+
+      const restarted = new AiProviderService(
+        configs.service as never, createHealthStub() as never, new AiProviderRegistry(),
       );
+      expect(await restarted.refreshRegistry()).toEqual([]);
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+
+  it('空数据库可启动；查询失败明确报错并保留上一份完整 Registry', async () => {
+    const configs = createConfigStub();
+    const registry = new AiProviderRegistry();
+    const service = new AiProviderService(
+      configs.service as never, createHealthStub() as never, registry,
+    );
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+    expect(await service.list()).toEqual([]);
+    expect(registry.list()).toEqual([]);
+    configs.replace([createDbRow('stored')]);
+    await service.refreshRegistry();
+    const snapshot = registry.list();
+    configs.service.listStored.mockRejectedValue(new Error('database unavailable'));
+    await expect(service.list()).rejects.toThrow('database unavailable');
+    await expect(service.refreshRegistry()).rejects.toThrow('database unavailable');
+    await expect(service.onModuleInit()).rejects.toThrow('database unavailable');
+    expect(registry.list()).toEqual(snapshot);
   });
 
   it('能力撤销由服务端绑定当前配置指纹并只阻断后续发送', async () => {

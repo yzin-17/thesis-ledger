@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   tradeDetailResponseSchema,
@@ -19,6 +20,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 import { summarizeTradeRealizedPnl, type TradeRealizedPnlSummary } from './trade-realized-pnl.js';
+import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
 
 const tradeDetailInclude = {
   asset: { select: { name: true } },
@@ -303,7 +305,14 @@ const generationConflict = () =>
 
 @Injectable()
 export class TradeQueryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
+  ) {}
+
+  private async namedDetails(trades: PersistedTrade[], transaction?: Prisma.TransactionClient) {
+    return (await this.display.nameAssets(trades, transaction)).map(mapDetail);
+  }
 
   async realizedPnl(
     accountIds: readonly string[],
@@ -379,7 +388,7 @@ export class TradeQueryService {
     return tradeListResponseSchema.parse({
       accountId: query.accountId ?? null,
       mode: query.mode,
-      items: page.map(mapSummary),
+      items: (await this.display.nameAssets(page)).map(mapSummary),
       nextCursor,
       projectionGenerations,
     });
@@ -392,7 +401,7 @@ export class TradeQueryService {
     });
     if (!trade || trade.accountId !== accountId || trade.accountMode !== mode)
       throw new NotFoundException('Trade 不存在');
-    return mapDetail(trade);
+    return (await this.namedDetails([trade]))[0]!;
   }
 
   async listDetails(input: {
@@ -409,7 +418,7 @@ export class TradeQueryService {
       },
       include: tradeDetailInclude,
     })) as PersistedTrade[];
-    return trades.sort(compareTrades).map(mapDetail);
+    return this.namedDetails(trades.sort(compareTrades));
   }
 
   async readVersion(accountId: string) {
@@ -460,7 +469,7 @@ export class TradeQueryService {
         ledgerRevision: state?.ledgerRevision.toString() ?? '0',
         projectionGeneration: state?.projectionGeneration.toString() ?? '0',
       },
-      details: trades.sort(compareTrades).map(mapDetail),
+      details: await this.namedDetails(trades.sort(compareTrades), transaction),
     };
   }
 
@@ -513,7 +522,7 @@ export class TradeQueryService {
       return tradeReferenceResolveResponseSchema.parse({
         ...base,
         status: 'RESOLVED',
-        trade: mapDetail(match),
+        trade: (await this.namedDetails([match]))[0],
       });
     if (matches.length > 1)
       return tradeReferenceResolveResponseSchema.parse({

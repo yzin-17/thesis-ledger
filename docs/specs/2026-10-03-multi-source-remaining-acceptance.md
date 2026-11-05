@@ -5,7 +5,7 @@
 > 状态（2026-10-08）：普通价格研究、基础Quote、有界公告现金分红M31-r1～r5和用户选定P6的保留范围已完成；取消的高级扩展与指定旧资产追补不记作通过。P6-E1/F3的美股有界整股、港股可覆盖冻结每手研究预设及精简F01镜像/备份/必要恢复均通过，最新[港股与当前版本核验](../tasks/evidence/2026-10-08-p6-hk-share-window-acceptance.md)持有证据。执行Task归档，本Spec保留现行范围与合同；历史整手变更未核验。
 > 对应任务：[剩余实施与验收](../archive/tasks/2026-10-03-multi-source-remaining-acceptance.md)
 
-> 2026-10-09 新的有界研究需求见[历史数据按需获取 Spec](2026-10-09-history-data-on-demand.md)及[Task](../tasks/2026-10-09-history-data-on-demand.md)。该主题以新预研为依据，HiThink 先做有限字段核实及条件性研究消费；不恢复下面已取消的旧 M31 全历史/高级准入追补，不改变已完成公告现金研究与 P6 的范围。
+> 2026-10-09 新的有界研究需求见[历史数据按需获取 Spec](2026-10-09-history-data-on-demand.md)及[Task](../archive/tasks/2026-10-09-history-data-on-demand.md)。该主题以新预研为依据，HiThink 先做有限字段核实及条件性研究消费；不恢复下面已取消的旧 M31 全历史/高级准入追补，不改变已完成公告现金研究与 P6 的范围。
 
 <a id="scope-cancellation-20261008"></a>
 ## 2026-10-08 范围取消与保留（当前执行基线）

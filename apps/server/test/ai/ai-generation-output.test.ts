@@ -44,6 +44,12 @@ describe('AI generation output contracts', () => {
     expect(parseGenerationOutput('native_schema', transformed, sdkValidatedValue)).toBe('ok!');
   });
 
+  it.each(['', ' ', '\n\t'])(
+    'classifies blank text JSON as a parsing failure: %j', (value) => {
+      expect(() => parseGenerationOutput('json_validated', schema, value)).toThrow(SyntaxError);
+    },
+  );
+
   it('does not claim Anthropic has an API JSON-mode adapter contract', () => {
     expect(adapterSupportsGenerationMode('anthropic-messages', 'json_mode')).toBe(false);
     const result = evaluateAiProviderReadiness({

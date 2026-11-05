@@ -7,6 +7,7 @@ import { AutomationService } from '../../src/automation/automation.service.js';
 import { PerformanceDataService } from '../../src/performance/performance-data.service.js';
 import { PerformanceLayerService } from '../../src/performance/performance-layer.service.js';
 import { PerformanceSnapshotService } from '../../src/performance/performance-snapshot.service.js';
+import { frozenSnapshotInputs } from '../../src/performance/performance-snapshot-inputs.js';
 import { PerformanceValuationSeriesService } from '../../src/performance/performance-valuation-series.service.js';
 
 const databaseUrl = process.env.PORTFOLIO_VALUATION_DATABASE_URL;
@@ -263,6 +264,50 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
       unavailable.capture(account.id, at, 'actual', {}, { valuationBasis: 'OFFICIAL' }),
     ).rejects.toThrow('尚未齐备');
     expect((await unavailable.detail(estimate.id))?.revisions).toHaveLength(1);
+  });
+
+  it('后续买卖不污染旧日校准，正式证据并发幂等并允许更正', async () => {
+    const at = new Date('2026-09-28T08:00:00Z');
+    const account = await prisma.account.create({
+      data: { name: '隔离冻结经济输入', type: 'securities', mode: 'actual' },
+    });
+    await prisma.position.create({ data: { accountId: account.id, symbol: '600519.SH',
+      quantity: 2, costPrice: 80, source: 'isolated-fixture' } });
+    const market = { getQuote: async () => ({ price: 100, provider: 'isolated-fixture', stale: false }) };
+    let officialPrice = 101;
+    const bars = { readV3: async () => ({ status: 'selected', selection: { response: {
+      bars: [{ timestamp: '2026-09-28T07:00:00Z', close: officialPrice, completionStatus: 'complete' }],
+      provenance: { providerId: 'isolated-fixture', upstreamSource: 'fixture-explicit' },
+    } } }) };
+    const data = new PerformanceDataService(prisma as never, market as never);
+    const service = new PerformanceSnapshotService(prisma as never, market as never, data, bars as never);
+    const estimate = await service.capture(account.id, at);
+    const original = JSON.stringify(estimate);
+    await prisma.position.update({ where: { accountId_symbol: { accountId: account.id, symbol: '600519.SH' } },
+      data: { quantity: 20, costPrice: 95 } });
+    await prisma.account.update({ where: { id: account.id }, data: { active: false } });
+    const first = await service.reconcileOfficial(100, account.id);
+    expect(first.scanned).toBe(1);
+    expect(first.pending.find(row => row.snapshotId === estimate.id)).toBeUndefined();
+    const detail = await service.detail(estimate.id);
+    expect(detail?.revisions).toHaveLength(2);
+    const initialOfficial = detail!.revisions[1]!;
+    expect(Number(initialOfficial.marketValue)).toBe(202);
+    expect(Number(initialOfficial.costValue)).toBe(160);
+    expect(JSON.stringify(await prisma.portfolioSnapshot.findUnique({ where: { id: estimate.id } }))).toBe(original);
+    const frozen = frozenSnapshotInputs(estimate);
+    const capture = () => service.capture(account.id, at, 'actual', {}, {
+      valuationBasis: 'OFFICIAL', valuationDate: estimate.valuationDate,
+    }, frozen);
+    const repeated = await Promise.all(Array.from({ length: 8 }, capture));
+    expect(new Set(repeated.map(row => row.id))).toEqual(new Set([initialOfficial.id]));
+    officialPrice = 103;
+    const corrected = await Promise.all(Array.from({ length: 8 }, capture));
+    expect(new Set(corrected.map(row => row.id)).size).toBe(1);
+    expect(corrected[0]).toMatchObject({ revision: 3, supersedesSnapshotId: initialOfficial.id });
+    expect(Number(corrected[0]!.marketValue)).toBe(206);
+    expect((await service.detail(estimate.id))?.revisions).toHaveLength(3);
+    expect(await service.list({ accountId: account.id })).toMatchObject([{ id: corrected[0]!.id }]);
   });
 
   it('组合分钟点保留低覆盖质量，不混入现金、模拟或异币种点', async () => {

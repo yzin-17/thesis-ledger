@@ -1,4 +1,34 @@
 import { z } from 'zod';
+import { aiTimeoutDecisionSchema } from './ai-timeout-decision.js';
+import { aiModelRequestOptionsSchema } from './ai-model-request-options.js';
+import {
+  aiExecutionClockSchema,
+  aiTimeoutDiagnosticSchema,
+  aiTimeoutDurationSchema,
+} from './ai-execution-timeout.js';
+import { aiResearchPolicyV1Schema } from './ai-research-policy.js';
+export {
+  aiResearchPolicyV1Schema,
+  DEFAULT_AI_RESEARCH_POLICY_V1,
+  type AiResearchPolicyV1,
+} from './ai-research-policy.js';
+import { aiGenerationHttpRequestDiagnosticSchema } from './ai-generation-http-request-diagnostic.js';
+import {
+  aiGenerationErrorSchema,
+  aiGenerationErrorCodeSchema,
+  aiGenerationPhaseSchema,
+  aiExternalResultCertaintySchema,
+} from './ai-generation-error.js';
+export {
+  aiGenerationErrorCodeSchema,
+  aiGenerationPhaseSchema,
+  aiExternalResultCertaintySchema,
+  aiGenerationErrorSchema,
+  aiGenerationFailureDiagnosticSchema,
+  type AiGenerationErrorCode,
+  type AiGenerationError,
+  type AiGenerationFailureDiagnostic,
+} from './ai-generation-error.js';
 import { nonNegativeDecimalStringSchema } from './monetary-values.js';
 import {
   authoringAnalysisOutputSchema,
@@ -29,6 +59,8 @@ export type AiAdapter = z.infer<typeof aiAdapterSchema>;
 
 export const aiGenerationModeSchema = z.enum(['native_schema', 'json_validated', 'json_mode']);
 export type AiGenerationMode = z.infer<typeof aiGenerationModeSchema>;
+
+export const aiReasoningEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 
 export const aiAuthModeSchema = z.enum(['api_key', 'none']);
 export type AiAuthMode = z.infer<typeof aiAuthModeSchema>;
@@ -86,7 +118,7 @@ export const aiGenerationContractRefSchema = z.discriminatedUnion('id', [
   z
     .object({
       id: z.literal('research'),
-      version: z.literal(AI_RESEARCH_GENERATION_CONTRACT_VERSION),
+      version: z.enum([AI_RESEARCH_GENERATION_CONTRACT_VERSION, 'research-generation-v2']),
     })
     .strict(),
 ]);
@@ -175,56 +207,6 @@ export const aiGenerationContracts = {
   },
 } as const;
 
-export const aiGenerationErrorCodeSchema = z.enum([
-  'configuration_invalid',
-  'capability_unsupported',
-  'authentication_failed',
-  'permission_denied',
-  'payment_required',
-  'provider_rejected',
-  'transport_unknown',
-  'provider_stream_error',
-  'output_truncated',
-  'empty_output',
-  'refused',
-  'schema_invalid',
-  'business_invalid',
-  'cancelled',
-  'persistence_failed',
-]);
-export type AiGenerationErrorCode = z.infer<typeof aiGenerationErrorCodeSchema>;
-
-export const aiGenerationPhaseSchema = z.enum([
-  'configuration',
-  'preflight',
-  'request',
-  'response_headers',
-  'stream',
-  'validation',
-  'persistence',
-  'settlement',
-  'cancellation',
-]);
-
-export const aiExternalResultCertaintySchema = z.enum([
-  'not_sent',
-  'rejected_before_generation',
-  'unknown',
-  'complete',
-]);
-
-export const aiGenerationErrorSchema = z
-  .object({
-    code: aiGenerationErrorCodeSchema,
-    phase: aiGenerationPhaseSchema,
-    summary: z.string().trim().min(1).max(500),
-    externalResult: aiExternalResultCertaintySchema,
-    requestId: z.uuid().nullable().default(null),
-    retryAfterMs: z.number().int().nonnegative().max(86_400_000).optional(),
-  })
-  .strict();
-export type AiGenerationError = z.infer<typeof aiGenerationErrorSchema>;
-
 export const aiUsageStatusSchema = z.enum(['reported', 'partial', 'unknown']);
 export const aiUsageCompletenessSchema = z.enum([
   'reported',
@@ -291,6 +273,7 @@ export const aiGenerationOutcomeSchema = z
     finishReason: z.string().trim().min(1).max(120).nullable(),
     contract: aiGenerationContractRefSchema,
     schemaAccepted: z.boolean(),
+    actualModel: z.string().trim().min(1).max(200).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -335,6 +318,8 @@ export const aiRequestAttemptSchema = z
     dispatchingAt: z.iso.datetime({ offset: true }).nullable(),
     completedAt: z.iso.datetime({ offset: true }).nullable(),
     outcome: aiGenerationOutcomeSchema.nullable(),
+    httpRequest: aiGenerationHttpRequestDiagnosticSchema.optional(),
+    timeoutDecision: aiTimeoutDecisionSchema.optional(),
     error: aiGenerationErrorSchema.nullable(),
     usageRevisions: z.array(aiUsageRevisionSchema).max(16),
     settledRevision: z.number().int().nonnegative(),
@@ -383,50 +368,6 @@ export const aiRequestAttemptSchema = z
       });
   });
 export type AiRequestAttempt = z.infer<typeof aiRequestAttemptSchema>;
-
-const researchPaidRouteSchema = z
-  .object({
-    provider: z.string().trim().min(1).max(120),
-    models: z.array(z.string().trim().min(1).max(200)).min(1).max(32),
-  })
-  .strict();
-
-const decimalIsZero = (value: string) => /^0+(?:\.0+)?$/u.test(value);
-
-export const aiResearchPolicyV1Schema = z
-  .object({
-    version: z.literal('research-policy-v1').default('research-policy-v1'),
-    maxAiCalls: z.number().int().min(1).max(2).default(2),
-    maxInputTokens: z.number().int().min(1).max(10_000_000).default(100_000),
-    maxOutputTokens: z.number().int().min(1).max(2_000_000).default(20_000),
-    maxDurationSeconds: z.number().int().min(30).max(86_400).default(300),
-    maxCost: nonNegativeDecimalStringSchema.default('0'),
-    costCurrency: z
-      .string()
-      .regex(/^[A-Z]{3}$/u)
-      .nullable()
-      .default(null),
-    paidRoutes: z.array(researchPaidRouteSchema).max(12).default([]),
-  })
-  .strict()
-  .superRefine((value, context) => {
-    const paid = !decimalIsZero(value.maxCost);
-    if (paid && (!value.costCurrency || value.paidRoutes.length === 0))
-      context.addIssue({
-        code: 'custom',
-        path: ['maxCost'],
-        message: '付费研究必须同时配置币种和允许的 Provider/模型范围',
-      });
-    if (!paid && (value.costCurrency !== null || value.paidRoutes.length > 0))
-      context.addIssue({
-        code: 'custom',
-        path: ['maxCost'],
-        message: '零费用策略不得携带付费路由授权',
-      });
-  });
-export type AiResearchPolicyV1 = z.infer<typeof aiResearchPolicyV1Schema>;
-
-export const DEFAULT_AI_RESEARCH_POLICY_V1: AiResearchPolicyV1 = aiResearchPolicyV1Schema.parse({});
 
 export const aiAdapterContractEvidenceSchema = z
   .object({
@@ -488,21 +429,35 @@ export const aiLiveValidationSchema = z
 
 export const aiProviderModelExecutionSchema = z
   .object({
+    requestOptions: aiModelRequestOptionsSchema.optional(),
     model: z.string().trim().min(1).max(200),
     adapter: aiAdapterSchema,
     compatibilityExtensionProfile: z.literal('openrouter-v1').optional(),
+    reasoningEnabled: z.boolean().optional(),
+    reasoningEffort: aiReasoningEffortSchema.optional(),
     mode: aiGenerationModeSchema,
     contract: aiGenerationContractRefSchema,
     adapterEvidence: aiAdapterContractEvidenceSchema.nullable(),
     readiness: aiReadinessSchema,
     liveValidation: aiLiveValidationSchema,
-    firstOutputTimeoutMs: z.number().int().positive().max(120_000).optional(),
-    outputIdleTimeoutMs: z.number().int().positive().max(120_000).optional(),
+    firstOutputTimeoutMs: aiTimeoutDurationSchema.optional(),
+    outputIdleTimeoutMs: aiTimeoutDurationSchema.optional(),
     firstOutputTimeoutSource: z.enum(['route', 'provider', 'system']).optional(),
     outputIdleTimeoutSource: z.enum(['route', 'provider', 'system']).optional(),
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.reasoningEnabled !== undefined && value.reasoningEffort !== undefined)
+      context.addIssue({ code: 'custom', path: ['reasoningEffort'], message: '推理开关和推理强度不能同时指定' });
+    if (
+      value.reasoningEnabled !== undefined &&
+      (value.contract.id !== 'research' || value.contract.version !== 'research-generation-v2')
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['reasoningEnabled'],
+        message: '显式推理开关仅适用于研究 V2',
+      });
     if (
       value.adapterEvidence &&
       (value.adapterEvidence.adapter !== value.adapter ||
@@ -554,6 +509,7 @@ export const aiExecutionSummarySchema = z
     contract: aiGenerationContractRefSchema,
     frozenPolicy: aiResearchPolicyV1Schema.nullable(),
     deadlineAt: z.iso.datetime({ offset: true }).nullable(),
+    timing: aiExecutionClockSchema.optional(),
     generationStatus: z.enum(['pending', 'complete', 'incomplete', 'unknown']),
     usageCompleteness: aiUsageCompletenessSchema,
     requests: z.array(aiRequestAttemptSchema).max(30),
@@ -572,6 +528,7 @@ export const aiExecutionRequestReadModelSchema = z
   .object({
     requestId: z.uuid(),
     sequence: z.number().int().positive(),
+    timeoutDecision: aiTimeoutDecisionSchema.optional(),
     state: z.enum(['prepared', 'dispatching', 'completed', 'unknown']),
     reservation: aiRequestReservationReadModelSchema,
     preparedAt: z.iso.datetime({ offset: true }),
@@ -585,6 +542,8 @@ export const aiExecutionRequestReadModelSchema = z
         externalResult: aiExternalResultCertaintySchema,
         requestId: z.uuid().nullable(),
         retryAfterMs: z.number().int().nonnegative().max(86_400_000).optional(),
+        timeout: aiTimeoutDiagnosticSchema.optional(),
+        upstreamStatus: z.number().int().min(100).max(599).optional(),
       })
       .strict()
       .nullable(),
@@ -600,6 +559,7 @@ export const aiExecutionReadModelSchema = z
     contract: aiGenerationContractRefSchema,
     frozenPolicy: aiResearchPolicyV1Schema.nullable(),
     deadlineAt: z.iso.datetime({ offset: true }).nullable(),
+    timing: aiExecutionClockSchema.optional(),
     generationStatus: z.enum(['pending', 'complete', 'incomplete', 'unknown']),
     usageCompleteness: aiUsageCompletenessSchema,
     requests: z.array(aiExecutionRequestReadModelSchema).max(30),

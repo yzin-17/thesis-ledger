@@ -182,7 +182,7 @@ postgresDescribe('Research recovery isolated PostgreSQL', () => {
     },
   );
 
-  it('仅允许已确认生成前拒绝在剩余额度内恢复一次 fallback', async () => {
+  it('生成前拒绝后没有预留新请求时，恢复不得赠送一次 fallback', async () => {
     const runId = await createRunning();
     const requestId = randomUUID();
     await store.prepareRequest({ runId, executionAttempt: 1, requestId, reservation });
@@ -219,8 +219,8 @@ postgresDescribe('Research recovery isolated PostgreSQL', () => {
 
     await runs.recoverStaleRuns();
     expect(await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({
-      status: 'queued',
-      errorCode: 'research_lease_recovered',
+      status: 'failed',
+      errorCode: 'research_provider_rejected',
     });
   });
 

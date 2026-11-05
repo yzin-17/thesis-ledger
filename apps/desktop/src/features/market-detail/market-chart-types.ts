@@ -14,6 +14,7 @@ export type MarketChartBar = Omit<BarPoint, 'completionStatus' | 'availableAt'> 
   availableAt?: string;
   symbol?: string;
   timeframe?: BarSeries['identity']['timeframe'];
+  session?: 'regular';
   timeframeKind?: 'base' | 'derived';
   provider?: string;
   upstreamSource?: string;
@@ -23,6 +24,14 @@ export type MarketChartBar = Omit<BarPoint, 'completionStatus' | 'availableAt'> 
   fetchedAt?: string;
   freshness?: 'live' | 'delayed' | 'stale';
   servedFromCache?: boolean;
+  tradingDate?: string;
+  bucketStartDate?: string;
+  bucketEndDate?: string;
+  observedTradingDates?: string[];
+  bucketEndAt?: string;
+  observedEndAt?: string;
+  observedAt?: string;
+  calculationCutoffAt?: string;
 };
 
 export type MarketChartIndicator = Omit<MarketIndicatorResult, 'points' | 'inputFingerprint'> & {
@@ -60,6 +69,7 @@ export const chartBarsFromSeries = (series: BarSeries): MarketChartBar[] => {
     ...point,
     symbol: series.identity.symbol,
     timeframe: series.identity.timeframe,
+    ...('chartContextV3' in series && series.chartContextV3?.session ? { session: series.chartContextV3.session } : {}),
     ...source,
     adjustment: series.identity.adjustment,
     inputFingerprint: series.inputFingerprint,

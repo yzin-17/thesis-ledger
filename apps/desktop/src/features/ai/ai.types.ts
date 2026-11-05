@@ -3,6 +3,7 @@ import type {
   AiResearchDisplayProjection,
   AiResearchSourceType,
   AiUsageCompleteness,
+  ResearchReportDetail,
 } from '@thesis-ledger/schemas';
 
 export type AiResearchScope = 'portfolio' | 'account' | 'position' | 'strategy';
@@ -16,21 +17,22 @@ export type AiRunSourceFilter = 'all' | AiResearchSourceType;
 
 export interface AiResearchContext {
   scope: AiResearchScope;
-  portfolioId?: string;
-  accountId?: string;
-  symbol?: string;
-  strategyVersionId?: string;
+  mode?: 'actual' | 'shadow' | undefined;
+  portfolioId?: string | undefined;
+  accountId?: string | undefined;
+  symbol?: string | undefined;
+  strategyVersionId?: string | undefined;
 }
 
 export interface AiCitation {
-  toolCallId?: string;
+  toolCallId?: string | undefined;
   tool: string;
   sourceId: string;
   provider: string;
   observedAt: string;
-  marketTime?: string;
-  availableAt?: string;
-  fetchedAt?: string;
+  marketTime?: string | undefined;
+  availableAt?: string | undefined;
+  fetchedAt?: string | undefined;
 }
 
 export interface AiEvidence {
@@ -41,15 +43,15 @@ export interface AiEvidence {
 export interface AiResearchResult {
   version: 1;
   provider: string;
-  symbol?: string;
-  score?: number;
+  symbol?: string | undefined;
+  score?: number | undefined;
   conclusion: string;
   evidence: AiEvidence[];
   risks: string[];
   unknowns: string[];
   signals: string[];
   disclaimer: string;
-  context?: AiResearchContext;
+  context?: AiResearchContext | undefined;
   createdAt: string;
 }
 
@@ -69,6 +71,7 @@ export interface AiToolCall {
 }
 
 export interface AiRunRecord {
+  savedReport?: ResearchReportDetail;
   id: string;
   provider: string;
   model: string;

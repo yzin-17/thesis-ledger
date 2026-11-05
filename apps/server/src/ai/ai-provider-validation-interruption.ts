@@ -1,9 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
-import { VALIDATION_DURATION_SECONDS } from './ai-provider-validation-policy.js';
+import { AiExecutionTimeoutError } from './timeout/ai-timeout-scope.js';
 
 export function validationInterruption(signal: AbortSignal, deadline: number) {
   if (signal.aborted) {
-    if (signal.reason instanceof Error && signal.reason.name === 'TimeoutError')
+    if (
+      signal.reason instanceof AiExecutionTimeoutError ||
+      (signal.reason instanceof Error && signal.reason.name === 'TimeoutError')
+    )
       return 'operation_timeout';
     return 'validation_cancelled';
   }
@@ -15,7 +18,7 @@ export function validationInterruptionMessage(
   interruption: NonNullable<ReturnType<typeof validationInterruption>>,
 ) {
   if (interruption === 'operation_timeout')
-    return `验证超过 ${VALIDATION_DURATION_SECONDS} 秒操作总期限，已按超时中断，原配置未修改`;
+    return '验证已耗尽本次计划的执行预算，已进入收尾，原配置未修改';
   return '生成请求已取消，原配置未修改';
 }
 

@@ -22,6 +22,16 @@ const clientAuditMetadataFields = new Set([
   'toolCalls',
   'fallbackErrors',
   'frozenResearch',
+  'diagnosticTrace',
+  'sdkExecution',
+  'researchPolicy',
+  'researchRoutes',
+  'researchDefault',
+  'researchSettingsRevision',
+  'researchScopeSnapshot',
+  'researchOwnerId',
+  'researchSubmissionId',
+  'researchInputDigest',
 ]);
 
 const clientModelMetadataSchema = z.unknown().superRefine((value, context) => {

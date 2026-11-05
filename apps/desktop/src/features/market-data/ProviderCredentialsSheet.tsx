@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Sheet,
   SheetContent,
@@ -16,11 +16,13 @@ import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ProviderCredentialFields } from './ProviderCredentialFields.js';
 import {
   clearMarketProviderCredential,
+  fetchMarketProviders,
   saveMarketProviderCredentials,
 } from './market-data.api.js';
 import { ProviderOAuthPanel } from './ProviderOAuthPanel.js';
 import { useProviderCredentialProbe } from './useProviderCredentialProbe.js';
 import { ProviderAccountAccessPanel } from './ProviderAccountAccessPanel.js';
+import { ProviderAccountLevelFields, savedAccountLevel, parseAccountLevelDraft, type AccountLevelDraft } from './ProviderAccountLevelFields.js';
 import { marketDataKeys } from './market-data.queries.js';
 import { credentialSourceLabel, validateCredentialDraft } from './provider-credentials.js';
 import type { ProviderManifest, ProviderCredentialDraft, MarketRouteCatalogReadV3 } from './market-data.types.js';
@@ -51,25 +53,34 @@ export function ProviderCredentialsSheet({
     provider.providerId === 'longbridge' && provider.credentialMethod !== 'legacy',
   );
   const draftRevision = useRef(0);
+  const [levelDraft, setLevelDraft] = useState<AccountLevelDraft>(() => ({
+    points: savedAccountLevel(provider)?.points.toString() ?? '', independentApis: savedAccountLevel(provider)?.independentApis ?? [],
+  }));
+  const accountLevel = parseAccountLevelDraft(levelDraft);
+  const levelDirty = provider.accountAccessSupported && JSON.stringify(accountLevel) !== JSON.stringify(savedAccountLevel(provider));
   const [feedback, setFeedback] = useState<{ error: boolean; text: string } | null>(null);
   const client = useQueryClient();
   const { confirm } = useConfirmDialog();
   const dirty = Object.values(draft.values).some((value) => value.length > 0);
   const refresh = () => client.invalidateQueries({ queryKey: marketDataKeys.root });
-  const probe = useProviderCredentialProbe(provider, draft, draftRevision, setFeedback);
+  const registry = useQuery({ queryKey: marketDataKeys.providers(), queryFn: fetchMarketProviders, enabled: false });
+  const probe = useProviderCredentialProbe(provider, draft, draftRevision, setFeedback, accountLevel ?? undefined);
   const test = probe.test;
   // 凭证通过组件闭包读取，不作为 mutation variables 留在全局缓存中。
   const save = useMutation({
     gcTime: 0,
     retry: false,
-    mutationFn: () => saveMarketProviderCredentials(provider.providerId, draft),
+    mutationFn: () => provider.accountAccessSupported
+      ? saveMarketProviderCredentials(provider.providerId, dirty ? draft : undefined,
+        accountLevel ? { ...provider.settings, accountLevel } : undefined, provider.configVersion)
+      : saveMarketProviderCredentials(provider.providerId, draft),
     onSuccess: (configuration) => {
       setSavedConfiguration(configuration);
       setFieldsRevision((revision) => revision + 1);
       setDraft((current) => ({ ...current, values: {} }));
       setFeedback({ error: false, text: provider.accountAccessSupported
-        ? '凭证已保存，正在检查账户功能权限。' : '凭证已保存。可通过测试连接检查权限与可达性。' });
-      probe.checkSaved(configuration.configVersion);
+        ? '账号等级和功能权限已保存。' : '凭证已保存。可通过测试连接检查权限与可达性。' });
+      probe.clear();
     },
     onError: () => setFeedback({ error: true, text: '凭证保存失败，请检查字段后重试。' }),
     onSettled: refresh,
@@ -86,6 +97,7 @@ export function ProviderCredentialsSheet({
         error: false,
         text: '页面凭证已移除。有环境配置时自动使用环境凭证；否则数据源已停用。',
       });
+      if (provider.accountAccessSupported) setLevelDraft({ points: '', independentApis: [] });
     },
     onError: () => setFeedback({ error: true, text: '移除失败，请稍后重试。' }),
     onSettled: refresh,
@@ -112,11 +124,11 @@ export function ProviderCredentialsSheet({
   }
   let saveLabel = '保存凭证';
   if (save.isPending) saveLabel = '保存中…';
-  else if (provider.accountAccessSupported) saveLabel = '保存并检查权限';
+  else if (provider.accountAccessSupported) saveLabel = '检查权限并保存';
   const close = async () => {
     if (busy) return;
     if (
-      dirty &&
+      (dirty || levelDirty) &&
       !(await confirm({
         title: '放弃未保存的凭证？',
         description: '关闭后会清除本次输入。',
@@ -146,6 +158,7 @@ export function ProviderCredentialsSheet({
     setOauthMode(useOAuth);
   };
   const clearCredentials = async () => {
+    if (busy) return;
     if (
       !(await confirm({
         title: '移除页面凭证？',
@@ -230,12 +243,23 @@ export function ProviderCredentialsSheet({
               </p>
             </>
           )}
+          {provider.accountAccessSupported && <ProviderAccountLevelFields value={levelDraft} disabled={busy}
+            onChange={(next) => { draftRevision.current++; probe.clear(); setLevelDraft(next); setFeedback(null); }} />}
           {feedback && (
             <Alert variant={feedback.error ? 'destructive' : 'default'}>
               <AlertDescription role="status">{feedback.text}</AlertDescription>
             </Alert>
           )}
-          <ProviderAccountAccessPanel provider={provider} catalog={catalog} report={probe.report} dirty={dirty} />
+          {registry.isError && savedConfiguration && (
+            <Alert>
+              <AlertTitle>配置已保存，数据源状态暂未更新</AlertTitle>
+              <AlertDescription>已确认的配置无需再次提交。重新读取只更新页面状态，不测试连接。</AlertDescription>
+              <Button variant="outline" disabled={registry.isFetching} onClick={() => void registry.refetch()}>
+                重新读取数据源状态
+              </Button>
+            </Alert>
+          )}
+          <ProviderAccountAccessPanel provider={provider} catalog={catalog} report={probe.report} dirty={dirty || !!levelDirty} />
           {provider.credentialSource === 'control' && (
             <div>
               <Button variant="ghost" disabled={busy} onClick={() => void clearCredentials()}>
@@ -253,6 +277,9 @@ export function ProviderCredentialsSheet({
               variant="outline"
               disabled={busy || test.isPending}
               onClick={() => {
+                if (provider.accountAccessSupported && !accountLevel) {
+                  setFeedback({ error: true, text: '请填写当前账号的有效积分。' }); return;
+                }
                 const error = !dirty && provider.accountAccessSupported && provider.credentialConfigured
                   ? null : validateCredentialDraft(provider, draft);
                 if (error) {
@@ -266,11 +293,14 @@ export function ProviderCredentialsSheet({
               {testLabel}
             </Button>
           )}
-          {!oauthMode && dirty && (
+          {!oauthMode && (dirty || levelDirty) && (
             <Button
-              disabled={busy || test.isPending || !dirty}
+              disabled={busy || test.isPending}
               onClick={() => {
-                const error = validateCredentialDraft(provider, draft);
+                if (provider.accountAccessSupported && !accountLevel) {
+                  setFeedback({ error: true, text: '请填写当前账号的有效积分。' }); return;
+                }
+                const error = !dirty && provider.credentialConfigured ? null : validateCredentialDraft(provider, draft);
                 if (error) {
                   setFeedback({ error: true, text: error });
                   return;

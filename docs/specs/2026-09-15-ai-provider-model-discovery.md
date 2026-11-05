@@ -2,17 +2,17 @@
 
 > 任务标识：`ai-provider-model-discovery`
 > 日期：2026-09-15
-> 状态：源码实现与分层验证完成；当前运行中的 Docker Server 尚未重建，部署后生效。
+> 状态：现行目录发现合同；用户手动规则扩展及运行态验收见[通用配置规格](2026-10-26-provider-model-catalog-configuration.md)。
 > 对应任务：[2026-09-15-ai-provider-model-discovery](../archive/tasks/2026-09-15-ai-provider-model-discovery.md)
 
 ## 背景与目标
 
-当前 AI Provider 表单要求用户手动输入模型 ID。OpenAI-compatible Provider 通常提供 `GET /models`，因此应由 Server 代为访问模型目录，前端展示可筛选、可多选的结果，减少拼写错误并避免浏览器直接访问第三方或持有已保存 API Key。
+模型目录由 Server 代为读取，前端展示可筛选、可多选的结果，减少模型 ID 拼写错误并避免浏览器直接访问第三方或持有已保存 API Key。目录请求和响应规则由用户在前端通用配置中手动填写。
 
 ## 设计
 
 - 新增 `POST /ai/providers/models`。请求包含当前 `name`、`baseUrl` 和可选的新 API Key；未提供新 Key 时，仅允许复用同名数据库 AI Provider 的加密凭据。
-- Server 请求 `${baseUrl}/models`，使用 Bearer 鉴权，校验 OpenAI-compatible `{ data: [{ id }] }` 响应，返回去重、排序后的模型 ID、可选推理能力元数据与获取时间。为兼容现有客户端，`models: string[]` 保持不变，并新增与模型 ID 对应的详情集合。
+- 默认目录请求 `${baseUrl}/models`，使用对应协议的鉴权头，校验 OpenAI-compatible `{ data: [{ id }] }` 响应；用户可按[通用配置规格](2026-10-26-provider-model-catalog-configuration.md)手动定义地址、列表及 ID 路径、筛选和分页。Server 仅解释这些配置，返回去重、排序后的 ID、可选推理能力及获取时间，`models: string[]` 兼容保持。
 - 推理能力只接受已知的 `supported_efforts`、`default_effort`、`default_enabled`、`supports_max_tokens` 和 `mandatory` 字段；Provider 未返回或返回非法元数据时忽略该部分，不影响合法模型 ID 进入目录。
 - 复用数据库凭据时，请求 Base URL 必须与已保存配置一致；模型目录请求拒绝重定向，避免把已保存密钥发送到其他地址。
 - API Key 不进入响应、日志、查询键或持久化模型目录。错误沿用 AI Provider 脱敏规则。保存 Provider 时仅保留已选模型的非敏感推理能力快照，不持久化完整目录。
@@ -28,14 +28,14 @@
 - 不定时同步或持久化第三方模型目录。
 - 不自动选择最便宜、免费或能力最强的模型。
 - 不在本次新增用户手动选择并持久化推理强度的运行参数。
-- 不支持用户在模型目录之外任意录入模型 ID；Provider 未实现 `/models` 时只能保留和删除已有选择，不能新增目录外模型。
+- 模型 ID、价格及用途的手动配置由[模型与用途配置规格](2026-09-21-ai-provider-model-usage-configuration.md)维护；目录获取不改变这些已选配置。
 
 ## 验收标准
 
 - AC1：Server 能使用草稿 API Key 或同名数据库 Provider 的已保存凭据获取 `/models`，且响应不包含凭据。
 - AC2：非法 URL、非成功 HTTP、超时、错误响应形状与超量目录均返回脱敏错误，不修改 Provider 配置或 Registry。
-- AC3：Desktop AI Provider 表单仅提供带标签的可搜索多选器，不渲染模型 `textarea`；已选项可从标签或列表移除，列表明确展示选中状态，最多选择 32 个。
-- AC4：获取失败不清空当前选择；已有但不在最新目录中的模型仍显示为可删除标签，且不能新增目录外模型。
+- AC3：Desktop 使用带标签的可搜索多选器，不渲染模型 `textarea`；已选项可从标签或列表移除，列表明确展示选中状态，最多选择 32 个。
+- AC4：获取失败不清空当前选择；已有但不在最新目录中的模型仍显示为可删除标签，手动输入继续遵守模型配置合同。
 - AC5：Server/Desktop 定向测试、TypeScript、边界与文件尺寸门禁通过，并在目标页面完成浏览器验收。
 - AC6：模型目录响应兼容保留 `models: string[]`，并返回合法、脱敏、数量受限的可选推理能力元数据；非法或未知元数据不会污染目录。
 - AC7：Desktop 模型候选项可展示支持的推理强度、默认值和强制状态；未声明能力时不作推断，既有搜索、多选、标签和 32 项上限行为不变。

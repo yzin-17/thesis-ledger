@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { backtestUnknownListingWarningV3 } from '@thesis-ledger/schemas';
+import { deterministicResultChecksum } from '@thesis-ledger/domain';
 import type { DsaClient } from '../../src/integration/dsa/dsa.client.js';
 import { DsaSnapshotBuilder } from '../../src/backtest/backtest-snapshot-builder.js';
 import { LocalSnapshotStore, hashCanonicalManifest } from '../../src/backtest/backtest-snapshot.js';
@@ -73,7 +74,15 @@ describe('未知上市信息的冻结消费者', () => {
       new AbortController().signal,
     );
     expect(result.simulationFills).toEqual(knownResult.simulationFills);
-    expect(knownResult.resultChecksum).toBe('7aa84c45e97d07ff');
+    const { resultChecksum, ...payload } = knownResult;
+    expect(payload.engineVersion).toBe('thesis-ledger-v3-local-runner-v3');
+    expect(resultChecksum).toBe('631d29e05ae81542');
+    expect(
+      deterministicResultChecksum({
+        ...payload,
+        engineVersion: 'thesis-ledger-v3-local-runner-v2',
+      }),
+    ).toBe('7aa84c45e97d07ff');
     expect(result.warnings).toContain(backtestUnknownListingWarningV3);
     expect(knownResult.warnings).not.toContain(backtestUnknownListingWarningV3);
     expect(result.completeness).toEqual(knownResult.completeness);

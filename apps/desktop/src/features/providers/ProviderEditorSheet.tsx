@@ -43,11 +43,7 @@ const providerTestLabel = (testing: boolean) => {
   return '测试连接';
 };
 
-const providerSheetTitle = (
-  editingProviderName: string | null,
-  takingOverEnvironmentName: string | null,
-) => {
-  if (takingOverEnvironmentName) return '接管部署 Provider';
+const providerSheetTitle = (editingProviderName: string | null) => {
   if (editingProviderName) return '更新 Provider';
   return '新增或更新 Provider';
 };
@@ -57,7 +53,6 @@ export const ProviderEditorSheet = ({
   editingProviderName,
   providerDraft,
   credentialInputOpen,
-  takingOverEnvironmentName,
   providerTestState,
   savingProviderDraft,
   availableAiModels = [],
@@ -81,7 +76,6 @@ export const ProviderEditorSheet = ({
   editingProviderName: string | null;
   providerDraft: ProviderDraft;
   credentialInputOpen: boolean;
-  takingOverEnvironmentName: string | null;
   providerTestState: 'idle' | 'testing' | 'success' | 'warning' | 'error';
   savingProviderDraft: boolean;
   availableAiModels?: string[];
@@ -123,7 +117,7 @@ export const ProviderEditorSheet = ({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
           <SheetHeader>
             <SheetTitle>
-              {providerSheetTitle(editingProviderName, takingOverEnvironmentName)}
+              {providerSheetTitle(editingProviderName)}
             </SheetTitle>
             <SheetDescription id="provider-form-description">
               凭证用于连接 Provider；已配置凭证不会回显，编辑时留空保存不会删除当前凭证。
@@ -145,7 +139,7 @@ export const ProviderEditorSheet = ({
                     onChange={(event) =>
                       onUpdateDraft((current) => ({ ...current, name: event.target.value }))
                     }
-                    readOnly={Boolean(editingProviderName) || Boolean(takingOverEnvironmentName)}
+                    readOnly={Boolean(editingProviderName)}
                     required
                     maxLength={80}
                   />
@@ -226,7 +220,6 @@ export const ProviderEditorSheet = ({
                         section="connection"
                         draft={providerDraft}
                         credentialInputOpen={credentialInputOpen}
-                        takingOverEnvironmentName={takingOverEnvironmentName}
                         onUpdateDraft={onUpdateDraft}
                         onResetTest={onResetTest}
                         onSetCredentialInputOpen={onSetCredentialInputOpen}
@@ -244,7 +237,6 @@ export const ProviderEditorSheet = ({
                         section="model"
                         draft={providerDraft}
                         credentialInputOpen={credentialInputOpen}
-                        takingOverEnvironmentName={takingOverEnvironmentName}
                         onUpdateDraft={onUpdateDraft}
                         onResetTest={onResetTest}
                         onSetCredentialInputOpen={onSetCredentialInputOpen}

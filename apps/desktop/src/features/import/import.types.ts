@@ -1,21 +1,6 @@
-export interface ImportRow {
-  rowId?: string;
-  rawSymbol: string;
-  rawName?: string;
-  assetType?: 'stock' | 'etf' | 'fund';
-  symbol?: string;
-  matchStatus: 'matched' | 'ambiguous' | 'unmatched';
-  matchCandidates: string[];
-  quantity?: string;
-  costPrice?: string;
-  marketPrice?: string;
-  marketValue?: string;
-  profit?: string;
-  profitRate?: string;
-  confidence: number;
-  rawText: Record<string, string>;
-  issues: string[];
-}
+import type { ImportDraft } from '@thesis-ledger/schemas';
+
+export type ImportRow = ImportDraft['rows'][number];
 
 export interface ImportDraftRecord {
   id: string;

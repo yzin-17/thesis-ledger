@@ -74,6 +74,21 @@ export const checkpointLabel = (checkpoint: Record<string, unknown> | null | und
 };
 
 export const errorLabel = (code: string | null | undefined) => {
+  const stages: Record<string, string> = {
+    provider_connect_timeout: '连接建立超时',
+    provider_first_output_timeout: '等待首有效输出超时',
+    provider_output_idle_timeout: '有效输出停顿超时',
+    provider_completion_timeout: '非流式完成等待超时',
+    tool_timeout: '数据工具执行超时',
+    task_budget_exhausted: '任务总预算已耗尽',
+    execution_lease_lost: '执行所有权已失效',
+    upstream_timeout: '上游返回超时',
+    cancelled: '任务已取消',
+    queue_expired: '排队等待已过期',
+    deadline_expired: '任务执行期限已到',
+  };
+  const stage = stages[(code ?? '').replace(/^research_/u, '')];
+  if (stage) return stage;
   const labels: Record<string, string> = {
     tool_unavailable: '数据工具不可用',
     result_contract_invalid: '结果契约校验失败',

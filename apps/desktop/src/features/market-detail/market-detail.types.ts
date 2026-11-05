@@ -4,12 +4,17 @@ import type {
   MarketDisplayDetailSection as MarketDetailSection,
   MarketDetailSectionStatus,
 } from '@thesis-ledger/api-client';
-import type { MarketDisplayBarSeries as BarSeries, Quote } from '@thesis-ledger/schemas';
+import type { Currency, MarketDisplayBarSeries as BarSeries, Quote } from '@thesis-ledger/schemas';
 import { canCombineChartSeries } from './market-chart-acquisition.js';
 import type { MarketDetailResponse as NativeDetailResponse } from '@thesis-ledger/api-client';
 
 export interface MarketDetailPosition {
   symbol: string;
+  accountId?: string;
+  mode?: 'actual' | 'shadow';
+  currency?: Currency | undefined;
+  valuedAt?: string;
+  accountName?: string | undefined;
   quantity?: number;
   costPrice?: number;
   pnl?: number | null;
@@ -52,10 +57,11 @@ export function mergeMarketDetail(
   });
   let mergedBarSeries = nextSeries ?? currentSeries;
   if (currentSeries && nextSeries && canCombine && !('derivation' in currentSeries) && !('derivation' in nextSeries)) {
-    // BarSeries 的 timestamp 可能在不同适配器间使用不同 ISO 表达，但图表语义按交易日
-    // 合并；同日重叠项必须由本次有效响应替换，不能因时刻字符串不同而重复一根 bar。
-    const byDate = new Map(currentSeries.points.map((bar) => [bar.timestamp.slice(0, 10), bar]));
-    nextSeries.points.forEach((bar) => byDate.set(bar.timestamp.slice(0, 10), bar));
+    // 日线按交易日合并，分钟保留同日每个独立时刻；重叠项由本次有效响应替换。
+    const key = (timestamp: string) => nextSeries.identity.timeframe === '1m'
+      ? new Date(timestamp).toISOString() : timestamp.slice(0, 10);
+    const byDate = new Map(currentSeries.points.map((bar) => [key(bar.timestamp), bar]));
+    nextSeries.points.forEach((bar) => byDate.set(key(bar.timestamp), bar));
     const points = [...byDate.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
     const mergedSeries: BarSeries = {
       ...nextSeries,

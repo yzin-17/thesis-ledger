@@ -10,6 +10,8 @@ export const marketChartPlanV3Schema = z.strictObject({
   barsLimit: z.number().int().min(1).max(3000),
   indicatorParams: z.record(z.string(), z.number().finite()).default({}),
   end: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).optional(),
+  timeframe: z.enum(['1m', '1d']).optional(),
+  assetType: z.enum(['STOCK', 'ETF']).optional(),
 });
 export type MarketChartPlanV3 = z.infer<typeof marketChartPlanV3Schema>;
 
@@ -18,6 +20,7 @@ export const marketChartOptionsV3Schema = z
     contractVersion: z.literal(3),
     symbol: z.string().min(1),
     mode: z.enum(['legacy', 'v3', 'unknown']),
+    timeframe: z.enum(['1m', '1d']).optional(),
     window: marketChartOptionsWindowV3Schema.optional(),
     plan: marketChartPlanV3Schema.optional(),
     options: z

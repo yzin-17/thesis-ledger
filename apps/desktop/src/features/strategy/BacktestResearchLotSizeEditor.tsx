@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { applyResearchLotSize, researchLotSourceLabel } from './backtest-research-lot-size.model.js';
-import { fetchSecurityLotSize } from './security-lot-size.api.js';
+import { fetchSecurityLotSize } from '../market-data/security-lot-size.api.js';
 
 type Props = { model: BacktestExecutionModelV3; onChange: (text: string) => void; onDraftChange: () => void };
 

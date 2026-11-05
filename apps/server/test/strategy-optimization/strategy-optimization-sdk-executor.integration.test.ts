@@ -1,3 +1,5 @@
+import { aiGenerationContracts } from '@thesis-ledger/schemas';
+import { buildGenerationSchemaPrompt } from '../../src/ai/ai-generation-schema-prompt.js';
 import { createServer, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -153,7 +155,7 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
     route,
     modelKey: step.modelKey,
     step,
-    messages: [{ role: 'user', content: 'Return JSON.' }],
+    messages: [{ role: 'system', content: buildGenerationSchemaPrompt(experiment.sourceMode === 'discovery' ? aiGenerationContracts.strategyDiscovery.schema : aiGenerationContracts.parameterOptimization.schema) }, { role: 'user', content: 'Return JSON.' }],
     inputTokenReservation: 100,
     outputTokenReservation: 100,
     estimatedCost: 0.003,
@@ -192,6 +194,18 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
         outcome: expect.objectContaining({ status: 'complete', schemaAccepted: true }),
       }),
     );
+  });
+
+  it('缺失字段指令时不初始化预算、不结算、不发请求', async () => {
+    const input = common({ sourceMode: 'existing' }, {},
+      { id: 'parameter_optimization', version: 'optimization-parameter-v1' });
+    input.messages = [{ role: 'user', content: '只返回JSON' }];
+    await expect(executor().completeProposal(input as never)).rejects.toMatchObject({
+      fact: { code: 'configuration_invalid', externalResult: 'not_sent' },
+    });
+    expect(executions.initialize).not.toHaveBeenCalled();
+    expect(settlements.completeAndSettle).not.toHaveBeenCalled();
+    expect(requestCount).toBe(0);
   });
 
   it('模型返回完整但格式无效的响应时只结算一次格式失败并保留已报告用量', async () => {

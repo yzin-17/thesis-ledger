@@ -4,9 +4,8 @@ import { desktopNavigation, desktopPathForView, desktopRoutes } from '../src/vie
 describe('Desktop routes', () => {
   it('keeps the eight primary navigation entries in URL order', () => {
     expect(desktopRoutes.map(({ view, path }) => [view, path])).toEqual([
-      ['portfolio', '/portfolio'],
-      ['position-entry', '/accounts'],
       ['performance', '/performance'],
+      ['position-entry', '/accounts'],
       ['risk-center', '/risk-center'],
       ['strategy', '/strategy'],
       ['journal', '/journal'],
@@ -15,9 +14,8 @@ describe('Desktop routes', () => {
       ['market-data', '/market-data'],
     ]);
     expect(desktopNavigation).toEqual([
-      'portfolio',
-      'position-entry',
       'performance',
+      'position-entry',
       'risk-center',
       'strategy',
       'journal',
@@ -28,7 +26,7 @@ describe('Desktop routes', () => {
   });
 
   it('resolves navigable views and leaves internal view state unrouted', () => {
-    expect(desktopPathForView('portfolio')).toBe('/portfolio');
+    expect(desktopPathForView('portfolio')).toBe('/performance');
     expect(desktopPathForView('providers')).toBe('/providers');
     expect(desktopPathForView('market-data')).toBe('/market-data');
     expect(desktopPathForView('position-detail')).toBeNull();

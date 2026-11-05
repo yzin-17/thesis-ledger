@@ -4,7 +4,7 @@
 
 `S05-evidence-complexity-0928 / worker_done`。本叶按领域职责拆分两个新增超限函数，全部指定局部门禁通过，源码未提交。主仓仍为 `main / fe0e871e37a09964f7a113b82e7d09f6d4d95f7e` 的既有脏工作区，未 stage、commit、reset、clean，也未修改只读测试、导出入口、配置、依赖、Spec 或主 Task。
 
-依据：[主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §6、[主 Task](../2026-09-25-multi-source-adjustment-aware-backtest.md) 的本叶边界和[前一门禁检查点](2026-09-28-s05-window-local-gates.md)。精确原缺口为历史窗口 `superRefine` 复杂度 66，以及旧 v1 `bindMarketPitReconstructionProofV3` 复杂度 27；后者不是 v2 refinement。执行前源码摘要分别为 `1c941c3d872d52f12775ce32b039d64e6c1ed6ac302f47674aa389367ba38eb2`、`4bec6991ce80445d676332aa399bee43e4ab8bed5eb3813c0d0e385a6770ede8`。
+依据：[主 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §6、[主 Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) 的本叶边界和[前一门禁检查点](2026-09-28-s05-window-local-gates.md)。精确原缺口为历史窗口 `superRefine` 复杂度 66，以及旧 v1 `bindMarketPitReconstructionProofV3` 复杂度 27；后者不是 v2 refinement。执行前源码摘要分别为 `1c941c3d872d52f12775ce32b039d64e6c1ed6ac302f47674aa389367ba38eb2`、`4bec6991ce80445d676332aa399bee43e4ab8bed5eb3813c0d0e385a6770ede8`。
 
 RTK、Codex、项目规则与 `spec-driven-workflow` 实施指引已读。Context Mode 工具发现不可用，Shell 经 RTK，原始日志保存在 `/private/tmp/s05-evidence-complexity-0928-*`，仅回传失败详情与结果摘要。所有验证命令已结束，测试、类型与构建资源已释放。
 

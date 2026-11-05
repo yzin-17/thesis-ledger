@@ -1,3 +1,4 @@
+import { displayPrisma } from '../instrument-display.fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import { RecurringFundInvestmentService } from '../../src/fund-plans/recurring-fund-investment.service.js';
 import { scheduledFundInvestmentForPeriod } from '../../src/fund-plans/recurring-fund-investment.schedule.js';
@@ -17,15 +18,57 @@ const asset = {
 };
 
 describe('基金定投', () => {
+  it('当前计划显示目录名，历史到期实例保留冻结名称且读取无写入', async () => {
+    const plan = { id: 'plan', symbol: asset.symbol, fundName: '旧计划名' };
+    const occurrence = { id: 'occurrence', symbol: asset.symbol, fundName: '冻结历史基金名' };
+    const prisma = {
+      ...displayPrisma(),
+      recurringFundInvestmentPlan: { findMany: vi.fn(async () => [plan]) },
+      recurringFundInvestmentOccurrence: { findMany: vi.fn(async () => [occurrence]) },
+    };
+    const service = new RecurringFundInvestmentService(prisma as never, {} as never);
+    expect(await service.list()).toEqual([{ ...plan, fundName: '华夏成长混合' }]);
+    expect(prisma.instrument.findMany).toHaveBeenCalledTimes(1);
+    expect(await service.listOccurrences()).toEqual([occurrence]);
+    expect(prisma.instrument.findMany).toHaveBeenCalledTimes(1);
+    expect(plan.fundName).toBe('旧计划名');
+    expect(occurrence.fundName).toBe('冻结历史基金名');
+  });
+
   it('31 日计划在短月按月末生成', () => {
     expect(scheduledFundInvestmentForPeriod('2026-02', 31)).toEqual(
       new Date('2026-02-28T01:00:00.000Z'),
     );
   });
 
+  it('补齐到期实例只冻结新记录，已存在月份的冻结名称保持原值', async () => {
+    const plan = { id: 'plan', accountId: account.id, name: '定投', symbol: asset.symbol,
+      fundName: '旧计划名称', status: 'ACTIVE', version: 1, dayOfMonth: 31,
+      nextDueAt: new Date('2026-07-31T01:00:00Z'), expectedAmount: '1000', currency: 'CNY' };
+    const historical = { periodKey: '2026-07', fundName: '历史冻结名称' };
+    const createMany = vi.fn(async () => ({ count: 1 }));
+    const transaction = {
+      recurringFundInvestmentPlan: { findUnique: vi.fn(async () => plan),
+        updateMany: vi.fn(async () => ({ count: 1 })) },
+      recurringFundInvestmentOccurrence: { findMany: vi.fn(async () => [historical]), createMany },
+    };
+    const prisma = { ...displayPrisma(),
+      recurringFundInvestmentPlan: { findMany: vi.fn(async () => [plan]) },
+      $transaction: vi.fn(async (fn: (tx: typeof transaction) => Promise<unknown>) => fn(transaction)) };
+    await new RecurringFundInvestmentService(prisma as never, {} as never)
+      .materializeDue(new Date('2026-08-31T02:00:00Z'));
+    expect(createMany).toHaveBeenCalledWith({ skipDuplicates: true, data: [expect.objectContaining({
+      periodKey: '2026-08', fundName: '华夏成长混合',
+    })] });
+    expect(historical.fundName).toBe('历史冻结名称');
+    expect(plan.fundName).toBe('旧计划名称');
+    expect(prisma.instrument.findMany).toHaveBeenCalledTimes(1);
+  });
+
   it('只为真实基金账户和已确认场外基金创建计划', async () => {
     const create = vi.fn(async ({ data }) => ({ id: 'plan-1', ...data }));
     const prisma = {
+      ...displayPrisma(),
       account: { findUnique: vi.fn(async () => account) },
       asset: { findUnique: vi.fn(async () => asset) },
       recurringFundInvestmentPlan: { create },
@@ -43,7 +86,7 @@ describe('基金定投', () => {
       data: expect.objectContaining({
         accountId: account.id,
         symbol: asset.symbol,
-        fundName: asset.name,
+        fundName: '华夏成长混合',
       }),
     });
   });
@@ -75,6 +118,7 @@ describe('基金定投', () => {
       },
     };
     const prisma = {
+      ...displayPrisma(),
       recurringFundInvestmentPlan: { findMany: vi.fn(async () => [plan]) },
       $transaction: vi.fn(async (operation: (client: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
@@ -89,7 +133,7 @@ describe('基金定投', () => {
     expect(createMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.arrayContaining([
-          expect.objectContaining({ periodKey: '2026-07' }),
+          expect.objectContaining({ periodKey: '2026-07', fundName: '华夏成长混合' }),
           expect.objectContaining({ periodKey: '2026-08' }),
         ]),
         skipDuplicates: true,
@@ -130,6 +174,7 @@ describe('基金定投', () => {
       return { response: {}, effectResult: undefined };
     });
     const prisma = {
+      ...displayPrisma(),
       account: { findUnique: vi.fn(async () => account) },
       asset: { findUnique: vi.fn(async () => asset) },
       recurringFundInvestmentOccurrence: { findUnique, updateMany },

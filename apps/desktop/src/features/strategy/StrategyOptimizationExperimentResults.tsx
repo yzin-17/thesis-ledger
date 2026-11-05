@@ -164,11 +164,11 @@ export function StrategyOptimizationExperimentResults({
           <CardTitle>实验记录</CardTitle>
           <CardDescription>实验可恢复、可取消；测试集在用户锁定候选前不会运行。</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2">
+        <CardContent className="divide-y divide-border">
           {experiments.map((experiment) => (
             <div
               key={experiment.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
+              className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0"
             >
               <div>
                 <div className="font-medium">{experiment.stage}</div>

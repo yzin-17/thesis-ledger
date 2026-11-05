@@ -20,12 +20,23 @@ export const apiErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const automationEditorErrorToastId = (editing: AutomationJob | null) =>
+  editing
+    ? `provider-automation-editor-save-error:${editing.id}`
+    : 'provider-automation-editor-create-error';
+
+const automationToggleErrorToastId = (jobId: string) => `provider-automation-toggle-error:${jobId}`;
+const automationRunErrorToastId = (jobId: string) => `provider-automation-run-error:${jobId}`;
+const automationDeleteErrorToastId = (jobId: string) => `provider-automation-delete-error:${jobId}`;
+
 const addAutomationErrorToast = (
   toastManager: ProviderToastManager,
   title: string,
   error: unknown,
+  id?: string,
 ) =>
   toastManager.add({
+    ...(id ? { id } : {}),
     title,
     description: apiErrorMessage(error, '请检查服务连接后重试。'),
     type: 'error',
@@ -69,9 +80,21 @@ export const createProviderAutomationHandlers = ({
   updateJobMutation,
   deleteJobMutation,
   runJobMutation,
+  deletingJobIdRef,
+  setDeletingJobId,
   confirm,
 }: ProviderActionDependencies) => {
+  let localDeletingJobId: string | null = null;
+  const currentDeletingJobId = () =>
+    deletingJobIdRef ? deletingJobIdRef.current : localDeletingJobId;
+  const setCurrentDeletingJobId = (jobId: string | null) => {
+    if (deletingJobIdRef) deletingJobIdRef.current = jobId;
+    else localDeletingJobId = jobId;
+  };
+
   const toggleJob = async (job: AutomationJob) => {
+    const errorToastId = automationToggleErrorToastId(job.id);
+    toastManager.close?.(errorToastId);
     setTogglingJobId(job.id);
     try {
       await toggleJobMutation.mutateAsync({ jobId: job.id, enabled: !job.enabled });
@@ -82,6 +105,7 @@ export const createProviderAutomationHandlers = ({
       });
     } catch {
       toastManager.add({
+        id: errorToastId,
         title: `${job.name} ${job.enabled ? '停用' : '启用'}失败`,
         description: '请检查服务连接后重试。',
         type: 'error',
@@ -109,6 +133,8 @@ export const createProviderAutomationHandlers = ({
     event.preventDefault();
     if (savingAutomationDraft) return;
     const editing = editingAutomationJob;
+    const errorToastId = automationEditorErrorToastId(editing);
+    toastManager.close?.(errorToastId);
     setSavingAutomationDraft(true);
     try {
       if (editing) {
@@ -133,7 +159,12 @@ export const createProviderAutomationHandlers = ({
       }
       setAutomationSheetOpen(false);
     } catch (error) {
-      addAutomationErrorToast(toastManager, editing ? '保存任务失败' : '创建任务失败', error);
+      addAutomationErrorToast(
+        toastManager,
+        editing ? '保存任务失败' : '创建任务失败',
+        error,
+        errorToastId,
+      );
     } finally {
       setSavingAutomationDraft(false);
     }
@@ -141,6 +172,8 @@ export const createProviderAutomationHandlers = ({
 
   const runJobNow = async (job: AutomationJob) => {
     if (runningJobId !== null) return;
+    const errorToastId = automationRunErrorToastId(job.id);
+    toastManager.close?.(errorToastId);
     setRunningJobId(job.id);
     try {
       const result = await runJobMutation.mutateAsync(job.id);
@@ -160,23 +193,36 @@ export const createProviderAutomationHandlers = ({
         });
       }
     } catch (error) {
-      addAutomationErrorToast(toastManager, `${job.name} 执行失败`, error);
+      addAutomationErrorToast(toastManager, `${job.name} 执行失败`, error, errorToastId);
     } finally {
       setRunningJobId((current) => (current === job.id ? null : current));
     }
   };
 
   const deleteJob = async (job: AutomationJob) => {
-    if (
-      !(await confirm({
+    if (currentDeletingJobId() !== null) return;
+    setCurrentDeletingJobId(job.id);
+    let confirmed: boolean;
+    try {
+      confirmed = await confirm({
         title: `删除任务「${job.name}」？`,
         description: '有运行历史的任务无法删除，可改用停用；删除后不再按计划执行。',
         confirmLabel: '删除任务',
         cancelLabel: '取消',
         variant: 'destructive',
-      }))
-    )
+      });
+    } catch (error) {
+      setCurrentDeletingJobId(null);
+      throw error;
+    }
+    if (!confirmed) {
+      setCurrentDeletingJobId(null);
       return;
+    }
+
+    const errorToastId = automationDeleteErrorToastId(job.id);
+    toastManager.close?.(errorToastId);
+    setDeletingJobId?.(job.id);
     try {
       await deleteJobMutation.mutateAsync(job.id);
       toastManager.add({
@@ -185,7 +231,12 @@ export const createProviderAutomationHandlers = ({
         timeout: 2800,
       });
     } catch (error) {
-      addAutomationErrorToast(toastManager, `${job.name} 删除失败`, error);
+      addAutomationErrorToast(toastManager, `${job.name} 删除失败`, error, errorToastId);
+    } finally {
+      if (currentDeletingJobId() === job.id) {
+        setCurrentDeletingJobId(null);
+        setDeletingJobId?.((current) => (current === job.id ? null : current));
+      }
     }
   };
 

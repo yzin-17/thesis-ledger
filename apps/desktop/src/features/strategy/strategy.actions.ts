@@ -1,4 +1,5 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { strategySchema } from '@thesis-ledger/schemas';
 import { preparedBacktestSubmission } from './backtest-prepared-submission.js';
 import type { useToastManager } from '@/components/ui/toast';
@@ -14,7 +15,7 @@ import type {
   StrategyVersion,
 } from './strategy.types.js';
 
-type ToastManager = Pick<ReturnType<typeof useToastManager>, 'add'>;
+type ToastManager = Pick<ReturnType<typeof useToastManager>, 'add'> & Partial<Pick<ReturnType<typeof useToastManager>, 'close'>>;
 type AsyncMutation<Input, Output> = {
   mutateAsync: (input: Input) => Promise<Output>;
 };
@@ -32,6 +33,7 @@ type Dependencies = {
   cancelMutation: AsyncMutation<string, BacktestJob>;
   retryMutation: AsyncMutation<string, BacktestJob>;
   onJobQueued?: (job: BacktestJob) => void;
+  queueErrorToastId?: { current: string | null };
   load: () => Promise<unknown>;
 };
 
@@ -45,7 +47,7 @@ const parseSchemaText = (schemaText: string): StrategySchema => {
 };
 
 const errorToast = (toastManager: ToastManager, title: string, description: string) => {
-  toastManager.add({
+  return toastManager.add({
     title,
     description,
     type: 'error',
@@ -129,8 +131,8 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
         timeout: 2800,
       });
       return true;
-    } catch {
-      errorToast(toastManager, '策略创建失败', '请检查策略配置或服务连接。');
+    } catch (error) {
+      errorToast(toastManager, '策略创建失败', requestFailureMessage(error));
       return false;
     } finally {
       setBusyAction(null);
@@ -150,8 +152,8 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
         timeout: 2800,
       });
       return true;
-    } catch {
-      errorToast(toastManager, '版本保存失败', '请检查策略配置或服务连接。');
+    } catch (error) {
+      errorToast(toastManager, '版本保存失败', requestFailureMessage(error));
       return false;
     } finally {
       setBusyAction(null);
@@ -178,6 +180,10 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
       errorToast(toastManager, '回测排队失败', '请先准备并确认回测配置。');
       return Promise.resolve(false);
     }
+    if (dependencies.queueErrorToastId?.current) {
+      toastManager.close?.(dependencies.queueErrorToastId.current);
+      dependencies.queueErrorToastId.current = null;
+    }
     backgroundPreparationVersionId = version.id;
     backgroundPreparationIdempotencyKey = crypto.randomUUID();
     setBusyAction(`queue:${version.id}`);
@@ -195,11 +201,12 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
           preparedBacktestSubmission(version.id, setup, idempotencyKey),
         );
         if (job.status === 'failed') {
-          errorToast(
+          const toastId = errorToast(
             toastManager,
             '回测失败',
             `${job.errorCode ?? 'DATA_UNAVAILABLE'}：${job.errorSummary ?? '服务端未提供具体原因'}`,
           );
+          if (dependencies.queueErrorToastId) dependencies.queueErrorToastId.current = toastId;
           refreshStrategyData();
           return;
         }
@@ -212,11 +219,13 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
         dependencies.onJobQueued?.(job);
         refreshStrategyData();
       } catch (error) {
-        errorToast(
+        const toastId = errorToast(
           toastManager,
           '回测排队失败',
           error instanceof Error ? error.message : '请检查策略配置、市场数据和服务连接。',
         );
+        if (dependencies.queueErrorToastId) dependencies.queueErrorToastId.current = toastId;
+        refreshStrategyData();
       } finally {
         backgroundPreparationVersionId = null;
         backgroundPreparationIdempotencyKey = null;

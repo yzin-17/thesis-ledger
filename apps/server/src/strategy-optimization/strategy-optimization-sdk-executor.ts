@@ -1,3 +1,4 @@
+import { assertGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -213,10 +214,7 @@ export class StrategyOptimizationSdkExecutor {
         aiCalls: 1,
         inputTokens: input.inputTokenReservation,
         outputTokens: input.outputTokenReservation,
-        cost: reservationCost(
-          input.estimatedCost,
-          this.pricing(input),
-        ),
+        cost: reservationCost(input.estimatedCost, this.pricing(input)),
       },
     });
     if (!reservation) throw new Error('优化请求事实预留失败');
@@ -257,12 +255,8 @@ export class StrategyOptimizationSdkExecutor {
       attemptId: input.step.id,
       revision: this.revision({
         usage: error.usage,
-        cost: completedCost(
-          null,
-          null,
-          error.usage,
-          this.pricing(input),
-        ),
+        cost: completedCost(error.completion?.providerCost ?? null,
+          error.completion?.providerCostCurrency ?? null, error.usage, this.pricing(input)),
       }),
       outcome: {
         status: 'incomplete',
@@ -281,6 +275,7 @@ export class StrategyOptimizationSdkExecutor {
     const runtime = input.resolved.provider.sdkRuntime?.();
     if (!runtime) throw new Error('AI Provider 缺少 SDK 运行配置');
     const startedAt = Date.now();
+    if (input.resolved.execution.mode === 'json_validated') assertGenerationSchemaPrompt(contractFor(input.experiment).schema, input.messages as { role: string; content: unknown }[]);
     const ownership = await this.initialize(input, requestId);
     let generation: Awaited<ReturnType<AiSdkGenerationAdapter['generate']>> | undefined;
     try {
@@ -303,6 +298,9 @@ export class StrategyOptimizationSdkExecutor {
           contract: input.resolved.execution.contract,
           schema: contractFor(input.experiment).schema as z.ZodType<unknown>,
           mode: input.resolved.execution.mode,
+          ...(input.resolved.execution.requestOptions
+            ? { requestOptions: input.resolved.execution.requestOptions }
+            : {}),
           transport: 'stream',
           maxOutputTokens: input.outputTokenReservation,
           ...(input.route.reasoningEffort === undefined

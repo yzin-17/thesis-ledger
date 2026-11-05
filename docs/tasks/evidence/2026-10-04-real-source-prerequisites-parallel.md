@@ -28,7 +28,7 @@
 | `docs/specs/2026-09-16-backtest-real-historical-market-rules.md`  | `3935f20617537da1a7bef767492468d99c9871bc476c31dfc010de4e978412b4` |
 | `docs/tasks/2026-09-16-backtest-real-historical-market-rules.md`  | `91a28dae6768f667520066351f1f8948823ebdf11f8e31b2a01c002d53e33b9b` |
 | `docs/specs/2026-10-03-multi-source-remaining-acceptance.md`      | `0ab6937b200a9e3e77de87a2345162cece8e58251f32f4735fe7ee3ee7ef91ed` |
-| `docs/tasks/2026-10-03-multi-source-remaining-acceptance.md`      | `07860c46a9040acaa72e57594cd034aacaae8b6bb0da493ff1bdc806b6336c53` |
+| `docs/archive/tasks/2026-10-03-multi-source-remaining-acceptance.md`      | `07860c46a9040acaa72e57594cd034aacaae8b6bb0da493ff1bdc806b6336c53` |
 | `docs/specs/2026-09-25-multi-source-adjustment-aware-backtest.md` | `2bba76cea5914a89e5699dc8ff6784e84b96ada8fb74d98e8593686630779aa8` |
 | `docs/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md` | `792a050e174a44600f77ba35b203b3452cd5f2b87cbf8de50357707fa63fa11f` |
 

@@ -13,7 +13,7 @@ const QUOTE_LOCK_DSA_OPERATIONS = 3;
 const QUOTE_LOCK_POLL_INTERVAL_MS = 100;
 
 export type { QuoteAssetType } from '@thesis-ledger/schemas';
-export type QuoteReadOptions = { allowStale?: boolean; refresh?: boolean; assetType?: QuoteAssetType };
+export type QuoteReadOptions = { allowStale?: boolean; refresh?: boolean; assetType?: QuoteAssetType; signal?: AbortSignal };
 
 type QuoteRedisClient = {
   get?: (key: string) => Promise<string | null>;
@@ -59,6 +59,12 @@ export class MarketQuoteReader {
 
   private client(): QuoteRedisClient | undefined {
     return this.redis?.client;
+  }
+
+  private requestQuote(symbol: string, options: QuoteReadOptions) {
+    const path = `/api/v3/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}${options.assetType ? `&assetType=${options.assetType}` : ''}`;
+    if (options.signal) return this.dsa.get<Record<string, unknown>>(path, 1, undefined, options.signal);
+    return this.dsa.get<Record<string, unknown>>(path, 1);
   }
 
   private async readFreshOrLastValid(
@@ -128,7 +134,9 @@ export class MarketQuoteReader {
     onWait: () => Promise<Quote>,
     onUnavailable: () => Promise<Quote>,
     onAcquired: () => void,
+    signal?: AbortSignal,
   ) {
+    signal?.throwIfAborted();
     const client = this.client();
     if (typeof client?.set !== 'function') return onUnavailable();
 
@@ -145,6 +153,7 @@ export class MarketQuoteReader {
       const waitAttempts = Math.max(1, Math.ceil(ttlMs / QUOTE_LOCK_POLL_INTERVAL_MS));
       if (typeof client.get === 'function') {
         for (let attempt = 0; attempt < waitAttempts; attempt += 1) {
+          signal?.throwIfAborted();
           await new Promise((resolve) => setTimeout(resolve, QUOTE_LOCK_POLL_INTERVAL_MS));
           try {
             if ((await client.get(lockKey)) === null) return onWait();
@@ -174,16 +183,17 @@ export class MarketQuoteReader {
   }
 
   async getQuote(input: string, options: QuoteReadOptions = {}): Promise<Quote> {
+    options.signal?.throwIfAborted();
     const { symbol } = normalizeMarketSymbol(input);
     const control = new MarketCacheControl(this.dsa);
     const scope = await control.read({ capability: 'REALTIME_QUOTE', symbol,
-      ...(options.assetType ? { assetType: options.assetType } : {}) });
+      ...(options.assetType ? { assetType: options.assetType } : {}) }, options.signal);
     const flightKey = `quote:4:${symbol}:${options.assetType ?? 'inferred'}:${scope.context.generation}`;
     const freshKey = redisKey('cache', `${flightKey}:fresh`);
     const lastValidKey = redisKey('cache', `${flightKey}:last-valid`);
     const startedAt = Date.now();
     const checked = async (quote: Quote) => {
-      await control.assertCurrent(scope);
+      await control.assertCurrent(scope, options.signal);
       if (options.allowStale === false && quote.stale) throw new Error('行情陈旧，当前操作要求新鲜行情');
       return quote;
     };
@@ -206,11 +216,11 @@ export class MarketQuoteReader {
       }
     }
 
-    return this.singleFlight(flightKey, () =>
+    const read = () =>
       this.withQuoteLock(
         flightKey,
         async () => {
-          await control.assertCurrent(scope);
+          await control.assertCurrent(scope, options.signal);
           if (!options.refresh) {
             try {
               const cached = await this.client()?.get?.(freshKey);
@@ -234,10 +244,7 @@ export class MarketQuoteReader {
           this.logStage(symbol, 'dsa-call', dsaStartedAt, 'started');
           let raw: Record<string, unknown>;
           try {
-            raw = await this.dsa.get<Record<string, unknown>>(
-              `/api/v3/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}${options.assetType ? `&assetType=${options.assetType}` : ''}`,
-              1,
-            );
+            raw = await this.requestQuote(symbol, options);
             this.logStage(symbol, 'dsa-call', dsaStartedAt, 'success');
           } catch (error) {
             this.logStage(symbol, 'dsa-call', dsaStartedAt, 'failure');
@@ -258,7 +265,7 @@ export class MarketQuoteReader {
               symbol,
             );
             const serialized = JSON.stringify(quote);
-            await control.assertCurrent(scope);
+            await control.assertCurrent(scope, options.signal);
             const multi = this.client()?.multi;
             if (typeof multi !== 'function') return readFallback('cache-unavailable');
             await multi
@@ -287,7 +294,9 @@ export class MarketQuoteReader {
         },
         () => readFallback('unavailable'),
         () => this.logStage(symbol, 'lock-acquired', startedAt, 'owner'),
-      ),
-    ).then(checked);
+        options.signal,
+      );
+    // 有调用方取消信号的读取不共享进程内 Promise，避免取消另一个消费者。
+    return (options.signal ? read() : this.singleFlight(flightKey, read)).then(checked);
   }
 }

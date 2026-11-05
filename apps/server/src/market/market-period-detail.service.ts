@@ -1,5 +1,5 @@
-import { HttpException, Injectable } from '@nestjs/common';
-import type { MarketPeriod } from '@thesis-ledger/domain';
+import { HttpException, Injectable, Optional } from '@nestjs/common';
+import type { MarketPeriod, MarketMinutePeriod } from '@thesis-ledger/domain';
 import {
   marketDisplayDetailResponseSchema,
   type MarketDetailCapability,
@@ -15,6 +15,7 @@ import {
   type ResolvedMarketDetailIdentity,
 } from './market-detail.service.js';
 import { MarketPeriodDisplayService } from './market-period-display.service.js';
+import { MarketMinuteDisplayService } from './market-minute-display.service.js';
 import { normalizeIndicatorName, selectIndicatorParameters } from './market-indicator-request.js';
 import { periodAvailabilityReason } from './market-period-availability.js';
 import type { MarketIndicatorRequest } from './market-indicator-window.js';
@@ -29,7 +30,11 @@ type Input = {
   acceptance?: string | undefined;
   indicatorParams?: string | undefined;
   refresh?: string | undefined;
+  calculationAnchor?: string | undefined;
 };
+type DisplayPeriod = MarketPeriod | MarketMinutePeriod;
+const isMinute = (period: DisplayPeriod): period is MarketMinutePeriod =>
+  ['5m', '15m', '30m', '60m'].includes(period);
 type Sections = Partial<Record<MarketDetailCapability, MarketDisplayDetailSection>>;
 const isChart = (capability: MarketDetailCapability) =>
   capability === 'bars' || capability.startsWith('indicator:');
@@ -58,11 +63,30 @@ export class MarketPeriodDetailService {
   constructor(
     private readonly detail: MarketDetailService,
     private readonly periods: MarketPeriodDisplayService,
+    @Optional() private readonly minutes?: MarketMinuteDisplayService,
   ) {}
+
+  private plan(symbol: string, timeframe: DisplayPeriod, query: Record<string, string | undefined>,
+    requests: MarketIndicatorRequest[], evaluationAsOf: string) {
+    if (isMinute(timeframe)) {
+      if (!this.minutes) throw new Error('分钟周期服务未注入');
+      return this.minutes.plan(symbol, timeframe, query, requests, evaluationAsOf);
+    }
+    return this.periods.plan(symbol, timeframe, query, requests, evaluationAsOf);
+  }
+
+  private read(symbol: string, timeframe: DisplayPeriod, query: Record<string, string | undefined>,
+    requests: MarketIndicatorRequest[]) {
+    if (isMinute(timeframe)) {
+      if (!this.minutes) throw new Error('分钟周期服务未注入');
+      return this.minutes.read(symbol, timeframe, query, requests);
+    }
+    return this.periods.read(symbol, timeframe, query, requests);
+  }
 
   private async feasible(
     symbol: string,
-    timeframe: MarketPeriod,
+    timeframe: DisplayPeriod,
     query: Record<string, string | undefined>,
     requests: MarketIndicatorRequest[],
     sections: Sections,
@@ -72,7 +96,7 @@ export class MarketPeriodDetailService {
     const evaluationAsOf = new Date().toISOString();
     for (const request of requests) {
       try {
-        await this.periods.plan(symbol, timeframe, query, [request], evaluationAsOf);
+        await this.plan(symbol, timeframe, query, [request], evaluationAsOf);
         selected.push(request);
       } catch (error) {
         sections[`indicator:${request.name}`] = failure(
@@ -87,7 +111,7 @@ export class MarketPeriodDetailService {
 
   private async chart(
     identity: ResolvedMarketDetailIdentity,
-    timeframe: MarketPeriod,
+    timeframe: DisplayPeriod,
     input: Input,
     sections: Sections,
     dependencies: Record<string, MarketDetailDependency>,
@@ -100,12 +124,13 @@ export class MarketPeriodDetailService {
     if (!capabilities.length) return undefined;
     const query = {
       assetType: identity.assetType,
-      adjustment: input.adjustment ?? 'qfq',
+      adjustment: input.adjustment ?? (isMinute(timeframe) ? 'none' : 'qfq'),
       start: input.start,
       end: input.end,
       limit: String(input.barsLimit),
       acceptance: input.acceptance,
       refresh: input.refresh,
+      calculationAnchor: input.calculationAnchor,
     };
     const requests = capabilities
       .filter((item) => item.startsWith('indicator:'))
@@ -123,7 +148,7 @@ export class MarketPeriodDetailService {
     );
     let view;
     try {
-      view = await this.periods.read(identity.symbol, timeframe, query, selected);
+      view = await this.read(identity.symbol, timeframe, query, selected);
     } catch (error) {
       if (error instanceof HttpException && error.getStatus() === 400) throw error;
       const reason = periodAvailabilityReason(error);
@@ -162,15 +187,20 @@ export class MarketPeriodDetailService {
     return series;
   }
 
-  async get(identity: ResolvedMarketDetailIdentity, timeframe: MarketPeriod, input: Input) {
-    this.periods.validate(identity.symbol, timeframe, {
+  async get(identity: ResolvedMarketDetailIdentity, timeframe: DisplayPeriod, input: Input) {
+    const validation = {
       assetType: identity.assetType,
-      adjustment: input.adjustment ?? 'qfq',
+      adjustment: input.adjustment ?? (isMinute(timeframe) ? 'none' : 'qfq'),
       start: input.start,
       end: input.end,
       limit: String(input.barsLimit),
       acceptance: input.acceptance,
-    });
+      calculationAnchor: input.calculationAnchor,
+    };
+    if (isMinute(timeframe)) {
+      if (!this.minutes) throw new Error('分钟周期服务未注入');
+      this.minutes.validate(identity.symbol, timeframe, validation);
+    } else this.periods.validate(identity.symbol, timeframe, validation);
     // 先校验全部参数，非行情分段也不能掩盖请求错误。
     for (const capability of input.requested.filter((item) => item.startsWith('indicator:')))
       selectIndicatorParameters(

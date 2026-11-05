@@ -207,12 +207,9 @@ export function ReviewCandidateList({
               以下 Journal 引用无法唯一对应当前 Close Slice，不会按标的或日期自动猜测。
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2 text-sm">
+          <CardContent className="divide-y divide-border text-sm">
             {legacyItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
-              >
+              <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
                 <span>
                   {(item.symbol && instrumentNameBySymbol.get(item.symbol.toUpperCase())) ??
                     item.symbol ??

@@ -1,5 +1,6 @@
 import type { DecimalString, ExecutionCharge, LedgerEvent } from './ledger-contract.js';
 import { DecimalValue } from './decimal.js';
+import { reduceBaselineCostRemainders, revalueBaselineSources } from './trade-baseline-cost.js';
 import {
   projectTradeProjections,
   selectEffectiveLedgerEvents,
@@ -194,88 +195,6 @@ const createBaselineSource = (input: {
 const currentQuantity = (state: MutableTradeCost) =>
   state.sources.reduce((total, source) => total.plus(source.remainingQuantity), zero());
 
-const baselineSources = (state: MutableTradeCost) =>
-  state.sources.filter((source) => source.source === 'BASELINE_COMPONENT');
-
-const executionSources = (state: MutableTradeCost) =>
-  state.sources.filter((source) => source.source !== 'BASELINE_COMPONENT');
-
-const remainingQuantityOf = (sources: readonly CostSourceState[]) =>
-  sources.reduce((total, source) => total.plus(source.remainingQuantity), zero());
-
-const remainingCostOf = (sources: readonly CostSourceState[], currency: string) => {
-  let total = zero();
-  for (const source of sources) {
-    if (source.remainingQuantity.isZero()) continue;
-    if (source.currency !== currency || source.remainingRawCost === null) return null;
-    total = total.plus(source.remainingRawCost);
-  }
-  return total;
-};
-
-const revalueBaselineSources = (input: {
-  event: Extract<EffectiveLedgerEvent, { type: 'POSITION_BASELINE_OBSERVATION' }>;
-  state: MutableTradeCost;
-  observedQuantity: DecimalValue;
-}) => {
-  const { event, state, observedQuantity } = input;
-  const baselines = baselineSources(state);
-  const executions = executionSources(state);
-  const baselineQuantity = observedQuantity.minus(remainingQuantityOf(executions));
-  if (baselineQuantity.isNegative()) return;
-
-  const averageCost =
-    event.payload.averageCost === undefined ? null : decimal(event.payload.averageCost);
-  if (averageCost === null) return;
-
-  const executionCost = remainingCostOf(executions, event.payload.currency);
-  if (executionCost === null) {
-    state.estimated = true;
-    addIssue(state, 'BASELINE_COST_UNKNOWN');
-    if (executions.some((source) => source.currency !== event.payload.currency))
-      addIssue(state, 'TRADE_CURRENCY_MISMATCH');
-    return;
-  }
-
-  const observedCost = observedQuantity.times(averageCost);
-  const targetBaselineCost = observedCost.minus(executionCost);
-  if (targetBaselineCost.isNegative()) {
-    state.estimated = true;
-    addIssue(state, 'BASELINE_COST_CONFLICT');
-    return;
-  }
-  if (baselineQuantity.isZero()) {
-    if (!targetBaselineCost.isZero()) {
-      state.estimated = true;
-      addIssue(state, 'BASELINE_COST_CONFLICT');
-    }
-    return;
-  }
-  if (baselines.length === 0) return;
-
-  const activeBaselines = baselines.filter((source) => source.remainingQuantity.isPositive());
-  if (activeBaselines.length === 0) return;
-
-  let allocated = zero();
-  for (const [index, source] of activeBaselines.entries()) {
-    const isLast = index === activeBaselines.length - 1;
-    const remainingCost = isLast
-      ? targetBaselineCost.minus(allocated)
-      : targetBaselineCost.times(source.remainingQuantity).dividedBy(baselineQuantity);
-    const consumedCost =
-      source.rawCost === null || source.remainingRawCost === null
-        ? null
-        : source.rawCost.minus(source.remainingRawCost);
-    source.remainingRawCost = remainingCost;
-    source.rawCost = consumedCost === null ? remainingCost : consumedCost.plus(remainingCost);
-    allocated = allocated.plus(remainingCost);
-  }
-  for (const source of baselines) {
-    if (source.remainingQuantity.isZero() && source.remainingRawCost !== null)
-      source.remainingRawCost = zero();
-  }
-};
-
 const addExecutionSource = (
   event: Extract<EffectiveLedgerEvent, { type: 'BUY_EXECUTION' }>,
   state: MutableTradeCost,
@@ -301,6 +220,7 @@ const addBaselineSource = (
     return;
   }
 
+  reduceBaselineCostRemainders(state, observedQuantity);
   const difference = observedQuantity.minus(currentQuantity(state));
   const quantity = difference.isNegative() ? zero() : difference;
   if (quantity.isPositive()) state.sources.push(createBaselineSource({ event, quantity, state }));

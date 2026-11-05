@@ -1,12 +1,16 @@
+import { aiRouteReasoningFields } from './ai-route-reasoning-options.js';
 import { createHash } from 'node:crypto';
+import { aiTimeoutProfileFor, createAiTimeoutPolicy } from './timeout/ai-timeout-policy.js';
 import {
   aiGenerationContracts,
+  researchGenerationV2Contract,
   aiProviderModelExecutionSchema,
   type AiAdapter,
   type AiChatImplementation,
   type AiProviderModelExecution,
   type AiReadinessReason,
   type AiUpstreamFormat,
+  type AiModelRequestOptions,
 } from '@thesis-ledger/schemas';
 import type {
   AiProviderCapabilityRevocation,
@@ -17,6 +21,10 @@ import {
   resolveAiSdkProviderImplementation,
   type AiCompatibilityExtensionProfile,
 } from './ai-provider-upstream.js';
+import {
+  researchReasoningSelectionSupported,
+} from './ai-research-reasoning-options.js';
+import { aiRequestOptionsFields, modelRequestOptionsIssue } from './ai-model-request-options.js';
 
 const SDK_VERSION = '7.0.107';
 const ADAPTER_VERSIONS: Record<AiAdapter, string> = {
@@ -37,6 +45,7 @@ export type AiProviderRouteSnapshot = {
   adapter: AiAdapter | null;
   models: readonly string[];
   route: AiProviderExecutionRouteInput;
+  requestOptions?: AiModelRequestOptions;
   firstOutputTimeoutMs?: number;
   outputIdleTimeoutMs?: number;
   costPer1kInput?: number;
@@ -51,8 +60,8 @@ export type AiProviderRouteSnapshot = {
   revocations: readonly AiProviderCapabilityRevocation[];
 };
 
-export const DEFAULT_AI_FIRST_OUTPUT_TIMEOUT_MS = 30_000;
-export const DEFAULT_AI_OUTPUT_IDLE_TIMEOUT_MS = 30_000;
+export const DEFAULT_AI_FIRST_OUTPUT_TIMEOUT_MS = 120_000;
+export const DEFAULT_AI_OUTPUT_IDLE_TIMEOUT_MS = 60_000;
 
 export type AiRouteTimeoutResolution = {
   firstOutputTimeoutMs: number;
@@ -76,11 +85,11 @@ export const resolveAiRouteTimeouts = (
   firstOutputTimeoutMs:
     snapshot.route.firstOutputTimeoutMs ??
     snapshot.firstOutputTimeoutMs ??
-    DEFAULT_AI_FIRST_OUTPUT_TIMEOUT_MS,
+    createAiTimeoutPolicy(aiTimeoutProfileFor(snapshot.route)).firstOutputTimeoutMs,
   outputIdleTimeoutMs:
     snapshot.route.outputIdleTimeoutMs ??
     snapshot.outputIdleTimeoutMs ??
-    DEFAULT_AI_OUTPUT_IDLE_TIMEOUT_MS,
+    createAiTimeoutPolicy(aiTimeoutProfileFor(snapshot.route)).outputIdleTimeoutMs,
   firstOutputTimeoutSource: timeoutSource(
     snapshot.route.firstOutputTimeoutMs,
     snapshot.firstOutputTimeoutMs,
@@ -110,7 +119,7 @@ const normalizedBaseUrl = (baseUrl: string) => {
 };
 
 const knownContract = (route: AiProviderExecutionRouteInput) =>
-  Object.values(aiGenerationContracts).some(
+  [...Object.values(aiGenerationContracts), researchGenerationV2Contract].some(
     ({ ref }) => ref.id === route.contract.id && ref.version === route.contract.version,
   );
 
@@ -165,6 +174,8 @@ export const configurationFingerprint = (snapshot: AiProviderRouteSnapshot) =>
     providerOutputIdleTimeoutMs: snapshot.outputIdleTimeoutMs ?? null,
     credentialFingerprint: snapshot.credentialFingerprint,
     authMode: snapshot.authMode ?? 'api_key',
+    ...aiRouteReasoningFields(snapshot.route),
+    ...aiRequestOptionsFields(snapshot),
   });
 
 export const evaluateAiProviderReadiness = (
@@ -176,11 +187,15 @@ export const evaluateAiProviderReadiness = (
   const evidence = adapterEvidence(snapshot.adapter, snapshot.route);
   const configuration = configurationFingerprint(snapshot);
   const reasons: AiReadinessReason[] = [];
+  if (modelRequestOptionsIssue(snapshot.requestOptions, snapshot.adapter, snapshot))
+    reasons.push('configuration_invalid');
   if (
     !baseUrl ||
     !snapshot.adapter ||
     !snapshot.models.includes(snapshot.route.model) ||
-    (snapshot.authMode !== 'none' && !snapshot.credentialFingerprint)
+    (snapshot.authMode !== 'none' && !snapshot.credentialFingerprint) ||
+    (snapshot.route.reasoningEnabled !== undefined &&
+      !researchReasoningSelectionSupported(snapshot))
   )
     reasons.push('configuration_invalid');
   if (!snapshot.enabled) reasons.push('provider_disabled');
@@ -211,6 +226,8 @@ export const evaluateAiProviderReadiness = (
     mode: snapshot.route.mode,
     contract: snapshot.route.contract,
     adapterEvidence: evidence,
+    ...aiRouteReasoningFields(snapshot.route),
+    ...aiRequestOptionsFields(snapshot),
     readiness: {
       state: uniqueReasons.length === 0 ? 'ready' : 'blocked',
       reasons: uniqueReasons,

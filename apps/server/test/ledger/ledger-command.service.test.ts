@@ -1,197 +1,97 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { LedgerEvent } from '@thesis-ledger/schemas';
+import { describe, expect, it } from 'vitest';
 import { LedgerCommandService } from '../../src/ledger/ledger-command.service.js';
-import type {
-  AccountLedgerMutation,
-  AccountLedgerWriteContext,
-  MultiAccountLedgerMutation,
-} from '../../src/ledger/ledger-v2.repository.js';
-
-const accountA = '11111111-1111-4111-8111-111111111111';
-const accountB = '22222222-2222-4222-8222-222222222222';
-
-const commandBase = {
-  accountId: accountA,
-  occurredAt: '2026-08-26T02:30:00.000Z',
-  timePrecision: 'INSTANT' as const,
-  sourceTimezone: 'Asia/Shanghai',
-  economicOrderKey: 'a0',
-  side: 'BUY' as const,
-  payload: {
-    symbol: 'AAPL.US',
-    quantity: '2',
-    price: '200',
-    currency: 'USD',
-    capabilityVerification: 'VERIFIED' as const,
-    charges: [],
-  },
-  source: {
-    category: 'MANUAL' as const,
-    channel: 'desktop',
-    externalId: 'command-create',
-  },
-  actorId: 'user-1',
-};
-
-const storedFromEvent = (event: LedgerEvent) => ({
-  id: event.eventId,
-  accountId: event.accountId,
-  type: event.type,
-  occurredAt: event.occurredAt === null ? null : new Date(event.occurredAt),
-  factId: event.factId,
-  ledgerRevision: BigInt(event.ledgerRevision),
-  timePrecision: event.timePrecision,
-  sourceTimezone: event.sourceTimezone,
-  economicOrderKey: event.economicOrderKey,
-  recordedAt: new Date(event.recordedAt),
-  envelopeVersion: 3,
-  payloadVersion: event.payloadVersion,
-  payload: event.revisionAction === 'VOID' ? null : event.payload,
-  sourceCategory: event.source.category,
-  sourceChannel: event.source.channel,
-  externalId: event.source.externalId ?? null,
-  sourceRowId: event.source.sourceRowId ?? null,
-  actorId: event.actorId,
-  revisionAction: event.revisionAction,
-  supersedesEventId: event.supersedesEventId ?? null,
-  reason: event.reason ?? null,
-});
-
-class InMemoryLedgerRepository {
-  readonly revisions = new Map([
-    [accountA, 0n],
-    [accountB, 0n],
-  ]);
-  readonly generations = new Map([
-    [accountA, 0n],
-    [accountB, 0n],
-  ]);
-  readonly events: LedgerEvent[] = [];
-  readonly lockedAccountOrders: string[][] = [];
-  failAppendForAccount?: string;
-
-  async withAccountWrite<T>(
-    accountId: string,
-    operation: (context: AccountLedgerWriteContext) => Promise<AccountLedgerMutation<T>>,
-  ) {
-    const contexts = this.contexts([accountId]);
-    const context = contexts.get(accountId)!;
-    const mutation = await operation(context);
-    if (mutation.advanceRevision) this.advance(accountId);
-    return {
-      value: mutation.value,
-      ledgerRevision: this.revisions.get(accountId)!.toString(),
-      projectionGeneration: this.generations.get(accountId)!.toString(),
-    };
-  }
-
-  async withAccountsWrite<T>(
-    accountIds: string[],
-    operation: (
-      contexts: Map<string, AccountLedgerWriteContext>,
-    ) => Promise<MultiAccountLedgerMutation<T>>,
-  ) {
-    const ordered = [...new Set(accountIds)].sort();
-    this.lockedAccountOrders.push(ordered);
-    const contexts = this.contexts(ordered);
-    const beforeEvents = [...this.events];
-    try {
-      const mutation = await operation(contexts);
-      for (const accountId of mutation.advanceAccountIds) this.advance(accountId);
-      return {
-        value: mutation.value,
-        ledgerRevisions: Object.fromEntries(
-          ordered.map((accountId) => [accountId, this.revisions.get(accountId)!.toString()]),
-        ),
-        projectionGenerations: Object.fromEntries(
-          ordered.map((accountId) => [accountId, this.generations.get(accountId)!.toString()]),
-        ),
-      };
-    } catch (error) {
-      this.events.splice(0, this.events.length, ...beforeEvents);
-      throw error;
-    }
-  }
-
-  async appendRevision(context: AccountLedgerWriteContext, event: LedgerEvent) {
-    if (this.failAppendForAccount === context.accountId) throw new Error('append failed');
-    this.events.push(event);
-    return event;
-  }
-
-  private contexts(accountIds: string[]) {
-    const contexts = new Map<string, AccountLedgerWriteContext>();
-    const ledgerEvent = {
-      findUnique: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
-        let event: LedgerEvent | undefined;
-        if (typeof where.id === 'string') {
-          event = this.events.find((candidate) => candidate.eventId === where.id);
-        } else if (typeof where.supersedesEventId === 'string') {
-          event = this.events.find(
-            (candidate) => candidate.supersedesEventId === where.supersedesEventId,
-          );
-        } else if (where.accountId_sourceChannel_externalId) {
-          const key = where.accountId_sourceChannel_externalId as {
-            accountId: string;
-            sourceChannel: string;
-            externalId: string;
-          };
-          event = this.events.find(
-            (candidate) =>
-              candidate.accountId === key.accountId &&
-              candidate.source.channel === key.sourceChannel &&
-              candidate.source.externalId === key.externalId,
-          );
-        }
-        return event ? storedFromEvent(event) : null;
-      }),
-      create: vi.fn(),
-      findMany: vi.fn(async () => this.events.map(storedFromEvent)),
-    };
-    const account = {
-      findUnique: vi.fn(async () => ({ active: true, currency: 'CNY', type: 'securities' })),
-    };
-    const asset = {
-      findUnique: vi.fn(async () => ({ identityStatus: 'confirmed', assetType: 'stock' })),
-    };
-    const position = {
-      findMany: vi.fn(async () => []),
-      update: vi.fn(),
-      delete: vi.fn(),
-      create: vi.fn(),
-    };
-    for (const accountId of accountIds) {
-      const revision = this.revisions.get(accountId) ?? 0n;
-      const generation = this.generations.get(accountId) ?? 0n;
-      contexts.set(accountId, {
-        transaction: { ledgerEvent, account, asset, position } as never,
-        accountId,
-        currentLedgerRevision: revision,
-        nextLedgerRevision: revision + 1n,
-        currentProjectionGeneration: generation,
-        nextProjectionGeneration: generation + 1n,
-      });
-    }
-    return contexts;
-  }
-
-  private advance(accountId: string) {
-    this.revisions.set(accountId, (this.revisions.get(accountId) ?? 0n) + 1n);
-    this.generations.set(accountId, (this.generations.get(accountId) ?? 0n) + 1n);
-  }
-}
-
-const errorCode = async (operation: Promise<unknown>) => {
-  try {
-    await operation;
-  } catch (error) {
-    const response = (error as { getResponse?: () => unknown }).getResponse?.();
-    return (response as { errorCode?: string } | undefined)?.errorCode;
-  }
-  throw new Error('期望命令失败');
-};
+import {
+  accountA,
+  accountB,
+  commandBase,
+  InMemoryLedgerRepository,
+  errorCode,
+} from './ledger-command.fixture.js';
 
 describe('Ledger V2 成交命令', () => {
+  it('客户端自报 VERIFIED 不能追加新成交或推进账本状态', async () => {
+    const repository = new InMemoryLedgerRepository();
+    const service = new LedgerCommandService(repository as never);
+    await expect(
+      errorCode(
+        service.createExecution({
+          command: 'CREATE_EXECUTION',
+          ...commandBase,
+          payload: { ...commandBase.payload, capabilityVerification: 'VERIFIED' },
+        }),
+      ),
+    ).resolves.toBe('LEDGER_VALIDATION_FAILED');
+    expect(repository.events).toHaveLength(0);
+    expect(repository.revisions.get(accountA)).toBe(2n);
+    expect(repository.generations.get(accountA)).toBe(2n);
+  });
+
+  it('旧 VERIFIED 命令重放仍返回原事件；新的更正不得继承该标记', async () => {
+    const repository = new InMemoryLedgerRepository();
+    const service = new LedgerCommandService(repository as never);
+    const created = await service.createExecution({ command: 'CREATE_EXECUTION', ...commandBase });
+    const original = repository.events[0]!;
+    if (original.revisionAction === 'VOID' || !('capabilityVerification' in original.payload))
+      throw new Error('测试要求成交事实');
+    original.payload.capabilityVerification = 'VERIFIED'; // 明确模拟既有历史事实。
+    const historicalCommand = {
+      command: 'CREATE_EXECUTION',
+      ...commandBase,
+      payload: { ...commandBase.payload, capabilityVerification: 'VERIFIED' },
+    };
+    await expect(service.createExecution(historicalCommand)).resolves.toMatchObject({
+      idempotentReplay: true,
+      eventIds: created.eventIds,
+      ledgerRevisions: { [accountA]: '3' },
+    });
+    await expect(
+      errorCode(
+        service.replaceExecution({
+          ...historicalCommand,
+          command: 'REPLACE_EXECUTION',
+          expectedLedgerRevision: '3',
+          supersedesEventId: created.eventIds[0],
+          reason: '本次必须重新校验',
+          source: { ...commandBase.source, externalId: 'untrusted-verification-replace' },
+        }),
+      ),
+    ).resolves.toBe('LEDGER_VALIDATION_FAILED');
+    expect(repository.events).toHaveLength(1);
+    expect(original.payload.capabilityVerification).toBe('VERIFIED');
+    expect(repository.revisions.get(accountA)).toBe(3n);
+  });
+
+  it('带新载荷恢复同样拒绝客户端 VERIFIED，VOID 历史及版本保持原状', async () => {
+    const repository = new InMemoryLedgerRepository();
+    const service = new LedgerCommandService(repository as never);
+    const created = await service.createExecution({ command: 'CREATE_EXECUTION', ...commandBase });
+    const removed = await service.voidExecution({
+      command: 'VOID_EXECUTION',
+      accountId: accountA,
+      expectedLedgerRevision: '3',
+      supersedesEventId: created.eventIds[0],
+      reason: '受控作废',
+      actorId: commandBase.actorId,
+      source: { ...commandBase.source, externalId: 'verification-void' },
+    });
+    await expect(
+      errorCode(
+        service.restoreExecution({
+          command: 'RESTORE_EXECUTION',
+          ...commandBase,
+          expectedLedgerRevision: '4',
+          supersedesEventId: removed.eventIds[0],
+          reason: '受控恢复',
+          source: { ...commandBase.source, externalId: 'untrusted-verification-restore' },
+          payload: { ...commandBase.payload, capabilityVerification: 'VERIFIED' },
+        }),
+      ),
+    ).resolves.toBe('LEDGER_VALIDATION_FAILED');
+    expect(repository.events).toHaveLength(2);
+    expect(repository.events[1]?.revisionAction).toBe('VOID');
+    expect(repository.revisions.get(accountA)).toBe(4n);
+  });
+
   it('相同幂等命令重放返回原事件且不增加 Revision', async () => {
     const repository = new InMemoryLedgerRepository();
     const service = new LedgerCommandService(repository as never);
@@ -205,7 +105,7 @@ describe('Ledger V2 成交命令', () => {
       eventIds: first.eventIds,
       factIds: first.factIds,
       idempotentReplay: true,
-      ledgerRevisions: { [accountA]: '1' },
+      ledgerRevisions: { [accountA]: '3' },
     });
     expect(repository.events).toHaveLength(1);
   });
@@ -244,7 +144,7 @@ describe('Ledger V2 成交命令', () => {
         }),
       ),
     ).resolves.toBe('LEDGER_IDEMPOTENCY_CONFLICT');
-    expect(repository.revisions.get(accountA)).toBe(1n);
+    expect(repository.revisions.get(accountA)).toBe(3n);
   });
 
   it('替代只能连接链末，且重放不受旧 expected Revision 影响', async () => {
@@ -255,7 +155,7 @@ describe('Ledger V2 成交命令', () => {
     const replace = {
       command: 'REPLACE_EXECUTION',
       ...commandBase,
-      expectedLedgerRevision: '1',
+      expectedLedgerRevision: '3',
       supersedesEventId,
       reason: '修正数量',
       source: { ...commandBase.source, externalId: 'command-replace' },
@@ -266,13 +166,13 @@ describe('Ledger V2 成交命令', () => {
     await expect(service.replaceExecution(replace)).resolves.toMatchObject({
       eventIds: replaced.eventIds,
       idempotentReplay: true,
-      ledgerRevisions: { [accountA]: '2' },
+      ledgerRevisions: { [accountA]: '4' },
     });
     await expect(
       errorCode(
         service.replaceExecution({
           ...replace,
-          expectedLedgerRevision: '2',
+          expectedLedgerRevision: '4',
           source: { ...replace.source, externalId: 'parallel-branch' },
         }),
       ),
@@ -289,7 +189,7 @@ describe('Ledger V2 成交命令', () => {
         service.voidExecution({
           command: 'VOID_EXECUTION',
           accountId: accountA,
-          expectedLedgerRevision: '0',
+          expectedLedgerRevision: '2',
           supersedesEventId: created.eventIds[0],
           source: { ...commandBase.source, externalId: 'command-void-stale' },
           actorId: 'user-1',
@@ -306,7 +206,7 @@ describe('Ledger V2 成交命令', () => {
     const voided = await service.voidExecution({
       command: 'VOID_EXECUTION',
       accountId: accountA,
-      expectedLedgerRevision: '1',
+      expectedLedgerRevision: '3',
       supersedesEventId: created.eventIds[0],
       source: { ...commandBase.source, externalId: 'command-void' },
       actorId: 'user-1',
@@ -315,7 +215,7 @@ describe('Ledger V2 成交命令', () => {
     const restored = await service.restoreExecution({
       command: 'RESTORE_EXECUTION',
       ...commandBase,
-      expectedLedgerRevision: '2',
+      expectedLedgerRevision: '4',
       supersedesEventId: voided.eventIds[0],
       reason: '撤销误作废',
       source: { ...commandBase.source, externalId: 'command-restore' },
@@ -345,7 +245,7 @@ describe('Ledger V2 成交命令', () => {
     const replaced = await service.replaceExecution({
       command: 'REPLACE_EXECUTION',
       ...commandBase,
-      expectedLedgerRevision: '1',
+      expectedLedgerRevision: '3',
       supersedesEventId: created.eventIds[0],
       reason: '修正数量',
       source: source('draft-replace'),
@@ -354,7 +254,7 @@ describe('Ledger V2 成交命令', () => {
     const voided = await service.voidExecution({
       command: 'VOID_EXECUTION',
       accountId: accountA,
-      expectedLedgerRevision: '2',
+      expectedLedgerRevision: '4',
       supersedesEventId: replaced.eventIds[0],
       source: source('draft-void'),
       actorId: 'user-1',
@@ -363,7 +263,7 @@ describe('Ledger V2 成交命令', () => {
     await service.restoreExecution({
       command: 'RESTORE_EXECUTION',
       ...commandBase,
-      expectedLedgerRevision: '3',
+      expectedLedgerRevision: '5',
       supersedesEventId: voided.eventIds[0],
       reason: '撤销误作废',
       source: source('draft-restore'),
@@ -385,8 +285,8 @@ describe('Ledger V2 成交命令', () => {
       command: 'MOVE_EXECUTION_ACCOUNT',
       sourceAccountId: accountA,
       targetAccountId: accountB,
-      expectedSourceLedgerRevision: '1',
-      expectedTargetLedgerRevision: '0',
+      expectedSourceLedgerRevision: '3',
+      expectedTargetLedgerRevision: '2',
       supersedesEventId: created.eventIds[0],
       occurredAt: commandBase.occurredAt,
       timePrecision: commandBase.timePrecision,
@@ -399,11 +299,22 @@ describe('Ledger V2 成交命令', () => {
       reason: '原成交归属账户错误',
     };
 
+    await expect(
+      errorCode(
+        service.moveExecutionAccount({
+          ...moveCommand,
+          payload: { ...commandBase.payload, capabilityVerification: 'VERIFIED' },
+        }),
+      ),
+    ).resolves.toBe('LEDGER_VALIDATION_FAILED');
+    expect(repository.events).toHaveLength(1);
+    expect(repository.revisions.get(accountA)).toBe(3n);
+    expect(repository.revisions.get(accountB)).toBe(2n);
     const moved = await service.moveExecutionAccount(moveCommand);
     const replay = await service.moveExecutionAccount(moveCommand);
 
     expect(repository.lockedAccountOrders[0]).toEqual([accountA, accountB].sort());
-    expect(moved.ledgerRevisions).toEqual({ [accountA]: '2', [accountB]: '1' });
+    expect(moved.ledgerRevisions).toEqual({ [accountA]: '4', [accountB]: '3' });
     expect(moved.factIds[0]).not.toBe(moved.factIds[1]);
     expect(replay).toMatchObject({ eventIds: moved.eventIds, idempotentReplay: true });
     expect(repository.events).toHaveLength(3);
@@ -420,8 +331,8 @@ describe('Ledger V2 成交命令', () => {
         command: 'MOVE_EXECUTION_ACCOUNT',
         sourceAccountId: accountA,
         targetAccountId: accountB,
-        expectedSourceLedgerRevision: '1',
-        expectedTargetLedgerRevision: '0',
+        expectedSourceLedgerRevision: '3',
+        expectedTargetLedgerRevision: '2',
         supersedesEventId: created.eventIds[0],
         occurredAt: commandBase.occurredAt,
         timePrecision: commandBase.timePrecision,
@@ -435,7 +346,7 @@ describe('Ledger V2 成交命令', () => {
       }),
     ).rejects.toThrow('append failed');
     expect(repository.events).toHaveLength(1);
-    expect(repository.revisions.get(accountA)).toBe(1n);
-    expect(repository.revisions.get(accountB)).toBe(0n);
+    expect(repository.revisions.get(accountA)).toBe(3n);
+    expect(repository.revisions.get(accountB)).toBe(2n);
   });
 });

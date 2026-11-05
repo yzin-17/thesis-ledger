@@ -54,6 +54,7 @@ export const createStoredAiProvider = async (
       ...(settings.adapter ? { adapter: settings.adapter } : {}),
       ...(settings.executionRoutes ? { executionRoutes: settings.executionRoutes } : {}),
       ...(settings.modelPricing ? { modelPricing: settings.modelPricing } : {}),
+      ...(settings.modelDefaults ? { modelDefaults: settings.modelDefaults } : {}),
       ...(settings.capabilityRevocations
         ? { capabilityRevocations: settings.capabilityRevocations }
         : {}),

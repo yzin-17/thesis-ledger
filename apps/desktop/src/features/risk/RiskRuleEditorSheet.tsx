@@ -181,6 +181,7 @@ export function RiskRuleEditorSheet({
   accounts,
   positions,
   pending,
+  readOnly = false,
   onOpenChange,
   onSubmit,
 }: {
@@ -189,6 +190,7 @@ export function RiskRuleEditorSheet({
   accounts: Account[];
   positions: Position[];
   pending: boolean;
+  readOnly?: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: CreateRiskRuleInput) => Promise<boolean>;
 }) {
@@ -352,7 +354,7 @@ export function RiskRuleEditorSheet({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (pending) return;
+    if (pending || readOnly) return;
     const nextErrors = validateDraft(draft, rule?.scope ?? null);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -388,7 +390,12 @@ export function RiskRuleEditorSheet({
         </SheetHeader>
         <form className="flex min-h-0 min-w-0 flex-1 flex-col gap-6" onSubmit={handleFormSubmit}>
           <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
-            <FieldGroup>
+            <FieldGroup inert={pending}>
+              {readOnly && (
+                <Field invalid>
+                  <FieldError>规则尚未重新确认，请先关闭并重新读取；当前输入保留。</FieldError>
+                </Field>
+              )}
               <Field invalid={Boolean(errors.kind)}>
                 <FieldLabel htmlFor="risk-rule-kind">类型</FieldLabel>
                 <Combobox.Root
@@ -726,13 +733,13 @@ export function RiskRuleEditorSheet({
 
               <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
                 <div>
-                  <p className="m-0 text-sm font-medium">创建后立即启用</p>
+                  <p className="m-0 text-sm font-medium">启用规则</p>
                   <p className="field-hint">启用后会参与下一次当前模式风险扫描。</p>
                 </div>
                 <Switch
                   variant="risk"
                   checked={draft.enabled}
-                  aria-label="创建后立即启用"
+                  aria-label="启用规则"
                   onCheckedChange={(checked) => updateDraft('enabled', checked)}
                 >
                   <SwitchThumb variant="risk" />
@@ -760,7 +767,7 @@ export function RiskRuleEditorSheet({
             >
               取消
             </Button>
-            <Button type="submit" disabled={pending} aria-busy={pending}>
+            <Button type="submit" disabled={pending || readOnly} aria-busy={pending}>
               {pending && (
                 <LoaderCircle
                   data-icon="inline-start"

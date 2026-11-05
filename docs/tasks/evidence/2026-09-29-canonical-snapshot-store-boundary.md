@@ -1,6 +1,6 @@
 # 现行 Snapshot Store 边界收敛
 
-> 2026-09-29；对应[单一现行链路替换任务](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md)的 C04/E01。本记录为源码与本地测试证据，目标 Worker 和运行态未验收。
+> 2026-09-29；对应[单一现行链路替换任务](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)的 C04/E01。本记录为源码与本地测试证据，目标 Worker 和运行态未验收。
 
 ## 修改
 

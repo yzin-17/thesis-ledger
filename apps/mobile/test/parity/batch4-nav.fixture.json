@@ -1,0 +1,604 @@
+{
+  "navDefinition": {
+    "schemaVersion": "2",
+    "name": "NAV 冻结测试",
+    "signalSources": [
+      {
+        "id": "nav",
+        "asset": {
+          "symbol": "161725.OF",
+          "market": "CN",
+          "assetType": "fund"
+        },
+        "timeframe": "1d",
+        "series": ["nav"]
+      }
+    ],
+    "executionInstrument": {
+      "symbol": "161725.OF",
+      "market": "CN",
+      "assetType": "fund"
+    },
+    "primaryTimeframe": "1d",
+    "entry": {
+      "type": "compare",
+      "operator": "gt",
+      "left": {
+        "type": "series",
+        "sourceId": "nav",
+        "field": "nav"
+      },
+      "right": {
+        "type": "constant",
+        "value": "1"
+      }
+    },
+    "exit": {
+      "type": "positionState",
+      "field": "isOpen"
+    },
+    "sizing": {
+      "type": "fixedQuantity",
+      "quantity": "1"
+    },
+    "risk": [],
+    "execution": {
+      "mode": "nav",
+      "requestTypes": ["subscribe", "redeem"],
+      "timing": "nextAvailableNav"
+    },
+    "cost": {
+      "commissionRate": "0",
+      "slippageRate": "0"
+    }
+  },
+  "navRequest": {
+    "contractVersion": 3,
+    "requestId": "nav-client-test",
+    "strategyVersionId": "11111111-1111-4111-8111-111111111111",
+    "runConfig": {
+      "schemaVersion": "3",
+      "startDate": "2026-09-08",
+      "endDate": "2026-09-08",
+      "baseCurrency": "CNY",
+      "initialCash": {
+        "CNY": "10000"
+      },
+      "valuationPolicy": {
+        "baseTimezone": "Asia/Shanghai",
+        "dailyValuationTime": "20:00",
+        "pricePolicy": "latestAvailable",
+        "fxPolicy": "latestAvailable"
+      },
+      "executionModel": {
+        "schemaVersion": "execution-model-v1",
+        "id": "cn-nav-fund-contract-fixture",
+        "version": "1",
+        "scope": {
+          "symbol": "161725.OF",
+          "market": "CN",
+          "instrumentType": "NAV_FUND",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "range": {
+            "start": "2026-09-08",
+            "end": "2026-09-15"
+          }
+        },
+        "segments": [
+          {
+            "id": "nav-contract",
+            "range": {
+              "start": "2026-09-08",
+              "end": "2026-09-15"
+            },
+            "source": {
+              "kind": "researchPreset",
+              "description": "NAV 费用适用契约的受控测试配置，不代表 Provider 事实或生产预设",
+              "references": ["docs/tasks/2026-09-10-backtest-historical-execution-rule-facts.md"],
+              "revision": "1",
+              "configuredAt": "2026-09-10T00:00:00+08:00"
+            },
+            "assumptions": [
+              "申购金额为不含费用的申请本金，申购费另加；赎回费基数为确认份额乘确认 NAV 的费前赎回款",
+              "申购费与赎回费均逐申请独立应用费率和最低额，并在确认时按 CNY 两位小数 half-up 扣收"
+            ],
+            "fees": null,
+            "execution": {
+              "mode": "nav",
+              "calendarMarket": "CN",
+              "cutoffLocalTime": "14:00",
+              "cutoffBoundary": "atOrAfterNextTradingDay",
+              "navDate": "acceptedApplicationTradingDate",
+              "navAvailability": "providerAvailableAt",
+              "reserveCashAt": "orderAccepted",
+              "subscriptionDebitAt": "confirmation",
+              "confirmationAfterTradingDays": 0,
+              "sellableAfterConfirmationTradingDays": 0,
+              "redemptionReinvestableAfterConfirmationTradingDays": 0,
+              "subscriptionFee": {
+                "treatment": "charged",
+                "side": "buy",
+                "basis": "subscriptionApplicationAmount",
+                "currency": "CNY",
+                "collection": "perApplication",
+                "collectedAt": "confirmation",
+                "rate": "0.01",
+                "minimum": {
+                  "kind": "none"
+                },
+                "rounding": {
+                  "mode": "halfUp",
+                  "decimalPlaces": 2
+                }
+              },
+              "redemptionFee": {
+                "treatment": "charged",
+                "side": "sell",
+                "basis": "redemptionGrossProceeds",
+                "currency": "CNY",
+                "collection": "perApplication",
+                "collectedAt": "confirmation",
+                "rate": "0.01",
+                "minimum": {
+                  "kind": "none"
+                },
+                "rounding": {
+                  "mode": "halfUp",
+                  "decimalPlaces": 2
+                }
+              }
+            }
+          }
+        ]
+      },
+      "navInput": {
+        "kind": "nav",
+        "symbol": "161725.OF"
+      }
+    },
+    "fundType": "domestic",
+    "visibilityMode": "research-assumption",
+    "freezeTimePolicy": "after-acquisition",
+    "calendarDecisionRaw": "{\"basis\":\"nav-dates-xshg-intersection-v1\",\"configuredAt\":\"2026-09-30T14:00:00Z\",\"decision\":\"用户确认缺日不交易研究口径\",\"schemaVersion\":\"nav-research-calendar-decision-v1\",\"symbol\":\"161725.OF\"}",
+    "domesticRuleDecisionRaw": "{\"applicableRange\":{\"endDate\":\"2026-09-30\",\"startDate\":\"2026-09-01\"},\"configuredAt\":\"2026-09-30T14:00:00Z\",\"decision\":\"用户选择普通 T+1 研究口径\",\"delayWorkdays\":1,\"fundType\":\"domestic\",\"schemaVersion\":\"nav-research-default-v1\",\"symbol\":\"161725.OF\"}"
+  },
+  "navPrepared": {
+    "contractVersion": 3,
+    "requestId": "nav-client-test",
+    "checkedAt": "2026-09-30T15:02:00Z",
+    "scope": "nav-input-plan",
+    "status": "prepared",
+    "receipt": {
+      "preparationId": "f622e880-7263-45a9-b2d2-6462ee8b7d73",
+      "preparationHash": "46b3208bc5f23937af8ce4a44145a5c313c5c03028a490dc8abe6db96a63d094",
+      "expiresAt": "2027-01-01T00:00:00Z"
+    },
+    "runConfig": {
+      "schemaVersion": "3",
+      "startDate": "2026-09-08",
+      "endDate": "2026-09-08",
+      "dataAsOf": "2026-09-30T15:02:00Z",
+      "baseCurrency": "CNY",
+      "initialCash": {
+        "CNY": "10000"
+      },
+      "valuationPolicy": {
+        "baseTimezone": "Asia/Shanghai",
+        "dailyValuationTime": "20:00",
+        "pricePolicy": "latestAvailable",
+        "fxPolicy": "latestAvailable"
+      },
+      "executionModel": {
+        "schemaVersion": "execution-model-v1",
+        "id": "cn-nav-fund-contract-fixture",
+        "version": "1",
+        "scope": {
+          "symbol": "161725.OF",
+          "market": "CN",
+          "instrumentType": "NAV_FUND",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "range": {
+            "start": "2026-09-08",
+            "end": "2026-09-15"
+          }
+        },
+        "segments": [
+          {
+            "id": "nav-contract",
+            "range": {
+              "start": "2026-09-08",
+              "end": "2026-09-15"
+            },
+            "source": {
+              "kind": "researchPreset",
+              "description": "NAV 费用适用契约的受控测试配置，不代表 Provider 事实或生产预设",
+              "references": ["docs/tasks/2026-09-10-backtest-historical-execution-rule-facts.md"],
+              "revision": "1",
+              "configuredAt": "2026-09-10T00:00:00+08:00"
+            },
+            "assumptions": [
+              "申购金额为不含费用的申请本金，申购费另加；赎回费基数为确认份额乘确认 NAV 的费前赎回款",
+              "申购费与赎回费均逐申请独立应用费率和最低额，并在确认时按 CNY 两位小数 half-up 扣收"
+            ],
+            "fees": null,
+            "execution": {
+              "mode": "nav",
+              "calendarMarket": "CN",
+              "cutoffLocalTime": "14:00",
+              "cutoffBoundary": "atOrAfterNextTradingDay",
+              "navDate": "acceptedApplicationTradingDate",
+              "navAvailability": "providerAvailableAt",
+              "reserveCashAt": "orderAccepted",
+              "subscriptionDebitAt": "confirmation",
+              "confirmationAfterTradingDays": 0,
+              "sellableAfterConfirmationTradingDays": 0,
+              "redemptionReinvestableAfterConfirmationTradingDays": 0,
+              "subscriptionFee": {
+                "treatment": "charged",
+                "side": "buy",
+                "basis": "subscriptionApplicationAmount",
+                "currency": "CNY",
+                "collection": "perApplication",
+                "collectedAt": "confirmation",
+                "rate": "0.01",
+                "minimum": {
+                  "kind": "none"
+                },
+                "rounding": {
+                  "mode": "halfUp",
+                  "decimalPlaces": 2
+                }
+              },
+              "redemptionFee": {
+                "treatment": "charged",
+                "side": "sell",
+                "basis": "redemptionGrossProceeds",
+                "currency": "CNY",
+                "collection": "perApplication",
+                "collectedAt": "confirmation",
+                "rate": "0.01",
+                "minimum": {
+                  "kind": "none"
+                },
+                "rounding": {
+                  "mode": "halfUp",
+                  "decimalPlaces": 2
+                }
+              }
+            }
+          }
+        ]
+      },
+      "navInput": {
+        "kind": "nav",
+        "symbol": "161725.OF"
+      },
+      "navVisibility": {
+        "mode": "research-assumption",
+        "boundary": "after-disclosure-day-end",
+        "timezone": "Asia/Shanghai",
+        "rule": {
+          "id": "nav-domestic-default:161725.OF",
+          "version": "user-t1-default-v1",
+          "symbol": "161725.OF",
+          "fundType": "domestic",
+          "applicableRange": {
+            "startDate": "2026-09-01",
+            "endDate": "2026-09-30"
+          },
+          "delayWorkdays": 1,
+          "basis": "domestic-default",
+          "evidenceRef": "research-config://nav-domestic/6064803cdacfa120a3c89f8a9700ca07dcdc42cea3ba50a9c2e11bf0c91a7cdf",
+          "documentHash": "6064803cdacfa120a3c89f8a9700ca07dcdc42cea3ba50a9c2e11bf0c91a7cdf",
+          "contentHash": "cbdb7aee5e0db95d95ddd0ee0d3151662e54c6e7235b66d25ab07f9f3c234d8a",
+          "configuredAt": "2026-09-30T14:00:00Z"
+        },
+        "disclosureCalendarHash": "c05b1f3cc15e4c35d2d1d42741572ae1e8884062da8d0f40948c139d0fe3a513"
+      }
+    },
+    "binding": {
+      "strategyVersionId": "11111111-1111-4111-8111-111111111111",
+      "strategyContentHash": "da26b9e618551d1b278070bd6f1548ebcd33acff1ba3b32a35a658a5f0dcd011",
+      "intentHash": "54f6f8aac1bd84d27cb49a7452e1f8d1ab445013791bd08a8ed6bc6a9440bd10",
+      "runConfigChecksum": "fc1787ec6cc29fd2a755662ba7ab3b361c332f23f17e3b7a11896bc2000a7506",
+      "inputPlanHash": "ae5241ae8f297756364ebd0c8c85baed6c1245706daf12b6dfd796654ce9c6f4",
+      "sourceRequestHash": "4a921b89c6f3b347b8d813c6c627e801fbb08462d127a91857b2a0fc25f5a90c",
+      "sourceResponseHash": "8e417aa1e3a589d58db5800b554651ade0eb958a06373412d97a23e1c5e9bfc0",
+      "routeStateHash": "d81fee5e9464d448eff2ce09e2be17e6845819725030be880df86477ff06fb53",
+      "admissionHash": "5636d1d69e14a3bb47e337476d55f096f160fb62f37c9f751c0af35a469dd967",
+      "preparationHash": "46b3208bc5f23937af8ce4a44145a5c313c5c03028a490dc8abe6db96a63d094",
+      "startedAt": "2026-09-30T15:00:00Z",
+      "checkedAt": "2026-09-30T15:02:00Z"
+    },
+    "inputPlanSummary": {
+      "version": "nav-input-plan-v1",
+      "runWindow": {
+        "startDate": "2026-09-08",
+        "endDate": "2026-09-08"
+      },
+      "navRange": {
+        "startDate": "2026-09-07",
+        "endDate": "2026-09-08"
+      },
+      "requiredCalendarRange": {
+        "startDate": "2026-09-07",
+        "endDate": "2026-09-09"
+      },
+      "warmupPeriods": 1,
+      "tailTradingDays": 1,
+      "disclosureTailWorkdays": 1,
+      "expectedValuationDates": ["2026-09-07", "2026-09-08"],
+      "priceInputs": [
+        {
+          "purpose": "execution",
+          "artifactKey": "execution/nav.parquet",
+          "range": {
+            "startDate": "2026-09-07",
+            "endDate": "2026-09-08"
+          }
+        },
+        {
+          "purpose": "signal",
+          "sourceId": "nav",
+          "artifactKey": "execution/nav.parquet",
+          "range": {
+            "startDate": "2026-09-07",
+            "endDate": "2026-09-08"
+          }
+        },
+        {
+          "purpose": "benchmark",
+          "artifactKey": "execution/nav.parquet",
+          "range": {
+            "startDate": "2026-09-08",
+            "endDate": "2026-09-08"
+          }
+        }
+      ]
+    },
+    "actualSource": {
+      "routeKey": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "MUTUAL_FUND",
+        "capability": "FUND_NAV_HISTORY"
+      },
+      "routeTarget": {
+        "providerId": "efinance",
+        "upstreamSource": "eastmoney",
+        "routeIndex": 0
+      },
+      "desiredRevision": 1,
+      "effectivePolicyRevision": 1,
+      "catalogRevision": 2,
+      "source": {
+        "adapterRevision": "efinance-fund-nav-raw-v1",
+        "sourceRevision": "eastmoney-fund-nav-raw-v1",
+        "providerRevision": "eastmoney-fund-nav-raw-v1",
+        "credentialRevision": "not-required",
+        "responseHash": "2e7332dda6d92db1e85a9744f03f0c1c24e9198a5426ac656c5a869991c6c64c",
+        "capturedAt": "2026-09-30T15:01:00Z"
+      },
+      "admission": {
+        "consumer": "thesis-ledger",
+        "routeKey": {
+          "kind": "data",
+          "market": "CN",
+          "assetType": "MUTUAL_FUND",
+          "capability": "FUND_NAV_HISTORY"
+        },
+        "target": {
+          "providerId": "efinance",
+          "upstreamSource": "eastmoney"
+        },
+        "status": "admitted",
+        "admissionState": "admitted",
+        "evidenceRef": "fixture://review",
+        "evidenceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scopeSymbols": ["161725.OF"],
+        "scopeDateFrom": "2026-09-01",
+        "scopeDateTo": "2026-09-30",
+        "adapterRevision": "efinance-fund-nav-raw-v1",
+        "sourceRevision": "eastmoney-fund-nav-raw-v1",
+        "credentialRevision": "not-required",
+        "validFrom": "2026-09-01T00:00:00Z",
+        "validUntil": "2026-10-02T00:00:00Z",
+        "recordVersion": 1,
+        "recordedAt": "2026-09-01T00:00:00Z",
+        "invalidatedAt": null,
+        "invalidationReason": null
+      }
+    }
+  },
+  "navResult": {
+    "source": "BACKTEST",
+    "inputKind": "nav",
+    "schemaVersion": "3",
+    "snapshotVersion": "snapshot-manifest-v3",
+    "engineVersion": "controlled-native-b4",
+    "runId": "0bd963a5-c0e9-42ee-be1a-5a71dcd46a27",
+    "strategyVersionId": "11111111-1111-4111-8111-111111111111",
+    "snapshotId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "comparableDataFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "resultChecksum": "0000000000000000",
+    "dataAsOf": "2026-09-30T15:02:00Z",
+    "evaluatedAt": "2026-09-08T20:00:00+08:00",
+    "dateRange": {
+      "startDate": "2026-09-08",
+      "endDate": "2026-09-08"
+    },
+    "executionSymbol": "161725.OF",
+    "calendarVersion": "controlled-fixture-v1",
+    "executionModelDisclosure": {
+      "model": {
+        "schemaVersion": "execution-model-v1",
+        "id": "cn-nav-fund-contract-fixture",
+        "version": "1",
+        "scope": {
+          "symbol": "161725.OF",
+          "market": "CN",
+          "instrumentType": "NAV_FUND",
+          "currency": "CNY",
+          "timezone": "Asia/Shanghai",
+          "range": {
+            "start": "2026-09-08",
+            "end": "2026-09-15"
+          }
+        },
+        "segments": [
+          {
+            "id": "nav-contract",
+            "range": {
+              "start": "2026-09-08",
+              "end": "2026-09-15"
+            },
+            "source": {
+              "kind": "researchPreset",
+              "description": "NAV 费用适用契约的受控测试配置，不代表 Provider 事实或生产预设",
+              "references": ["docs/tasks/2026-09-10-backtest-historical-execution-rule-facts.md"],
+              "revision": "1",
+              "configuredAt": "2026-09-10T00:00:00+08:00"
+            },
+            "assumptions": [
+              "申购金额为不含费用的申请本金，申购费另加；赎回费基数为确认份额乘确认 NAV 的费前赎回款",
+              "申购费与赎回费均逐申请独立应用费率和最低额，并在确认时按 CNY 两位小数 half-up 扣收"
+            ],
+            "fees": null,
+            "execution": {
+              "mode": "nav",
+              "calendarMarket": "CN",
+              "cutoffLocalTime": "14:00",
+              "cutoffBoundary": "atOrAfterNextTradingDay",
+              "navDate": "acceptedApplicationTradingDate",
+              "navAvailability": "providerAvailableAt",
+              "reserveCashAt": "orderAccepted",
+              "subscriptionDebitAt": "confirmation",
+              "confirmationAfterTradingDays": 0,
+              "sellableAfterConfirmationTradingDays": 0,
+              "redemptionReinvestableAfterConfirmationTradingDays": 0,
+              "subscriptionFee": {
+                "treatment": "charged",
+                "side": "buy",
+                "basis": "subscriptionApplicationAmount",
+                "currency": "CNY",
+                "collection": "perApplication",
+                "collectedAt": "confirmation",
+                "rate": "0.01",
+                "minimum": {
+                  "kind": "none"
+                },
+                "rounding": {
+                  "mode": "halfUp",
+                  "decimalPlaces": 2
+                }
+              },
+              "redemptionFee": {
+                "treatment": "charged",
+                "side": "sell",
+                "basis": "redemptionGrossProceeds",
+                "currency": "CNY",
+                "collection": "perApplication",
+                "collectedAt": "confirmation",
+                "rate": "0.01",
+                "minimum": {
+                  "kind": "none"
+                },
+                "rounding": {
+                  "mode": "halfUp",
+                  "decimalPlaces": 2
+                }
+              }
+            }
+          }
+        ]
+      },
+      "contentHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "navVisibility": {
+      "mode": "research-assumption",
+      "boundary": "after-disclosure-day-end",
+      "timezone": "Asia/Shanghai",
+      "rule": {
+        "id": "nav-domestic-default:161725.OF",
+        "version": "user-t1-default-v1",
+        "symbol": "161725.OF",
+        "fundType": "domestic",
+        "applicableRange": {
+          "startDate": "2026-09-01",
+          "endDate": "2026-09-30"
+        },
+        "delayWorkdays": 1,
+        "basis": "domestic-default",
+        "evidenceRef": "research-config://nav-domestic/6064803cdacfa120a3c89f8a9700ca07dcdc42cea3ba50a9c2e11bf0c91a7cdf",
+        "documentHash": "6064803cdacfa120a3c89f8a9700ca07dcdc42cea3ba50a9c2e11bf0c91a7cdf",
+        "contentHash": "cbdb7aee5e0db95d95ddd0ee0d3151662e54c6e7235b66d25ab07f9f3c234d8a",
+        "configuredAt": "2026-09-30T14:00:00Z"
+      },
+      "disclosureCalendarHash": "c05b1f3cc15e4c35d2d1d42741572ae1e8884062da8d0f40948c139d0fe3a513"
+    },
+    "visibilityDisclosure": {
+      "classification": "research-assumption",
+      "strictPit": false,
+      "assumptions": ["B4本机受控样本，仅验收客户端合同及展示，不代表真实行情或任务执行。"]
+    },
+    "navSource": {
+      "routeKey": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "MUTUAL_FUND",
+        "capability": "FUND_NAV_HISTORY"
+      },
+      "target": {
+        "providerId": "controlled-native",
+        "upstreamSource": "local-fixture"
+      },
+      "policyRevision": 1,
+      "adapterRevision": "controlled-v1",
+      "providerRevision": "controlled-v1",
+      "sourceRevision": "controlled-v1",
+      "credentialRevision": null,
+      "responseHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "capturedAt": "2026-09-29T00:00:00Z"
+    },
+    "completeness": "complete",
+    "warnings": ["B4本机受控响应；未调用真实模型、行情或Worker。"],
+    "diagnostics": [],
+    "requests": [],
+    "pendingRequestIds": [],
+    "cash": {
+      "settled": "10000",
+      "unsettled": "0",
+      "currency": "CNY"
+    },
+    "position": {
+      "quantity": "0",
+      "settledQuantity": "0",
+      "unsettledQuantity": "0",
+      "averageCost": "0"
+    },
+    "simulationFills": [],
+    "trades": [],
+    "equityCurve": [
+      {
+        "occurredAt": "2026-09-08T00:00:00+08:00",
+        "value": {
+          "amount": "10000.12345678",
+          "currency": "CNY"
+        }
+      },
+      {
+        "occurredAt": "2026-09-08T20:00:00+08:00",
+        "value": {
+          "amount": "10005.12345678",
+          "currency": "CNY"
+        }
+      }
+    ],
+    "drawdownCurve": [],
+    "metrics": {},
+    "benchmark": {}
+  }
+}

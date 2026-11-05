@@ -23,12 +23,15 @@ export function marketChartRequest(symbol: string, query: Record<string, string 
       symbol: normalizedSymbol,
       assetType,
       timeframe: requireNativeMarketTimeframe(query.timeframe, assetType),
-      adjustment: query.adjustment ?? 'qfq',
+      adjustment: query.adjustment ?? (query.timeframe === '1m' ? 'none' : 'qfq'),
     });
   } catch (error) {
     if (error instanceof HttpException) throw error;
     throw new BadRequestException('assetType、timeframe 或 adjustment 不支持');
   }
+  if (identity.timeframe === '1m' && (!/\.(HK|US)$/.test(identity.symbol) ||
+      !['STOCK', 'ETF'].includes(identity.assetType) || identity.adjustment !== 'none'))
+    throw new BadRequestException('1分钟仅支持港美股票/ETF不复权图表');
   const limit = query.limit === undefined ? undefined : Number(query.limit);
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 3650))
     throw new BadRequestException('limit 必须是 1 到 3650 之间的整数');

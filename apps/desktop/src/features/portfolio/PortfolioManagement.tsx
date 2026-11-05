@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 
@@ -9,7 +10,7 @@ import type {
   PortfolioChangeImpact,
   Position,
 } from './portfolio.types.js';
-import { useManagedAccountsQuery } from './portfolio.queries.js';
+import { portfolioKeys, useManagedAccountsQuery } from './portfolio.queries.js';
 import {
   useConfirmPortfolioInstrumentMutation,
   useClearPortfolioPositionsMutation,
@@ -23,6 +24,7 @@ import {
 import { createPortfolioActionHandlers } from './portfolio.actions.js';
 import { usePortfolioInstrumentSearch } from './portfolio.instrument-search.js';
 import { PortfolioManagementView } from './PortfolioManagementView.js';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 
 export const shouldAutoOpenEmptyAccountForm = ({
   step,
@@ -70,6 +72,7 @@ export function PortfolioManagement({
   editingPosition,
   onEditingPositionChange,
   onDirtyChange,
+  onBusyChange,
   onSaved,
 }: {
   accounts: Account[];
@@ -93,7 +96,8 @@ export function PortfolioManagement({
   editingPosition?: Position | null;
   onEditingPositionChange?: (editing: Position | null) => void;
   onDirtyChange?: (dirty: boolean) => void;
-  onSaved: (impact: PortfolioChangeImpact) => void;
+  onBusyChange?: (busy: boolean) => void;
+  onSaved: (impact: PortfolioChangeImpact) => void | Promise<unknown>;
 }) {
   const initialEntryAccountId = defaultAccountId ?? accounts[0]?.id ?? '';
   const [uncontrolledEditing, setUncontrolledEditing] = useState<Position | null>(null);
@@ -113,14 +117,21 @@ export function PortfolioManagement({
   const [instrumentQuery, setInstrumentQuery] = useState('');
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentLookup | null>(null);
   const [instrumentConfirmationBusy, setInstrumentConfirmationBusy] = useState(false);
+  useNavigationGuard({ dirty, busy: busyAction !== null || instrumentConfirmationBusy });
   const [instrumentSearchOpen, setInstrumentSearchOpen] = useState(false);
   const [manualInstrumentEntry, setManualInstrumentEntry] = useState(false);
   const [manualAssetType, setManualAssetType] = useState<HeldAssetType>('stock');
   const instrumentSelectionInProgress = useRef(false);
+  const accountSaveErrorToastId = useRef<string | null>(null);
+  const positionSaveErrorToastId = useRef<string | null>(null);
   const emptyAccountFormAutoOpened = useRef(false);
   const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
+  const queryClient = useQueryClient();
   const managedAccountsQuery = useManagedAccountsQuery(step === 'account' && accountsReady);
+  const refreshManagedAccounts = () => queryClient.refetchQueries(
+    { queryKey: portfolioKeys.accounts() }, { cancelRefetch: false },
+  );
   const managedAccounts = managedAccountsQuery.data ?? accounts;
   const managedAccountsLoaded =
     step !== 'account' || managedAccountsQuery.isSuccess || managedAccountsQuery.isError;
@@ -166,6 +177,7 @@ export function PortfolioManagement({
     setPositionSheetOpen(true);
   };
   const confirmDiscard = async () => {
+    if (busyAction) return false;
     if (!dirty) return true;
     return confirm({
       title: '放弃未保存修改？',
@@ -185,6 +197,15 @@ export function PortfolioManagement({
     markDirty(false);
     setAccountSheetOpen(false);
   };
+  const requestPositionSheetOpen = async (open: boolean) => {
+    if (!open && !(await confirmDiscard())) return;
+    if (!open) markDirty(false);
+    setPositionSheetOpen(open);
+  };
+
+  useEffect(() => {
+    onBusyChange?.(busyAction !== null);
+  }, [busyAction, onBusyChange]);
 
   useEffect(() => {
     if (defaultAccountId) setEntryAccountId(defaultAccountId);
@@ -266,6 +287,9 @@ export function PortfolioManagement({
     markDirty,
     confirm,
     onSaved,
+    refreshManagedAccounts,
+    accountSaveErrorToastId,
+    positionSaveErrorToastId,
     toastManager,
     mutations,
   });
@@ -284,6 +308,9 @@ export function PortfolioManagement({
       {...(onOpenReconciliation ? { onOpenReconciliation } : {})}
       accountFormInline={accountFormInline}
       managedAccounts={managedAccounts}
+      managedAccountsError={managedAccountsQuery.isError}
+      managedAccountsPending={managedAccountsQuery.isFetching}
+      onRetryManagedAccounts={() => void refreshManagedAccounts()}
       onAccountEntry={onAccountEntry}
       selectedAccount={selectedAccount}
       entryAccountLocked={entryAccountLocked}
@@ -319,7 +346,7 @@ export function PortfolioManagement({
       setAccountSheetOpen={(open) => {
         void closeAccountSheet(open);
       }}
-      setPositionSheetOpen={setPositionSheetOpen}
+      setPositionSheetOpen={(open) => void requestPositionSheetOpen(open)}
       setEditingAccount={setEditingAccount}
       setEditing={setEditing}
       setEntryAccountId={setEntryAccountId}

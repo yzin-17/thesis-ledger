@@ -78,7 +78,8 @@ export function MarketProviderRow({
             <span className="text-xs text-muted-foreground">精确能力目录尚未加载</span>
           )}
           {capabilities?.length === 0 && (
-            <span className="text-xs text-muted-foreground">当前合同尚无精确接入</span>
+            <span className="text-xs text-muted-foreground">{provider.accountAccessSupported
+              ? '尚无已确认可用的功能，请配置账号后检查。' : '当前合同尚无精确接入'}</span>
           )}
         </div>
       </div>

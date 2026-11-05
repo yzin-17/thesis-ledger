@@ -185,7 +185,7 @@ const readStrictMetadata = (
 };
 
 export class LocalSnapshotV3Runner implements BacktestV3Runner {
-  readonly id = 'thesis-ledger-v3-local-runner-v2';
+  readonly id = 'thesis-ledger-v3-local-runner-v3';
 
   constructor(private readonly snapshots: LocalSnapshotStore) {}
 

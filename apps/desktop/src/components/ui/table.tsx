@@ -1,15 +1,44 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+type TableFrame = 'outlined' | 'plain';
+
+function TableContainer({
+  className,
+  frame = 'outlined',
+  ...props
+}: React.ComponentProps<'div'> & { frame?: TableFrame | undefined }) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div
+      data-slot="table-container"
+      data-frame={frame}
+      className={cn(
+        'relative w-full overflow-x-auto',
+        frame === 'outlined' && 'rounded-md border border-border',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Table({
+  className,
+  containerClassName,
+  frame,
+  ...props
+}: Omit<React.ComponentProps<'table'>, 'frame'> & {
+  containerClassName?: string | undefined;
+  frame?: TableFrame | undefined;
+}) {
+  return (
+    <TableContainer frame={frame} className={containerClassName}>
       <table
         data-slot="table"
         className={cn('w-full caption-bottom text-sm', className)}
         {...props}
       />
-    </div>
+    </TableContainer>
   );
 }
 
@@ -55,7 +84,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground',
+        'h-10 px-3 text-left align-middle font-medium whitespace-nowrap text-foreground',
         className,
       )}
       {...props}
@@ -67,7 +96,7 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
   return (
     <td
       data-slot="table-cell"
-      className={cn('p-2 align-middle whitespace-nowrap', className)}
+      className={cn('px-3 py-2 text-left align-middle whitespace-nowrap', className)}
       {...props}
     />
   );
@@ -83,4 +112,14 @@ function TableCaption({ className, ...props }: React.ComponentProps<'caption'>) 
   );
 }
 
-export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption };
+export {
+  Table,
+  TableContainer,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableCaption,
+};

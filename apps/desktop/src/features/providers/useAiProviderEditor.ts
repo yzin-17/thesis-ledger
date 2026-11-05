@@ -1,9 +1,9 @@
 import { useRef, useState, type FormEvent } from 'react';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 import {
-  aiProviderDraftError,
-  aiProviderDraftFromRecord,
+  providerDraftFromRecord,
   aiProviderInputFromDraft,
   aiProviderTestPricingState,
   aiProviderTestInputFromDraft,
@@ -33,6 +33,11 @@ import {
   type ProviderTestState,
 } from './providers.types.js';
 import { createLatestRequestGate, createSingleFlightGate } from './ai-provider-editor-async.js';
+import { validatedAiProviderInput } from './ai-provider-draft-validation.js';
+import {
+  modelCatalogInputError,
+  modelCatalogRequestFromDraft,
+} from './ai-provider-model-catalog.js';
 import {
   cancelAiProviderTest,
   type AiProviderLifecycleOptions,
@@ -57,7 +62,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   const [draft, setDraft] = useState<ProviderDraft>(newProviderDraft);
   const [open, setOpen] = useState(false);
   const [editingProviderName, setEditingProviderName] = useState<string | null>(null);
-  const [takingOverEnvironmentName, setTakingOverEnvironmentName] = useState<string | null>(null);
   const [credentialInputOpen, setCredentialInputOpen] = useState(true);
   const [testState, setTestState] = useState<ProviderTestState>('idle');
   const [testEvidence, setTestEvidence] = useState<ProviderTestEvidence | null>(null);
@@ -131,7 +135,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   const resetEditor = () => {
     setOpen(false);
     setEditingProviderName(null);
-    setTakingOverEnvironmentName(null);
     setCredentialInputOpen(true);
     setDraft(newProviderDraft());
     setAvailableModels([]);
@@ -144,36 +147,16 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     resetEditor();
   };
 
-  const providerDraftFromRecord = (provider: ProviderRecord): ProviderDraft => {
-    if (provider.type === 'ai') return aiProviderDraftFromRecord(provider);
-    return {
-      ...newProviderDraft(),
-      name: provider.name,
-      type: provider.type,
-      capabilities: [...provider.capabilities],
-      priority: provider.priority,
-      enabled: provider.enabled,
-    };
-  };
-
   const openEditor = (provider?: ProviderRecord, initialDraft?: ProviderDraft) => {
     if (!provider) {
       setDraft(initialDraft ?? newProviderDraft());
       setEditingProviderName(null);
-      setTakingOverEnvironmentName(null);
       setCredentialInputOpen(true);
     } else {
       const nextDraft = providerDraftFromRecord(provider);
       setDraft(nextDraft);
-      if (provider.source === 'environment') {
-        setEditingProviderName(null);
-        setTakingOverEnvironmentName(provider.name);
-        setCredentialInputOpen(true);
-      } else {
-        setEditingProviderName(provider.name);
-        setTakingOverEnvironmentName(null);
-        setCredentialInputOpen(!provider.credentialConfigured);
-      }
+      setEditingProviderName(provider.name);
+      setCredentialInputOpen(!provider.credentialConfigured);
     }
     invalidateDraftResults();
     setAvailableModels([]);
@@ -216,19 +199,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     invalidateDraftResults();
   };
 
-  const invalidDraft = (input: ReturnType<typeof aiProviderInputFromDraft>) => {
-    const error = aiProviderDraftError(input);
-    if (!error) return false;
-    toastManager.add({
-      title: 'AI Provider 配置不完整',
-      description: error,
-      type: 'error',
-      timeout: 7000,
-      priority: 'high',
-    });
-    return true;
-  };
-
   const providerInputFromDraft = () => {
     const credentialsRef = credentialInputOpen
       ? providerCredentialForSave(draft.credentialsRef, testEvidence)
@@ -266,30 +236,21 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   };
 
   const fetchModels = async () => {
-    const baseUrl = draft.baseUrl.trim();
-    if (!baseUrl) {
+    const input = modelCatalogRequestFromDraft(draft);
+    const catalogError = modelCatalogInputError({ ...input, authMode: draft.authMode });
+    if (catalogError) {
       toastManager.add({
         title: '无法获取模型目录',
-        description: '请先填写 API Base URL。',
+        description: catalogError,
         type: 'error',
         timeout: 7000,
         priority: 'high',
       });
       return;
     }
-    const name = draft.name.trim();
-    const apiKey = draft.authMode === 'api_key' ? draft.credentialsRef.trim() : '';
-    const timeoutMs = Number(draft.timeoutMs);
     const requestSequence = modelRequestGate.begin();
     try {
-      const result = await modelCatalogMutation.mutateAsync({
-        ...(name ? { name } : {}),
-        baseUrl,
-        authMode: draft.authMode,
-        upstreamFormat: draft.upstreamFormat,
-        ...(apiKey ? { apiKey } : {}),
-        ...(Number.isInteger(timeoutMs) && timeoutMs > 0 ? { timeoutMs } : {}),
-      });
+      const result = await modelCatalogMutation.mutateAsync(input);
       if (!modelRequestGate.isCurrent(requestSequence)) return;
       const nextModelDetails = modelDetailsFromCatalog(result.modelDetails);
       setAvailableModels(result.models);
@@ -315,7 +276,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       if (!modelRequestGate.isCurrent(requestSequence)) return;
       toastManager.add({
         title: '模型目录获取失败',
-        description: error instanceof Error ? error.message : '可继续手动填写模型 ID。',
+        description: `${requestFailureMessage(error, '目录请求失败。')} 请在连接配置中检查模型目录规则，或手动填写模型 ID。`,
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -362,7 +323,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       setTestState('error');
       toastManager.add({
         title: `${input.name} 连通性测试失败`,
-        description: error instanceof Error ? error.message : '连接测试失败。',
+        description: requestFailureMessage(error, '连接测试失败。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -398,15 +359,19 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
         return;
       }
     }
-    const input = aiProviderTestInputFromDraft(
-      draft,
-      model,
-      testKind,
-      pricingState === 'paid' ? true : undefined,
-      purpose,
-      mode,
+    const input = validatedAiProviderInput(
+      () =>
+        aiProviderTestInputFromDraft(
+          draft,
+          model,
+          testKind,
+          pricingState === 'paid' ? true : undefined,
+          purpose,
+          mode,
+        ),
+      toastManager,
     );
-    if (invalidDraft(input)) {
+    if (!input) {
       testFlight.end();
       return;
     }
@@ -456,7 +421,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       setTestState('error');
       toastManager.add({
         title: `${input.name} ${testKind === 'generation' ? '生成测试' : '连通性测试'}失败`,
-        description: error instanceof Error ? error.message : '连接测试失败。',
+        description: requestFailureMessage(error, '连接测试失败。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -473,16 +438,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     if (draft.type !== 'ai') {
       const input = providerInputFromDraft();
       if (invalidOrdinaryDraft(input)) return;
-      if (takingOverEnvironmentName && !input.credentialsRef) {
-        toastManager.add({
-          title: '接管部署配置需要凭证',
-          description: '请填写目标类型的 API Key、Token 或 Webhook 后保存。',
-          type: 'error',
-          timeout: 7000,
-          priority: 'high',
-        });
-        return;
-      }
       try {
         await saveProviderMutation.mutateAsync(input);
         toastManager.add({
@@ -495,7 +450,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       } catch (error) {
         toastManager.add({
           title: 'Provider 配置保存失败',
-          description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+          description: requestFailureMessage(error),
           type: 'error',
           timeout: 0,
           priority: 'high',
@@ -504,18 +459,11 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       return;
     }
     const reusableTestToken = testEvidence?.model ? undefined : testEvidence?.token;
-    const input = aiProviderInputFromDraft(draft, reusableTestToken);
-    if (invalidDraft(input)) return;
-    if (takingOverEnvironmentName && draft.authMode === 'api_key' && !input.apiKey) {
-      toastManager.add({
-        title: '接管部署配置需要 API Key',
-        description: '请填写新的 API Key 后保存。',
-        type: 'error',
-        timeout: 7000,
-        priority: 'high',
-      });
-      return;
-    }
+    const input = validatedAiProviderInput(
+      () => aiProviderInputFromDraft(draft, reusableTestToken),
+      toastManager,
+    );
+    if (!input) return;
     try {
       await saveMutation.mutateAsync(input);
       toastManager.add({
@@ -528,7 +476,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     } catch (error) {
       toastManager.add({
         title: 'AI Provider 配置保存失败',
-        description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+        description: requestFailureMessage(error),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -603,7 +551,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       if (!testRequestGate.isCurrent(requestSequence)) return;
       toastManager.add({
         title: `${provider.name} 生成测试失败`,
-        description: error instanceof Error ? error.message : '请检查服务连接。',
+        description: requestFailureMessage(error, '请检查服务连接。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -616,7 +564,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   };
 
   const toggle = async (provider: ProviderRecord) => {
-    if (provider.source === 'environment') return;
     const isResearchDefault = routingSettings?.researchDefault?.providerId === provider.name;
     let lifecycle: AiProviderLifecycleOptions = provider.updatedAt
       ? { expectedRevision: provider.updatedAt }
@@ -651,7 +598,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     } catch (error) {
       toastManager.add({
         title: `${provider.name} 启停失败`,
-        description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+        description: requestFailureMessage(error, '请检查服务连接后重试。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -687,7 +634,7 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
     } catch (error) {
       toastManager.add({
         title: `${provider.name} 删除失败`,
-        description: error instanceof Error ? error.message : '请检查服务连接后重试。',
+        description: requestFailureMessage(error, '请检查服务连接后重试。'),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -714,7 +661,6 @@ export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
       editingProviderName,
       providerDraft: draft,
       credentialInputOpen,
-      takingOverEnvironmentName,
       providerTestState: testState,
       savingProviderDraft: saveMutation.isPending || saveProviderMutation.isPending,
       availableModels,

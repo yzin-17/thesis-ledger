@@ -145,7 +145,7 @@ describe('verified provider save', () => {
         authMode: 'none',
         contract: aiGenerationContracts.research.ref,
         // 流式用途探针不设总时长墙：判活交给首块与块间停顿，慢生成不该被 Provider 超时掐断。
-        timeout: { firstChunkMs: 30000, chunkMs: 30000 },
+        timeout: { firstChunkMs: 120000, chunkMs: 60000 },
       }),
     );
     expect(f.providers.save).toHaveBeenCalledWith(
@@ -344,7 +344,7 @@ describe('verified provider save', () => {
     expect(f.providers.save).not.toHaveBeenCalled();
     expect(f.sdk.generate).toHaveBeenCalledTimes(1);
   });
-  it('reports a probe timeout honestly instead of as a user cancellation', async () => {
+  it('does not invent a timeout from an unproven cancellation', async () => {
     const f = fixture();
     // 探针超时只会让合并 signal 变成 aborted，适配器只能给出 “cancelled / 生成请求已取消”。
     f.sdk.generate.mockRejectedValueOnce(
@@ -358,19 +358,15 @@ describe('verified provider save', () => {
     );
     const value = input();
     let message = '';
-    await f.service
-      .testAndSave(value, await f.authorize(value))
-      .catch((error: unknown) => {
-        message = error instanceof Error ? error.message : String(error);
-      });
-    expect(message).toContain('已按超时中断');
-    expect(message).toContain('首块 30000 ms / 间隔 30000 ms');
-    expect(message).not.toContain('生成请求已取消');
+    await f.service.testAndSave(value, await f.authorize(value)).catch((error: unknown) => {
+      message = error instanceof Error ? error.message : String(error);
+    });
+    expect(message).toContain('生成请求已取消');
     expect(f.health.recordHistory).toHaveBeenLastCalledWith(
       'local',
       'degraded',
       expect.any(Number),
-      'provider_timeout',
+      'cancelled',
       expect.any(Date),
       'manual',
       expect.objectContaining({ status: 'failed' }),

@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { LedgerCommandResponse } from '@thesis-ledger/api-client';
 import { useToastManager } from '@/components/ui/toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -25,10 +24,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { LoaderCircle } from 'lucide-react';
 
-import type { Account, InstrumentLookup } from '../portfolio/portfolio.types.js';
+import {
+  accountTypeLabel,
+  type Account,
+  type InstrumentLookup,
+} from '../portfolio/portfolio.types.js';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 import { InstrumentCombobox } from '../portfolio/InstrumentCombobox.js';
 import { useConfirmPortfolioInstrumentMutation } from '../portfolio/portfolio.mutations.js';
 import { usePortfolioInstrumentSearch } from '../portfolio/portfolio.instrument-search.js';
+import { ExecutionRuleReference } from './ExecutionRuleReference.js';
 import {
   useCreateExecutionMutation,
   useReplaceExecutionMutation,
@@ -62,12 +67,6 @@ import type {
 
 export type ExecutionSheetCloseOptions = {
   skipDiscardConfirm?: boolean;
-};
-
-const accountTypeLabel = (type: Account['type']) => {
-  if (type === 'fund') return '基金账户';
-  if (type === 'cash') return '现金账户';
-  return '证券账户';
 };
 
 export function ExecutionFormSheet({
@@ -112,11 +111,12 @@ export function ExecutionFormSheet({
     account.name,
     account.institution && account.institution !== account.name ? account.institution : null,
     account.currency,
-    accountTypeLabel(account.type),
+    `${accountTypeLabel(account.type)}账户`,
   ]
     .filter(Boolean)
     .join(' · ');
   const submitting = createMutation.isPending || replaceMutation.isPending;
+  useNavigationGuard({ dirty: false, busy: open && submitting });
 
   useEffect(() => {
     if (!open) return;
@@ -171,6 +171,7 @@ export function ExecutionFormSheet({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting) return;
+    setFormError(null);
     const symbol = (selectedInstrument?.symbol ?? draft.symbol).trim().toUpperCase();
     if (!symbol) {
       setFormError('请选择或填写标的。');
@@ -472,12 +473,7 @@ export function ExecutionFormSheet({
                     <FieldDescription>未来时间会先进入待结算资金。</FieldDescription>
                   </Field>
                 </FieldGroup>
-                <Alert variant="subtle">
-                  <AlertTitle>交易规则未验证</AlertTitle>
-                  <AlertDescription>
-                    当前能力元数据未验证，系统仅执行通用的高精度数量和价格校验。
-                  </AlertDescription>
-                </Alert>
+                <ExecutionRuleReference symbol={selectedInstrument?.symbol ?? draft.symbol} />
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between gap-3">
                     <div>

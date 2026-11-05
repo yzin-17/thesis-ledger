@@ -188,60 +188,6 @@ DSA 不作为这些数据的最终事实源。
 
 ---
 
-## 4.2 Screenshot Import
-
-完整流程属于 Investment OS：
-
-```text
-Screenshot
-↓
-Upload
-↓
-Vision Extraction
-↓
-Import Draft
-↓
-Asset Matching
-↓
-Validation
-↓
-User Review
-↓
-Commit
-↓
-Ledger
-```
-
-其中 Vision 可以调用 DSA 或其他模型服务：
-
-```text
-Investment OS
-      │
-      ▼
-DSA / Vision Provider
-      │
-      ▼
-Structured Candidate
-```
-
-但：
-
-> Vision 返回结果永远只能是候选数据，不能直接修改 Ledger。
-
-Investment OS 负责：
-
-```text
-confidence
-asset match
-duplicate detection
-amount validation
-dry-run
-confirm
-rollback
-```
-
----
-
 # 5. Risk Engine
 
 风险规则属于 Investment OS。
@@ -671,7 +617,6 @@ Portfolio Source of Truth
 /portfolio
 
 /imports
-/imports/screenshot
 
 /risk-rules
 /risk-events
@@ -1052,7 +997,6 @@ Benchmark
 | Position            |             ✓ |                |                |
 | Portfolio           |             ✓ |                |                |
 | Snapshot            |             ✓ |                |                |
-| Screenshot Workflow |             ✓ |         Vision |                |
 | Asset Matching      |             ✓ |                |                |
 | Quote               |      Contract |              ✓ |       Provider |
 | Kline               |      Contract |              ✓ |       Provider |
@@ -1097,8 +1041,6 @@ Long-term Ownership
 V0.1 的关键不是重构，而是验证：
 
 ```text
-Screenshot
-↓
 Portfolio
 ↓
 Quote
@@ -1130,7 +1072,6 @@ Investment OS 先承担：
 
 ```text
 API Gateway
-Screenshot Workflow
 Domain Contract
 客户端接口
 ```

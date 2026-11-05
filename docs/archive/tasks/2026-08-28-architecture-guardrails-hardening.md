@@ -9,7 +9,7 @@
 ## 完成范围
 
 - [x] 固化 Server feature 单向依赖、ownership-aware 修复、复杂度 ratchet、Native compile 和生成物治理规则。
-- [x] 移除 `ledger -> imports` 反向源码依赖，同时保持 Screenshot/Vision adapter 概念归 `imports` 所有。
+- [x] 移除 `ledger -> imports` 反向源码依赖，同时保持 外部输入 adapter 概念归 `imports` 所有。
 - [x] 增加 boundary guardrail，阻止新的 `ledger -> imports` 回归。
 - [x] 将文件尺寸 guardrail 升级为基于 `GUARDRAIL_BASE_REF` 的增量 ratchet。
 - [x] 增加 Android `:app:assembleDebug` 原生 CI job，不依赖 emulator。

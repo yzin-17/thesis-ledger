@@ -5,6 +5,7 @@ import {
   type TradeDetailResponse,
 } from '@thesis-ledger/api-client';
 import { useToastManager } from '@/components/ui/toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -53,10 +54,12 @@ export function PortfolioTradeOpeningBoundarySheet({
   detail,
   open,
   onOpenChange,
+  readOnly = false,
 }: {
   detail: TradeDetailResponse;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  readOnly?: boolean;
 }) {
   const toastManager = useToastManager();
   const mutation = useCreatePortfolioTradeOpeningBoundaryMutation();
@@ -64,7 +67,12 @@ export function PortfolioTradeOpeningBoundarySheet({
   const [reason, setReason] = useState('');
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [writeConfirmed, setWriteConfirmed] = useState(false);
+  const [confirmingRead, setConfirmingRead] = useState(false);
   const commandIdRef = useRef<string | null>(null);
+  const submittingRef = useRef(false);
+  const readingRef = useRef(false);
+  const busy = mutation.isPending || confirmingRead;
 
   useEffect(() => {
     if (!open) return;
@@ -72,6 +80,7 @@ export function PortfolioTradeOpeningBoundarySheet({
     setReason('');
     setDirty(false);
     setError(null);
+    setWriteConfirmed(false);
     commandIdRef.current = null;
   }, [detail.id, open]);
 
@@ -81,6 +90,7 @@ export function PortfolioTradeOpeningBoundarySheet({
       setReason('');
       setDirty(false);
       setError(null);
+      setWriteConfirmed(false);
       commandIdRef.current = null;
     }
     onOpenChange(nextOpen);
@@ -89,14 +99,30 @@ export function PortfolioTradeOpeningBoundarySheet({
   const requestClose = useDraftCloseGuard({
     open,
     draft: null,
-    dirty,
-    busy: mutation.isPending,
+    dirty: dirty && !writeConfirmed,
+    busy,
     onOpenChange: handleOpenChange,
   });
 
+  const readSavedTrades = async () => {
+    if (readingRef.current) return;
+    readingRef.current = true;
+    setConfirmingRead(true);
+    setError(null);
+    try {
+      await mutation.refreshTrades();
+      handleOpenChange(false);
+    } catch {
+      setError('当前交易读取失败，请重新读取；无需再次补录。');
+    } finally {
+      readingRef.current = false;
+      setConfirmingRead(false);
+    }
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (mutation.isPending) return;
+    if (submittingRef.current || busy || writeConfirmed || readOnly) return;
     if (!openingAt) {
       setError('请选择建仓时间。');
       return;
@@ -138,8 +164,12 @@ export function PortfolioTradeOpeningBoundarySheet({
       reason: reason.trim(),
     };
 
+    submittingRef.current = true;
+    setError(null);
     try {
       const response = await mutation.mutateAsync({ tradeId: detail.id, command });
+      setWriteConfirmed(true);
+      setDirty(false);
       toastManager.add({
         title: '建仓时间已补录',
         description: response.idempotentReplay
@@ -148,11 +178,17 @@ export function PortfolioTradeOpeningBoundarySheet({
         type: 'success',
         timeout: 2800,
       });
-      handleOpenChange(false);
+      await readSavedTrades();
     } catch (caught) {
       setError(errorMessage(caught));
+    } finally {
+      submittingRef.current = false;
     }
   };
+
+  let submitLabel = '确认补录';
+  if (writeConfirmed) submitLabel = confirmingRead ? '读取中…' : '重新读取交易';
+  else if (busy) submitLabel = '补录中…';
 
   return (
     <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
@@ -179,6 +215,7 @@ export function PortfolioTradeOpeningBoundarySheet({
                     value={openingAt}
                     max={currentLocalDateTime()}
                     step={60}
+                    disabled={busy || writeConfirmed || readOnly}
                     onChange={(inputEvent) => setOpeningAt(inputEvent.target.value)}
                     required
                   />
@@ -192,11 +229,18 @@ export function PortfolioTradeOpeningBoundarySheet({
                     onChange={(inputEvent) => setReason(inputEvent.target.value)}
                     placeholder="例如：券商历史账单显示首次买入时间"
                     rows={4}
+                    disabled={busy || writeConfirmed || readOnly}
                     required
                   />
                   <FieldDescription>请说明时间来自哪一份账单、记录或其他依据。</FieldDescription>
                 </Field>
-                {error ? (
+                {writeConfirmed && error ? (
+                  <Alert>
+                    <AlertTitle>补录已保存</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {error && !writeConfirmed ? (
                   <Field invalid>
                     <FieldError>{error}</FieldError>
                   </Field>
@@ -208,15 +252,17 @@ export function PortfolioTradeOpeningBoundarySheet({
                 type="button"
                 variant="outline"
                 onClick={() => void requestClose(false)}
-                disabled={mutation.isPending}
+                disabled={busy}
               >
                 取消
               </Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? (
-                  <Loader2Icon data-icon="inline-start" className="animate-spin" />
-                ) : null}
-                {mutation.isPending ? '补录中…' : '确认补录'}
+              <Button
+                type={writeConfirmed ? 'button' : 'submit'}
+                disabled={busy || (!writeConfirmed && readOnly)}
+                onClick={writeConfirmed ? () => void readSavedTrades() : undefined}
+              >
+                {busy ? <Loader2Icon data-icon="inline-start" className="animate-spin" /> : null}
+                {submitLabel}
               </Button>
             </SheetFooter>
           </form>

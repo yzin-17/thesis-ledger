@@ -3,11 +3,15 @@ import type {
   AiAuthMode,
   AiGenerationContractRef,
   AiGenerationMode,
+  ReasoningEffort,
   AiCostFacts,
   AiProviderModelExecution,
   AiUsageFacts,
   AiUpstreamFormat,
+  AiProviderModelCatalogConfig,
+  AiProviderModelDefaultConfig,
 } from '@thesis-ledger/schemas';
+import type { ModelCatalogDraft } from './ai-provider-model-catalog.js';
 
 export type AiProviderExecutionRouteConfig = {
   model: string;
@@ -19,6 +23,8 @@ export type AiProviderExecutionRouteConfig = {
   contract: AiGenerationContractRef;
   firstOutputTimeoutMs?: number;
   outputIdleTimeoutMs?: number;
+  reasoningEffort?: ReasoningEffort | undefined;
+  reasoningEnabled?: boolean | undefined;
 };
 
 export type AiProviderExecutionRouteDraft = {
@@ -29,14 +35,14 @@ export type AiProviderExecutionRouteDraft = {
   enabled: boolean;
   modeOverridden: boolean;
   contractId: AiGenerationContractRef['id'];
+  contractVersion?: AiGenerationContractRef['version'];
   firstOutputTimeoutMs: string;
   outputIdleTimeoutMs: string;
+  reasoningEffort?: ReasoningEffort | undefined;
+  reasoningEnabled?: boolean | undefined;
 };
 
-export type AiProviderModelDefaultConfig = {
-  mode: AiGenerationMode;
-  outputPolicy?: 'auto' | 'manual';
-};
+export type { AiProviderModelDefaultConfig } from '@thesis-ledger/schemas';
 
 export type ProviderHealthHistoryRecord = {
   provider: string;
@@ -108,10 +114,11 @@ export interface ProviderRecord {
   capabilities: string[];
   health: string;
   credentialConfigured?: boolean;
-  source?: 'database' | 'environment';
+  source?: 'database';
   baseUrl?: string | null;
   authMode?: AiAuthMode;
   models?: string[];
+  modelCatalog?: AiProviderModelCatalogConfig;
   upstreamFormat?: AiUpstreamFormat;
   chatImplementation?: AiChatImplementation;
   executionRouteConfigs?: AiProviderExecutionRouteConfig[];
@@ -227,6 +234,7 @@ export interface ProviderConnectionTestResult {
   purpose?: AiGenerationContractRef['id'];
   mode?: AiGenerationMode;
   model?: string;
+  actualModel?: string | null;
   usage?: AiUsageFacts;
   cost?: AiCostFacts;
   requestId?: string;
@@ -294,7 +302,7 @@ export const automationJobTypeLabels: Record<string, string> = {
   'snapshot-close-estimate': '盘后估值预估',
   'snapshot-official-reconcile': '正式净值校准',
   backup: '数据备份',
-  'provider-health': 'Provider 健康检查',
+  'provider-health': '提供方健康检查',
   'cash-deposit-materialization': '定期入账生成',
   'fund-investment-materialization': '基金定投待确认生成',
 };
@@ -333,6 +341,7 @@ export const automationOutputSummary = (output: unknown) => {
 };
 
 export const providerHealthStateLabels: Record<string, string> = {
+  unknown: '状态待确认',
   healthy: '健康',
   degraded: '降级',
   down: '宕机',
@@ -466,12 +475,16 @@ export const replaceProviderRecord = <T extends { name: string }>(
     ? current.map((provider) => (provider.name === saved.name ? saved : provider))
     : [...current, saved];
 
-export const sortProviderRecords = <T extends { name: string; priority: number }>(
+export const sortProviderRecords = <T extends { name: string; priority: number; type: string }>(
   providers: readonly T[],
 ) =>
-  [...providers].sort(
-    (left, right) => left.priority - right.priority || left.name.localeCompare(right.name),
-  );
+  [...providers].sort((left, right) => {
+    const typeOrder = Number(left.type === 'ai') - Number(right.type === 'ai');
+    if (typeOrder !== 0) return typeOrder;
+    const priorityOrder =
+      left.type === 'ai' ? right.priority - left.priority : left.priority - right.priority;
+    return priorityOrder || left.name.localeCompare(right.name);
+  });
 
 export const providerCredentialConfiguredAfterSave = (
   responseValue: boolean | undefined,
@@ -489,7 +502,8 @@ export const newProviderDraft = () => ({
   baseUrl: '',
   authMode: 'api_key' as AiAuthMode,
   modelsText: '',
-  timeoutMs: '30000',
+  modelCatalog: undefined as ModelCatalogDraft | null | undefined,
+  timeoutMs: '',
   firstOutputTimeoutMs: '',
   outputIdleTimeoutMs: '',
   costPer1kInput: '',
@@ -502,6 +516,7 @@ export const newProviderDraft = () => ({
   chatImplementation: 'compatible' as AiChatImplementation | undefined,
   executionRoutes: [] as AiProviderExecutionRouteDraft[],
   modelDefaults: {} as Record<string, AiProviderModelDefaultConfig>,
+  modelRequestOptionsText: {} as Record<string, string>,
   updatedAt: '',
 });
 
@@ -521,6 +536,7 @@ export const providerDraftForType = (type: string, current: ProviderDraft): Prov
     name: current.name,
     priority: current.priority,
     enabled: current.enabled,
+    updatedAt: current.updatedAt,
   };
   if (type === 'ai') return { ...newAiProviderDraft(), ...shared };
   return {
@@ -533,8 +549,7 @@ export const providerDraftForType = (type: string, current: ProviderDraft): Prov
 
 export const isAiProvider = (
   provider: ProviderRecord,
-): provider is ProviderRecord & { type: 'ai'; source: 'database' | 'environment' } =>
-  provider.type === 'ai' && (provider.source === 'database' || provider.source === 'environment');
+): provider is ProviderRecord & { type: 'ai' } => provider.type === 'ai';
 
 export const normalizeProviderHealthHistory = (
   value: unknown,

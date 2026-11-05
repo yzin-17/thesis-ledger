@@ -31,4 +31,4 @@
 - [x] 首次只读检查批次的策略和来源接口内容哈希前后相同；本执行者未保存凭证、改启用状态、保存路由或签发准入，后续并行更新已独立记录并保留。
 - [x] 页面、真实来源、本地及正式运行态证据分别记录，AC1–AC6 一致；当前 Spec 保留。
 
-结论：原 G2 的客户端门禁通过，见[客户端验收](../reviews/2026-10-08-market-provider-client-acceptance.md)，任务归档。没有将 UI 入口覆盖当作每个账号实读成功；外部账号在线义务继续由[凭证任务 T5b](../../tasks/2026-09-14-market-provider-credentials.md)负责，真实 HiThink 仅证明所选区间当次读取。
+结论：原 G2 的客户端门禁通过，见[客户端验收](../reviews/2026-10-08-market-provider-client-acceptance.md)，任务归档。没有将 UI 入口覆盖当作每个账号实读成功；外部账号在线义务继续由[凭证任务 T5b](2026-09-14-market-provider-credentials.md)负责，真实 HiThink 仅证明所选区间当次读取。

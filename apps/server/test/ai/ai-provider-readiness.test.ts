@@ -98,8 +98,8 @@ describe('AI Provider 接入就绪门禁', () => {
       outputIdleTimeoutSource: 'provider',
     });
     expect(resolveAiRouteTimeouts(snapshot())).toMatchObject({
-      firstOutputTimeoutMs: 30_000,
-      outputIdleTimeoutMs: 30_000,
+      firstOutputTimeoutMs: 120_000,
+      outputIdleTimeoutMs: 60_000,
       firstOutputTimeoutSource: 'system',
       outputIdleTimeoutSource: 'system',
     });

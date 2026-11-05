@@ -6,7 +6,7 @@
 
 本次仅写本文，源码、配置、台账、账号、数据库及运行态均只读；没有 Provider 请求、测试执行、目标证据发布、fixture 生成、暂存或提交。主仓 HEAD `fe0e871e`、DSA HEAD `f497b6da`；读取时分别有 539、160 项脏工作区记录，全部保留。已读 RTK、Codex、两仓 AGENTS 及 `spec-driven-workflow` 的任务规划规则。Context Mode 当前不可调用，使用 RTK 和有界派生输出。
 
-权威入口：主 [Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §4/§5/§8/§9/AC20、主 [Task](../2026-09-25-multi-source-adjustment-aware-backtest.md) §9/§12.9、DSA `docs/thesis-ledger-m2-source-gates.md`。DSA 专题中早期“RQData 隔离/配置/消费未接入”是历史记录；当前完成叶以 Task §9 的 `M29-b2-*` 为准，不能重新实施已完成叶。
+权威入口：主 [Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md) §4/§5/§8/§9/AC20、主 [Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) §9/§12.9、DSA `docs/thesis-ledger-m2-source-gates.md`。DSA 专题中早期“RQData 隔离/配置/消费未接入”是历史记录；当前完成叶以 Task §9 的 `M29-b2-*` 为准，不能重新实施已完成叶。
 
 ## 已核对的接缝与缺失事实
 

@@ -10,11 +10,15 @@ const text = z.string().trim().min(1);
 const instant = z.iso.datetime({ offset: true });
 const date = z.iso.date();
 const fingerprint = z.string().regex(/^[a-f0-9]{64}$/);
-export const marketTimeframeSchema = z.enum(['1m', '1d', '5d', '1w', '1mo', '1y']);
+export const marketMinutePeriodSchema = z.enum(['5m', '15m', '30m', '60m']);
+export const marketTimeframeSchema = z.enum(['1m', ...marketMinutePeriodSchema.options, '1d', '5d', '1w', '1mo', '1y']);
 export const marketDerivedTimeframeSchema = z.enum(['5d', '1w', '1mo', '1y']);
+export const marketDisplayDerivedTimeframeSchema = z.enum([...marketDerivedTimeframeSchema.options, ...marketMinutePeriodSchema.options]);
 export const marketTimeframeKindSchema = z.enum(['base', 'derived']);
 export const marketPeriodRuleVersionSchema = z.literal('market-period-aggregation-v1');
 export type MarketTimeframe = z.infer<typeof marketTimeframeSchema>;
+export const isMarketMinuteTimeframe = (value: string | undefined) =>
+  value === '1m' || value === '5m' || value === '15m' || value === '30m' || value === '60m';
 
 export const marketPeriodSessionSchema = z
   .strictObject({

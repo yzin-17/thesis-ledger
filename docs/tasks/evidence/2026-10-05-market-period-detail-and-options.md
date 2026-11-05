@@ -1,6 +1,6 @@
 # 行情派生详情与周期能力验收证据
 
-日期：2026-10-05。权威范围为[原 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md)与[原 Task](../2026-09-16-market-chart-period-aggregation.md)的 T3.3b1/b2。本叶完成本地实现、回归及只读能力核验；T3.3c、T3.2b2.2/T3.2c3、T5 和完整产品验收继续开放。
+日期：2026-10-05。权威范围为[原 Spec](../../specs/2026-09-16-market-chart-period-aggregation.md)与[原 Task](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md)的 T3.3b1/b2。本叶完成本地实现、回归及只读能力核验；T3.3c、T3.2b2.2/T3.2c3、T5 和完整产品验收继续开放。
 
 ## 实现与消费合同
 

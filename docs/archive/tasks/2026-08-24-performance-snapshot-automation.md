@@ -2,7 +2,7 @@
 
 对应历史规格：[`../specs/2026-08-24-performance-snapshot-automation.md`](../specs/2026-08-24-performance-snapshot-automation.md)
 
-状态：已被 [`投资组合快照系统实施任务`](../../tasks/2026-08-28-portfolio-snapshot-system.md) 取代
+状态：已被 [`投资组合快照系统实施任务`](2026-08-28-portfolio-snapshot-system.md) 取代
 
 本文件保留原始任务拆分，不再作为当前实施入口。
 

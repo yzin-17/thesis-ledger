@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { portfolioKeys } from '../portfolio/portfolio.queries.js';
 import type { PortfolioChangeImpact } from '../portfolio/portfolio.types.js';
 import { accountDataKeys } from './account-data.queries.js';
+import { performancePnlKeys } from '../performance/performance-pnl.queries.js';
 
 const uniqueAccountIds = (accountIds: readonly string[]) =>
   [...new Set(accountIds.filter((accountId) => Boolean(accountId)))];
@@ -33,6 +34,7 @@ export const invalidatePortfolioChange = async (
         queryKey: portfolioKeys.valuation(impact.mode, accountId),
         exact: true,
       }),
+      client.invalidateQueries({ queryKey: performancePnlKeys.scope(impact.mode, accountId) }),
     );
     if (impact.events) {
       invalidations.push(
@@ -63,6 +65,7 @@ export const invalidatePortfolioChange = async (
         queryKey: portfolioKeys.valuation(impact.mode),
         exact: true,
       }),
+      client.invalidateQueries({ queryKey: performancePnlKeys.scope(impact.mode, '') }),
     );
   }
   await Promise.all(invalidations);

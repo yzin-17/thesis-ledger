@@ -2,7 +2,7 @@
 
 2026-10-02 用户授权全部完成后，已按本文顺序完成 U01/U02、E04-d/E04、D01–D03 与最终 Review。当前剩余数为0，见[最终收口证据](2026-10-02-canonical-final-completion.md)。下文保留执行前的依赖安排，不作为新的待执行任务清单。
 
-依据[主任务](../2026-09-29-thesis-ledger-canonical-runtime-replacement.md)在 2026-10-02 的状态，以及 C03/C04、E03、E01-I1 和 NAV N1–N4 的完成证据整理。执行前仍需核对实际源码和未提交写集。
+依据[主任务](../../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)在 2026-10-02 的状态，以及 C03/C04、E03、E01-I1 和 NAV N1–N4 的完成证据整理。执行前仍需核对实际源码和未提交写集。
 
 ## 已完成范围
 

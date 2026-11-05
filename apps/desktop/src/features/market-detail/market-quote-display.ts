@@ -3,6 +3,21 @@ import { marketToneForValue, type MarketTone } from '@/ui/market-color';
 
 type QuotePrice = Pick<Quote, 'price' | 'previousClose'>;
 
+export const formatQuotePrice = (
+  value: number,
+  currency: NonNullable<Quote['units']>['priceCurrency'] | undefined,
+): string => {
+  const precision = { minimumFractionDigits: 2, maximumFractionDigits: 20 };
+  if (currency) {
+    return new Intl.NumberFormat('zh-CN', {
+      ...precision,
+      style: 'currency',
+      currency,
+    }).format(value);
+  }
+  return `${new Intl.NumberFormat('zh-CN', precision).format(value)}（币种未知）`;
+};
+
 export const quoteChangePercent = (quote: QuotePrice): number | null => {
   if (
     !Number.isFinite(quote.price) ||

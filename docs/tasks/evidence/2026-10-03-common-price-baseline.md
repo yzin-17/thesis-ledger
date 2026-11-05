@@ -67,7 +67,7 @@
 
 基础价格交付完成；未完成的严格历史 PIT、真实份额/公司行动、可逆因子、专业行情与非共同研究辅助能力按用户本轮范围调整为扩展。AKShare/EastMoney 未完成事件/价格、Tushare 当前免费权限不足、RQData 无账号及 TdxAiData 付费/ARM64 问题继续明确跳过。腾讯 none 本轮用于图表；真实 `raw-events` 回测仍依赖真实份额和公司行动，不计作已通过。
 
-原任务编号及 AC 对账以[主 Task §0](../2026-09-25-multi-source-adjustment-aware-backtest.md)为准。现有事件、严格 PIT、其他市场、NAV 和账户隔离由其已完成定向及本轮包级回归保留；没有新增外部事件或高级来源验收声明。文件尺寸门禁已通过；Electron、原始浏览器网络采集及新镜像发布均不计作本轮通过。
+原任务编号及 AC 对账以[主 Task §0](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)为准。现有事件、严格 PIT、其他市场、NAV 和账户隔离由其已完成定向及本轮包级回归保留；没有新增外部事件或高级来源验收声明。文件尺寸门禁已通过；Electron、原始浏览器网络采集及新镜像发布均不计作本轮通过。
 
 ## C06 测试职责收尾
 

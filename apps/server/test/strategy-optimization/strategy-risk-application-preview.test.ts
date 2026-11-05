@@ -8,6 +8,23 @@ const accountId = '22222222-2222-4222-8222-222222222222';
 const symbol = '600519.SH';
 
 describe('StrategyRiskApplicationService preview', () => {
+  it('持有周期规则要求实际上下文读取完整开仓窗口', async () => {
+    const strategy = createStrategyFixture(symbol, '持有周期预览')('0.08');
+    strategy.risk.push({ type: 'maxHoldingPeriod', periods: 20 });
+    const contexts = { load: vi.fn(async () => ({ context: {
+      quantity: '100', averageCost: '10', price: '9.73', holdingPeriods: 1,
+    } })) };
+    const service = new StrategyRiskApplicationService({ strategyVersion: {
+      findUnique: vi.fn(async () => ({ id: strategyVersionId, strategyId: accountId,
+        version: 1, schemaVersion: 2, schema: strategy })),
+    } } as never, contexts as never, {} as never, {} as never);
+    const result = await service.preview({ strategyVersionId, accountId, symbol,
+      cycleMode: 'existingAndFuture' });
+    expect(contexts.load).toHaveBeenCalledWith(accountId, symbol,
+      expect.objectContaining({ requiresHoldingPeriods: true }));
+    expect(result.evaluations.at(-1)).toMatchObject({ state: 'not_triggered', value: '1' });
+  });
+
   it('行情暂时不可用时仍返回规则预览，并把依赖价格的判断标记为 unavailable', async () => {
     const strategy = createStrategyFixture(symbol, '行情不可用预览')('0.08');
     const prisma = {
@@ -114,7 +131,9 @@ describe('StrategyRiskApplicationService preview', () => {
     expect(result.evaluations).toEqual([
       expect.objectContaining({ state: 'triggered', value: '-0.08', threshold: '-0.08' }),
     ]);
-    expect(contexts.load).toHaveBeenCalledWith(accountId, symbol, strategy);
+    expect(contexts.load).toHaveBeenCalledWith(accountId, symbol, {
+      ...strategy, requiresHoldingPeriods: false,
+    });
     expect(result.plan.coverage.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ source: 'exit', status: 'unsupported' }),

@@ -112,13 +112,14 @@ export class PerformanceSnapshotRevisionRepository {
     return { ...snapshot, snapshotAt: snapshot.capturedAt, revisions };
   }
 
-  pendingEstimates(limit: number) {
+  pendingEstimates(limit: number, accountId?: string) {
     return this.prisma.portfolioSnapshot.findMany({
       where: {
         source: 'DAILY_CLOSE',
         valuationBasis: 'ESTIMATED',
         status: 'VALID',
         supersededBy: null,
+        ...(accountId ? { accountId } : {}),
       },
       orderBy: [{ valuationDate: 'asc' }, { accountId: 'asc' }],
       take: limit,

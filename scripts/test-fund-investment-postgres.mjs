@@ -110,6 +110,7 @@ try {
       '--no-file-parallelism',
       'test/fund-plans/recurring-fund-postgres.integration.test.ts',
       'test/fund-plans/recurring-fund-lifecycle-postgres.integration.test.ts',
+      'test/fund-plans/execution-cash-postgres.integration.test.ts',
     ],
     {
       cwd: root,

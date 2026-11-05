@@ -33,9 +33,9 @@ RQData 身份续验：`M29-b2-identity` 已实现准入摘要绑定的直接映�
 
 F02-b DSA 版本入口说明已核对并修订：Data V1/V2/V3 与 Control 信封版本分开说明，Control V3 继续使用 V1 URL，infra 兼容基线与 V3 smoke 分开记录。验证依据为实际源码路由挂载、AST 路由清单、handshake 与兼容矩阵；本次仅改文档。F02-a 和其余基线文档、用户/运维说明尚待收口，F02 未完成。
 
-R04 持仓校验子项完成：未知/歧义报告期、重复身份及非法权重拒绝，70 项相关本地测试通过；官方 DSA 同步后真实 HTTP 首次返回 77 条持仓，并通过目标 Server Schema。见[持仓行完整性任务](../2026-09-27-fund-holdings-row-validation.md)。真实披露时间与来源完整性仍开放，不以此关闭 R04。
+R04 持仓校验子项完成：未知/歧义报告期、重复身份及非法权重拒绝，70 项相关本地测试通过；官方 DSA 同步后真实 HTTP 首次返回 77 条持仓，并通过目标 Server Schema。见[持仓行完整性任务](../../archive/tasks/2026-09-27-fund-holdings-row-validation.md)。真实披露时间与来源完整性仍开放，不以此关闭 R04。
 
-R01.10 已完成：固定 exchange-calendars 4.13.2，以 93 个文件的源码树摘要绑定公开发布时点；发布前请求拒绝，特殊休市样本与实际目标 HTTP 到冻结快照、离线重放已验证。官方完整 DSA 更新及后续代码同步成功。以[日历版本可见性任务](../2026-09-27-calendar-release-availability.md)为当前证据，不再把已完成的版本约束、特殊样本、发布可见性与部署列为剩余工作。该结论仅覆盖日历能力，真实行情和回测门禁独立保留。
+R01.10 已完成：固定 exchange-calendars 4.13.2，以 93 个文件的源码树摘要绑定公开发布时点；发布前请求拒绝，特殊休市样本与实际目标 HTTP 到冻结快照、离线重放已验证。官方完整 DSA 更新及后续代码同步成功。以[日历版本可见性任务](../../archive/tasks/2026-09-27-calendar-release-availability.md)为当前证据，不再把已完成的版本约束、特殊样本、发布可见性与部署列为剩余工作。该结论仅覆盖日历能力，真实行情和回测门禁独立保留。
 
 R01.6 名称消费者已选择；R01.7 单标的 BaoStock Fetcher 与受控 Manager 的目标真实探针首次通过，默认多源优先级及完整支持范围仍开放。批量名称身份与终态修复已通过 39 项定向测试并同步目标；真实批量首次及两次重试均在 8,981 行响应中发现身份冲突，保持缓存为空，预算耗尽后跳过成功验收。R01.8/R01.9 历史证券列表的消费契约仍未完成；详细证据以 DSA 的 `docs/thesis-ledger-catalog-source-evidence.md` 为准。
 
@@ -65,9 +65,9 @@ M3 的 R02.11 Sina 与 R02.13 Tushare 指数身份/最新日期选择已完成�
 
 I01 原 Worker 完整响应往返失败预算仍耗尽。本批独立一次原生 SQL JSONB 诊断只证明固定 15 条合成 Bar 的内存/JSONB/text→Node 三向 hash 相同、差异为零；没有定位历史真实失败字段、没有重跑原 Worker，根因仍未知。临时诊断容器已精确清理。HiThink、BaoStock 批量身份、Catalog、AI 和浏览器原失败预算/门禁不因本批新 ID 重置。
 
-本批状态及下一叶以 [主 Task §12.8](../2026-09-25-multi-source-adjustment-aware-backtest.md) 为准；M1/M2/M3、AC01–AC20 和 §13 整体验收继续开放，不以局部新增计数估算完成百分比。
+本批状态及下一叶以 [主 Task §12.8](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md) 为准；M1/M2/M3、AC01–AC20 和 §13 整体验收继续开放，不以局部新增计数估算完成百分比。
 
-主记录：[多源复权感知回测 Task](../2026-09-25-multi-source-adjustment-aware-backtest.md)。
+主记录：[多源复权感知回测 Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。
 
 S05 重建合同续验：`S05-reconstruction-contract` 完成，28 项定向包含于全包 41 文件/395 项，类型/构建/lint/边界通过。下一步实际只读清单与归档内容、历史时点核验及预检/冻结接线；合同只绑定输入引用，生产非空引用判断仍未替换，父项和真实门禁保持开放，见 [合同证据](2026-09-27-s05-reconstruction-contract.md)。
 

@@ -1,6 +1,6 @@
 # T6 行情周期包级检查与工程门禁证据
 
-日期：2026-10-05。用户本轮授权继续 T6。权威范围为[原 Task 的 T6](../2026-09-16-market-chart-period-aggregation.md)与[完整 Spec 的 AC10](../../specs/2026-09-16-market-chart-period-aggregation.md)。T1～T5 的启动前置已完成；本轮完成本地工程门禁后停止，不自动推进 G1/P1/R1。
+日期：2026-10-05。用户本轮授权继续 T6。权威范围为[原 Task 的 T6](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md)与[完整 Spec 的 AC10](../../specs/2026-09-16-market-chart-period-aggregation.md)。T1～T5 的启动前置已完成；本轮完成本地工程门禁后停止，不自动推进 G1/P1/R1。
 
 ## 结果与代码修复
 

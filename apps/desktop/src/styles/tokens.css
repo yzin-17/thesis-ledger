@@ -58,7 +58,6 @@
   /* 全局层级只在此处维护，组件使用语义化 layer-* 类名。 */
   --z-sidebar: 2;
   --z-mobile-navigation: 10;
-  --z-mobile-theme-toggle: 11;
   --z-popover-control: var(--z-mobile-navigation);
   --z-detail-overlay: 20;
   --z-dialog: 50;

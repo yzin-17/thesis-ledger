@@ -5,6 +5,7 @@ import type {
   TradeDetailResponse,
   TradeListQuery,
   TradeListResponse,
+  TradeInstrumentsResponse,
 } from '@thesis-ledger/api-client';
 
 import { getDesktopApiClient } from '../../shared/api/client.js';
@@ -15,6 +16,14 @@ export type PortfolioTradeClient = Pick<
 >;
 
 const defaultPortfolioClient = () => getDesktopApiClient().portfolio;
+
+export const fetchPortfolioTradeInstruments = (
+  mode: 'actual' | 'shadow',
+  accountId?: string,
+  signal?: AbortSignal,
+): Promise<TradeInstrumentsResponse> => defaultPortfolioClient().getTradeInstruments({
+  mode, ...(accountId ? { accountId } : {}),
+}, signal);
 
 export const fetchPortfolioTrades = (
   params: Partial<TradeListQuery>,

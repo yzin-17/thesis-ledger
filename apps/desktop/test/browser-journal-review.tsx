@@ -52,6 +52,9 @@ let version = 'source-1';
 let snapshotCount = 0;
 const history: JournalStoredSnapshotView[] = [];
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const layoutPreview = new URLSearchParams(location.search).has('layout');
+const initialState = new URLSearchParams(location.search).get('state') === 'empty' ? 'no-objects' : 'ready';
+journalBrowserStateFixture.state = initialState;
 function candidate(accountId: string, objectId?: string) {
   const input = journalUiEvidenceFixture();
   input.trade.accountId = accountId;
@@ -169,10 +172,11 @@ globalThis.fetch = async (input, init) => {
   return json({ message: '固定验收页未提供此接口' }, 404);
 };
 function BrowserJournalReview() {
-  const [state, setState] = useState<JournalBrowserState>('ready');
+  const [state, setState] = useState<JournalBrowserState>(initialState);
   return (
     <QueryClientProvider client={queryClient}>
       <main className="flex min-w-0 flex-col gap-4 p-4">
+        {!layoutPreview && <div className="flex flex-col gap-4">
         <p>本页使用固定复盘输入验证实际组件交互。请求均在此页处理，不访问或写入业务服务。</p>
         <JournalBrowserStateControls
           onChange={(next) => {
@@ -206,6 +210,7 @@ function BrowserJournalReview() {
         >
           启用固定 AI 终态验收
         </Button>
+        </div>}
         <JournalReviewWorkspace
           accounts={state === 'no-accounts' ? [] : [account, shadow]}
           accountsPending={state === 'accounts-pending'}

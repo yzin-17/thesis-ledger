@@ -2,7 +2,7 @@
 
 ## 范围与结论
 
-以[完整 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)的 M1/M2/M3、AC01–AC20 和[唯一 Task](../2026-09-25-multi-source-adjustment-aware-backtest.md)为准，对本批实际最终源码、必要调用点、跨仓合同和证据做集中核对。目录的 117 个唯一编号仍是 116 个固定项加 R07.8 模板；未把已完成子叶再次派发，也未把未勾选父项当成零工作或自动通过。
+以[完整 Spec](../../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)的 M1/M2/M3、AC01–AC20 和[唯一 Task](../../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)为准，对本批实际最终源码、必要调用点、跨仓合同和证据做集中核对。目录的 117 个唯一编号仍是 116 个固定项加 R07.8 模板；未把已完成子叶再次派发，也未把未勾选父项当成零工作或自动通过。
 
 结论是**局部实现和若干定向回归完成，整体验收未完成**。DSA 官方完整离线门禁两轮均未通过，依赖它的目标同步跳过；真实来源权限/历史覆盖、S05 最终资格、HiThink 普通 Run、独立真实对照、AI、浏览器/客户端与 M2/M3 原子来源门禁仍开放。I01 原始冲突已在后续节定位并修复，受控集成通过；这不是上述真实验收。后续没有第三次同前提 DSA 全包尝试、真实 Provider/AI 请求或目标数据库/应用容器操作；隔离测试容器另按证据精确清理。
 

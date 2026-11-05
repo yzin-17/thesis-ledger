@@ -1,5 +1,5 @@
 import { PageHeader } from '../shared/PageHeader.js';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToastManager } from '@/components/ui/toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,8 +9,8 @@ import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { resolveLoadState } from '../shared/loadState.js';
 import { AutomationEditorSheet } from './AutomationEditorSheet.js';
 import { ProviderEditorSheet } from './ProviderEditorSheet.js';
-import { AiResearchDefaultSettings } from './AiResearchDefaultSettings.js';
 import { useAiProviderEditor } from './useAiProviderEditor.js';
+import { useAiProviderPriority } from './useAiProviderPriority.js';
 import { isAiProvider } from './providers.types.js';
 import { createProviderActionHandlers } from './providers.actions.js';
 import { useProviderQueries } from './providers.queries.js';
@@ -67,10 +67,19 @@ export function ProviderSettings() {
   const [editingAutomationJob, setEditingAutomationJob] = useState<AutomationJob | null>(null);
   const [savingAutomationDraft, setSavingAutomationDraft] = useState(false);
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+  const deletingJobIdRef = useRef<string | null>(null);
   const toastManager = useToastManager();
   const { confirm } = useConfirmDialog();
   const providerQueries = useProviderQueries(healthHistoryPage, automationHistoryPage);
   const aiEditor = useAiProviderEditor(providerQueries.routingSettings.data);
+  const aiPriority = useAiProviderPriority((name) => {
+    setProviderPriorityDrafts((current) => {
+      const next = { ...current };
+      delete next[name];
+      return next;
+    });
+  });
   const providerMutation = useSaveProviderMutation();
   const testProviderMutation = useTestProviderConnectionMutation();
   const testProviderDraftMutation = useTestProviderDraftMutation();
@@ -96,6 +105,12 @@ export function ProviderSettings() {
     total: 0,
     totalPages: 0,
   };
+  const jobHistoryLoadState = resolveLoadState(
+    [providerQueries.jobHistory],
+    providerQueries.jobHistory.data !== undefined,
+    providerQueries.jobHistory.data !== undefined &&
+      providerQueries.jobHistory.data.items.length === 0,
+  );
   const notificationFailures = providerQueries.notificationFailures.data ?? [];
   const hasProviderData = Object.values(providerQueries).some((query) => query.data !== undefined);
   const loadState = resolveLoadState(
@@ -149,6 +164,8 @@ export function ProviderSettings() {
     setEditingAutomationJob,
     setSavingAutomationDraft,
     setRunningJobId,
+    deletingJobIdRef,
+    setDeletingJobId,
     createJobMutation,
     updateJobMutation,
     deleteJobMutation,
@@ -170,7 +187,7 @@ export function ProviderSettings() {
         actions={
           <>
             <RefreshIconButton
-              label="刷新 Provider 与自动化"
+              label="刷新数据与自动化"
               refreshing={providerRefreshing}
               onClick={() => void load()}
             />
@@ -182,7 +199,6 @@ export function ProviderSettings() {
         editingProviderName={aiEditor.editor.editingProviderName}
         providerDraft={aiEditor.editor.providerDraft}
         credentialInputOpen={aiEditor.editor.credentialInputOpen}
-        takingOverEnvironmentName={aiEditor.editor.takingOverEnvironmentName}
         providerTestState={aiEditor.editor.providerTestState}
         savingProviderDraft={aiEditor.editor.savingProviderDraft}
         availableAiModels={aiEditor.editor.availableModels}
@@ -223,19 +239,21 @@ export function ProviderSettings() {
         </TabsList>
         <TabsContent value="providers">
           <div className="space-y-6">
-            <AiResearchDefaultSettings settings={providerQueries.routingSettings.data} />
             <ProviderTable
               loadState={loadState}
               providers={providers}
               priorityDrafts={providerPriorityDrafts}
               testingProviderName={aiEditor.testingProviderName ?? testingProviderName}
-              savingProviderName={aiEditor.testingProviderName ?? savingProviderName}
+              savingProviderName={
+                aiPriority.savingProviderName ?? aiEditor.testingProviderName ?? savingProviderName
+              }
               deletingProviderName={aiEditor.deletingProviderName}
               onPriorityChange={(name, value) =>
                 setProviderPriorityDrafts((current) => ({ ...current, [name]: value }))
               }
               onPrioritySave={(provider) => {
-                if (!isAiProvider(provider)) void actions.saveProvider(provider);
+                if (isAiProvider(provider)) void aiPriority.save(provider);
+                else void actions.saveProvider(provider);
               }}
               onEdit={(provider) => aiEditor.openEditor(provider)}
               onTest={(provider) => {
@@ -255,10 +273,15 @@ export function ProviderSettings() {
               onCreate={() => aiEditor.openEditor()}
             />
             <HealthHistoryTable
-              loadState={loadState}
+              loadState={resolveLoadState(
+                [providerQueries.healthHistory],
+                providerQueries.healthHistory.data !== undefined,
+                providerQueries.healthHistory.data?.items.length === 0,
+              )}
               history={healthHistory}
               loading={healthHistoryLoading}
               onPage={handleHealthPage}
+              onRetry={() => void providerQueries.healthHistory.refetch()}
             />
           </div>
         </TabsContent>
@@ -267,8 +290,12 @@ export function ProviderSettings() {
             <AutomationTable
               loadState={loadState}
               jobs={jobs}
+              readError={providerQueries.jobs.isError}
+              reloading={providerQueries.jobs.isFetching}
+              onRetry={() => void providerQueries.jobs.refetch()}
               togglingJobId={togglingJobId}
               runningJobId={runningJobId}
+              deletingJobId={deletingJobId}
               onToggle={(job) => void actions.toggleJob(job)}
               onEdit={(job) => actions.openAutomationEditor(job)}
               onRun={(job) => void actions.runJobNow(job)}
@@ -276,7 +303,7 @@ export function ProviderSettings() {
               onCreate={() => actions.openAutomationEditor()}
             />
             <AutomationRunHistoryTable
-              loadState={loadState}
+              loadState={jobHistoryLoadState}
               jobs={jobs}
               history={jobHistory}
               loading={providerQueries.jobHistory.isFetching}
@@ -287,10 +314,23 @@ export function ProviderSettings() {
         <TabsContent value="diagnostics">
           <div className="space-y-6">
             <NotificationFailuresTable
-              loadState={loadState}
+              loadState={resolveLoadState(
+                [providerQueries.notificationFailures],
+                providerQueries.notificationFailures.data !== undefined,
+                providerQueries.notificationFailures.data?.length === 0,
+              )}
               notificationFailures={notificationFailures}
+              onRetry={() => void providerQueries.notificationFailures.refetch()}
             />
-            <DataQualityIssuesTable loadState={loadState} issues={issues} />
+            <DataQualityIssuesTable
+              loadState={resolveLoadState(
+                [providerQueries.issues],
+                providerQueries.issues.data !== undefined,
+                providerQueries.issues.data?.length === 0,
+              )}
+              issues={issues}
+              onRetry={() => void providerQueries.issues.refetch()}
+            />
           </div>
         </TabsContent>
       </Tabs>

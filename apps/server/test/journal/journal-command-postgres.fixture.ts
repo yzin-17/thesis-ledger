@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { createExecutionCommandSchema } from '@thesis-ledger/schemas';
+import { CashLedgerCommandService } from '../../src/ledger/cash-ledger-command.service.js';
 import { LedgerCommandService } from '../../src/ledger/ledger-command.service.js';
 import { LedgerV2Repository } from '../../src/ledger/ledger-v2.repository.js';
 import { TradeQueryService } from '../../src/ledger/trade-query.service.js';
@@ -37,7 +38,7 @@ export function journalExecutionFixture(accountId: string, symbol: string, prefi
         quantity,
         price,
         currency: 'USD',
-        capabilityVerification: 'VERIFIED',
+        capabilityVerification: 'UNVERIFIED',
         charges: [
           { category: 'COMMISSION', amount: side === 'BUY' ? '0.2' : '0.1', currency: 'USD' },
         ],
@@ -65,7 +66,13 @@ export async function createJournalCommandFixture(
   )
     throw new Error('隔离数据库身份不符');
   await owner.account.create({
-    data: { id: accountId, name: '隔离复盘真实命令账户', type: 'securities', mode: 'actual' },
+    data: {
+      id: accountId,
+      name: '隔离复盘真实命令账户',
+      type: 'securities',
+      mode: 'actual',
+      currency: 'USD',
+    },
   });
   await owner.asset.create({
     data: {
@@ -83,7 +90,19 @@ export async function createJournalCommandFixture(
     const trades = new TradeQueryService(app as never);
     const candidates = new JournalReviewQuery(app as never, trades);
     const snapshots = new JournalReviewSnapshots(app as never, candidates);
-    const commands = new LedgerCommandService(new LedgerV2Repository(app as never));
+    const repository = new LedgerV2Repository(app as never);
+    const commands = new LedgerCommandService(repository);
+    await new CashLedgerCommandService(repository).createCashFlow({
+      command: 'CREATE_CASH_FLOW',
+      accountId,
+      occurredAt: '2025-01-01T00:00:00Z',
+      timePrecision: 'INSTANT',
+      sourceTimezone: 'UTC',
+      economicOrderKey: 'fixture-funding',
+      actorId: 'fixture-owner',
+      source: { category: 'MANUAL', channel: 'isolated-funding', externalId: `fund-${accountId}` },
+      payload: { direction: 'INFLOW', category: 'DEPOSIT', amount: '100', currency: 'USD' },
+    });
     await commands.createExecution(execution('BUY', '2.000000000000000001', '10', 1, 'buy'));
     await commands.createExecution(execution('SELL', '1', '12', 2, 'sell-1'));
     const last = await commands.createExecution(

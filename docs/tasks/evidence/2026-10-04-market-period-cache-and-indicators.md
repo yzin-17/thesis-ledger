@@ -1,6 +1,6 @@
 # 行情周期缓存与指标消费证据
 
-对应 [Task](../2026-09-16-market-chart-period-aggregation.md) 的 T3.2c1/c2。真实来源窗口、目标缓存故障和公开成功链路仍归 T3.2c3/T3.3，未以受控输入代替。
+对应 [Task](../../archive/tasks/2026-09-16-market-chart-period-aggregation.md) 的 T3.2c1/c2。真实来源窗口、目标缓存故障和公开成功链路仍归 T3.2c3/T3.3，未以受控输入代替。
 
 ## 派生缓存
 

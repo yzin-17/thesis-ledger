@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDateTime } from '@/lib/date-display';
+import { cn } from '@/lib/utils';
 import { AiExecutionFacts } from '../ai/AiExecutionFacts.js';
 import type {
   OptimizationCandidate,
@@ -19,11 +20,17 @@ import {
 } from './strategy-experiment-detail.model.js';
 import { strategyCenterPath } from './strategy-center.navigation.js';
 
-export function ExperimentRunLinks({ runRefs }: { runRefs: Record<string, string> }) {
+export function ExperimentRunLinks({
+  runRefs,
+  className,
+}: {
+  runRefs: Record<string, string>;
+  className?: string;
+}) {
   const entries = Object.entries(runRefs);
   if (entries.length === 0) return <span className="text-muted-foreground">暂无回测记录</span>;
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className={cn('flex flex-wrap gap-2', className)}>
       {entries.map(([split, jobId]) => (
         <Button
           key={`${split}:${jobId}`}

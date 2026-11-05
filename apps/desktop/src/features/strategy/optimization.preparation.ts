@@ -1,12 +1,11 @@
 import {
-  optimizationRunPreparationRequestSchema,
-  optimizationRunPreparationResultSchema,
   type OptimizationPreparationTarget,
   type OptimizationRunPreparationRequest,
   type OptimizationRunPreparationResult,
   type OptimizationDiscoveryScope,
 } from '@thesis-ledger/schemas';
-import { requestDesktopJson, type DesktopRequestClient } from '../shared/request.js';
+import { strategyClients } from '@thesis-ledger/api-client';
+import { parsedDesktopRequest, type DesktopRequestClient } from '../shared/request.js';
 
 export type PreparedOptimizationConfiguration = {
   target: OptimizationPreparationTarget;
@@ -26,21 +25,7 @@ export async function prepareOptimizationConfiguration(
   signal?: AbortSignal,
   client?: DesktopRequestClient,
 ) {
-  const request = optimizationRunPreparationRequestSchema.parse(input);
-  const response = await requestDesktopJson<unknown>(
-    '/strategy-optimization/run-config/prepare',
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(request),
-      ...(signal ? { signal } : {}),
-    },
-    client,
-  );
-  const result = optimizationRunPreparationResultSchema.parse(response);
-  if (result.requestId !== request.intent.requestId)
-    throw new Error('实验配置准备响应与当前请求不一致');
-  return result;
+  return strategyClients(parsedDesktopRequest(client)).optimization.prepare(input, signal);
 }
 
 export function requirePreparedOptimizationConfiguration(

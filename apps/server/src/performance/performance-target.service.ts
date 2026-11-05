@@ -17,6 +17,8 @@ export class PerformanceTargetService {
     targets: Record<string, number>,
     accountId?: string,
   ) {
+    if ((scope === 'account' && !accountId) || (scope === 'portfolio' && accountId))
+      throw new BadRequestException('目标 scope 与账户身份不一致');
     const normalizedTargetResult = normalizeAllocationTargets(targets);
     if (normalizedTargetResult.unknown.length > 0)
       throw new BadRequestException(
@@ -28,22 +30,26 @@ export class PerformanceTargetService {
       throw new BadRequestException('目标权重必须是非负有限数字');
     if (Math.abs(values.reduce((sum, value) => sum + value, 0) - 1) > 1e-8)
       throw new BadRequestException('目标权重之和必须为 100%');
-    await this.prisma.targetAllocation.updateMany({
-      where: { scope, accountId: accountId ?? null, active: true },
-      data: { active: false },
-    });
-    const latest = await this.prisma.targetAllocation.findFirst({
-      where: { scope, accountId: accountId ?? null },
-      orderBy: { version: 'desc' },
-    });
-    return this.prisma.targetAllocation.create({
-      data: {
-        scope,
-        ...(accountId === undefined ? {} : { accountId }),
-        version: (latest?.version ?? 0) + 1,
-        targets: normalizedTargets,
-        active: true,
-      },
+    const identity = JSON.stringify(['target-allocation-v1', scope, accountId ?? null]);
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${identity}, 0))`;
+      await transaction.targetAllocation.updateMany({
+        where: { scope, accountId: accountId ?? null, active: true },
+        data: { active: false },
+      });
+      const latest = await transaction.targetAllocation.findFirst({
+        where: { scope, accountId: accountId ?? null },
+        orderBy: { version: 'desc' },
+      });
+      return transaction.targetAllocation.create({
+        data: {
+          scope,
+          ...(accountId === undefined ? {} : { accountId }),
+          version: (latest?.version ?? 0) + 1,
+          targets: normalizedTargets,
+          active: true,
+        },
+      });
     });
   }
 

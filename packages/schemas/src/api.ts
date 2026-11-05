@@ -34,6 +34,8 @@ export const portfolioPositionResponseSchema = z
     stale: z.boolean(),
     updatedAt: z.iso.datetime({ offset: true }).optional(),
     freshness: z.string().optional(),
+    navDate: z.iso.datetime({ offset: true }).optional(),
+    availabilityReason: z.enum(['disabled', 'not_selected', 'not_eligible', 'unavailable']).optional(),
     error: z.string().optional(),
     asset: z
       .object({
@@ -148,6 +150,7 @@ export const performanceSummaryResponseSchema = z
     accountId: z.uuid().nullable(),
     snapshots: z.array(z.unknown()),
     ttwror: z.number().finite().nullable(),
+    ttwrorReason: z.string().nullable().optional(),
     xirr: z.number().finite().nullable(),
     xirrReason: z.string().nullable().optional(),
   })

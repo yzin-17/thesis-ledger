@@ -1,6 +1,6 @@
 # 组合估值走势实施任务
 
-> 承接归档（2026-10-15）：本文的未通过验收已由[当前任务](../../tasks/2026-08-28-portfolio-snapshot-system.md#portfolio-series-acceptance)逐条承接，状态为“已被承接、验收仍开放”，不记为 Completed。原实施、勾选、失败与证据保留；下文“当前”仅指原记录日期，当前执行以承接任务为准。
+> 承接归档（2026-10-15）：本文的未通过验收已由[当前任务](2026-08-28-portfolio-snapshot-system.md#portfolio-series-acceptance)逐条承接，状态为“已被承接、验收仍开放”，不记为 Completed。原实施、勾选、失败与证据保留；下文“当前”仅指原记录日期，当前执行以承接任务为准。
 
 
 > 状态对账（2026-10-03）：已实现待验收：本轮 GET /api/v1/performance/series?mode=actual 返回 200、points=[]，解除旧 404/fresh-baseline 阻塞，不要求清库。T4 的真实点位鼠标/键盘/触屏 Tooltip 与 T5 的 AC1–AC9 仍开放。 本段为当前对账结论；下文历史时点的环境与协议描述仅在其原范围有效。对账依据见[本轮 Review](../reviews/2026-10-03-task-state-reconciliation.md)。

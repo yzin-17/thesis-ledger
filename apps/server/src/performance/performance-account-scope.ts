@@ -44,6 +44,7 @@ export const incompatibleAccountScopeSummary = <TSnapshot extends Snapshot>(
     accountId: null,
     snapshots,
     ttwror: null,
+    ttwrorReason: '组合快照账户口径不一致，旧口径与当前投资范围不能混合计算收益',
     xirr: null,
     xirrReason: '组合快照账户口径不一致，旧口径与当前投资范围不能混合计算收益',
     accountScopeCompatibility: 'incompatible' as const,

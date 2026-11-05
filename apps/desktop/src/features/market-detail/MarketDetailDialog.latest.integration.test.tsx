@@ -223,7 +223,7 @@ const { requestMarketDetailMock, useQueryMock, mergeMarketDetailMock, queryClien
   requestMarketDetailMock: vi.fn<MarketDetailFetcher>(),
   useQueryMock: vi.fn(),
   mergeMarketDetailMock: vi.fn(),
-  queryClient: { cancelQueries: vi.fn(), fetchQuery: vi.fn() },
+  queryClient: { cancelQueries: vi.fn(), fetchQuery: vi.fn(), setQueryData: vi.fn() },
 }));
 
 vi.mock('./market-detail.api.js', () => ({ requestMarketDetail: requestMarketDetailMock }));
@@ -377,11 +377,20 @@ const mount = async (
 ) => {
   const document = installDom();
   const opening = deferred<MarketDetailResponse>();
+  const freshQueryData = new Map<string, MarketDetailResponse>();
+  queryClient.setQueryData.mockImplementation((key: readonly unknown[], data: MarketDetailResponse) => {
+    freshQueryData.set(JSON.stringify(key), data);
+  });
   requestMarketDetailMock.mockImplementationOnce(() => opening.promise);
   useQueryMock.mockImplementation((options: { queryKey: readonly unknown[]; queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => {
-    if (options.queryKey[1] === 'market-period-options') return { data: { options: [] }, isSuccess: true };
+    if (['market-period-options', 'market-minute-options', 'market-derived-minute-options', 'market-trade-chart'].includes(String(options.queryKey[1]))) return { data: { options: [] }, isSuccess: true };
     const [state, setState] = useState({ data: cached, isPending: false, isError: false, isFetching: true });
     useEffect(() => {
+      const fresh = freshQueryData.get(JSON.stringify(options.queryKey));
+      if (fresh) {
+        setState({ data: fresh, isPending: false, isError: false, isFetching: false });
+        return;
+      }
       const controller = new AbortController();
       void options.queryFn({ signal: controller.signal }).then(
         (data) => setState({ data, isPending: false, isError: false, isFetching: false }),
@@ -407,6 +416,7 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
     useQueryMock.mockReset();
     queryClient.fetchQuery.mockReset();
     queryClient.cancelQueries.mockReset();
+    queryClient.setQueryData.mockReset();
     mergeMarketDetailMock.mockReset();
   });
 
@@ -451,9 +461,10 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
       await flushAsync();
     });
     await act(flushAsync);
-    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({ chartContractVersion: 3, barsLimit: 180 });
+    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({ chartContractVersion: 3, barsLimit: 180,
+      calculationAnchor: current.barSeries!.points.at(-1)!.timestamp });
     queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => queryFn({ signal: new AbortController().signal }));
-    for (const selector of ['[data-market-retry]', '[data-market-section-retry]']) {
+    for (const selector of ['[data-market-section-retry]', '[data-market-retry]']) {
       await act(async () => { mounted.container.querySelector(selector)!.dispatchEvent({ type: 'click' }); await flushAsync(); });
       await act(flushAsync);
       const request = requestMarketDetailMock.mock.calls.at(-1)![0];
@@ -461,6 +472,9 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
         include: ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] });
       expect(request.start).toBeUndefined();
       expect(request.end).toBeUndefined();
+      if (selector === '[data-market-section-retry]')
+        expect(request.calculationAnchor).toBe(current.barSeries!.points.at(-1)!.timestamp);
+      else expect(request.calculationAnchor).toBeUndefined();
     }
     await act(async () => { mounted.root.unmount(); await flushAsync(); });
   });
@@ -471,7 +485,7 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
     expect(requestMarketDetailMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ adjustment }), expect.any(AbortSignal),
     );
-    const openingOptions = useQueryMock.mock.calls.at(-1)?.[0] as { queryKey: readonly unknown[] };
+    const openingOptions = useQueryMock.mock.calls.filter(([options]) => (options as { queryKey: readonly unknown[] }).queryKey[1] === 'market-detail').at(-1)?.[0] as { queryKey: readonly unknown[] };
     expect(openingOptions.queryKey.at(-4)).toBe(adjustment);
     mounted.opening.resolve(current);
     await act(flushAsync);

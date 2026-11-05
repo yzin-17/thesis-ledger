@@ -3,9 +3,9 @@
 > 归档说明（2026-10-14）：本文保留原日期、输入、命令、结果、失败与未覆盖条件，供历史追溯。下文“当前”与状态仅指原记录时点；本次归档不代表未通过验收已完成。现行义务由[当前 Task](../../tasks/README.md)及其 Spec 管理，发布外部门禁仍从[发布门禁记录](../../reviews/2026-08-18-v1.0-release-gate-review.md)进入。
 
 
-历史评审适用性（2026-10-03）：下文以 272eaa27 为基线的 Desktop 失败/依赖限制属于历史发现；后继用途 Task 已记录 label 修复与复验，最新 Desktop 543 项及 AI 本地回归也有证据。当前缺口以[用途 Task](../../tasks/2026-09-21-ai-provider-model-usage-configuration.md)及[本轮对账](2026-10-03-task-state-reconciliation.md)为准，不将旧 Blocking 当作当前仍复现，也不关闭真实 Provider/费用/超时/Electron 门禁。
+历史评审适用性（2026-10-03）：下文以 272eaa27 为基线的 Desktop 失败/依赖限制属于历史发现；后继用途 Task 已记录 label 修复与复验，最新 Desktop 543 项及 AI 本地回归也有证据。当前缺口以[用途 Task](../tasks/2026-09-21-ai-provider-model-usage-configuration.md)及[本轮对账](2026-10-03-task-state-reconciliation.md)为准，不将旧 Blocking 当作当前仍复现，也不关闭真实 Provider/费用/超时/Electron 门禁。
 
-- 评审对象：`docs/tasks/2026-09-21-ai-provider-model-usage-configuration.md`
+- 评审对象：`docs/archive/tasks/2026-09-21-ai-provider-model-usage-configuration.md`
 - 评审基线：`thesis-ledger` HEAD=`272eaa27`（`feat(ai): 自动选择生成方式与测试后保存 (#45)`），工作区干净
 - 评审方式：源码/测试核对 + 本机门禁实跑（无 pnpm，用仓库根 `node_modules/.bin/`）
 

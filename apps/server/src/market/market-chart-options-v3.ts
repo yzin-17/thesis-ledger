@@ -15,10 +15,12 @@ export const unavailableChartOptions = (
   mode: MarketChartOptionsV3['mode'],
   reason: NonNullable<MarketChartOptionsV3['options'][number]['reason']>,
   window?: MarketChartOptionsWindowV3,
+  timeframe?: '1m' | '1d',
 ): MarketChartOptionsV3 => ({
   contractVersion: 3,
   symbol,
   mode,
+  ...(timeframe === '1m' ? { timeframe } : {}),
   ...(window ? { window } : {}),
   options: (['none', 'qfq', 'hfq'] as const).map((adjustment) => ({
     adjustment,
@@ -29,21 +31,23 @@ export const unavailableChartOptions = (
 
 /** Readiness is an exact route declaration, not a promise of a requested window's coverage. */
 export const resolveChartOptionsV3 = (
-  identity: { symbol: string; assetType: 'STOCK' | 'ETF' },
+  identity: { symbol: string; assetType: 'STOCK' | 'ETF'; timeframe?: '1m' | '1d' },
   desired: unknown,
   effective: unknown,
   catalog: unknown,
 ): MarketChartOptionsV3 => {
   const parsed = desiredProviderPolicyV3Schema.safeParse(desired);
-  if (!parsed.success) return unavailableChartOptions(identity.symbol, 'v3', 'policy_not_applied');
-  if (!parsed.data.enabled) return unavailableChartOptions(identity.symbol, 'v3', 'disabled');
+  if (!parsed.success) return unavailableChartOptions(identity.symbol, 'v3', 'policy_not_applied', undefined, identity.timeframe);
+  if (!parsed.data.enabled) return unavailableChartOptions(identity.symbol, 'v3', 'disabled', undefined, identity.timeframe);
   const options = (['none', 'qfq', 'hfq'] as const).map((adjustment) => {
+    if (identity.timeframe === '1m' && adjustment !== 'none')
+      return { adjustment, available: false, reason: 'unsupported_adjustment' as const };
     const routeKey: MarketDataBarRouteKeyV3 = {
       kind: 'bar',
       market: marketRouteMarket(identity.symbol),
       assetType: identity.assetType,
-      capability: 'DAILY_BAR',
-      timeframe: '1d',
+      capability: identity.timeframe === '1m' ? 'MINUTE_BAR' : 'DAILY_BAR',
+      timeframe: identity.timeframe ?? '1d',
       adjustment,
     };
     const context = marketRouteContextV3({ desired: parsed.data, effective, catalog, routeKey });
@@ -81,6 +85,7 @@ export const resolveChartOptionsV3 = (
     contractVersion: 3,
     symbol: identity.symbol,
     mode: 'v3',
+    ...(identity.timeframe === '1m' ? { timeframe: '1m' } : {}),
     options,
   });
 };

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useMutation } from '@tanstack/react-query';
 import type { MarketProviderProbeRoute } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetHeader,
   SheetTitle,
   SheetDescription,
@@ -16,9 +18,11 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  SelectGroup,
 } from '@/components/ui/select';
 import { testMarketProvider } from './market-data.api.js';
 import { providerProbeErrorLabel } from './provider-credentials.js';
+import { accountAccessSelectable } from './provider-account-access.js';
 import { routeKeyLabelV3, routeAvailabilityLabelV3 } from './market-data-routes-v3.js';
 import {
   dataSourceDisplay,
@@ -42,7 +46,8 @@ export function ProviderExactChecksSheet({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const entries =
     catalog?.status === 'complete'
-      ? catalog.entries.filter((entry) => entry.target.providerId === provider.providerId)
+      ? catalog.entries.filter((entry) => entry.target.providerId === provider.providerId &&
+        accountAccessSelectable(entry.accountAccess, Date.now(), provider.configVersion, provider.accountAccessSupported))
       : [];
   const selected = entries.find((entry) => identity(entry) === selectedId) ?? entries[0];
   const options = entries.map((entry) => ({
@@ -64,7 +69,7 @@ export function ProviderExactChecksSheet({
   let resultMessage = '尚未执行所选能力的读取检查。';
   if (test.isPending) resultMessage = '正在检查所选来源…';
   else if (test.isError)
-    resultMessage = test.error instanceof Error ? test.error.message : '检查失败，请稍后重试。';
+    resultMessage = requestFailureMessage(test.error, '检查失败，请稍后重试。');
   else if (checked?.result.status === 'healthy') resultMessage = '所选能力读取检查通过。';
   else if (checked) resultMessage = providerProbeErrorLabel(checked.result.errorCode);
 
@@ -75,12 +80,12 @@ export function ProviderExactChecksSheet({
         if (!open) onClose();
       }}
     >
-      <SheetContent size="compact">
+      <SheetContent size="compact" className="min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>{provider.displayName} 精确能力检查</SheetTitle>
           <SheetDescription>检查结果仅对应所选市场、资产、上游和价格口径。</SheetDescription>
         </SheetHeader>
-        <div className="flex flex-col gap-4">
+        <SheetBody className="flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{entries.length} 项精确能力</Badge>
             <Badge variant="outline">{provider.enabled ? '已启用' : '未启用'}</Badge>
@@ -99,11 +104,13 @@ export function ProviderExactChecksSheet({
               <SelectValue placeholder="选择精确能力" />
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false}>
+              <SelectGroup>
               {options.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
               ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
           {state && <p className="text-sm text-muted-foreground">当前能力状态：{availability}</p>}
@@ -136,7 +143,7 @@ export function ProviderExactChecksSheet({
           {options.length === 0 && (
             <p className="text-sm text-muted-foreground">精确目录尚未就绪。</p>
           )}
-        </div>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

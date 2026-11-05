@@ -5,6 +5,7 @@ import { researchResultSchema } from './research.js';
 export const aiResearchTaskKindSchema = z.enum(['research', 'experiment_internal', 'unknown']);
 
 export const aiResearchSourceTypeSchema = z.enum([
+  'instrument',
   'portfolio',
   'account',
   'position',
@@ -36,6 +37,7 @@ export const aiResearchPrimaryStatusSchema = z.enum([
 
 export const aiResearchListSourceFilterSchema = z.enum([
   'all',
+  'instrument',
   'portfolio',
   'account',
   'position',
@@ -79,7 +81,7 @@ export const aiResearchPageStateSchema = z
   });
 
 export const aiResearchObjectSchema = z.object({
-  type: z.enum(['portfolio', 'account', 'position', 'strategy_version', 'unknown']),
+  type: z.enum(['instrument', 'portfolio', 'account', 'position', 'strategy_version', 'unknown']),
   label: z.string().min(1),
   name: z.string().min(1).optional(),
   code: z.string().min(1).optional(),

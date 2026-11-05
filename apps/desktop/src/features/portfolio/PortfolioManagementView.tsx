@@ -1,9 +1,7 @@
 import { cn } from '@/lib/utils';
 
-import {
-  AccountManagementSection,
-  PositionManagementSection,
-} from './PortfolioManagementSections.js';
+import { AccountManagementSection } from './PortfolioAccountManagement.js';
+import { PositionManagementSection } from './PortfolioManagementSections.js';
 import type { PortfolioManagementViewProps } from './PortfolioManagementView.types.js';
 
 export type { PortfolioManagementViewProps } from './PortfolioManagementView.types.js';

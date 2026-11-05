@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
 import { getDesktopApiClient } from '@/shared/api/client';
+import { formatDateTime } from '@/lib/date-display';
 import { JournalDecimalResult } from './JournalMetricTable.js';
 import { JournalEmpty, JournalRequestError } from './JournalReviewFeedback.js';
 import { reviewObjectLabels } from './journal-review-display.js';
@@ -62,7 +63,9 @@ function SnapshotDetail({
         <CardTitle>
           {view.snapshot.status === 'STALE' ? '历史结果 · 证据已变化' : '已保存的复盘结果'}
         </CardTitle>
-        <CardDescription>{view.snapshot.createdAt} · 读取保留保存时的输入与结果</CardDescription>
+        <CardDescription>
+          {formatDateTime(view.snapshot.createdAt)} · 读取保留保存时的输入与结果
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <JournalDecimalResult result={view.snapshot.outputSnapshot} />
@@ -103,9 +106,10 @@ function SnapshotDetail({
   );
 }
 function snapshotLabel(view: JournalStoredSnapshotView) {
-  if (view.compatibility === 'LEGACY_UNSUPPORTED') return `${view.createdAt} · 旧快照待确认`;
+  if (view.compatibility === 'LEGACY_UNSUPPORTED')
+    return `${formatDateTime(view.createdAt)} · 旧快照待确认`;
   const input = view.snapshot.inputSnapshot;
-  return `${view.snapshot.createdAt} · ${input.trade.symbol} · ${reviewObjectLabels[input.reference.reviewObjectType]} · ${view.snapshot.status === 'STALE' ? '证据已变化' : '证据一致'}`;
+  return `${formatDateTime(view.snapshot.createdAt)} · ${input.trade.symbol} · ${reviewObjectLabels[input.reference.reviewObjectType]} · ${view.snapshot.status === 'STALE' ? '证据已变化' : '证据一致'}`;
 }
 export function JournalSnapshotHistory({
   accountId,
@@ -140,40 +144,43 @@ export function JournalSnapshotHistory({
   });
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        按保存时间查询历史。{reviewObjectId ? '当前仅显示所选对象。' : '当前显示此账户全部对象。'}
-      </p>
-      <FieldGroup className="sm:flex-row">
+    <div className="flex flex-col gap-3 pt-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-medium">复盘快照</h2>
+        <p className="text-xs text-muted-foreground">
+          按保存时间查询历史。{reviewObjectId ? '当前仅显示所选对象。' : '当前显示此账户全部对象。'}
+        </p>
+      </div>
+      <FieldGroup className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <Field className="flex-1">
-          <FieldLabel>保存时间起点（可选）</FieldLabel>
-          <Input
+          <FieldLabel>开始时间（可选）</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="快照开始时间"
-            placeholder="带时区的 ISO 8601 时间"
             value={draft.start}
-            onChange={(event) => setDraft({ ...draft, start: event.target.value })}
+            onValueChange={(start) => setDraft({ ...draft, start })}
           />
         </Field>
         <Field className="flex-1">
-          <FieldLabel>保存时间终点（不含，可选）</FieldLabel>
-          <Input
+          <FieldLabel>结束时间（可选）</FieldLabel>
+          <JournalWindowTimeInput
             aria-label="快照结束时间"
-            placeholder="带时区的 ISO 8601 时间"
             value={draft.end}
-            onChange={(event) => setDraft({ ...draft, end: event.target.value })}
+            onValueChange={(end) => setDraft({ ...draft, end })}
           />
         </Field>
+        <Button
+          className="self-end justify-self-start sm:col-span-2 lg:col-span-1"
+          onClick={() => {
+            setId(null);
+            setWindow({ ...draft });
+          }}
+        >
+          查询历史
+        </Button>
       </FieldGroup>
-      <Button
-        variant="outline"
-        className="self-start"
-        onClick={() => {
-          setId(null);
-          setWindow({ ...draft });
-        }}
-      >
-        查询历史
-      </Button>
+      <p className="text-xs text-muted-foreground">
+        按本机时区输入，开始时刻计入、结束时刻不计入；留空表示不限。
+      </p>
       {query.isPending && <Skeleton className="h-20 w-full" />}
       {query.isError && (
         <JournalRequestError
@@ -188,19 +195,21 @@ export function JournalSnapshotHistory({
           description="完成分析后显式保存，才能在这里查看历史输入与结果。"
         />
       )}
-      {items.map((item) => {
-        const snapshotId = item.compatibility === 'CURRENT_CONTRACT' ? item.snapshot.id : item.id;
-        return (
-          <Button
-            key={snapshotId}
-            className="h-auto justify-start whitespace-normal text-left"
-            variant="outline"
-            onClick={() => setId(snapshotId)}
-          >
-            {snapshotLabel(item)}
-          </Button>
-        );
-      })}
+      <div className="divide-y divide-border">
+        {items.map((item) => {
+          const snapshotId = item.compatibility === 'CURRENT_CONTRACT' ? item.snapshot.id : item.id;
+          return (
+            <Button
+              key={snapshotId}
+              className="h-auto w-full justify-start rounded-none px-0 py-3 whitespace-normal text-left"
+              variant="ghost"
+              onClick={() => setId(snapshotId)}
+            >
+              {snapshotLabel(item)}
+            </Button>
+          );
+        })}
+      </div>
       {query.hasNextPage && (
         <Button
           variant="outline"

@@ -165,6 +165,7 @@ isolated('基金定投隔离 PostgreSQL 状态机', () => {
     });
     expect(await fixture.prisma.ledgerEvent.count({ where: { accountId: account.id } })).toBe(0);
     expect((await fixture.http(`${path}/confirm`, fundConfirmation)).status).toBe(409);
+    await fixture.fund(account.id, '126');
     const confirmed = await fixture.http(`${path}/confirm`, {
       ...fundConfirmation,
       expectedVersion: 3,
@@ -177,7 +178,7 @@ isolated('基金定投隔离 PostgreSQL 状态机', () => {
           : { expectedVersion: 4 };
       expect((await fixture.http(`${path}/${action}`, command)).status).toBe(409);
     }
-    expect(await fixture.prisma.ledgerEvent.count({ where: { accountId: account.id } })).toBe(1);
+    expect(await fixture.prisma.ledgerEvent.count({ where: { accountId: account.id } })).toBe(2);
   });
 
   it('到期后账户停用或资产失去确认状态时拒绝写账', async () => {

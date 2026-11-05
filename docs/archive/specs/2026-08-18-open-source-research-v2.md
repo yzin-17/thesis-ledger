@@ -25,12 +25,12 @@ A 股领域适配           15%
    - 已覆盖多源 A 股行情、筹码、图片智能导入、持仓/账户/账本、组合风险、止损接近预警、告警中心、飞书等多渠道通知、AI Agent、多 Agent、策略体系、回测验证、Web 和 Electron 桌面端。
    - 持仓模块已经不是简单“当前仓位表”，而是账户 + 交易 + 现金流水 + 公司行动 + 快照的账本体系，并支持 FIFO / AVG、CSV Parser Registry、幂等导入和超卖校验。
    - MIT 许可证、极高社区活跃度和快速迭代，使它比从零实现更适合作为产品母体。
-   - 主要缺口：截图导入目前更偏自选/标的识别，需要接到持仓导入；现有回测更偏 AI 建议验证，不等于完整通用 Strategy Backtest Engine；移动端仍需补 React Native。
+   - 主要缺口：现有回测更偏 AI 建议验证，不等于完整通用 Strategy Backtest Engine；移动端仍需补 React Native。
 2. **InStock（myhhub/stock）：A 股量化功能最值得并入/借鉴的第二候选。**
    - 约 13.6k Star，Apache-2.0；高度聚焦 A 股。
    - 已有 200+ 条件综合选股、32+ 技术指标、61 种 K 线形态、筹码分布（CYQ）、策略模板、选股验证回测、自动交易、批处理、数据库历史沉淀和 PC/移动 Web。
    - 对本项目最重要的是现成的筹码算法、A 股选股/指标/形态/策略体系和交易适配经验。
-   - 缺口是个人持仓/多账户/截图导入/通知/LLM Agent 不如 daily_stock_analysis 完整，因此更适合作为能力来源，而不是优先于 daily_stock_analysis 做主仓。
+   - 缺口是个人持仓/多账户/通知/LLM Agent 不如 daily_stock_analysis 完整，因此更适合作为能力来源，而不是优先于 daily_stock_analysis 做主仓。
 3. **Vibe-Trading：策略研究、Agent 与行为复盘的核心扩展来源。**
    - Shadow Account、PIT/OOS/look-ahead 约束、Walk Forward、Monte Carlo、策略研究闭环值得在 V0.5+ 引入。
    - 如果未来重心从“个人持仓风控”转向“AI 量化研究”，它的重要性会明显上升。
@@ -49,7 +49,6 @@ A 股领域适配           15%
 Fork daily_stock_analysis
         │
         ├── 保留/增强 Portfolio / Ledger / Alert / Notification / AI
-        ├── 扩展“截图识别 → 持仓导入”
         ├── 引入 InStock 的筹码 / 指标 / 形态 / 选股设计
         ├── V0.5+ 引入 Vibe-Trading 的策略研究能力
         ├── V2 引入 Qlib / Portfolio Optimization
@@ -179,7 +178,6 @@ ADJUSTMENT
 - A 股股票/ETF/场外基金资产语义
 - T+1、涨跌停、停复牌、除权除息
 - A 股 Provider（AKShare/easy-tdx/AData）
-- 截图持仓导入
 - 实时 Risk Engine
 - Chip Engine
 - Feishu Notification Provider
@@ -233,28 +231,6 @@ Ghostfolio 是 **AGPL-3.0**。AGPL 的设计目标之一，就是让通过网络
 
 ### 4.1 MVP 可直接借鉴
 
-#### 图片持仓导入
-
-值得复用的设计：
-
-```text
-图片
-→ Vision/OCR
-→ 代码/名称/持仓字段
-→ 置信度
-→ 标的补全
-→ 用户确认
-→ 导入
-```
-
-增强点：
-
-- 多 Vision Provider fallback
-- 股票代码/名称/拼音/别名补全
-- 图片、CSV/Excel、剪贴板统一 Import Pipeline
-
-我们的截图导入应沿用“识别与提交分离”的思想，严禁识别后直接修改 Ledger。
-
 #### 多行情源
 
 已有 AkShare、Tushare、Pytdx、Baostock 等，免费源可零配置运行。
@@ -304,7 +280,7 @@ Ghostfolio 是 **AGPL-3.0**。AGPL 的设计目标之一，就是让通过网络
 
 ### 4.3 Fork 判断
 
-优点：MIT、A股、截图导入、飞书、多源行情、AI 都已经有。
+优点：MIT、A股、飞书、多源行情、AI 都已经有。
 
 缺点：Python/FastAPI 为主，Portfolio/Ledger 不是核心，客户端和数据库架构不匹配。
 
@@ -372,7 +348,6 @@ MVP 不启用，但其券商客户端适配、交易日志、策略到执行的�
 缺少或较弱：
 
 - 多账户个人 Portfolio / Ledger
-- 截图持仓导入
 - 飞书等通知中心
 - 事件型实时风控中心
 - LLM / Agent 分析
@@ -818,7 +793,6 @@ Star 低不代表不值得使用，尤其是新项目和单一能力库。
 
 新增：
 
-- Screenshot Import Review（置信度 + 人工确认）
 - Notification cooldown / dedup
 - Provider health state
 - AI 输出 provenance
@@ -950,13 +924,11 @@ Star 低不代表不值得使用，尤其是新项目和单一能力库。
 - 多源行情 / 筹码 / 基本面 / 新闻
 - Portfolio / Ledger / 多账户 / 风险
 - 告警中心 / 飞书通知
-- 图片识别基础设施
 - AI / Multi-Agent / PortfolioAgent
 - Web / Electron
 
 重点补：
 
-- 图片识别真正导入 Portfolio，而非只识别自选标的
 - 支付宝 / 同花顺截图模板和持仓字段提取
 - 更完整止损/止盈/移动止损规则
 - 通用 Strategy Backtest Engine
@@ -1011,7 +983,6 @@ Star 低不代表不值得使用，尤其是新项目和单一能力库。
 - 导入一个账户和真实 A 股交易，检查 Portfolio Snapshot / Risk
 - 配置价格止损并验证飞书触发
 - 跑通筹码分析
-- 用支付宝或同花顺持仓截图跑通 Vision 提取，并改造成 Portfolio dry-run 导入
 - 增加一个自定义 Alert Rule，评估扩展成本
 - 增加一个自定义 Strategy Skill，评估策略扩展成本
 - 评估升级上游版本的冲突范围

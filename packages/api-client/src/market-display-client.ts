@@ -7,6 +7,12 @@ import {
   marketDisplayDetailResponseSchema,
   marketPeriodOptionsSchema,
   marketPeriodBarSeriesSchema,
+  marketMinuteBarSeriesSchema,
+  marketMinuteOptionsSchema,
+  isMarketMinuteTimeframe,
+  marketQuoteBatchRequestSchema,
+  marketQuoteBatchResponseSchema,
+  type MarketQuoteBatchRequest,
   marketTimeframeSchema,
   type BarSeriesIdentity,
   type MarketDetailRequest,
@@ -39,14 +45,14 @@ export type MarketChartQuery = {
   signal?: AbortSignal;
 };
 const displayIdentitySchema = barSeriesIdentitySchema.extend({ timeframe: marketTimeframeSchema });
-const displaySeriesSchema = barSeriesSchema.or(marketPeriodBarSeriesSchema);
+const displaySeriesSchema = barSeriesSchema.or(marketPeriodBarSeriesSchema).or(marketMinuteBarSeriesSchema);
 
 function chartQuery(symbol: string, params: MarketChartQuery) {
   const identity = displayIdentitySchema.parse({
     symbol,
     assetType: params.assetType,
     timeframe: params.timeframe ?? '1d',
-    adjustment: params.adjustment ?? 'qfq',
+    adjustment: params.adjustment ?? (isMarketMinuteTimeframe(params.timeframe) ? 'none' : 'qfq'),
   });
   return {
     assetType: identity.assetType,
@@ -61,6 +67,14 @@ function chartQuery(symbol: string, params: MarketChartQuery) {
 
 export function marketDisplayClient(get: Request, suffix: Suffix) {
   return {
+    getQuotes: (input: MarketQuoteBatchRequest, signal?: AbortSignal) => {
+      const request = marketQuoteBatchRequestSchema.parse(input);
+      const keys = [...new Set(request.items.map((item) => `${item.symbol}:${item.assetType}`))];
+      return get('/api/market/quotes', marketQuoteBatchResponseSchema.refine((response) =>
+        response.requestedCount === request.items.length && response.results.length === keys.length &&
+        response.results.every((item, index) => `${item.identity.symbol}:${item.identity.assetType}` === keys[index])),
+      { method: 'POST', body: JSON.stringify(request), ...(signal ? { signal } : {}) });
+    },
     getDetail: <T extends MarketTimeframe | undefined = undefined>(
       symbol: string,
       params: Omit<MarketDetailQuery, 'timeframe'> & { timeframe?: T } = {},
@@ -68,6 +82,7 @@ export function marketDisplayClient(get: Request, suffix: Suffix) {
       marketDetailRequestSchema.parse({ ...params, symbol, chartContractVersion: 3 });
       const { signal, refresh, include, indicatorParams, adjustment, ...query } = params;
       const timeframe = params.timeframe ?? '1d';
+      const expectedAdjustment = adjustment ?? (isMarketMinuteTimeframe(timeframe) ? 'none' : 'qfq');
       const responseSchema =
         timeframe === '1m' || timeframe === '1d'
           ? marketDetailResponseSchema
@@ -93,10 +108,10 @@ export function marketDisplayClient(get: Request, suffix: Suffix) {
             (!response.barSeries ||
               (response.barSeries.identity.timeframe === timeframe &&
                 response.barSeries.identity.symbol === symbol &&
-                response.barSeries.identity.adjustment === (adjustment ?? 'qfq'))) &&
+                response.barSeries.identity.adjustment === expectedAdjustment)) &&
             (!bars ||
               (bars.identity.timeframe === timeframe &&
-                bars.identity.adjustment === (adjustment ?? 'qfq')))
+                bars.identity.adjustment === expectedAdjustment))
           );
         }) as Schema<DetailResult<T>>,
         signal ? { signal } : undefined,
@@ -117,6 +132,14 @@ export function marketDisplayClient(get: Request, suffix: Suffix) {
         signal ? { signal } : undefined,
       );
     },
+    getMinuteOptions: (symbol: string, params: Omit<MarketPeriodOptionsQuery, 'adjustment'> = {}) => {
+      marketDetailRequestSchema.parse({ ...params, symbol, adjustment: 'none' });
+      const { signal, indicatorParams, ...query } = params;
+      return get(`/api/market/${encodeURIComponent(symbol)}/minute-options${suffix({ ...query,
+        ...(indicatorParams ? { indicatorParams: JSON.stringify(indicatorParams) } : {}) })}`,
+      marketMinuteOptionsSchema.refine((response) => response.symbol === symbol),
+      signal ? { signal } : undefined);
+    },
     getBars: (symbol: string, params: MarketChartQuery) =>
       get(
         '/api/market/' + encodeURIComponent(symbol) + '/bars' + suffix(chartQuery(symbol, params)),
@@ -125,7 +148,7 @@ export function marketDisplayClient(get: Request, suffix: Suffix) {
             series.identity.symbol === symbol &&
             series.identity.timeframe === (params.timeframe ?? '1d') &&
             series.identity.assetType === params.assetType &&
-            series.identity.adjustment === (params.adjustment ?? 'qfq'),
+            series.identity.adjustment === (params.adjustment ?? (isMarketMinuteTimeframe(params.timeframe) ? 'none' : 'qfq')),
         ),
         params.signal ? { signal: params.signal } : undefined,
       ),

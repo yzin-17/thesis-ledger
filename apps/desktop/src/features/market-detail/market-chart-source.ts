@@ -10,6 +10,10 @@ export function chartSourceMetadata(series: MarketDisplayBarSeries) {
       freshness: 'delayed' as const,
       servedFromCache: false,
       timeframeKind: 'derived' as const,
+      observedAt: series.derivation.evaluationAsOf,
+      ...('cutoffAt' in series.derivation && series.derivation.cutoffAt
+        ? { calculationCutoffAt: series.derivation.cutoffAt } : {}),
+      ...('session' in series.derivation ? { session: series.derivation.session } : {}),
     };
   }
   return {
@@ -19,5 +23,6 @@ export function chartSourceMetadata(series: MarketDisplayBarSeries) {
     freshness: series.provenance.cacheStatus === 'stale' ? 'stale' as const : 'delayed' as const,
     servedFromCache: series.provenance.servedFromCache,
     timeframeKind: 'base' as const,
+    observedAt: series.provenance.fetchedAt,
   };
 }
