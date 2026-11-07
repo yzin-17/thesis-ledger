@@ -44,6 +44,16 @@ export class InstrumentService {
     return this.searcher().search(query, limit);
   }
 
+  async locate(symbol: string, instrumentType: string) {
+    const separator = symbol.lastIndexOf('.');
+    if (separator <= 0 || separator === symbol.length-1) throw new BadRequestException('需要完整市场代码');
+    const row = await this.prisma.instrument.findUnique({
+      where: {canonicalCode_instrumentType_market: {canonicalCode:symbol.slice(0,separator), market:symbol.slice(separator+1), instrumentType}},
+      select: {id:true,active:true},
+    });
+    return {instrumentId: row?.active ? row.id : null};
+  }
+
   confirm(instrumentId: string) {
     return this.associationsService().confirm(instrumentId);
   }

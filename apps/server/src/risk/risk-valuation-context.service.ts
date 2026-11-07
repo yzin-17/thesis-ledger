@@ -3,6 +3,7 @@ import type { Currency } from '@thesis-ledger/schemas';
 import { resolveFx } from '../market/fx-conversion.js';
 import { MarketService } from '../market/market.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
+import type { SecurityContext } from './risk-types.js';
 import { investmentAccountRelationWhere } from '../portfolio/investment-account-scope.js';
 import {
   hasRiskBaseValue,
@@ -17,17 +18,21 @@ export class RiskValuationContextService {
     private readonly market: MarketService,
   ) {}
 
-  async build(mode: 'actual' | 'shadow', marketTime: string) {
+  async build(
+    mode: 'actual' | 'shadow',
+    marketTime: string,
+    source: Pick<MarketService, 'getQuote' | 'getFundNav' | 'getFxRates'> = this.market,
+  ) {
     const positions = await this.prisma.position.findMany({
       where: investmentAccountRelationWhere(mode),
       include: { asset: true },
     });
     const valued = await Promise.all(
-      positions.map((row) => valueRiskPosition(row, this.market, marketTime)),
+      positions.map((row) => valueRiskPosition(row, source, marketTime)),
     );
     const currencies = valued.flatMap((row) => (row.currency ? [row.currency] : []));
     const fx = await resolveFx(
-      this.market,
+      source,
       currencies,
       { fxMerge: true, baseCurrency: 'CNY' },
       new Date(marketTime),
@@ -40,7 +45,7 @@ export class RiskValuationContextService {
       const base: Currency = native.size === 1 ? [...native][0]! : 'CNY';
       accounts.set(accountId, riskScopeWeights(rows, base, fx, marketTime));
     }
-    const contexts = valued.map(({ position, price, quality }) => {
+    const contexts: SecurityContext[] = valued.map(({ position, price, quality }) => {
       const account = accounts.get(position.accountId)!;
       const weight = portfolio.weights?.get(position.id);
       const accountWeight = account.weights?.get(position.id);
@@ -57,7 +62,7 @@ export class RiskValuationContextService {
         ...(weight === undefined ? {} : { weight }),
         ...(accountWeight === undefined ? {} : { accountWeight }),
         positionUpdatedAt: position.updatedAt.toISOString(),
-        marketTime,
+        marketTime: quality.priceTime ?? marketTime,
         dataQuality: {
           ...quality,
           portfolioWeight: portfolio.complete ? 'complete' : 'unavailable',

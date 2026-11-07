@@ -1,3 +1,4 @@
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { JournalAiExplanation } from '@thesis-ledger/schemas';
@@ -54,7 +55,7 @@ export function JournalAiRunPanel(props: PanelProps) {
   });
   if (reference.isError)
     return <JournalRequestError title="AI 任务引用暂不可用" error={reference.error} />;
-  if (reference.isPending) return <p className="text-sm">正在核对 AI 任务引用…</p>;
+  if (reference.isPending) return <LoadingState label="正在核对 AI 任务引用" />;
   return (
     <RunPanel
       key={reference.data.key}
@@ -116,10 +117,12 @@ function RunPanel({
         {!existingRunId && (
           <div className="flex flex-wrap items-center gap-3">
             <Button
+              aria-busy={create.isPending}
               variant="outline"
               disabled={disabled || create.isPending || id !== null}
               onClick={() => create.mutate()}
             >
+              {create.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
               {create.isPending ? '提交中…' : '开始 AI 解读'}
             </Button>
             <a className="text-sm underline underline-offset-4" href="/providers">

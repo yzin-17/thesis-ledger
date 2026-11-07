@@ -69,7 +69,7 @@ export function CashTransferCorrectionSheet({
     mutations.voidTransfer.isPending ||
     mutations.restoreTransfer.isPending;
   const requestClose = useDraftCloseGuard({
-    open, draft: { amount, occurredAt, note, reason }, busy: pending, onOpenChange,
+    open, draft: { eventId: event.eventId, mode, amount, occurredAt, note, reason }, busy: pending, onOpenChange,
   });
   const submit = async (formEvent: React.FormEvent) => {
     formEvent.preventDefault();
@@ -116,7 +116,7 @@ export function CashTransferCorrectionSheet({
           className="flex min-h-0 flex-1 flex-col gap-6"
           onSubmit={(formEvent) => void submit(formEvent)}
         >
-          <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+          <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto scroll-p-2 px-1 py-1">
             <FieldGroup>
               {mode === 'replace' && (
                 <>

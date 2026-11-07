@@ -201,7 +201,7 @@ export class StrategyRiskContextService {
     availabilityCutoff = () => evaluatedAt,
   ): Promise<RiskBar[]> {
     if (!this.bars) throw new BadRequestException('行情 Reader 不可用，策略风险拒绝读取行情');
-    if (timeframe === '1m') throw new MarketBarUnavailableError('分钟线尚无现行精确来源');
+    if (timeframe === '1m') throw new MarketBarUnavailableError('分钟线现行合同仅支持交互图表，风险监控尚未接入已完成分钟线更新');
     const normalizedAssetType = assetType.toUpperCase();
     if (normalizedAssetType !== 'STOCK' && normalizedAssetType !== 'ETF')
       throw new MarketBarUnavailableError('策略风险日线资产类型尚无现行精确来源');

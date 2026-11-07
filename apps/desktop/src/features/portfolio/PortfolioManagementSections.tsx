@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -59,6 +60,7 @@ export function PositionManagementSection(props: PortfolioManagementViewProps) {
 
 function PositionOverview({
   positions,
+  positionsRefreshing = false,
   selectedAccount,
   busyAction,
   cashValue,
@@ -75,7 +77,7 @@ function PositionOverview({
 }: PortfolioManagementViewProps) {
   const positionHeading = calibrationMode ? '持仓快照' : '持仓';
   const positionDescription = calibrationMode
-    ? '用于记录持仓快照，不产生 BUY / SELL 成交记录。'
+    ? '记录当前持仓，成交记录单独维护。'
     : undefined;
   const editPosition = (position: Position) => {
     setEditing(position);
@@ -140,24 +142,26 @@ function PositionOverview({
             </div>
             {positionActions}
           </div>
-          {calibrationMode ? (
-            <PositionObservationContent
-              positions={positions}
-              busyAction={busyAction}
-              onCreate={createPosition}
-              onEdit={editPosition}
-              remove={remove}
-              {...(resolveInstrumentName ? { resolveInstrumentName } : {})}
-            />
-          ) : (
-            <StandardPositionContent
-              positions={positions}
-              busyAction={busyAction}
-              onEdit={editPosition}
-              remove={remove}
-              {...(resolveInstrumentName ? { resolveInstrumentName } : {})}
-            />
-          )}
+          <ListRefreshRegion refreshing={positionsRefreshing} label="正在刷新持仓">
+            {calibrationMode ? (
+              <PositionObservationContent
+                positions={positions}
+                busyAction={busyAction}
+                onCreate={createPosition}
+                onEdit={editPosition}
+                remove={remove}
+                {...(resolveInstrumentName ? { resolveInstrumentName } : {})}
+              />
+            ) : (
+              <StandardPositionContent
+                positions={positions}
+                busyAction={busyAction}
+                onEdit={editPosition}
+                remove={remove}
+                {...(resolveInstrumentName ? { resolveInstrumentName } : {})}
+              />
+            )}
+          </ListRefreshRegion>
         </section>
       )}
       {selectedAccount?.type === 'cash' && !showCash && (
@@ -236,7 +240,7 @@ function PositionEntrySheet(props: PortfolioManagementViewProps) {
             </SheetTitle>
             <SheetDescription id="position-form-description">
               {calibrationMode
-                ? '这会记录持仓快照，不会生成 BUY/SELL 成交；单标的录入属于 PARTIAL 观察。'
+                ? '记录该标的的持仓快照，保留其他持仓。'
                 : '录入账户当前实际持仓，用于初始化或核对持仓数据。'}
             </SheetDescription>
           </SheetHeader>
@@ -263,7 +267,7 @@ function CashBalanceForm({
       onChange={() => markDirty()}
       onSubmit={(event) => void submitCashBalance(event)}
     >
-      <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto px-1 py-1">
+      <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto scroll-p-2 px-1 py-1">
         <h3>现金余额</h3>
         <p className="field-hint">现金单独计入组合总资产，不混入持仓成本和盈亏。</p>
         <div className="grid gap-1.5 text-xs text-muted-foreground">
@@ -337,7 +341,7 @@ function PositionForm(props: PortfolioManagementViewProps) {
       onSubmit={(event) => void submitPosition(event)}
       key={editing?.id ?? 'new'}
     >
-      <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto px-1 py-1">
+      <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto scroll-p-2 px-1 py-1">
         <AccountField
           accounts={accounts}
           entryAccountLocked={entryAccountLocked}

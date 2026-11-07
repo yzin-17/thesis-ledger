@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DsaError } from '../../src/integration/dsa/dsa.client.js';
 import { MarketService } from '../../src/market/market.service.js';
 import { StructuredLogger } from '../../src/platform/structured-logger.js';
@@ -80,6 +80,8 @@ const createDsa = (implementation: () => Promise<unknown>) => ({
 });
 
 describe('Quote 分布式锁并发保护', () => {
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-14T01:00:02Z')); });
+  afterEach(() => vi.restoreAllMocks());
   it.each([
     ['600519.SH', 'a-share-prices-snapshot'],
     ['510300.SH', 'fund-market-snapshot'],

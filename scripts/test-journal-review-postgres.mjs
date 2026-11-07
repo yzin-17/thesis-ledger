@@ -5,9 +5,15 @@ import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const container = `ledger-journal-test-${randomUUID().slice(0, 8)}`;
-const withRedis = process.env.AUTHORING_WITH_REDIS === '1';
+const authoringRedis = process.env.AUTHORING_WITH_REDIS === '1';
+const arenaRedis = process.env.ARENA_WITH_REDIS === '1';
+const arenaJourney = process.argv.includes('test/model-arena/watchlist-journey.integration.test.mjs');
+const arenaSchedule = process.argv.includes('test/model-arena/schedule-queue.integration.test.ts');
+if (arenaRedis && ((!arenaSchedule && !arenaJourney) || authoringRedis))
+  throw new Error('竞技场隔离队列仅用于独立调度验收');
+const withRedis = authoringRedis || arenaRedis;
 if (
-  withRedis &&
+  authoringRedis &&
   !process.argv.includes('test/strategy-authoring/authoring-execution.integration.test.ts')
 )
   throw new Error('Redis 隔离仅供明确的编写执行验收入口');
@@ -25,14 +31,16 @@ const run = (command, args, options = {}) => {
   });
   if (result.error || result.status !== 0)
     throw new Error(
-      `${command} failed: ${result.error?.message ?? result.stderr ?? result.stdout}`,
+      `${command} failed: ${(result.error?.message || result.stderr?.trim() || result.stdout?.trim() || String(result.signal ?? result.status))}`,
     );
   return result.stdout.trim();
 };
 let started = false;
 let redisStarted = false;
 try {
-  run('pnpm', ['--filter', '@thesis-ledger/server...', 'build'], { timeout: 300000 });
+  const filters = ['--filter', '@thesis-ledger/server...'];
+  if (arenaJourney) filters.push('--filter', '@thesis-ledger/api-client...');
+  run('pnpm', [...filters, 'build'], { timeout: 300000 });
   console.log('已构建当前结构初始化入口及 Server 依赖');
   run('docker', [
     'run',
@@ -168,7 +176,7 @@ try {
     }
     const redisPort = run('docker', ['port', redisContainer, '6379/tcp']).split(':').at(-1);
     redisUrl = `redis://127.0.0.1:${redisPort}`;
-    console.log('已启动独立 Redis 与随机编写队列范围');
+    console.log('已启动独立 Redis 与随机测试队列范围');
   }
   const result = spawnSync(
     'pnpm',
@@ -199,8 +207,7 @@ try {
         ...(withRedis
           ? {
               NODE_ENV: 'test',
-              AUTHORING_ISOLATED: '1',
-              AUTHORING_TEST_SCOPE: queueScope,
+              ...(authoringRedis ? {AUTHORING_ISOLATED:'1',AUTHORING_TEST_SCOPE:queueScope} : {ARENA_QUEUE_TEST_SCOPE:queueScope,DSA_BASE_URL:"http://127.0.0.1:1",THESIS_LEDGER_DSA_TOKEN:"isolated-queue-fixture"}),
               REDIS_URL: redisUrl,
             }
           : {}),

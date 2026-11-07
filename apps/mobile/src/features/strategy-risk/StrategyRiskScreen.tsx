@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -10,9 +11,8 @@ import {
   Action,
   Choices,
   Copy,
-  Field,
   Page,
-  QueryStatus,
+  QueryList, QueryStatus,
   Section,
 } from '../../components/MobilePrimitives';
 export function StrategyRiskScreen() {
@@ -66,7 +66,7 @@ export function StrategyRiskScreen() {
           ...(accounts.data ?? []).map((v) => ({ value: v.id, label: v.name })),
         ]}
       />
-      <Field label="风险应用标的筛选" value={symbol} onChange={setSymbol} />
+      <InstrumentSymbolField label="风险应用标的筛选" value={symbol} onChange={setSymbol} />
       <Action label="筛选策略风险应用" onPress={() => setSearch(symbol.trim())} />
       <Choices
         label="风险应用历史"
@@ -77,25 +77,31 @@ export function StrategyRiskScreen() {
           { value: 'yes', label: '包含归档历史' },
         ]}
       />
-      <QueryStatus query={query} empty={!rows.length} retry={() => void query.refetch()} />
-      {rows.map((v) => (
-        <Section key={v.id} title={`${v.symbol} · ${strategyRiskStatusLabel(v)}`}>
-          <Copy>
-            {accounts.data?.find((a) => a.id === v.accountId)?.name ?? '账户未记录'} · 修订{' '}
-            {v.revision}
-          </Copy>
-          <Copy>
-            版本 {v.strategyVersionId} · 覆盖 {v.coverage.riskMapped}/{v.coverage.riskTotal}
-          </Copy>
-          <Copy>
-            生效范围 {v.cycleMode === 'existingAndFuture' ? '当前及未来持仓周期' : '下个持仓周期'}
-          </Copy>
-          <Action
-            label={`管理风险应用 ${v.id}`}
-            onPress={() => navigation.navigate('StrategyRiskEditor', { id: v.id })}
-          />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={!rows.length}
+        retry={() => void query.refetch()}
+        label="正在刷新策略风险应用"
+      >
+        {rows.map((v) => (
+          <Section key={v.id} title={`${v.symbol} · ${strategyRiskStatusLabel(v)}`}>
+            <Copy>
+              {accounts.data?.find((a) => a.id === v.accountId)?.name ?? '账户未记录'} · 修订{' '}
+              {v.revision}
+            </Copy>
+            <Copy>
+              版本 {v.strategyVersionId} · 覆盖 {v.coverage.riskMapped}/{v.coverage.riskTotal}
+            </Copy>
+            <Copy>
+              生效范围 {v.cycleMode === 'existingAndFuture' ? '当前及未来持仓周期' : '下个持仓周期'}
+            </Copy>
+            <Action
+              label={`管理风险应用 ${v.id}`}
+              onPress={() => navigation.navigate('StrategyRiskEditor', { id: v.id })}
+            />
+          </Section>
+        ))}
+      </QueryList>
     </Page>
   );
 }

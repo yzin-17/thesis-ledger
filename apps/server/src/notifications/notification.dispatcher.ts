@@ -1,3 +1,4 @@
+import { cancelInactiveRiskDeliveries } from './risk-delivery-validity.js';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { loadConfig } from '../platform/config.js';
@@ -58,6 +59,7 @@ export class NotificationDispatcher implements OnModuleInit, OnModuleDestroy {
     if (this.running) return { skipped: true, reason: 'notification dispatcher 上一轮仍在运行' };
     this.running = true;
     try {
+      if (this.prisma) await cancelInactiveRiskDeliveries(this.prisma);
       await this.cancelSupersededStrategyRiskDeliveries();
       return { skipped: false, deliveries: await this.notifications.dispatchDue(now) };
     } finally {

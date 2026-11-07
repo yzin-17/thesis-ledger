@@ -17,7 +17,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { AlertTriangle, ArrowRight, BookOpen, CircleDot, RotateCcw, Search } from 'lucide-react';
 import { researchQuestionTemplates } from './ai.templates.js';
 import type { AiRunDetail as AiRunDetailRecord, AiRunRecord } from './ai.types.js';
@@ -47,7 +47,7 @@ function RunMetadata({ run }: { run: AiRunRecord }) {
       </h3>
       <dl className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2">
         <div>
-          <dt className="text-xs text-muted-foreground">Provider / 模型</dt>
+          <dt className="text-xs text-muted-foreground">提供方 / 模型</dt>
           <dd>
             {run.provider} / {run.model}
           </dd>
@@ -82,7 +82,7 @@ function RunMetadata({ run }: { run: AiRunRecord }) {
         </div>
         {run.fallbackSummary && (
           <div className="sm:col-span-2">
-            <dt className="text-xs text-muted-foreground">Provider fallback 摘要</dt>
+            <dt className="text-xs text-muted-foreground">来源切换摘要</dt>
             <dd className="text-xs text-muted-foreground">{run.fallbackSummary}</dd>
           </div>
         )}
@@ -241,14 +241,7 @@ export function AiRunDetail({
   emptyState?: 'first-run' | 'filtered';
 }) {
   if (!run && isLoading) {
-    return (
-      <div className="flex flex-col gap-4 rounded-md border bg-card p-6" aria-busy="true">
-        <Skeleton className="h-8 w-2/3" />
-        <Skeleton className="h-5 w-1/3" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
+    return <LoadingState label="正在加载研究任务" />;
   }
   if (!run) {
     if (emptyState === 'filtered') {
@@ -365,7 +358,7 @@ export function AiRunDetail({
             <CardDescription>只展示服务端已确认的阶段，不生成虚假百分比。</CardDescription>
           </CardHeader>
           <CardContent className="flex items-center gap-2 text-sm">
-            <CircleDot className="animate-pulse text-muted-foreground" />
+            <Spinner aria-label="研究进行中" />
             {checkpointLabel(current.checkpoint)}
           </CardContent>
         </Card>

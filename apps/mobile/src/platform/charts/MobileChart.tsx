@@ -19,6 +19,7 @@ declare function __MOBILE_CHART_LIBRARY__(): string;
 type MobileChartProps = {
   data: ChartData;
   onOlder?: () => void;
+  onArenaTime?:(time:number)=>void;
   onReady?: () => void;
   onDiagnostic?: (kind: ChartDiagnostic) => void;
 };
@@ -44,14 +45,15 @@ export function MobileChart(props: MobileChartProps) {
 function ChartInstance({
   data,
   onOlder,
+  onArenaTime,
   onReady,
   onDiagnostic,
   height,
 }: MobileChartProps & { height: number }) {
   const { theme } = useMobileRuntime();
   const [instance] = useState(() => Crypto.randomUUID());
-  const callbacks = useRef({ onOlder, onReady, onDiagnostic });
-  callbacks.current = { onOlder, onReady, onDiagnostic };
+  const callbacks = useRef({ onOlder, onReady, onDiagnostic,onArenaTime });
+  callbacks.current = { onOlder, onReady, onDiagnostic,onArenaTime };
   const diagnostics = Boolean(onDiagnostic);
   const colors = useMemo(
     () => ({
@@ -84,6 +86,7 @@ function ChartInstance({
           webview.current?.injectJavaScript(latestScript.current);
           callbacks.current.onReady?.();
         },
+        onArenaTime:(time)=>callbacks.current.onArenaTime?.(time),
         onDiagnostic: (kind) => callbacks.current.onDiagnostic?.(kind),
       }),
     [instance],

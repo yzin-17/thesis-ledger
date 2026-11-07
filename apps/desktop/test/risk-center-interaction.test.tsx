@@ -81,7 +81,7 @@ describe('通知 Provider 选择', () => {
         />
       </Field>,
     );
-    expect(unconfigured).toContain('没有可用的通知 Provider');
+    expect(unconfigured).toContain('没有可用的通知提供方');
     expect(unconfigured).not.toContain('>飞书<');
   });
 });
@@ -111,6 +111,16 @@ const portfolio: Portfolio = {
 };
 
 describe('风险中心 AB 交互契约', () => {
+  it.each([
+    ['cost-stop', 1e-9],
+    ['cost-stop', Number.MIN_VALUE],
+    ['price-below', 1e-9],
+    ['price-below', Number.MIN_VALUE],
+  ] as const)('极小阈值 %s / %s 不展示为零', (kind, value) => {
+    const text = formatThreshold(kind, value);
+    expect(Number(text.replace(/%$/, ''))).toBeGreaterThan(0);
+    if (kind === 'cost-stop' && value === 1e-9) expect(text).toBe('1E-7%');
+  });
   it('扫描上下文跟随路由模式和当前组合数据', () => {
     const contexts = buildRiskContexts(portfolio, 'shadow');
 
@@ -560,7 +570,7 @@ describe('风险中心 AB 交互契约', () => {
     expect(html).toContain('半导体设备ETF国泰 · 159516.SZ · v2');
   });
 
-  it('已归档规则退出默认列表，显示已归档后仅保留恢复和审计', () => {
+  it('只有已归档规则时，默认列表没有选中项或规则详情', () => {
     const html = renderToStaticMarkup(
       <RiskRuleWorkbench
         rules={[
@@ -599,12 +609,10 @@ describe('风险中心 AB 交互契约', () => {
 
     expect(html).toContain('已归档');
     expect(html).toContain('显示已归档');
-    expect(html).toContain('恢复规则');
-    expect(html).toContain('查看审计');
-    // 标的名展示在标题小字中，网格不再重复“范围/目标”
-    expect(html).toContain('证券 · 600519.SH · 贵州茅台');
-    expect(html).not.toContain('>目标<');
-    expect(html).not.toContain('>范围<');
+    expect(html).not.toContain('aria-current="true"');
+    expect(html).not.toContain('恢复规则');
+    expect(html).not.toContain('查看审计');
+    expect(html).not.toContain('贵州茅台');
     expect(html).not.toContain('>归档规则<');
     expect(html).not.toContain('>启用规则<');
     expect(html).not.toContain('>人工测试<');

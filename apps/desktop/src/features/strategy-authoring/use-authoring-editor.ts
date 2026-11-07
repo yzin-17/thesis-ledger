@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -16,7 +17,6 @@ import {
 import { useAuthoringDraft } from './use-authoring-draft.js';
 import { authoringRequestFailure, submitAuthoringIntent } from './authoring-submission.js';
 import { useNavigationGuard } from '../shared/navigation-guard.js';
-
 export function useAuthoringEditor({
   id,
   ownerId,
@@ -94,7 +94,11 @@ export function useAuthoringEditor({
     },
   });
   const busy = perform.isPending || draft.busy;
-  useNavigationGuard({ dirty: false, busy });
+  useNavigationGuard({
+    dirty: draft.dirty,
+    busy,
+    draft: { id, ownerId, content: draft.content, modelKey, intent, target },
+  });
   const editing = draft.query.data?.state === 'editing';
   useEffect(() => {
     onDirtyChange(draft.dirty || draft.busy || perform.isPending);
@@ -122,7 +126,7 @@ export function useAuthoringEditor({
             expectedRevision: current.revision,
             providerId: selected.providerId,
             model: selected.model,
-            idempotencyKey: crypto.randomUUID(),
+            idempotencyKey: createClientRequestId(),
             intent: kind === 'modify' ? intent : '',
             ...(kind === 'modify' ? { modificationTarget: target } : {}),
             unknownCostAcknowledgedAt:

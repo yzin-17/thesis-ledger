@@ -87,7 +87,7 @@ export function EvidenceEditorSheet({
 
   const requestClose = useDraftCloseGuard({
     open,
-    draft: null,
+    draft: { symbol: candidate.symbol, fields: draft },
     dirty: fields.some(({ key }) => draft[key] !== toInputValue(value[key])),
     busy: false,
     onOpenChange,
@@ -99,7 +99,7 @@ export function EvidenceEditorSheet({
         <SheetHeader>
           <SheetTitle>补充本次复盘证据</SheetTitle>
           <SheetDescription>
-            {candidate.symbol} 的临时补充只参与本次计算，不会回写 TradePlan、Journal 或 Ledger。
+            {candidate.symbol} 的临时补充仅用于本次计算，保留原计划、复盘和账本记录。
           </SheetDescription>
         </SheetHeader>
         <div className="min-w-0">

@@ -1,3 +1,6 @@
+import { formatRiskRuleThreshold } from './threshold-format.js';
+export { formatRiskRuleThreshold } from './threshold-format.js';
+
 export type Severity = 'info' | 'warning' | 'error' | 'critical';
 export type RuleScope = 'security' | 'account' | 'portfolio';
 export type RuleKind =
@@ -132,23 +135,7 @@ const riskRuleKindLabels: Readonly<Record<string, string>> = {
   correlation: '组合相关性',
 };
 
-const percentageRuleKinds: ReadonlySet<string> = new Set([
-  'cost-stop',
-  'take-profit',
-  'position-concentration',
-  'trailing-stop',
-]);
-
 export const riskRuleKindLabel = (kind: string) => riskRuleKindLabels[kind] ?? kind;
-
-export const formatRiskRuleThreshold = (kind: string, threshold: number) => {
-  const percentage = percentageRuleKinds.has(kind);
-  const value = percentage ? threshold * 100 : threshold;
-  const formatted = percentage
-    ? value.toLocaleString('zh-CN')
-    : value.toLocaleString('zh-CN', { maximumFractionDigits: 6 });
-  return percentage ? `${formatted}%` : formatted;
-};
 
 export const formatRiskEventName = (
   rule: Pick<RiskRule, 'kind' | 'threshold'>,

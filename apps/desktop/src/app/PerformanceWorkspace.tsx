@@ -1,3 +1,5 @@
+import { PortfolioDashboard } from '../features/portfolio/PortfolioDashboard.js';
+import { LoadingState } from '@/components/ui/spinner';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePageRefresh } from '../features/shared/usePageRefresh.js';
@@ -5,11 +7,8 @@ import { useGuardedTransition } from '../features/shared/navigation-guard.js';
 import { PageHeader } from '../features/shared/PageHeader.js';
 import { RefreshIconButton } from '../features/shared/RefreshIconButton.js';
 import { PortfolioModeNote } from '../features/shared/PortfolioModeSwitch.js';
-import { PortfolioDashboard } from '../features/portfolio/PortfolioDashboard.js';
 import { PortfolioAccountFilter } from '../features/portfolio/PortfolioAccountFilter.js';
-import { PortfolioTradeView } from '../features/portfolio/PortfolioTradeView.js';
 import type { PortfolioTradeReviewTarget } from '../features/portfolio/portfolio-trade.types.js';
-import { PerformanceDashboard } from '../features/performance/PerformanceDashboard.js';
 import { performanceKeys } from '../features/performance/performance.queries.js';
 import {
   fetchPerformanceLayers,
@@ -23,16 +22,30 @@ import type {
   PerformanceLayersResponse,
   PerformanceSummary,
 } from '../features/performance/performance.types.js';
-import { DashboardSkeleton, StatePanel } from '../features/shared/DesktopPrimitives.js';
+import { StatePanel } from '../features/shared/DesktopPrimitives.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
-const workspaceTabs = ['overview', 'analysis', 'allocation', 'trades'] as const;
-export type PerformanceWorkspaceTab = (typeof workspaceTabs)[number];
-export const performanceWorkspaceTab = (search: string): PerformanceWorkspaceTab => {
-  const value = new URLSearchParams(search).get('tab');
-  return workspaceTabs.find((tab) => tab === value) ?? 'overview';
-};
+import { createDeferredPage } from './DeferredPage.js';
+import {
+  performanceWorkspaceTabs as workspaceTabs,
+  type PerformanceWorkspaceTab,
+} from './performance-workspace-tabs.js';
+export {
+  performanceWorkspaceTab,
+  type PerformanceWorkspaceTab,
+} from './performance-workspace-tabs.js';
+const PerformanceDashboard = createDeferredPage(() =>
+  import('../features/performance/PerformanceDashboard.js').then((module) => ({
+    default: module.PerformanceDashboard,
+  })),
+);
+const PortfolioTradeView = createDeferredPage(() =>
+  import('../features/portfolio/PortfolioTradeView.js').then((module) => ({
+    default: module.PortfolioTradeView,
+  })),
+);
+
 
 type Props = Omit<ComponentProps<typeof PortfolioDashboard>, 'onRetry'> & {
   accountsReady?: boolean;
@@ -119,8 +132,9 @@ export function PerformanceWorkspace({
     />
   );
   return (
-    <section className="flex min-w-0 flex-col gap-5">
+    <section className="flex min-w-0 flex-col gap-card">
       <PageHeader
+        eyebrow="PERFORMANCE ANALYSIS"
         title="收益分析"
         actions={
           <RefreshIconButton
@@ -179,8 +193,9 @@ export function PerformanceWorkspace({
         </TabsList>
         {accountsReady && (
           <>
-            <TabsContent value="overview" className="mt-0 pt-3">
+            <TabsContent value="overview">
               <PortfolioDashboard
+                refreshing={refreshing}
                 state={state}
                 portfolio={portfolio}
                 accounts={accounts}
@@ -189,13 +204,13 @@ export function PerformanceWorkspace({
                 onRetry={() => void onRetry()}
               />
             </TabsContent>
-            <TabsContent value="analysis" className="mt-0 pt-3">
+            <TabsContent value="analysis">
               {panel('analysis')}
             </TabsContent>
-            <TabsContent value="allocation" className="mt-0 pt-3">
+            <TabsContent value="allocation">
               {panel('allocation')}
             </TabsContent>
-            <TabsContent value="trades" className="mt-0 pt-3">
+            <TabsContent value="trades">
               <PortfolioTradeView
                 accounts={accounts}
                 mode={mode}
@@ -206,7 +221,7 @@ export function PerformanceWorkspace({
           </>
         )}
         {!accountsReady && (
-          <TabsContent value={tab} className="mt-0 pt-3">
+          <TabsContent value={tab}>
             {state === 'error' && (
               <StatePanel
                 title="账户范围读取失败"
@@ -214,7 +229,7 @@ export function PerformanceWorkspace({
                 children={null}
               />
             )}
-            {state !== 'error' && <DashboardSkeleton />}
+            {state !== 'error' && <LoadingState label="正在加载账户范围" />}
           </TabsContent>
         )}
       </Tabs>

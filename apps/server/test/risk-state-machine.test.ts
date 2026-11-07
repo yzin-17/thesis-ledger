@@ -292,6 +292,14 @@ describe('风险扫描状态机', () => {
     expect(prisma.riskEvent.create).toHaveBeenCalledTimes(2);
   });
 
+  it('显式不可用价格不能抬高持仓峰值后制造虚假移动止损', async () => {
+    const { service, prisma } = createService([trailingRule(ruleA, 0.1)]);
+    await service.scan([context(120)]);
+    await service.scan([{ ...context(200), dataQuality: { marketData: 'unavailable' } }]);
+    await service.scan([context(115)]);
+    expect(prisma.riskEvent.create).not.toHaveBeenCalled();
+  });
+
   it('首次观察忽略外部峰值提示，不因已有回撤直接触发', async () => {
     const { service, prisma } = createService([trailingRule(ruleA, 0.1)]);
     await service.scan([{ ...context(90), holdingPeak: 120 }]);
@@ -381,6 +389,34 @@ describe('风险扫描状态机', () => {
     await expect(service.scan([stale])).rejects.toThrow('陈旧');
   });
 
+  it('普通 critical 规则持续越界只建一次事件，恢复后再次越界；复用持久状态模拟重启', async () => {
+    const { service, prisma, notifications } = createService([
+      { ...trailingRule(ruleA, 100), kind: 'price-below', severity: 'critical' },
+    ], { notifications: {
+      enqueue: vi.fn(async () => []),
+      subjectDeliveryStatus: vi.fn(async () => ({ shouldRetry: false })),
+    } });
+    await service.scan([context(90)]);
+    await service.scan([context(89)]);
+    const restarted = new RiskService(prisma as never, notifications as never);
+    await restarted.scan([context(88)]);
+    expect(prisma.riskEvent.create).toHaveBeenCalledTimes(1);
+    expect(notifications.enqueue).toHaveBeenCalledTimes(1);
+    await restarted.scan([context(101)]);
+    await restarted.scan([context(90)]);
+    expect(prisma.riskEvent.create).toHaveBeenCalledTimes(2);
+    expect(notifications.enqueue).toHaveBeenCalledTimes(2);
+  });
+
+  it('缺价和陈旧数据不清除持续越界状态', async () => {
+    const { service, prisma } = createService([{ ...trailingRule(ruleA, 100), kind: 'price-below' }]);
+    await service.scan([context(90)]);
+    await service.scan([{ ...context(110), dataQuality: { marketData: 'unavailable' } }]);
+    await service.scan({ allowStale: true, security: [{ ...context(110), dataQuality: { marketData: 'stale' } }] });
+    await service.scan([context(89)]);
+    expect(prisma.riskEvent.create).toHaveBeenCalledTimes(1);
+  });
+
   it('通知失败后复用原事件重试，不创建第二条事件', async () => {
     const rule = {
       id: ruleA,
@@ -402,7 +438,7 @@ describe('风险扫描状态机', () => {
       subjectDeliveryStatus: vi.fn(async () => ({
         subjectType: 'risk-event',
         subjectId: 'event-1',
-        statuses: ['failed'],
+        statuses: [],
         shouldRetry: true,
       })),
     };

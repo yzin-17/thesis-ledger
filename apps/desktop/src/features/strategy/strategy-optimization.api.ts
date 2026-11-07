@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import type {
   MonitoringPlan,
   AiExecutionReadModel,
@@ -16,7 +17,6 @@ import { strategyClients } from '@thesis-ledger/api-client';
 import { omitUndefinedDeep } from '@thesis-ledger/schemas';
 import { parsedDesktopRequest, type DesktopRequestClient } from '../shared/request.js';
 import type { BacktestJobSummary } from './strategy.types.js';
-
 export type OptimizationCapabilities = {
   riskApplicationsEnabled: boolean;
   aiOptimizationEnabled: boolean;
@@ -278,7 +278,7 @@ export const cloneOptimizationExperiment = (
   client?: DesktopRequestClient,
 ): Promise<OptimizationExperimentSummary> =>
   optimization(client)
-    .clone(id, { ...options, idempotencyKey: crypto.randomUUID() })
+    .clone(id, { ...options, idempotencyKey: createClientRequestId() })
     .then(omitUndefinedDeep);
 export const renameOptimizationExperiment = (
   id: string,

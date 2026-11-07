@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useMemo, useState } from 'react';
 import type { LedgerEvent } from '@thesis-ledger/api-client';
 import { sumBy } from 'es-toolkit';
@@ -11,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { MoreHorizontalIcon } from 'lucide-react';
 
@@ -296,16 +297,14 @@ function CashOverview({
   const payableRows = pendingSummary(pendingRows, '应付');
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="account-data-cash-overview-title">
-      <h3 id="account-data-cash-overview-title" className="m-0 text-base font-semibold">
-        现金总览
-      </h3>
-      <div className="grid gap-4 rounded-md bg-muted/30 p-4 sm:p-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6">
+    <section aria-label="现金余额">
+      <div className="flex min-w-0 flex-col gap-4 rounded-md bg-muted/30 p-4 sm:p-5">
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-sm font-medium">可用现金</span>
             <Badge
               variant={evidencePartial ? 'secondary' : 'ghost'}
+              className={evidencePartial ? undefined : 'font-normal text-muted-foreground'}
               title="现金证据完整度：根据当前估值与流水读取结果判断。"
             >
               现金数据：{evidencePartial ? '部分' : '完整'}
@@ -340,7 +339,7 @@ function CashOverview({
             </span>
           )}
         </div>
-        <div className="grid min-w-0 grid-cols-2 gap-4 border-t border-border pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+        {pendingRows.length === 0 ? <span className="text-xs text-muted-foreground">暂无待结算资金</span> : <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-4">
           <CashSummaryMetric
             title="待结算应收"
             count={pendingRows.filter((row) => row.direction === '应收').length}
@@ -353,19 +352,22 @@ function CashOverview({
             rows={payableRows}
             direction="应付"
           />
-        </div>
+        </div>}
       </div>
     </section>
   );
 }
 
 function PendingCashSection({
+  refreshing = false,
   rows,
   resolveInstrumentName,
 }: {
+  refreshing?: boolean;
   rows: PendingCashRow[];
   resolveInstrumentName: (symbol: string) => string | undefined;
 }) {
+  if (rows.length === 0) return null;
   return (
     <section className="flex flex-col gap-3" aria-labelledby="cash-pending-title">
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -374,65 +376,61 @@ function PendingCashSection({
             待结算
           </h3>
         </div>
-        {rows.length === 0 ? (
-          <Empty className="w-auto flex-none items-end p-0">
-            <EmptyDescription>暂无待结算资金</EmptyDescription>
-          </Empty>
-        ) : (
-          <span className="shrink-0 text-xs text-muted-foreground">{rows.length} 笔</span>
-        )}
+        <span className="shrink-0 text-xs text-muted-foreground">{rows.length} 笔</span>
       </div>
-      {rows.length > 0 && (
-        <div className="divide-y divide-border">
-          {rows.map((row) => {
-            const instrumentName = row.symbol ? resolveInstrumentName(row.symbol) : undefined;
-            return (
-              <div
-                key={row.id}
-                className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_auto] sm:items-center"
-              >
-                <div className="row-span-2 flex flex-col gap-1 sm:row-span-1">
-                  <strong className="text-sm font-medium">
-                    {formatCashShortDate(row.settledAt)}
-                  </strong>
-                  <span className="text-xs text-muted-foreground">
-                    {cashRelativeDateLabel(row.settledAt)}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                    <strong className="min-w-0 truncate text-sm font-medium">
-                      {instrumentName && row.symbol
-                        ? row.label.replace(row.symbol, instrumentName)
-                        : row.label}
+      <ListRefreshRegion refreshing={refreshing} label="正在刷新待结算记录">
+        {rows.length > 0 && (
+          <div className="divide-y divide-border">
+            {rows.map((row) => {
+              const instrumentName = row.symbol ? resolveInstrumentName(row.symbol) : undefined;
+              return (
+                <div
+                  key={row.id}
+                  className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <div className="row-span-2 flex flex-col gap-1 sm:row-span-1">
+                    <strong className="text-sm font-medium">
+                      {formatCashShortDate(row.settledAt)}
                     </strong>
-                    <span className="text-xs text-muted-foreground">{row.currency}</span>
-                    {instrumentName && row.symbol && (
-                      <span className="text-xs text-muted-foreground">{row.symbol}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {cashRelativeDateLabel(row.settledAt)}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                      <strong className="min-w-0 truncate text-sm font-medium">
+                        {instrumentName && row.symbol
+                          ? row.label.replace(row.symbol, instrumentName)
+                          : row.label}
+                      </strong>
+                      <span className="text-xs text-muted-foreground">{row.currency}</span>
+                      {instrumentName && row.symbol && (
+                        <span className="text-xs text-muted-foreground">{row.symbol}</span>
+                      )}
+                    </div>
+                    {row.note && (
+                      <span className="mt-1 block max-w-[36rem] truncate text-xs text-muted-foreground">
+                        备注：{row.note}
+                      </span>
                     )}
                   </div>
-                  {row.note && (
-                    <span className="mt-1 block max-w-[36rem] truncate text-xs text-muted-foreground">
-                      备注：{row.note}
-                    </span>
-                  )}
+                  <div className="col-start-2 sm:col-start-auto sm:text-right">
+                    <strong className="block whitespace-nowrap tabular-nums text-base font-semibold">
+                      {formatSignedCashAmount(row.amount, row.currency, row.direction)}
+                    </strong>
+                    <span className="text-xs text-muted-foreground">待结算 · {row.direction}</span>
+                  </div>
                 </div>
-                <div className="col-start-2 sm:col-start-auto sm:text-right">
-                  <strong className="block whitespace-nowrap tabular-nums text-base font-semibold">
-                    {formatSignedCashAmount(row.amount, row.currency, row.direction)}
-                  </strong>
-                  <span className="text-xs text-muted-foreground">待结算 · {row.direction}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </ListRefreshRegion>
     </section>
   );
 }
 
-export function RecentCashFlowSection({ rows }: { rows: SettledCashFlowRow[] }) {
+export function RecentCashFlowSection({ rows, refreshing = false }: { rows: SettledCashFlowRow[]; refreshing?: boolean }) {
   const [showAll, setShowAll] = useState(false);
   const visibleRows = showAll ? rows : rows.slice(0, 5);
   const hasMore = rows.length > 5;
@@ -459,40 +457,43 @@ export function RecentCashFlowSection({ rows }: { rows: SettledCashFlowRow[] }) 
           </Button>
         )}
       </div>
-      {rows.length === 0 ? (
-        <Empty className="items-start px-0 py-2">
-          <EmptyDescription>暂无现金流水</EmptyDescription>
-        </Empty>
-      ) : (
-        <div className="divide-y divide-border">
-          {visibleRows.map((row) => (
-            <div
-              key={row.id}
-              className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_auto]"
-            >
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {formatCashShortDate(row.settledAt)}
-              </span>
-              <div className="min-w-0">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <strong className="min-w-0 truncate text-sm font-medium">{row.label}</strong>
+      <ListRefreshRegion refreshing={refreshing} label="正在刷新现金流水">
+        {rows.length === 0 ? (
+          <Empty className="items-start px-0 py-2">
+            <EmptyDescription>暂无现金流水</EmptyDescription>
+          </Empty>
+        ) : (
+          <div className="divide-y divide-border">
+            {visibleRows.map((row) => (
+              <div
+                key={row.id}
+                className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_auto]"
+              >
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {formatCashShortDate(row.settledAt)}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <strong className="min-w-0 truncate text-sm font-medium">{row.label}</strong>
+                    {row.label === '账户间划转' && <span className="text-xs text-muted-foreground">{row.direction === '流入' ? '转入' : '转出'}</span>}
+                  </div>
+                  {row.note && (
+                    <span className="mt-1 block max-w-[36rem] truncate text-xs text-muted-foreground">
+                      备注：{row.note}
+                    </span>
+                  )}
                 </div>
-                {row.note && (
-                  <span className="mt-1 block max-w-[36rem] truncate text-xs text-muted-foreground">
-                    备注：{row.note}
-                  </span>
-                )}
+                <div className="flex min-w-0 flex-wrap items-baseline justify-end gap-x-2 gap-y-1 text-right">
+                  <span className="text-xs text-muted-foreground">{row.currency}</span>
+                  <strong className="block break-all text-sm font-semibold tabular-nums sm:text-base">
+                    {formatSignedCashAmount(row.amount, row.currency, row.direction)}
+                  </strong>
+                </div>
               </div>
-              <div className="flex min-w-0 flex-wrap items-baseline justify-end gap-x-2 gap-y-1 text-right">
-                <span className="text-xs text-muted-foreground">{row.currency}</span>
-                <strong className="block break-all text-sm font-semibold tabular-nums sm:text-base">
-                  {formatSignedCashAmount(row.amount, row.currency, row.direction)}
-                </strong>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </ListRefreshRegion>
     </section>
   );
 }
@@ -537,12 +538,11 @@ export function CashSection({
 
   return (
     <section className="flex min-w-0 flex-col gap-6" aria-labelledby="account-data-cash-title">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 id="account-data-cash-title" className="m-0 text-xl font-semibold">
             现金
           </h2>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">查看余额、结算安排和现金流水。</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {canCreateCashDeposit && (
@@ -576,6 +576,7 @@ export function CashSection({
       </header>
 
       <CashResults
+        eventsRefreshing={eventsQuery.isFetching && !!eventsQuery.data}
         account={account}
         valuation={valuation}
         valuationQuery={valuationQuery}
@@ -592,6 +593,7 @@ export function CashSection({
             保留上次成功结果。已成功记录的入账、快照或划转无需再次提交，请重新读取余额与流水。
           </AlertDescription>
           <Button
+            aria-busy={eventsQuery.isFetching || valuationQuery.isFetching}
             type="button"
             variant="outline"
             size="sm"
@@ -617,6 +619,7 @@ export function CashSection({
 }
 
 export function CashResults({
+  eventsRefreshing = false,
   account,
   valuation,
   valuationQuery,
@@ -626,6 +629,7 @@ export function CashResults({
   evidencePartial,
   resolveInstrumentName,
 }: {
+  eventsRefreshing?: boolean;
   account: Account;
   valuation: CashValuation | undefined;
   valuationQuery: CashValuationQuery;
@@ -636,12 +640,7 @@ export function CashResults({
   resolveInstrumentName: (symbol: string) => string | undefined;
 }) {
   if (valuationQuery.isPending && !valuation) {
-    return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="正在加载现金">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    );
+    return <LoadingState label="正在加载现金" />;
   }
   if (valuationQuery.isError && !valuation) {
     return (
@@ -660,16 +659,18 @@ export function CashResults({
     );
   }
   return (
-    <div className="flex min-w-0 flex-col gap-5">
-      <CashOverview
-        account={account}
-        valuation={valuation}
-        settledRows={settledRows}
-        pendingRows={pendingRows}
-        evidencePartial={evidencePartial}
-      />
-      <PendingCashSection rows={pendingRows} resolveInstrumentName={resolveInstrumentName} />
-      <RecentCashFlowSection rows={settledCashFlowRows} />
+    <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      <div className="flex min-w-0 flex-col gap-5">
+        <CashOverview
+          account={account}
+          valuation={valuation}
+          settledRows={settledRows}
+          pendingRows={pendingRows}
+          evidencePartial={evidencePartial}
+        />
+        <PendingCashSection refreshing={eventsRefreshing} rows={pendingRows} resolveInstrumentName={resolveInstrumentName} />
+      </div>
+      <RecentCashFlowSection refreshing={eventsRefreshing} rows={settledCashFlowRows} />
     </div>
   );
 }

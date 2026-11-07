@@ -7,6 +7,7 @@ import { useDraftReviewsQuery, useDraftReviewMutations } from './draft-review.qu
 import { draftIsFrozen, reviewedDraftCommand, rowCanSubmit } from './draft-review.helpers.js';
 import { ImportDraftReviewContent } from './ImportDraftReviewContent.js';
 import { ImportDraftReviewList } from './ImportDraftReviewList.js';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 
 export function ImportDraftReview({
   accountId,
@@ -151,6 +152,11 @@ function DraftReviewEditor({
   const toast = useToastManager();
   const frozen = draftIsFrozen(draft);
   const busy = action !== null || revise.isPending || submit.isPending;
+  useNavigationGuard({
+    dirty,
+    busy,
+    draft: { draftId: draft.id, revision: draft.review?.revision, rows, selectedIds, fullConfirmed },
+  });
   useEffect(() => {
     onBusyChange(busy);
     return () => onBusyChange(false);

@@ -1,0 +1,6 @@
+BEGIN;
+ALTER TABLE "ArenaReservation" ADD COLUMN "execution" JSONB, ADD COLUMN "executionAt" TIMESTAMP(3);
+ALTER TABLE "ArenaFill" ADD COLUMN "recordedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+INSERT INTO "SchemaVersion" (id,version,"updatedAt") VALUES (1,'20261105050000_arena_execution_receipts',CURRENT_TIMESTAMP)
+ON CONFLICT (id) DO UPDATE SET version=EXCLUDED.version,"updatedAt"=CURRENT_TIMESTAMP;
+COMMIT;

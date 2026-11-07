@@ -1,3 +1,4 @@
+import { InstrumentOptionField } from '../market/InstrumentOptionField';
 import { useQuery } from '@tanstack/react-query';
 import type { ResearchSubmissionV2 } from '@thesis-ledger/schemas';
 import { useMobileRuntime } from '../../app/MobileRuntime';
@@ -55,7 +56,7 @@ export function ResearchObjects({
       {value.scope === 'position' ? (
         <>
           <QueryStatus query={positions} retry={() => void positions.refetch()} />
-          <Choices
+          <InstrumentOptionField
             label="研究持仓"
             value={value.symbol}
             disabled={disabled || positions.isError}
@@ -71,7 +72,7 @@ export function ResearchObjects({
         <>
           <Copy>已选目录标的 {value.instrumentId || '未选择'}</Copy>
           {!disabled ? (
-            <InstrumentPicker
+            <InstrumentPicker purpose="research"
               onConfirmed={(v) => onChange({ scope: 'instrument', instrumentId: v.id })}
             />
           ) : null}

@@ -1,5 +1,6 @@
 import {
   marketNewsReadInputSchema,
+  marketNewsDefaultPageSize,
   marketNewsFeedReadInputSchema,
   type MarketNewsReadInput,
   type MarketNewsFeedReadInput,
@@ -15,7 +16,7 @@ export function newsSubmission(
   const window = {
     publishedStart: form.start || null,
     publishedEnd: form.end || null,
-    limit: 5,
+    limit: marketNewsDefaultPageSize,
     requestBudgetMs: 15_000,
   };
   if (!instrument)

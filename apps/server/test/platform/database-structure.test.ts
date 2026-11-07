@@ -22,11 +22,11 @@ describe('database structure input', () => {
   it('自动发现全部 migration、Prisma 表和 raw-owned 表', async () => {
     const input = await discoverDatabaseStructure();
 
-    expect(input.currentHead).toBe('20261023010000_report_metadata_snapshots');
-    expect(input.migrations).toHaveLength(36);
-    expect(input.prismaTables).toHaveLength(68);
+    expect(input.currentHead).toBe('20261106030000_strategy_submission');
+    expect(input.migrations).toHaveLength(48);
+    expect(input.prismaTables).toHaveLength(84);
     expect(input.rawOwnedTables).toHaveLength(16);
-    expect(input.expectedTables).toHaveLength(84);
+    expect(input.expectedTables).toHaveLength(100);
     expect(input.expectedTables).toEqual(
       expect.arrayContaining([
         'StrategyRiskApplication',
@@ -38,7 +38,7 @@ describe('database structure input', () => {
         'ResearchObservation',
         'ResearchObservationVersion',
         'ResearchObservationSubmission',
-        'MarketReportMetadataSnapshot',
+        'MarketReportMetadataSnapshot','WatchlistItem','ArenaRound','ArenaWeekRevision',
       ]),
     );
   });

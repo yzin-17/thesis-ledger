@@ -1,3 +1,4 @@
+import { formatMarketNumber } from '@thesis-ledger/domain';
 import { Fragment } from 'react';
 import { isMarketMinuteTimeframe } from '@thesis-ledger/schemas';
 import type { MarketChartBar } from './market-chart-types.js';
@@ -6,7 +7,6 @@ import { Separator } from '@/components/ui/separator';
 import { indicatorComparable, indicatorValue, type ChartPoint } from './market-chart-model.js';
 import type { ChartPreference } from './market-chart-preferences.js';
 
-const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
 type ReadoutValue = {
   label: string;
@@ -83,7 +83,7 @@ function ReadoutGroup({ title, values }: { title: string; values: ReadoutValue[]
               />
             ) : null}
             <dt className="text-muted-foreground">{item.label}</dt>
-            <dd className="m-0">{item.value === null ? '—' : number.format(item.value)}</dd>
+            <dd className="m-0">{formatMarketNumber(item.value)}</dd>
           </div>
         ))}
       </dl>

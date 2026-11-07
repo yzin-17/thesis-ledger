@@ -21,14 +21,18 @@ export class FundValuationPointRepository {
     const lastValidAt = point.quality === 'unavailable' ? null : observedAt;
     const lastValidSnapshot = lastValidAt ? JSON.stringify(point) : null;
     await this.prisma.$executeRaw(Prisma.sql`
-      INSERT INTO "FundValuationPoint" ("symbol", "minute", "method", "observedAt", "quality", "snapshot", "evidence", "lastValidAt", "lastValidSnapshot")
+      INSERT INTO "FundValuationPoint" ("symbol", "minute", "method", "observedAt", "quality", "snapshot", "evidence", "lastValidAt", "lastValidSnapshot", "lastValidEvidence")
       VALUES (${point.symbol}, ${minute}, ${point.method}, ${observedAt}, ${point.quality},
-        ${JSON.stringify(point)}::jsonb, ${JSON.stringify(evidence)}::jsonb, ${lastValidAt}, ${lastValidSnapshot}::jsonb)
+        ${JSON.stringify(point)}::jsonb, ${JSON.stringify(evidence)}::jsonb, ${lastValidAt}, ${lastValidSnapshot}::jsonb, ${lastValidAt ? JSON.stringify(evidence) : null}::jsonb)
       ON CONFLICT ("symbol", "minute", "method") DO UPDATE SET
         "observedAt" = GREATEST("FundValuationPoint"."observedAt", EXCLUDED."observedAt"),
         "quality" = CASE WHEN EXCLUDED."observedAt" > "FundValuationPoint"."observedAt" THEN EXCLUDED."quality" ELSE "FundValuationPoint"."quality" END,
         "snapshot" = CASE WHEN EXCLUDED."observedAt" > "FundValuationPoint"."observedAt" THEN EXCLUDED."snapshot" ELSE "FundValuationPoint"."snapshot" END,
         "evidence" = CASE WHEN EXCLUDED."observedAt" > "FundValuationPoint"."observedAt" THEN EXCLUDED."evidence" ELSE "FundValuationPoint"."evidence" END,
+        "lastValidEvidence" = CASE
+          WHEN EXCLUDED."lastValidAt" IS NOT NULL AND ("FundValuationPoint"."lastValidAt" IS NULL OR EXCLUDED."lastValidAt" > "FundValuationPoint"."lastValidAt")
+          THEN EXCLUDED."lastValidEvidence" ELSE COALESCE("FundValuationPoint"."lastValidEvidence",
+            CASE WHEN "FundValuationPoint"."observedAt" = "FundValuationPoint"."lastValidAt" THEN "FundValuationPoint"."evidence" END) END,
         "lastValidAt" = GREATEST("FundValuationPoint"."lastValidAt", EXCLUDED."lastValidAt"),
         "lastValidSnapshot" = CASE
           WHEN "FundValuationPoint"."lastValidAt" IS NULL OR EXCLUDED."lastValidAt" > "FundValuationPoint"."lastValidAt"

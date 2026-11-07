@@ -255,6 +255,23 @@ describe('应用全局模式与转换保护', () => {
     await act(async () => settleWrite!('error'));
   });
 
+  it('确认期间草稿刷新时保留模式和新内容，下一次重新确认', async () => {
+    await mount();
+    await edit('确认前草稿');
+    await click(globalSwitch());
+    await edit('确认期间刷新后的草稿');
+    await button('放弃修改并切换');
+    expect(output('当前模式')).toBe('actual');
+    expect(input().value).toBe('确认期间刷新后的草稿');
+    expect(discardCount).toBe(0);
+    expect(window.localStorage.getItem(storageKey)).toBeNull();
+    await click(globalSwitch());
+    await button('放弃修改并切换');
+    expect(output('当前模式')).toBe('shadow');
+    expect(discardCount).toBe(1);
+    expect(writes).toEqual([]);
+  });
+
   it('浏览器返回先确认，取消保留位置与输入，确认后不重复询问', async () => {
     await mount(['/previous', '/first?accountId=A']);
     await edit('返回保护');

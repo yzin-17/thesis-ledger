@@ -112,6 +112,7 @@ export function AccountEditor() {
       />
       <Feedback message={feedback} error={mutation.isError} />
       <Action
+        busy={mutation.isPending}
         label={mutation.isPending ? '保存中…' : '保存账户'}
         primary
         disabled={mutation.isPending || !dirty || !readable}

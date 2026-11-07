@@ -1,3 +1,6 @@
+import { createClientRequestId } from '../../lib/client-request-id';
+import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
+import { Spinner } from '@/components/ui/spinner';
 import { StrategyExperimentConfigurationReview } from './StrategyExperimentConfigurationReview.js';
 import { requestFailureMessage } from '@/shared/api/request-error';
 import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
@@ -12,7 +15,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useNavigationGuard } from '../shared/navigation-guard.js';
 import {
   strategySchema,
-  type OptimizationExperimentCreate,
+  type OptimizationExperimentCreate, type StrategySubmissionInput,
   type OptimizationReasoningEffort,
 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -44,7 +47,6 @@ import {
 import { objectiveLabels } from './StrategyOptimizationExperimentPanel.js';
 import { strategyCenterPath } from './strategy-center.navigation.js';
 import type { StrategyRecord } from './strategy.types.js';
-
 const optimizationKey = ['desktop', 'strategy', 'optimization'] as const;
 const currencyByMarket = { CN: 'CNY', HK: 'HKD', US: 'USD' } as const;
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
@@ -126,7 +128,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   const [maxCost, setMaxCost] = useState('');
   const [acknowledgeUnknownCost, setAcknowledgeUnknownCost] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [submitIntentId] = useState(() => crypto.randomUUID());
+  const [submitIntentId] = useState(() => createClientRequestId());
   const [touched, setTouched] = useState(false);
   const capabilities = useQuery({
     queryKey: [...optimizationKey, 'capabilities'],
@@ -185,7 +187,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
         errors.source = '至少授权一个可优化参数。';
     }
     if (targetStep >= 2) {
-      if (selectedRoutes.length === 0) errors.models = '至少选择一个可用的 Provider/Model。';
+      if (selectedRoutes.length === 0) errors.models = '至少选择一个可用的提供方和模型。';
       if (mixedCurrencies)
         errors.cost = `所选模型包含不同费用币种：${knownCurrencies.join('、')}。请改为同币种模型。`;
       if (!(
@@ -202,7 +204,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
             (route.reasoning?.mandatory === true && effort === 'none'))
         );
       });
-      if (invalidReasoning) errors.models = '推理强度不符合 Provider 能力配置。';
+      if (invalidReasoning) errors.models = '推理强度不符合提供方能力配置。';
     }
     if (targetStep >= 3) {
       if (
@@ -230,8 +232,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
     },
     primaryTimeframe: '1d',
   });
-  const createMutation = useMutation({
-    mutationFn: async () => {
+  const settings = (): Extract<StrategySubmissionInput, {kind:'optimization'}>['settings'] => {
       if (!validateStep(3)) throw new Error('请修正表单中的问题。');
       const models = selectedRoutes.map((route) => {
         const effort = reasoningEfforts[routeKey(route.provider, route.model)];
@@ -241,17 +242,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
           ...(effort === undefined ? {} : { reasoningEffort: effort }),
         };
       });
-      const runConfig = requirePreparedOptimizationConfiguration(
-        preparedConfig,
-        preparationTarget,
-        startDate,
-        endDate,
-        currency,
-        initialCash,
-      );
-      const input: OptimizationExperimentCreate = {
-        contractVersion: 3,
-        ...preparationTarget,
+      return {
         ...(sourceMode === 'existing' ? { allowedParameterIds: selectedParameters } : {}),
         models,
         objective: { mode: objective, minClosedTrades: 1 },
@@ -260,7 +251,6 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
           validation: { start: nextExperimentDay(developmentEnd), end: validationEnd },
           test: { start: nextExperimentDay(validationEnd), end: endDate },
         },
-        runConfig,
         budget: {
           maxAiCalls: Number(maxAiCalls),
           maxBacktestRuns: Number(maxBacktestRuns),
@@ -271,6 +261,20 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
         },
         maxRounds: 2,
         acknowledgeUnknownCost: !hasUnknownCost || acknowledgeUnknownCost,
+      };
+  };
+  const createMutation = useMutation({
+    mutationFn: () => {
+      const runConfig = requirePreparedOptimizationConfiguration(
+        preparedConfig,
+        preparationTarget,
+        startDate,
+        endDate,
+        currency,
+        initialCash,
+      );
+      const input: OptimizationExperimentCreate = {
+        ...settings(), ...preparationTarget, contractVersion:3, runConfig,
         idempotencyKey: submitIntentId,
       };
       return createOptimizationExperiment(input);
@@ -289,8 +293,15 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
         budget: requestFailureMessage(error, '创建实验失败，请使用同一提交意图重试。'),
       })),
   });
-  useNavigationGuard({ dirty: touched, busy: createMutation.isPending,
-    bypass: () => allowNavigationRef.current });
+  useNavigationGuard({
+    dirty: touched,
+    busy: createMutation.isPending,
+    bypass: () => allowNavigationRef.current,
+    draft: { sourceMode, strategyVersionId, discoverySymbol, discoveryMarket, discoveryAssetType,
+      objective, selectedModels, reasoningEfforts, selectedParameters, startDate, developmentEnd,
+      validationEnd, endDate, initialCash, preparedConfig, maxAiCalls, maxBacktestRuns,
+      maxInputTokens, maxOutputTokens, maxDurationSeconds, maxCost, acknowledgeUnknownCost },
+  });
   const next = () => {
     if (!validateStep(step)) return;
     setStep((current) => Math.min(3, current + 1));
@@ -319,7 +330,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
     <div className="mx-auto max-w-5xl space-y-5" onChange={markTouched}>
       <div>
         <p className="text-sm text-muted-foreground">策略中心 / AI 实验 / 新建实验</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight">新建 AI 实验</h2>
+        <h2 className="mt-2 text-xl font-semibold tracking-tight">新建 AI 实验</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           前三步只保留输入，最后确认时才创建实验。
         </p>
@@ -405,11 +416,18 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                 <div className="grid gap-3 sm:grid-cols-3">
                   <Field invalid={Boolean(fieldErrors.source)}>
                     <FieldLabel>探索标的</FieldLabel>
-                    <Input
+                    <InstrumentSymbolField
                       aria-label="探索标的"
                       value={discoverySymbol}
-                      onChange={(event) => setDiscoverySymbol(event.target.value)}
-                      placeholder="如 600519.SH"
+                      markets={
+                        discoveryMarket === 'CN' ? ['SH', 'SZ', 'BJ', 'OF'] : [discoveryMarket]
+                      }
+                      instrumentTypes={[
+                        discoveryAssetType === 'fund'
+                          ? 'MUTUAL_FUND'
+                          : discoveryAssetType.toUpperCase(),
+                      ]}
+                      onChange={(value) => setDiscoverySymbol(value)}
                     />
                     {fieldErrors.source ? <FieldError>{fieldErrors.source}</FieldError> : null}
                   </Field>
@@ -634,6 +652,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                 endDate={endDate}
                 currency={currency}
                 initialCash={initialCash}
+                settings={settings}
                 onPrepared={setPreparedConfig}
               />
               <StrategyExperimentConfigurationReview
@@ -680,6 +699,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                 aria-busy={createMutation.isPending}
                 onClick={() => createMutation.mutate()}
               >
+                {createMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
                 {createMutation.isPending ? '创建中…' : '创建实验'}
               </Button>
             )}

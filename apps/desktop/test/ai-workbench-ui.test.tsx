@@ -188,7 +188,7 @@ describe('研究工作台 UI 契约', () => {
     expect(source).toContain('provider.action');
     expect(source).toContain('data-ai-provider-status');
     expect(controllerSource).toContain("label: '服务已就绪'");
-    expect(newResearchSource).toContain('Provider、Tool 和执行 Worker 已就绪。');
+    expect(newResearchSource).toContain('模型提供方、工具和执行服务已就绪。');
     expect(controllerSource).not.toContain("label: 'Provider 已就绪'");
     expect(source).toContain('<Button type="button" size="sm"');
     expect(controllerSource).toContain('trigger ?? listFallbackRef.current');

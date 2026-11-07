@@ -47,10 +47,13 @@ const copy = vi.fn();
 const content = { description: '受控本地草稿，禁止发送生成请求' };
 const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
 const button = (text: string) =>
-  [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+  [...document.querySelectorAll<HTMLButtonElement>('button,[role="menuitem"]')].find(
     (element) => element.textContent?.trim() === text,
   )!;
 async function click(text: string) {
+  if (['复制本地草稿', '读取服务器最新草稿', '丢弃这个草稿'].includes(text)) {
+    await act(async () => button('草稿操作').click());
+  }
   await act(async () => button(text).click());
 }
 async function render() {

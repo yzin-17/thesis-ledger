@@ -14,7 +14,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList, QueryStatus,
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
@@ -161,35 +161,41 @@ function AuthoringHome({ versionId }: { versionId: string | undefined }) {
           onPress={() => execute('find')}
         />
       ) : null}
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
       {receipt ? (
         <Action
           label="进入新编写草稿"
           onPress={() => navigation.navigate('StrategyAuthoring', { draftId: receipt })}
         />
       ) : null}
-      <QueryStatus query={list} retry={() => void list.refetch()} />
-      {list.data?.pages
-        .flatMap((p) => p.items)
-        .map((row) => (
-          <Section key={row.id} title={row.title || '未命名草稿'}>
-            <Copy>
-              修订 {row.revision} ·{' '}
-              {(
-                { editing: '编写中', saved: '已保存', discarded: '已丢弃' } as Record<
-                  string,
-                  string
-                >
-              )[row.state] ?? '待核对'}
-            </Copy>
-            <Action
-              label={`打开草稿 ${row.id}`}
-              onPress={() => navigation.navigate('StrategyAuthoring', { draftId: row.id })}
-            />
-          </Section>
-        ))}
+      <QueryList
+        query={list}
+        retry={() => void list.refetch()}
+        label="正在刷新策略草稿"
+      >
+        {list.data?.pages
+          .flatMap((p) => p.items)
+          .map((row) => (
+            <Section key={row.id} title={row.title || '未命名草稿'}>
+              <Copy>
+                修订 {row.revision} ·{' '}
+                {(
+                  { editing: '编写中', saved: '已保存', discarded: '已丢弃' } as Record<
+                    string,
+                    string
+                  >
+                )[row.state] ?? '待核对'}
+              </Copy>
+              <Action
+                label={`打开草稿 ${row.id}`}
+                onPress={() => navigation.navigate('StrategyAuthoring', { draftId: row.id })}
+              />
+            </Section>
+          ))}
+      </QueryList>
       {list.hasNextPage ? (
         <Action
+          busy={list.isFetchingNextPage}
           label="更多编写草稿"
           disabled={list.isFetching}
           onPress={() => void list.fetchNextPage()}

@@ -1,5 +1,8 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { LoadingState } from '@/components/ui/spinner';
 import { TableContainer } from '@/components/ui/table';
 import { useEffect, useMemo } from 'react';
+import { StrategyDefinitionFields } from './StrategyDefinitionFields.js';
 import { AuthoringVersionSource } from '../strategy-authoring/AuthoringVersionSource.js';
 import { AuthoringIdentity } from '../strategy-authoring/AuthoringIdentity.js';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -7,7 +10,6 @@ import { AlertCircle, ArrowLeft, Search } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Empty,
   EmptyContent,
@@ -52,6 +54,7 @@ import {
   strategyVersionSummary,
 } from './strategy-version-summary.model.js';
 import { riskCenterApplicationPath } from './strategy-risk-application.model.js';
+import { strategyTimeframeLabel } from './strategy-display-labels.js';
 
 const PAGE_SIZE = 20;
 
@@ -82,10 +85,10 @@ const schemaSymbols = (schema: StrategySchema | undefined) => {
 
 const definitionRows = (version: StrategyVersion) => {
   const schema = schemaRecord(version.schema);
-  const rows = [
+  const rows: [string, string][] = [
     ['策略说明', typeof schema.description === 'string' ? schema.description : '未填写'],
     ['执行标的', schemaSymbols(version.schema).join('、') || '未配置'],
-    ['主周期', typeof schema.primaryTimeframe === 'string' ? schema.primaryTimeframe : '未配置'],
+    ['主周期', typeof schema.primaryTimeframe === 'string' ? strategyTimeframeLabel(schema.primaryTimeframe) : '未配置'],
     [
       '信号来源',
       Array.isArray(schema.signalSources) ? `${schema.signalSources.length} 个` : '未配置',
@@ -97,11 +100,13 @@ const definitionRows = (version: StrategyVersion) => {
 };
 
 export function StrategyLibraryPage({
+  refreshing = false,
   strategies,
   jobs,
   loading,
   onBacktest,
 }: {
+  refreshing?: boolean;
   strategies: StrategyRecord[];
   jobs: BacktestJobSummary[];
   loading: boolean;
@@ -145,102 +150,104 @@ export function StrategyLibraryPage({
     <div className="flex flex-col gap-4">
       <StrategyLibraryToolbar search={search} onSearchChange={updateSearch} />
       <AuthoringIdentity />
-      {!loading && visible.length === 0 ? (
-        <Empty className="rounded-md border border-border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Search />
-            </EmptyMedia>
-            <EmptyTitle>{search ? '没有匹配的策略' : '还没有策略'}</EmptyTitle>
-            <EmptyDescription>
-              {search ? '调整搜索条件后重试。' : '创建第一条策略，开始记录可复现的交易假设。'}
-            </EmptyDescription>
-          </EmptyHeader>
-          {!search ? (
-            <EmptyContent>
-              <Button
-                nativeButton={false}
-                render={<Link to={strategyCenterPath.newStrategy}>创建第一条策略</Link>}
-              />
-            </EmptyContent>
-          ) : null}
-        </Empty>
-      ) : (
-        <TableContainer>
-          <table className="w-full table-fixed text-sm">
-            <thead className="border-b text-left">
-              <tr>
-                <th className="w-[34%] px-2 py-3 font-medium sm:px-4">策略名称 / 标的</th>
-                <th className="hidden w-[16%] px-4 py-3 font-medium sm:table-cell">最新版本</th>
-                <th className="w-[20%] px-2 py-3 font-medium sm:px-4">最近回测</th>
-                <th className="hidden w-[18%] px-4 py-3 font-medium sm:table-cell">更新时间</th>
-                <th
-                  data-table-action-static
-                  className="w-24 px-1 py-3 text-right font-medium whitespace-nowrap sm:px-3"
-                >
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((strategy) => {
-                const latest = latestStrategyVersion(strategy.versions);
-                const recentJob = latest
-                  ? (jobs
-                      .filter((job) => job.strategyVersionId === latest.id)
-                      .sort((left, right) =>
-                        (right.createdAt ?? '').localeCompare(left.createdAt ?? ''),
-                      )[0] ?? null)
-                  : null;
-                return (
-                  <tr key={strategy.id} className="border-b last:border-0 hover:bg-muted/20">
-                    <td className="min-w-0 px-2 py-3 sm:px-4">
-                      {latest ? (
-                        <Link
-                          className="block truncate font-medium text-foreground hover:underline"
-                          title={strategy.name}
-                          to={strategyCenterPath.strategyVersion(strategy.id, latest.id)}
-                        >
-                          {strategy.name}
-                        </Link>
-                      ) : (
-                        <span className="block truncate font-medium">{strategy.name}</span>
-                      )}
-                      <div className="mt-1 max-w-md truncate text-xs text-muted-foreground">
-                        {schemaSymbols(latest?.schema).join('、') ||
-                          strategy.description ||
-                          '未填写执行范围'}
-                      </div>
-                    </td>
-                    <td className="hidden px-4 py-3 align-top whitespace-normal sm:table-cell">
-                      {latest ? `v${latest.version}` : '无版本'}
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        共 {strategy.versions.length} 个版本
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 align-top sm:px-4">
-                      <StrategyRecentBacktest job={recentJob} />
-                    </td>
-                    <td
-                      className="hidden px-4 py-3 align-top whitespace-normal text-muted-foreground sm:table-cell"
-                      title={formatDateTime(latest?.createdAt ?? strategy.updatedAt, '未知')}
-                    >
-                      {formatDateTime(latest?.createdAt ?? strategy.updatedAt, '时间未记录')}
-                    </td>
-                    <td className="px-1 py-3 text-right align-top whitespace-nowrap sm:px-3">
-                      <StrategyLibraryAction
-                        strategy={strategy}
-                        version={latest}
-                        onBacktest={onBacktest}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </TableContainer>
-      )}
+      <ListRefreshRegion refreshing={refreshing && !loading} label="正在刷新策略列表">
+        {!loading && visible.length === 0 ? (
+          <Empty className="rounded-md border border-border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Search />
+              </EmptyMedia>
+              <EmptyTitle>{search ? '没有匹配的策略' : '还没有策略'}</EmptyTitle>
+              <EmptyDescription>
+                {search ? '调整搜索条件后重试。' : '创建第一条策略，开始记录可复现的交易假设。'}
+              </EmptyDescription>
+            </EmptyHeader>
+            {!search ? (
+              <EmptyContent>
+                <Button
+                  nativeButton={false}
+                  render={<Link to={strategyCenterPath.newStrategy}>创建第一条策略</Link>}
+                />
+              </EmptyContent>
+            ) : null}
+          </Empty>
+        ) : (
+          <TableContainer>
+            <table className="w-full table-fixed text-sm">
+              <thead className="border-b text-left">
+                <tr>
+                  <th className="w-[34%] px-2 py-3 font-medium sm:px-4">策略名称 / 标的</th>
+                  <th className="hidden w-[16%] px-4 py-3 font-medium sm:table-cell">最新版本</th>
+                  <th className="w-[20%] px-2 py-3 font-medium sm:px-4">最近回测</th>
+                  <th className="hidden w-[18%] px-4 py-3 font-medium sm:table-cell">更新时间</th>
+                  <th
+                    data-table-action-static
+                    className="w-24 px-1 py-3 text-right font-medium whitespace-nowrap sm:px-3"
+                  >
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((strategy) => {
+                  const latest = latestStrategyVersion(strategy.versions);
+                  const recentJob = latest
+                    ? (jobs
+                        .filter((job) => job.strategyVersionId === latest.id)
+                        .sort((left, right) =>
+                          (right.createdAt ?? '').localeCompare(left.createdAt ?? ''),
+                        )[0] ?? null)
+                    : null;
+                  return (
+                    <tr key={strategy.id} className="border-b last:border-0 hover:bg-muted/20">
+                      <td className="min-w-0 px-2 py-3 sm:px-4">
+                        {latest ? (
+                          <Link
+                            className="block truncate font-medium text-foreground hover:text-primary/80"
+                            title={strategy.name}
+                            to={strategyCenterPath.strategyVersion(strategy.id, latest.id)}
+                          >
+                            {strategy.name}
+                          </Link>
+                        ) : (
+                          <span className="block truncate font-medium">{strategy.name}</span>
+                        )}
+                        <div className="mt-1 max-w-md truncate text-xs text-muted-foreground">
+                          {schemaSymbols(latest?.schema).join('、') ||
+                            strategy.description ||
+                            '未填写执行范围'}
+                        </div>
+                      </td>
+                      <td className="hidden px-4 py-3 align-top whitespace-normal sm:table-cell">
+                        {latest ? `v${latest.version}` : '无版本'}
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          共 {strategy.versions.length} 个版本
+                        </div>
+                      </td>
+                      <td className="px-2 py-3 align-top sm:px-4">
+                        <StrategyRecentBacktest job={recentJob} />
+                      </td>
+                      <td
+                        className="hidden px-4 py-3 align-top whitespace-normal text-muted-foreground sm:table-cell"
+                        title={formatDateTime(latest?.createdAt ?? strategy.updatedAt, '未知')}
+                      >
+                        {formatDateTime(latest?.createdAt ?? strategy.updatedAt, '时间未记录')}
+                      </td>
+                      <td className="px-1 py-3 text-right align-top whitespace-nowrap sm:px-3">
+                        <StrategyLibraryAction
+                          strategy={strategy}
+                          version={latest}
+                          onBacktest={onBacktest}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableContainer>
+        )}
+      </ListRefreshRegion>
       {filtered.length > PAGE_SIZE ? (
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
@@ -271,12 +278,14 @@ export function StrategyLibraryPage({
 }
 
 export function StrategyVersionPage({
+  refreshing = false,
   strategies,
   loading,
   onBacktest,
   tabState,
   onTabChange,
 }: {
+  refreshing?: boolean;
   strategies: StrategyRecord[];
   loading: boolean;
   onBacktest: (strategy: StrategyRecord, version: StrategyVersion) => void;
@@ -296,9 +305,7 @@ export function StrategyVersionPage({
     return () => window.cancelAnimationFrame(frame);
   }, [loading, location.key, location.state]);
   if (loading)
-    return (
-      <div className="rounded-lg border p-6 text-sm text-muted-foreground">正在读取策略版本…</div>
-    );
+    return <LoadingState label="正在读取策略版本" />;
   if (!selection) {
     return (
       <Alert variant="destructive">
@@ -330,14 +337,10 @@ export function StrategyVersionPage({
   const activeTab =
     requestedTab === 'experiments' && !actionsAvailable ? 'definition' : requestedTab;
   const savedRiskApplicationId = searchParams.get('riskApplicationId');
-  const definitionSections =
-    summary.kind === 'ready'
-      ? summary.sections
-      : definitionRows(version).map(([label, value]) => ({ label, value }));
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
+    <div className="flex min-w-0 flex-col gap-5">
+      <header className="flex min-w-0 flex-col gap-3">
+        <div className="flex min-w-0 items-start gap-2">
           <Button
             nativeButton={false}
             render={
@@ -349,64 +352,70 @@ export function StrategyVersionPage({
             variant="ghost"
             size="icon-sm"
           />
-          <h2 className="truncate text-2xl font-semibold tracking-tight">{strategy.name}</h2>
-          <Badge variant={strategy.status === 'active' ? 'default' : 'secondary'}>
-            {strategyStatusLabel(strategy.status)}
-          </Badge>
-          <Field className="w-auto shrink-0 flex-row items-center">
-            <FieldLabel>版本</FieldLabel>
-            <Select
-              value={version.id}
-              onValueChange={(value) => {
-                if (value) void navigate(strategyCenterPath.strategyVersion(strategy.id, value));
-              }}
-            >
-              <SelectTrigger aria-label="查看策略版本">
-                <SelectValue>{versionLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {versionOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
+          <h2 className="min-w-0 wrap-anywhere text-2xl font-semibold tracking-tight">
+            {strategy.name}
+          </h2>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <Button
-            id={strategyCenterTriggerId.editVersion}
-            nativeButton={false}
-            render={
-              <Link to={strategyCenterPath.editStrategyVersion(strategy.id, version.id)}>
-                编辑当前版本
-              </Link>
-            }
-            variant="outline"
-          />
-          {actionsAvailable ? (
+        <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
+          <div className="flex items-center gap-3">
+            <Badge variant={strategy.status === 'active' ? 'default' : 'secondary'}>
+              {strategyStatusLabel(strategy.status)}
+            </Badge>
+            <Field className="w-auto shrink-0 flex-row items-center">
+              <FieldLabel>版本</FieldLabel>
+              <Select
+                value={version.id}
+                onValueChange={(value) => {
+                  if (value) void navigate(strategyCenterPath.strategyVersion(strategy.id, value));
+                }}
+              >
+                <SelectTrigger aria-label="查看策略版本">
+                  <SelectValue>{versionLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {versionOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
-              id={strategyCenterTriggerId.riskApplication}
+              id={strategyCenterTriggerId.editVersion}
               nativeButton={false}
               render={
-                <Link to={strategyCenterPath.riskApplication(strategy.id, version.id)}>
-                  生成风险规则
+                <Link to={strategyCenterPath.editStrategyVersion(strategy.id, version.id)}>
+                  编辑当前版本
                 </Link>
               }
-              variant="outline"
+              variant="ghost"
             />
-          ) : null}
-          <StrategyVersionBacktestAction
-            strategy={strategy}
-            version={version}
-            actionsAvailable={actionsAvailable}
-            onBacktest={onBacktest}
-          />
+            {actionsAvailable ? (
+              <Button
+                id={strategyCenterTriggerId.riskApplication}
+                nativeButton={false}
+                render={
+                  <Link to={strategyCenterPath.riskApplication(strategy.id, version.id)}>
+                    生成风险规则
+                  </Link>
+                }
+                variant="ghost"
+              />
+            ) : null}
+            <StrategyVersionBacktestAction
+              strategy={strategy}
+              version={version}
+              actionsAvailable={actionsAvailable}
+              onBacktest={onBacktest}
+            />
+          </div>
         </div>
-      </div>
+      </header>
       {summary.kind === 'missing' ? (
         <Alert variant="destructive">
           <AlertTitle>策略定义缺少必需信息</AlertTitle>
@@ -465,20 +474,17 @@ export function StrategyVersionPage({
             AI 实验
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="definition" className="mt-4">
-          <AuthoringVersionSource version={version} />
-          <div className="grid gap-3 md:grid-cols-2">
-            {definitionSections.map((section) => (
-              <Card key={section.label}>
-                <CardHeader className="pb-2">
-                  <CardDescription>{section.label}</CardDescription>
-                  <CardTitle className="text-base">{section.value}</CardTitle>
-                </CardHeader>
-              </Card>
-            ))}
+        <TabsContent value="definition">
+          <div className="flex min-w-0 flex-col gap-5">
+            <StrategyDefinitionFields
+              fields={summary.kind === 'ready'
+                ? summary.sections
+                : definitionRows(version).map(([label, value]) => ({ group: 'context', label, value }))}
+            />
+            <AuthoringVersionSource version={version} />
           </div>
-          <details className="mt-4 rounded-lg border p-4">
-            <summary className="cursor-pointer text-sm font-medium">诊断信息与完整定义</summary>
+          <details className="mt-4 border-t pt-3">
+            <summary className="w-fit cursor-pointer text-sm text-muted-foreground hover:text-foreground">诊断信息与完整定义</summary>
             <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
               <div>
                 <dt className="text-muted-foreground">版本技术标识</dt>
@@ -494,8 +500,8 @@ export function StrategyVersionPage({
             </pre>
           </details>
         </TabsContent>
-        <TabsContent value="versions" className="mt-4">
-          <TableContainer>
+        <TabsContent value="versions">
+          <TableContainer refreshing={refreshing} refreshLabel="正在刷新策略版本">
             <table className="w-full table-fixed text-sm">
               <thead className="border-b text-left">
                 <tr>
@@ -508,7 +514,7 @@ export function StrategyVersionPage({
                   <tr key={candidate.id} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3">
                       <Link
-                        className="font-medium text-foreground hover:underline"
+                        className="font-medium text-foreground hover:text-primary/80"
                         to={strategyCenterPath.strategyVersion(strategy.id, candidate.id)}
                       >
                         v{candidate.version}
@@ -523,37 +529,27 @@ export function StrategyVersionPage({
             </table>
           </TableContainer>
         </TabsContent>
-        <TabsContent value="backtests" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">当前版本回测</CardTitle>
-              <CardDescription>
-                当前页面只展示版本身份；任务执行与结果读取由回测任务入口承载。
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <TabsContent value="backtests">
+          <h3 className="text-xl font-semibold">当前版本回测</h3>
+          <p className="mt-2 text-sm text-muted-foreground">可在「回测任务」查看执行进度和结果。</p>
         </TabsContent>
-        <TabsContent value="experiments" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">基于当前版本创建实验</CardTitle>
-              <CardDescription>
-                实验来源会锁定为 {strategy.name} v{version.version}。
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                nativeButton={false}
-                render={
-                  <Link
-                    to={`${strategyCenterPath.newExperiment}?strategyVersionId=${encodeURIComponent(version.id)}`}
-                  >
-                    新建 AI 实验
-                  </Link>
-                }
-              />
-            </CardContent>
-          </Card>
+        <TabsContent value="experiments">
+          <div className="flex flex-col items-start gap-3">
+            <h3 className="text-xl font-semibold">基于当前版本创建实验</h3>
+            <p className="wrap-anywhere text-sm text-muted-foreground">
+              实验来源会锁定为 {strategy.name} v{version.version}。
+            </p>
+            <Button
+              nativeButton={false}
+              render={
+                <Link
+                  to={`${strategyCenterPath.newExperiment}?strategyVersionId=${encodeURIComponent(version.id)}`}
+                >
+                  新建 AI 实验
+                </Link>
+              }
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -577,7 +573,7 @@ function StrategyVersionBacktestAction({
         nativeButton={false}
         render={
           <Link to={strategyCenterPath.navBacktestSetup(strategy.id, version.id)}>
-            基金净值回测
+            开始回测
           </Link>
         }
       />

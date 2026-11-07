@@ -1,10 +1,10 @@
 import { authoringStrategySchema, type AuthoringContent } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { strategyVersionSummary } from '../strategy/strategy-version-summary.model.js';
+import { StrategyDefinitionFields } from '../strategy/StrategyDefinitionFields.js';
 import { editAuthoringDefinition } from './authoring-definition-edit.model.js';
 
 type Parameter = { path: string[]; label: string; value: string | number };
@@ -60,33 +60,18 @@ export function AuthoringDefinition({
   let preview = null;
   if (parsed.success) {
     const summary = strategyVersionSummary({ id: 'draft', version: 0, schema: parsed.data });
-    if (summary.kind === 'ready')
-      preview = (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {summary.sections.map((section) => (
-            <Card key={section.label}>
-              <CardHeader>
-                <CardDescription>{section.label}</CardDescription>
-                <CardTitle>{section.value}</CardTitle>
-              </CardHeader>
-            </Card>
-          ))}
-          <Card>
-            <CardHeader>
-              <CardDescription>交易成本</CardDescription>
-              <CardTitle>
-                佣金 {parsed.data.cost.commissionRate} · 滑点 {parsed.data.cost.slippageRate}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-      );
+    if (summary.kind === 'ready') preview = <StrategyDefinitionFields fields={summary.sections} />;
   }
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <h3 className="text-lg font-semibold">当前实际定义</h3>
+      <h3 className="text-xl font-semibold">当前实际定义</h3>
       {preview}
-      {!parsed.success && (
+      {!content.definitionText && (
+        <p className="text-sm text-muted-foreground">
+          可在高级定义编辑中补充定义，或返回确认条件重新生成。
+        </p>
+      )}
+      {!parsed.success && content.definitionText && (
         <Alert variant="destructive">
           <AlertTitle>{content.definitionText ? '定义需要修正' : '尚未生成定义'}</AlertTitle>
           <AlertDescription>
@@ -96,32 +81,30 @@ export function AuthoringDefinition({
           </AlertDescription>
         </Alert>
       )}
-      {parsed.success && (
-        <Card>
-          <CardHeader>
-            <CardTitle>指标参数与常量</CardTitle>
-            <CardDescription>
+      {parsed.success && parameters(parsed.data).length > 0 && (
+        <section className="flex max-w-3xl flex-col gap-4">
+          <div>
+            <h3 className="text-xl font-semibold">指标参数与常量</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
               这里直接编辑当前定义。修改后需重新审核需求和交易条件。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <FieldGroup>
-              {parameters(parsed.data).map((parameter) => (
-                <Field key={parameter.label}>
-                  <FieldLabel>{parameter.label}</FieldLabel>
-                  <Input
-                    aria-label={`编辑 ${parameter.label}`}
-                    disabled={disabled}
-                    value={parameter.value}
-                    onChange={(event) =>
-                      updateParameter(parameter.path, event.target.value, parameter.value)
-                    }
-                  />
-                </Field>
-              ))}
-            </FieldGroup>
-          </CardContent>
-        </Card>
+            </p>
+          </div>
+          <FieldGroup className="grid sm:grid-cols-2">
+            {parameters(parsed.data).map((parameter) => (
+              <Field key={parameter.label}>
+                <FieldLabel>{parameter.label}</FieldLabel>
+                <Input
+                  aria-label={`编辑 ${parameter.label}`}
+                  disabled={disabled}
+                  value={parameter.value}
+                  onChange={(event) =>
+                    updateParameter(parameter.path, event.target.value, parameter.value)
+                  }
+                />
+              </Field>
+            ))}
+          </FieldGroup>
+        </section>
       )}
       <details>
         <summary className="cursor-pointer text-sm font-medium">高级定义编辑</summary>

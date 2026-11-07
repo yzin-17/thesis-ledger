@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { MarketStackParams } from './navigation-types';
+import { WatchlistScreen } from '../features/watchlist/WatchlistScreen';
 import { MarketScreen } from '../features/market/MarketScreen';
 import { MarketDetailScreen } from '../features/market-detail/MarketDetailScreen';
 import { MarketStaticScreen } from '../features/market-static/MarketStaticScreen';
@@ -12,6 +13,7 @@ export function MarketNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerTitle: '', headerBackTitle: '返回' }}>
       <Stack.Screen name="MarketHome" component={MarketScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Watchlist" component={WatchlistScreen} />
       <Stack.Screen name="MarketDetail" component={MarketDetailScreen} />
       <Stack.Screen name="MarketStatic" component={MarketStaticScreen} />
       <Stack.Screen name="MarketNews" component={MarketNewsScreen} />

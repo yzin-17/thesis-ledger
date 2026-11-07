@@ -1,3 +1,7 @@
+import {
+  ArenaWeekPage, WatchlistPage, AccountDataPage, AiChat, JournalReviewWorkspace,
+  PerformanceWorkspace, ProviderSettings, RiskCenter, StrategyDashboard, MarketDataPage,
+} from './deferred-pages.js';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useEffect } from 'react';
 import { desktopPathForView, type DesktopNavigationView } from '../views.js';
@@ -7,15 +11,8 @@ import {
 } from '../features/portfolio/portfolio.queries.js';
 import { usePortfolioMode } from '../features/portfolio/portfolio-mode-context.js';
 import { AccountModeLinkNotice } from '../features/portfolio/AccountModeLinkNotice.js';
-import { AccountDataPage } from '../features/account-data/AccountDataPage.js';
-import { AiChat } from '../features/ai/AiChat.js';
 import { LegacyImportReviewRedirect } from '../features/import/LegacyImportReviewRedirect.js';
-import { JournalReviewWorkspace } from '../features/journal/review/JournalReviewWorkspace.js';
-import { PerformanceWorkspace, performanceWorkspaceTab } from './PerformanceWorkspace.js';
-import { ProviderSettings } from '../features/providers/ProviderSettings.js';
-import { RiskCenter } from '../features/risk/RiskCenter.js';
-import { StrategyDashboard } from '../features/strategy/StrategyDashboard.js';
-import { MarketDataPage } from '../features/market-data/MarketDataPage.js';
+import { performanceWorkspaceTab } from './performance-workspace-tabs.js';
 import type { PortfolioTradeReviewTarget } from '../features/portfolio/portfolio-trade.types.js';
 
 type ImportStep = 'account' | 'position' | 'screenshot';
@@ -146,6 +143,7 @@ export function AppRoutes() {
             />
           }
         />
+        <Route path="/watchlist" element={<WatchlistPage />} />
         <Route path="/import-review" element={<LegacyImportReviewRedirect />} />
         <Route path="/position-entry" element={<LegacyImportReviewRedirect />} />
         <Route
@@ -172,6 +170,7 @@ export function AppRoutes() {
             />
           }
         />
+        <Route path="/journal/model-weeklies/:match?/:id?" element={<ArenaWeekPage/>}/>
         <Route path="/strategy/*" element={<StrategyDashboard />} />
         <Route
           path="/journal"

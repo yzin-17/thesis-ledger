@@ -118,7 +118,7 @@ export function PlanEditor() {
       <QueryStatus query={accounts} retry={() => void accounts.refetch()} />
       <QueryStatus query={query} retry={() => void query.refetch()} />
       {params.kind === 'fund' && !plan ? (
-        <InstrumentPicker
+        <InstrumentPicker markets={['OF']} instrumentTypes={['MUTUAL_FUND']}
           onConfirmed={(item) => {
             if (!isFundInvestmentInstrument(item)) {
               setFeedback('请选择场外基金（000000.OF）。');
@@ -156,7 +156,7 @@ export function PlanEditor() {
         onChange={(startPeriod) => change({ startPeriod })}
         editable={!mutation.isPending && !plan}
       />
-      <Feedback message={feedback} error={mutation.isError || uncertain} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError || uncertain} />
       <Action
         label="重新核对计划"
         disabled={mutation.isPending || query.isFetching}

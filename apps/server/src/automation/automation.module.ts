@@ -9,6 +9,7 @@ import { PortfolioModule } from '../portfolio/portfolio.module.js';
 import { RiskModule } from '../risk/risk.module.js';
 import { AutomationRuntimeHandlers } from './automation-runtime.service.js';
 import { AutomationController } from './automation.controller.js';
+import { RiskMonitoringController } from './risk-monitoring.controller.js';
 import { AutomationScheduler } from './automation.scheduler.js';
 import { AutomationService } from './automation.service.js';
 import { AutomationWorkflowRunner } from './workflow-runner.service.js';
@@ -24,7 +25,7 @@ import { AutomationWorkflowRunner } from './workflow-runner.service.js';
     RecurringCashDepositModule,
     RecurringFundInvestmentModule,
   ],
-  controllers: [AutomationController],
+  controllers: [AutomationController, RiskMonitoringController],
   providers: [
     AutomationService,
     AutomationScheduler,

@@ -1,3 +1,5 @@
+import { InstrumentSymbolField } from './InstrumentSymbolField.js';
+import { Spinner } from '@/components/ui/spinner';
 import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { marketNewsReadInputSchema, type MarketNewsReadInput } from '@thesis-ledger/schemas';
@@ -11,7 +13,6 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
@@ -68,17 +69,20 @@ function NewsSearch() {
           <Field>
             <FieldLabel htmlFor="market-news-symbol">股票代码</FieldLabel>
             <div className="flex gap-2">
-              <Input
+              <InstrumentSymbolField
                 id="market-news-symbol"
+                aria-label="股票代码"
+                markets={['SH', 'SZ', 'BJ', 'US']}
+                instrumentTypes={['STOCK']}
                 value={symbol}
-                autoComplete="off"
-                onChange={(event) => {
-                  setSymbol(event.target.value);
+                onChange={(value) => {
+                  setSymbol(value);
                   setSubmitted(null);
                   setValidation(null);
                 }}
               />
-              <Button type="submit" disabled={query.isFetching}>
+              <Button aria-busy={query.isFetching} type="submit" disabled={query.isFetching}>
+                {query.isLoading && <Spinner data-icon="inline-start" aria-hidden="true" />}
                 {query.isFetching ? '正在读取…' : '读取新闻'}
               </Button>
             </div>
@@ -93,18 +97,13 @@ function NewsSearch() {
           {validation}
         </p>
       )}
-      {query.isFetching && (
-        <p role="status" className="text-sm text-muted-foreground">
-          正在读取新闻…
-        </p>
-      )}
       {query.isError && (
         <Alert variant="destructive">
           <AlertTitle>新闻未读取</AlertTitle>
           <AlertDescription>{requestFailureMessage(query.error)} 可保留代码重试。</AlertDescription>
         </Alert>
       )}
-      {query.data && <NewsResult result={query.data} heading={query.data.instrument.symbol} />}
+      {query.data && <NewsResult result={query.data} refreshing={query.isRefetching} heading={query.data.instrument.symbol} />}
     </div>
   );
 }

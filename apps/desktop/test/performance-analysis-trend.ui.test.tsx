@@ -80,12 +80,13 @@ let client: QueryClient;
 async function settle() {
   await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 }
-async function render(accountId = '', mode: 'actual' | 'shadow' = 'actual') {
+async function render(accountId = '', mode: 'actual' | 'shadow' = 'actual', refreshing = false) {
   await act(async () =>
     root.render(
       <QueryClientProvider client={client}>
         <PerformanceAnalysisTrend
           {...trend}
+          refreshing={refreshing}
           portfolio={portfolio}
           accountId={accountId}
           mode={mode}
@@ -126,6 +127,40 @@ afterEach(async () => {
 });
 
 describe('累计盈亏图表', () => {
+  it('两条曲线首次读取时在图表区域只显示一个加载圈', async () => {
+    getPnlSeries.mockImplementation(() => new Promise(() => {}));
+    await act(() => root.render(
+      <QueryClientProvider client={client}>
+        <PerformanceAnalysisTrend {...trend} loadState="loading" refreshing series={undefined}
+          portfolio={null} accountId="" mode="actual" />
+      </QueryClientProvider>,
+    ));
+    await settle();
+    expect(host.querySelectorAll('[data-slot="spinner"]')).toHaveLength(1);
+    expect(host.querySelector('[data-slot="list-refresh-region"] [data-slot="spinner"]')).not.toBeNull();
+    expect(host.textContent).not.toContain('完成数据配置');
+  });
+
+  it('两项读取共用图内的一个圈，保留原图直到较慢的刷新完成', async () => {
+    await render();
+    const chart = host.querySelector('svg[role="application"]')!;
+    expect(chart).not.toBeNull();
+    const lines = [...chart.querySelectorAll('polyline')].map(line => line.getAttribute('points'));
+    let finish!: (data: PerformancePnlResponse) => void;
+    getPnlSeries.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const pending = client.refetchQueries();
+    await render('', 'actual', true);
+    const region = chart.closest('[data-slot="list-refresh-region"]')!;
+    expect(region.querySelector('[data-slot="spinner"]')).not.toBeNull();
+    expect(host.querySelectorAll('[data-slot="spinner"]')).toHaveLength(1);
+    await render();
+    expect(host.querySelector('svg[role="application"]')).toBe(chart);
+    expect([...chart.querySelectorAll('polyline')].map(line => line.getAttribute('points'))).toEqual(lines);
+    expect(region.getAttribute('aria-busy')).toBe('true');
+    await act(async () => { finish(history); await pending; });
+    await settle();
+    expect(region.querySelector('[data-slot="spinner"]')).toBeNull();
+  });
   it('当前金额与卡片一致，区间使用中文，并支持键盘读取历史和空点', async () => {
     await render();
     expect(host.textContent).toContain('-¥58.90');
@@ -184,8 +219,8 @@ describe('累计盈亏图表', () => {
     await render();
     expect(host.textContent).toContain('历史盈亏读取失败');
     expect(host.textContent).toContain('-¥58.90');
-    await click('重试盈亏历史');
-    expect(host.querySelector('[role="alert"]')).toBeNull();
+    await click('重新加载');
+    expect(host.textContent).not.toContain('历史盈亏读取失败');
     expect(host.querySelector('svg[role="application"]')).not.toBeNull();
   });
   it('资产读取失败仍展示盈亏；盈亏失败不隐藏已有资产', async () => {

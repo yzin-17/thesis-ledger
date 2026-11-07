@@ -1,14 +1,15 @@
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { LoaderCircle } from 'lucide-react';
 
 import type { LoadState } from '../shared/types.js';
 import type {
-  PortfolioMode,
   RiskEventRecord,
   RiskRuleRecord,
   NotificationRecord,
 } from './risk.types.js';
-import { formatDateTime, riskModeLabel } from './risk.format.js';
+import { formatDateTime } from './risk.format.js';
+import { RiskMonitoringSchedule } from './RiskMonitoringSchedule.js';
 import { RiskEventTable } from './RiskSections.js';
 
 type SummaryTab = 'overview' | 'rules' | 'events' | 'notifications';
@@ -24,7 +25,7 @@ export const portfolioDataStatus = (state: LoadState) => {
 export const isPortfolioScanReady = (state: LoadState) => state === 'ready' || state === 'stale';
 
 export function RiskOverview({
-  mode,
+  eventsRefreshing = false,
   portfolioValueAt,
   portfolioState,
   loadState,
@@ -40,7 +41,7 @@ export function RiskOverview({
   onSelectTab,
   onRetryEvents,
 }: {
-  mode: PortfolioMode;
+  eventsRefreshing?: boolean;
   portfolioValueAt: string | null;
   portfolioState: LoadState;
   loadState: LoadState;
@@ -56,24 +57,21 @@ export function RiskOverview({
   onSelectTab: (tab: SummaryTab, filter?: string) => void;
   onRetryEvents?: (() => void) | undefined;
 }) {
-  const enabledRules = rules.filter((rule) => rule.enabled).length;
+  const enabledRules = rules.filter((rule) => rule.enabled && !rule.archivedAt).length;
   const criticalEvents = events.filter((event) => event.severity === 'critical').length;
   const failedNotifications = deliveries.filter((delivery) => delivery.status === 'failed').length;
   const scanReady = isPortfolioScanReady(portfolioState);
   return (
     <div className="flex flex-col gap-6">
       <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="m-0 text-lg font-semibold">监控总览</h2>
-            <p className="mt-1 mb-0 text-sm text-muted-foreground">
-              当前显示 {riskModeLabel(mode)}，规则配置对两种模式共用。
-            </p>
-          </div>
-        </div>
+        <h2 className="m-0 text-xl font-semibold">监控总览</h2>
+        <RiskMonitoringSchedule
+          enabledRules={rulesState === 'ready' || rulesState === 'empty' ? enabledRules : null}
+          onOpenRules={() => onSelectTab('rules')}
+        />
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
-          <span>组合数据：{portfolioDataStatus(portfolioState)}</span>
-          <span>数据时点：{formatDateTime(portfolioValueAt)}</span>
+          <span className="inline-flex items-center gap-1.5">组合数据：{portfolioState === 'loading' ? <Spinner aria-label="正在读取组合数据" /> : portfolioDataStatus(portfolioState)}</span>
+          <span>估值计算时间：{formatDateTime(portfolioValueAt)}</span>
           <span>风险数据更新：{formatDateTime(lastUpdatedAt)}</span>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -103,7 +101,7 @@ export function RiskOverview({
         </div>
       </section>
 
-      <section className="metrics" aria-label="风险关键指标">
+      <section className="grid grid-cols-3 gap-3" aria-label="风险关键指标">
         <SummaryMetric label="启用规则" value={enabledRules} state={rulesState} onClick={() => onSelectTab('rules')} />
         <SummaryMetric
           label="严重事件"
@@ -122,6 +120,7 @@ export function RiskOverview({
       </section>
 
       <RiskEventTable
+        refreshing={eventsRefreshing}
         loadState={loadState}
         onRetry={onRetryEvents}
         events={events}
@@ -171,9 +170,9 @@ function SummaryMetric({
   }
   return (
     <Button type="button" variant="metric" tone={tone} onClick={onClick} disabled={unavailable}>
-      <p>{label}</p>
-      <strong>{valueLabel}</strong>
-      {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
+      <p className="m-0 text-xs text-muted-foreground">{label}</p>
+      <strong className="text-2xl font-semibold break-words tabular-nums">{valueLabel}</strong>
+      {statusLabel && <span className="text-xs text-muted-foreground">{state === 'loading' ? <Spinner aria-label={statusLabel} /> : statusLabel}</span>}
     </Button>
   );
 }

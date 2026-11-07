@@ -1,12 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { evaluateCompleteRule } from '@thesis-ledger/domain';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
-import type {
-  EvaluationCandidate,
-  PortfolioMode,
-  StoredRule,
-} from './risk-types.js';
+import type { EvaluationCandidate, PortfolioMode, StoredRule } from './risk-types.js';
 
 type RiskEvaluationEvent = NonNullable<ReturnType<typeof evaluateCompleteRule>>;
 
@@ -117,9 +114,7 @@ export class RiskEventService {
     scanId: string,
     traceId: string,
   ) {
-    return stored.kind === 'trailing-stop'
-      ? this.persistTrailingEvent(stored, candidate, event, scanId, traceId)
-      : this.persistRegularEvent(stored, candidate, event, scanId, traceId);
+    return this.persistTransitionEvent(stored, candidate, event, scanId, traceId);
   }
 
   history(mode: PortfolioMode = 'actual', options: { cursor?: string; limit?: number } = {}) {
@@ -211,131 +206,33 @@ export class RiskEventService {
     }
   }
 
-  private async persistRegularEvent(
-    stored: StoredRule,
-    candidate: EvaluationCandidate,
-    event: RiskEvaluationEvent,
-    scanId: string,
-    traceId: string,
-  ): Promise<{ eventId?: string; created: boolean }> {
-    const triggerState = this.riskRuleTriggerStateDelegate();
-    const dedupeKey = this.eventDedupeKey(scanId, stored, candidate);
-    if (!triggerState) {
-      if (!event.triggered) return { created: false };
-      return this.persistRiskEvent(stored, candidate, event, scanId, traceId, dedupeKey);
-    }
-
-    const targetKey = candidate.accountId ?? 'all';
-    const symbol = candidate.symbol ?? candidate.domain.symbol;
-    return this.withTransaction(async (client) => {
-      const stateDelegate = this.riskRuleTriggerStateDelegate(client);
-      if (!stateDelegate) throw new Error('RiskRuleTriggerState 数据访问不可用');
-      let state = await stateDelegate.findUnique({
-        where: {
-          ruleId_targetKey_symbol_mode: {
-            ruleId: stored.id,
-            targetKey,
-            symbol,
-            mode: candidate.mode,
-          },
-        },
-      });
-      if (!state && !event.triggered) return { created: false };
-      if (!state) {
-        state = await stateDelegate.upsert({
-          where: {
-            ruleId_targetKey_symbol_mode: {
-              ruleId: stored.id,
-              targetKey,
-              symbol,
-              mode: candidate.mode,
-            },
-          },
-          create: {
-            id: crypto.randomUUID(),
-            ruleId: stored.id,
-            targetKey,
-            symbol,
-            mode: candidate.mode,
-            ...(candidate.domain.positionId === undefined
-              ? {}
-              : { positionId: candidate.domain.positionId }),
-            ruleVersion: stored.version,
-            breachActive: false,
-          },
-          update: { ruleVersion: stored.version },
-        });
-      }
-
-      const positionChanged =
-        candidate.domain.positionId !== undefined &&
-        state.positionId !== candidate.domain.positionId;
-      const versionChanged = state.ruleVersion !== stored.version;
-      if (positionChanged || versionChanged) {
-        state = await stateDelegate.update({
-          where: { id: state.id },
-          data: {
-            ...(candidate.domain.positionId === undefined
-              ? {}
-              : { positionId: candidate.domain.positionId }),
-            ruleVersion: stored.version,
-            breachActive: false,
-            activeEventId: null,
-            lastScanId: null,
-            triggeredAt: null,
-          },
-        });
-      }
-
-      if (!event.triggered) {
-        if (state.activeEventId !== null) {
-          await stateDelegate.update({
-            where: { id: state.id },
-            data: {
-              breachActive: false,
-              activeEventId: null,
-              lastScanId: scanId,
-              triggeredAt: null,
-            },
-          });
-        }
-        return { created: false };
-      }
-
-      if (state.activeEventId && state.lastScanId === scanId)
-        return { eventId: state.activeEventId, created: false };
-      if (candidate.mode === 'actual' && state.activeEventId) {
-        const deliveryStatus = await this.notifications.subjectDeliveryStatus({
-          type: 'risk-event',
-          id: state.activeEventId,
-        });
-        if (deliveryStatus.shouldRetry) return { eventId: state.activeEventId, created: false };
-      }
-
-      const outcome = await this.persistRiskEvent(
-        stored,
-        candidate,
-        event,
-        scanId,
-        traceId,
-        dedupeKey,
-        client,
-      );
-      await stateDelegate.update({
-        where: { id: state.id },
-        data: {
-          ruleVersion: stored.version,
-          breachActive: false,
-          activeEventId: outcome.eventId,
-          lastScanId: scanId,
-          triggeredAt: new Date(),
-        },
-      });
-      return outcome;
-    });
+  private async lockRuleForEvaluation(client: PrismaService, stored: StoredRule, target: string) {
+    if (typeof client.$queryRaw !== 'function') return true;
+    await client.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${target}))`);
+    const current = await client.$queryRaw<
+      Array<{
+        version: number;
+        enabled: boolean;
+        needsRepair: boolean;
+        archivedAt: Date | null;
+        effectiveAt: Date;
+      }>
+    >(Prisma.sql`
+      SELECT "version", "enabled", "needsRepair", "archivedAt", "effectiveAt"
+      FROM "RiskRule" WHERE "id"=${stored.id}::uuid FOR SHARE
+    `);
+    const rule = current[0];
+    return Boolean(
+      rule &&
+      rule.version === stored.version &&
+      rule.enabled &&
+      !rule.needsRepair &&
+      !rule.archivedAt &&
+      rule.effectiveAt <= new Date(),
+    );
   }
 
-  private async persistTrailingEvent(
+  private async persistTransitionEvent(
     stored: StoredRule,
     candidate: EvaluationCandidate,
     event: RiskEvaluationEvent,
@@ -352,6 +249,14 @@ export class RiskEventService {
     const targetKey = candidate.accountId ?? 'all';
     const symbol = candidate.symbol ?? candidate.domain.symbol;
     return this.withTransaction(async (client) => {
+      if (
+        !(await this.lockRuleForEvaluation(
+          client,
+          stored,
+          [stored.id, targetKey, symbol, candidate.mode].join(':'),
+        ))
+      )
+        return { created: false };
       const stateDelegate = this.riskRuleTriggerStateDelegate(client);
       if (!stateDelegate) throw new Error('RiskRuleTriggerState 数据访问不可用');
       let state = await stateDelegate.findUnique({
@@ -426,7 +331,7 @@ export class RiskEventService {
         return { created: false };
       }
 
-      if (state.breachActive && state.activeEventId) {
+      if (state.activeEventId) {
         return { eventId: state.activeEventId, created: false };
       }
 

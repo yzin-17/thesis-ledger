@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,7 +8,6 @@ import {
 } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import { researchKeys, useResearchIdentity } from './research.queries.js';
-
 interface ObservationCommand {
   input: ResearchObservationSubmissionInput;
   state: 'pending' | 'unknown' | 'succeeded' | 'failed';
@@ -58,7 +58,7 @@ export function useResearchObservation(
     if (controller.current || mutation.isPending) return;
     let body = command?.input;
     if (!command || command.state === 'succeeded' || command.state === 'failed')
-      body = { submissionId: crypto.randomUUID(), claimId, asOf: new Date().toISOString() };
+      body = { submissionId: createClientRequestId(), claimId, asOf: new Date().toISOString() };
     if (!body) return;
     save({ input: body, state: 'pending' });
     mutation.mutate(body);

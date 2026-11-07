@@ -6,12 +6,14 @@ import type {
 } from '@thesis-ledger/schemas';
 import type { ChartData, ChartLine } from '../../platform/charts/chart-document';
 export type MobileInstrument = {
+  instrumentId?: string;
   symbol: string;
   name: string;
   assetType: 'STOCK' | 'ETF' | 'MUTUAL_FUND' | 'INDEX' | 'UNKNOWN';
   market: 'CN' | 'HK' | 'US' | 'UNKNOWN';
 };
 export function mobileInstrument(input: {
+  id?: string;
   symbol: string;
   displayName?: string;
   instrumentType?: string;
@@ -28,7 +30,7 @@ export function mobileInstrument(input: {
   if (/\.(SH|SZ|BJ|OF)$/.test(input.symbol)) market = 'CN';
   else if (input.symbol.endsWith('.HK')) market = 'HK';
   else if (input.symbol.endsWith('.US')) market = 'US';
-  return { symbol: input.symbol, name: input.displayName ?? input.symbol, assetType, market };
+  return { ...(input.id ? {instrumentId:input.id} : {}), symbol: input.symbol, name: input.displayName ?? input.symbol, assetType, market };
 }
 export type MarketChartFilters = {
   timeframe: MarketTimeframe;

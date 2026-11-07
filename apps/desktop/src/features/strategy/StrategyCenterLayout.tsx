@@ -8,6 +8,7 @@ const entries = [
   { value: 'library', to: '/strategy/library', label: '策略库' },
   { value: 'jobs', to: '/strategy/jobs', label: '回测任务' },
   { value: 'experiments', to: '/strategy/experiments', label: 'AI 实验' },
+  {value:'arena',to:'/strategy/arena',label:'模型竞技场'},
 ] as const;
 
 export function StrategyCenterLayout({
@@ -21,7 +22,7 @@ export function StrategyCenterLayout({
 }) {
   return (
     <section className="module-page">
-      <PageHeader title="策略中心" actions={actions} />
+      <PageHeader className="mb-card" eyebrow="STRATEGY CENTER" title="策略中心" actions={actions} />
       <Tabs value={value}>
         <TabsList
           variant="line"
@@ -40,7 +41,7 @@ export function StrategyCenterLayout({
           ))}
         </TabsList>
       </Tabs>
-      <div className="pt-3">{children}</div>
+      <div className="pt-group">{children}</div>
     </section>
   );
 }

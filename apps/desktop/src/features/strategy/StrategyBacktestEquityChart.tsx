@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { formatRatioPercent } from '@thesis-ledger/domain';
 import { ArrowLeft, ArrowRight, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDateTimeInTimeZone } from '@/lib/date-display';
@@ -75,9 +76,12 @@ export function StrategyBacktestEquityChart({
           ref={chart.containerRef}
           tabIndex={0}
           role="region"
-          aria-label="权益与回撤联动图表。方向键平移，加减键缩放，Home 键重置。"
+          aria-label="权益与回撤联动图表。上下键逐点查看，左右键平移，加减键缩放，Home 键重置。"
           onKeyDown={(event) => {
-            if (event.key === '+' || event.key === '=') chart.changeRange('zoomIn');
+            if (event.key === 'ArrowUp') chart.stepPoint(-1);
+            else if (event.key === 'ArrowDown') chart.stepPoint(1);
+            else if (event.key === 'Escape') chart.clearPoint();
+            else if (event.key === '+' || event.key === '=') chart.changeRange('zoomIn');
             else if (event.key === '-') chart.changeRange('zoomOut');
             else if (event.key === 'ArrowLeft') chart.changeRange('earlier');
             else if (event.key === 'ArrowRight') chart.changeRange('later');
@@ -88,7 +92,7 @@ export function StrategyBacktestEquityChart({
           className="h-[430px] w-full min-w-0 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-ring [&_table]:h-auto [&_table]:min-w-0 [&_table]:w-auto [&_td]:min-w-0 [&_td]:p-0"
         />
         {chart.activeTime !== null && (
-          <div className="pointer-events-none absolute left-3 top-3 rounded-md border bg-popover/95 px-3 py-2 text-xs shadow-sm">
+          <div role="status" className="pointer-events-none absolute left-3 top-3 rounded-md border bg-popover/95 px-3 py-2 text-xs shadow-sm">
             <p className="font-medium">
               {formatDateTimeInTimeZone(chart.activeTime, model.timezone)}
               {chart.lockedTime !== null ? ' · 已锁定' : ''}
@@ -96,15 +100,21 @@ export function StrategyBacktestEquityChart({
             <p className="mt-1">
               组合权益：{activeEquity ? formatMoney(activeEquity.value) : '该时点缺失'}
             </p>
+            {activeEquity && (
+              <>
+                <p>现金：{activeEquity.cash === null ? '不可用' : formatMoney(activeEquity.cash)}</p>
+                <p>持仓市值：{activeEquity.positionsValue === null ? '不可用' : formatMoney(activeEquity.positionsValue)}</p>
+              </>
+            )}
             <p>
               回撤：
-              {activeDrawdown ? `${(activeDrawdown.value * 100).toFixed(2)}%` : '该时点缺失'}
+              {activeDrawdown ? formatRatioPercent(activeDrawdown.value) : '该时点缺失'}
             </p>
           </div>
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        可拖动平移、捏合缩放或使用按钮与键盘；点按时点可锁定提示。页头指标始终保持全任务口径。
+        点按锁定时点，上下键逐点查看。拖动平移，捏合缩放。
       </p>
     </div>
   );

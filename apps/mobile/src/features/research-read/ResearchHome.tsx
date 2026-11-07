@@ -11,7 +11,7 @@ import {
   Copy,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 import { runStatusLabels } from '../journal-ai/JournalAiPanel';
@@ -98,21 +98,28 @@ export function ResearchHome() {
       />
       <Field label="研究搜索" value={input} onChange={setInput} />
       <Action label="筛选研究" onPress={() => setSearch(input.trim())} />
-      <QueryStatus query={query} empty={!rows.length} retry={() => void query.refetch()} />
-      {rows.map((row) => (
-        <Section key={row.id} title={row.question ?? '研究报告'}>
-          <Copy>
-            {runStatusLabels[row.status] ?? '状态待核对'} · {row.createdAt}
-          </Copy>
-          <Copy>{row.summary ?? row.errorSummary ?? '暂无摘要'}</Copy>
-          <Action
-            label={`打开报告 ${row.id}`}
-            onPress={() => navigation.navigate('ResearchReport', { id: row.id, locator })}
-          />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={!rows.length}
+        retry={() => void query.refetch()}
+        label="正在刷新研究列表"
+      >
+        {rows.map((row) => (
+          <Section key={row.id} title={row.question ?? '研究报告'}>
+            <Copy>
+              {runStatusLabels[row.status] ?? '状态待核对'} · {row.createdAt}
+            </Copy>
+            <Copy>{row.summary ?? row.errorSummary ?? '暂无摘要'}</Copy>
+            <Action
+              label={`打开报告 ${row.id}`}
+              onPress={() => navigation.navigate('ResearchReport', { id: row.id, locator })}
+            />
+          </Section>
+        ))}
+      </QueryList>
       {query.hasNextPage ? (
         <Action
+          busy={query.isFetchingNextPage}
           label="更多研究报告"
           disabled={query.isFetching}
           onPress={() => void query.fetchNextPage()}

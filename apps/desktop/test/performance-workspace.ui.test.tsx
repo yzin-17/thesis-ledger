@@ -202,10 +202,18 @@ async function mount(url: string) {
   await settle();
 }
 async function settle() {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  await vi.waitFor(
+    async () => {
+      await act(async () => {
+        await vi.dynamicImportSettled();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(document.querySelector('[aria-label="正在打开页面"]')).toBeNull();
+    },
+    { timeout: 5000 },
+  );
 }
+
 async function click(text: string, selector = 'button') {
   let button: HTMLElement | undefined;
   await vi.waitFor(async () => {
@@ -231,8 +239,8 @@ async function fill(label: string, value: string) {
   });
 }
 const params = () => new URLSearchParams(router.state.location.search);
-async function chooseAccount(name: string) {
-  const trigger = document.querySelector<HTMLButtonElement>('button[aria-label="收益账户范围"]')!;
+async function chooseAccount(name: string, label = '收益账户范围') {
+  const trigger = document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
   await act(async () => {
     trigger.click();
     await Promise.resolve();
@@ -253,6 +261,22 @@ async function chooseAccount(name: string) {
 }
 
 describe('收益分析统一工作区的真实路由', () => {
+  it('清除交易筛选保持 URL 账户参数，返回概览仍读取同一账户', async () => {
+    await mount('/performance?accountId=a&tab=trades');
+    await chooseAccount('进行中', '交易生命周期');
+    expect(calls.trades).toHaveBeenLastCalledWith(
+      expect.objectContaining({ accountId: 'a', lifecycle: 'ACTIVE' }),
+    );
+    await click('清除筛选');
+    expect(params().get('accountId')).toBe('a');
+    expect(params().get('tab')).toBe('trades');
+    expect(host.querySelector('[aria-label="收益账户范围"]')?.textContent).toContain('实际甲');
+    expect(calls.trades.mock.calls.every(([query]) => query.accountId === 'a')).toBe(true);
+    await click('组合概览', '[role="tab"]');
+    expect(params().get('accountId')).toBe('a');
+    expect(calls.valuation).toHaveBeenCalledWith('actual', 'a', undefined);
+  });
+
   it('单账户链接等待账户列表校验后才读取该账户', async () => {
     let finish!: (value: Account[]) => void;
     calls.accounts.mockReturnValueOnce(
@@ -317,7 +341,12 @@ describe('收益分析统一工作区的真实路由', () => {
       expect(calls.pnl).toHaveBeenCalledTimes(2);
     });
     await click('配置目标', '[role="tab"]');
-    expect(host.textContent).toContain('配置与目标');
+    const allocationHeading = [...host.querySelectorAll('h2')].find(
+      (heading) => heading.textContent === '配置与目标',
+    );
+    expect(allocationHeading).toBeDefined();
+    const panel = allocationHeading!.closest('[role="tabpanel"]')!;
+    expect(panel.firstElementChild?.firstElementChild?.contains(allocationHeading!)).toBe(true);
     expect(host.textContent).not.toContain('时间加权收益率');
     await chooseAccount('实际乙');
     expect(params().get('accountId')).toBe('b');
@@ -365,6 +394,8 @@ describe('收益分析统一工作区的真实路由', () => {
     });
     await click('配置目标', '[role="tab"]');
     await click('调整目标');
+    expect(document.querySelector('[role="dialog"] input[aria-label="股票目标权重百分比"]')).not.toBeNull();
+    expect(host.querySelector('table input')).toBeNull();
     await fill('股票目标权重百分比', '70');
     await fill('基金目标权重百分比', '30');
     await act(async () => {
@@ -453,7 +484,7 @@ describe('收益分析统一工作区的真实路由', () => {
     ).toBe('70');
     calls.save.mockRejectedValueOnce(new Error('受控保存失败'));
     await click('保存目标');
-    expect(host.textContent).toContain('受控保存失败');
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('受控保存失败');
     expect(
       document.querySelector<HTMLInputElement>('input[aria-label="股票目标权重百分比"]')?.value,
     ).toBe('70');

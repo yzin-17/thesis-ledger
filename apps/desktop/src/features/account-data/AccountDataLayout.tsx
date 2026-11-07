@@ -1,10 +1,10 @@
 import { PageHeader } from '../shared/PageHeader.js';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 
 export function AccountDataFrame({ children }: { children: React.ReactNode }) {
   return (
     <section className="module-page" data-account-data-page>
-      <div className="flex w-full max-w-7xl flex-col gap-6">{children}</div>
+      <div className="flex w-full max-w-7xl flex-col gap-card">{children}</div>
     </section>
   );
 }
@@ -12,9 +12,8 @@ export function AccountDataFrame({ children }: { children: React.ReactNode }) {
 export function AccountDataLoading() {
   return (
     <AccountDataFrame>
-      <PageHeader className="mb-0" eyebrow="ACCOUNT DATA" title="账户数据" />
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-96 w-full" />
+      <PageHeader eyebrow="ACCOUNT DATA" title="账户数据" />
+      <LoadingState label="正在加载账户数据" />
     </AccountDataFrame>
   );
 }

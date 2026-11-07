@@ -171,6 +171,10 @@ export const instrumentSearchResultSchema = z
   })
   .passthrough();
 
+export const instrumentLocatorSchema = instrumentSearchResultSchema.pick({
+  symbol: true, instrumentType: true,
+}).strict();
+export const instrumentLocatorResultSchema = z.object({instrumentId: z.uuid().nullable()}).strict();
 export const instrumentSearchResponseSchema = z.array(instrumentSearchResultSchema);
 
 export const dataQualityIssueInputSchema = z.object({

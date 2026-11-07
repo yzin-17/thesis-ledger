@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -29,6 +30,7 @@ type ScreenshotImportContentProps = {
   embedded: boolean;
   busyAction: string | null;
   loadState: LoadState;
+  refreshing: boolean;
   drafts: ImportDraftRecord[];
   selected: ImportDraftRecord | null;
   rows: ImportRow[];
@@ -219,6 +221,7 @@ export function ScreenshotImportReview({
       embedded={embedded}
       busyAction={busyAction}
       loadState={loadState}
+      refreshing={draftsQuery.isFetching}
       drafts={drafts}
       selected={selected}
       rows={rows}
@@ -247,6 +250,7 @@ function ScreenshotImportContent({
   embedded,
   busyAction,
   loadState,
+  refreshing,
   drafts,
   selected,
   rows,
@@ -272,7 +276,7 @@ function ScreenshotImportContent({
     <div
       className={cn(
         'import-screenshot-content',
-        embedded && 'embedded min-h-0 content-start overflow-auto',
+        embedded && 'embedded -mx-1 -my-1 min-h-0 content-start overflow-auto scroll-p-2 px-1 py-1',
       )}
     >
       {!embedded && (
@@ -282,7 +286,9 @@ function ScreenshotImportContent({
         </div>
       )}
       <Button
-        className="secondary mb-[18px]"
+        className="secondary mb-group"
+        aria-busy={refreshing}
+        disabled={!accountId || refreshing}
         type="button"
         variant="outline"
         onClick={() => {
@@ -313,12 +319,14 @@ function ScreenshotImportContent({
         onRetry={accountId ? () => void loadDrafts(accountId) : undefined}
       />
       <div className="review-layout">
-        <ScreenshotImportDraftList
-          loadState={loadState}
-          drafts={drafts}
-          selectedId={selected?.id ?? null}
-          onChoose={choose}
-        />
+        <ListRefreshRegion refreshing={refreshing && loadState !== 'loading'} label="正在刷新导入历史">
+          <ScreenshotImportDraftList
+            loadState={loadState}
+            drafts={drafts}
+            selectedId={selected?.id ?? null}
+            onChoose={choose}
+          />
+        </ListRefreshRegion>
         <div className="review-table">
           <ScreenshotImportEditor
             selected={selected}

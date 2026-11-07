@@ -124,7 +124,7 @@ export function CashObservationSheet({
 
   const requestClose = useDraftCloseGuard({
     open,
-    draft: null,
+    draft: { accountId: account.id, amount, currency, capturedAt },
     dirty,
     busy,
     onOpenChange: handleOpenChange,
@@ -145,7 +145,7 @@ export function CashObservationSheet({
             className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={(event) => void submit(event)}
           >
-            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto scroll-p-2 px-1 py-1">
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="cash-observation-currency">币种</FieldLabel>

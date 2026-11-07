@@ -1,5 +1,6 @@
 import {
   riskRuleInputSchema,
+  riskAutomaticMonitoringStatusSchema,
   riskRuleUpdateSchema,
   riskRuleResponseSchema,
   riskRulesResponseSchema,
@@ -25,6 +26,7 @@ export function riskManagementClient(request: Request) {
   const read = <T>(path: string, schema: Schema<T>, signal?: AbortSignal) =>
     request(path, schema, { cache: 'no-store', ...(signal ? { signal } : {}) });
   return {
+    monitoring: (signal?: AbortSignal) => read('/risk/monitoring', riskAutomaticMonitoringStatusSchema, signal),
     getRules: (params: { includeArchived?: boolean } = {}, signal?: AbortSignal) =>
       read(
         `/risk/rules${params.includeArchived ? '?includeArchived=true' : ''}`,

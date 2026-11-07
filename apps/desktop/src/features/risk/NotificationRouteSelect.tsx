@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { FieldDescription } from '@/components/ui/field';
 import {
   Select,
@@ -28,17 +29,17 @@ export function NotificationRouteSelect({
   disabled?: boolean;
 }) {
   const selectedRoute = routes.find((route) => route.channel === value);
-  let placeholder = '选择通知 Provider';
-  let description = '仅展示已配置、已启用且凭证有效的通知 Provider。';
+  let placeholder = '选择通知提供方';
+  let description = '仅展示已配置、已启用且凭证有效的通知提供方。';
   if (routingState === 'loading') {
-    placeholder = '正在读取通知 Provider…';
-    description = '正在确认当前可投递的通知 Provider。';
+    placeholder = '正在读取通知提供方…';
+    description = '正在确认当前可投递的通知提供方。';
   } else if (routingState === 'error') {
-    placeholder = '通知 Provider 读取失败';
-    description = '暂时无法确认可投递的通知 Provider，请稍后重试。';
+    placeholder = '通知提供方 读取失败';
+    description = '暂时无法确认可投递的通知提供方，请稍后重试。';
   } else if (routes.length === 0) {
-    placeholder = '没有可用的通知 Provider';
-    description = '请先在 Provider 页面配置并启用消息 Provider。';
+    placeholder = '没有可用的通知提供方';
+    description = '请先在提供方页面配置并启用消息提供方。';
   } else if (selectedRoute) {
     description = `当前使用 ${notificationRouteLabel(selectedRoute)}。`;
   }
@@ -57,6 +58,7 @@ export function NotificationRouteSelect({
         disabled={disabled || routingState !== 'ready' || routes.length === 0}
       >
         <SelectTrigger aria-label={ariaLabel} className="w-full">
+          {routingState === 'loading' && <Spinner aria-hidden="true" />}
           <SelectValue placeholder={placeholder}>
             {selectedRoute ? notificationRouteLabel(selectedRoute) : placeholder}
           </SelectValue>

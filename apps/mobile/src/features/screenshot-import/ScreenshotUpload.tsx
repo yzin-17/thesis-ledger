@@ -89,6 +89,7 @@ export function ScreenshotUpload({
       />
       <Feedback message={feedback} error={upload.isError} />
       <Action
+        busy={upload.isPending}
         label={upload.isPending ? '上传中…' : '上传为草稿'}
         primary
         disabled={disabled || !file || upload.isPending}

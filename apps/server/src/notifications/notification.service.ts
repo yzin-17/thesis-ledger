@@ -1,3 +1,4 @@
+import { cancelInactiveRiskDeliveries } from './risk-delivery-validity.js';
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { Severity } from '@thesis-ledger/domain';
@@ -254,7 +255,9 @@ export class NotificationService {
         try {
           return await this.prisma.notificationDelivery.upsert({
             where: { dedupKey_channel: { dedupKey: deliveryDedupKey, channel } },
-            update: { status: 'pending', scheduledAt, message: messageSnapshot },
+            // Repeated enqueue must not reopen a delivered/terminal subject or
+            // rewrite its frozen message, even when critical bypasses cooldown.
+            update: {},
             create: {
               subjectType: subject.type,
               subjectId: subject.id,
@@ -290,8 +293,7 @@ export class NotificationService {
       subjectType: subject.type,
       subjectId: subject.id,
       statuses,
-      shouldRetry:
-        deliveries.length === 0 || statuses.some((status) => ['failed', 'error'].includes(status)),
+      shouldRetry: deliveries.length === 0,
     };
   }
 
@@ -366,6 +368,11 @@ export class NotificationService {
       )
         return { skipped: true, reason: '通知当前不可投递' } as const;
 
+      if (
+        delivery.subjectType === 'risk-event' &&
+        (await cancelInactiveRiskDeliveries(this.prisma, id))
+      )
+        return { skipped: true, reason: '风险规则当前不可投递' } as const;
       try {
         const provider = await this.resolveProvider(delivery.channel, delivery.provider);
         const message = messageOverride ?? this.messageForDelivery(delivery);

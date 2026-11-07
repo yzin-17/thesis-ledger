@@ -40,7 +40,8 @@ export async function readQuoteBatch(
 }
 
 export function quoteBatchFailure(error: unknown) {
-  const code = error instanceof DsaError ? error.code : 'unavailable';
+  let code = 'unavailable';
+  if (error instanceof DsaError) code = error.sourceReason === 'request_budget_cooldown' ? 'request_budget_cooldown' : error.code;
   const reason = error instanceof DsaError ? error.sourceReason : undefined;
   return {
     code,

@@ -383,6 +383,8 @@ const mount = async (
   });
   requestMarketDetailMock.mockImplementationOnce(() => opening.promise);
   useQueryMock.mockImplementation((options: { queryKey: readonly unknown[]; queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => {
+    if (options.queryKey[0] === 'market' && options.queryKey[1] === 'fund-daily-error')
+      return { data: null, isSuccess: true };
     if (['market-period-options', 'market-minute-options', 'market-derived-minute-options', 'market-trade-chart'].includes(String(options.queryKey[1]))) return { data: { options: [] }, isSuccess: true };
     const [state, setState] = useState({ data: cached, isPending: false, isError: false, isFetching: true });
     useEffect(() => {
@@ -444,6 +446,9 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
       include: ['fund-nav', 'fund-nav-history'],
       navLimit: 90,
     });
+    expect(useQueryMock).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['market', 'fund-daily-error', symbol] }),
+    );
     mounted.opening.resolve(current);
     await act(flushAsync);
     await act(async () => { mounted.root.unmount(); await flushAsync(); });

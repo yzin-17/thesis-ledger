@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { identitySessionSchema } from '@thesis-ledger/schemas';
@@ -61,10 +62,12 @@ export function AuthoringIdentity({ disabled = false }: { disabled?: boolean }) 
       <div className="flex flex-wrap items-center gap-3">
         <span>编写用户：{session.principal.displayName}</span>
         <Button
+          aria-busy={logout.isPending}
           variant="outline"
           disabled={disabled || logout.isPending}
           onClick={() => logout.mutate()}
         >
+          {logout.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           退出登录
         </Button>
         <Button
@@ -155,7 +158,8 @@ export function AuthoringIdentity({ disabled = false }: { disabled?: boolean }) 
             <AlertDescription>{authenticate.error.message}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" disabled={authenticate.isPending}>
+        <Button aria-busy={authenticate.isPending} type="submit" disabled={authenticate.isPending}>
+          {authenticate.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {authenticate.isPending ? '正在处理…' : '继续编写'}
         </Button>
       </FieldGroup>

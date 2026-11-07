@@ -9,7 +9,7 @@ import {
   Copy,
   Feedback,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 import { useConfigCommand } from '../configuration/use-config-command';
@@ -66,53 +66,55 @@ export function AutomationsScreen({
       }
     >
       <Copy muted>任务由服务端调度。账户范围不隔离全局自动化；立即执行与定时启停分别控制。</Copy>
-      <Feedback message={message} />
-      <QueryStatus
-        query={query}
-        empty={query.data?.length === 0}
-        retry={() => void query.refetch()}
-      />
+      <Feedback busy={command.pending} message={message} />
       <Action
         label="重新读取自动化"
         disabled={query.isFetching}
         onPress={() => void query.refetch()}
       />
       <Action label="全部运行历史" onPress={() => navigation.navigate('AutomationHistory')} />
-      {query.data?.map((row) => (
-        <Section key={row.id} title={row.name}>
-          <Copy>
-            {automationTypeLabel(row.type)} · {row.enabled ? '已启用' : '已停用'} ·{' '}
-            {row.managed ? '系统托管任务' : '自建任务'}
-          </Copy>
-          <Copy>
-            {row.cron} / {row.timezone}；下次运行 {row.nextRunAt ?? '未安排'}
-          </Copy>
-          <Action
-            label={`编辑任务 ${row.name}`}
-            onPress={() => navigation.navigate('AutomationEditor', { id: row.id })}
-          />
-          <Action
-            label={`查看历史 ${row.name}`}
-            onPress={() => navigation.navigate('AutomationHistory', { id: row.id })}
-          />
-          <Action
-            label={`${row.enabled ? '停用任务' : '启用任务'} ${row.name}`}
-            disabled={command.pending || query.isError}
-            onPress={() => void act(row, 'toggle')}
-          />
-          <Action
-            label={`立即执行 ${row.name}`}
-            disabled={command.pending || query.isError}
-            onPress={() => void act(row, 'run')}
-          />
-          <Action
-            label={`删除任务 ${row.name}`}
-            disabled={command.pending || query.isError || row.managed === true}
-            destructive
-            onPress={() => void act(row, 'remove')}
-          />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={query.data?.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新自动化任务"
+      >
+        {query.data?.map((row) => (
+          <Section key={row.id} title={row.name}>
+            <Copy>
+              {automationTypeLabel(row.type)} · {row.enabled ? '已启用' : '已停用'} ·{' '}
+              {row.managed ? '系统托管任务' : '自建任务'}
+            </Copy>
+            <Copy>
+              {row.cron} / {row.timezone}；下次运行 {row.nextRunAt ?? '未安排'}
+            </Copy>
+            <Action
+              label={`编辑任务 ${row.name}`}
+              onPress={() => navigation.navigate('AutomationEditor', { id: row.id })}
+            />
+            <Action
+              label={`查看历史 ${row.name}`}
+              onPress={() => navigation.navigate('AutomationHistory', { id: row.id })}
+            />
+            <Action
+              label={`${row.enabled ? '停用任务' : '启用任务'} ${row.name}`}
+              disabled={command.pending || query.isError}
+              onPress={() => void act(row, 'toggle')}
+            />
+            <Action
+              label={`立即执行 ${row.name}`}
+              disabled={command.pending || query.isError}
+              onPress={() => void act(row, 'run')}
+            />
+            <Action
+              label={`删除任务 ${row.name}`}
+              disabled={command.pending || query.isError || row.managed === true}
+              destructive
+              onPress={() => void act(row, 'remove')}
+            />
+          </Section>
+        ))}
+      </QueryList>
     </Page>
   );
 }

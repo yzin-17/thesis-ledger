@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -170,10 +171,12 @@ export function JournalPeriodReview({
           />
         </Field>
         <Button
+          aria-busy={analysis.isPending}
           className="self-end justify-self-start md:col-span-3 xl:col-span-1"
           disabled={analysis.isPending}
           onClick={() => analysis.mutate()}
         >
+          {analysis.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {analysis.isPending ? '分析中…' : '分析周期'}
         </Button>
       </FieldGroup>

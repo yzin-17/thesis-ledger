@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { JournalCandidateWindowFilter } from './JournalCandidateWindowFilter.js';
 import { getDesktopApiClient } from '@/shared/api/client';
 import { StickyTableActionCell, StickyTableActionHeader } from '../../shared/StickyTableActions.js';
@@ -80,7 +81,7 @@ export function JournalCandidateBrowser({
       </div>
       <JournalCandidateWindowFilter accountId={accountId} mode={mode} window={window}
         onApply={(nextWindow) => { setWindow(nextWindow); onWindowApplied(); }} />
-      {query.isPending && <Skeleton className="h-40 w-full" />}
+      {query.isPending && <LoadingState label="正在读取复盘候选" />}
       {query.isError && (
         <JournalRequestError
           title="候选读取失败"
@@ -90,65 +91,69 @@ export function JournalCandidateBrowser({
           }}
         />
       )}
-      {rows.length === 0 && !query.isError && !query.isPending && (
-        <JournalEmpty
-          title="没有可复盘对象"
-          description="当前范围没有可读取的交易周期或减仓。只有持仓或基线观察时，历史成交证据仍可能不足。"
-        />
-      )}
-      {rows.length > 0 && (
-        <Table className="min-w-[32rem]">
-          <TableHeader>
-            <TableRow>
-              <TableHead>标的与粒度</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead>统计资格</TableHead>
-              <StickyTableActionHeader className="h-10 w-28 min-w-28 px-2 align-middle font-medium whitespace-nowrap">
-                选择
-              </StickyTableActionHeader>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow
-                key={row.input.reference.reviewObjectId}
-                data-state={selectedId === row.input.reference.reviewObjectId ? 'selected' : undefined}
-              >
-                <TableCell>
-                  <p>{instrumentLabel(row.input.trade.symbol)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {reviewObjectLabels[row.input.reference.reviewObjectType]}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{reviewStatusLabels[row.reviewStatus]}</Badge>
-                </TableCell>
-                <TableCell className="whitespace-normal">
-                  {row.statisticsEligibility.eligible
-                    ? '符合资格'
-                    : row.statisticsEligibility.reasons.map(evidenceLabel).join('；')}
-                </TableCell>
-                <StickyTableActionCell className="w-28 min-w-28 p-2 text-right align-middle whitespace-nowrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    aria-pressed={selectedId === row.input.reference.reviewObjectId}
-                    onClick={() => onSelect(row.input.reference.reviewObjectId)}
-                  >
-                    {selectedId === row.input.reference.reviewObjectId ? '已选择' : '选择对象'}
-                  </Button>
-                </StickyTableActionCell>
+      <ListRefreshRegion refreshing={query.isRefetching && query.data !== undefined} label="正在刷新复盘候选">
+        {rows.length === 0 && !query.isError && !query.isPending && (
+          <JournalEmpty
+            title="没有可复盘对象"
+            description="当前范围没有可读取的交易周期或减仓。只有持仓或基线观察时，历史成交证据仍可能不足。"
+          />
+        )}
+        {rows.length > 0 && (
+          <Table className="min-w-[32rem]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>标的与粒度</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>统计资格</TableHead>
+                <StickyTableActionHeader className="h-10 w-28 min-w-28 px-2 align-middle font-medium whitespace-nowrap">
+                  选择
+                </StickyTableActionHeader>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow
+                  key={row.input.reference.reviewObjectId}
+                  data-state={selectedId === row.input.reference.reviewObjectId ? 'selected' : undefined}
+                >
+                  <TableCell>
+                    <p>{instrumentLabel(row.input.trade.symbol)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {reviewObjectLabels[row.input.reference.reviewObjectType]}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{reviewStatusLabels[row.reviewStatus]}</Badge>
+                  </TableCell>
+                  <TableCell className="whitespace-normal">
+                    {row.statisticsEligibility.eligible
+                      ? '符合资格'
+                      : row.statisticsEligibility.reasons.map(evidenceLabel).join('；')}
+                  </TableCell>
+                  <StickyTableActionCell className="w-28 min-w-28 p-2 text-right align-middle whitespace-nowrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      aria-pressed={selectedId === row.input.reference.reviewObjectId}
+                      onClick={() => onSelect(row.input.reference.reviewObjectId)}
+                    >
+                      {selectedId === row.input.reference.reviewObjectId ? '已选择' : '选择对象'}
+                    </Button>
+                  </StickyTableActionCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </ListRefreshRegion>
       {query.hasNextPage && (
         <Button
+          aria-busy={query.isFetchingNextPage}
           variant="outline"
           disabled={query.isFetchingNextPage || query.isError}
           onClick={() => void query.fetchNextPage()}
         >
+          {query.isFetchingNextPage && <Spinner data-icon="inline-start" aria-hidden="true" />}
           读取下一页
         </Button>
       )}

@@ -1,24 +1,35 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { ListRefreshRegion } from './list-refresh-region';
 
 type TableFrame = 'outlined' | 'plain';
+type RefreshProps = { refreshing?: boolean | undefined; refreshLabel?: string | undefined; refreshAvoidText?: boolean | undefined };
 
 function TableContainer({
   className,
   frame = 'outlined',
+  refreshing,
+  refreshLabel,
+  refreshAvoidText,
   ...props
-}: React.ComponentProps<'div'> & { frame?: TableFrame | undefined }) {
-  return (
+}: React.ComponentProps<'div'> & { frame?: TableFrame | undefined } & RefreshProps) {
+  const table = (
     <div
       data-slot="table-container"
       data-frame={frame}
       className={cn(
-        'relative w-full overflow-x-auto',
+        'relative w-full overflow-x-auto [&_a]:no-underline [&_a:hover]:no-underline [&_button:hover]:no-underline',
         frame === 'outlined' && 'rounded-md border border-border',
         className,
       )}
       {...props}
     />
+  );
+  if (refreshing === undefined) return table;
+  return (
+    <ListRefreshRegion refreshing={refreshing} label={refreshLabel} avoidText={refreshAvoidText}>
+      {table}
+    </ListRefreshRegion>
   );
 }
 
@@ -26,13 +37,23 @@ function Table({
   className,
   containerClassName,
   frame,
+  refreshing,
+  refreshLabel,
+  refreshAvoidText,
   ...props
-}: Omit<React.ComponentProps<'table'>, 'frame'> & {
-  containerClassName?: string | undefined;
-  frame?: TableFrame | undefined;
-}) {
+}: Omit<React.ComponentProps<'table'>, 'frame'> &
+  RefreshProps & {
+    containerClassName?: string | undefined;
+    frame?: TableFrame | undefined;
+  }) {
   return (
-    <TableContainer frame={frame} className={containerClassName}>
+    <TableContainer
+      frame={frame}
+      className={containerClassName}
+      refreshing={refreshing}
+      refreshLabel={refreshLabel}
+      refreshAvoidText={refreshAvoidText}
+    >
       <table
         data-slot="table"
         className={cn('w-full caption-bottom text-sm', className)}

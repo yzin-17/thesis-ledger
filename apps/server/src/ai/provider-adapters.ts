@@ -11,6 +11,7 @@ import type {
 } from './ai-provider.contracts.js';
 import type {
   AiAdapter,
+  AiProviderModelCatalogConfig,
   AiAuthMode,
   AiChatImplementation,
   AiUpstreamFormat,
@@ -32,6 +33,7 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 export class OpenAiCompatibleProvider implements AiProvider {
   readonly metadata;
+  private readonly modelCatalog: AiProviderModelCatalogConfig | undefined;
 
   constructor(
     readonly id: string,
@@ -46,6 +48,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
       pricingVersion?: string;
     },
     options?: {
+      modelCatalog?: AiProviderModelCatalogConfig;
       priority?: number;
       capabilities?: readonly string[];
       health?: AiProviderHealth;
@@ -64,6 +67,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
       credentialFingerprint?: string;
     },
   ) {
+    this.modelCatalog = options?.modelCatalog;
     this.metadata = {
       baseURL: baseUrl,
       timeoutMs: this.timeoutMs,
@@ -104,6 +108,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
     return {
       baseURL: this.baseUrl,
       apiKey: this.apiKey,
+      ...(this.modelCatalog ? { modelCatalog: this.modelCatalog } : {}),
       authMode: this.metadata.authMode,
       timeoutMs: this.timeoutMs,
       ...(this.metadata.firstOutputTimeoutMs === undefined

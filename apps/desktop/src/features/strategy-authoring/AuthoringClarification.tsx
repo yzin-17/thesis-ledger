@@ -1,7 +1,6 @@
 import type { AuthoringContent } from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { AuthoringSelect } from './AuthoringSelect.js';
@@ -39,13 +38,13 @@ export function AuthoringClarification({
           (id) => content.questions.find((item) => item.id === id)?.answerState !== 'confirmed',
         );
         return (
-          <Card key={question.id}>
-            <CardHeader>
-              <CardTitle>{question.reason || '请确认这项条件'}</CardTitle>
-              <CardDescription>原句：{question.quote}</CardDescription>
+          <section key={question.id} className="flex flex-col gap-4 border-b pb-5">
+            <div className="flex flex-col items-start gap-2">
+              <h4 className="text-sm font-medium">{question.reason || '请确认这项条件'}</h4>
+              <p className="text-xs text-muted-foreground">原句：{question.quote}</p>
               <Badge variant="outline">{answerLabels[question.answerState]}</Badge>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <FieldGroup>
                 {question.options.length > 0 && (
                   <Field>
@@ -81,21 +80,21 @@ export function AuthoringClarification({
                   确认这个答案
                 </Button>
               </FieldGroup>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         );
       })}
-      <h3 className="text-lg font-semibold">需求覆盖清单</h3>
+      <h3 className="text-xl font-semibold">需求覆盖清单</h3>
       {content.requirements.length === 0 && (
         <p className="text-sm text-muted-foreground">分析后逐项审核你的要求。</p>
       )}
       {content.requirements.map((requirement) => (
-        <Card key={requirement.id}>
-          <CardHeader>
-            <CardTitle>{requirement.quote}</CardTitle>
+        <section key={requirement.id} className="flex flex-col gap-4 border-b pb-5">
+          <div className="flex flex-col items-start gap-2">
+            <h4 className="text-sm font-medium">{requirement.quote}</h4>
             <Badge variant="outline">{requirementLabels[requirement.state]}</Badge>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             <FieldGroup>
               <Field>
                 <FieldLabel>对应原文</FieldLabel>
@@ -188,37 +187,37 @@ export function AuthoringClarification({
                 )}
               </div>
             </FieldGroup>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       ))}
       {content.runtimeIntents.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>回测时再次确认</CardTitle>
-            <CardDescription>保存策略后由你主动开始回测。</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col items-start gap-2">
+            <h4 className="text-sm font-medium">回测时再次确认</h4>
+            <p className="text-xs text-muted-foreground">保存策略后由你主动开始回测。</p>
+          </div>
+          <div>
             <ul className="list-disc pl-5">
               {content.runtimeIntents.map((intent, index) => (
                 <li key={index}>{intent}</li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
       {content.removedRequirements.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>已移除的原始要求</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col items-start gap-2">
+            <h4 className="text-sm font-medium">已移除的原始要求</h4>
+          </div>
+          <div>
             <ul className="list-disc pl-5">
               {content.removedRequirements.map((quote, index) => (
                 <li key={index}>{quote}</li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
     </div>
   );

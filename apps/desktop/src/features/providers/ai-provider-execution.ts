@@ -21,6 +21,7 @@ export const aiContractOptions: Array<{
   { value: 'strategy_authoring_modification', label: '策略局部修改' },
   { value: 'research', label: '研究报告' },
   { value: 'parameter_optimization', label: '参数优化' },
+  { value:'arena_decision',label:'模拟交易决策' },
   { value: 'strategy_discovery', label: '策略发现' },
 ];
 
@@ -33,6 +34,7 @@ const contractRefs: Record<AiGenerationContractRef['id'], AiGenerationContractRe
     id: 'parameter_optimization',
     version: AI_PARAMETER_OPTIMIZATION_CONTRACT_VERSION,
   },
+  arena_decision: aiGenerationContracts.arenaDecision.ref,
   strategy_discovery: {
     id: 'strategy_discovery',
     version: AI_STRATEGY_DISCOVERY_CONTRACT_VERSION,

@@ -1,3 +1,4 @@
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import type { SecurityStaticInfoResponse } from '@thesis-ledger/schemas';
@@ -70,10 +71,13 @@ export function SecurityStaticPriceDialog({ info, onClose }: {
           <span>行情时间 {quote.data.marketTime ? new Date(quote.data.marketTime).toLocaleString('zh-CN') : '未知'}</span>
           {quote.data.stale && <span>缓存行情</span>}
         </>}
-        {quote.isPending && <span role="status">正在读取报价…</span>}
+        {quote.isPending && <LoadingState label="正在读取报价" />}
         {quote.error && <span role="alert">报价暂时无法读取，请检查来源配置或稍后刷新。</span>}
-        <Button variant="outline" size="sm" disabled={quote.isFetching || series.isFetching}
-          onClick={() => { void quote.refetch(); if (available) void series.refetch(); }}>刷新行情</Button>
+        <Button aria-busy={quote.isFetching || series.isFetching} variant="outline" size="sm" disabled={quote.isFetching || series.isFetching}
+          onClick={() => { void quote.refetch(); if (available) void series.refetch(); }}>
+            {(quote.isFetching || series.isFetching) && <Spinner data-icon="inline-start" aria-hidden="true" />}
+            刷新行情
+          </Button>
       </section>
       <ToggleGroup aria-label="行情周期" value={[timeframe]} onValueChange={value => {
         if (value[0] === '1d' || value[0] === '1m') { setTimeframe(value[0]); setHover(null); setLocked(null); }
@@ -92,7 +96,7 @@ export function SecurityStaticPriceDialog({ info, onClose }: {
       {(chartError || unavailable) && <Alert variant="destructive"><AlertTitle>图表未读取</AlertTitle>
         <AlertDescription>{chartError ? '当前图表暂时不可用，请检查来源配置或稍后重试。' :
           `当前未配置可用的${adjustmentLabels[adjustment]}价格来源。`}</AlertDescription></Alert>}
-      {(selectedPlan?.isPending || series.isFetching) && <p role="status">正在读取图表…</p>}
+      {(selectedPlan?.isPending || series.isFetching) && <LoadingState label="正在读取图表" />}
       {series.data && <p className="text-sm text-muted-foreground">
         {series.isError ? '上次成功加载' : '已加载'} {bars.length} 点 · {plan?.window?.start} 至 {plan?.window?.end} ·
         来源 {series.data.provenance.providerId === 'futu' ? '富途 OpenAPI' : series.data.provenance.providerId}

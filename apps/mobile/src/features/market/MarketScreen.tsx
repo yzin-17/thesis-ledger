@@ -11,13 +11,13 @@ export function MarketScreen() {
   const [selected, setSelected] = useState<InstrumentSearchResult | null>(null);
   return (
     <Page title="市场">
-      <InstrumentPicker onConfirmed={setSelected} />
+      <Action label="自选" onPress={()=>navigation.navigate('Watchlist')} />
+      <InstrumentPicker purpose="browse" onConfirmed={setSelected} />
       {selected ? (
         <Section title={selected.displayName}>
           <Copy>
             {selected.symbol} · {selected.market}
           </Copy>
-          <Copy muted>标的身份已确认，可在账户中录入持仓或成交。</Copy>
           <Action
             label="查看标的行情"
             primary

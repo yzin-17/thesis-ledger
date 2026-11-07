@@ -1,3 +1,5 @@
+import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useState, type FormEvent } from 'react';
 import type {
   RecurringFundInvestmentOccurrence,
@@ -5,7 +7,8 @@ import type {
 } from '@thesis-ledger/api-client';
 import { ChevronDownIcon, LoaderCircle, PlusIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
+import { AccountDataInfoTip } from './AccountDataInfoTip.js';
 import { FundInvestmentPlanList } from './FundInvestmentPlanList.js';
 import { canManageFundInvestments } from './account-data.fund-investment.display.js';
 import { Button } from '@/components/ui/button';
@@ -15,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetFooter,
   SheetHeader,
@@ -88,15 +92,20 @@ export function RecurringFundInvestments({
   };
 
   return (
-    <section className="flex flex-col gap-6" aria-labelledby="fund-investment-title">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 id="fund-investment-title" className="m-0 text-lg font-semibold">
+    <section className="flex min-w-0 flex-col gap-4" aria-labelledby="fund-investment-title">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <h3 id="fund-investment-title" className="m-0 text-xl font-semibold">
             定投计划
           </h3>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
+          <AccountDataInfoTip label="定投确认说明">
             到期核对实际份额和净值后确认成交，确认前不会改变持仓或现金。
-          </p>
+          </AccountDataInfoTip>
+          {pending.length === 0 &&
+            queries.occurrences.data !== undefined &&
+            !queries.occurrences.isError && (
+              <span className="text-xs text-muted-foreground">暂无待确认成交</span>
+            )}
         </div>
         <Button
           type="button"
@@ -114,6 +123,7 @@ export function RecurringFundInvestments({
             计划或待确认记录未更新。已成功保存或确认的操作无需再次提交，请重新读取。
           </AlertDescription>
           <Button
+            aria-busy={queries.plans.isFetching || queries.occurrences.isFetching}
             type="button"
             variant="outline"
             size="sm"
@@ -134,94 +144,104 @@ export function RecurringFundInvestments({
           </AlertDescription>
         </Alert>
       )}
-      <section aria-label="定投待确认记录" className="space-y-2">
-        {pending.length > 0 && (
-          <h3 className="m-0 text-sm font-semibold">待确认成交 · {pending.length} 条</h3>
-        )}
-        {queries.occurrences.isPending && (
-          <Skeleton className="h-12 w-full" aria-label="正在读取待确认记录" />
-        )}
-        {pending.length === 0 && queries.occurrences.data !== undefined && (
-          <p className="m-0 py-3 text-sm text-muted-foreground">暂无待确认成交</p>
-        )}
-        {pending.length > 0 && (
-          <div className="divide-y divide-border rounded-md border border-border px-3">
-            {pending.map((item) => (
-              <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div>
-                  <strong className="text-sm font-medium">
-                    {item.fundName} · {item.periodKey}
-                  </strong>
-                  <span className="mt-1 block text-xs text-muted-foreground">
-                    {item.symbol} · 计划 {formatDate(item.scheduledFor)} ·{' '}
-                    {formatCurrencyAmount(
-                      Number(item.expectedAmount),
-                      supportedCurrency(item.currency),
-                    )}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    type="button"
-                    onClick={() => setAction({ type: 'confirm', occurrence: item })}
+      {(queries.occurrences.isPending || pending.length > 0) && (
+        <section aria-label="定投待确认记录" className="flex flex-col gap-2">
+          {pending.length > 0 && (
+            <h3 className="m-0 text-sm font-semibold">待确认成交 · {pending.length} 条</h3>
+          )}
+          {queries.occurrences.isPending && <LoadingState label="正在读取待确认记录" />}
+          <ListRefreshRegion
+            refreshing={queries.occurrences.isRefetching && queries.occurrences.data !== undefined}
+            label="正在刷新待确认成交"
+          >
+            {pending.length > 0 && (
+              <div className="divide-y divide-border rounded-md border border-border px-3">
+                {pending.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3"
                   >
-                    确认成交
-                  </Button>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => setAction({ type: 'skip', occurrence: item })}
-                  >
-                    跳过
-                  </Button>
-                </div>
+                    <div>
+                      <strong className="text-sm font-medium">
+                        {item.fundName} · {item.periodKey}
+                      </strong>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {item.symbol} · 计划 {formatDate(item.scheduledFor)} ·{' '}
+                        {formatCurrencyAmount(
+                          Number(item.expectedAmount),
+                          supportedCurrency(item.currency),
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        type="button"
+                        onClick={() => setAction({ type: 'confirm', occurrence: item })}
+                      >
+                        确认成交
+                      </Button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => setAction({ type: 'skip', occurrence: item })}
+                      >
+                        跳过
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </ListRefreshRegion>
+        </section>
+      )}
+      {queries.plans.isPending && <LoadingState label="正在读取定投计划" />}
+      <ListRefreshRegion
+        refreshing={queries.plans.isRefetching && queries.plans.data !== undefined}
+        label="正在刷新定投计划"
+      >
+        {queries.plans.data !== undefined && (
+          <FundInvestmentPlanList
+            plans={plans}
+            focusPlanId={linkedPlan?.id ?? null}
+            busy={mutations.changePlanState.isPending}
+            onEdit={(plan) => setEditor({ mode: 'edit', plan })}
+            onChangeState={(plan, action) => void changePlanState(plan, action)}
+          />
         )}
-      </section>
-      {queries.plans.isPending && (
-        <Skeleton className="h-24 w-full" aria-label="正在读取定投计划" />
-      )}
-      {queries.plans.data !== undefined && (
-        <FundInvestmentPlanList
-          plans={plans}
-          focusPlanId={linkedPlan?.id ?? null}
-          busy={mutations.changePlanState.isPending}
-          onEdit={(plan) => setEditor({ mode: 'edit', plan })}
-          onChangeState={(plan, action) => void changePlanState(plan, action)}
-        />
-      )}
+      </ListRefreshRegion>
       {skipped.length > 0 && (
         <details className="rounded-md border border-border px-3">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-2 text-sm font-medium">
             <span>已跳过记录 · {skipped.length} 条</span>
             <ChevronDownIcon className="size-4" />
           </summary>
-          <div className="space-y-2 border-t border-border pt-2">
-            {skipped.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
-                <span>
-                  {item.fundName} · {item.periodKey}
-                </span>
-                <Button
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                  onClick={() =>
-                    void mutations.reopenOccurrence.mutateAsync({
-                      id: item.id,
-                      expectedVersion: item.version,
-                    })
-                  }
-                >
-                  恢复待确认
-                </Button>
-              </div>
-            ))}
-          </div>
+          <ListRefreshRegion refreshing={queries.occurrences.isRefetching} label="正在刷新跳过记录">
+            <div className="space-y-2 border-t border-border pt-2">
+              {skipped.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                  <span>
+                    {item.fundName} · {item.periodKey}
+                  </span>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={() =>
+                      void mutations.reopenOccurrence.mutateAsync({
+                        id: item.id,
+                        expectedVersion: item.version,
+                      })
+                    }
+                  >
+                    恢复待确认
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </ListRefreshRegion>
         </details>
       )}
       {editor && (
@@ -325,62 +345,66 @@ function FundInvestmentPlanSheet({
           className="flex min-h-0 flex-1 flex-col gap-5"
           onSubmit={(event) => void submit(event)}
         >
-          <FieldGroup className="min-h-0 flex-1 overflow-y-auto">
-            <Field>
-              <FieldLabel htmlFor="fund-plan-name">计划名称</FieldLabel>
-              <Input
-                id="fund-plan-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="fund-plan-symbol">基金代码</FieldLabel>
-              <Input
-                id="fund-plan-symbol"
-                value={symbol}
-                disabled={Boolean(plan)}
-                placeholder="例如 000001.OF"
-                onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="fund-plan-amount">每月计划金额</FieldLabel>
-              <Input
-                id="fund-plan-amount"
-                inputMode="decimal"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="fund-plan-day">每月日期</FieldLabel>
-              <Input
-                id="fund-plan-day"
-                type="number"
-                min={1}
-                max={31}
-                value={day}
-                onChange={(event) => setDay(event.target.value)}
-              />
-            </Field>
-            {!plan && (
+          <SheetBody>
+            <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="fund-plan-start">开始月份</FieldLabel>
-                <DateInput
-                  id="fund-plan-start"
-                  type="month"
-                  value={startPeriod}
-                  onChange={(event) => setStartPeriod(event.target.value)}
+                <FieldLabel htmlFor="fund-plan-name">计划名称</FieldLabel>
+                <Input
+                  id="fund-plan-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
                 />
               </Field>
-            )}
-            {error && (
-              <Field invalid>
-                <FieldError>{error}</FieldError>
+              <Field>
+                <FieldLabel htmlFor="fund-plan-symbol">基金代码</FieldLabel>
+                <InstrumentSymbolField
+                  markets={['OF']}
+                  instrumentTypes={['MUTUAL_FUND']}
+                  id="fund-plan-symbol"
+                  aria-label="基金代码"
+                  value={symbol}
+                  disabled={Boolean(plan)}
+                  onChange={(value) => setSymbol(value.toUpperCase())}
+                />
               </Field>
-            )}
-          </FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="fund-plan-amount">每月计划金额</FieldLabel>
+                <Input
+                  id="fund-plan-amount"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="fund-plan-day">每月日期</FieldLabel>
+                <Input
+                  id="fund-plan-day"
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={day}
+                  onChange={(event) => setDay(event.target.value)}
+                />
+              </Field>
+              {!plan && (
+                <Field>
+                  <FieldLabel htmlFor="fund-plan-start">开始月份</FieldLabel>
+                  <DateInput
+                    id="fund-plan-start"
+                    type="month"
+                    value={startPeriod}
+                    onChange={(event) => setStartPeriod(event.target.value)}
+                  />
+                </Field>
+              )}
+              {error && (
+                <Field invalid>
+                  <FieldError>{error}</FieldError>
+                </Field>
+              )}
+            </FieldGroup>
+          </SheetBody>
           <SheetFooter>
             <Button
               type="button"
@@ -483,62 +507,64 @@ function FundInvestmentOccurrenceSheet({
           className="flex min-h-0 flex-1 flex-col gap-5"
           onSubmit={(event) => void submit(event)}
         >
-          <FieldGroup className="min-h-0 flex-1 overflow-y-auto">
-            {action.type === 'skip' ? (
-              <Field>
-                <FieldLabel htmlFor="fund-skip-reason">跳过原因</FieldLabel>
-                <Input
-                  id="fund-skip-reason"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                />
-              </Field>
-            ) : (
-              <>
+          <SheetBody>
+            <FieldGroup>
+              {action.type === 'skip' ? (
                 <Field>
-                  <FieldLabel htmlFor="fund-actual-quantity">实际确认份额</FieldLabel>
+                  <FieldLabel htmlFor="fund-skip-reason">跳过原因</FieldLabel>
                   <Input
-                    id="fund-actual-quantity"
-                    inputMode="decimal"
-                    value={quantity}
-                    onChange={(event) => setQuantity(event.target.value)}
+                    id="fund-skip-reason"
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
                   />
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="fund-unit-price">单位净值</FieldLabel>
-                  <Input
-                    id="fund-unit-price"
-                    inputMode="decimal"
-                    value={unitPrice}
-                    onChange={(event) => setUnitPrice(event.target.value)}
-                  />
+              ) : (
+                <>
+                  <Field>
+                    <FieldLabel htmlFor="fund-actual-quantity">实际确认份额</FieldLabel>
+                    <Input
+                      id="fund-actual-quantity"
+                      inputMode="decimal"
+                      value={quantity}
+                      onChange={(event) => setQuantity(event.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="fund-unit-price">单位净值</FieldLabel>
+                    <Input
+                      id="fund-unit-price"
+                      inputMode="decimal"
+                      value={unitPrice}
+                      onChange={(event) => setUnitPrice(event.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="fund-commission">手续费（可选）</FieldLabel>
+                    <Input
+                      id="fund-commission"
+                      inputMode="decimal"
+                      value={commission}
+                      onChange={(event) => setCommission(event.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="fund-occurred-at">成交日期</FieldLabel>
+                    <DateInput
+                      id="fund-occurred-at"
+                      type="date"
+                      value={occurredAt}
+                      onChange={(event) => setOccurredAt(event.target.value)}
+                    />
+                  </Field>
+                </>
+              )}
+              {error && (
+                <Field invalid>
+                  <FieldError>{error}</FieldError>
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="fund-commission">手续费（可选）</FieldLabel>
-                  <Input
-                    id="fund-commission"
-                    inputMode="decimal"
-                    value={commission}
-                    onChange={(event) => setCommission(event.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="fund-occurred-at">成交日期</FieldLabel>
-                  <DateInput
-                    id="fund-occurred-at"
-                    type="date"
-                    value={occurredAt}
-                    onChange={(event) => setOccurredAt(event.target.value)}
-                  />
-                </Field>
-              </>
-            )}
-            {error && (
-              <Field invalid>
-                <FieldError>{error}</FieldError>
-              </Field>
-            )}
-          </FieldGroup>
+              )}
+            </FieldGroup>
+          </SheetBody>
           <SheetFooter>
             <Button
               type="button"

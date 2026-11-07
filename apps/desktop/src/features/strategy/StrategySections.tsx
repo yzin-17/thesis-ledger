@@ -1,3 +1,4 @@
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { TableContainer } from '@/components/ui/table';
 export {
   BacktestSetupDialog,
@@ -286,7 +287,7 @@ export function StrategyLibrary({
                   </tr>
                 );
               })}
-              {loadState === 'loading' && <EmptyTableRow colSpan={6} label="正在加载策略…" />}
+              {loadState === 'loading' && <EmptyTableRow colSpan={6} loading label="正在加载策略…" />}
             </tbody>
           </table>
         </TableContainer>
@@ -357,7 +358,7 @@ export function StrategyJobs({
                       )}
                     </div>
                   ) : (
-                    <div className="p-5 text-sm text-muted-foreground">正在加载任务…</div>
+                    <LoadingState label="正在加载任务" />
                   )}
                 </td>
               </tr>
@@ -430,7 +431,7 @@ export function StrategyJobs({
                             aria-busy={busyAction === `run:${job.id}`}
                             onClick={() => onRun(job)}
                           >
-                            <Play data-icon="inline-start" />
+                            {busyAction === `run:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Play data-icon="inline-start" />}
                             {busyAction === `run:${job.id}` ? '启动中…' : '重试运行'}
                           </Button>
                         )}
@@ -442,7 +443,7 @@ export function StrategyJobs({
                             aria-busy={busyAction === `cancel:${job.id}`}
                             onClick={() => onCancel(job)}
                           >
-                            <X data-icon="inline-start" />
+                            {busyAction === `cancel:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <X data-icon="inline-start" />}
                             取消
                           </Button>
                         )}
@@ -460,7 +461,7 @@ export function StrategyJobs({
                             aria-busy={busyAction === `retry:${job.id}`}
                             onClick={() => onRetry(job.id)}
                           >
-                            <Play data-icon="inline-start" />
+                            {busyAction === `retry:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Play data-icon="inline-start" />}
                             {busyAction === `retry:${job.id}` ? '重试中…' : '重试'}
                           </Button>
                         )}

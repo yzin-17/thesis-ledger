@@ -124,7 +124,7 @@ export function CashTransferSheet({
 
   const requestClose = useDraftCloseGuard({
     open,
-    draft: null,
+    draft: { accountId: account.id, direction, counterpartyId, amount, occurredAt, note },
     dirty,
     busy: mutations.transfer.isPending,
     onOpenChange: handleOpenChange,
@@ -142,7 +142,7 @@ export function CashTransferSheet({
             className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={(formEvent) => void submit(formEvent)}
           >
-            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto scroll-p-2 px-1 py-1">
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="cash-transfer-direction">当前账户方向</FieldLabel>

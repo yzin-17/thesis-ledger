@@ -56,7 +56,7 @@ export function JournalDraftSheet({
   const errorId = useId();
   const requestClose = useDraftCloseGuard({
     open,
-    draft: null,
+    draft: { reference: candidate.input.reference, fields: draft },
     dirty: !isEqual(draft, value),
     busy: false,
     onOpenChange,

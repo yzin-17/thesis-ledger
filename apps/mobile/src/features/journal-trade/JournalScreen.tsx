@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -11,9 +12,8 @@ import {
   Action,
   Choices,
   Copy,
-  Field,
   Page,
-  QueryStatus,
+  QueryList, QueryStatus,
   Section,
 } from '../../components/MobilePrimitives';
 export function JournalScreen() {
@@ -54,6 +54,7 @@ export function JournalScreen() {
     navigation.navigate('JournalObject', { ...locator, reviewObjectId });
   return (
     <Page title="复盘">
+      <Action label="模型周报" onPress={()=>navigation.navigate('ArenaWeek')}/>
       <QueryStatus query={accounts} retry={() => void accounts.refetch()} />
       <Choices
         label="复盘账户"
@@ -87,40 +88,46 @@ export function JournalScreen() {
         disabled={!accountId}
         onPress={() => navigation.navigate('JournalAiHistory', locator)}
       />
-      <Field label="复盘标的筛选" value={symbol} onChange={setSymbol} />
+      <InstrumentSymbolField label="复盘标的筛选" value={symbol} onChange={setSymbol} />
       <Action label="筛选复盘" onPress={() => setSearch(symbol.trim())} />
-      <QueryStatus query={query} retry={() => void query.refetch()} />
-      {query.data?.pages
-        .flatMap((p) => {
-          const name = instrumentLabelLookup(p.instrumentDirectory);
-          return p.items.map((row) => ({ row, name }));
-        })
-        .map(({ row, name }) => (
-          <Section key={row.input.reference.reviewObjectId}>
-            <Copy>
-              {name(row.input.trade.symbol)} ·{' '}
-              {row.input.reference.reviewObjectType === 'TRADE_CYCLE' ? '完整交易周期' : '单次减仓'}
+      <QueryList
+        query={query}
+        retry={() => void query.refetch()}
+        label="正在刷新复盘对象"
+      >
+        {query.data?.pages
+          .flatMap((p) => {
+            const name = instrumentLabelLookup(p.instrumentDirectory);
+            return p.items.map((row) => ({ row, name }));
+          })
+          .map(({ row, name }) => (
+            <Section key={row.input.reference.reviewObjectId}>
+              <Copy>
+                {name(row.input.trade.symbol)} ·{' '}
+                {row.input.reference.reviewObjectType === 'TRADE_CYCLE' ? '完整交易周期' : '单次减仓'}
+              </Copy>
+              <Copy>
+                {row.openedAt ?? '时间未知'} ·{' '}
+                {row.reviewStatus === 'CURRENT' ? '当前事实' : '事实已变化'}
+              </Copy>
+              <Action
+                label={`复盘 ${row.input.reference.reviewObjectId}`}
+                onPress={() => open(row.input.reference.reviewObjectId)}
+              />
+            </Section>
+          ))}
+        {query.data?.pages[0]?.total === 0 ? <Copy muted>当前范围暂无复盘对象。</Copy> : null}
+        {query.data?.pages
+          .flatMap((p) => p.legacyItems)
+          .map((row, i) => (
+            <Copy muted key={i}>
+              旧格式复盘需要重新确认，保留历史记录。
             </Copy>
-            <Copy>
-              {row.openedAt ?? '时间未知'} ·{' '}
-              {row.reviewStatus === 'CURRENT' ? '当前事实' : '事实已变化'}
-            </Copy>
-            <Action
-              label={`复盘 ${row.input.reference.reviewObjectId}`}
-              onPress={() => open(row.input.reference.reviewObjectId)}
-            />
-          </Section>
-        ))}
-      {query.data?.pages[0]?.total === 0 ? <Copy muted>当前范围暂无复盘对象。</Copy> : null}
-      {query.data?.pages
-        .flatMap((p) => p.legacyItems)
-        .map((row, i) => (
-          <Copy muted key={i}>
-            旧格式复盘需要重新确认，保留历史记录。
-          </Copy>
-        ))}
+          ))}
+      </QueryList>
       {query.hasNextPage ? (
         <Action
+          busy={query.isFetchingNextPage}
           label="更多复盘对象"
           disabled={query.isFetching}
           onPress={() => void query.fetchNextPage()}

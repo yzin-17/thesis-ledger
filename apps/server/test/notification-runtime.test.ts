@@ -115,6 +115,17 @@ describe('Feishu provider', () => {
 });
 
 describe('Notification cooldown', () => {
+  it('critical 重复入队不重新打开已投递记录，也不覆盖冻结消息', async () => {
+    const delivered = { status: 'delivered', attemptCount: 1, message: { body: 'frozen' } };
+    const upsert = vi.fn(async ({ update }: { update: Record<string, unknown> }) => ({ ...delivered, ...update }));
+    const service = new NotificationService({ notificationDelivery: { upsert }, providerConfig: providerConfigFixture() } as never,
+      redisFixture() as never, { record: vi.fn() } as never);
+    const subject = riskSubject('event-critical', '600519.SH', 'account-1', 'critical');
+    const result = await service.enqueue(subject, { ...message, severity: 'critical' }, policy);
+    expect(result[0]).toEqual(delivered);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ update: {} }));
+  });
+
   it('不同 eventId 但相同风险语义在 30 分钟内只排队一次', async () => {
     const redis = redisFixture();
     const upsert = vi.fn(async ({ create }: { create: object }) => create);
@@ -370,6 +381,7 @@ describe('Notification dispatch', () => {
       scheduledAt: new Date('2026-08-20T10:00:00Z'),
     };
     const prisma = {
+      $executeRaw: vi.fn(async () => 0),
       notificationDelivery: {
         findUniqueOrThrow: vi.fn(async () => delivery),
         update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -425,6 +437,7 @@ describe('Notification dispatch', () => {
     const assetLookup = vi.fn(async () => Promise.reject(new Error('asset db down')));
     const riskEventLookup = vi.fn();
     const prisma = {
+      $executeRaw: vi.fn(async () => 0),
       notificationDelivery: {
         findUniqueOrThrow: vi.fn(async () => delivery),
         update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -485,6 +498,7 @@ describe('Notification dispatch', () => {
       scheduledAt: new Date('2026-08-20T10:00:00Z'),
     };
     const prisma = {
+      $executeRaw: vi.fn(async () => 0),
       notificationDelivery: {
         findUniqueOrThrow: vi.fn(async () => delivery),
         update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -539,6 +553,7 @@ describe('Notification dispatch', () => {
       status: data.status,
     }));
     const prisma = {
+      $executeRaw: vi.fn(async () => 0),
       notificationDelivery: {
         findUniqueOrThrow: vi.fn(async () => delivery),
         update,
@@ -600,6 +615,7 @@ describe('Notification dispatch', () => {
       scheduledAt: new Date('2026-08-20T10:00:00Z'),
     };
     const prisma = {
+      $executeRaw: vi.fn(async () => 0),
       notificationDelivery: {
         findUniqueOrThrow: vi.fn(async () => delivery),
         update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -653,6 +669,7 @@ describe('Notification dispatch', () => {
     const now = new Date('2026-08-20T10:01:00Z');
     const due = [{ id: 'pending-1' }, { id: 'retrying-1' }];
     const prisma = {
+      $executeRaw: vi.fn(async () => 0),
       notificationDelivery: {
         findMany: vi.fn(async () => due),
       },

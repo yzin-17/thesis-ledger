@@ -1,3 +1,5 @@
+import { createClientRequestId } from '../../lib/client-request-id';
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useState } from 'react';
 import { formatDateTime } from '@/lib/date-display';
 import { useQuery } from '@tanstack/react-query';
@@ -18,8 +20,8 @@ import {
   prepareOptimizationConfiguration,
   type PreparedOptimizationConfiguration,
 } from './optimization.preparation.js';
+import {useStrategySubmission} from './use-strategy-submission.js';
 import { usePreparationRouteStale } from './strategy.preparation.js';
-
 const adjustments = { none: '不复权', qfq: '前复权', hfq: '后复权' } as const;
 const histories = {
   'fixed-provider-snapshot': '固定供应商快照',
@@ -32,13 +34,14 @@ export function OptimizationPricePreparation({
   endDate,
   currency,
   initialCash,
-  onPrepared,
+  onPrepared, settings,
 }: {
   target: OptimizationPreparationTarget;
   startDate: string;
   endDate: string;
   currency: 'CNY' | 'HKD' | 'USD';
   initialCash: string;
+  settings: ()=>Extract<import('@thesis-ledger/schemas').StrategySubmissionInput,{kind:'optimization'}>['settings'];
   onPrepared: (value: PreparedOptimizationConfiguration | null) => void;
 }) {
   const [adjustment, setAdjustment] = useState<keyof typeof adjustments>('qfq');
@@ -90,13 +93,14 @@ export function OptimizationPricePreparation({
     );
   }, [result, submitted, onPrepared]);
   useEffect(() => () => onPrepared(null), [onPrepared]);
-  const prepare = () => {
+  const automatic=useStrategySubmission();
+  const prepare = (run=false) => {
     const timezones = { CNY: 'Asia/Shanghai', HKD: 'Asia/Hong_Kong', USD: 'America/New_York' };
     const parsed = optimizationRunPreparationRequestSchema.safeParse({
       target,
       intent: {
         contractVersion: 3,
-        requestId: crypto.randomUUID(),
+        requestId: createClientRequestId(),
         freezeTimePolicy:
           history === 'fixed-provider-snapshot' ? 'after-acquisition' : 'requested-time',
         warmupBudgetSessions: warmupBudget.trim() === '' ? undefined : Number(warmupBudget),
@@ -128,6 +132,7 @@ export function OptimizationPricePreparation({
     }
     setError(null);
     onPrepared(null);
+    if(run){try { const configured=settings(); automatic.mutate({signature:JSON.stringify([key,configured]),input:{kind:'optimization',preparation:parsed.data,settings:configured}}); }catch(e){setError(e instanceof Error?e.message:'请核对实验设置');} return; }
     setSubmitted({ key, request: parsed.data });
   };
   return (
@@ -219,12 +224,17 @@ export function OptimizationPricePreparation({
           准备完成时冻结本次取得的行情，并显示实际冻结时间。
         </p>
       )}
+      <Button type="button" disabled={!model||automatic.isPending||query.isFetching} onClick={()=>prepare(true)}>准备并创建零价模型实验</Button>
+      {automatic.isSuccess && <p>提交已登记，可在策略中心查看后台进度。</p>}
+      {automatic.isError && <FieldError>{automatic.error.message}</FieldError>}
       <Button
+        aria-busy={query.isFetching}
         type="button"
         variant="outline"
-        onClick={prepare}
+        onClick={()=>prepare()}
         disabled={!model || query.isFetching || result?.status === 'preparing'}
       >
+        {query.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
         {query.isFetching ? '正在准备实验配置…' : '准备实验配置'}
       </Button>
       {error && <Field invalid><FieldError>{error}</FieldError></Field>}

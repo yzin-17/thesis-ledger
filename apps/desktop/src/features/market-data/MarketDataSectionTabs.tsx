@@ -15,7 +15,7 @@ export function MarketDataSectionTabs({
   monitorPanel,
 }: MarketDataSectionTabsProps) {
   return (
-    <Tabs defaultValue="routing" className="mt-6 gap-4">
+    <Tabs defaultValue="routing">
       <TabsList
         variant="line"
         className="w-full justify-start overflow-x-auto"

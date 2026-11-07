@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import type { OptimizationAdoptionContext } from '@thesis-ledger/schemas';
 import { Link } from 'react-router';
 import { ExternalLink, ShieldAlert } from 'lucide-react';
@@ -156,7 +157,7 @@ export function ExperimentAdoptionReview({
         <AdoptionDiffGroup title="候选相对实验基线" entries={context.candidateVsBaseline} />
         <AdoptionDiffGroup title="候选相对当前版本" entries={context.candidateVsCurrent} />
         {acknowledgeExposure ? (
-          <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+          <div className="flex gap-2 rounded-md border border-caution/40 bg-caution/5 p-3 text-sm">
             <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             当前候选不是测试前预选候选。确认后会记录测试结果暴露下的改选。
           </div>
@@ -165,7 +166,8 @@ export function ExperimentAdoptionReview({
           <Button variant="outline" onClick={onCancel}>
             返回候选
           </Button>
-          <Button disabled={pending} onClick={onConfirm}>
+          <Button aria-busy={pending} disabled={pending} onClick={onConfirm}>
+            {pending && <Spinner data-icon="inline-start" aria-hidden="true" />}
             {pending ? '正在采纳…' : '确认采纳'}
           </Button>
         </div>

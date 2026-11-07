@@ -1,0 +1,15 @@
+{
+  "changed": [],
+  "inputs": {
+    "apps/desktop/test/account-data-investments-navigation.ui.test.tsx": "5491ceb804fd0dca5974c3b0d7788949b9d592731b9cf62cfdd9a6de767f4974",
+    "apps/desktop/src/features/account-data/AccountDataRecurringFundInvestments.tsx": "396c35148d19a5fbf9b027f7dac2f16d51d06768215674c1edf28cacdb0164ab",
+    "apps/desktop/src/features/account-data/FundInvestmentPlanList.tsx": "e6f92d706073f8d44326f38f227e2c7c4457c5e08ed592dd8c74748888e4f16d",
+    "apps/desktop/src/features/account-data/ExecutionRuleReference.tsx": "9a954d10457c57ab3ce74e4c9188ba1857b2566354ad91eee2410c2bb450d36d",
+    "apps/desktop/test/ui-contract.test.tsx": "97e0ece985c60d23a895ed0d9278f35bce40775b830ce8adbaf95c865ae47565",
+    "apps/desktop/src/features/onboarding/FirstRunOnboarding.tsx": "b9d170af85793701e6010f50c2fc29def16ea1f83c081365892d90f7f5ee0954",
+    "apps/desktop/src/features/market-detail/MarketDetailDialog.latest.integration.test.tsx": "a6497965185e7b4628b58d4f6326b32cf9075553f294a178c38ac08a0608b19d",
+    "apps/desktop/src/features/market-detail/FundDailyComparison.tsx": "c284c51223e5e9c7c39612f117f13be695a9311c1a3ab72f3dafc2e090176ed3",
+    "apps/mobile/test/parity/batch4-ui.test.tsx": "85ba14ef43dc92605def965f2c4353c1b6d5cc66a68cfbfcdcabf41359d88f2c",
+    "apps/mobile/src/features/strategy-library/StrategyLibraryScreen.tsx": "92a79dda923d3f037620b399eb41dbcc6c09faae9caaffb424cb51c28c94c109"
+  }
+}

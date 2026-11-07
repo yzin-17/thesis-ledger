@@ -147,7 +147,7 @@ function RunMetadata({ run }: { run: AiRunRecord }) {
       </summary>
       <dl className="mt-4 grid gap-x-4 gap-y-3 sm:grid-cols-2">
         <div>
-          <dt className="text-xs text-muted-foreground">Provider / 实际模型</dt>
+          <dt className="text-xs text-muted-foreground">提供方 / 实际模型</dt>
           <dd>
             {run.provider} / {run.model}
           </dd>

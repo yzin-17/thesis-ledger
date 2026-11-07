@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+export const marketAnnouncementSymbolSchema = z.string().regex(/^\d{6}\.(SH|SZ|BJ|OF)$/);
+
 export const marketAnnouncementSchema = z.object({
   id: z.string().min(1),
-  symbol: z.string().regex(/^\d{6}\.(SH|SZ|BJ)$/),
+  symbol: marketAnnouncementSymbolSchema,
   title: z.string().min(1),
   url: z.url().refine((value) => /^https?:\/\//i.test(value)),
   publishedDate: z.iso.date(),

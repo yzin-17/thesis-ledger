@@ -1,3 +1,5 @@
+import { createClientRequestId } from '../../lib/client-request-id';
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useRef, useState } from 'react';
 import { formatDateTime } from '@/lib/date-display';
 import {
@@ -21,7 +23,6 @@ import {
   BacktestKnownCashResearchChoice,
   useKnownCashResearchChoice,
 } from './BacktestKnownCashResearchChoice.js';
-
 export type PreparedBacktest = Extract<BacktestRunPreparationResultV3, { status: 'prepared' }>;
 const histories = {
   'fixed-provider-snapshot': '固定供应商快照',
@@ -32,6 +33,7 @@ const ruleModes = {
   'rules-only': '只研究原价与规则',
 } as const;
 
+import {useStrategySubmission} from './use-strategy-submission.js';
 export function BacktestPricePreparation({
   strategyVersionId,
   adjustment,
@@ -40,7 +42,7 @@ export function BacktestPricePreparation({
   currency,
   onPrepared,
   initialModel,
-  onDirtyChange,
+  onDirtyChange, onSubmitted,
 }: {
   strategyVersionId: string;
   adjustment: 'none' | 'qfq' | 'hfq';
@@ -49,6 +51,7 @@ export function BacktestPricePreparation({
   currency: 'CNY' | 'HKD' | 'USD';
   onPrepared: (prepared: PreparedBacktest | null) => void;
   initialModel?: BacktestExecutionModelV3;
+  onSubmitted?: ()=>void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [text, setText] = useState(() =>
@@ -104,11 +107,12 @@ export function BacktestPricePreparation({
   }, [result, onPrepared]);
   useEffect(() => () => onPrepared(null), [onPrepared]);
 
-  const prepare = () => {
+  const automatic=useStrategySubmission();
+  const prepare = (run=false) => {
     const timezones = { CNY: 'Asia/Shanghai', HKD: 'Asia/Hong_Kong', USD: 'America/New_York' };
     const parsed = backtestRunPreparationRequestV3Schema.safeParse({
       contractVersion: 3,
-      requestId: crypto.randomUUID(),
+      requestId: createClientRequestId(),
       freezeTimePolicy:
         history === 'fixed-provider-snapshot' ? 'after-acquisition' : 'requested-time',
       strategyVersionId,
@@ -147,6 +151,7 @@ export function BacktestPricePreparation({
     }
     setError(null);
     onPrepared(null);
+    if(run){automatic.mutate({signature:key,input:{kind:'ordinary',preparation:parsed.data}},{onSuccess:onSubmitted??(()=>{})});return;}
     setSubmitted({ key, request: parsed.data });
   };
 
@@ -238,12 +243,16 @@ export function BacktestPricePreparation({
           准备完成时冻结本次取得的行情，并显示实际冻结时间。
         </p>
       )}
+      <Button type="button" disabled={!model || automatic.isPending || query.isFetching} onClick={()=>prepare(true)}>准备并开始回测</Button>
+      {automatic.isError && <FieldError>{automatic.error.message}</FieldError>}
       <Button
+        aria-busy={query.isFetching}
         type="button"
         variant="outline"
         disabled={!model || query.isFetching || result?.status === 'preparing'}
-        onClick={prepare}
+        onClick={()=>prepare()}
       >
+        {query.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
         {query.isFetching ? '正在准备并预检…' : '准备并核对配置'}
       </Button>
       {error && <Field invalid><FieldError>{error}</FieldError></Field>}

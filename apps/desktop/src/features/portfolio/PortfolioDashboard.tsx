@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/ui/spinner';
 import { portfolioValuationNotice } from '@thesis-ledger/domain';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -8,13 +9,14 @@ import { MarketDetailDialog } from '../market-detail/MarketDetailDialog.js';
 import type { PortfolioMode, Position, Portfolio, Account } from './portfolio.types.js';
 import type { LoadState } from '../shared/types.js';
 import type { OnboardingNavigationOptions } from '../onboarding/onboarding.types.js';
-import { StatePanel, DataStateBanner, DashboardSkeleton } from '../shared/DesktopPrimitives.js';
+import { StatePanel, DataStateBanner } from '../shared/DesktopPrimitives.js';
 
 import { FirstRunOnboarding } from '../onboarding/FirstRunOnboarding.js';
 import { useOnboardingStatusQuery } from '../onboarding/onboarding.queries.js';
 import { PortfolioPositionTable, PortfolioSummary } from './PortfolioOverview.js';
 
 export function PortfolioDashboard({
+  refreshing = false,
   state,
   portfolio,
   accounts,
@@ -22,6 +24,7 @@ export function PortfolioDashboard({
   onRetry,
   onNavigate,
 }: {
+  refreshing?: boolean;
   state: LoadState;
   portfolio: Portfolio | null;
   accounts: Account[];
@@ -38,11 +41,7 @@ export function PortfolioDashboard({
     hasRiskRule: false,
   };
   if (state === 'loading') {
-    return (
-      <>
-        <DashboardSkeleton />
-      </>
-    );
+    return <LoadingState label="正在加载投资组合" />;
   }
   if (state === 'error')
     return (
@@ -76,6 +75,7 @@ export function PortfolioDashboard({
         />
       </>
     );
+  if (!portfolio) return <LoadingState label="正在加载投资组合" />;
   return (
     <>
       <DataStateBanner
@@ -90,9 +90,10 @@ export function PortfolioDashboard({
         hasRiskRule={onboardingStatus.hasRiskRule}
         onNavigate={onNavigate}
       />
-      <PortfolioSummary portfolio={portfolio!} />
+      <PortfolioSummary portfolio={portfolio} />
       <PortfolioPositionTable
-        portfolio={portfolio!}
+        refreshing={refreshing}
+        portfolio={portfolio}
         accounts={accounts}
         onSelectPosition={setDetailPosition}
       />

@@ -240,20 +240,12 @@ function MarketDetailDialogView({
   const chipSection = visibleDetail?.sections.chip;
   const fundNavSection = visibleDetail?.sections['fund-nav'];
   const fundNavHistorySection = visibleDetail?.sections['fund-nav-history'];
-  const loading = query.isPending && !visibleDetail;
+  const loading = query.isPending && query.isFetching && !visibleDetail;
   const queryError = query.isError && !visibleDetail;
   const refreshError = query.isError && Boolean(visibleDetail);
   const { stale, staleNotice, quoteUpstreamNotice } = marketDetailNotices(visibleDetail, query.isFetching, retryAll);
 
   const queryNotice = () => {
-    if (loading)
-      return (
-        <MarketDetailNotice
-          state="loading"
-          title="正在加载行情详情"
-          description="正在按服务端声明的能力读取行情，请稍候。"
-        />
-      );
     if (queryError)
       return (
         <MarketDetailNotice

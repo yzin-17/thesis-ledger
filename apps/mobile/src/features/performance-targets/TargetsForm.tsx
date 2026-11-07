@@ -102,7 +102,7 @@ export function TargetsForm({
           editable={!mutation.isPending}
         />
       ))}
-      <Feedback message={feedback} error={mutation.isError || locked} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError || locked} />
       <Action
         label="重新核对配置目标"
         disabled={mutation.isPending}

@@ -12,7 +12,7 @@ import {
   Copy,
   Feedback,
   Page,
-  QueryStatus,
+  QueryList, QueryStatus,
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
@@ -89,134 +89,138 @@ export function PlansScreen() {
         disabled={!writable}
         onPress={() => navigation.navigate('PlanEditor', params)}
       />
-      <Feedback message={feedback} error={mutation.isError} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError} />
       <Choices
         label="计划状态"
         value={status}
         options={[{ value: 'all', label: '全部计划' }, ...planStatusOptions]}
         onChange={setStatus}
       />
-      <QueryStatus
+      <QueryList
         query={plans}
         empty={plans.data?.length === 0}
         retry={() => void plans.refetch()}
-      />
-      {plans.data
-        ?.filter((row) => status === 'all' || row.status === status)
-        .map((plan) => (
-          <Section key={plan.id} title={plan.name}>
-            <Copy>
-              {plan.expectedAmount} {plan.currency} · 每月 {plan.dayOfMonth} 日 ·{' '}
-              {planStatusOptions.find((item) => item.value === plan.status)?.label}
-            </Copy>
-            {'symbol' in plan ? (
+        label="正在刷新计划"
+      >
+        {plans.data
+          ?.filter((row) => status === 'all' || row.status === status)
+          .map((plan) => (
+            <Section key={plan.id} title={plan.name}>
               <Copy>
-                {plan.fundName} · {plan.symbol}
+                {plan.expectedAmount} {plan.currency} · 每月 {plan.dayOfMonth} 日 ·{' '}
+                {planStatusOptions.find((item) => item.value === plan.status)?.label}
               </Copy>
-            ) : null}
-            <Copy muted>
-              起始 {plan.startPeriod} · 下期 {plan.nextDueAt ?? '无'} · 版本 {plan.version}
-            </Copy>
-            <Action
-              label={`编辑计划 ${plan.name}`}
-              disabled={!writable || plan.status === 'ENDED'}
-              onPress={() => navigation.navigate('PlanEditor', { ...params, plan })}
-            />
-            {plan.status === 'ACTIVE' ? (
+              {'symbol' in plan ? (
+                <Copy>
+                  {plan.fundName} · {plan.symbol}
+                </Copy>
+              ) : null}
+              <Copy muted>
+                起始 {plan.startPeriod} · 下期 {plan.nextDueAt ?? '无'} · 版本 {plan.version}
+              </Copy>
               <Action
-                label={`暂停计划 ${plan.name}`}
-                disabled={!writable}
-                onPress={() => void changeState(plan, 'pause')}
+                label={`编辑计划 ${plan.name}`}
+                disabled={!writable || plan.status === 'ENDED'}
+                onPress={() => navigation.navigate('PlanEditor', { ...params, plan })}
               />
-            ) : null}
-            {plan.status === 'PAUSED' ? (
-              <Action
-                label={`恢复计划 ${plan.name}`}
-                disabled={!writable}
-                onPress={() => void changeState(plan, 'resume')}
-              />
-            ) : null}
-            {plan.status !== 'ENDED' ? (
-              <Action
-                label={`结束计划 ${plan.name}`}
-                disabled={!writable}
-                destructive
-                onPress={() => void changeState(plan, 'end')}
-              />
-            ) : null}
-          </Section>
-        ))}
+              {plan.status === 'ACTIVE' ? (
+                <Action
+                  label={`暂停计划 ${plan.name}`}
+                  disabled={!writable}
+                  onPress={() => void changeState(plan, 'pause')}
+                />
+              ) : null}
+              {plan.status === 'PAUSED' ? (
+                <Action
+                  label={`恢复计划 ${plan.name}`}
+                  disabled={!writable}
+                  onPress={() => void changeState(plan, 'resume')}
+                />
+              ) : null}
+              {plan.status !== 'ENDED' ? (
+                <Action
+                  label={`结束计划 ${plan.name}`}
+                  disabled={!writable}
+                  destructive
+                  onPress={() => void changeState(plan, 'end')}
+                />
+              ) : null}
+            </Section>
+          ))}
+      </QueryList>
       <Choices
         label="发生项状态"
         value={occurrenceStatus}
         options={[{ value: 'all', label: '全部发生项' }, ...occurrenceStatusOptions]}
         onChange={setOccurrenceStatus}
       />
-      <QueryStatus
+      <QueryList
         query={occurrences}
         empty={occurrences.data?.length === 0}
         retry={() => void occurrences.refetch()}
-      />
-      {occurrences.data
-        ?.filter((row) => occurrenceStatus === 'all' || row.status === occurrenceStatus)
-        .map((occurrence) => (
-          <Section key={occurrence.id} title={`${occurrence.planName} · ${occurrence.periodKey}`}>
-            <Copy>
-              {occurrenceStatusOptions.find((item) => item.value === occurrence.status)?.label} ·
-              预计 {occurrence.expectedAmount} {occurrence.currency} · 版本 {occurrence.version}
-            </Copy>
-            <Copy muted>
-              计划日 {occurrence.scheduledFor} · 账本事件 {occurrence.ledgerEventId ?? '尚未记账'}
-            </Copy>
-            {'actualAmount' in occurrence ? (
-              <Copy>实际金额 {occurrence.actualAmount ?? '—'}</Copy>
-            ) : (
+        label="正在刷新发生项"
+      >
+        {occurrences.data
+          ?.filter((row) => occurrenceStatus === 'all' || row.status === occurrenceStatus)
+          .map((occurrence) => (
+            <Section key={occurrence.id} title={`${occurrence.planName} · ${occurrence.periodKey}`}>
               <Copy>
-                实际份额 {occurrence.actualQuantity ?? '—'} · 净值 {occurrence.unitPrice ?? '—'} ·
-                费用 {occurrence.commission ?? '—'}
+                {occurrenceStatusOptions.find((item) => item.value === occurrence.status)?.label} ·
+                预计 {occurrence.expectedAmount} {occurrence.currency} · 版本 {occurrence.version}
               </Copy>
-            )}
-            {occurrence.status === 'PENDING' ? (
-              <>
+              <Copy muted>
+                计划日 {occurrence.scheduledFor} · 账本事件 {occurrence.ledgerEventId ?? '尚未记账'}
+              </Copy>
+              {'actualAmount' in occurrence ? (
+                <Copy>实际金额 {occurrence.actualAmount ?? '—'}</Copy>
+              ) : (
+                <Copy>
+                  实际份额 {occurrence.actualQuantity ?? '—'} · 净值 {occurrence.unitPrice ?? '—'} ·
+                  费用 {occurrence.commission ?? '—'}
+                </Copy>
+              )}
+              {occurrence.status === 'PENDING' ? (
+                <>
+                  <Action
+                    label={`确认发生 ${occurrence.periodKey}`}
+                    disabled={!writable || !canUseReadForWrite(occurrences)}
+                    onPress={() =>
+                      navigation.navigate('OccurrenceEditor', {
+                        ...params,
+                        occurrence,
+                        action: 'confirm',
+                      })
+                    }
+                  />
+                  <Action
+                    label={`跳过发生 ${occurrence.periodKey}`}
+                    disabled={!writable || !canUseReadForWrite(occurrences)}
+                    onPress={() =>
+                      navigation.navigate('OccurrenceEditor', {
+                        ...params,
+                        occurrence,
+                        action: 'skip',
+                      })
+                    }
+                  />
+                </>
+              ) : null}
+              {occurrence.status === 'SKIPPED' ? (
                 <Action
-                  label={`确认发生 ${occurrence.periodKey}`}
+                  label={`重开发生 ${occurrence.periodKey}`}
                   disabled={!writable || !canUseReadForWrite(occurrences)}
                   onPress={() =>
                     navigation.navigate('OccurrenceEditor', {
                       ...params,
                       occurrence,
-                      action: 'confirm',
+                      action: 'reopen',
                     })
                   }
                 />
-                <Action
-                  label={`跳过发生 ${occurrence.periodKey}`}
-                  disabled={!writable || !canUseReadForWrite(occurrences)}
-                  onPress={() =>
-                    navigation.navigate('OccurrenceEditor', {
-                      ...params,
-                      occurrence,
-                      action: 'skip',
-                    })
-                  }
-                />
-              </>
-            ) : null}
-            {occurrence.status === 'SKIPPED' ? (
-              <Action
-                label={`重开发生 ${occurrence.periodKey}`}
-                disabled={!writable || !canUseReadForWrite(occurrences)}
-                onPress={() =>
-                  navigation.navigate('OccurrenceEditor', {
-                    ...params,
-                    occurrence,
-                    action: 'reopen',
-                  })
-                }
-              />
-            ) : null}
-          </Section>
-        ))}
+              ) : null}
+            </Section>
+          ))}
+      </QueryList>
     </Page>
   );
 }

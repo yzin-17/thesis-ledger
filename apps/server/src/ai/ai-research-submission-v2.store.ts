@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
   aiExecutionSummarySchema,
+  RESEARCH_OBSERVATION_METHOD,
   aiFrozenResearchV2Schema,
   researchScopeSnapshotV2Schema,
   type AiExecutionSummary,
@@ -115,6 +116,7 @@ export class AiResearchSubmissionV2Store {
           researchScopeSnapshot: frozen.scopeSnapshot,
           modelMetadata: {
             ...seed.metadata,
+            scheduledObservationMethod: RESEARCH_OBSERVATION_METHOD,
             researchSettingsRevision: frozen.researchSettingsRevision,
             sdkExecution: execution,
             frozenResearch: frozen,

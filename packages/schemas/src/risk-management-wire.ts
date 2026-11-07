@@ -54,7 +54,14 @@ export const riskScanResponseSchema = z
     scanId: z.uuid(),
     results: z.array(
       z
-        .object({ ruleId: z.uuid(), eventId: z.uuid().optional(), error: z.string().optional() })
+        .object({
+          ruleId: z.uuid(),
+          eventId: z.uuid().optional(),
+          error: z.string().optional(),
+          errorCode: z
+            .enum(['input-unavailable', 'evaluation-failed', 'notification-enqueue-failed'])
+            .optional(),
+        })
         .passthrough()
         .transform(omitUndefinedDeep),
     ),
@@ -96,3 +103,37 @@ export const notificationRoutingResponseSchema = z
   .passthrough();
 export type RiskRuleWire = z.infer<typeof riskRuleResponseSchema>;
 export type RiskTestResultsWire = z.infer<typeof riskTestResultsResponseSchema>;
+
+export const riskMonitoringSourceSchema = z.object({
+  symbol: z.string(),
+  assetName: z.string().optional(),
+  assetType: z.string(),
+  acquisition: z.string(),
+  reason: z.string(),
+  provider: z.string().nullable(),
+  minIntervalSeconds: z.number().nullable(),
+  sourceUpdateIntervalSeconds: z.number().nullable(),
+  sourceTime: z.string().nullable(),
+  fetchedAt: time.nullable(),
+  nextAttemptAt: time.nullable(),
+});
+export const riskAutomaticMonitoringStatusSchema = z.object({
+  mode: z.literal('observed-data'),
+  continuousSource: z.literal(false),
+  eligibleRules: z.number().int().nonnegative(),
+  futureRules: z.number().int().nonnegative(),
+  unsupportedRules: z.number().int().nonnegative(),
+  checkedAt: time.nullable(),
+  evaluatedAt: time.nullable(),
+  gapAt: time.nullable(),
+  missingPrices: z.number().int().nonnegative(),
+  inputUnavailable: z.number().int().nonnegative().default(0),
+  inputReason: z.string().nullable().default(null),
+  delayedPrices: z.number().int().nonnegative(),
+  processorAvailable: z.boolean(),
+  error: z.string().nullable(),
+  limitation: z.string(),
+  acquisitionCheckedAt: time.nullable().default(null),
+  acquisitionAvailable: z.boolean().default(false),
+  sources: z.array(riskMonitoringSourceSchema).default([]),
+});

@@ -88,16 +88,16 @@ export function FirstRunOnboarding({
 
   return (
     <section
-      className="mb-4 rounded-md border bg-card p-4 forced-colors:bg-[Canvas] forced-colors:text-[CanvasText] forced-colors:border-[ButtonText]"
+      className={cn('mb-3 forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]', !hasPosition && 'rounded-md border bg-card p-4 forced-colors:border-[ButtonText]')}
       aria-labelledby="onboarding-title"
       data-onboarding-step={currentStep}
     >
       <details open={!hasPosition || undefined}>
-        <summary id="onboarding-title" className="cursor-pointer text-sm font-medium">
-          {hasPosition ? `待完善：${remaining}（展开配置步骤）` : '四步完成第一次闭环'}
+        <summary id="onboarding-title" className={cn('cursor-pointer font-medium', hasPosition ? 'text-xs text-muted-foreground' : 'text-sm')}>
+          {hasPosition ? `待完善：${remaining}` : '四步完成第一次闭环'}
         </summary>
         <div className="py-4">
-          <p className="mt-2 text-[13px] leading-[1.5] text-muted-foreground">
+          <p className="mt-2 text-sm leading-[1.5] text-muted-foreground">
             按顺序完成账户、持仓、数据源与通知、风险提醒配置。自动化任务可以稍后设置。
           </p>
           <p className="mt-2 text-xs text-muted-foreground">当前步骤 {currentStep} / 4</p>
@@ -170,10 +170,10 @@ export function FirstRunOnboarding({
             number={4}
             complete={hasRiskRule}
             current={currentStep === 4}
-            title="设置风险规则"
+            title="启用风险规则"
             description={
               hasRiskRule
-                ? '已设置风险规则。'
+                ? '风险规则已启用，自动参与已有数据更新评估。'
                 : '风险提醒用于研究辅助，不代表交易执行保证；通知失败会保留在历史中。'
             }
             actions={

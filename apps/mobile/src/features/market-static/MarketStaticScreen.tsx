@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { useState } from 'react';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -9,7 +10,6 @@ import {
   Choices,
   Copy,
   Feedback,
-  Field,
   Page,
   QueryStatus,
   Section,
@@ -47,7 +47,13 @@ export function MarketStaticScreen() {
   return (
     <Page title="港美证券资料">
       <Copy muted>输入证券代码，读取港美股票或 ETF 的当前参考资料。</Copy>
-      <Field label="港美证券代码" value={symbol} onChange={setSymbol} />
+      <InstrumentSymbolField
+        label="港美证券代码"
+        markets={['HK', 'US']}
+        instrumentTypes={[type]}
+        value={symbol}
+        onChange={setSymbol}
+      />
       <Choices
         label="静态资料资产类型"
         value={type}

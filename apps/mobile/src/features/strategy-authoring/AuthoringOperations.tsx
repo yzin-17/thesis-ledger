@@ -25,7 +25,7 @@ import {
   Copy,
   Feedback,
   Field,
-  QueryStatus,
+  QueryList, QueryStatus,
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
@@ -323,17 +323,23 @@ export function AuthoringOperations({
           onPress={() => execute('rebuild')}
         />
       ) : null}
-      <QueryStatus query={history} retry={() => void history.refetch()} />
-      {history.data?.map((row) => (
-        <Action
-          key={row.id}
-          label={`读取操作 ${row.id} · ${operationStatusLabels[row.status] ?? '待核对'}`}
-          onPress={() => {
-            setOperationId(row.id);
-            setProposalId(row.proposalId ?? '');
-          }}
-        />
-      ))}
+      <QueryList
+        query={history}
+        retry={() => void history.refetch()}
+        label="正在刷新编写历史"
+        gap={12}
+      >
+        {history.data?.map((row) => (
+          <Action
+            key={row.id}
+            label={`读取操作 ${row.id} · ${operationStatusLabels[row.status] ?? '待核对'}`}
+            onPress={() => {
+              setOperationId(row.id);
+              setProposalId(row.proposalId ?? '');
+            }}
+          />
+        ))}
+      </QueryList>
       {operationId ? (
         <QueryStatus query={operation} retry={() => void operation.refetch()} />
       ) : null}
@@ -386,7 +392,7 @@ export function AuthoringOperations({
           />
         </Section>
       ) : null}
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
     </Section>
   );
 }

@@ -1,9 +1,9 @@
+import { formatMarketNumber, formatPercentValue } from '@thesis-ledger/domain';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { useMarketTradingOverlays } from './useMarketTradingOverlays.js';
 
 type Overlay = ReturnType<typeof useMarketTradingOverlays>;
-const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 6 });
 
 export function MarketTradingOverlayControls({ overlay }: { overlay: Overlay }) {
   const { state, update } = overlay;
@@ -92,12 +92,10 @@ export function MarketTradingOverlayControls({ overlay }: { overlay: Overlay }) 
       ) : null}
       {overlay.measurement ? (
         <p className="text-sm" aria-label="价格区间测量结果">
-          价格区间：{number.format(overlay.measurement.fromPrice)} →{' '}
-          {number.format(overlay.measurement.toPrice)}， 差值
-          {number.format(overlay.measurement.difference)}， 涨跌幅
-          {overlay.measurement.percent === null
-            ? '—'
-            : `${number.format(overlay.measurement.percent)}%`}
+          价格区间：{formatMarketNumber(overlay.measurement.fromPrice, 'measurement')} →{' '}
+          {formatMarketNumber(overlay.measurement.toPrice, 'measurement')}， 差值
+          {formatMarketNumber(overlay.measurement.difference, 'measurement')}， 涨跌幅
+          {formatPercentValue(overlay.measurement.percent, 'auto', 6)}
           ，{overlay.measurement.bars}根；不含费用。
         </p>
       ) : null}

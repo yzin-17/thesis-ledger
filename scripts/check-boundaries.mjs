@@ -4,25 +4,62 @@ import { boundarySourceFiles } from './boundary-source-inventory.mjs';
 import { mobileBoundaryViolation } from './mobile-boundaries.mjs';
 import { aiCatalogBoundaryViolation } from './ai-catalog-boundaries.mjs';
 import { instrumentDisplayBoundaryViolation } from './instrument-display-boundaries.mjs';
-
+import { browserRequestIdBoundaryViolation } from './browser-request-id-boundaries.mjs';
+import { dateInputBoundaryViolation } from './date-input-boundaries.mjs';
+import { draftCloseSnapshotBoundaryViolation, navigationDraftSnapshotBoundaryViolation } from './draft-close-boundaries.mjs';
 const root = new URL('..', import.meta.url).pathname;
 const violations = [];
-
 const serverLedgerPrefix = 'apps/server/src/ledger/';
 const serverImportsPrefix = 'apps/server/src/imports/';
 const serverProvidersPrefix = 'apps/server/src/providers/';
 const serverBacktestPrefix = 'apps/server/src/backtest/';
 const serverBacktestTestPrefix = 'apps/server/test/backtest/';
 const forbiddenFeatureDependencies = [
+  ['apps/server/src/watchlist/', 'apps/server/src/integration/', '自选报价与日历只消费 Market 领域边界，不得直连 DSA 绕过控制和缓存'],
+  ['apps/server/src/market/', 'apps/server/src/risk/', 'Market拥有行情观察事实，必须由Risk单向消费，禁止行情反向编排风险'],
+  ['apps/server/src/risk/risk-monitoring.service.ts', 'apps/server/src/integration/', '自动监控只消费已取得的数据，不得隐式扩展远程行情调用'],
+  ['apps/server/src/risk/risk-market-demand.service.ts', 'apps/server/src/integration/', '风险只登记行情需求，来源能力和后台执行属于 Market/DSA'],
+
+  ...['InstrumentSymbolField.tsx', 'InstrumentSearchCombobox.tsx', 'InstrumentOptionField.tsx', 'instrument-picker.queries.ts', 'MarketReferenceCodeField.tsx', 'MarketReferenceContractField.tsx'].flatMap(file =>
+    ['portfolio', 'ai', 'risk', 'account-data', 'strategy', 'watchlist'].map(feature => [
+      `apps/desktop/src/features/market-data/${file}`, `apps/desktop/src/features/${feature}/`,
+      '公共标的选择属于 Market 目录契约，不得反向依赖业务确认与保存编排',
+    ]),
+  ),
+  ['packages/api-client/src/market-reference-contracts.ts', 'apps/', '来源合约投影只消费已关联的资料页，不得依赖运行时业务编排'],
+  ...['InstrumentPicker.tsx', 'InstrumentSymbolField.tsx', 'InstrumentOptionField.tsx'].flatMap(file =>
+    ['account-baselines', 'executions', 'recurring-plans', 'research-submit', 'watchlist'].map(feature => [
+      `apps/mobile/src/features/market/${file}`, `apps/mobile/src/features/${feature}/`,
+      '移动端公共标的选择不得反向依赖业务消费者',
+    ]),
+  ),
+  ...['ledger','portfolio','imports'].map(feature => [
+    'apps/server/src/model-arena/', `apps/server/src/${feature}/`, '比赛专用模拟账不可依赖账户写入模块',
+  ]),
   ['apps/desktop/src/features/portfolio/', 'apps/desktop/src/features/performance/', '组合事实与展示不得反向依赖收益分析消费；联合刷新由应用编排拥有'],
   ['apps/desktop/src/features/portfolio/', 'apps/desktop/src/app/', '组合特性不得反向依赖统一收益工作区编排'],
   ['apps/desktop/src/features/performance/', 'apps/desktop/src/app/', '收益特性不得反向依赖统一收益工作区编排'],
+  ...['market', 'ledger', 'research'].map(feature => [
+    `apps/server/src/${feature}/`, 'apps/server/src/watchlist/', '上游领域不得反向依赖自选关注关系',
+  ]),
   ['apps/server/src/market/', 'apps/server/src/ledger/trade-', '行情来源不得反向读取账本成交投影；交易叠加由Ledger提供并由Portfolio消费'],
   ['apps/server/src/ledger/trade-chart-query.service.ts', 'apps/server/src/market/', '成交图表只读投影不得依赖行情来源或价格读取'],
   ['apps/server/src/market/market-rule-monitor.controller.ts', 'apps/server/src/backtest/', '收费资料监测仅观察版本，不得编排回测或改写执行冻结'],
   ['apps/server/src/market/market-rule-monitor.controller.ts', 'apps/server/src/providers/', '收费资料监测不得改变Provider配置或准入'],
   ['apps/desktop/src/features/shared/usePageRefresh.ts', 'apps/desktop/src/features/', '页面刷新只调度查询缓存，不得依赖具体功能编排'],
   ['apps/desktop/src/features/shared/usePageRefresh.ts', 'apps/desktop/src/shared/api/', '页面刷新不得绕过查询缓存直接重放 API 请求'],
+  ['apps/desktop/src/app/DeferredPage.tsx', 'apps/desktop/src/features/', '页面代码加载只承接加载器，不依赖功能编排'],
+  ['apps/desktop/src/app/DeferredPage.tsx', 'apps/desktop/src/shared/api/', '页面代码加载不得发起业务请求'],
+  ['apps/desktop/src/app/performance-workspace-tabs.ts', 'apps/desktop/src/features/', '收益 URL 投影保持轻量，不加载功能页面'],
+  ['apps/desktop/src/app/performance-workspace-tabs.ts', 'apps/desktop/src/app/PerformanceWorkspace', 'URL 投影不得反向加载收益页面实现'],
+  ['apps/desktop/src/features/', 'apps/desktop/src/app/deferred-pages', '功能模块不得反向依赖应用路由加载注册'],
+  ['apps/desktop/src/features/', 'apps/desktop/src/app/DeferredPage', '页面加载组合由应用层拥有'],
+  ['packages/domain/src/ratio-percent.ts', 'apps/', '比例单位合同不得依赖应用业务编排'],
+  ['packages/domain/src/ratio-percent.ts', 'packages/api-client/', '比例单位合同不得依赖请求适配层'],
+  ...['decimal.ts', 'decimal-number-display.ts', 'risk/threshold-format.ts'].flatMap(file => [
+    [`packages/domain/src/${file}`, 'apps/', '十进制表示与风险阈值展示不得依赖应用编排'],
+    [`packages/domain/src/${file}`, 'packages/api-client/', '十进制表示与风险阈值展示不得依赖请求适配层'],
+  ]),
   ['packages/domain/src/valuation-display.ts', 'apps/', '估值展示投影不得依赖应用编排、来源或持久化'],
   ['packages/domain/src/valuation-display.ts', 'packages/api-client/', '估值展示投影只消费结果，不得主动发起请求'],
   ...['research', 'providers', 'ledger', 'backtest'].map((feature) => [
@@ -405,10 +442,10 @@ async function inspect(path) {
   ) {
     violations.push(`${file} -> 旧工具审计入口 (研究报告必须携带正文 locator 读取审计)`);
   }
-  const catalogViolation = aiCatalogBoundaryViolation(file, source);
-  if (catalogViolation) violations.push(`${file} -> ${catalogViolation}`);
-  const displayViolation = instrumentDisplayBoundaryViolation(file, source);
-  if (displayViolation) violations.push(`${file} -> ${displayViolation}`);
+  for (const check of [aiCatalogBoundaryViolation, instrumentDisplayBoundaryViolation, dateInputBoundaryViolation, browserRequestIdBoundaryViolation, draftCloseSnapshotBoundaryViolation, navigationDraftSnapshotBoundaryViolation]) {
+    const violation = check(file, source);
+    if (violation) violations.push(`${file} -> ${violation}`);
+  }
   const isMarketFeature = file.startsWith('apps/server/src/market/');
   if (
     isServerSource &&
@@ -517,11 +554,12 @@ async function inspect(path) {
       !file.startsWith(serverBacktestPrefix) &&
       !file.startsWith(serverBacktestTestPrefix) &&
       ![
+        'apps/server/src/model-arena/arena-queue.ts',
         'apps/server/src/strategy-authoring/authoring-queue.ts',
         'apps/server/src/strategy-authoring/authoring.worker.ts',
       ].includes(file)
     ) {
-      violations.push(`${file} -> ${specifier} (BullMQ 只能由回测或编写队列适配器消费)`);
+      violations.push(`${file} -> ${specifier} (BullMQ 只能由回测、编写或竞技场队列适配器消费)`);
     }
     if (!specifier.startsWith('.')) continue;
     const target = relative(root, resolve(dirname(path), specifier)).replaceAll('\\', '/');

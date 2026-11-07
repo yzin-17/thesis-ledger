@@ -145,9 +145,41 @@ model FundValuationPoint {
   evidence   Json
   lastValidAt DateTime? @db.Timestamp(3)
   lastValidSnapshot Json?
+  lastValidEvidence Json?
 
   @@id([symbol, minute, method])
   @@index([symbol, lastValidAt])
+}
+
+model FundDailyEstimateError {
+  symbol     String
+  day        String   @db.Char(10)
+  method     String
+  minute     DateTime
+  estimate   Json
+  evidence   Json
+  official   Json?
+  errors     Json?
+  checkedAt  DateTime?
+  sourceAttemptAt DateTime?
+  frozenAt   DateTime @default(now())
+  @@id([symbol, day, method])
+}
+
+model StrategySubmission {
+  id          String   @id @db.Uuid
+  ownerId     String   @db.Uuid
+  kind        String
+  input       Json
+  state       String
+  attempt     Int      @default(0)
+  nextAt      DateTime @default(now())
+  prepared    Json?
+  outcome     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([state, nextAt])
+  @@index([ownerId, createdAt])
 }
 
 model Instrument {
@@ -163,6 +195,7 @@ model Instrument {
   active         Boolean                      @default(true)
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
+  watchlistItems  WatchlistItem[]
   associations   InstrumentAssetAssociation[]
   reportMetadataSnapshots MarketReportMetadataSnapshot[]
 
@@ -656,6 +689,19 @@ model MarketDerivedSeriesSnapshotV3 {
   algorithmRevision String   @db.VarChar(128)
   snapshot          Json
   createdAt         DateTime @default(now())
+}
+
+model MarketEconomicPriceCertificate {
+  inputFingerprint   String   @id @db.Char(64)
+  algorithmRevision  String   @db.VarChar(128)
+  symbol             String   @db.VarChar(32)
+  startDate          String   @db.Char(10)
+  endDate            String   @db.Char(10)
+  derivedFingerprint String   @db.Char(64)
+  snapshot           Json
+  createdAt          DateTime @default(now())
+
+  @@index([symbol, startDate, endDate])
 }
 
 model DataQualityIssue {
@@ -1418,4 +1464,182 @@ model AiInvocationFact {
 
   @@id([requestId, eventKey])
   @@unique([requestId, sequence])
+}
+
+model Watchlist {
+  ownerId  String @id @db.Uuid
+  revision Int @default(0)
+  groups   WatchlistGroup[]
+  items    WatchlistItem[]
+}
+
+model WatchlistGroup {
+  id      String @id @default(uuid()) @db.Uuid
+  ownerId String @db.Uuid
+  name    String @db.VarChar(60)
+  list    Watchlist @relation(fields: [ownerId], references: [ownerId], onDelete: Restrict)
+  items   WatchlistItem[]
+
+  @@unique([ownerId, id])
+}
+
+model WatchlistItem {
+  id           String @id @default(uuid()) @db.Uuid
+  ownerId      String @db.Uuid
+  instrumentId String @db.Uuid
+  groupId      String? @db.Uuid
+  pinned       Boolean @default(false)
+  order        Int @default(0)
+  addedAt      DateTime @default(now())
+  list         Watchlist @relation(fields: [ownerId], references: [ownerId], onDelete: Restrict)
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  group        WatchlistGroup? @relation(fields: [ownerId, groupId], references: [ownerId, id], onDelete: Restrict)
+
+  @@unique([ownerId, instrumentId])
+  @@index([ownerId, groupId, pinned, order])
+}
+
+model ModelArena {
+  id         String @id @default(uuid()) @db.Uuid
+  ownerId    String @db.Uuid
+  state      String @default("draft")
+  protocol   Json
+  remaining  Json
+  createdAt  DateTime @default(now())
+  entrants   ArenaEntrant[]
+  rounds     ArenaRound[]
+  occurrences ArenaOccurrence[]
+  startedAt DateTime?
+  endedAt DateTime?
+  weeks ArenaWeek[]
+
+  @@index([ownerId, createdAt])
+}
+
+model ArenaEntrant {
+  id          String @id @default(uuid()) @db.Uuid
+  arenaId     String @db.Uuid
+  providerId  String
+  model       String
+  cash        Decimal @db.Decimal(24,6)
+  remaining   Json
+  arena       ModelArena @relation(fields:[arenaId], references:[id], onDelete:Restrict)
+  reservations ArenaReservation[]
+
+  @@unique([arenaId,providerId,model])
+  @@unique([arenaId,id])
+}
+
+model ArenaRound {
+  id           String @id @default(uuid()) @db.Uuid
+  arenaId      String @db.Uuid
+  tradingDate  String @db.VarChar(10)
+  corporateActionCoverage Json?
+  openingFacts Json?
+  packet       ArenaResearchPacket?
+  outcome      Json
+  createdAt    DateTime @default(now())
+  arena        ModelArena @relation(fields:[arenaId], references:[id], onDelete:Restrict)
+  reservations ArenaReservation[]
+
+  @@unique([arenaId,tradingDate])
+  @@unique([arenaId,id])
+}
+
+model ArenaReservation {
+  id         String @id @default(uuid()) @db.Uuid
+  arenaId    String @db.Uuid
+  roundId    String @db.Uuid
+  entrantId  String @db.Uuid
+  amount     Json
+  privateBook Json?
+  decisionState String @default("pending")
+  execution Json?
+  executionAt DateTime?
+  decision Json?
+  requestAudit Json?
+  requestId String? @unique @db.Uuid
+  settledAt DateTime?
+  fills ArenaFill[]
+  round      ArenaRound @relation(fields:[arenaId,roundId],references:[arenaId,id],onDelete:Restrict)
+  entrant    ArenaEntrant @relation(fields:[arenaId,entrantId],references:[arenaId,id],onDelete:Restrict)
+
+  @@unique([roundId,entrantId])
+}
+
+model ArenaOccurrence {
+  id           String @id @default(uuid()) @db.Uuid
+  arenaId      String @db.Uuid
+  arena        ModelArena @relation(fields:[arenaId],references:[id],onDelete:Restrict)
+  tradingDate  String @db.VarChar(10)
+  dueAt        DateTime
+  deadlineAt   DateTime
+  nextOpenAt   DateTime
+  calendarRevision String
+  state        String @default("scheduled")
+  attempt      Int @default(0)
+  maxAttempts  Int
+  leaseUntil   DateTime?
+  reason       String?
+
+  @@unique([arenaId,tradingDate])
+  @@index([state,dueAt])
+}
+
+model ArenaResearchPacket {
+  roundId String @id @db.Uuid
+  round ArenaRound @relation(fields:[roundId],references:[id],onDelete:Restrict)
+  asOf DateTime
+  fingerprint String @db.Char(64)
+  promptVersion String
+  closeMarks Json?
+  facts Json
+}
+
+model ArenaFill {
+  id String @id @default(uuid()) @db.Uuid
+  reservationId String @db.Uuid
+  reservation ArenaReservation @relation(fields:[reservationId],references:[id],onDelete:Restrict)
+  symbol String @db.VarChar(80)
+  side String
+  quantity Decimal @db.Decimal(24,6)
+  price Decimal @db.Decimal(24,6)
+  fee Decimal @db.Decimal(24,6)
+  cashDelta Decimal @db.Decimal(24,6)
+  executedAt DateTime
+  recordedAt DateTime @default(now())
+  sourceRef String
+
+  @@unique([reservationId,symbol])
+  @@index([executedAt])
+}
+
+model ArenaWeek {
+  id String @id @default(uuid()) @db.Uuid
+  arenaId String @db.Uuid
+  arena ModelArena @relation(fields:[arenaId],references:[id],onDelete:Restrict)
+  week String @db.VarChar(10)
+  method String
+  periodStart String @db.VarChar(10)
+  periodEnd String @db.VarChar(10)
+  cutoff DateTime
+  state String @default("scheduled")
+  attempt Int @default(0)
+  leaseUntil DateTime?
+  attemptBase Int @default(0)
+  reason String?
+  revisions ArenaWeekRevision[]
+  @@unique([arenaId,week,method])
+  @@index([state,cutoff])
+}
+model ArenaWeekRevision {
+  id String @id @default(uuid()) @db.Uuid
+  weekId String @db.Uuid
+  week ArenaWeek @relation(fields:[weekId],references:[id],onDelete:Restrict)
+  revision Int
+  digest String @db.Char(64)
+  report Json
+  publishedAt DateTime @default(now())
+  @@unique([weekId,revision])
+  @@unique([weekId,digest])
 }

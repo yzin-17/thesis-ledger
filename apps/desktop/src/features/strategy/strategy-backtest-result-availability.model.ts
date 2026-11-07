@@ -1,5 +1,9 @@
 import { backtestBenchmarkCompatibilitySchemaV3 } from '@thesis-ledger/schemas';
-import { backtestMetricNumber, backtestMetricReason } from './strategy-backtest-detail.model.js';
+import {
+  backtestMetricNumber,
+  backtestMetricPercent,
+  backtestMetricReason,
+} from './strategy-backtest-detail.model.js';
 import type { BacktestJobResult } from './strategy.types.js';
 
 const record = (value: unknown): Record<string, unknown> | null =>
@@ -48,15 +52,15 @@ export const backtestBenchmarkDisplayMetrics = (result: BacktestJobResult) => {
   else if (cost?.kind === 'unsupported') reason = 'BENCHMARK_COST_MODEL_UNSUPPORTED';
   else if (!['execution-model', 'zero-cost', 'proportional'].includes(String(cost?.kind)))
     reason = 'BENCHMARK_COST_ASSUMPTION_UNAVAILABLE';
-  else if (backtestMetricNumber(record(result.metrics)?.totalReturn) === null)
+  else if (backtestMetricPercent(record(result.metrics)?.totalReturn) === null)
     reason = 'STRATEGY_RETURN_UNAVAILABLE';
-  else if (backtestMetricNumber(benchmark.totalReturn) === null)
+  else if (backtestMetricPercent(benchmark.totalReturn) === null)
     reason = 'BENCHMARK_RETURN_UNAVAILABLE';
 
   let excessReturn = benchmark.excessReturn;
   if (excessReturn === undefined) {
     excessReturn = { status: 'unavailable', reason: reason ?? 'BENCHMARK_RETURN_UNAVAILABLE' };
-  } else if (reason && backtestMetricNumber(excessReturn) !== null) {
+  } else if (reason && backtestMetricPercent(excessReturn) !== null) {
     excessReturn = { status: 'unavailable', reason };
   }
   return { totalReturn: benchmark.totalReturn, excessReturn };
@@ -78,15 +82,32 @@ export const backtestPartialResultSummary = (result: BacktestJobResult) => {
   };
   const entries = Object.entries(labels)
     .filter(([key]) => metrics?.[key] !== undefined)
-    .map(([key, label]) => [label, metrics?.[key]] as const);
+    .map(([key, label]) => {
+      const metric = metrics?.[key];
+      const numeric = ['sharpe', 'profitFactor', 'tradeCount', 'turnover'].includes(key);
+      const available =
+        (numeric ? backtestMetricNumber(metric) : backtestMetricPercent(metric)) !== null;
+      return { label, metric, available };
+    });
   const benchmark = backtestBenchmarkDisplayMetrics(result);
   if (benchmark) {
-    entries.push(['基准净收益', benchmark.totalReturn], ['净收益差', benchmark.excessReturn]);
+    entries.push(
+      {
+        label: '基准净收益',
+        metric: benchmark.totalReturn,
+        available: backtestMetricPercent(benchmark.totalReturn) !== null,
+      },
+      {
+        label: '净收益差',
+        metric: benchmark.excessReturn,
+        available: backtestMetricPercent(benchmark.excessReturn) !== null,
+      },
+    );
   }
   const missing = entries
-    .filter(([, metric]) => backtestMetricNumber(metric) === null)
+    .filter(({ available }) => !available)
     .map(
-      ([label, metric]) => `${label}（${backtestMetricReasonLabel(metric) ?? '未提供有效指标'}）`,
+      ({ label, metric }) => `${label}（${backtestMetricReasonLabel(metric) ?? '未提供有效指标'}）`,
     );
   if (missing.length === 0)
     return '任务已完成，结果标记为部分可用；已返回指标按各自状态展示，缺口说明见诊断与复现。';

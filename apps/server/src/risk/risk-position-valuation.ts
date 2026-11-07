@@ -25,9 +25,19 @@ const qualifiedQuote = (quote: Quote, symbol: string, marketTime: string) =>
   ['live', 'delayed'].includes(quote.freshness) &&
   validTime(quote.marketTime, marketTime);
 
+const riskPriceSourceQuality = (
+  source: Pick<Quote, 'fetchedAt' | 'fallbackUsed' | 'upstreamSource'> & { freshness: string },
+) => {
+  const result: Record<string, string> = { freshness: source.freshness };
+  if (source.fetchedAt) result.fetchedAt = source.fetchedAt;
+  if (source.fallbackUsed !== undefined) result.fallbackUsed = String(source.fallbackUsed);
+  if (source.upstreamSource) result.upstreamSource = source.upstreamSource;
+  return result;
+};
+
 export const valueRiskPosition = async (
   position: RiskPosition,
-  market: MarketService,
+  market: Pick<MarketService, 'getQuote' | 'getFundNav'>,
   marketTime: string,
 ): Promise<RiskValuedPosition> => {
   const quality: Record<string, string> = { marketData: 'unavailable' };
@@ -53,6 +63,7 @@ export const valueRiskPosition = async (
       quality.priceTime = nav.navDate;
       quality.priceProvider = nav.provider;
       quality.priceBasis = 'official-nav';
+      Object.assign(quality, riskPriceSourceQuality(nav));
     } else {
       const quote = await market.getQuote(position.symbol, { allowStale: false });
       if (!qualifiedQuote(quote, position.symbol, marketTime)) reject('报价质量或时点不合格');
@@ -62,13 +73,14 @@ export const valueRiskPosition = async (
       quality.priceTime = quote.marketTime!;
       quality.priceProvider = quote.provider;
       quality.priceBasis = 'quote';
+      Object.assign(quality, riskPriceSourceQuality(quote));
     }
     if (!Number.isFinite(price) || price < 0) reject('价格不是有效非负数');
     const currency = position.asset.currency;
     if (currency !== 'CNY' && currency !== 'USD' && currency !== 'HKD')
       return reject('持仓币种不受支持');
     result.price = price;
-    quality.marketData = 'fresh';
+    quality.marketData = quality.freshness === 'delayed' ? 'delayed' : 'fresh';
     result.currency = currency;
     quality.priceCurrency = currency;
     const quantity = riskDecimal(position.quantity);

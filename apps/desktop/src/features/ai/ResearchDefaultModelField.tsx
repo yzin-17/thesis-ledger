@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
@@ -50,7 +51,7 @@ export function ResearchDefaultModelField({
         </SelectContent>
       </Select>
       <FieldDescription>保存后用于本次及后续研究；不会按提供方列表顺序自动替换。</FieldDescription>
-      {query.isPending && <FieldDescription>正在读取研究默认模型…</FieldDescription>}
+      {query.isPending && <FieldDescription><Spinner aria-label="正在读取研究默认模型" /></FieldDescription>}
       {!query.isPending && !query.isError && model.options.length === 0 && (
         <FieldDescription>
           暂无可选模型，请在数据与自动化的 AI 提供方中配置“研究报告”用途。
@@ -69,12 +70,14 @@ export function ResearchDefaultModelField({
       {hasError && <FieldError>{errorMessage}</FieldError>}
       <div className="flex flex-wrap gap-2">
         <Button
+          aria-busy={model.saving}
           type="button"
           size="sm"
           variant="outline"
           disabled={locked || !model.dirty || (!selected && model.selectedKey !== 'none')}
           onClick={model.save}
         >
+          {model.saving && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {model.saving ? '保存中…' : '保存默认模型'}
         </Button>
         {currentDefault && (
@@ -96,6 +99,7 @@ export function ResearchDefaultModelField({
             disabled={disabled || model.saving || query.isFetching}
             onClick={model.reload}
           >
+            {query.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
             重新读取模型
           </Button>
         )}

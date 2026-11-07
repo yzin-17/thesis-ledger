@@ -1,6 +1,8 @@
+import { LoadingState } from '@/components/ui/spinner';
 import { useRef, useState, type ReactNode } from 'react';
 import { requestFailureMessage } from '@/shared/api/request-error';
-import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { ArrowLeft } from 'lucide-react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useNavigationGuard } from '../shared/navigation-guard.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AuthoringWorkPage } from '../strategy-authoring/AuthoringWorkPage.js';
@@ -9,6 +11,7 @@ import { useToastManager } from '@/components/ui/toast';
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -53,7 +56,7 @@ function StrategyEditorDrawerState({
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
-        {children ? <div className="min-h-0 flex-1 overflow-y-auto">{children}</div> : null}
+        {children ? <SheetBody>{children}</SheetBody> : null}
       </SheetContent>
     </Sheet>
   );
@@ -73,7 +76,9 @@ export function StrategyEditorPage({
   const params = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [creationMode, setCreationMode] = useState(searchParams.has('draft') || searchParams.get('authoring') === '1' ? 'authoring' : 'manual');
+  const [creationMode, setCreationMode] = useState(
+    searchParams.has('draft') || searchParams.get('authoring') === '1' ? 'authoring' : 'manual',
+  );
   const [authoringDirty, setAuthoringDirty] = useState(false);
   const selection =
     mode === 'edit' ? findStrategyVersion(strategies, params.strategyId, params.versionId) : null;
@@ -86,13 +91,20 @@ export function StrategyEditorPage({
   const busy = createStrategy.isPending || createVersion.isPending;
   const strategy = selection?.strategy ?? null;
   const version = selection?.version ?? null;
-  useNavigationGuard({ dirty: dirty || authoringDirty, busy,
+  useNavigationGuard({
+    dirty: dirty || authoringDirty,
+    busy,
+    draft: { mode, creationMode, strategyId: strategy?.id, versionId: version?.id,
+      authoringDraftId: searchParams.get('draft') },
     bypass: () => allowNavigationRef.current,
     blocksLocation: (currentLocation, nextLocation) => {
-    const leavingPage = currentLocation.pathname !== nextLocation.pathname;
-    const changingDraft = new URLSearchParams(currentLocation.search).get('draft') !== new URLSearchParams(nextLocation.search).get('draft');
-    return leavingPage || (authoringDirty && changingDraft);
-  } });
+      const leavingPage = currentLocation.pathname !== nextLocation.pathname;
+      const changingDraft =
+        new URLSearchParams(currentLocation.search).get('draft') !==
+        new URLSearchParams(nextLocation.search).get('draft');
+      return leavingPage || (authoringDirty && changingDraft);
+    },
+  });
 
   const closePage = () => {
     allowNavigationRef.current = true;
@@ -117,9 +129,7 @@ export function StrategyEditorPage({
         />
       );
     }
-    return (
-      <div className="rounded-lg border p-6 text-sm text-muted-foreground">正在读取策略版本…</div>
-    );
+    return <LoadingState label="正在读取策略版本" />;
   }
   if (mode === 'edit' && !selection) {
     const unavailable = (
@@ -152,7 +162,11 @@ export function StrategyEditorPage({
         const created = await createStrategy.mutateAsync({ name, schema });
         const createdVersion = latestStrategyVersion(created.versions);
         if (!createdVersion) throw new Error('策略已创建，但响应中没有可定位的版本');
-        toastManager.add({ title: '策略已创建', description: '首个版本已保存，无需重复创建。', type: 'success' });
+        toastManager.add({
+          title: '策略已创建',
+          description: '首个版本已保存，无需重复创建。',
+          type: 'success',
+        });
         allowNavigationRef.current = true;
         void navigate(strategyCenterPath.strategyVersion(created.id, createdVersion.id), {
           replace: true,
@@ -162,7 +176,11 @@ export function StrategyEditorPage({
       }
       if (!strategy) return;
       const createdVersion = await createVersion.mutateAsync({ strategyId: strategy.id, schema });
-      toastManager.add({ title: '新版本已保存', description: '原版本保持不变，无需重复保存。', type: 'success' });
+      toastManager.add({
+        title: '新版本已保存',
+        description: '原版本保持不变，无需重复保存。',
+        type: 'success',
+      });
       allowNavigationRef.current = true;
       void navigate(strategyCenterPath.strategyVersion(strategy.id, createdVersion.id), {
         replace: true,
@@ -185,6 +203,7 @@ export function StrategyEditorPage({
         errorMessage={error}
         triggerId={presentation === 'drawer' ? strategyCenterTriggerId.editVersion : undefined}
         onDirtyChange={setDirty}
+        bypassNavigation={() => allowNavigationRef.current}
         onOpenChange={(open) => {
           if (!open) closePage();
         }}
@@ -195,37 +214,61 @@ export function StrategyEditorPage({
 
   if (presentation === 'drawer') return editor;
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          策略中心 / 策略库 /{' '}
-          {mode === 'create'
-            ? '新建策略'
-            : `${strategy?.name ?? '策略'} v${version?.version ?? '?'}`}
-        </p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-          {mode === 'create' ? '新建策略' : '编辑当前版本'}
+  if (mode === 'edit') {
+    return (
+      <div className="flex max-w-3xl flex-col gap-5">
+        <h2 className="text-xl font-semibold">
+          编辑当前版本 · {strategy?.name} v{version?.version ?? '?'}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {mode === 'create'
-            ? '保存后创建策略与首个明确版本。'
-            : `基于 v${version?.version ?? '?'} 编辑，保存后创建新版本，原版本保持不变。`}
+        <p className="text-sm text-muted-foreground">
+          基于 v{version?.version ?? '?'} 编辑，保存为新版本；保留原版本和历史回测。
         </p>
+        {editor}
       </div>
-      {mode === 'create' ? <Tabs value={creationMode} onValueChange={(value: unknown) => {
+    );
+  }
+  return (
+    <Tabs
+      value={creationMode}
+      onValueChange={(value: unknown) => {
         if (typeof value !== 'string') return;
         setCreationMode(value);
         const next = new URLSearchParams(searchParams);
-        if (value === 'authoring') next.set('authoring', '1'); else next.delete('authoring');
+        if (value === 'authoring') next.set('authoring', '1');
+        else next.delete('authoring');
         setSearchParams(next, { replace: true });
-      }}><TabsList><TabsTrigger value="manual">手动编写</TabsTrigger><TabsTrigger value="authoring">自然语言创建</TabsTrigger></TabsList>
-        <TabsContent value="manual" keepMounted>{editor}</TabsContent>
-        <TabsContent value="authoring" keepMounted><AuthoringWorkPage onDirtyChange={setAuthoringDirty} onSaved={(strategyId, versionId) => {
-          allowNavigationRef.current = true;
-          void navigate(strategyCenterPath.strategyVersion(strategyId, versionId), { replace: true });
-        }} /></TabsContent>
-      </Tabs> : editor}
-    </div>
+      }}
+    >
+      <header className="flex w-full max-w-3xl flex-col items-start gap-2">
+        <Link
+          to={strategyCenterPath.library}
+          className="inline-flex min-h-8 items-center gap-2 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-ring"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          返回策略库
+        </Link>
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-semibold tracking-tight">新建策略</h2>
+          <TabsList aria-label="创建方式">
+            <TabsTrigger value="manual">手动编写</TabsTrigger>
+            <TabsTrigger value="authoring">自然语言创建</TabsTrigger>
+          </TabsList>
+        </div>
+      </header>
+      <TabsContent value="manual" className="w-full max-w-3xl" keepMounted>
+        {editor}
+      </TabsContent>
+      <TabsContent value="authoring" keepMounted>
+        <AuthoringWorkPage
+          onDirtyChange={setAuthoringDirty}
+          onSaved={(strategyId, versionId) => {
+            allowNavigationRef.current = true;
+            void navigate(strategyCenterPath.strategyVersion(strategyId, versionId), {
+              replace: true,
+            });
+          }}
+        />
+      </TabsContent>
+    </Tabs>
   );
 }

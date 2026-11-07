@@ -314,7 +314,7 @@ function AuthoringDraftForm({
         onPress={() => execute('save')}
       />
       <Action label="丢弃编写草稿" disabled={locked || dirty} onPress={() => execute('discard')} />
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
       {receipt ? (
         <Action
           label="打开正式策略版本"

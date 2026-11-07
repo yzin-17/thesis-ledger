@@ -48,3 +48,10 @@ export type EvaluationCandidate = {
 };
 
 export type PositionContext = NonNullable<SecurityContext['positions']>[number];
+
+export type RiskScanResult = {
+  ruleId: string;
+  eventId?: string;
+  error?: string;
+  errorCode?: 'input-unavailable' | 'evaluation-failed' | 'notification-enqueue-failed';
+};

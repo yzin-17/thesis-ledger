@@ -1,3 +1,4 @@
+import { formatRatioPercent } from '@thesis-ledger/domain';
 import { money } from '../shared/display.js';
 import type { Currency } from './performance.types.js';
 
@@ -20,6 +21,7 @@ export const signedMoney = (value: number, currency?: Currency) =>
   value >= 0 ? `+${formatMoney(value, currency)}` : formatMoney(value, currency);
 
 export const signedPercent = (value: number) => {
-  const formatted = `${Math.abs(value * 100).toFixed(2)}%`;
+  if (!Number.isFinite(value)) return '—';
+  const formatted = formatRatioPercent(Math.abs(value));
   return value >= 0 ? `+${formatted}` : `-${formatted}`;
 };

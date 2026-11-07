@@ -107,8 +107,10 @@ export const usePortfolioInstrumentSearch = ({
     debouncedQuery === normalizedQuery,
   );
   const query = usePortfolioInstrumentSearchQuery(accountType, debouncedQuery, searchEnabled);
-  const results = filterInstrumentResults(accountType, query.data ?? []);
   const debouncing = Boolean(normalizedQuery) && debouncedQuery !== normalizedQuery;
+  const results = debouncedQuery === normalizedQuery && !instrumentConfirmationBusy
+    ? filterInstrumentResults(accountType, query.data ?? [])
+    : [];
   const busy =
     instrumentConfirmationBusy || (Boolean(normalizedQuery) && (debouncing || query.isFetching));
   const state = resolveSearchState({

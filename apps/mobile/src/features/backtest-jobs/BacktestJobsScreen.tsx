@@ -11,7 +11,7 @@ import {
   Copy,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 import { backtestStatusLabels, isBacktestActive } from './backtest-state';
@@ -48,22 +48,28 @@ export function BacktestJobsScreen() {
           ...Object.entries(backtestStatusLabels).map(([value, label]) => ({ value, label })),
         ]}
       />
-      <QueryStatus query={query} empty={!rows.length} retry={() => void query.refetch()} />
-      {rows.map((run) => (
-        <Section key={run.id} title={backtestStatusLabels[run.status]}>
-          <Copy>Run {run.id}</Copy>
-          <Copy>策略版本 {run.strategyVersionId}</Copy>
-          <Copy>
-            进度{' '}
-            {run.progress === undefined || run.progress === null ? '未记录' : `${run.progress}%`} ·{' '}
-            {run.createdAt ?? '创建时间未记录'}
-          </Copy>
-          <Action
-            label={`查看回测 ${run.id}`}
-            onPress={() => navigation.navigate('BacktestResult', { id: run.id, kind: params.kind })}
-          />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={!rows.length}
+        retry={() => void query.refetch()}
+        label="正在刷新回测任务"
+      >
+        {rows.map((run) => (
+          <Section key={run.id} title={backtestStatusLabels[run.status]}>
+            <Copy>Run {run.id}</Copy>
+            <Copy>策略版本 {run.strategyVersionId}</Copy>
+            <Copy>
+              进度{' '}
+              {run.progress === undefined || run.progress === null ? '未记录' : `${run.progress}%`} ·{' '}
+              {run.createdAt ?? '创建时间未记录'}
+            </Copy>
+            <Action
+              label={`查看回测 ${run.id}`}
+              onPress={() => navigation.navigate('BacktestResult', { id: run.id, kind: params.kind })}
+            />
+          </Section>
+        ))}
+      </QueryList>
       <Copy muted>
         列表最多返回最近 100 项；查询失败会保留上次数据并显示错误，不会创建或补投任务。
       </Copy>

@@ -1,0 +1,100 @@
+{
+  "dataVersion": "market-reference-v1",
+  "requestId": "6f8b7cbb-8b94-4d33-a2b1-9c8333176254",
+  "dataset": "etf-option-contracts",
+  "symbol": "510050.SH",
+  "indexCode": null,
+  "start": null,
+  "end": null,
+  "page": 2,
+  "pageSize": 20,
+  "cursor": null,
+  "nextCursor": null,
+  "providerId": "akshare",
+  "upstreamSource": "sina-etf-option-public",
+  "adapterRevision": "market-reference-projection-v1",
+  "sourceRevision": "sina-etf-option-public-v1",
+  "fetchedAt": "2026-11-06T17:24:08.109508+00:00",
+  "sourceUrl": "https://hq.sinajs.cn/list=OP_UP_5100502611,OP_DOWN_5100502611",
+  "columns": [
+    {
+      "key": "underlying",
+      "label": "标的 ETF",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "month",
+      "label": "合约月",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "optionType",
+      "label": "认购／认沽",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "contract",
+      "label": "期权合约代码",
+      "format": "text",
+      "unit": null
+    }
+  ],
+  "items": [
+    {
+      "id": "d3bf5197914627e0da0d489de965a03a10e8ea81511670cb3e8f2c7769494cb5",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012451"
+      }
+    },
+    {
+      "id": "cea38499fe00522376c6e35a8467abf1e76e05f738fe90d7a1538f923e90d28a",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012452"
+      }
+    },
+    {
+      "id": "3533cdc268ed8304ddfa87a1f97a5b9a75b711963db663fcb1d65e030da11595",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012453"
+      }
+    },
+    {
+      "id": "91e736027c125a39f6672e65f59d7217ef4c20a07d0ba4ea4c676945ba401ba3",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012454"
+      }
+    }
+  ],
+  "status": "ok",
+  "hasMore": false,
+  "totalSourceRecords": 24,
+  "historyComplete": false,
+  "notes": [
+    "历史完整性未声明；抓取时间与披露时间分别记录。",
+    "清单为所选标的当前近月的认购与认沽代码，两侧完整读取后分页；月提示与可选合约月分开，不自动扫描所有月份。",
+    "合约月按本次月份接口返回选择；合约清单与报价是独立读取，翻页期间来源清单可能变化。"
+  ],
+  "contractVersion": 3,
+  "consumer": "thesis-ledger",
+  "policyRevision": 189,
+  "routeTarget": {
+    "providerId": "akshare",
+    "upstreamSource": "sina-etf-option-public",
+    "routeIndex": 0
+  }
+}

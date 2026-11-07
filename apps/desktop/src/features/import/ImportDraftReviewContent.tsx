@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import type { ImportDraftReviewRecord, ImportDraftRow } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -117,10 +118,12 @@ export function ImportDraftReviewContent({
       )}
       {receipt && <p role="status">{receipt}</p>}
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={!canSave} onClick={onSave}>
+        <Button aria-busy={saving} variant="outline" disabled={!canSave} onClick={onSave}>
+          {saving && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {draftSaveActionLabel(draft.status, saving)}
         </Button>
-        <Button disabled={!canSubmit} onClick={onSubmit}>
+        <Button aria-busy={submitting} disabled={!canSubmit} onClick={onSubmit}>
+          {submitting && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {submitting ? '提交中……' : `确认并提交所选 ${selectedIds.length} 行`}
         </Button>
       </div>

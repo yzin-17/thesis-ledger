@@ -1,3 +1,4 @@
+import { formatRatioPercent as formatCoverage } from '@thesis-ledger/domain';
 import { useEffect, useRef, useState } from 'react';
 
 import { money } from '../shared/display.js';
@@ -22,9 +23,7 @@ const formatDate = (value: string) => {
   return Number.isNaN(date.getTime()) ? '尚无数据时点' : date.toLocaleString('zh-CN');
 };
 
-const formatCoverage = (value: number) => `${(value * 100).toFixed(2)}%`;
-
-export const performanceSeriesQualityLabel = (quality: PerformanceSeriesPoint['dataQuality']) => {
+const performanceSeriesQualityLabel = (quality: PerformanceSeriesPoint['dataQuality']) => {
   if (quality === 'LOW_COVERAGE') return '低覆盖估值';
   if (quality === 'PARTIAL') return '部分估值';
   if (quality === 'UNAVAILABLE') return '数据不可用';
@@ -138,7 +137,7 @@ export function PerformanceTrendChart({
               strokeDasharray="3 5"
             />
             {seriesPoints.length > 0 && (
-              <text x={0} y={tick.y + 4} className="fill-muted-foreground text-[10px]">
+              <text x={0} y={tick.y + 4} className="fill-muted-foreground text-chart">
                 {axisMoney(tick.value, currency)}
               </text>
             )}
@@ -151,7 +150,7 @@ export function PerformanceTrendChart({
               x={width}
               y={tick.y + 4}
               textAnchor="end"
-              className="fill-muted-foreground text-[10px]"
+              className="fill-muted-foreground text-chart"
             >
               {axisMoney(tick.value, pnlCurrency)}
             </text>
@@ -221,7 +220,7 @@ export function PerformanceTrendChart({
         <text
           x={geometry.padding.left}
           y={geometry.height - 5}
-          className="fill-muted-foreground text-[10px]"
+          className="fill-muted-foreground text-chart"
         >
           {geometry.timeline[0]
             ? new Date(geometry.timeline[0].at).toLocaleDateString('zh-CN')
@@ -231,7 +230,7 @@ export function PerformanceTrendChart({
           x={width - geometry.padding.right}
           y={geometry.height - 5}
           textAnchor="end"
-          className="fill-muted-foreground text-[10px]"
+          className="fill-muted-foreground text-chart"
         >
           {geometry.timeline.length > 1
             ? new Date(geometry.timeline.at(-1)!.at).toLocaleDateString('zh-CN')

@@ -3,7 +3,7 @@ import { useRoute, useNavigation, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import type { ResearchStackParams } from '../../app/navigation-types';
-import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Copy, Page, QueryList, QueryStatus, Section } from '../../components/MobilePrimitives';
 import { ResearchBody } from './ResearchBody';
 import { runStatusLabels } from '../journal-ai/JournalAiPanel';
 export function ResearchReportScreen() {
@@ -64,23 +64,30 @@ export function ResearchReportScreen() {
             />
           ) : null}
           <Section title="工具调用历史">
-            <QueryStatus query={tools} retry={() => void tools.refetch()} />
-            {tools.data?.pages
-              .flatMap((p) => p.items)
-              .map((tool, i) => (
-                <Section key={tool.id ?? i} title={tool.tool}>
-                  <Copy>
-                    {tool.status === 'ok' ? '成功' : '不可用或拒绝'} · 权限 {tool.permission}
-                  </Copy>
-                  <Copy>输入摘要：{tool.inputSummary}</Copy>
-                  <Copy>输出摘要：{tool.outputSummary ?? '未记录'}</Copy>
-                  <Copy>
-                    来源 {tool.provider ?? '未记录'} · 抓取 {tool.fetchedAt ?? '未记录'}
-                  </Copy>
-                </Section>
-              ))}
+            <QueryList
+              query={tools}
+              retry={() => void tools.refetch()}
+              label="正在刷新工具记录"
+              gap={12}
+            >
+              {tools.data?.pages
+                .flatMap((p) => p.items)
+                .map((tool, i) => (
+                  <Section key={tool.id ?? i} title={tool.tool}>
+                    <Copy>
+                      {tool.status === 'ok' ? '成功' : '不可用或拒绝'} · 权限 {tool.permission}
+                    </Copy>
+                    <Copy>输入摘要：{tool.inputSummary}</Copy>
+                    <Copy>输出摘要：{tool.outputSummary ?? '未记录'}</Copy>
+                    <Copy>
+                      来源 {tool.provider ?? '未记录'} · 抓取 {tool.fetchedAt ?? '未记录'}
+                    </Copy>
+                  </Section>
+                ))}
+            </QueryList>
             {tools.hasNextPage ? (
               <Action
+                busy={tools.isFetchingNextPage}
                 label="更多工具调用"
                 disabled={tools.isFetching}
                 onPress={() => void tools.fetchNextPage()}

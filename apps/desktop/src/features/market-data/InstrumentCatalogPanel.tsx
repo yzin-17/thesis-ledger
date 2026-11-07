@@ -1,10 +1,11 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { type FormEvent, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import { LoaderCircle } from 'lucide-react';
 import { MarketDetailDialog } from '../market-detail/MarketDetailDialog.js';
 import type { MarketDetailPosition } from '../market-detail/market-detail.types.js';
@@ -17,6 +18,7 @@ const marketAssetTypes: Record<string, 'stock' | 'etf' | 'fund' | undefined> = {
 };
 
 export function InstrumentCatalogPanel({
+  searchRefreshing = false,
   catalog,
   disabled,
   syncing,
@@ -30,6 +32,7 @@ export function InstrumentCatalogPanel({
   onRetrySearch,
   onConfirm,
 }: {
+  searchRefreshing?: boolean;
   catalog: CatalogStatus | null;
   disabled: boolean;
   syncing: boolean;
@@ -50,6 +53,7 @@ export function InstrumentCatalogPanel({
     const assetType = marketAssetTypes[instrument.instrumentType];
     if (!assetType) return;
     setMarketSubject({
+      instrumentId: instrument.id,
       symbol: instrument.symbol,
       asset: { name: instrument.displayName, assetType },
     });
@@ -104,12 +108,10 @@ export function InstrumentCatalogPanel({
               </Button>
             </div>
           </form>
-          {searchBusy && (
-            <div className="flex flex-col gap-3" role="status" aria-live="polite" aria-busy="true">
-              <span className="text-sm text-muted-foreground">正在搜索本地标的…</span>
-              {searchResults.length === 0 && (
-                <Skeleton className="h-14 w-full" aria-hidden="true" />
-              )}
+          {searchBusy && !searchRefreshing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-busy="true">
+              <Spinner aria-hidden="true" />
+              正在搜索本地标的…
             </div>
           )}
           {!searchBusy && searchError && (
@@ -136,59 +138,61 @@ export function InstrumentCatalogPanel({
               </EmptyHeader>
             </Empty>
           )}
-          {!searchBusy && !searchError && hasSearchRequest && searchResults.length === 0 && (
-            <Empty className="gap-2 border-0 p-4">
-              <EmptyHeader>
-                <EmptyTitle className="text-sm">没有找到匹配的本地标的</EmptyTitle>
-                <EmptyDescription>请调整代码、名称或拼音首字母后重新搜索。</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
-          {searchResults.length > 0 && (
-            <div className="divide-y divide-border">
-              {searchResults.map((instrument) => (
-                <div key={instrument.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <strong className="block truncate text-sm font-medium">
-                      {instrument.displayName}
-                    </strong>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {instrument.symbol} · {instrument.instrumentType}
-                    </span>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {marketAssetTypes[instrument.instrumentType] && (
+          <ListRefreshRegion refreshing={searchRefreshing} label="正在刷新标的搜索">
+            {(!searchBusy || searchRefreshing) && !searchError && hasSearchRequest && searchResults.length === 0 && (
+              <Empty className="gap-2 border-0 p-4">
+                <EmptyHeader>
+                  <EmptyTitle className="text-sm">没有找到匹配的本地标的</EmptyTitle>
+                  <EmptyDescription>请调整代码、名称或拼音首字母后重新搜索。</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+            {searchResults.length > 0 && (
+              <div className="divide-y divide-border">
+                {searchResults.map((instrument) => (
+                  <div key={instrument.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <strong className="block truncate text-sm font-medium">
+                        {instrument.displayName}
+                      </strong>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {instrument.symbol} · {instrument.instrumentType}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {marketAssetTypes[instrument.instrumentType] && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          aria-label={`查看 ${instrument.symbol} 行情`}
+                          onClick={() => openMarketDetails(instrument)}
+                        >
+                          行情详情
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        aria-label={`查看 ${instrument.symbol} 行情`}
-                        onClick={() => openMarketDetails(instrument)}
+                        disabled={!instrument.confirmable || confirmingId !== null}
+                        onClick={() => onConfirm(instrument)}
                       >
-                        行情详情
+                        {confirmingId === instrument.id && (
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="animate-spin"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {instrument.confirmable ? '确认标的' : '已确认'}
                       </Button>
-                    )}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={!instrument.confirmable || confirmingId !== null}
-                      onClick={() => onConfirm(instrument)}
-                    >
-                      {confirmingId === instrument.id && (
-                        <LoaderCircle
-                          data-icon="inline-start"
-                          className="animate-spin"
-                          aria-hidden="true"
-                        />
-                      )}
-                      {instrument.confirmable ? '确认标的' : '已确认'}
-                    </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </ListRefreshRegion>
         </CardContent>
       </Card>
       {marketSubject && (

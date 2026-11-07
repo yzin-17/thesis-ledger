@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ThesisLedgerApiError, ThesisLedgerContractError } from '@thesis-ledger/api-client';
@@ -56,21 +57,19 @@ function CurrentRuleReference({ symbol }: { symbol: string }) {
   });
   const value = requested && reference.isSuccess && !reference.isFetching ? reference.data : null;
   const stale = value && Date.now() - Date.parse(value.source.observedAt) > referenceMaxAgeMs;
+  if (!supported && !hasDocument) return <p className="m-0 text-xs text-muted-foreground">{symbol ? '暂无已核对的规则参考，可继续录入。' : '选择标的后显示已有规则参考。'}</p>;
 
   return (
     <Alert variant="subtle">
-      <AlertTitle>交易规则未验证</AlertTitle>
+      <AlertTitle>交易规则参考</AlertTitle>
       <AlertDescription className="flex flex-col gap-2">
-        <div>数量和价格须为正数，可保留高精度小数。每手参考不限制成交数量或均价。</div>
-        {!symbol && <div>选择标的后显示已有规则参考；港股每手资料需主动查询。</div>}
+        <div>每手参考不限制成交数量或均价。</div>
         {hasDocument && <ShanghaiRuleReference />}
-        {symbol && !supported && !hasDocument && (
-          <div>当前市场暂无已核对的规则参考，可继续录入。</div>
-        )}
         {supported && (
           <>
             <div>仅提供当前港股每手观察；历史变更及成交日期适用性未验证。</div>
             <Button
+              aria-busy={reference.isFetching}
               type="button"
               size="sm"
               variant="outline"
@@ -81,6 +80,7 @@ function CurrentRuleReference({ symbol }: { symbol: string }) {
                 else setRequested(true);
               }}
             >
+              {reference.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
               {reference.isFetching ? '正在查询每手参考…' : '查询当前每手参考'}
             </Button>
             <div role="status" aria-live="polite">

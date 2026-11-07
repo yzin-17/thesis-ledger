@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useEffect, useState } from 'react';
 import type { BaselineReconciliationCandidate } from '@thesis-ledger/api-client';
 import { useToastManager } from '@/components/ui/toast';
@@ -14,7 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -191,12 +192,7 @@ function ReconciliationResults({
   onSubmit: () => void;
 }) {
   if (query.isPending && !query.data) {
-    return (
-      <div className="flex flex-col gap-3" aria-busy="true">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
-      </div>
-    );
+    return <LoadingState label="正在读取对账候选" />;
   }
   if (query.isError) {
     return (
@@ -213,6 +209,7 @@ function ReconciliationResults({
   return (
     <div className="flex flex-col gap-4">
       <Button
+        aria-busy={query.isFetching}
         type="button"
         variant="outline"
         disabled={query.isFetching}
@@ -220,26 +217,28 @@ function ReconciliationResults({
       >
         重新读取对账候选
       </Button>
-      {candidates.length > 0 ? (
-        candidates.map((candidate) => (
-          <ReconciliationCandidate
-            key={candidate.candidateId}
-            candidate={candidate}
-            observedAt={
-              query.data?.checkpoints.find(
-                (checkpoint) => checkpoint.baselineFactId === candidate.baselineFactId,
-              )?.occurredAt ?? null
-            }
-            selected={candidate.candidateId === selectedCandidateId}
-            disabled={!canSelect}
-            onSelect={() => onSelectCandidate(candidate)}
-          />
-        ))
-      ) : (
-        <Empty className="min-h-40 rounded-md border border-border bg-card p-8">
-          <EmptyDescription>暂无可确认的对账候选。</EmptyDescription>
-        </Empty>
-      )}
+      <ListRefreshRegion refreshing={query.isFetching && !!query.data} label="正在刷新对账候选" className="flex flex-col gap-4">
+        {candidates.length > 0 ? (
+          candidates.map((candidate) => (
+            <ReconciliationCandidate
+              key={candidate.candidateId}
+              candidate={candidate}
+              observedAt={
+                query.data?.checkpoints.find(
+                  (checkpoint) => checkpoint.baselineFactId === candidate.baselineFactId,
+                )?.occurredAt ?? null
+              }
+              selected={candidate.candidateId === selectedCandidateId}
+              disabled={!canSelect}
+              onSelect={() => onSelectCandidate(candidate)}
+            />
+          ))
+        ) : (
+          <Empty className="min-h-40 rounded-md border border-border bg-card p-8">
+            <EmptyDescription>暂无可确认的对账候选。</EmptyDescription>
+          </Empty>
+        )}
+      </ListRefreshRegion>
       {selectedCandidate && (
         <Card className="shadow-none">
           <CardHeader className="gap-2 border-b">

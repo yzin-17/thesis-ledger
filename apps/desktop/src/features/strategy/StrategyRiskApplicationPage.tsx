@@ -1,3 +1,6 @@
+import { createClientRequestId } from '../../lib/client-request-id';
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { requestFailureMessage } from '@/shared/api/request-error';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +27,7 @@ import { Switch, SwitchThumb } from '@/components/ui/switch';
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetFooter,
   SheetHeader,
@@ -68,7 +72,6 @@ import {
   strategyTimeframeLabel,
 } from './strategy-display-labels.js';
 import type { StrategyRecord } from './strategy.types.js';
-
 const riskApplicationKey = ['desktop', 'strategy', 'risk-applications'] as const;
 
 type PreviewState = {
@@ -99,15 +102,20 @@ export function StrategyRiskApplicationPage({
   const [notificationChannel, setNotificationChannel] = useState('');
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [previewInvalidated, setPreviewInvalidated] = useState(false);
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => createClientRequestId());
   const [dirty, setDirty] = useState(false);
   const [savedApplicationId, setSavedApplicationId] = useState<string | null>(null);
   const [closeRequested, setCloseRequested] = useState(false);
   const allowNavigationRef = useRef(false);
   const operationBusy = useRef(false);
   const saveErrorToastId = useRef<string | null>(null);
-  useNavigationGuard({ dirty, busy: operationBusy.current,
-    bypass: () => allowNavigationRef.current });
+  useNavigationGuard({
+    dirty,
+    busy: operationBusy.current,
+    draft: { strategyId, versionId, accountId, cycleMode, notificationEnabled,
+      notificationSeverity, cooldownMinutes, notificationChannel },
+    bypass: () => allowNavigationRef.current,
+  });
   const accounts = useQuery({
     queryKey: ['desktop', 'accounts'],
     queryFn: () => fetchAccounts(),
@@ -127,7 +135,7 @@ export function StrategyRiskApplicationPage({
     if (!nextChannel) setNotificationEnabled(false);
   }, [notificationRoutes, notificationRoutingState, selectedNotificationRoute]);
   const globalMode = useOptionalPortfolioMode()?.mode ?? 'actual';
-  const actualAccounts = (globalMode === 'shadow' ? [] : accounts.data ?? []).filter(
+  const actualAccounts = (globalMode === 'shadow' ? [] : (accounts.data ?? [])).filter(
     (account) => account.mode === 'actual' && account.active !== false && account.type !== 'cash',
   );
   const selectedAccount = actualAccounts.find((account) => account.id === accountId);
@@ -144,7 +152,7 @@ export function StrategyRiskApplicationPage({
     if (!preview || preview.fingerprint === currentFingerprint) return;
     setPreview(null);
     setPreviewInvalidated(true);
-    setIdempotencyKey(crypto.randomUUID());
+    setIdempotencyKey(createClientRequestId());
   }, [currentFingerprint, preview]);
   const applications = useQuery({
     queryKey: [...riskApplicationKey, accountId, symbol],
@@ -184,7 +192,7 @@ export function StrategyRiskApplicationPage({
     onSuccess: (data) => {
       setPreview({ data, fingerprint: currentFingerprint });
       setPreviewInvalidated(false);
-      setIdempotencyKey(crypto.randomUUID());
+      setIdempotencyKey(createClientRequestId());
       setDirty(true);
     },
     onError: (error) =>
@@ -207,7 +215,7 @@ export function StrategyRiskApplicationPage({
         throw new Error('当前配置需要重新预览');
       if (cooldown === null) throw new Error('通知冷却时间必须是 0 到 10080 的整数');
       if (notificationEnabled && !selectedNotificationRoute)
-        throw new Error('请先选择已配置的通知 Provider');
+        throw new Error('请先选择已配置的通知提供方');
       return createStrategyRiskApplication({
         strategyVersionId: source.version.id,
         accountId,
@@ -254,7 +262,7 @@ export function StrategyRiskApplicationPage({
       if (message.includes('预览') && (message.includes('过期') || message.includes('重新'))) {
         setPreview(null);
         setPreviewInvalidated(true);
-        setIdempotencyKey(crypto.randomUUID());
+        setIdempotencyKey(createClientRequestId());
       }
       saveErrorToastId.current = toast.add({
         title: '保存风险应用失败',
@@ -371,7 +379,7 @@ export function StrategyRiskApplicationPage({
             <p className="text-sm text-muted-foreground">
               策略中心 / {source.strategy.name} v{source.version.version} / 生成风险规则
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight">生成风险规则</h2>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight">生成风险规则</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               来源：{source.strategy.name} v{source.version.version} · {symbol} ·{' '}
               {strategyTimeframeLabel(parsed.data.primaryTimeframe)}
@@ -380,7 +388,14 @@ export function StrategyRiskApplicationPage({
         </>
       ) : null}
 
-      {globalMode === 'shadow' && <Alert><AlertTitle>策略风险应用仅支持实际账户</AlertTitle><AlertDescription>当前为模拟范围。请先使用全局开关切换到实际，再选择账户；已保存应用的归属不变。</AlertDescription></Alert>}
+      {globalMode === 'shadow' && (
+        <Alert>
+          <AlertTitle>策略风险应用仅支持实际账户</AlertTitle>
+          <AlertDescription>
+            当前为模拟范围。请先使用全局开关切换到实际，再选择账户；已保存应用的归属不变。
+          </AlertDescription>
+        </Alert>
+      )}
       {savedApplicationId ? (
         <Alert>
           <AlertTitle>风险应用已保存</AlertTitle>
@@ -537,14 +552,25 @@ export function StrategyRiskApplicationPage({
             </details>
           </div>
 
-          {accounts.isPending ? (
-            <p className="text-sm text-muted-foreground">正在读取账户…</p>
-          ) : null}
+          {accounts.isPending ? <LoadingState label="正在读取账户" /> : null}
           {accounts.isError || applications.isError ? (
             <Alert variant="destructive">
               <AlertTitle>账户或风险应用读取失败</AlertTitle>
               <AlertDescription>已保存的应用无需再次提交；请先重新读取当前状态。</AlertDescription>
-              <Button variant="outline" disabled={accounts.isFetching || applications.isFetching} onClick={() => { void accounts.refetch(); if (accountId) void applications.refetch(); }}>重新读取应用状态</Button>
+              <Button
+                aria-busy={accounts.isFetching || applications.isFetching}
+                variant="outline"
+                disabled={accounts.isFetching || applications.isFetching}
+                onClick={() => {
+                  void accounts.refetch();
+                  if (accountId) void applications.refetch();
+                }}
+              >
+                {(accounts.isFetching || applications.isFetching) && (
+                  <Spinner data-icon="inline-start" aria-hidden="true" />
+                )}
+                重新读取应用状态
+              </Button>
             </Alert>
           ) : null}
           {actualAccounts.length === 0 && !accounts.isPending && !accounts.isError ? (
@@ -564,10 +590,12 @@ export function StrategyRiskApplicationPage({
             <Badge variant="outline">来源 v{source.version.version}</Badge>
             <Badge variant="outline">执行标的 {symbol}</Badge>
             <Button
+              aria-busy={previewMutation.isPending}
               variant="outline"
               disabled={!selectedAccount || busy || accounts.isError || applications.isError || Boolean(savedApplicationId) || sameIdentity.length > 0}
               onClick={() => previewMutation.mutate()}
             >
+              {previewMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
               {previewMutation.isPending ? '正在预览…' : '预览风险规则'}
             </Button>
           </div>
@@ -587,20 +615,26 @@ export function StrategyRiskApplicationPage({
                 : '系统不会自动选择、合并或删除记录。请选择一条进入风险中心管理。'}
             </p>
             <div className="flex flex-wrap gap-2">
-              {sameIdentity.map((application) => (
-                <Button
-                  key={application.id}
-                  nativeButton={false}
-                  render={
-                    <Link to={riskCenterApplicationPath(application.id)}>
-                      查看 r{application.revision}
-                      <ExternalLink aria-hidden="true" />
-                    </Link>
-                  }
-                  variant="outline"
-                  size="sm"
-                />
-              ))}
+              <ListRefreshRegion
+                refreshing={applications.isRefetching}
+                label="正在刷新现有风险应用"
+                className="flex flex-col gap-2"
+              >
+                {sameIdentity.map((application) => (
+                  <Button
+                    key={application.id}
+                    nativeButton={false}
+                    render={
+                      <Link to={riskCenterApplicationPath(application.id)}>
+                        查看 r{application.revision}
+                        <ExternalLink aria-hidden="true" />
+                      </Link>
+                    }
+                    variant="outline"
+                    size="sm"
+                  />
+                ))}
+              </ListRefreshRegion>
             </div>
           </AlertDescription>
         </Alert>
@@ -724,7 +758,7 @@ export function StrategyRiskApplicationPage({
               {strategyTimeframeLabel(parsed.data.primaryTimeframe)}
             </SheetDescription>
           </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto">{content}</div>
+          <SheetBody>{content}</SheetBody>
           {closeRequested || previewData ? (
             <SheetFooter>
               {closeRequested ? (

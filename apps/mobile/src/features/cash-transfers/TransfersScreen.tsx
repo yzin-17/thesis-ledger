@@ -5,7 +5,7 @@ import type { AccountStackParams } from '../../app/navigation-types';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { useAccounts } from '../../app/query/mobile-queries';
 import { canUseReadForWrite } from '../../app/query/query-state';
-import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Copy, Page, QueryList, Section } from '../../components/MobilePrimitives';
 import { CashEventView } from '../cash-observations/CashEventView';
 import { isTransfer } from './transfer-command';
 
@@ -38,35 +38,41 @@ export function TransfersScreen() {
       }
     >
       <Copy>{account?.name ?? '账户不在当前范围'}</Copy>
-      <QueryStatus query={query} empty={facts.size === 0} retry={() => void query.refetch()} />
-      {[...facts.values()].map((event) => {
-        const tip = events
-          .filter((row) => row.factId === event.factId)
-          .reduce((a, b) => (BigInt(a.ledgerRevision) > BigInt(b.ledgerRevision) ? a : b));
-        const go = (action: 'replace' | 'void' | 'restore') =>
-          navigation.navigate('TransferEditor', { ...params, event, action });
-        return (
-          <Section key={event.factId}>
-            <CashEventView event={event} />
-            {tip.revisionAction === 'VOID' ? (
-              <Action label="恢复划转" disabled={!writable} onPress={() => go('restore')} />
-            ) : (
-              <>
-                <Action label="更正划转" disabled={!writable} onPress={() => go('replace')} />
-                <Action
-                  label="作废划转"
-                  disabled={!writable}
-                  destructive
-                  onPress={() => go('void')}
-                />
-              </>
-            )}
-            <Copy muted>
-              当前链顶修订 {tip.ledgerRevision} · {tip.eventId}
-            </Copy>
-          </Section>
-        );
-      })}
+      <QueryList
+        query={query}
+        empty={facts.size === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新划转记录"
+      >
+        {[...facts.values()].map((event) => {
+          const tip = events
+            .filter((row) => row.factId === event.factId)
+            .reduce((a, b) => (BigInt(a.ledgerRevision) > BigInt(b.ledgerRevision) ? a : b));
+          const go = (action: 'replace' | 'void' | 'restore') =>
+            navigation.navigate('TransferEditor', { ...params, event, action });
+          return (
+            <Section key={event.factId}>
+              <CashEventView event={event} />
+              {tip.revisionAction === 'VOID' ? (
+                <Action label="恢复划转" disabled={!writable} onPress={() => go('restore')} />
+              ) : (
+                <>
+                  <Action label="更正划转" disabled={!writable} onPress={() => go('replace')} />
+                  <Action
+                    label="作废划转"
+                    disabled={!writable}
+                    destructive
+                    onPress={() => go('void')}
+                  />
+                </>
+              )}
+              <Copy muted>
+                当前链顶修订 {tip.ledgerRevision} · {tip.eventId}
+              </Copy>
+            </Section>
+          );
+        })}
+      </QueryList>
     </Page>
   );
 }

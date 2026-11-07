@@ -1,3 +1,5 @@
+import {instrumentSearchResultSchema} from '@thesis-ledger/schemas';
+import type { InstrumentLookup } from '../portfolio/portfolio.types.js';
 import { researchComparisonChoices } from './research-comparison-display.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -11,6 +13,13 @@ import {
 } from './research.queries.js';
 import { useOptionalPortfolioMode } from '../portfolio/portfolio-mode-context.js';
 import type { AiCapabilitiesResponse, AiRunRecord, AiRunResult } from './ai.types.js';
+const seedInstrument=instrumentSearchResultSchema.pick({id:true,symbol:true,canonicalCode:true,instrumentType:true,market:true,displayName:true,confirmable:true});
+function readResearchSeed(state:unknown,owner:string){
+ if(!state||typeof state!=='object'||!('instrumentResearch' in state))return null;
+ const seed=state.instrumentResearch;
+ if(!seed||typeof seed!=='object'||!('owner' in seed)||seed.owner!==owner||!('instrument' in seed))return null;
+ return seedInstrument.safeParse(seed.instrument).data;
+}
 const uniqueRuns = (pages: Array<{ items: AiRunRecord[] }> | undefined) => {
   const runs = new Map<string, AiRunRecord>();
   for (const page of pages ?? []) {
@@ -80,6 +89,16 @@ export function useResearchWorkbench() {
   const historical = new URLSearchParams(location.search).get('history') === 'legacy';
   const [newResearchOpen, setNewResearchOpen] = useState(false);
   const [initialQuestion, setInitialQuestion] = useState('');
+  const [initialInstrument, setInitialInstrument] = useState<InstrumentLookup | null>(null);
+  useEffect(() => {
+    const seed=readResearchSeed(location.state,owner);
+    if(!seed)return;
+    setInitialInstrument(seed);
+    setRetryOfRunId(undefined);
+    setInitialQuestion('');
+    setNewResearchOpen(true);
+    void navigate(location.pathname + location.search, {replace:true, state:null});
+  }, [location.state, location.pathname, location.search, owner, navigate]);
   const [retryOfRunId, setRetryOfRunId] = useState<string | undefined>();
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -89,6 +108,7 @@ export function useResearchWorkbench() {
   useEffect(() => {
     if (priorOwner.current === owner) return;
     priorOwner.current = owner;
+    setInitialInstrument(null);
     setNewResearchOpen(false);
     setInitialQuestion('');
     setRetryOfRunId(undefined);
@@ -201,8 +221,8 @@ export function useResearchWorkbench() {
   const switchRun = (id: string) => updatePageState({ selectedRunId: id, mode: pageState.mode });
 
   const closeDetail = () => {
-    const state = location.state as { aiListOrigin?: boolean } | null;
-    if (state?.aiListOrigin) {
+    const state = location.state as { aiListOrigin?: boolean; instrumentDetailOrigin?: boolean } | null;
+    if (state?.aiListOrigin || state?.instrumentDetailOrigin) {
       void navigate(-1);
       return;
     }
@@ -211,6 +231,7 @@ export function useResearchWorkbench() {
 
   const openNewResearch = (question = '', retryId?: string) => {
     const openForm = () => {
+      setInitialInstrument(null);
       setInitialQuestion(question);
       setRetryOfRunId(retryId);
       setNewResearchOpen(true);
@@ -283,6 +304,7 @@ export function useResearchWorkbench() {
     pageState,
     accountMode,
     historical,
+    initialInstrument,
     newResearchOpen,
     initialQuestion,
     retryOfRunId,

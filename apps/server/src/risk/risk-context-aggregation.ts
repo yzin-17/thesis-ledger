@@ -31,7 +31,9 @@ const positionsFor = (contexts: readonly SecurityContext[], scope: 'account' | '
       weight = context.accountWeight;
     if (weight === undefined) continue;
     const previous = bySymbol.get(context.symbol)?.weight ?? 0;
-    const total = Number(DecimalValue.from(String(previous)).plus(String(weight)).toString());
+    const total = Number(
+      DecimalValue.fromNumber(previous).plus(DecimalValue.fromNumber(weight)).toString(),
+    );
     // 浮点接口的末位舍入不得把经济上等于 1 的权重变成非法输入。
     const bounded = total > 1 && total <= 1 + Number.EPSILON * 4 ? 1 : total;
     bySymbol.set(context.symbol, { symbol: context.symbol, weight: bounded });
@@ -97,7 +99,10 @@ export const concentrationGroups = (contexts: readonly SecurityContext[]) => {
       ? undefined
       : Number(
           rows
-            .reduce((sum, row) => sum.plus(String(row.weight)), DecimalValue.from('0'))
+            .reduce(
+              (sum, row) => sum.plus(DecimalValue.fromNumber(row.weight!)),
+              DecimalValue.from('0'),
+            )
             .toString(),
         ),
     affectedAccountIds: [

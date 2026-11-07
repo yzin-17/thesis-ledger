@@ -88,6 +88,7 @@ describe.skipIf(!databaseUrl)('研究准备提交：HTTP、真实 Prisma 与受�
     expect(harness.dispatch.dispatch).toHaveBeenCalledOnce();
     expect(await prisma.aiRun.count()).toBe(1);
     const run = await prisma.aiRun.findUniqueOrThrow({ where: { id: receipts[0]!.runId } });
+    expect(run.modelMetadata).toMatchObject({ scheduledObservationMethod: 'research-price-direction-v1' });
     const frozen = verifyAiFrozenResearchV2(
       (run.modelMetadata as Record<string, unknown>).frozenResearch,
     );

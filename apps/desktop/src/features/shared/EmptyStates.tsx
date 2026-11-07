@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/ui/spinner';
 import {
   Empty,
   EmptyContent,
@@ -11,15 +12,21 @@ import { cn } from '@/lib/utils';
 export const EmptyTableRow = ({
   colSpan,
   label = '暂无记录',
+  loading = false,
 }: {
   colSpan: number;
   label?: string;
+  loading?: boolean;
 }) => (
   <tr>
     <td className="p-0 text-center hover:bg-transparent" colSpan={colSpan}>
-      <Empty className="min-h-16 rounded-none border-0 px-3 py-[18px]" aria-live="polite">
-        <EmptyDescription>{label}</EmptyDescription>
-      </Empty>
+      {loading ? (
+        <LoadingState label={label} className="min-h-16" />
+      ) : (
+        <Empty className="min-h-16 rounded-none border-0 px-3 py-group" aria-live="polite">
+          <EmptyDescription>{label}</EmptyDescription>
+        </Empty>
+      )}
     </td>
   </tr>
 );

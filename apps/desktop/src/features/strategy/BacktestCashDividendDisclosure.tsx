@@ -42,7 +42,7 @@ export function BacktestCashDividendDisclosure({
                 href={document.url}
                 target="_blank"
                 rel="noreferrer"
-                className="underline underline-offset-4"
+                className="text-primary hover:text-primary/80"
               >
                 {document.title}
               </a>{' '}

@@ -1,24 +1,14 @@
-import { validateTargetDraft, type TargetRow } from './performance.target-draft.js';
-import { useMemo, useState } from 'react';
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { CATEGORY_LABELS, CATEGORY_ORDER } from './performance.target-draft.js';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
-import { Input } from '@/components/ui/input';
-import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { AlertTriangle, Plus } from 'lucide-react';
-import { normalizeAllocationCategory, normalizeAllocationTargets } from '@thesis-ledger/domain';
+import { cn } from '@/lib/utils';
+import { LoadingState } from '@/components/ui/spinner';
+import { AlertTriangle } from 'lucide-react';
+import { formatRatioPercent as formatWeight, normalizeAllocationTargets } from '@thesis-ledger/domain';
 
-import { PerformanceTargetActions } from './PerformanceTargetActions.js';
-import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
-import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
+import { PerformanceTargetEditor } from './PerformanceTargetEditor.js';
+import { AllocationWeight as WeightBar } from './AllocationWeight.js';
 import type {
   AllocationCategory,
   PerformanceAllocationRecord,
@@ -34,50 +24,6 @@ export { PerformanceMetrics } from './PerformanceMetrics.js';
 
 export { PerformanceSnapshotTable } from './PerformanceTrendSection.js';
 
-const CATEGORY_ORDER: AllocationCategory[] = ['stock', 'etf', 'fund', 'index', 'cash'];
-const CATEGORY_LABELS: Record<AllocationCategory, string> = {
-  stock: '股票',
-  etf: 'ETF',
-  fund: '基金',
-  index: '指数',
-  cash: '现金',
-};
-
-const formatWeight = (weight: number | null | undefined) => {
-  if (weight === null || weight === undefined || !Number.isFinite(weight)) return '—';
-  return `${(weight * 100).toFixed(2)}%`;
-};
-
-const WeightBar = ({
-  value,
-  label,
-  unavailable = false,
-}: {
-  value: number | null | undefined;
-  label: string;
-  unavailable?: boolean;
-}) => {
-  if (unavailable || value === null || value === undefined || !Number.isFinite(value)) {
-    return (
-      <div className="min-w-32 text-right text-sm text-muted-foreground">{formatWeight(null)}</div>
-    );
-  }
-  const progressValue = Math.max(0, Math.min(100, value * 100));
-  return (
-    <div className="flex min-w-32 items-center justify-end gap-2">
-      <div className="shrink-0 text-xs text-muted-foreground">{formatWeight(value)}</div>
-      <Progress
-        className="w-20 shrink-0"
-        value={progressValue}
-        aria-label={`${label}${formatWeight(value)}`}
-      >
-        <ProgressTrack className="h-1">
-          <ProgressIndicator />
-        </ProgressTrack>
-      </Progress>
-    </div>
-  );
-};
 
 export { PerformanceAccountSelector } from './PerformanceScopeControls.js';
 
@@ -99,6 +45,7 @@ const adjustmentLabel = (
 ) => {
   if (weightsUnavailable) return { text: '暂不可用', className: 'text-muted-foreground' };
   if (targetsUnavailable) return { text: '目标不可用', className: 'text-muted-foreground' };
+  if (row.targetWeight === null) return { text: '未设置目标', className: 'text-muted-foreground' };
   if (row.direction === 'increase' && row.amountGap !== null) {
     return {
       text: `↑ 买入 ${formatMoney(Math.abs(row.amountGap), currency)}`,
@@ -149,6 +96,7 @@ const comparisonRows = (
 };
 
 export function PerformanceAllocationSection({
+  refreshing = false,
   loadState,
   allocationRows,
   rebalanceRows,
@@ -156,6 +104,7 @@ export function PerformanceAllocationSection({
   dataQuality,
   targetsUnavailable = false,
   portfolioScope = false,
+  targetScopeLabel,
   valuedAt,
   fx,
   currencyTotals = [],
@@ -164,10 +113,12 @@ export function PerformanceAllocationSection({
   targetCreatedAt,
   targetSaving = false,
   targetSaveError,
+  onBeginTargetEdit,
   editDisabled,
   onRetry,
   onSaveTargets,
 }: {
+  refreshing?: boolean;
   loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
   allocationRows: PerformanceAllocationRecord[];
   rebalanceRows: RebalanceGapRecord[];
@@ -175,6 +126,7 @@ export function PerformanceAllocationSection({
   dataQuality: PerformanceDataQuality;
   targetsUnavailable?: boolean | undefined;
   portfolioScope?: boolean | undefined;
+  targetScopeLabel?: string | undefined;
   valuedAt?: string | undefined;
   fx?: PerformanceFxMeta | undefined;
   currencyTotals?: PerformancePortfolioTotal[];
@@ -183,6 +135,7 @@ export function PerformanceAllocationSection({
   targetCreatedAt?: string | undefined;
   targetSaving?: boolean | undefined;
   targetSaveError?: string | null | undefined;
+  onBeginTargetEdit?: (() => void) | undefined;
   editDisabled?: boolean | undefined;
   onRetry?: (() => void) | undefined;
   onSaveTargets: (targets: Record<AllocationCategory, number>) => Promise<boolean>;
@@ -193,55 +146,6 @@ export function PerformanceAllocationSection({
   const hasTargets = !targetsUnavailable && Object.keys(targets).length > 0;
   const fxBlocked = fx?.status === 'blocked';
   const weightsUnavailable = dataQuality.partial || allocationUnavailable || fxBlocked;
-  const [editingTargets, setEditingTargets] = useState(false);
-  const [draftRows, setDraftRows] = useState<TargetRow[]>([]);
-  const requestClose = useDraftCloseGuard({
-    open: editingTargets,
-    draft: draftRows,
-    busy: Boolean(targetSaving),
-    onOpenChange: setEditingTargets,
-  });
-  const beginEdit = () => {
-    const existingRows = rowsFromTargets(targets);
-    const existingCategories = new Set(
-      existingRows.map((row) => normalizeAllocationCategory(row.category)),
-    );
-    const currentRows = rows
-      .filter((row) => !existingCategories.has(row.category))
-      .map((row) => ({ id: row.category, category: row.category, percent: null }));
-    setDraftRows([...existingRows, ...currentRows]);
-    setEditingTargets(true);
-  };
-  const validation = useMemo(() => validateTargetDraft(draftRows), [draftRows]);
-  const updateDraftRow = (id: string, patch: Partial<TargetRow>) => {
-    setDraftRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
-  };
-  const removeDraftRow = (id: string) => {
-    setDraftRows((current) => current.filter((row) => row.id !== id));
-  };
-  const saveDraft = async () => {
-    if (!validation.valid || targetSaving) return;
-    const nextTargets = {} as Record<AllocationCategory, number>;
-    for (const row of draftRows) {
-      const category = normalizeAllocationCategory(row.category);
-      if (category && row.percent !== null) nextTargets[category] = row.percent / 100;
-    }
-    if (await onSaveTargets(nextTargets)) setEditingTargets(false);
-  };
-  const addDraftCategory = () => {
-    const nextCategory = CATEGORY_ORDER.find(
-      (category) =>
-        !draftRows.some((row) => normalizeAllocationCategory(row.category) === category),
-    );
-    if (!nextCategory) return;
-    setDraftRows((current) => [
-      ...current,
-      { id: `${nextCategory}-${Date.now()}`, category: nextCategory, percent: null },
-    ]);
-  };
-  let targetButtonLabel = '设置目标';
-  if (editingTargets) targetButtonLabel = '取消';
-  else if (hasTargets) targetButtonLabel = '调整目标';
   const hasLoadNotice = loadState === 'error' || loadState === 'stale';
   const hasStatusNotice =
     hasLoadNotice ||
@@ -260,7 +164,7 @@ export function PerformanceAllocationSection({
         <div className="min-w-0">
           <h2 className="m-0 text-xl font-semibold tracking-tight">配置与目标</h2>
           <p className="m-0 mt-1 text-sm text-muted-foreground">
-            估值于 {formatDate(valuedAt)}；现金来自账本现金余额，仅提供建议，不会自动下单。
+            估值计算时间 {formatDate(valuedAt)}
           </p>
           {fx?.status === 'stale' ? (
             <p className="m-0 mt-1 text-xs text-muted-foreground">
@@ -273,19 +177,14 @@ export function PerformanceAllocationSection({
             </p>
           ) : null}
         </div>
-        <Button
-          type="button"
-          variant={editingTargets ? 'ghost' : 'outline'}
-          size="sm"
-          className="shrink-0"
-          disabled={editDisabled || targetSaving}
-          onClick={() => {
-            if (editingTargets) void requestClose(false);
-            else beginEdit();
-          }}
-        >
-          {targetButtonLabel}
-        </Button>
+        <PerformanceTargetEditor
+          label={hasTargets ? '调整目标' : '设置目标'}
+          scopeLabel={targetScopeLabel ?? (portfolioScope ? '全部账户' : '当前账户')}
+          targets={targets}
+          categories={rows.map(row => ({ category: row.category, currentWeight: weightsUnavailable ? null : row.currentWeight }))}
+          saving={Boolean(targetSaving)} disabled={Boolean(editDisabled)} error={targetSaveError}
+          onBeginEdit={onBeginTargetEdit} onSave={onSaveTargets}
+        />
       </div>
       {hasStatusNotice ? (
         <div
@@ -378,250 +277,81 @@ export function PerformanceAllocationSection({
           </div>
         </div>
       ) : null}
-      {loadState === 'loading' && rows.length === 0 ? (
-        <Skeleton className="h-[120px] w-full rounded-md" aria-label="配置数据加载中" />
-      ) : rows.length > 0 && !allocationUnavailable && !fxBlocked ? (
-        <div
-          data-list-frame="composite"
-          className="overflow-hidden rounded-md border border-border bg-card"
-        >
-          <div className="table-wrap px-4">
-            <table className="min-w-[680px] md:min-w-0">
-              <thead>
-                <tr>
-                  <th>分类</th>
-                  <th className="text-right">当前金额</th>
-                  <th className="text-right">当前权重</th>
-                  <th className="text-right">目标权重</th>
-                  <th className="text-right">权重偏差</th>
-                  <StickyTableActionHeader>调整</StickyTableActionHeader>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const adjustment = adjustmentLabel(
-                    row,
-                    weightsUnavailable,
-                    targetsUnavailable,
-                    displayCurrency,
-                  );
-                  const draftRow = draftRows.find(
-                    (draft) => normalizeAllocationCategory(draft.category) === row.category,
-                  );
-                  return (
-                    <tr key={row.category}>
-                      <td>{CATEGORY_LABELS[row.category]}</td>
-                      <td className="text-right text-muted-foreground">
-                        {formatMoney(row.value, displayCurrency)}
-                      </td>
-                      <td className="text-right">
-                        <WeightBar
-                          value={row.currentWeight}
-                          label={`${CATEGORY_LABELS[row.category]}当前权重`}
-                          unavailable={weightsUnavailable}
-                        />
-                      </td>
-                      <td className="text-right">
-                        {editingTargets ? (
-                          draftRow ? (
-                            <div className="flex min-w-40 items-center justify-end gap-1">
-                              <Input
-                                className="h-8 w-20 text-right"
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                                value={draftRow.percent ?? ''}
-                                aria-label={`${CATEGORY_LABELS[row.category]}目标权重百分比`}
-                                onChange={(event) => {
-                                  const value = event.target.value;
-                                  updateDraftRow(draftRow.id, {
-                                    percent: value === '' ? null : Number(value),
-                                  });
-                                }}
-                              />
-                              <span className="text-xs text-muted-foreground">%</span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="px-1.5 text-xs text-muted-foreground"
-                                aria-label={`移除${CATEGORY_LABELS[row.category]}目标`}
-                                onClick={() => removeDraftRow(draftRow.id)}
-                              >
-                                移除
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">未设置</span>
-                          )
-                        ) : (
+      <ListRefreshRegion refreshing={refreshing && loadState !== 'loading'} label="正在刷新配置明细">
+        {loadState === 'loading' && rows.length === 0 ? (
+          <LoadingState label="配置数据加载中" />
+        ) : rows.length > 0 && !allocationUnavailable && !fxBlocked ? (
+          <div
+            data-list-frame="composite"
+            className="overflow-hidden rounded-md border border-border bg-card"
+          >
+            <div className="table-wrap">
+              <table className="min-w-[680px] md:min-w-0">
+                <thead>
+                  <tr>
+                    <th>分类</th>
+                    <th className="text-right">当前金额</th>
+                    <th className="text-right">当前权重</th>
+                    <th className="text-right">目标权重</th>
+                    <th className="text-right">权重偏差</th>
+                    <th className="text-right">再平衡建议</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const adjustment = adjustmentLabel(
+                      row,
+                      weightsUnavailable,
+                      targetsUnavailable,
+                      displayCurrency,
+                    );
+                    return (
+                      <tr key={row.category}>
+                        <td>{CATEGORY_LABELS[row.category]}</td>
+                        <td className="text-right text-muted-foreground">
+                          {formatMoney(row.value, displayCurrency)}
+                        </td>
+                        <td className="text-right">
+                          <WeightBar
+                            value={row.currentWeight}
+                            label={`${CATEGORY_LABELS[row.category]}当前权重`}
+                            unavailable={weightsUnavailable}
+                          />
+                        </td>
+                        <td className="text-right">
                           <WeightBar
                             value={row.targetWeight}
                             label={`${CATEGORY_LABELS[row.category]}目标权重`}
                             unavailable={weightsUnavailable}
                           />
-                        )}
-                      </td>
-                      <td className="text-right">
-                        {formatWeight(weightsUnavailable ? null : row.weightGap)}
-                      </td>
-                      <StickyTableActionCell className={`font-medium ${adjustment.className}`}>
-                        {adjustment.text}
-                      </StickyTableActionCell>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="text-right">
+                          {formatWeight(weightsUnavailable ? null : row.weightGap)}
+                        </td>
+                        <td className={cn('text-right text-sm', adjustment.className)}>
+                          {adjustment.text}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ) : (
-        (loadState === 'ready' || loadState === 'empty') &&
-        !targetsUnavailable && (
-          <Empty
-            className="min-h-[120px] rounded-md border border-border bg-muted/20 px-4 py-6"
-            aria-live="polite"
-          >
-            <EmptyDescription>
-              {hasTargets ? '当前范围暂无可估值配置。' : '先设置目标配置，保存后可在这里比较。'}
-            </EmptyDescription>
-          </Empty>
-        )
-      )}
-      {editingTargets &&
-      draftRows.some(
-        (draft) =>
-          !rows.some((row) => row.category === normalizeAllocationCategory(draft.category)) ||
-          allocationUnavailable ||
-          fxBlocked,
-      ) ? (
-        <div className="mt-3 rounded-lg bg-muted/30 p-3">
-          <p className="m-0 text-xs text-destructive">
-            {validation.unknown ? '旧分类需要重新选择后才能保存。' : '设置分类与目标权重。'}
-          </p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {draftRows
-              .filter(
-                (draft) =>
-                  !rows.some(
-                    (row) => row.category === normalizeAllocationCategory(draft.category),
-                  ) ||
-                  allocationUnavailable ||
-                  fxBlocked,
-              )
-              .map((draft) => (
-                <div key={draft.id} className="flex items-center gap-2">
-                  <Select
-                    value={normalizeAllocationCategory(draft.category) ?? ''}
-                    onValueChange={(value) => updateDraftRow(draft.id, { category: value ?? '' })}
-                  >
-                    <SelectTrigger className="min-w-0 flex-1">
-                      <SelectValue placeholder={draft.category || '选择分类'}>
-                        {CATEGORY_LABELS[draft.category as AllocationCategory] ?? draft.category}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {CATEGORY_ORDER.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {CATEGORY_LABELS[option]}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    className="h-8 w-20 text-right"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={draft.percent ?? ''}
-                    aria-label={`${CATEGORY_LABELS[draft.category as AllocationCategory] ?? '旧分类'}目标权重百分比`}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      updateDraftRow(draft.id, { percent: value === '' ? null : Number(value) });
-                    }}
-                  />
-                  <span className="text-xs text-muted-foreground">%</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="px-1.5 text-xs text-muted-foreground"
-                    onClick={() => removeDraftRow(draft.id)}
-                  >
-                    移除
-                  </Button>
-                </div>
-              ))}
-          </div>
-        </div>
-      ) : null}
-      {editingTargets ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/30 p-3">
-          <div className="text-sm">
-            <span>合计 {validation.total.toFixed(2)}%</span>
-            {validation.totalValid ? (
-              <span className="ml-2 text-[var(--color-positive)]">已完成</span>
-            ) : (
-              <span className="ml-2 text-destructive">
-                目标权重合计 {validation.total.toFixed(2)}%，请调整至 100%。
-              </span>
-            )}
-            {validation.duplicate ? (
-              <p className="m-0 mt-1 text-xs text-destructive">分类不能重复。</p>
-            ) : null}
-            {validation.unknown ? (
-              <p className="m-0 mt-1 text-xs text-destructive">存在未知旧分类，请重新选择。</p>
-            ) : null}
-            {validation.invalidNumber ? (
-              <p className="m-0 mt-1 text-xs text-destructive">请输入非负数字。</p>
-            ) : null}
-            {targetSaveError ? (
-              <p className="m-0 mt-1 text-xs text-destructive">{targetSaveError}</p>
-            ) : null}
-          </div>
-          <PerformanceTargetActions
-            saving={Boolean(targetSaving)}
-            valid={validation.valid}
-            onCancel={() => void requestClose(false)}
-            onSave={() => void saveDraft()}
-          />
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="basis-full justify-start px-0"
-            onClick={addDraftCategory}
-          >
-            <Plus data-icon="inline-start" aria-hidden="true" />
-            新增分类
-          </Button>
-        </div>
-      ) : null}
+        ) : (
+          (loadState === 'ready' || loadState === 'empty') &&
+          !targetsUnavailable && (
+            <Empty
+              className="min-h-[120px] rounded-md border border-border bg-muted/20 px-4 py-6"
+              aria-live="polite"
+            >
+              <EmptyDescription>
+                {hasTargets ? '当前范围暂无可估值配置。' : '先设置目标配置，保存后可在这里比较。'}
+              </EmptyDescription>
+            </Empty>
+          )
+        )}
+      </ListRefreshRegion>
     </section>
   );
 }
-
-const rowsFromTargets = (targets: Record<string, number> | undefined): TargetRow[] => {
-  const known = new Map<AllocationCategory, number>();
-  const unknown: TargetRow[] = [];
-  for (const [index, [rawCategory, value]] of Object.entries(targets ?? {}).entries()) {
-    const category = normalizeAllocationCategory(rawCategory);
-    if (!category) {
-      unknown.push({ id: `${rawCategory}-${index}`, category: rawCategory, percent: value * 100 });
-      continue;
-    }
-    known.set(category, (known.get(category) ?? 0) + value * 100);
-  }
-  return [
-    ...CATEGORY_ORDER.filter((category) => known.has(category)).map((category) => ({
-      id: category,
-      category,
-      percent: known.get(category) ?? 0,
-    })),
-    ...unknown,
-  ];
-};

@@ -1,8 +1,7 @@
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { RefreshCw } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
-/** 页面顶栏 ghost 刷新图标按钮：与模式开关同高（h-7），刷新中图标旋转并禁用。 */
 export function RefreshIconButton({
   label,
   refreshing,
@@ -21,13 +20,11 @@ export function RefreshIconButton({
       className="h-7 w-7 rounded-lg text-muted-foreground"
       title={label}
       aria-label={label}
+      aria-busy={refreshing}
       disabled={disabled || refreshing}
       onClick={onClick}
     >
-      <RefreshCw
-        className={cn('size-[18px]', refreshing && 'animate-spin')}
-        aria-hidden="true"
-      />
+      {refreshing ? <Spinner aria-hidden="true" /> : <RefreshCw className="size-[18px]" aria-hidden="true" />}
     </Button>
   );
 }

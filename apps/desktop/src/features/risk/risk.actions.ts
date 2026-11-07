@@ -1,7 +1,7 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import type { Dispatch, SetStateAction } from 'react';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 import type { useToastManager } from '@/components/ui/toast';
-
 import type { Portfolio } from '../portfolio/portfolio.types.js';
 import type {
   CreateRiskRuleInput,
@@ -256,7 +256,7 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
     try {
       const result = await scanRiskMutation.mutateAsync({
         contexts: buildRiskContexts(portfolio, mode),
-        scanId: crypto.randomUUID(),
+        scanId: createClientRequestId(),
       });
       const feedback = riskActionFeedback(
         'scan',

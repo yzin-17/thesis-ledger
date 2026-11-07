@@ -1,7 +1,7 @@
 import type { OperationView, ProposalView } from './authoring.api.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { authoringFailureMessage } from './authoring-operation-feedback.js';
 
 const statusLabels: Record<string, string> = {
@@ -46,7 +46,7 @@ function OperationFacts({ outcome }: { outcome: OperationView['outcome'] }) {
         {outcome ? ` · ${resultLabels[outcome.externalResult] ?? '等待确认'}` : ''}
       </p>
       {outcome?.usage?.status === 'reported' && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           实际用量：输入 {outcome.usage.inputTokens ?? '未知'} / 输出{' '}
           {outcome.usage.outputTokens ?? '未知'} tokens
         </p>
@@ -109,18 +109,30 @@ export function AuthoringOperation({
     operation.status === 'succeeded' && operation.disposition === 'unapplied' && !stale;
   const outcome = operation.outcome;
   const selection = operation.input.selection;
+  const resolved = operation.disposition === 'applied' || operation.disposition === 'discarded';
+  let statusLabel = statusLabels[operation.status] ?? '状态待确认';
+  if (operation.disposition === 'applied') statusLabel = '已应用';
+  else if (operation.disposition === 'discarded') statusLabel = '已放弃';
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{kindLabels[selection.kind]}</CardTitle>
-        <CardDescription className="break-all">
+    <section
+      className={cn(
+        'flex min-w-0 flex-col gap-3',
+        resolved ? 'border-b pb-4' : 'rounded-md bg-muted/50 p-4',
+      )}
+      aria-label="当前编写操作"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium">{kindLabels[selection.kind]}</h3>
+          <Badge variant="secondary">{statusLabel}</Badge>
+        </div>
+        <p className="break-all text-xs text-muted-foreground">
           {selection.providerId} / {selection.model} · 输入修订 {operation.revision}
-        </CardDescription>
-        <Badge variant="outline">{statusLabels[operation.status] ?? '状态待确认'}</Badge>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+        </p>
+      </div>
+      <div className="flex flex-col gap-2">
         <OperationFacts outcome={outcome} />
-        {stale && <p className="text-sm">当前草稿已有新修订，此结果只供追溯。</p>}
+        {stale && !resolved && <p className="text-sm">当前草稿已有新修订，此结果只供追溯。</p>}
         {active && (
           <Button
             type="button"
@@ -161,13 +173,15 @@ export function AuthoringOperation({
         )}
         {(outcome?.outputText || outcome?.errorCode) && (
           <details>
-            <summary className="cursor-pointer text-sm">原始响应与诊断</summary>
+            <summary className="cursor-pointer text-xs text-muted-foreground">
+              原始响应与诊断
+            </summary>
             <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">
               {[outcome.errorCode, outcome.outputText].filter(Boolean).join('\n')}
             </pre>
           </details>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

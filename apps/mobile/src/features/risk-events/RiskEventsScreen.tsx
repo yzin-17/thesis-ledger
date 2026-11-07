@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,9 +9,8 @@ import {
   Action,
   Choices,
   Copy,
-  Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 import { riskSeverities } from '../risk-rules/risk-rule-form';
@@ -45,25 +45,32 @@ export function RiskEventsScreen() {
         options={[{ value: 'all', label: '全部级别' }, ...riskSeverities]}
         onChange={setSeverity}
       />
-      <Field label="按风险标的筛选" value={symbol} onChange={setSymbol} />
-      <QueryStatus query={query} empty={rows.length === 0} retry={() => void query.refetch()} />
-      {events.map((event) => (
-        <Section key={event.id} title={event.message}>
-          <Copy>
-            {riskSeverities.find((row) => row.value === event.severity)?.label ?? '其他级别'} ·{' '}
-            {event.symbol ?? '组合／账户'} · {event.triggered ? '已触发' : '未触发'}
-          </Copy>
-          <Copy muted>
-            {event.evaluatedAt} · 规则版本 {event.ruleVersion}
-          </Copy>
-          <Action
-            label="风险事件详情"
-            onPress={() => navigation.navigate('RiskEventDetail', { event })}
-          />
-        </Section>
-      ))}
+      <InstrumentSymbolField label="按风险标的筛选" value={symbol} onChange={setSymbol} />
+      <QueryList
+        query={query}
+        empty={rows.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新风险事件"
+      >
+        {events.map((event) => (
+          <Section key={event.id} title={event.message}>
+            <Copy>
+              {riskSeverities.find((row) => row.value === event.severity)?.label ?? '其他级别'} ·{' '}
+              {event.symbol ?? '组合／账户'} · {event.triggered ? '已触发' : '未触发'}
+            </Copy>
+            <Copy muted>
+              {event.evaluatedAt} · 规则版本 {event.ruleVersion}
+            </Copy>
+            <Action
+              label="风险事件详情"
+              onPress={() => navigation.navigate('RiskEventDetail', { event })}
+            />
+          </Section>
+        ))}
+      </QueryList>
       {query.hasNextPage ? (
         <Action
+          busy={query.isFetchingNextPage}
           label="更多风险事件"
           disabled={query.isFetchingNextPage}
           onPress={() => void query.fetchNextPage()}

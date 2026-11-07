@@ -6,6 +6,7 @@ export function createChartBridge(
   callbacks: {
     onOlder: () => void;
     onReady: () => void;
+    onArenaTime?:(time:number)=>void;
     onDiagnostic?: (kind: ChartDiagnostic) => void;
   },
 ) {
@@ -20,6 +21,7 @@ export function createChartBridge(
     receive(raw: string) {
       if (!active) return;
       const message = parseChartMessage(raw, instanceId);
+      if(message?.kind==='arena'&&message.time!==undefined)callbacks.onArenaTime?.(message.time);
       if (message?.kind === 'older') older();
       if (message?.kind === 'ready') callbacks.onReady();
       if (message?.kind === 'touch') callbacks.onDiagnostic?.('touch');

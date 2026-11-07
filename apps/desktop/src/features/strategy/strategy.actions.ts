@@ -1,9 +1,9 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { strategySchema } from '@thesis-ledger/schemas';
 import { preparedBacktestSubmission } from './backtest-prepared-submission.js';
 import type { useToastManager } from '@/components/ui/toast';
-
 import type {
   BacktestJob,
   BacktestSetupInput,
@@ -185,7 +185,7 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
       dependencies.queueErrorToastId.current = null;
     }
     backgroundPreparationVersionId = version.id;
-    backgroundPreparationIdempotencyKey = crypto.randomUUID();
+    backgroundPreparationIdempotencyKey = createClientRequestId();
     setBusyAction(`queue:${version.id}`);
     toastManager.add({
       title: '正在后台准备回测',

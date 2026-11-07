@@ -1,12 +1,19 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { MarketEventFreeReader } from './market-event-free-reader.js';
 import type { BarSeriesIdentity, BarSeries, HistoryInput } from '@thesis-ledger/schemas';
 import { DsaError } from '../integration/dsa/dsa.client.js';
-import { MarketBarWindowReaderV3, type MarketBarWindowReadInputV3 } from './market-bar-reader-v3.js';
+import {
+  MarketBarWindowReaderV3,
+  type MarketBarWindowReadInputV3,
+} from './market-bar-reader-v3.js';
 import { MarketChartReaderV3 } from './market-chart-reader-v3.js';
 import type { MarketBarWindow } from './market-bar-window.js';
 
 export { barSeriesInputFingerprint, sliceBarSeries } from './market-bar-window.js';
-export type { MarketBarWindowReadInputV3, MarketBarWindowReadResultV3 } from './market-bar-reader-v3.js';
+export type {
+  MarketBarWindowReadInputV3,
+  MarketBarWindowReadResultV3,
+} from './market-bar-reader-v3.js';
 
 export class MarketBarUnavailableError extends Error {}
 
@@ -29,10 +36,24 @@ export class MarketBarReader {
   constructor(
     @Inject(MarketBarWindowReaderV3) private readonly windowReader: MarketBarWindowReaderV3,
     @Inject(MarketChartReaderV3) private readonly chartReader: MarketChartReaderV3,
+    @Optional()
+    @Inject(MarketEventFreeReader)
+    private readonly economicReader?: MarketEventFreeReader,
   ) {}
 
-  readV3(input: MarketBarWindowReadInputV3) {
+  async readV3(input: MarketBarWindowReadInputV3) {
+    const qualified = await this.economicReader?.read(input);
+    if (qualified) return qualified;
     return this.windowReader.read(input);
+  }
+
+  async researchCertificatePublishedAt(symbol: string, start: string, end: string) {
+    return (await this.economicReader?.publishedAt(symbol, start, end)) ?? null;
+  }
+
+  /** 后台研究仅消费已发布的证书；缺失时返回空，不访问实时行情。 */
+  async readRetainedResearch(input: MarketBarWindowReadInputV3) {
+    return (await this.economicReader?.read(input)) ?? null;
   }
 
   readChartV3(input: BarReadInput): Promise<BarSeries> {

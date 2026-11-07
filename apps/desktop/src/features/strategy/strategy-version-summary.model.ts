@@ -1,4 +1,5 @@
 import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
+import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
 import type { StrategySchema, StrategyVersion } from './strategy.types.js';
 import {
   strategyAssetTypeLabel,
@@ -10,8 +11,11 @@ import {
   strategyTimeframeLabel,
 } from './strategy-display-labels.js';
 
+type DefinitionGroup = 'context' | 'signals' | 'execution';
+export type StrategyDefinitionField = { group: DefinitionGroup; label: string; value: string };
+
 export type StrategyVersionSummary =
-  | { kind: 'ready'; sections: ReadonlyArray<{ label: string; value: string }> }
+  | { kind: 'ready'; sections: ReadonlyArray<StrategyDefinitionField> }
   | { kind: 'missing'; missing: string[] }
   | { kind: 'invalid'; reason: string };
 
@@ -108,7 +112,7 @@ const booleanExpression = (value: unknown, sourceLabels: ReadonlyMap<string, str
   return '无法识别的交易条件';
 };
 
-const percentage = (value: string) => `${(Number(value) * 100).toLocaleString()}%`;
+const percentage = (value: string) => formatDecimalRatioPercent(value, 3);
 
 const sizingSummary = (sizing: BacktestStrategy['sizing']) => {
   if (sizing.type === 'fixedAmount') return `每次固定投入 ${sizing.amount}`;
@@ -158,16 +162,17 @@ export const strategyVersionSummary = (version: StrategyVersion): StrategyVersio
   return {
     kind: 'ready',
     sections: [
-      { label: '策略说明', value: value.description?.trim() || '未填写策略说明' },
+      { group: 'context', label: '策略说明', value: value.description?.trim() || '未填写策略说明' },
       {
+        group: 'context',
         label: '适用范围',
         value: `${instrument.symbol} · ${strategyMarketLabel(instrument.market)} · ${strategyAssetTypeLabel(instrument.assetType)} · ${strategyTimeframeLabel(value.primaryTimeframe)}`,
       },
-      { label: '入场逻辑', value: booleanExpression(value.entry, sourceLabels) },
-      { label: '退出逻辑', value: booleanExpression(value.exit, sourceLabels) },
-      { label: '仓位管理', value: sizingSummary(value.sizing) },
-      { label: '风险约束', value: riskSummary(value.risk) },
-      { label: '执行假设', value: executionSummary(value) },
+      { group: 'signals', label: '入场逻辑', value: booleanExpression(value.entry, sourceLabels) },
+      { group: 'signals', label: '退出逻辑', value: booleanExpression(value.exit, sourceLabels) },
+      { group: 'execution', label: '仓位管理', value: sizingSummary(value.sizing) },
+      { group: 'execution', label: '风险约束', value: riskSummary(value.risk) },
+      { group: 'execution', label: '执行假设', value: executionSummary(value) },
     ],
   };
 };

@@ -32,7 +32,7 @@ export function ProviderAccountAccessPanel({ provider, catalog, report, dirty }:
   return (
     <section className="flex flex-col gap-3" aria-label="账户功能权限">
       <h3 className="text-sm font-medium">可用功能{usableReport?.credentialContext === 'draft' ? ' · 当前输入' : ''}</h3>
-      {!rows?.length && <p className="text-sm text-muted-foreground">功能目录加载中，可点击检查获取当前输入的结果。</p>}
+      {!rows?.length && <p className="text-sm text-muted-foreground">暂无已确认的功能，可检查当前输入。</p>}
       {!!rows?.length && !visible?.length && <p className="text-sm text-muted-foreground">尚无已确认可用的功能，可更新账号积分后检查。</p>}
       <ul className="flex flex-col gap-3">
         {visible?.map((row) => {

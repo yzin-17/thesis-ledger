@@ -29,7 +29,7 @@ export class ResearchObservationService {
     @Inject(ResearchObservationStore) private readonly store: ResearchObservationStore,
     @Inject(ResearchObservationMaterials) private readonly materials: ResearchObservationMaterials,
   ) {}
-  async submit(ownerId: string, rawId: unknown, rawLocator: unknown, raw: unknown) {
+  async submit(ownerId: string, rawId: unknown, rawLocator: unknown, raw: unknown, retainedOnly = false) {
     const id = researchReportIdSchema.parse(rawId),
       locator = researchReportLocatorSchema.parse(rawLocator);
     const input = researchObservationSubmissionSchema.parse(raw);
@@ -108,6 +108,7 @@ export class ResearchObservationService {
           window.window,
           calendar.material,
           input.asOf,
+          retainedOnly,
         );
       const evaluation = evaluateObservationPrices(window, claim, input.asOf, prices.material);
       const checked = await this.access.report(ownerId, id, locator);

@@ -8,3 +8,11 @@
 - 已结案且仅属于归档任务的证据可进入 `docs/archive/evidence`，归档时同步修正所有引用。
 
 文档分类与生命周期见[文档指南](../DOCUMENTATION-GUIDE.md)。保存证据不扩大来源、模型、通知、部署或受保护数据操作的授权。
+
+- [自选、多模型模拟交易与周报本地验证](2026-11-06-watchlist-arena-weekly-local.md)
+
+- [标的输入盘点与验证](2026-11-06-instrument-picker.md)
+
+- [基金收盘估算误差精确展示](2026-11-07-fund-daily-decimal-display.md)：两端差额、非零读数与原比例兼容。
+
+- [竞技场与周报详情刷新](2026-11-07-arena-detail-refresh.md)：两端相关请求、四宽受控浏览器、冻结输入的包级验证及共享工作区边界。

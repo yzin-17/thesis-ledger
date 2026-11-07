@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { formatRatioPercent } from '@thesis-ledger/domain';
 import {
   CrosshairMode,
   LineSeries,
@@ -152,7 +153,7 @@ export const useStrategyBacktestChart = ({
       color: css('--color-market-down', '#2f7a66'),
       lineWidth: 2,
       pointMarkersVisible: model.drawdown.length <= 1,
-      priceFormat: { type: 'custom', formatter: (value: number) => `${(value * 100).toFixed(2)}%` },
+      priceFormat: { type: 'custom', formatter: formatRatioPercent },
       title: model.drawdownSource === 'authoritative' ? '回撤' : '回撤（展示派生）',
     });
     equitySeries.setData(
@@ -173,9 +174,38 @@ export const useStrategyBacktestChart = ({
     const equitySeries = equitySeriesRef.current;
     if (!chart || !equitySeries) return;
     const point = model.equity.find((candidate) => candidate.time === lockedTime);
-    if (!point) chart.clearCrosshairPosition();
-    else chart.setCrosshairPosition(point.value, backtestChartTime(point.time), equitySeries);
-  }, [lockedTime, model.equity]);
+    if (point) {
+      chart.setCrosshairPosition(point.value, backtestChartTime(point.time), equitySeries);
+      return;
+    }
+    const drawdown = model.drawdown.find((candidate) => candidate.time === lockedTime);
+    if (drawdown && drawdownSeriesRef.current) {
+      chart.setCrosshairPosition(drawdown.value, backtestChartTime(drawdown.time), drawdownSeriesRef.current);
+    } else {
+      chart.clearCrosshairPosition();
+    }
+  }, [lockedTime, model.equity, model.drawdown]);
+
+  const timeline = useMemo(
+    () => [...new Set([...model.equity, ...model.drawdown].map((point) => point.time))].sort((a, b) => a - b),
+    [model.equity, model.drawdown],
+  );
+  const activeTime = lockedTime ?? hoverTime;
+  const stepPoint = (direction: -1 | 1) => {
+    const range = chartRef.current?.timeScale().getVisibleRange();
+    const from = milliseconds(range?.from);
+    const to = milliseconds(range?.to);
+    const times = timeline.filter((time) =>
+      (from === null || time >= from) && (to === null || time < to + 1_000),
+    );
+    if (direction < 0) times.reverse();
+    const next = times.find((time) => activeTime === null || (time - activeTime) * direction > 0);
+    setLockedTime(next ?? times.at(-1) ?? null);
+  };
+  const clearPoint = () => {
+    setLockedTime(null);
+    setHoverTime(null);
+  };
 
   const changeRange = (action: RangeAction) => {
     const chart = chartRef.current;
@@ -206,7 +236,9 @@ export const useStrategyBacktestChart = ({
 
   return {
     containerRef,
-    activeTime: lockedTime ?? hoverTime,
+    activeTime,
+    stepPoint,
+    clearPoint,
     lockedTime,
     changeRange,
     reset,

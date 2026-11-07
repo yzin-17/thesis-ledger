@@ -3,6 +3,7 @@ import { makeReaderResult } from '../backtest/v3-snapshot-fixtures.js';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { describe, expect, it, vi } from 'vitest';
+import { OptimizationPreparation } from '../../src/strategy-optimization/optimization-preparation.js';
 import { BacktestRunPreparationService } from '../../src/backtest/backtest-run-preparation.service.js';
 import { StrategyOptimizationPreparationController } from '../../src/strategy-optimization/strategy-optimization-preparation.controller.js';
 import { ApiExceptionFilter } from '../../src/platform/api-exception.filter.js';
@@ -48,7 +49,7 @@ describe('实验配置准备HTTP', () => {
     );
     @Module({
       controllers: [StrategyOptimizationPreparationController],
-      providers: [{ provide: BacktestRunPreparationService, useValue: preparation }],
+      providers: [OptimizationPreparation, { provide: BacktestRunPreparationService, useValue: preparation }],
     })
     class TestModule {}
     const app = await NestFactory.create(TestModule, { logger: false });

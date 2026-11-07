@@ -181,9 +181,9 @@ export function ProviderSettings() {
   return (
     <section className="module-page" data-provider-sheet-open={String(providerEditorOpen)}>
       <PageHeader
+        className="mb-card"
         eyebrow="DATA & AUTOMATION"
         title="数据与自动化"
-        description="管理数据源、连接状态和自动化任务。"
         actions={
           <>
             <RefreshIconButton
@@ -240,6 +240,7 @@ export function ProviderSettings() {
         <TabsContent value="providers">
           <div className="space-y-6">
             <ProviderTable
+              refreshing={providerQueries.providers.isRefetching}
               loadState={loadState}
               providers={providers}
               priorityDrafts={providerPriorityDrafts}
@@ -314,6 +315,7 @@ export function ProviderSettings() {
         <TabsContent value="diagnostics">
           <div className="space-y-6">
             <NotificationFailuresTable
+              refreshing={providerQueries.notificationFailures.isRefetching}
               loadState={resolveLoadState(
                 [providerQueries.notificationFailures],
                 providerQueries.notificationFailures.data !== undefined,
@@ -323,6 +325,7 @@ export function ProviderSettings() {
               onRetry={() => void providerQueries.notificationFailures.refetch()}
             />
             <DataQualityIssuesTable
+              refreshing={providerQueries.issues.isRefetching}
               loadState={resolveLoadState(
                 [providerQueries.issues],
                 providerQueries.issues.data !== undefined,

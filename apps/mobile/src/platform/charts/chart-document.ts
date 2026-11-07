@@ -13,7 +13,7 @@ export type ChartLine = {
   kind?: 'line' | 'histogram';
   style?: 0 | 1 | 2;
 };
-export type ChartData = { candles: ChartCandle[]; lines: ChartLine[]; main?: 'candles' | 'line' };
+export type ChartData = { candles: ChartCandle[]; lines: ChartLine[]; arenaMarkers?:{time:number,side:'buy'|'sell',text:string}[]; main?: 'candles' | 'line' };
 export type ChartColors = {
   background: string;
   text: string;
@@ -25,7 +25,7 @@ export type ChartDiagnostic = 'touch' | 'move' | 'range' | 'cancel' | 'end';
 export type ChartMessage = {
   version: 1;
   instanceId: string;
-  kind: 'ready' | 'older' | ChartDiagnostic;
+  kind: 'ready' | 'older' | ChartDiagnostic | 'arena'; time?:number;
 };
 
 function orderedChartTimes(points: ReadonlyArray<{ time: ChartTime }>) {
@@ -56,6 +56,7 @@ export function parseChartMessage(raw: string, instanceId: string): ChartMessage
     const data: unknown = JSON.parse(raw);
     if (!data || typeof data !== 'object') return null;
     const value = data as Record<string, unknown>;
+    if(value.version===1&&value.instanceId===instanceId&&value.kind==='arena'&&Number.isSafeInteger(value.time)&&typeof value.time==='number'&&value.time>0&&value.time<253402300800)return {version:1,instanceId,kind:'arena',time:value.time};
     if (
       value.version !== 1 ||
       value.instanceId !== instanceId ||
@@ -72,6 +73,10 @@ export function assertChartData(data: ChartData) {
   if (data.candles.length > 3000 || data.lines.length > 10)
     throw new Error('图表数据超过当前窗口上限。');
   if (!orderedChartTimes(data.candles)) throw new Error('图表窗口必须是有序且有效的时间数据。');
+  if(data.arenaMarkers){
+    const times=new Set(data.candles.map(c=>c.time));
+    if(data.arenaMarkers.some(m=>!times.has(m.time)||!['buy','sell'].includes(m.side)||typeof m.text!=='string'||m.text.length>500)) throw new Error('模拟成交点位超出当前行情窗口。');
+  }
   for (const candle of data.candles) {
     if (
       ![candle.open, candle.high, candle.low, candle.close].every(Number.isFinite) ||
@@ -121,12 +126,18 @@ export function chartDocument(
   const chart=LightweightCharts.createChart(root,{autoSize:true,...palette(p.colors),timeScale:{timeVisible:false},rightPriceScale:{borderVisible:false},handleScroll:{vertTouchDrag:false,horzTouchDrag:true}});
   const mainLine=p.data.main==='line';
   const candles=chart.addSeries(mainLine?LightweightCharts.LineSeries:LightweightCharts.CandlestickSeries,{borderVisible:false});
-  const lines=[];
+  const lines=[];let simulated;
+
   const applySeries=()=>{
     chart.applyOptions(palette(p.colors));
     candles.applyOptions(mainLine?{color:p.colors.line,lineWidth:2,priceLineVisible:false}:{upColor:p.colors.up,downColor:p.colors.down,wickUpColor:p.colors.up,wickDownColor:p.colors.down});
     candles.setData(mainLine?p.data.candles.map(point=>({time:point.time,value:point.close})):p.data.candles);
     while(lines.length>p.data.lines.length)chart.removeSeries(lines.pop());
+    if(p.data.arenaMarkers?.length||simulated){
+      const markers=(p.data.arenaMarkers||[]).map(m=>({time:m.time,position:m.side==='buy'?'belowBar':'aboveBar',shape:'circle',color:'#7c3aed',text:m.text}));
+      if(simulated)simulated.setMarkers(markers);
+      else{simulated=LightweightCharts.createSeriesMarkers(candles,markers);chart.subscribeClick(event=>{if(typeof event.time==='number'&&(p.data.arenaMarkers||[]).some(m=>m.time===event.time))window.ReactNativeWebView?.postMessage(JSON.stringify({version:1,instanceId:p.id,kind:'arena',time:event.time}));});}
+    }
     p.data.lines.forEach((line,index)=>{
       if(!lines[index])lines[index]=chart.addSeries(line.kind==='histogram'?LightweightCharts.HistogramSeries:LightweightCharts.LineSeries,{lineWidth:1,priceLineVisible:false,lastValueVisible:false},line.pane||0);
       lines[index].applyOptions({color:p.colors.line,...(line.kind==='histogram'?{}:{lineStyle:line.style||0})});lines[index].setData(line.kind==='histogram'?line.values.map(point=>({...point,color:point.value>=0?p.colors.up:p.colors.down})):line.values);

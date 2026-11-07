@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,7 @@ export function JournalAiTaskHistory({
       <p className="text-sm text-muted-foreground">
         恢复本窗口最近提交的任务，读取服务端保存的报告与状态。单笔和周期输入沿用提交时的证据。
       </p>
-      <div className="flex flex-wrap gap-2">
+      <ListRefreshRegion refreshing={tasks.isRefetching} label="正在刷新解读历史" className="flex flex-wrap gap-2">
         {tasks.data.map((row) => (
           <Button
             key={row.id}
@@ -49,7 +50,7 @@ export function JournalAiTaskHistory({
             {row.kind === 'object' ? '单笔解读' : '周期解读'} · {row.id}
           </Button>
         ))}
-      </div>
+      </ListRefreshRegion>
       <Button variant="ghost" className="self-start" onClick={() => void removeReference()}>
         移除本机任务引用
       </Button>

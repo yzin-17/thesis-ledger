@@ -360,7 +360,7 @@ function StrategyRiskEditorForm({
           onPress={() => execute('review')}
         />
       ) : null}
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
       {receipt ? (
         <Action
           label="打开目标风险应用"

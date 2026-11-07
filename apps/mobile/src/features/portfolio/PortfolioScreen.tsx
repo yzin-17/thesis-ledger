@@ -47,33 +47,36 @@ export function PortfolioScreen() {
         ]}
         onChange={setSelection}
       />
-      <QueryStatus query={query} retry={() => void query.refetch()} />
+      <QueryStatus inlineRefresh={false} query={query} retry={() => void query.refetch()} />
       {valuationNotice ? <Copy muted>{valuationNotice.title}：{valuationNotice.description}</Copy> : null}
-      <MobilePortfolioScreen
-        state={state}
-        accounts={accounts.data ?? []}
-        theme={runtime.theme}
-        styles={createStyles(runtime.theme)}
-        renderPositionAction={(position) => (
-          <Action
-            label={`查看行情 ${position.symbol}`}
-            onPress={() =>
-              rootNavigation.navigate('Market', {
-                screen: 'MarketDetail',
-                params: {
-                  instrument: mobileInstrument({
-                    symbol: position.symbol,
-                    displayName: position.asset?.name ?? position.symbol,
-                    instrumentType: position.asset?.assetType ?? '',
-                  }),
-                  accountId: position.accountId,
-                  mode: runtime.mode,
-                },
-              })
-            }
-          />
-        )}
-      />
+      {!query.isPending && (
+        <MobilePortfolioScreen
+          refreshing={query.isRefetching && !!query.data}
+          state={state}
+          accounts={accounts.data ?? []}
+          theme={runtime.theme}
+          styles={createStyles(runtime.theme)}
+          renderPositionAction={(position) => (
+            <Action
+              label={`查看行情 ${position.symbol}`}
+              onPress={() =>
+                rootNavigation.navigate('Market', {
+                  screen: 'MarketDetail',
+                  params: {
+                    instrument: mobileInstrument({
+                      symbol: position.symbol,
+                      displayName: position.asset?.name ?? position.symbol,
+                      instrumentType: position.asset?.assetType ?? '',
+                    }),
+                    accountId: position.accountId,
+                    mode: runtime.mode,
+                  },
+                })
+              }
+            />
+          )}
+        />
+      )}
       <Action
         label="查看交易"
         onPress={() =>

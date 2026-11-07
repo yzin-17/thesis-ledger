@@ -19,23 +19,30 @@ export function AuthoringEditorStatus({ model }: { model: AuthoringEditorModel }
     model.operation.error?.message;
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge variant="outline">修订 {draft.query.data?.revision}</Badge>
-        <span role="status">{saveLabel(model)}</span>
-        <Button
-          variant="outline"
-          disabled={busy || !draft.dirty}
-          onClick={() => model.perform.mutate(() => draft.flush())}
-        >
-          立即保存草稿
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant="secondary">修订 {draft.query.data?.revision}</Badge>
+          <span role="status" className="text-xs text-muted-foreground">
+            {saveLabel(model)}
+          </span>
+          {draft.dirty && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => model.perform.mutate(() => draft.flush())}
+            >
+              立即保存草稿
+            </Button>
+          )}
+        </div>
+        <AuthoringDraftRecovery
+          content={model.content}
+          disabled={busy || model.active}
+          onReadLatest={model.readLatest}
+          {...(editing ? { onDiscard: model.discardDraft } : {})}
+        />
       </div>
-      <AuthoringDraftRecovery
-        content={model.content}
-        disabled={busy || model.active}
-        onReadLatest={model.readLatest}
-        {...(editing ? { onDiscard: model.discardDraft } : {})}
-      />
       {failure && (
         <Alert variant="destructive">
           <AlertTitle>操作未完成</AlertTitle>

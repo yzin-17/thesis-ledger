@@ -7,7 +7,7 @@ import type {
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import { formatFullDateTime } from './ai.display.js';
 import { useResearchObservationHistoryQuery } from './research.queries.js';
 import { researchObservationState, researchStateMeta } from './research-state-display.js';
@@ -95,7 +95,7 @@ function ObservationHistoryRead({
   item: ResearchReportObservations['items'][number];
   query: ReturnType<typeof useResearchObservationHistoryQuery>;
 }) {
-  if (query.isFetching || query.isPending) return <Skeleton className="h-24 w-full" />;
+  if (query.isFetching || query.isPending) return <LoadingState label="正在读取历次复核" />;
   if (query.isError || !query.data)
     return (
       <Alert variant="destructive">

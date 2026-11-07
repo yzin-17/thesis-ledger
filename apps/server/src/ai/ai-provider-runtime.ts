@@ -35,6 +35,7 @@ export const createStoredAiProvider = async (
     },
     {
       priority: row.priority,
+      ...(settings.modelCatalog ? { modelCatalog: settings.modelCatalog } : {}),
       capabilities: aiProviderCapabilities(row.capabilities),
       health: healthValue(row.health),
       source: 'database',

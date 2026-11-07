@@ -290,6 +290,7 @@ export const aiProviderTestPurposeSchema = z.enum([
   'research',
   'parameter_optimization',
   'strategy_discovery',
+  'arena_decision',
 ]);
 export type AiProviderTestPurpose = z.infer<typeof aiProviderTestPurposeSchema>;
 

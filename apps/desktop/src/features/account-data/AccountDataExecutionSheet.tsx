@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import type { LedgerCommandResponse } from '@thesis-ledger/api-client';
 import { useToastManager } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { DecimalInput } from '@/components/ui/decimal-input';
 import {
   Select,
   SelectContent,
@@ -31,6 +32,7 @@ import {
 } from '../portfolio/portfolio.types.js';
 import { useNavigationGuard } from '../shared/navigation-guard.js';
 import { InstrumentCombobox } from '../portfolio/InstrumentCombobox.js';
+import { InstrumentSummary } from '../portfolio/InstrumentSummary.js';
 import { useConfirmPortfolioInstrumentMutation } from '../portfolio/portfolio.mutations.js';
 import { usePortfolioInstrumentSearch } from '../portfolio/portfolio.instrument-search.js';
 import { ExecutionRuleReference } from './ExecutionRuleReference.js';
@@ -76,6 +78,7 @@ export function ExecutionFormSheet({
   ledgerRevision,
   onOpenChange,
   onDirtyChange,
+  resolveInstrumentName,
 }: {
   account: Account;
   open: boolean;
@@ -83,6 +86,7 @@ export function ExecutionFormSheet({
   ledgerRevision: string;
   onOpenChange: (open: boolean, options?: ExecutionSheetCloseOptions) => void;
   onDirtyChange: (dirty: boolean) => void;
+  resolveInstrumentName?: (symbol: string) => string | undefined;
 }) {
   const toastManager = useToastManager();
   const createMutation = useCreateExecutionMutation(account.mode);
@@ -97,6 +101,11 @@ export function ExecutionFormSheet({
   const [manualInstrumentEntry, setManualInstrumentEntry] = useState(false);
   const [instrumentOpen, setInstrumentOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const updateDirty = useCallback((nextDirty = true) => {
+    setDirty(nextDirty);
+    onDirtyChange(nextDirty);
+  }, [onDirtyChange]);
   const instrumentSearch = usePortfolioInstrumentSearch({
     accountType: account.type,
     positionSheetOpen: open,
@@ -116,7 +125,12 @@ export function ExecutionFormSheet({
     .filter(Boolean)
     .join(' · ');
   const submitting = createMutation.isPending || replaceMutation.isPending;
-  useNavigationGuard({ dirty: false, busy: open && submitting });
+  useNavigationGuard({
+    dirty: open && dirty,
+    busy: open && submitting,
+    draft: { accountId: account.id, eventId: editingEvent?.eventId, draft, charges,
+      instrumentQuery, selectedInstrument, manualInstrumentEntry },
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -135,16 +149,12 @@ export function ExecutionFormSheet({
     setManualInstrumentEntry(false);
     setInstrumentOpen(false);
     setFormError(null);
-    onDirtyChange(false);
-  }, [account.currency, editingEvent?.eventId, onDirtyChange, open]);
+    updateDirty(false);
+  }, [account.currency, editingEvent?.eventId, updateDirty, open]);
 
   const updateDraft = <K extends keyof ExecutionDraft>(key: K, value: ExecutionDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
-    onDirtyChange(true);
-  };
-
-  const updateDirty = (nextDirty = true) => {
-    onDirtyChange(nextDirty);
+    updateDirty(true);
   };
 
   const close = (nextOpen: boolean) => {
@@ -162,7 +172,7 @@ export function ExecutionFormSheet({
       setSelectedInstrument(instrument);
       setInstrumentQuery(instrument.symbol);
       setInstrumentOpen(false);
-      onDirtyChange(true);
+      updateDirty(true);
     } catch (error) {
       setFormError(errorMessage(error, '标的确认失败，请检查标的目录。'));
     }
@@ -281,7 +291,7 @@ export function ExecutionFormSheet({
         type: 'success',
         timeout: 2800,
       });
-      onDirtyChange(false);
+      updateDirty(false);
       onOpenChange(false, { skipDiscardConfirm: true });
     } catch (error) {
       const code = errorCode(error);
@@ -302,22 +312,22 @@ export function ExecutionFormSheet({
             <SheetTitle>{editingEvent ? '更正成交' : '录入成交'}</SheetTitle>
             <SheetDescription>
               {editingEvent
-                ? '更正会生成新的 REPLACE 版本，原始成交和原因仍可在修正链中审计。'
-                : '录入真实 BUY/SELL 事实；提交使用稳定客户端命令 ID，重复重放不会重复写入。'}
+                ? '保存后保留原记录，可在历史中查看更正原因。'
+                : '记录实际发生的买入或卖出。'}
             </SheetDescription>
           </SheetHeader>
           <form
             className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={(event) => void submit(event)}
           >
-            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto scroll-p-2 px-1 py-1">
               <div className="flex flex-col gap-5">
                 <FieldGroup>
                   <Field>
                     <FieldLabel htmlFor="execution-account">账户</FieldLabel>
                     <div
                       id="execution-account"
-                      className="min-h-9 rounded-md border bg-muted/30 px-3 py-2 text-sm"
+                      className="text-sm text-foreground"
                     >
                       <span className="whitespace-normal break-words">{accountSummary}</span>
                     </div>
@@ -325,10 +335,7 @@ export function ExecutionFormSheet({
                   <Field>
                     <FieldLabel>标的</FieldLabel>
                     {editingEvent ? (
-                      <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border bg-muted/30 px-3">
-                        <span className="text-sm font-medium">{editingEvent.payload.symbol}</span>
-                        <span className="text-xs text-muted-foreground">已确认标的</span>
-                      </div>
+                      <InstrumentSummary className="min-h-0 rounded-none border-0 bg-transparent p-0" symbol={editingEvent.payload.symbol} name={resolveInstrumentName?.(editingEvent.payload.symbol)} />
                     ) : (
                       <InstrumentCombobox
                         manualEntry={manualInstrumentEntry}
@@ -374,14 +381,14 @@ export function ExecutionFormSheet({
                         if (next) updateDraft('side', next);
                       }}
                     >
-                      <ToggleGroupItem value="BUY">买入 BUY</ToggleGroupItem>
-                      <ToggleGroupItem value="SELL">卖出 SELL</ToggleGroupItem>
+                      <ToggleGroupItem value="BUY">买入</ToggleGroupItem>
+                      <ToggleGroupItem value="SELL">卖出</ToggleGroupItem>
                     </ToggleGroup>
                   </Field>
                   <FieldGroup className="grid gap-4 sm:grid-cols-2">
                     <Field>
                       <FieldLabel htmlFor="execution-quantity">数量</FieldLabel>
-                      <Input
+                      <DecimalInput fractionDigits={8}
                         id="execution-quantity"
                         inputMode="decimal"
                         value={draft.quantity}
@@ -392,7 +399,7 @@ export function ExecutionFormSheet({
                     </Field>
                     <Field>
                       <FieldLabel htmlFor="execution-price">价格</FieldLabel>
-                      <Input
+                      <DecimalInput
                         id="execution-price"
                         inputMode="decimal"
                         value={draft.price}
@@ -502,14 +509,14 @@ export function ExecutionFormSheet({
                       添加费用
                     </Button>
                   </div>
-                  <FieldGroup className="rounded-lg border p-4">
+                  <FieldGroup className="gap-4">
                     {charges.length === 0 && (
                       <p className="m-0 text-xs text-muted-foreground">暂无费用明细</p>
                     )}
                     {charges.map((charge, index) => (
                       <FieldGroup
                         key={`${index}-${charge.category}`}
-                        className="grid gap-3 rounded-md bg-muted/30 p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                        className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
                       >
                         <Field>
                           <FieldLabel htmlFor={`charge-category-${index}`}>类别</FieldLabel>

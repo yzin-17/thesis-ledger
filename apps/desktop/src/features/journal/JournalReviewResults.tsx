@@ -145,7 +145,7 @@ export function AiReviewPanel({
           <Alert variant="destructive">
             <AlertTitle>AI 解读暂时不可用</AlertTitle>
             <AlertDescription>
-              {error.message || 'Provider 未返回可用结果。确定性复盘仍然保留。'}
+              {error.message || '提供方未返回可用结果。确定性复盘仍然保留。'}
             </AlertDescription>
           </Alert>
         )}

@@ -7,6 +7,9 @@ import {
   validateMarketNewsContentV3,
 } from './market-news-v3.js';
 
+export const marketNewsDefaultWindowMs = 3 * 86_400_000;
+export const marketNewsDefaultPageSize = 5;
+
 const request = marketNewsRequestV3Schema.shape;
 export const marketNewsReadInputSchema = z
   .strictObject({

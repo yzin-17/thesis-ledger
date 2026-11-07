@@ -98,7 +98,7 @@ export function JournalAiPanel({
           />
         </>
       ) : null}
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
       {runId ? (
         <>
           <Copy>任务 {runId}</Copy>

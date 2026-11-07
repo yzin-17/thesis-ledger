@@ -270,7 +270,7 @@ export function StandardPositionContent({
           </div>
           <div className="form-actions justify-end">
             <Button
-              className="text-button"
+              className="text-button hover:no-underline"
               size="sm"
               type="button"
               variant="link"

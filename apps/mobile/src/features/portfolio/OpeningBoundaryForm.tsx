@@ -83,7 +83,7 @@ export function OpeningBoundaryForm({ trade }: { trade: TradeDetailResponse }) {
         editable={!mutation.isPending}
       />
       <Field label="补录原因" value={reason} onChange={setReason} editable={!mutation.isPending} />
-      <Feedback message={feedback} error={mutation.isError} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError} />
       <Action
         label="确认补录建仓时间"
         disabled={

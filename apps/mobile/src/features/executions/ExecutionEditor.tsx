@@ -211,6 +211,7 @@ export function ExecutionEditor() {
       ) : null}
       <Feedback message={feedback} error={mutation.isError} />
       <Action
+        busy={mutation.isPending}
         label={mutation.isPending ? '写入中…' : '确认写入账本'}
         primary
         disabled={blocked || !confirmed || JSON.stringify(form) === JSON.stringify(saved)}

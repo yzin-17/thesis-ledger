@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePageRefresh } from '../src/features/shared/usePageRefresh.js';
+import { RefreshIconButton } from '../src/features/shared/RefreshIconButton.js';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const first = vi.fn();
@@ -20,7 +21,7 @@ function Harness() {
   useQuery({ queryKey: ['page', 'disabled'], queryFn: disabled, enabled: false });
   useQuery({ queryKey: ['other'], queryFn: other, staleTime: Infinity });
   const page = usePageRefresh([{ queryKey: ['page'] }, { queryKey: ['page', 'first'] }]);
-  return <><button disabled={page.refreshing} onClick={() => void page.refresh()}>刷新页面</button><span>{one.isError ? '查询失败' : one.data}</span></>;
+  return <><RefreshIconButton label="刷新页面" refreshing={page.refreshing} onClick={() => void page.refresh()} /><span>{one.isError ? '查询失败' : one.data}</span></>;
 }
 const settle = async () => { await act(async () => new Promise((resolve) => setTimeout(resolve, 5))); };
 const button = () => host.querySelector('button')!;
@@ -52,10 +53,16 @@ describe('页面只读刷新调度', () => {
     second.mockReturnValueOnce(new Promise((resolve) => { finishSecond = resolve; }));
     await act(async () => button().click()); await settle();
     expect(button().disabled).toBe(true);
+    expect(button().getAttribute('aria-busy')).toBe('true');
+    expect(button().querySelector('[data-slot="spinner"]')).not.toBeNull();
+    expect(host.textContent).toContain('原数据');
     await act(async () => finishFirst('较快查询完成')); await settle();
     expect(button().disabled).toBe(true);
+    expect(button().querySelector('[data-slot="spinner"]')).not.toBeNull();
     await act(async () => finishSecond('较慢查询完成')); await settle();
     expect(button().disabled).toBe(false);
+    expect(button().getAttribute('aria-busy')).toBe('false');
+    expect(button().querySelector('[data-slot="spinner"]')).toBeNull();
   });
   it('错误后结束刷新状态，保留查询自己的失败信息并允许恢复', async () => {
     first.mockRejectedValueOnce(new Error('读取失败'));

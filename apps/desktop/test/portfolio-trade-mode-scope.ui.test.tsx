@@ -280,13 +280,39 @@ afterEach(async () => {
 });
 
 describe('交易周期的账户范围与全局模式', () => {
+  it('独立使用时清除本地账户、标的和生命周期筛选', async () => {
+    await renderHarness();
+    await waitForRequestCount(1);
+    await resolveRequest(0, 'actual');
+    await selectAccount(actualAccount, 1);
+    await resolveRequest(1, 'actual');
+    expect(button('清除筛选').disabled).toBe(false);
+    await setSymbol('600519.SH', 2);
+    await resolveRequest(2, 'actual');
+    await selectLifecycle(3);
+    await resolveRequest(3, 'actual');
+    await act(async () => {
+      queryClient!.removeQueries({
+        queryKey: portfolioTradeKeys.list('actual', '', '', 'ALL'),
+        exact: true,
+      });
+      button('清除筛选').click();
+    });
+    await waitForRequestCount(5);
+    expect(requests[4]!.params).toEqual({ mode: 'actual', limit: 50 });
+    expect(host!.querySelector('[aria-label="交易账户范围"]')?.textContent).toContain('全部账户');
+    expect(host!.querySelector<HTMLInputElement>('[aria-label="交易标的筛选"]')?.value).toContain('全部标的');
+    expect(host!.querySelector('[aria-label="交易生命周期"]')?.textContent).toContain('全部');
+    expect(button('清除筛选').disabled).toBe(true);
+  });
+
   it('从完整选项选择名称与代码，加载时保留统计和筛选控件', async () => {
     await renderHarness(); await waitForRequestCount(1);
     await act(async () => new Promise(resolve => setTimeout(resolve, 0)));
     const stats = host!.querySelector('dl');
-    const trigger = host!.querySelector('[aria-label="交易标的筛选"]');
-    expect(trigger?.tagName).toBe('BUTTON');
-    expect(host!.querySelector('input[aria-label="交易标的筛选"]')).toBeNull();
+    const trigger = host!.querySelector<HTMLInputElement>('[aria-label="交易标的筛选"]');
+    expect(trigger?.tagName).toBe('INPUT');
+    expect(host!.querySelector('input[aria-label="交易标的筛选"]')).toBe(trigger);
     expect(stats?.getAttribute('aria-busy')).toBe('true');
     await openSelect('交易标的筛选');
     const options = [...document.querySelectorAll('[role="option"]')].map(option => option.textContent);
@@ -299,10 +325,10 @@ describe('交易周期的账户范围与全局模式', () => {
     await resolveRequest(0, 'actual', [trade(actualAccount, 'AAPL.US', '全部范围结果')]);
     expect(host!.textContent).not.toContain('全部范围结果');
     await resolveRequest(1, 'actual', [trade(actualAccount, '600519.SH', '茅台交易')]);
-    expect(trigger?.textContent).toContain('贵州茅台 · 600519.SH');
+    expect(trigger?.value).toContain('贵州茅台 · 600519.SH');
     await openSelect('交易标的筛选');
     await clickOption(option => option.textContent === '全部标的');
-    expect(trigger?.textContent).toContain('全部标的');
+    expect(trigger?.value).toContain('全部标的');
     expect(requests[0]!.params).not.toHaveProperty('symbol');
     expect(host!.textContent).toContain('全部范围结果');
   });
@@ -313,7 +339,7 @@ describe('交易周期的账户范围与全局模式', () => {
     await selectAccount(actualAccount, 2);
     expect(requests[2]!.params).not.toHaveProperty('symbol');
     await resolveRequest(2, 'actual');
-    expect(host!.querySelector('[aria-label="交易标的筛选"]')?.textContent).toContain('全部标的');
+    expect(host!.querySelector<HTMLInputElement>('[aria-label="交易标的筛选"]')?.value).toContain('全部标的');
   });
 
   it('标的选项读取失败时列表仍可查看，查询刷新可恢复选项', async () => {
@@ -321,12 +347,12 @@ describe('交易周期的账户范围与全局模式', () => {
     await renderHarness(); await waitForRequestCount(1);
     await resolveRequest(0, 'actual', [trade(actualAccount, '600519.SH', '可查看的交易')]);
     expect(host!.textContent).toContain('可查看的交易');
-    const trigger = host!.querySelector<HTMLButtonElement>('[aria-label="交易标的筛选"]')!;
-    expect(trigger.disabled).toBe(true); expect(trigger.textContent).toContain('标的暂不可用');
+    const trigger = host!.querySelector<HTMLInputElement>('[aria-label="交易标的筛选"]')!;
+    expect(trigger.disabled).toBe(true); expect(trigger.value).toContain('标的暂不可用');
     vi.mocked(fetchPortfolioTradeInstruments).mockResolvedValue({ mode: 'actual', accountId: null, items: [{ symbol: '600519.SH', displayName: '贵州茅台' }] });
     await act(async () => { void queryClient!.invalidateQueries({ queryKey: portfolioTradeKeys.root }); });
     await waitForRequestCount(2); await resolveRequest(1, 'actual');
-    expect(trigger.disabled).toBe(false); expect(trigger.textContent).toContain('全部标的');
+    expect(trigger.disabled).toBe(false); expect(trigger.value).toContain('全部标的');
   });
 
   it('切换模式时恢复全部账户与标的，并保留生命周期筛选', async () => {

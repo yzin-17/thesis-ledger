@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import type { MarketNewsResult, MarketNewsFeedResult } from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -21,7 +22,7 @@ const reasonLabels: Record<string, string> = {
   pagination_truncated: '结果受到条数或订阅范围限制',
   published_time_unknown: '部分消息的发布时间未知',
   source_available_time_unknown: '来源首次可用时间未知',
-  not_admitted: '该范围或时间窗口尚未准入',
+  not_admitted: '当前没有可用于这个范围的新闻来源',
   not_covered: '当前来源未覆盖该范围',
   rate_limited: '来源请求受限，请稍后再试',
   timeout: '来源读取超时，请稍后再试',
@@ -30,23 +31,38 @@ const reasonLabels: Record<string, string> = {
 };
 
 export function NewsResult({
+  refreshing = false,
   result,
   heading,
+  compact = false,
 }: {
+  refreshing?: boolean;
   result: MarketNewsResult | MarketNewsFeedResult;
   heading: string;
+  compact?: boolean;
 }) {
   const { coverage } = result;
+  if (compact && result.status === 'unavailable') {
+    const reasons = [...new Set([
+      ...result.errors.map((error) => reasonLabels[error.code]),
+      ...coverage.missingReasons.map((reason) => reasonLabels[reason]),
+    ].filter(Boolean))];
+    return (
+      <p role="status" className="py-2 text-sm text-muted-foreground">
+        {reasons.join('；') || '当前时间范围的新闻暂不可读取。'}
+      </p>
+    );
+  }
   return (
     <section aria-label="新闻检索结果" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      {!compact && <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{heading}</h3>
         <Badge variant="outline">{statusLabels[result.status]}</Badge>
         <span className="text-sm text-muted-foreground tabular-nums">
           {coverage.returnedCount} 条 · {coverage.uniqueEvidenceCount} 组独立证据
         </span>
-      </div>
-      <p className="text-xs text-muted-foreground">
+      </div>}
+      <p className={compact ? 'order-last text-xs text-muted-foreground' : 'text-xs text-muted-foreground'}>
         数据来源：
         {result.source ? (newsSourceLabels[result.source.providerId] ?? '已配置来源') : '未选定'}
         <br />
@@ -77,32 +93,34 @@ export function NewsResult({
           </AlertDescription>
         </Alert>
       )}
-      {result.items.length === 0 && (
-        <p className="py-4 text-muted-foreground">
-          当前窗口没有可展示的新闻；这不代表该期间没有新闻。
-        </p>
-      )}
-      <ol className="divide-y divide-border">
-        {result.items.map((item) => (
-          <li key={item.id} className="flex flex-col gap-2 py-4 first:pt-0">
-            <a
-              className="block leading-relaxed underline underline-offset-4 break-words"
-              href={item.originalUrl ?? item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {item.title}
-            </a>
-            <p className="text-sm text-muted-foreground">
-              {item.publisher ?? '发布方未知'} · 发布于 {formatDateTime(item.publishedAt, '未知')}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              来源首次可用：{formatDateTime(item.sourceAvailableAt, '未知')} · 抓取于{' '}
-              {formatDateTime(item.fetchedAt)}
-            </p>
-          </li>
-        ))}
-      </ol>
+      <ListRefreshRegion refreshing={refreshing} label="正在刷新新闻列表">
+        {result.items.length === 0 && (
+          <p className="py-4 text-muted-foreground">
+            {coverage.complete ? '该时段暂无新闻。' : '当前来源在该时段没有可展示的新闻。'}
+          </p>
+        )}
+        <ol className="divide-y divide-border">
+          {result.items.map((item) => (
+            <li key={item.id} className="flex flex-col gap-2 py-4 first:pt-0">
+              <a
+                className="block leading-relaxed hover:text-primary/80 break-words"
+                href={item.originalUrl ?? item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {item.title}
+              </a>
+              <p className="text-sm text-muted-foreground">
+                {item.publisher ?? '发布方未知'} · 发布于 {formatDateTime(item.publishedAt, '未知')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                来源首次可用：{formatDateTime(item.sourceAvailableAt, '未知')} · 抓取于{' '}
+                {formatDateTime(item.fetchedAt)}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </ListRefreshRegion>
     </section>
   );
 }

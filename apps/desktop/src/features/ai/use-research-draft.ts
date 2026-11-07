@@ -20,9 +20,9 @@ export type ResearchDraft = {
   question: string;
   templateId: ResearchSubmissionV2['templateId'];
 };
-const initialDraft = (question: string): ResearchDraft => ({
+const initialDraft = (question: string, instrument: InstrumentLookup | null): ResearchDraft => ({
   scope: 'instrument',
-  instrument: null,
+  instrument,
   accountId: null,
   symbol: null,
   strategyVersionId: null,
@@ -68,12 +68,13 @@ export function useResearchDraft(
   mode: ResearchSubmissionV2['mode'],
   editable: boolean,
   allowedScopes: ResearchDraft['scope'][],
+  instrument: InstrumentLookup | null = null,
 ) {
   const owner = useResearchIdentity();
-  const [draft, setDraft] = useState(() => initialDraft(question));
+  const [draft, setDraft] = useState(() => initialDraft(question, instrument));
   useEffect(() => {
-    if (open) setDraft(initialDraft(question));
-  }, [open, question, mode, owner]);
+    if (open) setDraft(initialDraft(question, instrument));
+  }, [open, question, mode, owner, instrument]);
   const objects = useResearchDraftObjects(
     draft.scope,
     mode,

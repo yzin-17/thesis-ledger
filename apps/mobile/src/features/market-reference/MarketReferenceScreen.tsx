@@ -1,3 +1,4 @@
+import { MarketReferenceCodeField } from './MarketReferenceCodeField';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -15,7 +16,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
 } from '../../components/MobilePrimitives';
 import { ReferenceTypePicker } from './ReferenceTypePicker';
 import { ReferenceResult } from './ReferenceResult';
@@ -80,19 +81,7 @@ export function MarketReferenceScreen() {
           clear();
         }}
       />
-      {codeInput ? (
-        <>
-          <Field
-            label={codeInput.label}
-            value={symbol}
-            onChange={(value) => {
-              setSymbol(value);
-              clear();
-            }}
-          />
-          <Copy>{codeInput.example}</Copy>
-        </>
-      ) : null}
+      <MarketReferenceCodeField dataset={dataset} value={symbol} onChange={(value) => { setSymbol(value); clear(); }} />
       {entry.scope === 'index' ? <Copy>指数：{index?.label}</Copy> : null}
       {entry.dateFilter ? (
         <>
@@ -117,8 +106,15 @@ export function MarketReferenceScreen() {
       <Copy muted>每页五条，缺失显示为 —；日期、单位和覆盖范围以本次来源记录为准。</Copy>
       <Feedback message={error} error />
       <Action label="查询资料" primary disabled={query.isFetching} onPress={read} />
-      {submitted ? <QueryStatus query={query} retry={() => void query.refetch()} /> : null}
-      {query.data ? <ReferenceResult data={query.data} /> : null}
+      {submitted && (
+        <QueryList
+          query={query}
+          retry={() => void query.refetch()}
+          label="正在刷新市场资料"
+        >
+          {query.data ? <ReferenceResult data={query.data} /> : null}
+        </QueryList>
+      )}
       {query.data && submitted ? (
         <>
           <Copy>第 {submitted.page} 页</Copy>

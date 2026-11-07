@@ -49,9 +49,10 @@ describe('现金展示与交互保持', () => {
     expect(container.textContent?.match(/¥1,160\.00/g)).toHaveLength(1);
     expect(container.textContent).not.toContain('本位币合计');
     expect(container.textContent).toContain('现金数据：完整');
-    expect(container.textContent).toContain('待结算应收0 笔');
-    expect(container.textContent).toContain('待结算应付0 笔');
+    expect(container.textContent).not.toContain('待结算应收0 笔');
+    expect(container.textContent).not.toContain('待结算应付0 笔');
     expect(container.textContent).toContain('暂无待结算资金');
+    expect(container.querySelector('#cash-pending-title')).toBeNull();
   });
 
   it('多币种按原币展示，仅在所有折算值可靠时展示本位币合计', async () => {

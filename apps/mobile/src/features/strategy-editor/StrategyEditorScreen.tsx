@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -266,7 +267,7 @@ function StrategyEditorForm({
         disabled={command.isPending || !!draft.pending || !!saved}
         onPress={() => execute('save')}
       />
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
       {saved ? (
         <Action
           label="打开已保存版本"
@@ -299,8 +300,16 @@ function StrategyCommonFields({
         multiline
         onChange={(description) => onPatch({ description })}
       />
-      <Field
+      <InstrumentSymbolField
         label="执行标的"
+        markets={
+          instrument.market === 'CN' ? ['SH', 'SZ', 'BJ', 'OF'] : [String(instrument.market)]
+        }
+        instrumentTypes={[
+          instrument.assetType === 'fund'
+            ? 'MUTUAL_FUND'
+            : String(instrument.assetType).toUpperCase(),
+        ]}
         value={typeof instrument.symbol === 'string' ? instrument.symbol : ''}
         editable={!locked}
         onChange={(v) => onInstrument('symbol', v)}

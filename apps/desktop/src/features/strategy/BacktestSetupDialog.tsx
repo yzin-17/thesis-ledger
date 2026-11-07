@@ -74,7 +74,7 @@ export function BacktestSetupDialog({
   const requestOpenChange = useDraftCloseGuard({
     open,
     busy,
-    draft: { period, initialCash, baseCurrency, adjustment },
+    draft: { strategyVersionId: version?.id, period, initialCash, baseCurrency, adjustment },
     dirty: preparationDirty,
     onOpenChange,
   });
@@ -153,7 +153,6 @@ export function BacktestSetupDialog({
           {version?.schema && currentStrategy && (
             <StrategyV2Summary
               schema={version.schema}
-              variant="compact"
               version={version.version}
               {...(strategy?.name ? { strategyName: strategy.name } : {})}
             />
@@ -254,6 +253,7 @@ export function BacktestSetupDialog({
                 ? { initialModel: initialSetup.executionModel }
                 : {})}
               onPrepared={setPrepared}
+              onSubmitted={()=>onOpenChange(false)}
               onDirtyChange={setPreparationDirty}
             />
           )}

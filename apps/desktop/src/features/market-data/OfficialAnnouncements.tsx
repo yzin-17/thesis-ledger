@@ -1,3 +1,5 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { LoadingState } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { marketInformationClient } from '@thesis-ledger/api-client';
@@ -30,9 +32,7 @@ export function OfficialAnnouncements() {
         }}
       />
       {query.isPending && (
-        <p role="status" className="text-sm text-muted-foreground">
-          正在加载公告…
-        </p>
+        <LoadingState label="正在加载公告" />
       )}
       {query.isError && (
         <div className="flex flex-col gap-2">
@@ -49,31 +49,33 @@ export function OfficialAnnouncements() {
           <p role="status" className="text-xs text-muted-foreground">
             {q.trim() ? '匹配' : '共收录'} {data.total} 份原文，当前显示 {data.items.length} 份
           </p>
-          <ul className="divide-y divide-border" aria-label="已收录公告与规则文档">
-            {data.items.map((item) => (
-              <li key={item.id} className="flex flex-col gap-3 py-3 first:pt-0">
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-sm text-sm font-medium text-primary underline underline-offset-4 wrap-anywhere"
-                >
-                  {item.title}
-                </a>
-                <p className="text-xs text-muted-foreground">
-                  发布日期：{item.publishedDate} · {item.symbol}
-                </p>
-                <p className="text-xs">
-                  {item.uses.map((use) => (use === 'risk' ? '风险警示' : '停复牌')).join('、')}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  原文：{downloadLabel(item.downloadState)} · 状态解析：
-                  {parseLabel(item.parseState)}
-                </p>
-                {item.detail && <p className="text-xs text-muted-foreground">{item.detail}</p>}
-              </li>
-            ))}
-          </ul>
+          <ListRefreshRegion refreshing={query.isRefetching} label="正在刷新公告">
+            <ul className="divide-y divide-border" aria-label="已收录公告与规则文档">
+              {data.items.map((item) => (
+                <li key={item.id} className="flex flex-col gap-3 py-3 first:pt-0">
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-sm text-sm font-medium text-primary hover:text-primary/80 wrap-anywhere"
+                  >
+                    {item.title}
+                  </a>
+                  <p className="text-xs text-muted-foreground">
+                    发布日期：{item.publishedDate} · {item.symbol}
+                  </p>
+                  <p className="text-xs">
+                    {item.uses.map((use) => (use === 'risk' ? '风险警示' : '停复牌')).join('、')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    原文：{downloadLabel(item.downloadState)} · 状态解析：
+                    {parseLabel(item.parseState)}
+                  </p>
+                  {item.detail && <p className="text-xs text-muted-foreground">{item.detail}</p>}
+                </li>
+              ))}
+            </ul>
+          </ListRefreshRegion>
           {data.total === 0 && (
             <p className="text-sm text-muted-foreground">
               {q ? '没有匹配的公告或规则文档。' : '当前尚未收录公告。'}

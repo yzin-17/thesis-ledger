@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
@@ -276,7 +277,7 @@ export function StrategyRiskCreateScreen() {
           .filter((v) => v.active)
           .map((v) => ({ value: v.id, label: v.name }))}
       />
-      <Field
+      <InstrumentSymbolField
         label="风险应用标的"
         value={effectiveSymbol}
         editable={!locked}
@@ -337,7 +338,7 @@ export function StrategyRiskCreateScreen() {
           onPress={() => execute('review')}
         />
       ) : null}
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
       {receipt ? (
         <Action
           label="打开已保存风险应用"

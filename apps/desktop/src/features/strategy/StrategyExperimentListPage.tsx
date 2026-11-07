@@ -1,3 +1,5 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { Spinner } from '@/components/ui/spinner';
 import { TableContainer } from '@/components/ui/table';
 import { useEffect, useRef, useState } from 'react';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
@@ -292,167 +294,171 @@ export function StrategyExperimentListPage() {
           onRetry={renameReadFailed ? () => void refreshRenamedList(savedRename.id) : undefined}
         />
       ) : null}
-      {experiments.data && items.length === 0 ? (
-        <Empty className="rounded-md border border-border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <FlaskConical />
-            </EmptyMedia>
-            <EmptyTitle>没有匹配的实验</EmptyTitle>
-            <EmptyDescription>调整筛选条件，或创建新的策略实验。</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button
-              nativeButton={false}
-              render={<Link to={strategyCenterPath.newExperiment}>新建实验</Link>}
-            />
-          </EmptyContent>
-        </Empty>
-      ) : null}
-      {experiments.data && items.length > 0 ? (
-        <TableContainer>
-          <table className="w-full min-w-[900px] table-fixed text-sm">
-            <thead className="border-b text-left">
-              <tr>
-                <th className="w-[38%] px-4 py-3 font-medium">实验名称 / 来源</th>
-                <th className="w-[19%] px-4 py-3 font-medium">状态</th>
-                <th className="w-[23%] px-4 py-3 font-medium">进展与产出</th>
-                <th className="w-[12%] px-4 py-3 font-medium">更新时间</th>
-                <th data-table-action-static className="w-[8%] px-4 py-3 text-right font-medium">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((experiment) => (
-                <tr key={experiment.id} className="border-b last:border-0 hover:bg-muted/20">
-                  <td className="px-4 py-3">
-                    {renamingId === experiment.id ? (
-                      <div className="flex w-full max-w-sm flex-col items-stretch gap-2">
-                        <Input
-                          autoFocus
-                          className="w-full"
-                          aria-label="新的实验名称"
-                          value={savedRename?.id === experiment.id ? savedRename.name : renameValue}
-                          disabled={renameMutation.isPending || savedRename?.id === experiment.id}
-                          onChange={(event) => {
-                            if (renameFlightRef.current || savedRename?.id === experiment.id)
-                              return;
-                            setRenameValue(event.target.value);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault();
-                              submitRename(experiment.id, renameValue.trim());
-                            }
-                            if (event.key === 'Escape') {
-                              event.preventDefault();
-                              cancelRename();
-                            }
-                          }}
-                        />
-                        {savedRename?.id !== experiment.id ? (
+      <ListRefreshRegion refreshing={experiments.isRefetching && !!experiments.data} label="正在刷新策略实验">
+        {experiments.data && items.length === 0 ? (
+          <Empty className="rounded-md border border-border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FlaskConical />
+              </EmptyMedia>
+              <EmptyTitle>没有匹配的实验</EmptyTitle>
+              <EmptyDescription>调整筛选条件，或创建新的策略实验。</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button
+                nativeButton={false}
+                render={<Link to={strategyCenterPath.newExperiment}>新建实验</Link>}
+              />
+            </EmptyContent>
+          </Empty>
+        ) : null}
+        {experiments.data && items.length > 0 ? (
+          <TableContainer>
+            <table className="w-full min-w-[900px] table-fixed text-sm">
+              <thead className="border-b text-left">
+                <tr>
+                  <th className="w-[38%] px-4 py-3 font-medium">实验名称 / 来源</th>
+                  <th className="w-[19%] px-4 py-3 font-medium">状态</th>
+                  <th className="w-[23%] px-4 py-3 font-medium">进展与产出</th>
+                  <th className="w-[12%] px-4 py-3 font-medium">更新时间</th>
+                  <th data-table-action-static className="w-[8%] px-4 py-3 text-right font-medium">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((experiment) => (
+                  <tr key={experiment.id} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-3">
+                      {renamingId === experiment.id ? (
+                        <div className="flex w-full max-w-sm flex-col items-stretch gap-2">
+                          <Input
+                            autoFocus
+                            className="w-full"
+                            aria-label="新的实验名称"
+                            value={savedRename?.id === experiment.id ? savedRename.name : renameValue}
+                            disabled={renameMutation.isPending || savedRename?.id === experiment.id}
+                            onChange={(event) => {
+                              if (renameFlightRef.current || savedRename?.id === experiment.id)
+                                return;
+                              setRenameValue(event.target.value);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                submitRename(experiment.id, renameValue.trim());
+                              }
+                              if (event.key === 'Escape') {
+                                event.preventDefault();
+                                cancelRename();
+                              }
+                            }}
+                          />
+                          {savedRename?.id !== experiment.id ? (
+                            <Button
+                              aria-busy={renameMutation.isPending}
+                              size="sm"
+                              className="w-fit"
+                              disabled={!renameValue.trim() || renameMutation.isPending}
+                              onClick={() => submitRename(experiment.id, renameValue.trim())}
+                            >
+                              {renameMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
+                              {renameMutation.isPending ? '保存中…' : '保存'}
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
+                            variant="outline"
                             className="w-fit"
-                            disabled={!renameValue.trim() || renameMutation.isPending}
-                            onClick={() => submitRename(experiment.id, renameValue.trim())}
+                            aria-label="取消重命名"
+                            disabled={renameMutation.isPending || savedRename !== null}
+                            onClick={cancelRename}
                           >
-                            {renameMutation.isPending ? '保存中…' : '保存'}
+                            取消
                           </Button>
-                        ) : null}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-fit"
-                          aria-label="取消重命名"
-                          disabled={renameMutation.isPending || savedRename !== null}
-                          onClick={cancelRename}
-                        >
-                          取消
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <Link
-                          className="block truncate font-medium text-foreground hover:underline"
-                          title={experiment.name}
-                          to={strategyCenterPath.experiment(experiment.id)}
-                        >
-                          {experiment.name}
-                        </Link>
-                        <div className="mt-1 truncate text-xs text-muted-foreground">
-                          {experimentSourceLabel(experiment)}
                         </div>
-                      </>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <Badge variant={experimentStatusVariant(experiment.status)}>
-                      {experimentStatusLabel(experiment.status)}
-                    </Badge>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {experimentStageLabel(experiment.stage)}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 whitespace-normal text-muted-foreground">
-                    {experimentProgressLabel(experiment)}
-                  </td>
-                  <td className="px-4 py-3 whitespace-normal text-muted-foreground">
-                    {formatDateTime(experiment.updatedAt, '时间未记录')}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`管理 ${experiment.name}`}
-                            disabled={
-                              renamingId === experiment.id &&
-                              (renameMutation.isPending || savedRename?.id === experiment.id)
-                            }
+                      ) : (
+                        <>
+                          <Link
+                            className="block truncate font-medium text-foreground hover:text-primary/80"
+                            title={experiment.name}
+                            to={strategyCenterPath.experiment(experiment.id)}
                           >
-                            <MoreHorizontal />
-                          </Button>
-                        }
-                      />
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuGroup>
-                          <DropdownMenuItem
-                            disabled={
-                              renamingId !== null ||
-                              renameMutation.isPending ||
-                              savedRename !== null
-                            }
-                            onClick={() => {
-                              setRenamingId(experiment.id);
-                              setRenameValue(experiment.name);
-                              setSavedRename(null);
-                              setRenameReadFailed(false);
-                            }}
-                          >
-                            <Pencil />
-                            修改名称
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={cloneMutation.isPending}
-                            onClick={() => cloneMutation.mutate(experiment.id)}
-                          >
-                            <Copy />
-                            克隆实验
-                          </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableContainer>
-      ) : null}
+                            {experiment.name}
+                          </Link>
+                          <div className="mt-1 truncate text-xs text-muted-foreground">
+                            {experimentSourceLabel(experiment)}
+                          </div>
+                        </>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <Badge variant={experimentStatusVariant(experiment.status)}>
+                        {experimentStatusLabel(experiment.status)}
+                      </Badge>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {experimentStageLabel(experiment.stage)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-normal text-muted-foreground">
+                      {experimentProgressLabel(experiment)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-normal text-muted-foreground">
+                      {formatDateTime(experiment.updatedAt, '时间未记录')}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`管理 ${experiment.name}`}
+                              disabled={
+                                renamingId === experiment.id &&
+                                (renameMutation.isPending || savedRename?.id === experiment.id)
+                              }
+                            >
+                              <MoreHorizontal />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem
+                              disabled={
+                                renamingId !== null ||
+                                renameMutation.isPending ||
+                                savedRename !== null
+                              }
+                              onClick={() => {
+                                setRenamingId(experiment.id);
+                                setRenameValue(experiment.name);
+                                setSavedRename(null);
+                                setRenameReadFailed(false);
+                              }}
+                            >
+                              <Pencil />
+                              修改名称
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={cloneMutation.isPending}
+                              onClick={() => cloneMutation.mutate(experiment.id)}
+                            >
+                              <Copy />
+                              克隆实验
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableContainer>
+        ) : null}
+      </ListRefreshRegion>
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
           {experiments.data ? `共 ${experiments.data.totalCount} 条` : '总数暂不可用'}

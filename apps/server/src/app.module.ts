@@ -1,3 +1,5 @@
+import { ModelArenaModule } from './model-arena/model-arena.module.js';
+import { WatchlistModule } from './watchlist/watchlist.module.js';
 import { Module } from '@nestjs/common';
 import { AiModule } from './ai/ai.module.js';
 import { AutomationModule } from './automation/automation.module.js';
@@ -22,6 +24,8 @@ import { ResearchModule } from './research/research.module.js';
 @Module({
   imports: [
     PlatformModule,
+    ModelArenaModule,
+    WatchlistModule,
     QualityModule,
     LedgerModule,
     MarketModule,

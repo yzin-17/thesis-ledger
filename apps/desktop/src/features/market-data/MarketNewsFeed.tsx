@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -65,22 +66,18 @@ export function MarketNewsFeed() {
         <p className="text-xs text-muted-foreground">
         财联社为全市场电报，华尔街见闻为 A 股频道。读取最近 3 天内的当前一页，最多 5 条，不会自动关联到某只股票。
         </p>
-        <Button type="submit" disabled={query.isFetching}>
+        <Button aria-busy={query.isFetching} type="submit" disabled={query.isFetching}>
+          {query.isLoading && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {query.isFetching ? '正在读取…' : '读取快讯'}
         </Button>
       </form>
-      {query.isFetching && (
-        <p role="status" className="text-sm text-muted-foreground">
-          正在读取市场快讯…
-        </p>
-      )}
       {query.isError && (
         <Alert variant="destructive">
           <AlertTitle>快讯未读取</AlertTitle>
           <AlertDescription>{requestFailureMessage(query.error)} 可保留来源重试。</AlertDescription>
         </Alert>
       )}
-      {query.data && <NewsResult result={query.data} heading="市场快讯" />}
+      {query.data && <NewsResult result={query.data} refreshing={query.isRefetching} heading="市场快讯" />}
     </div>
   );
 }

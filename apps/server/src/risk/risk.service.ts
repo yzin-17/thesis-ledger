@@ -18,11 +18,13 @@ import type {
   ParsedScan,
   PortfolioMode,
   StoredRule,
+  RiskScanResult,
 } from './risk-types.js';
 
 type RiskScanOptions = {
   evaluatedAt?: Date;
   includeStrategyRules?: boolean;
+  ruleIds?: readonly string[];
 };
 
 @Injectable()
@@ -95,9 +97,10 @@ export class RiskService {
     const traceId = crypto.randomUUID();
     const evaluatedAt = options.evaluatedAt ?? this.scanEvaluationTime(parsed);
     const includeStrategyRules = options.includeStrategyRules ?? true;
-    const results: Array<{ ruleId: string; eventId?: string; error?: string }> = [];
+    const results: RiskScanResult[] = [];
 
     for (const stored of rules) {
+      if (options.ruleIds && !options.ruleIds.includes(stored.id)) continue;
       try {
         if (stored.sourcePlanId) {
           if (includeStrategyRules)
@@ -105,7 +108,7 @@ export class RiskService {
           continue;
         }
         const evaluated = this.evaluateStoredRule(stored, parsed, (reason, candidate) => {
-          results.push({ ruleId: stored.id, error: `${reason}；对象 ${candidate.symbol ?? candidate.accountId ?? '组合'}` });
+          results.push({ ruleId: stored.id, errorCode: 'input-unavailable', error: `${reason}；对象 ${candidate.symbol ?? candidate.accountId ?? '组合'}` });
         });
         for (const { candidate, event } of evaluated) {
           const outcome = await this.events.persist(stored, candidate, event, scanId, traceId);
@@ -127,6 +130,7 @@ export class RiskService {
             results.push({
               ruleId: stored.id,
               eventId: outcome.eventId,
+              errorCode: 'notification-enqueue-failed',
               error: `风险已记录，通知排队失败：${notificationError instanceof Error ? notificationError.message : '未知错误'}`,
             });
           }
@@ -134,6 +138,7 @@ export class RiskService {
       } catch (error) {
         results.push({
           ruleId: stored.id,
+          errorCode: 'evaluation-failed',
           error: error instanceof Error ? error.message : '规则评估失败',
         });
       }
@@ -195,7 +200,7 @@ export class RiskService {
     evaluatedAt: Date,
     scanId: string,
     traceId: string,
-    results: Array<{ ruleId: string; eventId?: string; error?: string }>,
+    results: RiskScanResult[],
   ) {
     const evaluated = await this.strategyRuntime.evaluateStoredRule(stored, evaluatedAt);
     if (!evaluated.application.enabled || !evaluated.event || !evaluated.candidate) return;
@@ -229,6 +234,7 @@ export class RiskService {
       results.push({
         ruleId: stored.id,
         eventId: outcome.eventId,
+        errorCode: 'notification-enqueue-failed',
         error: `风险已记录，通知排队失败：${notificationError instanceof Error ? notificationError.message : '未知错误'}`,
       });
     }

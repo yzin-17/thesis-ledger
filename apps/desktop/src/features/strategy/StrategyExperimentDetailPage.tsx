@@ -1,3 +1,5 @@
+import { createClientRequestId } from '../../lib/client-request-id';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { TableContainer } from '@/components/ui/table';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { requestFailureMessage } from '@/shared/api/request-error';
@@ -57,7 +59,6 @@ import {
 import { strategyCenterPath } from './strategy-center.navigation.js';
 import { strategyKeys } from './strategy.queries.js';
 import type { StrategyRecord } from './strategy.types.js';
-
 const optimizationKey = ['desktop', 'strategy', 'optimization'] as const;
 const settledStatuses = new Set(['succeeded', 'failed', 'cancelled']);
 const nonPollingStatuses = new Set(['awaiting_finalization', 'succeeded', 'failed', 'cancelled']);
@@ -169,7 +170,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
     queryFn: () => fetchOptimizationAdoptionContext(experimentId ?? '', reviewCandidate?.id ?? ''),
     enabled: Boolean(experimentId && reviewCandidate),
   });
-  const adoptionIntentKey = useMemo(() => crypto.randomUUID(), [experimentId, reviewCandidate?.id]);
+  const adoptionIntentKey = useMemo(() => createClientRequestId(), [experimentId, reviewCandidate?.id]);
   const adoptMutation = useMutation({
     onMutate: () => clearOperationError('adopt'),
     mutationFn: () => {
@@ -209,9 +210,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
   };
 
   if (detailQuery.isPending || compareQuery.isPending)
-    return (
-      <div className="rounded-lg border p-6 text-sm text-muted-foreground">正在读取实验详情…</div>
-    );
+    return <LoadingState label="正在读取实验详情" />;
   if (!experiment)
     return (
       <DataStateBanner
@@ -272,7 +271,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">策略中心 / AI 实验</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <h2 className="text-2xl font-semibold tracking-tight">{experiment.name}</h2>
+            <h2 className="text-xl font-semibold tracking-tight">{experiment.name}</h2>
             <Badge variant="outline">
               {experimentStageLabels[experiment.stage] ?? experiment.stage}
             </Badge>
@@ -330,7 +329,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
       ) : null}
 
       {displayedAdoptedVersion ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-success/40 bg-success/5 p-3 text-sm">
           <span className="flex items-center gap-2">
             <CheckCircle2 className="size-4" aria-hidden="true" />
             已采纳为正式策略 v{displayedAdoptedVersion.version}
@@ -367,9 +366,9 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
           <TabsTrigger value="candidates">候选与评估</TabsTrigger>
           <TabsTrigger value="runtime">运行详情</TabsTrigger>
         </TabsList>
-        <TabsContent value="candidates" className="space-y-4 pt-4">
+        <TabsContent value="candidates" className="space-y-4">
           {!testRevealed && (experiment.stage === 'testing' || retryRequired) ? (
-            <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+            <div className="flex gap-2 rounded-md border border-caution/40 bg-caution/5 p-3 text-sm">
               <FlaskConical className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               封存测试尚未全部完成，测试指标和质量结论保持隐藏。
             </div>
@@ -408,7 +407,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <TableContainer frame="plain">
+              <TableContainer frame="plain" refreshing={compareQuery.isRefetching || detailQuery.isRefetching} refreshLabel="正在刷新实验候选">
                 <table className="w-full min-w-[900px] text-sm">
                   <thead className="text-left text-xs text-muted-foreground">
                     <tr>
@@ -575,6 +574,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                     </div>
                   </div>
                   <Button
+                    aria-busy={finalizeMutation.isPending}
                     disabled={
                       writesDisabled ||
                       lockedCandidateIds.length === 0 ||
@@ -582,6 +582,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                     }
                     onClick={() => finalizeMutation.mutate()}
                   >
+                    {finalizeMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
                     {finalizeMutation.isPending ? '封存测试中…' : '锁定并运行封存测试'}
                   </Button>
                 </div>
@@ -589,9 +590,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
             </CardContent>
           </Card>
           {reviewCandidate && adoptionContextQuery.isPending ? (
-            <div className="rounded-md border p-4 text-sm text-muted-foreground">
-              正在读取三方差异…
-            </div>
+            <LoadingState label="正在读取三方差异" />
           ) : null}
           {reviewCandidate && adoptionContextQuery.isError ? (
             <DataStateBanner state="error" onRetry={() => void adoptionContextQuery.refetch()} />
@@ -611,7 +610,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
             </p>
           ) : null}
         </TabsContent>
-        <TabsContent value="runtime" className="pt-4">
+        <TabsContent value="runtime">
           <ExperimentRuntimeDetails experiment={experiment} attempts={attempts} />
         </TabsContent>
       </Tabs>

@@ -70,7 +70,7 @@ export function ProviderOAuthScreen() {
       <Copy muted>
         授权由服务端建立并确认。系统浏览器中的登录和回调必须能够到达服务端，应用不会把浏览器返回当作成功。
       </Copy>
-      <Feedback message={message} />
+      <Feedback busy={command.pending} message={message} />
       <QueryStatus query={query} retry={() => void query.refetch()} />
       <Section title="授权会话">
         <Field

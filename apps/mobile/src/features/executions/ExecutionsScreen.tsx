@@ -12,7 +12,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
@@ -91,33 +91,35 @@ export function ExecutionsScreen() {
         />
       }
     >
-      <QueryStatus
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError} />
+      <QueryList
         query={query}
         empty={query.data?.events.filter(isExecution).length === 0}
         retry={() => void query.refetch()}
-      />
-      <Feedback message={feedback} error={mutation.isError} />
-      {query.data?.events.filter(isExecution).map((event) => (
-        <Section key={event.eventId}>
-          <LedgerEventView event={event} name={name} />
-          <Action
-            label="更正成交"
-            disabled={blocked}
-            onPress={() =>
-              navigation.navigate('ExecutionEditor', { ...params, event, action: 'replace' })
-            }
-          />
-          <Action
-            label="作废成交"
-            disabled={blocked}
-            destructive
-            onPress={() => {
-              setTarget({ event, revision: query.data.ledgerRevision });
-              setReason('');
-            }}
-          />
-        </Section>
-      ))}
+        label="正在刷新成交记录"
+      >
+        {query.data?.events.filter(isExecution).map((event) => (
+          <Section key={event.eventId}>
+            <LedgerEventView event={event} name={name} />
+            <Action
+              label="更正成交"
+              disabled={blocked}
+              onPress={() =>
+                navigation.navigate('ExecutionEditor', { ...params, event, action: 'replace' })
+              }
+            />
+            <Action
+              label="作废成交"
+              disabled={blocked}
+              destructive
+              onPress={() => {
+                setTarget({ event, revision: query.data.ledgerRevision });
+                setReason('');
+              }}
+            />
+          </Section>
+        ))}
+      </QueryList>
       {target ? (
         <Section title="作废原因">
           <Field

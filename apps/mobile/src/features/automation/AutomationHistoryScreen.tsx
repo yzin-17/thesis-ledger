@@ -8,7 +8,7 @@ import {
   Choices,
   Copy,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 import { automationStatusLabel } from './automation-labels';
@@ -31,7 +31,6 @@ export function AutomationHistoryScreen({
   return (
     <Page title="自动化运行历史">
       <Copy muted>终态来自服务端运行记录；结果待确认不表示执行成功。筛选作用于当前页。</Copy>
-      <QueryStatus query={query} empty={rows?.length === 0} retry={() => void query.refetch()} />
       <Choices
         label="当前页状态"
         value={status}
@@ -62,15 +61,22 @@ export function AutomationHistoryScreen({
         disabled={query.isFetching || !query.data || query.data.page >= query.data.totalPages}
         onPress={() => setPage((query.data?.page ?? page) + 1)}
       />
-      {rows?.map((item) => (
-        <Section key={item.id} title={automationStatusLabel(item.status)}>
-          <Copy>
-            任务 {item.jobId}；开始 {item.startedAt}；记录 {item.id}
-          </Copy>
-          <Copy>{item.error || '无错误记录'}</Copy>
-          <Copy>{JSON.stringify(item.output ?? null, null, 2)}</Copy>
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={rows?.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新运行历史"
+      >
+        {rows?.map((item) => (
+          <Section key={item.id} title={automationStatusLabel(item.status)}>
+            <Copy>
+              任务 {item.jobId}；开始 {item.startedAt}；记录 {item.id}
+            </Copy>
+            <Copy>{item.error || '无错误记录'}</Copy>
+            <Copy>{JSON.stringify(item.output ?? null, null, 2)}</Copy>
+          </Section>
+        ))}
+      </QueryList>
     </Page>
   );
 }

@@ -166,7 +166,7 @@ export function OccurrenceEditor() {
           editable={!mutation.isPending && !done}
         />
       ) : null}
-      <Feedback message={feedback} error={mutation.isError} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError} />
       <Action
         label="重新核对发生项"
         disabled={mutation.isPending || done}

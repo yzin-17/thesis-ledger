@@ -1,3 +1,6 @@
+import { createClientRequestId } from '../../lib/client-request-id';
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +23,6 @@ import {
   optimizationAttemptExecutionText,
   tradingCostText,
 } from './strategy-experiment-detail.model.js';
-
 const metricText = (value: unknown) => {
   if (!value || typeof value !== 'object') return '指标不可用';
   const metric = value as Record<string, unknown>;
@@ -67,6 +69,8 @@ const riskChangeText = (change: string) =>
         : '无变化';
 
 type Props = {
+  experimentsRefreshing?: boolean;
+  candidatesRefreshing?: boolean;
   experiments: OptimizationExperimentSummary[];
   compare?: OptimizationCompare | undefined;
   settledStatuses: ReadonlySet<string>;
@@ -81,6 +85,8 @@ type Props = {
 };
 
 export function StrategyOptimizationExperimentResults({
+  experimentsRefreshing = false,
+  candidatesRefreshing = false,
   experiments,
   compare,
   settledStatuses,
@@ -125,7 +131,7 @@ export function StrategyOptimizationExperimentResults({
       );
       if (compare?.experiment.sourceMode !== 'discovery' && !baseline)
         throw new Error('找不到基线正式策略版本');
-      const idempotencyKey = adoptionIntentKeys[candidate.id] ?? crypto.randomUUID();
+      const idempotencyKey = adoptionIntentKeys[candidate.id] ?? createClientRequestId();
       if (!adoptionIntentKeys[candidate.id])
         setAdoptionIntentKeys((current) => ({ ...current, [candidate.id]: idempotencyKey }));
       return adoptOptimizationCandidate(selectedExperimentId, {
@@ -165,53 +171,59 @@ export function StrategyOptimizationExperimentResults({
           <CardDescription>实验可恢复、可取消；测试集在用户锁定候选前不会运行。</CardDescription>
         </CardHeader>
         <CardContent className="divide-y divide-border">
-          {experiments.map((experiment) => (
-            <div
-              key={experiment.id}
-              className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0"
-            >
-              <div>
-                <div className="font-medium">{experiment.stage}</div>
-                <div className="text-xs text-muted-foreground">
-                  AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · Token{' '}
-                  {experimentUsageText(
-                    experiment,
-                    compare?.experiment.id === experiment.id ? compare.attempts : [],
-                  )}{' '}
-                  · AI 费用 {experimentCostText(experiment.costSummary)}
+          <ListRefreshRegion refreshing={experimentsRefreshing} label="正在刷新实验列表">
+            <div className="divide-y divide-border">
+              {experiments.map((experiment) => (
+                <div
+                  key={experiment.id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0"
+                >
+                  <div>
+                    <div className="font-medium">{experiment.stage}</div>
+                    <div className="text-xs text-muted-foreground">
+                      AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · Token{' '}
+                      {experimentUsageText(
+                        experiment,
+                        compare?.experiment.id === experiment.id ? compare.attempts : [],
+                      )}{' '}
+                      · AI 费用 {experimentCostText(experiment.costSummary)}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>
+                      {experiment.status}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onSelectExperiment(experiment.id)}
+                    >
+                      查看
+                    </Button>
+                    <Button
+                      aria-busy={clonePending}
+                      size="sm"
+                      variant="outline"
+                      disabled={clonePending}
+                      onClick={() => onCloneExperiment(experiment.id)}
+                    >
+                      {clonePending && <Spinner data-icon="inline-start" aria-hidden="true" />}
+                      克隆
+                    </Button>
+                    {!settledStatuses.has(experiment.status) ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onCancelExperiment(experiment.id)}
+                      >
+                        取消
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>
-                  {experiment.status}
-                </Badge>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onSelectExperiment(experiment.id)}
-                >
-                  查看
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={clonePending}
-                  onClick={() => onCloneExperiment(experiment.id)}
-                >
-                  克隆
-                </Button>
-                {!settledStatuses.has(experiment.status) ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onCancelExperiment(experiment.id)}
-                  >
-                    取消
-                  </Button>
-                ) : null}
-              </div>
+              ))}
             </div>
-          ))}
+          </ListRefreshRegion>
           {experiments.length === 0 ? (
             <p className="text-sm text-muted-foreground">暂无优化实验。</p>
           ) : null}
@@ -240,7 +252,7 @@ export function StrategyOptimizationExperimentResults({
               ))}
             </div>
             {compare.experiment.testExposedAt ? (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+              <div className="rounded-md border border-caution/40 bg-caution/5 p-3 text-sm">
                 测试集已揭示。改选原预选候选之外的方案会显式记录测试暴露。
               </div>
             ) : null}
@@ -307,79 +319,84 @@ export function StrategyOptimizationExperimentResults({
                 );
               })}
             </div>
-            {compare.candidates.map((candidate) => (
-              <div key={candidate.id} className="rounded-md border p-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="font-medium">
-                      候选 {candidate.candidateNumber} · {candidate.modelKey}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      验证集：{validationMetricText(candidate)} · score{' '}
-                      {candidate.validationScore ?? '—'}
-                    </div>
-                    {candidate.metrics.test ? (
-                      <div className="text-xs text-muted-foreground">
-                        测试集：{metricText(candidate.metrics.test)}
+            <ListRefreshRegion refreshing={candidatesRefreshing} label="正在刷新实验候选" className="flex flex-col gap-3">
+              {compare.candidates.map((candidate) => (
+                <div key={candidate.id} className="rounded-md border p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium">
+                        候选 {candidate.candidateNumber} · {candidate.modelKey}
                       </div>
+                      <div className="text-xs text-muted-foreground">
+                        验证集：{validationMetricText(candidate)} · score{' '}
+                        {candidate.validationScore ?? '—'}
+                      </div>
+                      {candidate.metrics.test ? (
+                        <div className="text-xs text-muted-foreground">
+                          测试集：{metricText(candidate.metrics.test)}
+                        </div>
+                      ) : null}
+                    </div>
+                    <Badge
+                      variant={candidate.validationStatus.includes('valid') ? 'default' : 'outline'}
+                    >
+                      {candidate.validationStatus}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    {candidate.diff.length > 0
+                      ? candidate.diff
+                          .map((item) =>
+                            item.kind === 'full-strategy'
+                              ? '完整 BacktestStrategy 候选'
+                              : `${String(item.label ?? item.parameterId)}: ${String(item.before)} → ${String(item.after)}`,
+                          )
+                          .join('；')
+                      : '无参数变化'}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {compare.experiment.stage === 'awaiting_finalization' &&
+                    candidate.validationStatus === 'valid' ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant={lockedCandidateIds.includes(candidate.id) ? 'default' : 'outline'}
+                          onClick={() => toggleLockedCandidate(candidate.id)}
+                        >
+                          进入封存测试
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={preselectedCandidateId === candidate.id ? 'default' : 'outline'}
+                          onClick={() => {
+                            setPreselectedCandidateId(candidate.id);
+                            if (!lockedCandidateIds.includes(candidate.id))
+                              toggleLockedCandidate(candidate.id);
+                          }}
+                        >
+                          预选最终候选
+                        </Button>
+                      </>
+                    ) : null}
+                    {compare.experiment.status === 'succeeded' &&
+                    candidate.validationStatus === 'test_valid' ? (
+                      <Button
+                        aria-busy={adoptMutation.isPending}
+                        size="sm"
+                        disabled={adoptMutation.isPending}
+                        onClick={() => adoptMutation.mutate(candidate)}
+                      >
+                        {adoptMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
+                        采纳为正式版本
+                      </Button>
                     ) : null}
                   </div>
-                  <Badge
-                    variant={candidate.validationStatus.includes('valid') ? 'default' : 'outline'}
-                  >
-                    {candidate.validationStatus}
-                  </Badge>
                 </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  {candidate.diff.length > 0
-                    ? candidate.diff
-                        .map((item) =>
-                          item.kind === 'full-strategy'
-                            ? '完整 BacktestStrategy 候选'
-                            : `${String(item.label ?? item.parameterId)}: ${String(item.before)} → ${String(item.after)}`,
-                        )
-                        .join('；')
-                    : '无参数变化'}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {compare.experiment.stage === 'awaiting_finalization' &&
-                  candidate.validationStatus === 'valid' ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant={lockedCandidateIds.includes(candidate.id) ? 'default' : 'outline'}
-                        onClick={() => toggleLockedCandidate(candidate.id)}
-                      >
-                        进入封存测试
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={preselectedCandidateId === candidate.id ? 'default' : 'outline'}
-                        onClick={() => {
-                          setPreselectedCandidateId(candidate.id);
-                          if (!lockedCandidateIds.includes(candidate.id))
-                            toggleLockedCandidate(candidate.id);
-                        }}
-                      >
-                        预选最终候选
-                      </Button>
-                    </>
-                  ) : null}
-                  {compare.experiment.status === 'succeeded' &&
-                  candidate.validationStatus === 'test_valid' ? (
-                    <Button
-                      size="sm"
-                      disabled={adoptMutation.isPending}
-                      onClick={() => adoptMutation.mutate(candidate)}
-                    >
-                      采纳为正式版本
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
+              ))}
+            </ListRefreshRegion>
             {compare.experiment.stage === 'awaiting_finalization' ? (
               <Button
+                aria-busy={finalizeMutation.isPending}
                 disabled={
                   finalizeMutation.isPending ||
                   !preselectedCandidateId ||
@@ -387,6 +404,7 @@ export function StrategyOptimizationExperimentResults({
                 }
                 onClick={() => finalizeMutation.mutate()}
               >
+                {finalizeMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
                 {finalizeMutation.isPending ? '测试中…' : '锁定候选并运行测试集'}
               </Button>
             ) : null}

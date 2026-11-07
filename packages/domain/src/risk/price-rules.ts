@@ -45,14 +45,11 @@ const copiedComparisonOperator = (rule: RiskRule) => {
 };
 
 const costReturnComparison = (context: V01RiskContext, rule: RiskRule) => {
-  const price = DecimalValue.from(String(context.price));
-  const costPrice = DecimalValue.from(String(context.costPrice));
-  const value = price.dividedBy(costPrice).minus('1');
-  if (rule.kind === 'cost-stop') {
-    const boundary = DecimalValue.from(String(Math.abs(rule.threshold))).times('-1');
-    return value.compareTo(boundary);
-  }
-  return value.compareTo(String(rule.threshold));
+  const price = DecimalValue.fromNumber(context.price!);
+  const costPrice = DecimalValue.fromNumber(context.costPrice!);
+  const threshold = rule.kind === 'cost-stop' ? -Math.abs(rule.threshold) : rule.threshold;
+  const boundary = costPrice.times(DecimalValue.fromNumber(threshold));
+  return price.minus(costPrice).compareTo(boundary);
 };
 
 export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEvent | null => {

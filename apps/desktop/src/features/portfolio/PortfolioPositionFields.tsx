@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
+import { DecimalInput } from '@/components/ui/decimal-input';
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupInput,
   InputGroupText,
 } from '@/components/ui/input-group';
 import {
@@ -139,10 +139,10 @@ export function PositionFields({
       )}
       <div className="grid gap-4 border-t border-border pt-4">
         <div className="text-sm font-semibold text-foreground">持仓信息</div>
-        <div className="grid gap-1.5 text-xs text-muted-foreground">
-          <span>当前数量</span>
+        <div className="grid gap-1.5 text-sm text-foreground">
+          <span className="text-xs text-muted-foreground">当前数量</span>
           <InputGroup className="h-10">
-            <InputGroupInput
+            <DecimalInput grouped fractionDigits={8}
               aria-label="当前数量"
               className="h-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               name="quantity"
@@ -153,7 +153,7 @@ export function PositionFields({
               defaultValue={editing?.quantity}
             />
             <InputGroupAddon align="inline-end">
-              <InputGroupText>
+              <InputGroupText className="text-xs font-normal">
                 {assetQuantityUnit(
                   positionAssetType(
                     selectedInstrument,
@@ -167,10 +167,10 @@ export function PositionFields({
             </InputGroupAddon>
           </InputGroup>
         </div>
-        <div className="grid gap-1.5 text-xs text-muted-foreground">
-          <span>平均成本</span>
+        <div className="grid gap-1.5 text-sm text-foreground">
+          <span className="text-xs text-muted-foreground">平均成本</span>
           <InputGroup className="h-10">
-            <InputGroupInput
+            <DecimalInput grouped
               aria-label="平均成本"
               className="h-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               name="costPrice"
@@ -181,7 +181,7 @@ export function PositionFields({
               defaultValue={editing?.costPrice}
             />
             <InputGroupAddon align="inline-end">
-              <InputGroupText>
+              <InputGroupText className="text-xs font-normal">
                 元/
                 {assetQuantityUnit(
                   positionAssetType(
@@ -196,8 +196,8 @@ export function PositionFields({
             </InputGroupAddon>
           </InputGroup>
         </div>
-        <div className="grid gap-1.5 text-xs text-muted-foreground">
-          <span>发生时间</span>
+        <div className="grid gap-1.5 text-sm text-foreground">
+          <span className="text-xs text-muted-foreground">发生时间</span>
           <DateInput
             aria-label="发生时间"
             name="occurredAt"
@@ -205,7 +205,7 @@ export function PositionFields({
             value={occurredAt}
             onChange={(event) => setOccurredAt(event.target.value)}
           />
-          <span>快照实际观察的时间，默认为保存时刻。</span>
+          <span className="text-xs text-muted-foreground">快照实际观察的时间，默认为保存时刻。</span>
         </div>
       </div>
     </>

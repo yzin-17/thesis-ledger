@@ -189,13 +189,18 @@ async function mount(mode: 'actual' | 'shadow' = 'actual') {
   await act(async () => root.render(<RouterProvider router={router} />));
 }
 async function wait(check: () => void) {
-  await vi.waitFor(async () => {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-    check();
-  });
+  await vi.waitFor(
+    async () => {
+      await act(async () => {
+        await vi.dynamicImportSettled();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      check();
+    },
+    { timeout: 5000 },
+  );
 }
+
 async function click(e: Element) {
   await act(async () => {
     e.dispatchEvent(new MouseEvent('click', { bubbles: true }));

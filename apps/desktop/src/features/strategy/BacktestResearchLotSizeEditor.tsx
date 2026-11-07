@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { BacktestExecutionModelV3, SecurityLotReference } from '@thesis-ledger/schemas';
@@ -56,9 +57,12 @@ function ResearchLotEditor({ model, onChange, onDraftChange }: Props) {
       </FieldDescription>
       {error && <FieldError>{error}</FieldError>}
     </Field>
-    <Button type="button" variant="outline" disabled={lookup.isPending} onClick={() => {
+    <Button aria-busy={lookup.isPending} type="button" variant="outline" disabled={lookup.isPending} onClick={() => {
       setError(null); onDraftChange(); lookup.mutate();
-    }}>{lookup.isPending ? '查询每手股数中…' : '按路由查询当前每手股数'}</Button>
+    }}>
+      {lookup.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
+      {lookup.isPending ? '查询每手股数中…' : '按路由查询当前每手股数'}
+    </Button>
     <Button type="button" variant="outline" disabled={lookup.isPending || !defaultShares} onClick={() => {
       try { onChange(JSON.stringify(applyResearchLotSize(model, shares, undefined, reference), null, 2)); setError(null); }
       catch (cause) { setError(cause instanceof Error ? cause.message : '每手股数配置无效'); }

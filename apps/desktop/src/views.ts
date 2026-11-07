@@ -1,4 +1,5 @@
 export type DesktopView =
+  | 'watchlist'
   | 'portfolio'
   | 'position-detail'
   | 'position-entry'
@@ -15,6 +16,7 @@ export type DesktopNavigationView = Exclude<DesktopView, 'position-detail' | 'au
 
 export const desktopRoutes = [
   { view: 'performance', path: '/performance', label: '收益分析' },
+  { view: 'watchlist', path: '/watchlist', label: '自选' },
   { view: 'position-entry', path: '/accounts', label: '账户数据' },
   { view: 'risk-center', path: '/risk-center', label: '风险中心' },
   { view: 'strategy', path: '/strategy', label: '策略中心' },

@@ -66,6 +66,7 @@ export const quoteSchema = z
     stale: z.boolean(),
     fallbackUsed: z.boolean().optional(),
     servedFromCache: z.boolean().optional(),
+    refreshFailure: z.enum(['budget_cooldown', 'fetch_failed', 'cache_unavailable']).optional(),
     units: z
       .object({
         priceCurrency: currencySchema,

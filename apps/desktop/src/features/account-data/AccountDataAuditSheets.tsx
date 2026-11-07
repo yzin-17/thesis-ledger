@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useState, useEffect, type FormEvent } from 'react';
 import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import type { LedgerCommandResponse, LedgerEvent } from '@thesis-ledger/api-client';
@@ -15,7 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { LoaderCircle } from 'lucide-react';
 
@@ -89,18 +90,20 @@ export function AuditSheet({
             当前列表只计有效版本；这里展示同一事实的录入、更正、作废、恢复全部审计记录。
           </SheetDescription>
         </SheetHeader>
-        <AuditResults
-          query={query}
-          chain={chain}
-          targetEventId={target?.eventId}
-          findSnapshotPosition={findSnapshotPosition}
-          onEditSnapshot={onEditSnapshot}
-          onRemoveSnapshot={onRemoveSnapshot}
-          onCorrect={onCorrect}
-          onVoid={onVoid}
-          onRestore={onRestore}
-          onRestoreTransfer={onRestoreTransfer}
-        />
+        <ListRefreshRegion refreshing={query.isFetching && !!query.data} label="正在刷新修正记录">
+          <AuditResults
+            query={query}
+            chain={chain}
+            targetEventId={target?.eventId}
+            findSnapshotPosition={findSnapshotPosition}
+            onEditSnapshot={onEditSnapshot}
+            onRemoveSnapshot={onRemoveSnapshot}
+            onCorrect={onCorrect}
+            onVoid={onVoid}
+            onRestore={onRestore}
+            onRestoreTransfer={onRestoreTransfer}
+          />
+        </ListRefreshRegion>
         {query.isError && query.data && !ledgerContractRejected(query.error) && (
           <Alert>
             <AlertTitle>审计链可能陈旧</AlertTitle>
@@ -108,6 +111,7 @@ export function AuditSheet({
               当前显示上次成功结果。已成功提交的修正无需再次提交，请重新读取。
             </AlertDescription>
             <Button
+              aria-busy={query.isFetching}
               type="button"
               size="sm"
               variant="outline"
@@ -150,12 +154,7 @@ function AuditResults({
   if (query.isError && ledgerContractRejected(query.error))
     return <LedgerContractFailure onRetry={query.refetch} />;
   if (query.isPending && !query.data) {
-    return (
-      <div className="flex flex-col gap-3" aria-busy="true">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </div>
-    );
+    return <LoadingState label="正在读取审计记录" />;
   }
   if (query.isError && !query.data) {
     return (
@@ -351,7 +350,7 @@ export function CorrectionReasonSheet({
   const [error, setError] = useState<string | null>(null);
   const open = Boolean(target);
   const pending = voidMutation.isPending || restoreMutation.isPending;
-  const requestClose = useDraftCloseGuard({ open, draft: { reason }, busy: pending, onOpenChange });
+  const requestClose = useDraftCloseGuard({ open, draft: { eventId: target?.eventId, reason }, busy: pending, onOpenChange });
 
   useEffect(() => {
     if (!open) return;

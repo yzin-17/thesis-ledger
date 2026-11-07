@@ -53,6 +53,18 @@ describe('保留数据升级计划', () => {
       '20261019010000_research_submission_v2',
       '20261019020000_research_observation_versions',
       '20261023010000_report_metadata_snapshots',
+      '20261104010000_fund_intraday_valuation',
+      '20261105010000_watchlist_foundation',
+      '20261105020000_model_arena',
+      '20261105030000_arena_occurrences',
+      '20261105040000_arena_research_inputs',
+      '20261105050000_arena_execution_receipts',
+      '20261105060000_arena_opening_evidence',
+      '20261105070000_arena_close_marks',
+      '20261105080000_arena_weekly_reviews',
+      '20261106010000_market_economic_price_certificate',
+      '20261106020000_fund_daily_estimate_error',
+      '20261106030000_strategy_submission',
     ]);
   });
   it('仅列出当前 head 后的迁移且保留完整链摘要', () => {

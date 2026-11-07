@@ -6,7 +6,7 @@ import {
   Choices,
   Copy,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 const statusLabels: Record<string, string> = {
@@ -45,15 +45,21 @@ export function RiskNotifications() {
     <Page title="通知与路由状态">
       <Copy muted>这里读取全局通知记录，不变更通知配置或主动发送。</Copy>
       <Section title="当前路由">
-        <QueryStatus query={routing} retry={() => void routing.refetch()} />
         {routing.isSuccess && routing.data.routes.length === 0 ? (
           <Copy>尚未配置通知路由。</Copy>
         ) : null}
-        {routing.data?.routes.map((row, index) => (
-          <Copy key={`${row.channel}:${index}`}>
-            {channels[row.channel] ?? row.channel} · {row.provider}
-          </Copy>
-        ))}
+        <QueryList
+          query={routing}
+          retry={() => void routing.refetch()}
+          label="正在刷新通知路由"
+          gap={12}
+        >
+          {routing.data?.routes.map((row, index) => (
+            <Copy key={`${row.channel}:${index}`}>
+              {channels[row.channel] ?? row.channel} · {row.provider}
+            </Copy>
+          ))}
+        </QueryList>
         {routing.isError ? <Copy muted>路由状态未知，请重新读取。</Copy> : null}
       </Section>
       <Choices
@@ -68,23 +74,25 @@ export function RiskNotifications() {
         ]}
         onChange={setStatus}
       />
-      <QueryStatus
+      <QueryList
         query={query}
         empty={query.data?.length === 0}
         retry={() => void query.refetch()}
-      />
-      {rows.slice(0, limit).map((row) => (
-        <Section key={row.id} title={statusLabels[row.status] ?? `其他状态（${row.status}）`}>
-          <Copy>
-            {channels[row.channel] ?? row.channel} · 尝试 {row.attemptCount} 次 · 计划时间{' '}
-            {row.scheduledAt}
-          </Copy>
-          <Copy muted>
-            关联对象 {row.subjectType} · {row.subjectId}
-          </Copy>
-          {row.lastError ? <Copy>失败原因 {row.lastError}</Copy> : null}
-        </Section>
-      ))}
+        label="正在刷新通知记录"
+      >
+        {rows.slice(0, limit).map((row) => (
+          <Section key={row.id} title={statusLabels[row.status] ?? `其他状态（${row.status}）`}>
+            <Copy>
+              {channels[row.channel] ?? row.channel} · 尝试 {row.attemptCount} 次 · 计划时间{' '}
+              {row.scheduledAt}
+            </Copy>
+            <Copy muted>
+              关联对象 {row.subjectType} · {row.subjectId}
+            </Copy>
+            {row.lastError ? <Copy>失败原因 {row.lastError}</Copy> : null}
+          </Section>
+        ))}
+      </QueryList>
       {rows.length > limit ? (
         <Action label="更多通知记录" onPress={() => setLimit((value) => value + 30)} />
       ) : null}

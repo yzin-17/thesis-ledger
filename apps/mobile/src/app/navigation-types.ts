@@ -74,10 +74,11 @@ export type SettingsStackParams = {
 };
 export type MarketStackParams = {
   MarketHome: undefined;
+  Watchlist: undefined;
   MarketDetail: { instrument: MobileInstrument; accountId?: string; mode?: 'actual' | 'shadow' };
   MarketStatic: { instrument?: MobileInstrument } | undefined;
   MarketNews: { instrument?: MobileInstrument } | undefined;
-  MarketAnnouncements: { q?: string } | undefined;
+  MarketAnnouncements: { q?: string; symbol?: string } | undefined;
   MarketDocuments: undefined;
   MarketReference: undefined;
 };
@@ -91,6 +92,7 @@ export type RootTabParams = {
 type JournalScope = { accountId: string; mode: 'actual' | 'shadow' };
 type ReportScope = { id: string; locator: ResearchReportLocatorInput };
 export type ResearchStackParams = {
+  ArenaWeek:{match?:string,id?:string}|undefined;
   ResearchHome: undefined;
   Strategy: NavigatorScreenParams<StrategyStackParams> | undefined;
   Journal: MobileObjectTarget | undefined;
@@ -101,6 +103,6 @@ export type ResearchStackParams = {
   JournalEvidence: JournalScope & { kind: 'object' | 'period'; runId: string; toolCallId: string };
   ResearchReport: ReportScope;
   ResearchEvidence: ReportScope & { referenceId: string };
-  ResearchSubmit: { retryRunId?: string } | undefined;
+  ResearchSubmit: { retryRunId?: string; instrumentId?: string } | undefined;
   ResearchReview: ReportScope;
 };

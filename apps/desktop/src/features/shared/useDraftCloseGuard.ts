@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useNavigationGuard } from './navigation-guard.js';
 
@@ -29,11 +29,40 @@ export function useDraftCloseGuard({
   const wasOpen = useRef(false);
   const confirming = useRef(false);
   const serialized = JSON.stringify(draft);
+  const current = useRef({
+    open,
+    busy,
+    dirty,
+    serialized,
+    onOpenChange,
+    session: 0,
+    mounted: false,
+  });
+  useLayoutEffect(() => {
+    const previous = current.current;
+    current.current = {
+      open,
+      busy,
+      dirty,
+      serialized,
+      onOpenChange,
+      mounted: true,
+      session: previous.session + (previous.open !== open ? 1 : 0),
+    };
+  });
+  useLayoutEffect(
+    () => () => {
+      current.current.mounted = false;
+      current.current.session += 1;
+    },
+    [],
+  );
   useEffect(() => {
     if (open && !wasOpen.current) baseline.current = serialized;
     wasOpen.current = open;
   }, [open, serialized]);
   useNavigationGuard({
+    draft: { open, serialized },
     dirty: open && (dirty ?? (wasOpen.current && serialized !== baseline.current)),
     busy: open && busy,
     discard: () => {
@@ -42,8 +71,10 @@ export function useDraftCloseGuard({
   });
 
   return async (nextOpen: boolean) => {
-    if (busy || confirming.current) return;
-    if (!nextOpen && (dirty ?? serialized !== baseline.current)) {
+    const requested = current.current;
+    const session = requested.session;
+    if (!requested.mounted || requested.busy || confirming.current) return;
+    if (!nextOpen && (requested.dirty ?? requested.serialized !== baseline.current)) {
       confirming.current = true;
       try {
         const discard = await confirm({
@@ -59,6 +90,14 @@ export function useDraftCloseGuard({
         confirming.current = false;
       }
     }
-    onOpenChange(nextOpen);
+    const latest = current.current;
+    if (
+      !latest.mounted ||
+      latest.busy ||
+      latest.session !== session ||
+      latest.serialized !== requested.serialized
+    )
+      return;
+    latest.onOpenChange(nextOpen);
   };
 }

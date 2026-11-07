@@ -101,7 +101,6 @@ export class DsaClient {
   get timeoutMs() {
     return this.config.dsaTimeoutMs;
   }
-
   async get<T>(path: string, attempts = 2, mapHttpError?: HttpErrorMapper, signal?: AbortSignal): Promise<T> {
     let lastError: unknown;
     const traceId = currentTraceId() ?? crypto.randomUUID();
@@ -131,6 +130,7 @@ export class DsaClient {
             detail?.message ?? `DSA 返回 ${response.status}`,
             code,
             response.status,
+            detail?.code,
           );
         }
         try {

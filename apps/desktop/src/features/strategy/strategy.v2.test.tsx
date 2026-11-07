@@ -1,9 +1,16 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { StrategyConfigurationFields } from './StrategyConfigurationFields.js';
 import { StrategyV2Summary } from './StrategyV2Summary.js';
 import { completenessLabel } from './BacktestModelDisclosure.js';
 import { cancelBacktest, retryBacktest } from './strategy.api.js';
 import type { DesktopRequestClient } from '../shared/request.js';
+
+const Fields = (props: ComponentProps<typeof StrategyConfigurationFields>) => (
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <StrategyConfigurationFields {...props} />
+  </QueryClientProvider>
+);
 
 const schema = {
   schemaVersion: '2',
@@ -44,9 +51,7 @@ describe('策略工作台当前合同', () => {
   });
 
   it('策略摘要展示中文业务字段和控件', () => {
-    const html = renderToStaticMarkup(
-      <StrategyV2Summary schema={schema} editable onChange={vi.fn()} />,
-    );
+    const html = renderToStaticMarkup(<Fields schema={schema} onChange={vi.fn()} />);
     expect(html).toContain('信号来源');
     expect(html).toContain('固定投入金额');
     expect(html).toContain('固定止损');
@@ -60,7 +65,7 @@ describe('策略工作台当前合同', () => {
 
   it('回测弹窗使用紧凑策略摘要并隐藏次要执行细节', () => {
     const html = renderToStaticMarkup(
-      <StrategyV2Summary schema={schema} variant="compact" strategyName="测试策略" version={1} />,
+      <StrategyV2Summary schema={schema} strategyName="测试策略" version={1} />,
     );
 
     expect(html).toContain('测试策略');
@@ -81,9 +86,7 @@ describe('策略工作台当前合同', () => {
     const root = createRoot(container);
     try {
       await act(async () => {
-        root.render(
-          <StrategyV2Summary schema={{ ...schema, sizing }} editable onChange={vi.fn()} />,
-        );
+        root.render(<Fields schema={{ ...schema, sizing }} onChange={vi.fn()} />);
         await Promise.resolve();
       });
       const input = document.getElementById('strategy-v2-sizing') as HTMLInputElement | null;
@@ -123,5 +126,6 @@ describe('策略工作台当前合同', () => {
   });
 });
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';

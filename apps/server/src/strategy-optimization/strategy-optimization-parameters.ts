@@ -116,14 +116,17 @@ export const describeStrategyParameters = (strategy: BacktestStrategy): Strategy
   return descriptors;
 };
 
+const parameterDecimal = (value: string | number) =>
+  typeof value === 'number' ? DecimalValue.fromNumber(value) : DecimalValue.from(value);
+
 const compareValue = (left: string | number, right: string | number) =>
-  DecimalValue.from(String(left)).compareTo(String(right));
+  parameterDecimal(left).compareTo(parameterDecimal(right));
 
 const multipleOfStep = (value: string | number, min: string | number, step: string | number) => {
-  const delta = DecimalValue.from(String(value)).minus(String(min));
-  if (delta.isNegative()) return false;
-  const units = delta.dividedBy(String(step), 16).toString();
-  return /^\d+$/.test(units);
+  const delta = parameterDecimal(value).minus(parameterDecimal(min));
+  const increment = parameterDecimal(step);
+  if (delta.isNegative() || !increment.isPositive()) return false;
+  return delta.isMultipleOf(increment);
 };
 
 const validateParameterValue = (descriptor: StrategyParameterDescriptor, value: string | number) => {

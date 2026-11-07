@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useMobileRuntime } from '../../app/MobileRuntime';
-import { Action, Choices, Copy, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Choices, Copy, QueryList, Section } from '../../components/MobilePrimitives';
 type Props = { provider: string; select: (value: unknown) => void };
 export function HealthDiagnostics({ provider, select }: Props) {
   const { api, scope } = useMobileRuntime();
@@ -15,7 +15,6 @@ export function HealthDiagnostics({ provider, select }: Props) {
   );
   return (
     <>
-      <QueryStatus query={query} empty={rows?.length === 0} retry={() => void query.refetch()} />
       <Action
         label="重新读取健康记录"
         disabled={query.isFetching}
@@ -41,17 +40,24 @@ export function HealthDiagnostics({ provider, select }: Props) {
           select(null);
         }}
       />
-      {rows?.map((item, index) => (
-        <Section key={`${item.provider}:${item.checkedAt}:${index}`} title={item.provider}>
-          <Copy>
-            {item.state} · {item.checkedAt} · 延迟 {item.latencyMs ?? '未知'} 毫秒
-          </Copy>
-          <Action
-            label={`查看健康详情 ${item.provider} ${index + 1}`}
-            onPress={() => select(item)}
-          />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={rows?.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新健康历史"
+      >
+        {rows?.map((item, index) => (
+          <Section key={`${item.provider}:${item.checkedAt}:${index}`} title={item.provider}>
+            <Copy>
+              {item.state} · {item.checkedAt} · 延迟 {item.latencyMs ?? '未知'} 毫秒
+            </Copy>
+            <Action
+              label={`查看健康详情 ${item.provider} ${index + 1}`}
+              onPress={() => select(item)}
+            />
+          </Section>
+        ))}
+      </QueryList>
     </>
   );
 }
@@ -79,20 +85,26 @@ export function QualityDiagnostics({ provider, select }: Props) {
           select(null);
         }}
       />
-      <QueryStatus query={query} empty={rows?.length === 0} retry={() => void query.refetch()} />
       <Action
         label="重新读取数据质量"
         disabled={query.isFetching}
         onPress={() => void query.refetch()}
       />
-      {rows?.map((item) => (
-        <Section key={item.id} title={`${item.provider} · ${item.symbol ?? '全市场'}`}>
-          <Copy>
-            {item.code} · {item.severity} · {item.status}
-          </Copy>
-          <Action label={`查看问题详情 ${item.id}`} onPress={() => select(item)} />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={rows?.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新数据质量"
+      >
+        {rows?.map((item) => (
+          <Section key={item.id} title={`${item.provider} · ${item.symbol ?? '全市场'}`}>
+            <Copy>
+              {item.code} · {item.severity} · {item.status}
+            </Copy>
+            <Action label={`查看问题详情 ${item.id}`} onPress={() => select(item)} />
+          </Section>
+        ))}
+      </QueryList>
     </>
   );
 }
@@ -107,18 +119,24 @@ export function NotificationDiagnostics({ provider, select }: Props) {
   );
   return (
     <>
-      <QueryStatus query={query} empty={rows?.length === 0} retry={() => void query.refetch()} />
       <Action
         label="重新读取通知失败"
         disabled={query.isFetching}
         onPress={() => void query.refetch()}
       />
-      {rows?.map((item) => (
-        <Section key={item.id} title={item.provider}>
-          <Copy>{item.lastError ?? '未提供失败原因'}</Copy>
-          <Action label={`查看通知详情 ${item.id}`} onPress={() => select(item)} />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={rows?.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新通知失败"
+      >
+        {rows?.map((item) => (
+          <Section key={item.id} title={item.provider}>
+            <Copy>{item.lastError ?? '未提供失败原因'}</Copy>
+            <Action label={`查看通知详情 ${item.id}`} onPress={() => select(item)} />
+          </Section>
+        ))}
+      </QueryList>
     </>
   );
 }

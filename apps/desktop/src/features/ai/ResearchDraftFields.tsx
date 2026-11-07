@@ -1,13 +1,15 @@
-import type { ResearchSubmissionV2 } from '@thesis-ledger/schemas';
-import { Field, FieldGroup, FieldLabel, FieldDescription } from '@/components/ui/field';
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
+import { InstrumentOptionField } from '../market-data/InstrumentOptionField.js';
+import { Spinner } from '@/components/ui/spinner';
+import type { ResearchSubmissionV2 } from '@thesis-ledger/schemas';
+import { Field, FieldGroup, FieldLabel, FieldDescription } from '@/components/ui/field';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Textarea } from '@/components/ui/textarea';
 import { ResearchInstrumentPicker } from './ResearchInstrumentPicker.js';
@@ -28,7 +30,9 @@ function ObjectSelect({
   loading,
   failed,
   onChange,
+  searchable = false,
 }: {
+  searchable?: boolean;
   label: string;
   value: string | null;
   items: Array<{ value: string; label: string }>;
@@ -39,26 +43,39 @@ function ObjectSelect({
   return (
     <Field>
       <FieldLabel>{label}</FieldLabel>
-      <Select
-        items={items}
-        value={value ?? ''}
-        onValueChange={(next) => onChange(next || null)}
-        disabled={loading || failed}
-      >
-        <SelectTrigger className="w-full" aria-label={label}>
-          <SelectValue placeholder={`选择${label}`} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <FieldDescription>{objectSelectHint(loading, failed, items.length)}</FieldDescription>
+      {searchable ? (
+        <InstrumentOptionField
+          label={label}
+          value={value ?? ''}
+          options={items}
+          onChange={(next) => onChange(next || null)}
+          disabled={loading || failed}
+        />
+      ) : (
+        <Select
+          items={items}
+          value={value ?? ''}
+          onValueChange={(next) => onChange(next || null)}
+          disabled={loading || failed}
+        >
+          <SelectTrigger className="w-full" aria-label={label}>
+            <SelectValue placeholder={`选择${label}`} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      )}
+      <FieldDescription className="flex items-center gap-2">
+        {loading && <Spinner aria-hidden="true" />}
+        {objectSelectHint(loading, failed, items.length)}
+      </FieldDescription>
     </Field>
   );
 }
@@ -122,6 +139,7 @@ export function ResearchDraftFields({
       {scope === 'position' && objects.effectiveAccountId && (
         <ObjectSelect
           label="研究持仓"
+          searchable
           value={symbol}
           items={objects.positionOptions}
           loading={objects.positions.isPending}

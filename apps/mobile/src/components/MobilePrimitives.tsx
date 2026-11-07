@@ -3,7 +3,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +10,8 @@ import {
   type KeyboardTypeOptions,
 } from 'react-native';
 import type { ReactNode } from 'react';
+import { ListPageScrollView, MobileListRefreshRegion } from './MobileListRefresh';
+export { MobileListRefreshRegion };
 import { ThesisLedgerApiError, ThesisLedgerContractError } from '@thesis-ledger/api-client';
 import { useMobileRuntime } from '../app/MobileRuntime';
 
@@ -41,7 +42,7 @@ export function Page({
       style={[ui.flex, { backgroundColor: theme.pageBackground }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.page}>
+      <ListPageScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.page}>
         <View style={ui.titleRow}>
           <Text accessibilityRole="header" style={[ui.title, { color: theme.textPrimary }]}>
             {title}
@@ -49,7 +50,7 @@ export function Page({
           {action}
         </View>
         {children}
-      </ScrollView>
+      </ListPageScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -89,6 +90,7 @@ export function Action({
   label,
   onPress,
   disabled = false,
+  busy = false,
   primary = false,
   destructive = false,
   testID,
@@ -96,6 +98,7 @@ export function Action({
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  busy?: boolean;
   primary?: boolean;
   destructive?: boolean;
   testID?: string;
@@ -109,8 +112,9 @@ export function Action({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      aria-busy={busy}
+      accessibilityState={{ disabled: disabled || busy }}
+      disabled={disabled || busy}
       onPress={onPress}
       style={({ pressed }) => [
         ui.action,
@@ -119,9 +123,10 @@ export function Action({
           backgroundColor: primary ? theme.textPrimary : theme.surface1,
         },
         pressed && ui.pressed,
-        disabled && ui.disabled,
+        (disabled || busy) && ui.disabled,
       ]}
     >
+      {busy && <ActivityIndicator color={color} />}
       <Text style={[ui.actionText, { color }]}>{label}</Text>
     </Pressable>
   );
@@ -228,38 +233,81 @@ export function Choices<T extends string>({
 export function Feedback({
   message,
   error = false,
+  busy = false,
 }: {
   message: string | null | undefined;
   error?: boolean;
+  busy?: boolean;
 }) {
   const { theme } = useMobileRuntime();
-  if (!message) return null;
+  if (!message && !busy) return null;
   return (
-    <Text
-      accessibilityRole={error ? 'alert' : 'text'}
-      style={[ui.copy, { color: error ? theme.error : theme.textSecondary }]}
-    >
-      {message}
-    </Text>
+    <>
+      {busy && <ActivityIndicator accessibilityLabel="正在处理" color={theme.brand} />}
+      {message && (
+        <Text
+          accessibilityRole={error ? 'alert' : 'text'}
+          style={[ui.copy, { color: error ? theme.error : theme.textSecondary }]}
+        >
+          {message}
+        </Text>
+      )}
+    </>
   );
 }
-export function QueryStatus({
-  query,
-  empty,
-  retry,
-}: {
+type ReadStatusProps = {
   query: {
     isPending: boolean;
     isError: boolean;
     error: unknown;
+    data?: unknown;
     isFetching?: boolean;
+    isFetchingNextPage?: boolean;
     fetchStatus?: 'paused' | 'fetching' | 'idle';
   };
-  empty?: boolean;
+  empty?: boolean | undefined;
   retry: () => void;
+};
+
+export function QueryList({
+  query,
+  empty,
+  retry,
+  label,
+  gap,
+  relatedRefreshing = false,
+  children,
+}: ReadStatusProps & {
+  children: ReactNode;
+  label?: string;
+  gap?: number;
+  relatedRefreshing?: boolean;
 }) {
+  const refreshing =
+    (query.isFetching === true || relatedRefreshing) &&
+    !query.isPending &&
+    query.data !== undefined &&
+    !query.isFetchingNextPage &&
+    query.fetchStatus !== 'paused';
+  return (
+    <MobileListRefreshRegion refreshing={refreshing} label={label} gap={gap}>
+      <QueryStatus query={query} empty={empty} retry={retry} inlineRefresh={false} />
+      {children}
+    </MobileListRefreshRegion>
+  );
+}
+
+export function QueryStatus({
+  query,
+  empty,
+  retry,
+  inlineRefresh = true,
+}: ReadStatusProps & { inlineRefresh?: boolean }) {
+  const { theme } = useMobileRuntime();
   if (query.fetchStatus === 'paused') return <Copy muted>当前离线，连接恢复后继续读取。</Copy>;
-  if (query.isPending) return <ActivityIndicator accessibilityLabel="正在读取" />;
+  if (query.isPending && query.fetchStatus === 'idle') return null;
+  if (query.isPending)
+    return <ActivityIndicator accessibilityLabel="正在读取" color={theme.brand} />;
   if (query.isError)
     return (
       <Section>
@@ -267,14 +315,19 @@ export function QueryStatus({
         <Action
           label={query.isFetching ? '正在读取…' : '重新读取'}
           disabled={query.isFetching === true}
+          busy={query.isFetching === true && (inlineRefresh || query.data === undefined)}
           onPress={retry}
         />
       </Section>
     );
+  if (inlineRefresh && query.isFetching)
+    return (
+      <ActivityIndicator accessibilityLabel="正在刷新，显示上次读取的数据" color={theme.brand} />
+    );
   if (empty) return <Copy muted>当前范围暂无数据。</Copy>;
-  if (query.isFetching) return <Copy muted>正在更新，当前显示上次读取的数据。</Copy>;
   return null;
 }
+
 export const ui = StyleSheet.create({
   flex: { flex: 1 },
   page: { padding: 18, paddingBottom: 36, gap: 16 },
@@ -299,6 +352,8 @@ export const ui = StyleSheet.create({
   },
   multiline: { minHeight: 100, textAlignVertical: 'top' },
   action: {
+    flexDirection: 'row',
+    gap: 6,
     minHeight: 44,
     paddingHorizontal: 14,
     paddingVertical: 11,

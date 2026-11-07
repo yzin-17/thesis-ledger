@@ -30,7 +30,7 @@ vi.mock('react-native', async () => {
   const React = await import('react');
   const Element = ({ children }: { children?: React.ReactNode }) =>
     React.createElement('div', {}, children);
-  return { Text: Element, View: Element, ActivityIndicator: Element };
+  return { Text: Element, View: Element, ActivityIndicator: Element, StyleSheet: { create: <T,>(styles: T) => styles } };
 });
 describe('手机组合范围与事实展示', () => {
   it('持仓卡片展示服务端目录名称，缺失时显示代码', async () => {

@@ -188,6 +188,17 @@ try {
       console.log('V1 记录保留升级逐字段及既有结果解析通过，新增字段保持空值');
     }
   }
+  // 现行迁移由初始化入口统一登记 head；在本次专属临时库同事务核对完整清单。
+  const { discoverDatabaseStructure, buildDatabaseStructureCheckSql } =
+    await import('../apps/server/src/platform/database-structure.ts');
+  const structure = await discoverDatabaseStructure(`${root}apps/server/prisma`);
+  if (structure.migrations.map(row => row.name).join() !== migrations.join())
+    throw new Error('隔离库执行的迁移与结构清单不一致');
+  sql(`BEGIN;
+    INSERT INTO "SchemaVersion" (id, version) VALUES (1, '${structure.currentHead}')
+    ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version, "updatedAt" = CURRENT_TIMESTAMP;
+    ${buildDatabaseStructureCheckSql(structure, { databaseName: database, ownerName: owner })}
+    COMMIT;`);
   if (sql('SELECT version FROM "SchemaVersion" WHERE id=1;') !== migrations.at(-1))
     throw new Error('隔离数据库结构 head 与实际 migration 输入不一致');
   const port = run('docker', ['port', container, '5432/tcp']).split(':').at(-1);

@@ -249,7 +249,7 @@ export function BacktestResultScreen() {
           ) : null}
         </>
       ) : null}
-      <Feedback message={message} error={command.isError || exportCommand.isError} />
+      <Feedback busy={command.isPending || exportCommand.isPending} message={message} error={command.isError || exportCommand.isError} />
     </Page>
   );
 }

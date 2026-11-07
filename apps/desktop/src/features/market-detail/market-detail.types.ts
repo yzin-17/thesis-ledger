@@ -9,6 +9,7 @@ import { canCombineChartSeries } from './market-chart-acquisition.js';
 import type { MarketDetailResponse as NativeDetailResponse } from '@thesis-ledger/api-client';
 
 export interface MarketDetailPosition {
+  instrumentId?: string;
   symbol: string;
   accountId?: string;
   mode?: 'actual' | 'shadow';

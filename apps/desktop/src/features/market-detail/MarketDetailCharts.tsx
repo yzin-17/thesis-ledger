@@ -1,3 +1,5 @@
+import { formatMarketNumber, formatRatioPercent } from '@thesis-ledger/domain';
+import {ArenaPriceLayer} from '../model-arena/ArenaPriceLayer.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -13,7 +15,6 @@ import { MarketIndicatorSettingsMenu } from './MarketIndicatorSettingsMenu.js';
 import { MarketTradingOverlayControls } from './MarketTradingOverlayControls.js';
 import type { MarketTradingOverlayState } from './useMarketTradingOverlays.js';
 import {
-  LightweightMarketChart,
   rangeCoverage,
   rangeMonths,
   visibleBarsForRange,
@@ -31,7 +32,6 @@ import {
 export { FundNavHistoryChart } from './MarketNavChart.js';
 export type { ChartPreference, MarketIndicatorParams } from './market-chart-preferences.js';
 
-const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
 export function MarketPriceChart({
   bars,
@@ -357,7 +357,7 @@ export function MarketPriceChart({
       </div>
       {tradingOverlay ? <MarketTradingOverlayControls overlay={tradingOverlay} /> : null}
       {visible.length > 0 ? (
-        <LightweightMarketChart
+        <ArenaPriceLayer
           bars={bars}
           indicators={indicators}
           {...(providedChartPoints ? { chartPoints: providedChartPoints } : {})}
@@ -443,13 +443,13 @@ export function MarketPriceChart({
         {last ? new Date(last.timestamp).toLocaleDateString('zh-CN') : '—'}
       </span>
       <span>
-        最新行情 {number.format(latestBar?.close ?? 0)} · 币种 {currency ?? '未声明'}
+        最新行情 {formatMarketNumber(latestBar?.close)} · 币种 {currency ?? '未声明'}
         {last && latestBar && last.timestamp !== latestBar.timestamp
-          ? ` · 区间末值 ${number.format(last.close)}`
+          ? ` · 区间末值 ${formatMarketNumber(last.close)}`
           : ''}
         {change === null
           ? ''
-          : ` · 可视区间 ${change >= 0 ? '+' : ''}${(change * 100).toFixed(2)}%`}
+          : ` · 可视区间 ${formatRatioPercent(change, 'always')}`}
       </span>
       <span>
         {chartPeriodSourceLabel(last)} ·{' '}

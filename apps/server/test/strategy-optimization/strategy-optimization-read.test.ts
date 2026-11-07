@@ -1,3 +1,4 @@
+import { strategyBacktestGroupPageSchema } from '@thesis-ledger/schemas';
 import { describe, expect, it, vi } from 'vitest';
 import type { ExperimentReadRow } from '../../src/strategy-optimization/strategy-optimization-common.js';
 import { StrategyOptimizationReadService } from '../../src/strategy-optimization/strategy-optimization-read.service.js';
@@ -196,7 +197,7 @@ describe('StrategyOptimizationReadService backtest grouping', () => {
     });
   });
 
-  it('uses the exact stored strategy version as a searchable user-task identity', async () => {
+  it.each([[4, 2], [0, 2], [-1, 2], [4, 0]])('preserves tasks and projects a valid source for version %s / schema %s', async (storedVersion, storedSchemaVersion) => {
     const jobId = uuid(6000);
     const strategyVersionId = uuid(6001);
     const backtestJob = {
@@ -249,8 +250,8 @@ describe('StrategyOptimizationReadService backtest grouping', () => {
         findMany: vi.fn().mockResolvedValue([
           {
             id: strategyVersionId,
-            version: 4,
-            schemaVersion: 2,
+            version: storedVersion,
+            schemaVersion: storedSchemaVersion,
             strategy: { id: uuid(6002), name: '均线趋势策略' },
           },
         ]),
@@ -267,6 +268,15 @@ describe('StrategyOptimizationReadService backtest grouping', () => {
     expect(page.items).toHaveLength(1);
     expect(JSON.stringify(page)).not.toContain('999');
 
+    expect(strategyBacktestGroupPageSchema.safeParse(JSON.parse(JSON.stringify(page))).success).toBe(true);
+    expect(page.totalCount).toBe(1);
+    if (storedVersion <= 0 || storedSchemaVersion <= 0) {
+      expect(page.items[0]).toMatchObject({
+        id: jobId, name: '均线趋势策略',
+        source: { kind: 'unknown', reason: 'missing_source', referenceId: strategyVersionId },
+      });
+      return;
+    }
     expect(page.items[0]).toMatchObject({
       id: jobId,
       kind: 'user',

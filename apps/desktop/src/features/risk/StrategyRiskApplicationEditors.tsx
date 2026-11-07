@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -126,6 +127,7 @@ export function RiskApplicationNotificationEditor({
       ) : null}
       <div className="flex justify-end">
         <Button
+          aria-busy={pending}
           size="sm"
           disabled={!dirty || !validCooldown || !notificationValid || pending}
           onClick={() =>
@@ -140,6 +142,7 @@ export function RiskApplicationNotificationEditor({
             })
           }
         >
+          {pending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           保存通知配置
         </Button>
       </div>
@@ -195,7 +198,8 @@ export function RiskApplicationUpgradeReview({
         </div>
       ) : (
         <div className="flex justify-end">
-          <Button disabled={pending} onClick={onConfirm}>
+          <Button aria-busy={pending} disabled={pending} onClick={onConfirm}>
+            {pending && <Spinner data-icon="inline-start" aria-hidden="true" />}
             {pending ? '正在升级…' : `确认升级到 v${targetVersion.version}`}
           </Button>
         </div>

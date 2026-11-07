@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
-import type { MarketNewsResult, MarketNewsFeedResult } from '@thesis-ledger/schemas';
+import {
+  marketNewsDefaultWindowMs,
+  type MarketNewsResult,
+  type MarketNewsFeedResult,
+} from '@thesis-ledger/schemas';
 import type { MarketStackParams } from '../../app/navigation-types';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import {
@@ -11,7 +15,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
   failureMessage,
 } from '../../components/MobilePrimitives';
 import { newsSubmission, type NewsSubmission } from './news-input';
@@ -23,7 +27,7 @@ export function MarketNewsScreen() {
   const [form, setForm] = useState(() => {
     const end = new Date();
     return {
-      start: new Date(end.getTime() - 3 * 86400000).toISOString(),
+      start: new Date(end.getTime() - marketNewsDefaultWindowMs).toISOString(),
       end: end.toISOString(),
       provider: 'cls',
     };
@@ -86,8 +90,15 @@ export function MarketNewsScreen() {
       </Copy>
       <Feedback message={feedback} error />
       <Action label="读取资讯" primary disabled={query.isFetching} onPress={read} />
-      {submitted ? <QueryStatus query={query} retry={() => void query.refetch()} /> : null}
-      {query.data ? <NewsResult data={query.data} /> : null}
+      {submitted && (
+        <QueryList
+          query={query}
+          retry={() => void query.refetch()}
+          label="正在刷新新闻列表"
+        >
+          {query.data ? <NewsResult data={query.data} /> : null}
+        </QueryList>
+      )}
       {cursors.length ? (
         <Action
           label="上一页资讯"

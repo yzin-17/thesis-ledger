@@ -436,6 +436,8 @@ const optimizationExperimentCreateFields = {
   idempotencyKey: z.string().trim().min(1).max(200),
 };
 
+export const optimizationSubmissionSettingsSchema = z.strictObject(optimizationExperimentCreateFields)
+  .omit({sourceMode:true,strategyVersionId:true,discoveryScope:true,idempotencyKey:true});
 type OptimizationExperimentCreateInput = {
   name?: string | undefined;
   sourceMode: z.infer<typeof optimizationSourceModeSchema>;
@@ -451,7 +453,7 @@ type OptimizationExperimentCreateInput = {
   idempotencyKey: string;
 };
 
-const validateOptimizationExperimentCreate = (
+export const validateOptimizationExperimentCreate = (
   value: OptimizationExperimentCreateInput,
   ctx: z.RefinementCtx,
 ) => {

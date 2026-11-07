@@ -1,3 +1,5 @@
+import { modelArenaClient } from './model-arena-client.js';
+import { watchlistClient } from './watchlist-client.js';
 import { cashManagementClient } from './cash-management-client.js';
 import { aiProviderClient } from './ai-provider-client.js';
 import { marketPolicyClient } from './market-policy-client.js';
@@ -7,6 +9,7 @@ import { marketCatalogClient } from './market-catalog-client.js';
 export { marketPolicyClient } from './market-policy-client.js';
 export { marketCatalogClient } from './market-catalog-client.js';
 import { providerOAuthClient } from './provider-oauth-client.js';
+import { strategySubmissionsClient } from './strategy-submissions-client.js';
 import { automationClient } from './automation-client.js';
 import { diagnosticsClient } from './diagnostics-client.js';
 export { automationClient } from './automation-client.js';
@@ -337,7 +340,8 @@ export class ThesisLedgerApiClient {
   readonly cash = this.cashManagement.cash;
   readonly cashDeposits = this.cashManagement.cashDeposits;
   readonly fundInvestments = this.cashManagement.fundInvestments;
-
+  readonly modelArenas = modelArenaClient(this.requestParsed.bind(this));
+  readonly watchlist = watchlistClient(this.requestParsed.bind(this));
   readonly risk = riskManagementClient(this.requestParsed.bind(this));
 
   readonly performance = performanceClient(this.requestParsed.bind(this));
@@ -453,6 +457,7 @@ export class ThesisLedgerApiClient {
   readonly research = researchClient(this.requestParsed.bind(this));
   readonly aiProviders = aiProviderClient(this.requestParsed.bind(this));
   readonly providerOAuth = providerOAuthClient(this.requestParsed.bind(this));
+  readonly strategySubmissions = strategySubmissionsClient(this.requestParsed.bind(this));
   readonly automations = automationClient(this.requestParsed.bind(this));
   readonly diagnostics = diagnosticsClient(this.requestParsed.bind(this));
   readonly researchRuns = researchRunClient(this.requestParsed.bind(this));
@@ -530,3 +535,5 @@ export class ThesisLedgerApiClient {
     );
   }
 }
+export * from './arena-setup.js';
+export * from './market-reference-contracts.js';

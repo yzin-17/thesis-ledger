@@ -75,7 +75,7 @@ it.each(['', '000001.SZ', 'AAPL.US', '161725.OF'])(
   '未选择或未覆盖的 %s 不请求、不补默认每手',
   async (symbol) => {
     await render(symbol);
-    expect(document.body.textContent).toContain('交易规则未验证');
+    expect(document.querySelector('[data-slot=alert]')).toBeNull();
     expect(document.body.textContent).toContain(symbol ? '暂无已核对的规则参考' : '选择标的后');
     expect(document.querySelector('button')).toBeNull();
     expect(api.request).not.toHaveBeenCalled();

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { useAccounts } from '../../app/query/mobile-queries';
 import type { AccountStackParams } from '../../app/navigation-types';
-import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Copy, Page, QueryList, Section } from '../../components/MobilePrimitives';
 import { ScreenshotUpload } from '../screenshot-import/ScreenshotUpload';
 export const draftStatusLabels = {
   pending: '待审核',
@@ -31,22 +31,24 @@ export function DraftsScreen() {
         disabled={!account?.active || accounts.isError || accounts.isFetching}
         onUploaded={() => void query.refetch()}
       />
-      <QueryStatus
+      <QueryList
         query={query}
         empty={query.data?.length === 0}
         retry={() => void query.refetch()}
-      />
-      {query.data?.map((draft) => (
-        <Section key={draft.id} title={`${draftStatusLabels[draft.status]} · ${draft.createdAt}`}>
-          <Copy muted>
-            修订 {draft.review?.revision ?? '缺失'} · {draft.review?.rows.length ?? 0} 行
-          </Copy>
-          <Action
-            label="审核草稿"
-            onPress={() => navigation.navigate('DraftReview', { ...params, draftId: draft.id })}
-          />
-        </Section>
-      ))}
+        label="正在刷新导入草稿"
+      >
+        {query.data?.map((draft) => (
+          <Section key={draft.id} title={`${draftStatusLabels[draft.status]} · ${draft.createdAt}`}>
+            <Copy muted>
+              修订 {draft.review?.revision ?? '缺失'} · {draft.review?.rows.length ?? 0} 行
+            </Copy>
+            <Action
+              label="审核草稿"
+              onPress={() => navigation.navigate('DraftReview', { ...params, draftId: draft.id })}
+            />
+          </Section>
+        ))}
+      </QueryList>
     </Page>
   );
 }

@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
 import type { ReactNode } from 'react';
 import type { InstrumentDirectory } from '@thesis-ledger/api-client';
 import { SearchIcon } from 'lucide-react';
@@ -12,8 +13,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import type { JournalLegacyReviewCandidate, JournalReviewCandidate } from './journal.types.js';
 
 const formatDate = (value: string) =>
@@ -86,13 +86,7 @@ export function ReviewCandidateList({
     : candidates;
   let content;
   if (loading) {
-    content = (
-      <div className="flex flex-col gap-2 p-2" aria-label="正在加载交易" aria-busy="true">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </div>
-    );
+    content = <LoadingState label="正在加载交易" />;
   } else if (visibleCandidates.length === 0) {
     content = (
       <Empty className="min-h-36 border-0 px-6 py-8">
@@ -154,22 +148,16 @@ export function ReviewCandidateList({
           <div className="flex items-start justify-between gap-3">
             <div>
               <CardTitle>已平仓交易</CardTitle>
-              <CardDescription>从 Ledger 读取，不会自动写入任何记录。</CardDescription>
+              <CardDescription>读取账本中的交易记录。</CardDescription>
             </div>
             <Badge variant="outline">{candidates.length} 笔</Badge>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(12rem,1fr)_minmax(10rem,14rem)_minmax(10rem,14rem)] lg:items-end">
             <div className="relative block">
               <span className="sr-only">按标的筛选</span>
-              <SearchIcon
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
+              <InstrumentSymbolField
                 value={filter}
-                onChange={(event) => onFilterChange(event.target.value)}
-                className="pl-9"
-                placeholder="搜索标的代码"
+                onChange={(value) => onFilterChange(value)}
                 aria-label="按标的筛选"
               />
             </div>

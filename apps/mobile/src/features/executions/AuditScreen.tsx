@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { AccountStackParams } from '../../app/navigation-types';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { useAccounts } from '../../app/query/mobile-queries';
-import { Action, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Page, QueryList, Section } from '../../components/MobilePrimitives';
 import { isExecution } from './execution-command';
 import { LedgerEventView } from './LedgerEventView';
 import { instrumentLabelLookup } from '../market/instrument-display';
@@ -23,44 +23,50 @@ export function AuditScreen() {
   const name = instrumentLabelLookup(query.data?.instrumentDirectory);
   return (
     <Page title="账本审计">
-      <QueryStatus query={query} empty={events.length === 0} retry={() => void query.refetch()} />
-      {events.map((event) => {
-        const latest = events
-          .filter((row) => row.factId === event.factId)
-          .reduce((a, b) => (BigInt(a.ledgerRevision) > BigInt(b.ledgerRevision) ? a : b), event);
-        const previous = events
-          .filter((row) => row.factId === event.factId && isExecution(row))
-          .reduce<typeof event | null>(
-            (a, b) => (!a || BigInt(a.ledgerRevision) < BigInt(b.ledgerRevision) ? b : a),
-            null,
+      <QueryList
+        query={query}
+        empty={events.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新账本审计"
+      >
+        {events.map((event) => {
+          const latest = events
+            .filter((row) => row.factId === event.factId)
+            .reduce((a, b) => (BigInt(a.ledgerRevision) > BigInt(b.ledgerRevision) ? a : b), event);
+          const previous = events
+            .filter((row) => row.factId === event.factId && isExecution(row))
+            .reduce<typeof event | null>(
+              (a, b) => (!a || BigInt(a.ledgerRevision) < BigInt(b.ledgerRevision) ? b : a),
+              null,
+            );
+          const restorable =
+            latest.eventId === event.eventId &&
+            event.revisionAction === 'VOID' &&
+            previous &&
+            account?.active &&
+            !query.isError &&
+            !query.isFetching &&
+            !accounts.isError;
+          return (
+            <Section key={event.eventId}>
+              <LedgerEventView event={event} name={name} />
+              {restorable && previous ? (
+                <Action
+                  label="恢复成交"
+                  onPress={() =>
+                    navigation.navigate('ExecutionEditor', {
+                      ...params,
+                      event: previous,
+                      action: 'restore',
+                      supersedesEventId: event.eventId,
+                    })
+                  }
+                />
+              ) : null}
+            </Section>
           );
-        const restorable =
-          latest.eventId === event.eventId &&
-          event.revisionAction === 'VOID' &&
-          previous &&
-          account?.active &&
-          !query.isError &&
-          !query.isFetching &&
-          !accounts.isError;
-        return (
-          <Section key={event.eventId}>
-            <LedgerEventView event={event} name={name} />
-            {restorable && previous ? (
-              <Action
-                label="恢复成交"
-                onPress={() =>
-                  navigation.navigate('ExecutionEditor', {
-                    ...params,
-                    event: previous,
-                    action: 'restore',
-                    supersedesEventId: event.eventId,
-                  })
-                }
-              />
-            ) : null}
-          </Section>
-        );
-      })}
+        })}
+      </QueryList>
     </Page>
   );
 }

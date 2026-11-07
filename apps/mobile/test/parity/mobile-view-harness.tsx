@@ -23,8 +23,9 @@ vi.mock('../../src/app/MobileRuntime', () => ({
   showMessage: view.notice,
 }));
 vi.mock('@react-navigation/native', () => ({
+  useIsFocused: () => true,
   useRoute: () => ({ params: view.params }),
-  useNavigation: () => ({ navigate: view.navigate }),
+  useNavigation: () => ({ navigate: view.navigate, getParent: () => ({navigate:view.navigate}) }),
 }));
 vi.mock('../../src/platform/files/select-file', () => ({
   selectImage: view.image,
@@ -54,6 +55,16 @@ vi.mock('../../src/components/MobilePrimitives', async () => {
       return (error.payload as { message?: string })?.message ?? '请求失败';
     return error instanceof Error ? error.message : '操作失败';
   };
+  const readStatus = ({
+      query,
+      retry,
+    }: {
+      query: { isError: boolean; isPending: boolean; error: unknown };
+      retry: () => void;
+    }) =>
+      query.isError
+        ? e('div', {}, failureMessage(query.error), e('button', { onClick: retry }, '重新读取'))
+        : null;
   return {
     failureMessage,
     Page: ({
@@ -125,16 +136,10 @@ vi.mock('../../src/components/MobilePrimitives', async () => {
       ),
     Feedback: ({ message }: { message?: string }) =>
       message ? e('p', { role: 'status' }, message) : null,
-    QueryStatus: ({
-      query,
-      retry,
-    }: {
-      query: { isError: boolean; isPending: boolean; error: unknown };
-      retry: () => void;
-    }) =>
-      query.isError
-        ? e('div', {}, failureMessage(query.error), e('button', { onClick: retry }, '重新读取'))
-        : null,
+    QueryStatus: readStatus,
+    MobileListRefreshRegion: ({ children }: { children: React.ReactNode }) => e(React.Fragment, {}, children),
+    QueryList: ({ children, ...props }: Parameters<typeof readStatus>[0] & { children: React.ReactNode }) =>
+      e(React.Fragment, {}, readStatus(props), children),
   };
 });
 

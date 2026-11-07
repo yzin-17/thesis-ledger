@@ -1,4 +1,6 @@
 export type StrategyStackParams = {
+  ArenaSetup:undefined;
+  ModelArena: {match?:string,round?:string,entrant?:string} | undefined;
   StrategyLibrary: undefined;
   StrategyVersion: { strategyId: string; versionId: string };
   StrategyEditor: { strategyId?: string; versionId?: string } | undefined;

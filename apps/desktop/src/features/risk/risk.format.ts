@@ -1,3 +1,8 @@
+import {
+  formatRatioPercent,
+  formatRiskRuleThreshold as formatThreshold,
+} from '@thesis-ledger/domain';
+export { formatThreshold };
 import type {
   KnownRiskRuleKind,
   RiskRuleRecord,
@@ -100,11 +105,6 @@ export const percentageRuleKinds: ReadonlySet<string> = new Set([
 
 export const isPercentageRule = (kind: string) => percentageRuleKinds.has(kind);
 
-export const formatThreshold = (kind: string, threshold: number) => {
-  if (isPercentageRule(kind)) return `${(threshold * 100).toLocaleString('zh-CN')}%`;
-  return threshold.toLocaleString('zh-CN', { maximumFractionDigits: 6 });
-};
-
 export const ruleTargetLabel = (
   rule: {
     scope: string;
@@ -168,8 +168,6 @@ export const riskEventMode = (event: {
   if (contextMode === 'actual' || contextMode === 'shadow') return contextMode;
   return null;
 };
-
-const formatRatioPercent = (ratio: number) => `${(ratio * 100).toFixed(2)}%`;
 
 const formatMetricNumber = (value: number) =>
   value.toLocaleString('zh-CN', { maximumFractionDigits: 4 });

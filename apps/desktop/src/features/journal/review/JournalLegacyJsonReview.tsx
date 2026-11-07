@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { completedTradeSchema } from '@thesis-ledger/schemas';
@@ -79,7 +80,8 @@ export function JournalLegacyJsonReview() {
               />
             </Field>
           </FieldGroup>
-          <Button disabled={analysis.isPending || submissionLock.current} onClick={handleAnalyze}>
+          <Button aria-busy={analysis.isPending} disabled={analysis.isPending || submissionLock.current} onClick={handleAnalyze}>
+            {analysis.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
             分析兼容输入
           </Button>
           {analysis.isError && (

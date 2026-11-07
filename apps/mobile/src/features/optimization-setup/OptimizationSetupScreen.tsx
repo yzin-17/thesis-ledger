@@ -1,3 +1,4 @@
+import {useContinuousSubmission} from '../strategy-library/StrategySubmissions';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
@@ -5,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  optimizationExperimentCreateSchema,
+  optimizationExperimentCreateSchema, optimizationSubmissionSettingsSchema,
   optimizationRunPreparationRequestSchema,
   optimizationDiscoveryScopeSchema,
   type OptimizationExperimentCreate,
@@ -22,7 +23,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList, QueryStatus,
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
@@ -100,6 +101,31 @@ function useOptimizationSetupController() {
     preparationResult?.status === 'prepared' && submitted?.signature === signature
       ? preparationResult
       : null;
+  const continuous=useContinuousSubmission();
+  const settings=()=>{
+        const selected = (caps.data?.providers ?? []).filter((v) =>
+          models.includes(JSON.stringify([v.provider, v.model])),
+        );
+        if (selected.some((v) => v.costStatus === 'unknown') && ack !== 'yes')
+          throw Error('请针对所选模型明确确认未知费用。');
+        return optimizationSubmissionSettingsSchema.parse({
+          ...(name.trim() ? { name } : {}),
+          ...(source === 'existing' ? { allowedParameterIds: parameters } : {}),
+          models: selected.map((v) => {
+            const effort = efforts[JSON.stringify([v.provider, v.model])];
+            return {
+              provider: v.provider,
+              model: v.model,
+              ...(effort && effort !== 'auto' ? { reasoningEffort: effort } : {}),
+            };
+          }),
+          objective: JSON.parse(objective) as unknown,
+          split: JSON.parse(split) as unknown,
+          budget: JSON.parse(budget) as unknown,
+          maxRounds: Number(rounds),
+          acknowledgeUnknownCost: ack === 'yes',
+        });
+  };
   const command = useMobileCommand(
     async () => {
       if (!capabilityReady) throw Error('实验能力尚未就绪，原提交已保留，未创建实验。');
@@ -119,32 +145,7 @@ function useOptimizationSetupController() {
                 sourceMode: source,
                 discoveryScope: optimizationDiscoveryScopeSchema.parse(JSON.parse(discovery)),
               };
-        const selected = (caps.data?.providers ?? []).filter((v) =>
-          models.includes(JSON.stringify([v.provider, v.model])),
-        );
-        if (selected.some((v) => v.costStatus === 'unknown') && ack !== 'yes')
-          throw Error('请针对所选模型明确确认未知费用。');
-        body = optimizationExperimentCreateSchema.parse({
-          contractVersion: 3,
-          ...target,
-          ...(name.trim() ? { name } : {}),
-          ...(source === 'existing' ? { allowedParameterIds: parameters } : {}),
-          models: selected.map((v) => {
-            const effort = efforts[JSON.stringify([v.provider, v.model])];
-            return {
-              provider: v.provider,
-              model: v.model,
-              ...(effort && effort !== 'auto' ? { reasoningEffort: effort } : {}),
-            };
-          }),
-          objective: JSON.parse(objective) as unknown,
-          split: JSON.parse(split) as unknown,
-          budget: JSON.parse(budget) as unknown,
-          maxRounds: Number(rounds),
-          runConfig: prepared.runConfig,
-          acknowledgeUnknownCost: ack === 'yes',
-          idempotencyKey: randomUUID(),
-        });
+        body = optimizationExperimentCreateSchema.parse({ contractVersion:3,...target,...settings(),runConfig:prepared.runConfig,idempotencyKey:randomUUID() });
         if (
           !(await confirmAction(
             '确认创建优化实验？',
@@ -164,12 +165,12 @@ function useOptimizationSetupController() {
     },
     { refresh: false },
   );
-  const locked = command.isPending || !!pending.data || !!receipt;
+  const locked = continuous.isPending || command.isPending || !!pending.data || !!receipt;
   const edit = (update: () => void) => {
     update();
     setEdited(true);
   };
-  const prepare = () => {
+  const prepare = async (automatic=false) => {
     try {
       const target =
         source === 'existing'
@@ -187,6 +188,13 @@ function useOptimizationSetupController() {
         new Date().toISOString(),
       );
       const body = optimizationRunPreparationRequestSchema.parse({ target, intent });
+      if(automatic) {
+        if(!capabilityReady)throw Error('实验能力尚未就绪');
+        const options=settings();
+        if(!(await confirmAction('按当前预算准备并创建实验？','服务端将准备行情并读取所选模型与预算，关闭页面后继续。'))) return;
+        await continuous.mutateAsync({signature:JSON.stringify([signature,options]),input:{kind:'optimization',preparation:body,settings:options}});
+        setEdited(false);navigation.navigate('StrategyLibrary');return;
+      }
       setSubmitted({ signature, body });
       setMessage(null);
     } catch (e) {
@@ -341,12 +349,13 @@ export function OptimizationSetupScreen() {
           })
         }
       />
+      <Action label="后台准备并创建零价模型实验" primary disabled={locked||!capabilityReady} onPress={()=>void prepare(true)}/>
       <Action
         label="准备实验价格与执行配置"
         disabled={
           locked || !capabilityReady || preparation.isFetching
         }
-        onPress={prepare}
+        onPress={()=>void prepare()}
       />
       {submitted ? (
         <QueryStatus query={preparation} retry={() => void preparation.refetch()} />
@@ -373,7 +382,7 @@ export function OptimizationSetupScreen() {
           void command.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))
         }
       />
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
       {receipt ? (
         <Action
           label="打开已创建实验"
@@ -450,28 +459,33 @@ function OptimizationSelectionFields({
                 .map((v) => ({ value: v.id, label: `${s.name} · 版本 ${v.version}` })),
             )}
           />
-          <QueryStatus query={descriptors} retry={() => void descriptors.refetch()} />
-          {descriptors.data?.map((p) => (
-            <Section key={p.parameterId} title={p.label}>
-              <Copy>
-                当前值 {String(p.currentValue)} ·{' '}
-                {JSON.stringify(p.optimizationRange ?? p.schemaRange ?? '范围未记录')}
-              </Copy>
-              <Action
-                label={`${parameters.includes(p.parameterId) ? '取消授权' : '授权优化'} ${p.label}`}
-                disabled={locked || descriptors.isError}
-                onPress={() =>
-                  edit(() =>
-                    setParameters((v) =>
-                      v.includes(p.parameterId)
-                        ? v.filter((x) => x !== p.parameterId)
-                        : [...v, p.parameterId],
-                    ),
-                  )
-                }
-              />
-            </Section>
-          ))}
+          <QueryList
+            query={descriptors}
+            retry={() => void descriptors.refetch()}
+            label="正在刷新优化参数"
+          >
+            {descriptors.data?.map((p) => (
+              <Section key={p.parameterId} title={p.label}>
+                <Copy>
+                  当前值 {String(p.currentValue)} ·{' '}
+                  {JSON.stringify(p.optimizationRange ?? p.schemaRange ?? '范围未记录')}
+                </Copy>
+                <Action
+                  label={`${parameters.includes(p.parameterId) ? '取消授权' : '授权优化'} ${p.label}`}
+                  disabled={locked || descriptors.isError}
+                  onPress={() =>
+                    edit(() =>
+                      setParameters((v) =>
+                        v.includes(p.parameterId)
+                          ? v.filter((x) => x !== p.parameterId)
+                          : [...v, p.parameterId],
+                      ),
+                    )
+                  }
+                />
+              </Section>
+            ))}
+          </QueryList>
         </>
       ) : (
         <Field

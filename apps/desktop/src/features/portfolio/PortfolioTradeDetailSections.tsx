@@ -415,7 +415,7 @@ export function PortfolioTradeDetailTabs({
         <TabsTrigger value="positions">持仓构成</TabsTrigger>
         <TabsTrigger value="evidence">证据与技术信息</TabsTrigger>
       </TabsList>
-      <TabsContent value="overview" className="pt-4">
+      <TabsContent value="overview">
         <TradeOverview
           detail={detail}
           accountLabel={accountLabel}
@@ -423,12 +423,12 @@ export function PortfolioTradeDetailTabs({
           {...(onSupplementOpening === undefined ? {} : { onSupplementOpening })}
         />
       </TabsContent>
-      <TabsContent value="positions" className="grid gap-5 pt-4">
+      <TabsContent value="positions" className="grid gap-5">
         <BaselineComponents detail={detail} />
         <EntryLegs detail={detail} />
         <CloseSlices detail={detail} onReview={onReview} />
       </TabsContent>
-      <TabsContent value="evidence" className="pt-4">
+      <TabsContent value="evidence">
         <TradeEvidence detail={detail} />
       </TabsContent>
     </Tabs>

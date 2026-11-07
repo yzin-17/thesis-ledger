@@ -8,9 +8,10 @@ import {
   Copy,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
+import {StrategySubmissions} from './StrategySubmissions';
 import { useStrategyLibrary } from './useStrategyLibrary';
 export function StrategyLibraryScreen() {
   const query = useStrategyLibrary();
@@ -27,6 +28,7 @@ export function StrategyLibraryScreen() {
   );
   return (
     <Page title="策略与回测">
+      <StrategySubmissions/>
       <Action label="返回研究与复盘" onPress={() => navigation.getParent()?.goBack()} />
       <Action label="新建策略" primary onPress={() => navigation.navigate('StrategyEditor')} />
       <Action label="辅助编写工作区" onPress={() => navigation.navigate('StrategyAuthoring')} />
@@ -38,6 +40,7 @@ export function StrategyLibraryScreen() {
         label="净值回测任务"
         onPress={() => navigation.navigate('BacktestJobs', { kind: 'nav' })}
       />
+      <Action label="模型竞技场" onPress={()=>navigation.navigate('ModelArena')} />
       <Action label="优化实验" onPress={() => navigation.navigate('OptimizationResults')} />
       <Action label="策略风险应用" onPress={() => navigation.navigate('StrategyRisk')} />
       <Field
@@ -59,27 +62,33 @@ export function StrategyLibraryScreen() {
           { value: 'archived', label: '已归档' },
         ]}
       />
-      <QueryStatus query={query} empty={!rows.length} retry={() => void query.refetch()} />
-      {rows.slice(0, limit).map((row) => (
-        <Section key={row.id} title={row.name}>
-          <Copy>{row.description ?? '暂无说明'}</Copy>
-          <Copy muted>策略 {row.id}</Copy>
-          {[...row.versions]
-            .sort((a, b) => b.version - a.version)
-            .map((version) => (
-              <Action
-                key={version.id}
-                label={`查看 ${row.name} · 版本 ${version.version}`}
-                onPress={() =>
-                  navigation.navigate('StrategyVersion', {
-                    strategyId: row.id,
-                    versionId: version.id,
-                  })
-                }
-              />
-            ))}
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={!rows.length}
+        retry={() => void query.refetch()}
+        label="正在刷新策略库"
+      >
+        {rows.slice(0, limit).map((row) => (
+          <Section key={row.id} title={row.name}>
+            <Copy>{row.description ?? '暂无说明'}</Copy>
+            <Copy muted>策略 {row.id}</Copy>
+            {[...row.versions]
+              .sort((a, b) => b.version - a.version)
+              .map((version) => (
+                <Action
+                  key={version.id}
+                  label={`查看 ${row.name} · 版本 ${version.version}`}
+                  onPress={() =>
+                    navigation.navigate('StrategyVersion', {
+                      strategyId: row.id,
+                      versionId: version.id,
+                    })
+                  }
+                />
+              ))}
+          </Section>
+        ))}
+      </QueryList>
       {limit < rows.length ? (
         <Action label="更多策略" onPress={() => setLimit((v) => v + 20)} />
       ) : null}

@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/ui/spinner';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Currency, FundNavHistory } from '@thesis-ledger/schemas';
@@ -80,7 +81,7 @@ function ScopedFundNavPnlChart({
   );
   const notice = (
     <>
-      {query.isPending ? <p className="m-0 text-xs text-muted-foreground" role="status">盈亏加载中</p> : null}
+      {query.isPending ? <LoadingState label="盈亏加载中" /> : null}
       {query.isError ? (
         <Alert>
           <AlertDescription className="flex flex-wrap items-center justify-between gap-2">

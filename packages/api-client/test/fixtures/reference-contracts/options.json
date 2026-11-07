@@ -1,0 +1,244 @@
+{
+  "dataVersion": "market-reference-v1",
+  "requestId": "282d0aaa-f99f-4198-abcd-3407df6a4162",
+  "dataset": "etf-option-contracts",
+  "symbol": "510050.SH",
+  "indexCode": null,
+  "start": null,
+  "end": null,
+  "page": 1,
+  "pageSize": 20,
+  "cursor": null,
+  "nextCursor": null,
+  "providerId": "akshare",
+  "upstreamSource": "sina-etf-option-public",
+  "adapterRevision": "market-reference-projection-v1",
+  "sourceRevision": "sina-etf-option-public-v1",
+  "fetchedAt": "2026-11-06T17:16:20.432663+00:00",
+  "sourceUrl": "https://hq.sinajs.cn/list=OP_UP_5100502611,OP_DOWN_5100502611",
+  "columns": [
+    {
+      "key": "underlying",
+      "label": "标的 ETF",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "month",
+      "label": "合约月",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "optionType",
+      "label": "认购／认沽",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "contract",
+      "label": "期权合约代码",
+      "format": "text",
+      "unit": null
+    }
+  ],
+  "items": [
+    {
+      "id": "7470b259d6fae34fcab1c3df950d2ad2c1bd0be6ead0be24df1b5deb40e8b5eb",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012637"
+      }
+    },
+    {
+      "id": "9c7c295670d1d1697d9fad70cedf1c68f1a7994b333b5f9dd11319d0722f4e1f",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012537"
+      }
+    },
+    {
+      "id": "870dd8b93d52f6991ffafe36de159c3a2458c33cdcb34d4ffab0908dfc5e7ca8",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012527"
+      }
+    },
+    {
+      "id": "b9c86600b18ef1073deb107ca587d7c44925becf64cf1d5f1d649ed69d4720d0",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012437"
+      }
+    },
+    {
+      "id": "d64c0502dce4bb794d505d878745d778351ce9e63ff836828e6a5a599ea4b75e",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012438"
+      }
+    },
+    {
+      "id": "d1b8e6c39ec4cb8d4af244f760eff65a78e82b02586d808fe5ac8cca1e73a87b",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012439"
+      }
+    },
+    {
+      "id": "7bdfc56e68446250707bfb2abeb7cb0e8cafe738334aed242d0b71ca500694ee",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012440"
+      }
+    },
+    {
+      "id": "849cd6b321a9cbb3a3851eafdaea470c404aa8550699676eb14035fd56eb7884",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012441"
+      }
+    },
+    {
+      "id": "9359939be4856d27e604da7518593670254b664c20a3c83c9254b9ba36c4ed75",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012442"
+      }
+    },
+    {
+      "id": "07af6af8ab1f4c081511de320858194e82be2154285ad85ab9abd2e5e5d581ce",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012443"
+      }
+    },
+    {
+      "id": "25ca7f6d2e51ce4dccbc3acb66b946d541554f58f562178153e2f54bc748217a",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012444"
+      }
+    },
+    {
+      "id": "9fd6c1bcaa15db7271d2a6eb1643a60434b1f34eb27e8afe67351f924fff0ba0",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认购",
+        "contract": "10012445"
+      }
+    },
+    {
+      "id": "968159007b12944e1ca0b5b965940716e7cc99f2e8acdc86a04bef2744a57347",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012638"
+      }
+    },
+    {
+      "id": "943a288a324a5a2e8e64837029d1ed8dc9f1063465818337b7f79d076517cec4",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012538"
+      }
+    },
+    {
+      "id": "25621b15463c41a87fd3ff914be8e73b825fd943f6e6af09644061e0cf2faf07",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012528"
+      }
+    },
+    {
+      "id": "e4dc2be6dc79341d65acd1d965fbe47c73921d9e8db01a5873a93f05f4970956",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012446"
+      }
+    },
+    {
+      "id": "f6b1df5d8042bbe90181be26e1591a27541ea07abbda52420e21a29906673156",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012447"
+      }
+    },
+    {
+      "id": "6399856943c60ad567ecdc33d03e14234522a12f7d6c0318a92bbb22a9b4ab48",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012448"
+      }
+    },
+    {
+      "id": "a4071e82b7055e82aa6713dd4f71a8c13e0863ecece6f52603afdd34545709ba",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012449"
+      }
+    },
+    {
+      "id": "4ee544e5c8668ee0c2ce89d28d3d0b2bebedc0eed5f31dcf0737dd254fcbc2de",
+      "values": {
+        "underlying": "510050.SH",
+        "month": "2026-11",
+        "optionType": "认沽",
+        "contract": "10012450"
+      }
+    }
+  ],
+  "status": "ok",
+  "hasMore": true,
+  "totalSourceRecords": 24,
+  "historyComplete": false,
+  "notes": [
+    "历史完整性未声明；抓取时间与披露时间分别记录。",
+    "清单为所选标的当前近月的认购与认沽代码，两侧完整读取后分页；月提示与可选合约月分开，不自动扫描所有月份。",
+    "合约月按本次月份接口返回选择；合约清单与报价是独立读取，翻页期间来源清单可能变化。"
+  ],
+  "contractVersion": 3,
+  "consumer": "thesis-ledger",
+  "policyRevision": 189,
+  "routeTarget": {
+    "providerId": "akshare",
+    "upstreamSource": "sina-etf-option-public",
+    "routeIndex": 0
+  }
+}

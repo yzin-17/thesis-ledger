@@ -20,7 +20,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import { useResearchComparisonQuery, useResearchIdentity } from './research.queries.js';
 import { reportEvidenceLocator } from './research-report-display.js';
 import {
@@ -37,12 +37,7 @@ type Props = {
 };
 function ComparisonReadState({ query }: { query: ReturnType<typeof useResearchComparisonQuery> }) {
   if (query.isFetching || query.isPending)
-    return (
-      <div className="flex flex-col gap-3" role="status" aria-label="正在读取报告比较">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
+    return <LoadingState label="正在读取报告比较" />;
   if (query.isError)
     return (
       <Alert variant="destructive">

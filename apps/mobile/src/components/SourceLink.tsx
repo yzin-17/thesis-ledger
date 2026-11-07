@@ -18,7 +18,7 @@ export function SourceLink({ url, label = '在浏览器打开原文' }: { url: s
   };
   return (
     <>
-      <Action label={label} disabled={busy} onPress={() => void open()} />
+      <Action label={label} busy={busy} onPress={() => void open()} />
       <Feedback message={error} error />
     </>
   );

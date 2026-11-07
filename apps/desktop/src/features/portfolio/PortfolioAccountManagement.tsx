@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -68,7 +69,7 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
       <div
         className={cn(
           accountFormInline &&
-            'min-h-0 overflow-y-auto animate-in fade-in slide-in-from-left-6 duration-200 motion-reduce:animate-none',
+            '-mx-1 -my-1 min-h-0 overflow-y-auto scroll-p-2 px-1 py-1 animate-in fade-in slide-in-from-left-6 duration-200 motion-reduce:animate-none',
         )}
         data-account-manager-view={accountFormInline ? 'list' : undefined}
       >
@@ -100,6 +101,7 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
             <AlertDescription>
               已成功保存的账户无需再次创建或保存。请重新读取列表。
               <Button
+                aria-busy={managedAccountsPending}
                 type="button"
                 variant="outline"
                 disabled={managedAccountsPending}
@@ -110,97 +112,99 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
             </AlertDescription>
           </Alert>
         )}
-        {managedAccounts.length > 0 ? (
-          <div className="mt-1.5 divide-y divide-border rounded-md border border-border px-3" aria-label="已有账户">
-            {managedAccounts.map((account) => (
-              <div key={account.id} className="flex min-h-[42px] items-center justify-between gap-2.5 text-xs text-muted-foreground">
-                <span className="block">
-                  {account.name}
-                  <small className="mt-1 block text-[10px] text-muted-foreground">
-                    {(account.institution || '未填写机构') +
-                      ' · ' +
-                      accountTypeLabel(account.type) +
-                      ' · ' +
-                      (account.mode === 'shadow' ? '模拟' : '实际') +
-                      ' · ' +
-                      account.currency +
-                      (account.active === false ? ' · 已停用' : '')}
-                  </small>
-                </span>
-                <div className="form-actions">
-                  {account.active !== false && onAccountEntry && (
+        <ListRefreshRegion refreshing={managedAccountsPending === true && managedAccounts.length > 0} label="正在刷新账户">
+          {managedAccounts.length > 0 ? (
+            <div className="mt-1.5 divide-y divide-border rounded-md border border-border px-3" aria-label="已有账户">
+              {managedAccounts.map((account) => (
+                <div key={account.id} className="flex min-h-[42px] items-center justify-between gap-2.5 text-xs text-muted-foreground">
+                  <span className="block">
+                    {account.name}
+                    <small className="mt-1 block text-xs text-muted-foreground">
+                      {(account.institution || '未填写机构') +
+                        ' · ' +
+                        accountTypeLabel(account.type) +
+                        ' · ' +
+                        (account.mode === 'shadow' ? '模拟' : '实际') +
+                        ' · ' +
+                        account.currency +
+                        (account.active === false ? ' · 已停用' : '')}
+                    </small>
+                  </span>
+                  <div className="form-actions">
+                    {account.active !== false && onAccountEntry && (
+                      <Button
+                        className="text-button hover:no-underline"
+                        size="sm"
+                        type="button"
+                        variant="link"
+                        disabled={Boolean(currentMode && account.mode !== currentMode)}
+                        title={currentMode && account.mode !== currentMode ? '请先使用全局开关切换到账户所属范围' : undefined}
+                        onClick={() => onAccountEntry(account.id)}
+                      >
+                        录入持仓
+                      </Button>
+                    )}
                     <Button
-                      className="text-button"
+                      className="text-button hover:no-underline"
                       size="sm"
                       type="button"
                       variant="link"
-                      disabled={Boolean(currentMode && account.mode !== currentMode)}
-                      title={currentMode && account.mode !== currentMode ? '请先使用全局开关切换到账户所属范围' : undefined}
-                      onClick={() => onAccountEntry(account.id)}
+                      onClick={() => {
+                        setEditingAccount(account);
+                        markDirty(false);
+                        setAccountSheetOpen(true);
+                      }}
                     >
-                      录入持仓
+                      编辑
                     </Button>
-                  )}
-                  <Button
-                    className="text-button"
-                    size="sm"
-                    type="button"
-                    variant="link"
-                    onClick={() => {
-                      setEditingAccount(account);
-                      markDirty(false);
-                      setAccountSheetOpen(true);
-                    }}
-                  >
-                    编辑
-                  </Button>
-                  <Button
-                    className={cn('text-button', account.active !== false && 'danger')}
-                    size="sm"
-                    type="button"
-                    variant={account.active === false ? 'link' : 'destructive'}
-                    disabled={busyAction !== null}
-                    aria-busy={busyAction === `account-toggle:${account.id}`}
-                    onClick={() => void toggleAccount(account)}
-                  >
-                    {busyAction === `account-toggle:${account.id}` && (
-                      <LoaderCircle
-                        data-icon="inline-start"
-                        className="animate-spin"
-                        aria-hidden="true"
-                      />
-                    )}
-                    {accountToggleLabel(
-                      busyAction === `account-toggle:${account.id}`,
-                      account.active !== false,
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="destructive"
-                    disabled={busyAction !== null}
-                    aria-busy={busyAction === `account-delete:${account.id}`}
-                    onClick={() => void permanentlyDeleteAccount(account)}
-                  >
-                    {busyAction === `account-delete:${account.id}` && (
-                      <LoaderCircle
-                        data-icon="inline-start"
-                        className="animate-spin"
-                        aria-hidden="true"
-                      />
-                    )}
-                    {busyAction === `account-delete:${account.id}` ? '删除中…' : '删除'}
-                  </Button>
+                    <Button
+                      className={cn('text-button', account.active !== false && 'danger')}
+                      size="sm"
+                      type="button"
+                      variant={account.active === false ? 'link' : 'destructive'}
+                      disabled={busyAction !== null}
+                      aria-busy={busyAction === `account-toggle:${account.id}`}
+                      onClick={() => void toggleAccount(account)}
+                    >
+                      {busyAction === `account-toggle:${account.id}` && (
+                        <LoaderCircle
+                          data-icon="inline-start"
+                          className="animate-spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      {accountToggleLabel(
+                        busyAction === `account-toggle:${account.id}`,
+                        account.active !== false,
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      type="button"
+                      variant="destructive"
+                      disabled={busyAction !== null}
+                      aria-busy={busyAction === `account-delete:${account.id}`}
+                      onClick={() => void permanentlyDeleteAccount(account)}
+                    >
+                      {busyAction === `account-delete:${account.id}` && (
+                        <LoaderCircle
+                          data-icon="inline-start"
+                          className="animate-spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      {busyAction === `account-delete:${account.id}` ? '删除中…' : '删除'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state" role="status">
-            暂无账户，点击右上角“创建账户”开始。
-          </div>
-        )}
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state" role="status">
+              暂无账户，点击右上角“创建账户”开始。
+            </div>
+          )}
+        </ListRefreshRegion>
       </div>
       {!accountFormInline && (
         <Sheet open={accountSheetOpen} onOpenChange={setAccountSheetOpen}>
@@ -245,7 +249,7 @@ function AccountFormContent({
           <SheetHeader className="min-w-0 flex-1 shrink">
             <SheetTitle>{editingAccount ? '编辑账户' : '创建账户'}</SheetTitle>
             <SheetDescription id={descriptionId}>
-              账户是持仓的容器；类型、模式和币种在出现 Ledger 事件后锁定。
+              账户有账本记录后，类型、模式和币种将锁定。
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -256,7 +260,7 @@ function AccountFormContent({
         onChange={() => markDirty()}
         onSubmit={(event) => void submitAccount(event)}
       >
-        <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto px-1 py-1">
+        <div className="grid -mx-1 -my-1 min-h-0 max-w-none flex-1 content-start gap-6 overflow-y-auto scroll-p-2 px-1 py-1">
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="account-name">账户名称</FieldLabel>

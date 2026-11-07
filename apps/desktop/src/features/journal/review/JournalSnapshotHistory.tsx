@@ -1,9 +1,10 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import type { JournalStoredSnapshotView } from '@thesis-ledger/schemas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
 import { getDesktopApiClient } from '@/shared/api/client';
@@ -28,7 +29,7 @@ function SnapshotDetail({
       getDesktopApiClient().journalReviews.snapshot(id, { accountId, mode }, signal),
     retry: false,
   });
-  if (query.isPending) return <Skeleton className="h-40 w-full" />;
+  if (query.isPending) return <LoadingState label="正在读取历史快照" />;
   if (query.isError)
     return (
       <JournalRequestError
@@ -181,7 +182,7 @@ export function JournalSnapshotHistory({
       <p className="text-xs text-muted-foreground">
         按本机时区输入，开始时刻计入、结束时刻不计入；留空表示不限。
       </p>
-      {query.isPending && <Skeleton className="h-20 w-full" />}
+      {query.isPending && <LoadingState label="正在读取快照列表" />}
       {query.isError && (
         <JournalRequestError
           title="历史列表读取失败"
@@ -189,33 +190,37 @@ export function JournalSnapshotHistory({
           retry={() => void query.refetch()}
         />
       )}
-      {query.isSuccess && items.length === 0 && (
-        <JournalEmpty
-          title="没有复盘快照"
-          description="完成分析后显式保存，才能在这里查看历史输入与结果。"
-        />
-      )}
-      <div className="divide-y divide-border">
-        {items.map((item) => {
-          const snapshotId = item.compatibility === 'CURRENT_CONTRACT' ? item.snapshot.id : item.id;
-          return (
-            <Button
-              key={snapshotId}
-              className="h-auto w-full justify-start rounded-none px-0 py-3 whitespace-normal text-left"
-              variant="ghost"
-              onClick={() => setId(snapshotId)}
-            >
-              {snapshotLabel(item)}
-            </Button>
-          );
-        })}
-      </div>
+      <ListRefreshRegion refreshing={query.isRefetching && query.data !== undefined} label="正在刷新快照列表">
+        {query.isSuccess && items.length === 0 && (
+          <JournalEmpty
+            title="没有复盘快照"
+            description="完成分析后显式保存，才能在这里查看历史输入与结果。"
+          />
+        )}
+        <div className="divide-y divide-border">
+          {items.map((item) => {
+            const snapshotId = item.compatibility === 'CURRENT_CONTRACT' ? item.snapshot.id : item.id;
+            return (
+              <Button
+                key={snapshotId}
+                className="h-auto w-full justify-start rounded-none px-0 py-3 whitespace-normal text-left"
+                variant="ghost"
+                onClick={() => setId(snapshotId)}
+              >
+                {snapshotLabel(item)}
+              </Button>
+            );
+          })}
+        </div>
+      </ListRefreshRegion>
       {query.hasNextPage && (
         <Button
+          aria-busy={query.isFetchingNextPage}
           variant="outline"
           disabled={query.isFetchingNextPage}
           onClick={() => void query.fetchNextPage()}
         >
+          {query.isFetchingNextPage && <Spinner data-icon="inline-start" aria-hidden="true" />}
           读取下一页快照
         </Button>
       )}

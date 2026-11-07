@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -8,9 +9,8 @@ import {
   Action,
   Choices,
   Copy,
-  Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 import type { PortfolioStackParams } from '../../app/navigation-types';
@@ -61,34 +61,41 @@ function TradesWorkspace({ initialAccountId }: { initialAccountId: string }) {
         ]}
         onChange={setAccountId}
       />
-      <Field label="标的代码筛选" value={symbol} onChange={setSymbol} />
+      <InstrumentSymbolField label="标的代码筛选" value={symbol} onChange={setSymbol} />
       <Action label="筛选交易" onPress={() => setSearch(symbol.trim())} />
-      <QueryStatus query={query} empty={items.length === 0} retry={() => void query.refetch()} />
-      {items.map((trade) => (
-        <Section key={trade.id} title={trade.assetName ?? trade.symbol}>
-          <Copy>
-            {trade.symbol} · {trade.lifecycle === 'ACTIVE' ? '进行中' : '已结束'} · 剩余数量{' '}
-            {trade.remainingQuantity}
-          </Copy>
-          <Copy>已实现净盈亏 {trade.netRealizedPnl ?? '不可用'}</Copy>
-          <Copy muted>
-            {trade.completeness === 'COMPLETE' ? '事实完整' : '事实不完整'} ·{' '}
-            {trade.openedAt ?? '建仓时间未知'}
-          </Copy>
-          <Action
-            label="查看交易详情"
-            onPress={() =>
-              navigation.navigate('TradeDetail', {
-                accountId: trade.accountId,
-                tradeId: trade.id,
-                mode,
-              })
-            }
-          />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={items.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新交易"
+      >
+        {items.map((trade) => (
+          <Section key={trade.id} title={trade.assetName ?? trade.symbol}>
+            <Copy>
+              {trade.symbol} · {trade.lifecycle === 'ACTIVE' ? '进行中' : '已结束'} · 剩余数量{' '}
+              {trade.remainingQuantity}
+            </Copy>
+            <Copy>已实现净盈亏 {trade.netRealizedPnl ?? '不可用'}</Copy>
+            <Copy muted>
+              {trade.completeness === 'COMPLETE' ? '事实完整' : '事实不完整'} ·{' '}
+              {trade.openedAt ?? '建仓时间未知'}
+            </Copy>
+            <Action
+              label="查看交易详情"
+              onPress={() =>
+                navigation.navigate('TradeDetail', {
+                  accountId: trade.accountId,
+                  tradeId: trade.id,
+                  mode,
+                })
+              }
+            />
+          </Section>
+        ))}
+      </QueryList>
       {query.hasNextPage ? (
         <Action
+          busy={query.isFetchingNextPage}
           label={query.isFetchingNextPage ? '加载中…' : '加载更多交易'}
           disabled={query.isFetchingNextPage}
           onPress={() => void query.fetchNextPage()}

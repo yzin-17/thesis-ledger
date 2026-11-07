@@ -1,5 +1,13 @@
 import { useState } from 'react';
+import { ChevronDownIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -24,31 +32,58 @@ export function AuthoringDraftRecovery({
   const [copied, setCopied] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button
-        variant="outline"
-        disabled={disabled}
-        onClick={() => {
-          void navigator.clipboard.writeText(JSON.stringify(content, null, 2)).then(
-            () => {
-              setCopied(true);
-              setFailure(null);
-            },
-            () => setFailure('无法复制，请在高级定义编辑中手动保留文本'),
-          );
-        }}
-      >
-        {copied ? '已复制本地草稿' : '复制本地草稿'}
-      </Button>
-      <Button variant="outline" disabled={disabled} onClick={() => setConfirm('reload')}>
-        读取服务器最新草稿
-      </Button>
-      {onDiscard && (
-        <Button variant="outline" disabled={disabled} onClick={() => setConfirm('discard')}>
-          丢弃这个草稿
-        </Button>
+    <div className="flex flex-wrap items-center gap-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="sm" disabled={disabled}>
+              草稿操作
+              <ChevronDownIcon aria-hidden="true" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem
+            disabled={disabled}
+            onClick={() => {
+              void navigator.clipboard.writeText(JSON.stringify(content, null, 2)).then(
+                () => {
+                  setCopied(true);
+                  setFailure(null);
+                },
+                () => setFailure('无法复制，请在高级定义编辑中手动保留文本'),
+              );
+            }}
+          >
+            复制本地草稿
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={disabled} onClick={() => setConfirm('reload')}>
+            读取服务器最新草稿
+          </DropdownMenuItem>
+          {onDiscard && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={disabled}
+                variant="destructive"
+                onClick={() => setConfirm('discard')}
+              >
+                丢弃这个草稿
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {copied && (
+        <span role="status" className="text-xs text-muted-foreground">
+          已复制本地草稿
+        </span>
       )}
-      {failure && <p role="alert">{failure}</p>}
+      {failure && (
+        <p role="alert" className="text-xs text-destructive">
+          {failure}
+        </p>
+      )}
       <AlertDialog
         open={confirm !== null}
         onOpenChange={(open) => {

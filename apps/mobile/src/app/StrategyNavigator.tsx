@@ -1,3 +1,5 @@
+import {ArenaSetupScreen} from '../features/model-arena/ArenaSetupScreen';
+import {ArenaScreen} from '../features/model-arena/ArenaScreen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { StrategyStackParams } from './strategy-navigation';
 import { StrategyLibraryScreen } from '../features/strategy-library/StrategyLibraryScreen';
@@ -22,6 +24,8 @@ export function StrategyNavigator() {
         component={StrategyLibraryScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="ArenaSetup" component={ArenaSetupScreen}/>
+      <Stack.Screen name="ModelArena" component={ArenaScreen}/>
       <Stack.Screen name="StrategyVersion" component={StrategyVersionScreen} />
       <Stack.Screen name="StrategyEditor" component={StrategyEditorScreen} />
       <Stack.Screen name="StrategyAuthoring" component={StrategyAuthoringScreen} />

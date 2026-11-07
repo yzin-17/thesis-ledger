@@ -1,3 +1,4 @@
+import {useContinuousSubmission} from '../strategy-library/StrategySubmissions';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
@@ -124,7 +125,8 @@ function useBacktestSetupController() {
     },
     { refresh: false },
   );
-  const prepare = () => {
+  const continuous=useContinuousSubmission();
+  const prepare = async (automatic=false) => {
     try {
       if (!version) throw Error('当前版本不可读，请重新选择。');
       const input = { ...form, symbol: instrument?.symbol ?? form.symbol };
@@ -137,13 +139,18 @@ function useBacktestSetupController() {
               new Date().toISOString(),
             )
           : navPreparationIntent(input, params.versionId, randomUUID(), new Date().toISOString());
-      setSubmitted({ kind: params.kind, body, signature } as Intent);
+      const choice={ kind: params.kind, body, signature } as Intent;
+      if(automatic){
+        const input=choice.kind==='ordinary'?{kind:choice.kind,preparation:choice.body}:{kind:choice.kind,preparation:choice.body};
+        await continuous.mutateAsync({signature,input});setEdited(false);navigation.navigate('StrategyLibrary');return;
+      }
+      setSubmitted(choice);
       setMessage(null);
     } catch (e) {
       setMessage(failureMessage(e));
     }
   };
-  const locked = command.isPending || !!pendingQuery.data || !!receipt;
+  const locked = continuous.isPending || command.isPending || !!pendingQuery.data || !!receipt;
   return {
     params,
     library,
@@ -204,10 +211,11 @@ export function BacktestSetupScreen() {
           setSubmitted(null);
         }}
       />
+      <Action label="后台准备并提交回测" primary disabled={locked || !version || !pendingQuery.isSuccess} onPress={()=>void prepare(true)}/>
       <Action
         label="准备并预检回测配置"
         disabled={locked || !version || !pendingQuery.isSuccess || preparation.isFetching}
-        onPress={prepare}
+        onPress={()=>void prepare()}
       />
       {submitted ? (
         <QueryStatus query={preparation} retry={() => void preparation.refetch()} />
@@ -243,7 +251,7 @@ export function BacktestSetupScreen() {
           void command.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))
         }
       />
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
       {receipt ? (
         <Action
           label="打开已创建回测"

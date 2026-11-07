@@ -179,12 +179,11 @@ export function MarketDataPage() {
   };
 
   return (
-    <section className="module-page" aria-labelledby="market-data-title">
+    <section className="module-page flex flex-col gap-card" aria-labelledby="market-data-title">
       <PageHeader
         titleId="market-data-title"
         eyebrow="MARKET DATA"
         title="市场数据"
-        description="管理行情来源、数据优先级与标的目录。"
         actions={
           <>
             <MarketReferenceSheet />
@@ -213,7 +212,7 @@ export function MarketDataPage() {
         </Alert>
       )}
 
-      <section className="mt-5 flex flex-wrap items-center gap-2" aria-label="市场数据概况">
+      <section className="flex flex-wrap items-center gap-2" aria-label="市场数据概况">
         <Badge variant="outline">路由状态：{policyStatus}</Badge>
         <Badge variant="outline">
           {providers.data
@@ -232,6 +231,7 @@ export function MarketDataPage() {
       <MarketDataSectionTabs
         providerPanel={
           <MarketProviderPanel
+            refreshing={providers.isRefetching}
             providers={providerDrafts}
             catalog={routeCapabilities.data}
             disabled={controlsDisabled}
@@ -274,6 +274,7 @@ export function MarketDataPage() {
             disabled={controlsDisabled}
             syncing={syncCatalog.isPending || Boolean(catalogJobId)}
             searchBusy={instrumentSearch.isFetching}
+            searchRefreshing={instrumentSearch.isRefetching && instrumentSearch.data !== undefined}
             searchRequested={Boolean(submittedSearch)}
             searchError={
               instrumentSearch.isError ? '本地标的目录暂时无法读取，请重试。' : null

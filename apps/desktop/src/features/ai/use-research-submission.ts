@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
@@ -11,7 +12,6 @@ import { researchKeys, useResearchIdentity } from './research.queries.js';
 import { readPendingResearch, savePendingResearch } from './research-submission-pending.js';
 import { currentIdentitySession } from '../../shared/api/identity-session.js';
 import { aiKeys } from './ai.queries.js';
-
 type Receipt = ResearchSubmissionReceiptV2;
 type Action = 'submit' | 'find' | 'cancel';
 type Pending = { owner: string; input: ResearchSubmissionV2 };
@@ -98,7 +98,7 @@ export function useResearchSubmission(
     if (mutation.isPending) return;
     let input = pending;
     if (!input && draft)
-      input = normalizeResearchSubmissionV2({ ...draft, submissionId: crypto.randomUUID() });
+      input = normalizeResearchSubmissionV2({ ...draft, submissionId: createClientRequestId() });
     if (!input) return;
     const savedLocally = savePendingResearch(owner, input, mode);
     if (!savedLocally) {

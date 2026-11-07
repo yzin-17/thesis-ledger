@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ const testResultMessage = (result: RiskTestResult) => {
 };
 
 export function RiskRuleWorkbench({
+  refreshing = false,
   rules,
   accounts,
   positions,
@@ -75,6 +77,7 @@ export function RiskRuleWorkbench({
   onTestComplete,
   onAudit,
 }: {
+  refreshing?: boolean;
   rules: RiskRuleRecord[];
   accounts: Account[];
   positions: Position[];
@@ -91,7 +94,7 @@ export function RiskRuleWorkbench({
   onTestComplete: (rule: RiskRuleRecord, results: RiskTestResult[]) => void;
   onAudit: (rule: RiskRuleRecord) => void;
 }) {
-  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(rules[0]?.id ?? null);
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RiskRuleRecord | null>(null);
   const [archiveRule, setArchiveRule] = useState<RiskRuleRecord | null>(null);
@@ -102,12 +105,12 @@ export function RiskRuleWorkbench({
   const archivedRules = rules.filter((rule) => rule.archivedAt != null);
   const visibleRules = showArchived ? rules : activeRules;
 
+  const selectedRule = visibleRules.find((rule) => rule.id === selectedRuleId) ?? activeRules[0] ?? null;
+  const visibleSelectionId = selectedRule?.id ?? null;
   useEffect(() => {
-    if (selectedRuleId && visibleRules.some((rule) => rule.id === selectedRuleId)) return;
-    setSelectedRuleId(activeRules[0]?.id ?? archivedRules[0]?.id ?? null);
-  }, [activeRules, archivedRules, visibleRules, selectedRuleId]);
+    setSelectedRuleId(visibleSelectionId);
+  }, [visibleSelectionId]);
 
-  const selectedRule = rules.find((rule) => rule.id === selectedRuleId) ?? null;
   const selectedTestRecord = selectedRule ? riskTestRecordForRule(testRecords, selectedRule) : null;
   const canCreate = busyAction === null && !readOnly;
   const empty = isDataLoaded(loadState) && rules.length === 0;
@@ -146,7 +149,7 @@ export function RiskRuleWorkbench({
   };
 
   const renderRuleItem = (rule: RiskRuleRecord, muted = false) => {
-    const selected = rule.id === selectedRuleId;
+    const selected = rule.id === visibleSelectionId;
     // 列表空间有限：证券规则显示“标的名 · 代码”（无名称时仅代码）；范围与账户在详情小字中展示
     const listTarget =
       rule.scope === 'security'
@@ -183,12 +186,9 @@ export function RiskRuleWorkbench({
 
   return (
     <>
-      <section className="panel mt-0 border-t-0">
-        <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2>规则工作台</h2>
-            <p>规则全局共用；修改、启停、归档和恢复都会递增版本并写入审计。</p>
-          </div>
+      <section className="panel mt-0 border-t-0 lg:flex lg:flex-col">
+        <div className="mb-group flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">规则全局共用；修改、启停、归档和恢复都会递增版本并写入审计。</p>
           <Button type="button" disabled={!canCreate} onClick={openCreate}>
             <Plus data-icon="inline-start" aria-hidden="true" />
             新建规则
@@ -196,6 +196,7 @@ export function RiskRuleWorkbench({
         </div>
 
         {empty ? (
+          <ListRefreshRegion refreshing={refreshing} label="正在刷新风险规则" className="lg:grid lg:grow">
           <Empty className="min-h-40 rounded-md border border-dashed p-8">
             <EmptyTitle>还没有风险规则</EmptyTitle>
             <EmptyDescription>创建第一条规则后，它会在这里集中管理。</EmptyDescription>
@@ -203,41 +204,44 @@ export function RiskRuleWorkbench({
               创建第一条规则
             </Button>
           </Empty>
+          </ListRefreshRegion>
         ) : (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(200px,280px)_minmax(0,1fr)]">
+          <div className={cn('grid grid-cols-1 gap-4', visibleRules.length > 0 && 'lg:grow lg:grid-cols-[minmax(200px,280px)_minmax(0,1fr)]')}>
             <aside
-              className="flex min-h-64 flex-col gap-2 rounded-md border border-border bg-card p-2"
+              className="flex flex-col gap-2 rounded-md border border-border bg-card p-2"
               aria-label="风险规则列表"
             >
               <div className="flex items-center justify-between gap-2 px-2 py-1">
                 <span className="text-xs font-medium text-muted-foreground">全部规则</span>
                 <Badge variant="outline">{activeRules.length}</Badge>
               </div>
-              {activeRules.length === 0 && archivedRules.length > 0 && (
-                <p className="px-2 py-1 text-xs text-muted-foreground">
-                  当前没有活跃规则，仅剩已归档规则。
-                </p>
-              )}
-              {activeRules.map((rule) => renderRuleItem(rule))}
-              {archivedRules.length > 0 && (
-                <div className="mt-auto flex flex-col gap-2 border-t border-border pt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-8 w-full justify-between px-2 py-1 text-xs text-muted-foreground"
-                    aria-expanded={showArchived}
-                    onClick={() => setShowArchived((current) => !current)}
-                  >
-                    {showArchived ? '隐藏已归档' : '显示已归档'}
-                    <Badge variant="outline">{archivedRules.length}</Badge>
-                  </Button>
-                  {showArchived && archivedRules.map((rule) => renderRuleItem(rule, true))}
-                </div>
-              )}
+              <ListRefreshRegion refreshing={refreshing} label="正在刷新风险规则" className="flex grow flex-col gap-2">
+                {activeRules.length === 0 && archivedRules.length > 0 && (
+                  <p className="px-2 py-1 text-xs text-muted-foreground">
+                    当前没有活跃规则，仅剩已归档规则。
+                  </p>
+                )}
+                {activeRules.map((rule) => renderRuleItem(rule))}
+                {archivedRules.length > 0 && (
+                  <div className="mt-auto flex flex-col gap-2 border-t border-border pt-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8 w-full justify-between px-2 py-1 text-xs text-muted-foreground"
+                      aria-expanded={showArchived}
+                      onClick={() => setShowArchived((current) => !current)}
+                    >
+                      {showArchived ? '隐藏已归档' : '显示已归档'}
+                      <Badge variant="outline">{archivedRules.length}</Badge>
+                    </Button>
+                    {showArchived && archivedRules.map((rule) => renderRuleItem(rule, true))}
+                  </div>
+                )}
+              </ListRefreshRegion>
             </aside>
 
-            <div className="min-w-0 rounded-md border border-border bg-card p-5">
-              {selectedRule ? (
+            {selectedRule && (
+              <div className="min-w-0 rounded-md border border-border bg-card p-5">
                 <RuleDetail
                   rule={selectedRule}
                   {...(selectedAccountName ? { accountName: selectedAccountName } : {})}
@@ -252,12 +256,8 @@ export function RiskRuleWorkbench({
                   onTest={() => void runTest()}
                   onAudit={() => onAudit(selectedRule)}
                 />
-              ) : (
-                <Empty className="min-h-40 border-0 p-8">
-                  <EmptyDescription>选择一条规则查看详情。</EmptyDescription>
-                </Empty>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </section>

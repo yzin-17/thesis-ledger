@@ -1,4 +1,8 @@
-import { normalizeAllocationCategory, normalizeAllocationTargets } from '@thesis-ledger/domain';
+import {
+  formatRatioPercent,
+  normalizeAllocationCategory,
+  normalizeAllocationTargets,
+} from '@thesis-ledger/domain';
 import type {
   PerformanceLayersWire,
   PerformanceSeriesWire,
@@ -66,5 +70,5 @@ export function performanceAllocationInput(
   };
 }
 export function displayRatio(value: number | null | undefined) {
-  return value === null || value === undefined ? '—' : `${(value * 100).toFixed(2)}%`;
+  return formatRatioPercent(value);
 }

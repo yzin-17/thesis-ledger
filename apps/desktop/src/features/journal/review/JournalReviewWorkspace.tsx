@@ -1,12 +1,12 @@
+import { InstrumentSymbolField } from '../../market-data/InstrumentSymbolField.js';
 import { useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { journalReviewReferenceLocatorSchema } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '@/shared/api/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import type { Account } from '../../portfolio/portfolio.types.js';
 import { PageHeader } from '../../shared/PageHeader.js';
 import { RefreshIconButton } from '../../shared/RefreshIconButton.js';
@@ -80,11 +80,10 @@ function ScopedReview({ account, search, accountSelector }: { account: Account; 
         <Field className="min-w-0">
           <FieldLabel>标的筛选（可选）</FieldLabel>
           <div className="flex min-w-0 items-center gap-2">
-            <Input
+            <InstrumentSymbolField
               aria-label="复盘标的筛选"
-              placeholder="例如 AAPL.US"
               value={symbolDraft}
-              onChange={(event) => setSymbolDraft(event.target.value)}
+              onChange={(value) => setSymbolDraft(value)}
             />
             <Button
               variant="outline"
@@ -99,7 +98,7 @@ function ScopedReview({ account, search, accountSelector }: { account: Account; 
         </Field>
       </FieldGroup>
       <Tabs value={tab} onValueChange={(value) => typeof value === 'string' && setTab(value)}>
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b">
           <TabsList variant="line" className="w-auto">
             <TabsTrigger value="single">单笔复盘</TabsTrigger>
             <TabsTrigger value="period">周期复盘</TabsTrigger>
@@ -226,7 +225,7 @@ function Workspace({
         {...(onRetry ? { retry: onRetry } : {})}
       />
     );
-  else if (accountsPending || !accountsReady) content = <Skeleton className="h-40 w-full" />;
+  else if (accountsPending || !accountsReady) content = <LoadingState label="正在加载账户" />;
   else if (!account && accounts.length > 0)
     content = (
       <div className="flex flex-col gap-4">
@@ -271,8 +270,9 @@ function Workspace({
   return (
     <section className="flex min-w-0 flex-col">
       <PageHeader
+        className="mb-card"
+        eyebrow="INVESTMENT JOURNAL"
         title="投资复盘"
-        description="以实际成交和计划证据复盘交易。完整周期与减仓分别统计，未知事实保留证据不足。"
         actions={<RefreshIconButton label="刷新复盘数据" refreshing={refreshing} onClick={() => void refresh()} />}
       />
       {content}

@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, LoaderCircle, Play, RefreshCw, X } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -193,8 +194,8 @@ export function StrategyBacktestDetailPage({
               再次运行
             </Button>
             {job.status === 'queued' && (
-              <Button size="sm" disabled={busyAction !== null} onClick={() => onRun(job)}>
-                <Play />
+              <Button size="sm" disabled={busyAction !== null} aria-busy={busyAction === `run:${job.id}`} onClick={() => onRun(job)}>
+                {busyAction === `run:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Play />}
                 启动任务
               </Button>
             )}
@@ -203,15 +204,15 @@ export function StrategyBacktestDetailPage({
                 size="sm"
                 variant="ghost"
                 disabled={busyAction !== null}
-                onClick={() => onCancel(job)}
+                aria-busy={busyAction === `cancel:${job.id}`} onClick={() => onCancel(job)}
               >
-                <X />
+                {busyAction === `cancel:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <X />}
                 取消
               </Button>
             )}
             {job.mode === 'V3' && job.status === 'failed' && (
-              <Button size="sm" disabled={busyAction !== null} onClick={() => onRetry(job)}>
-                <Play />
+              <Button size="sm" disabled={busyAction !== null} aria-busy={busyAction === `retry:${job.id}`} onClick={() => onRetry(job)}>
+                {busyAction === `retry:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Play />}
                 重试执行
               </Button>
             )}

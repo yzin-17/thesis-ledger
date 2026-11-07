@@ -1,3 +1,4 @@
+import { PageHeader } from '../shared/PageHeader.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -250,16 +251,16 @@ function ImportPositionPage({
       data-import-step="position"
       data-screenshot-sheet-open={String(screenshotSheetOpen)}
     >
-      <p className="kicker">Portfolio Input</p>
-      <div className="entry-page-heading">
-        <div>
-          <h1>录入持仓</h1>
-          <p className="page-description">更新账户当前持仓与现金余额。</p>
-        </div>
-        <Button className="text-button" type="button" variant="link" onClick={onNavigateAccounts}>
-          账户管理
-        </Button>
-      </div>
+      <PageHeader
+        className="mb-card"
+        eyebrow="PORTFOLIO INPUT"
+        title="录入持仓"
+        actions={
+          <Button className="text-button" type="button" variant="link" onClick={onNavigateAccounts}>
+            账户管理
+          </Button>
+        }
+      />
       <div className="entry-context">
         <div className="grid gap-2 text-xs text-muted-foreground">
           <span>当前账户</span>

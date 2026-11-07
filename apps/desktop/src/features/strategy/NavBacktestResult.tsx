@@ -1,3 +1,4 @@
+import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
 import type { BacktestNavResultV3 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -356,9 +357,8 @@ function metricValue(key: string, metric: BacktestNavResultV3['metrics'][string]
     return `${state}：${metric.reason ?? '本次结果没有提供原因'}`;
   }
   if (!percentageMetrics.has(key)) return metric.value;
-  const value = Number(metric.value);
-  if (!Number.isFinite(value)) return metric.value;
-  return `${(value * 100).toFixed(2)}%`;
+  const formatted = formatDecimalRatioPercent(metric.value);
+  return formatted === '—' ? metric.value : formatted;
 }
 
 function sampledPoints<T>(values: T[], limit: number) {
@@ -404,9 +404,8 @@ function navFeeResultText(
 }
 
 function feeRateLabel(rate: string) {
-  const value = Number(rate);
-  if (!Number.isFinite(value)) return rate;
-  return `${(value * 100).toLocaleString('zh-CN', { maximumFractionDigits: 6 })}%`;
+  const formatted = formatDecimalRatioPercent(rate, 6);
+  return formatted === '—' ? rate : formatted;
 }
 
 function requestTypeLabel(value: BacktestNavResultV3['requests'][number]['requestType']) {

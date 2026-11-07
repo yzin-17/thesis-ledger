@@ -61,6 +61,7 @@ describe('基础 Quote 量额降级的读取与缓存', () => {
     expect(await reader.getQuote('510300.SH', { refresh: true })).toEqual({
       ...quote,
       servedFromCache: true,
+      refreshFailure: 'fetch_failed',
     });
   });
 

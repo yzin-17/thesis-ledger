@@ -1,6 +1,6 @@
+import { formatMarketNumber, formatRatioPercent } from '@thesis-ledger/domain';
 import type { Currency, FundNavHistory } from '@thesis-ledger/schemas';
 
-const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
 export function MarketNavChartReadout({
   selectedDate,
@@ -31,7 +31,7 @@ export function MarketNavChartReadout({
       <div className="grid min-w-0 gap-2 sm:grid-cols-2">
         <div className="grid min-w-0 gap-1">
           <span className="min-w-0 overflow-x-auto whitespace-nowrap tabular-nums">
-            单位净值 {selected ? number.format(selected.unitNav) : '—'}
+            单位净值 {formatMarketNumber(selected?.unitNav)}
           </span>
           <span className="min-w-0 overflow-x-auto whitespace-nowrap tabular-nums">
             {interaction}
@@ -49,7 +49,7 @@ export function MarketNavChartReadout({
         ) : null}
       </div>
       <span className="min-w-0 overflow-x-auto whitespace-nowrap tabular-nums">
-        可视区间涨跌幅 {viewportChange === null ? '—' : `${viewportChange >= 0 ? '+' : ''}${(viewportChange * 100).toFixed(2)}%`}
+        可视区间涨跌幅 {formatRatioPercent(viewportChange, 'always')}
       </span>
     </div>
   );

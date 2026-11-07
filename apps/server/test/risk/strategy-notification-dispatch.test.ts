@@ -5,7 +5,7 @@ describe('策略风险通知发送前门禁', () => {
   it('投递前先清理已经失效的策略应用修订', async () => {
     const calls: string[] = [];
     const prisma = {
-      $executeRaw: vi.fn(async () => {
+      $executeRaw: vi.fn(async (_query: unknown) => {
         calls.push('guard');
         return 1;
       }),
@@ -22,6 +22,9 @@ describe('策略风险通知发送前门禁', () => {
       skipped: false,
       deliveries: [],
     });
-    expect(calls).toEqual(['guard', 'dispatch']);
+    expect(calls).toEqual(['guard', 'guard', 'dispatch']);
+    const statements = prisma.$executeRaw.mock.calls as unknown as Array<[{ strings: string[] }]>;
+    expect(statements[0]?.[0].strings.join('')).toContain('risk_rule_inactive');
+    expect(statements[1]?.[0].strings.join('')).toContain('strategy_risk_application_superseded');
   });
 });

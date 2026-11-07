@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { TableContainer } from '@/components/ui/table';
 import type { LedgerEvent } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -11,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { MoreHorizontalIcon } from 'lucide-react';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
@@ -140,27 +141,24 @@ export function TransactionSection({
           </DropdownMenu>
         </div>
       </div>
-      {query.isFetching && query.data && (
-        <Badge variant="secondary" className="self-start">
-          正在更新
-        </Badge>
-      )}
-      <TransactionResults
-        query={query}
-        onOpenFundInvestment={onOpenFundInvestment}
-        filter={filter}
-        emptyTitle={emptyTitle}
-        filteredEvents={filteredEvents}
-        findSnapshotPosition={findSnapshotPosition}
-        onEditSnapshot={onEditSnapshot}
-        onRemoveSnapshot={onRemoveSnapshot}
-        resolveInstrumentName={resolveInstrumentName}
-        onCorrect={onCorrect}
-        onVoid={onVoid}
-        onCorrectTransfer={onCorrectTransfer}
-        onVoidTransfer={onVoidTransfer}
-        onAudit={onAudit}
-      />
+      <ListRefreshRegion refreshing={query.isFetching && !!query.data} label="正在刷新成交记录">
+        <TransactionResults
+          query={query}
+          onOpenFundInvestment={onOpenFundInvestment}
+          filter={filter}
+          emptyTitle={emptyTitle}
+          filteredEvents={filteredEvents}
+          findSnapshotPosition={findSnapshotPosition}
+          onEditSnapshot={onEditSnapshot}
+          onRemoveSnapshot={onRemoveSnapshot}
+          resolveInstrumentName={resolveInstrumentName}
+          onCorrect={onCorrect}
+          onVoid={onVoid}
+          onCorrectTransfer={onCorrectTransfer}
+          onVoidTransfer={onVoidTransfer}
+          onAudit={onAudit}
+        />
+      </ListRefreshRegion>
       {query.isError && query.data && !ledgerContractRejected(query.error) && (
         <Alert>
           <AlertTitle>显示的是上次成功读取的结果</AlertTitle>
@@ -168,6 +166,7 @@ export function TransactionSection({
             本次刷新失败。已成功提交的操作无需再次提交；提交修正前请重新读取最新账本版本。
           </AlertDescription>
           <Button
+            aria-busy={query.isFetching}
             type="button"
             variant="outline"
             size="sm"
@@ -216,16 +215,7 @@ function TransactionResults({
   if (query.isError && ledgerContractRejected(query.error))
     return <LedgerContractFailure onRetry={query.refetch} />;
   if (query.isPending && !query.data) {
-    return (
-      <div
-        className="flex flex-col gap-3 rounded-md border border-border p-3"
-        aria-busy="true"
-        aria-label="正在加载成交记录"
-      >
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-56 w-full" />
-      </div>
-    );
+    return <LoadingState label="正在加载成交记录" />;
   }
   if (query.isError && !query.data) {
     return (
@@ -428,12 +418,7 @@ export function PositionCalibrationSection({
   onEditingPositionChange: (editing: Position | null) => void;
 }) {
   if (valuationQuery.isPending && !valuationQuery.data) {
-    return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="正在加载持仓">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
+    return <LoadingState label="正在加载持仓" />;
   }
   if (valuationQuery.isError && !valuationQuery.data) {
     return (
@@ -452,7 +437,7 @@ export function PositionCalibrationSection({
     );
   }
   return (
-    <>
+    <div className="flex flex-col gap-group">
       {valuationQuery.isError && valuationQuery.data && (
         <Alert>
           <AlertTitle>持仓快照暂未更新</AlertTitle>
@@ -460,6 +445,7 @@ export function PositionCalibrationSection({
             显示的是上次成功读取的结果；已成功保存的快照无需再次提交。
           </AlertDescription>
           <Button
+            aria-busy={valuationQuery.isFetching}
             type="button"
             variant="outline"
             size="sm"
@@ -474,6 +460,7 @@ export function PositionCalibrationSection({
         key={account.id}
         accounts={accounts}
         positions={positions}
+        positionsRefreshing={valuationQuery.isFetching && !!valuationQuery.data}
         cashValue={cashValue}
         step="position"
         defaultAccountId={account.id}
@@ -492,6 +479,6 @@ export function PositionCalibrationSection({
         onBusyChange={onBusyChange}
         onSaved={onSaved}
       />
-    </>
+    </div>
   );
 }

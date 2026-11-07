@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ThesisLedgerApiError,
@@ -21,7 +22,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2Icon } from 'lucide-react';
 import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useCreatePortfolioTradeOpeningBoundaryMutation } from './portfolio-trade.mutations.js';
-
 const pad = (value: number) => String(value).padStart(2, '0');
 
 const currentLocalDateTime = () => {
@@ -37,11 +37,7 @@ const sourceTimezone = () => {
   }
 };
 
-const commandId = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
-    return crypto.randomUUID();
-  return `desktop-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-};
+const commandId = createClientRequestId;
 
 const errorMessage = (error: unknown) => {
   if (error instanceof ThesisLedgerApiError)
@@ -98,7 +94,7 @@ export function PortfolioTradeOpeningBoundarySheet({
 
   const requestClose = useDraftCloseGuard({
     open,
-    draft: null,
+    draft: { tradeId: detail.id, openingAt, reason, writeConfirmed },
     dirty: dirty && !writeConfirmed,
     busy,
     onOpenChange: handleOpenChange,
@@ -205,7 +201,7 @@ export function PortfolioTradeOpeningBoundarySheet({
             className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
             onSubmit={(formEvent) => void submit(formEvent)}
           >
-            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto scroll-p-2 px-1 py-1">
               <FieldGroup>
                 <Field invalid={Boolean(error && !openingAt)}>
                   <FieldLabel htmlFor="trade-opening-boundary-at">建仓时间</FieldLabel>

@@ -1,3 +1,4 @@
+import { percentTextToRatio, ratioToPercentText } from '@thesis-ledger/domain';
 import {
   riskRuleInputSchema,
   requiresRiskRuleAccount,
@@ -66,13 +67,16 @@ export type RiskForm = {
   enabled: boolean;
 };
 export function riskForm(rule?: RiskRuleWire): RiskForm {
+  let threshold = '';
+  if (rule) {
+    threshold = String(rule.threshold);
+    if (isRiskPercentage(rule.kind)) threshold = ratioToPercentText(rule.threshold);
+  }
   return {
     kind: (rule?.kind as RiskForm['kind']) ?? 'price-below',
     scope: rule?.scope ?? 'security',
     severity: rule?.severity ?? 'warning',
-    threshold: rule
-      ? String(isRiskPercentage(rule.kind) ? rule.threshold * 100 : rule.threshold)
-      : '',
+    threshold,
     symbol: rule?.symbol ?? '',
     accountId: rule?.accountId ?? '',
     enabled: rule?.enabled ?? false,
@@ -85,10 +89,12 @@ export function buildRiskInput(form: RiskForm, previous?: RiskRuleWire) {
     throw new Error('已有证券或账户规则不能改为组合规则，请新建。');
   if (previous?.accountId && !form.accountId)
     throw new Error('已有账户绑定不能直接清空，请新建所需范围的规则。');
-  const value = Number(form.threshold);
-  if (!form.threshold.trim() || !Number.isFinite(value) || value < 0)
+  const value = isRiskPercentage(form.kind)
+    ? percentTextToRatio(form.threshold)
+    : Number(form.threshold);
+  if (!form.threshold.trim() || value === null || !Number.isFinite(value) || value < 0)
     throw new Error('请输入有效的非负阈值。');
-  if (isRiskPercentage(form.kind) && (value <= 0 || value > 100))
+  if (isRiskPercentage(form.kind) && (value <= 0 || value > 1))
     throw new Error('百分比阈值须大于 0 且不超过 100%。');
   if (requiresRiskRuleAccount(form.kind, form.scope) && !form.accountId)
     throw new Error('该证券规则必须绑定账户。');
@@ -96,7 +102,7 @@ export function buildRiskInput(form: RiskForm, previous?: RiskRuleWire) {
     kind: form.kind,
     scope: form.scope,
     severity: form.severity,
-    threshold: isRiskPercentage(form.kind) ? value / 100 : value,
+    threshold: value,
     enabled: form.enabled,
     ...(form.scope === 'security' ? { symbol: form.symbol } : {}),
     ...(form.scope !== 'portfolio' && form.accountId ? { accountId: form.accountId } : {}),

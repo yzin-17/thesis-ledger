@@ -1,9 +1,10 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { TableContainer } from '@/components/ui/table';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import {
   Select,
   SelectContent,
@@ -103,10 +104,10 @@ export function PortfolioTradeView({
     (trade) =>
       trade.excludedReasons.length > 0 || trade.issues.length > 0 || trade.costIssues.length > 0,
   ).length;
-  const hasFilters = Boolean(effectiveAccountId || symbol.trim() || lifecycle !== 'ALL');
+  const hasFilters = Boolean((!accountScope && effectiveAccountId) || symbol.trim() || lifecycle !== 'ALL');
 
   const clearFilters = () => {
-    setAccountId('');
+    if (!accountScope) setLocalAccountId('');
     setSymbol('');
     setLifecycle('ALL');
   };
@@ -206,90 +207,91 @@ export function PortfolioTradeView({
         </Alert>
       )}
       {query.isPending && (
-        <div className="grid gap-2 rounded-md border border-border p-3" role="status" aria-label="正在读取交易周期">
-          <Skeleton className="h-11 w-full" />
-          <Skeleton className="h-11 w-full" />
-        </div>
+        <LoadingState label="正在读取交易周期" />
       )}
-      {query.isSuccess && trades.length === 0 && (
-        <EmptyListState
-          className="rounded-md border border-border py-8"
-          title={hasFilters ? '没有匹配的交易周期' : '暂无交易周期'}
-          description={
-            hasFilters ? '调整或清除筛选后再查看。' : '录入成交后，交易周期会显示在这里。'
-          }
-        />
-      )}
-      {trades.length > 0 && (
-        <TableContainer>
-          <table>
-            <thead>
-              <tr>
-                <th>标的</th>
-                <th className="text-left">账户</th>
-                <th>开始 / 结束</th>
-                <th className="text-right">数量</th>
-                <th className="text-right">净实现盈亏</th>
-                <th>状态</th>
-                <StickyTableActionHeader>操作</StickyTableActionHeader>
-              </tr>
-            </thead>
-            <tbody>
-              {trades.map((trade) => (
-                <tr key={trade.id}>
-                  <td>
-                    <strong>{trade.assetName ?? trade.symbol}</strong>
-                    <span className="text-xs text-muted-foreground">
-                      {trade.assetName ? trade.symbol : '标的名称暂不可用'}
-                    </span>
-                  </td>
-                  <td className="text-left">{accountName(displayAccounts, trade.accountId)}</td>
-                  <td>
-                    <span>{formatTradeDateTime(trade.openedAt)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatTradeDateTime(trade.closedAt)}
-                    </span>
-                  </td>
-                  <td className="text-right">
-                    <span>{trade.sourceQuantity}</span>
-                    <span className="text-xs text-muted-foreground">
-                      剩余 {trade.remainingQuantity}
-                    </span>
-                  </td>
-                  <td className="text-right font-mono">{trade.netRealizedPnl ?? '—'}</td>
-                  <td>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant="secondary">
-                        {tradeLifecycleLabel(trade.lifecycle)} · {tradeExitProgressLabel(trade.exitProgress)}
-                      </Badge>
-                      {trade.excludedReasons.length > 0 && <Badge variant="secondary">需复核</Badge>}
-                    </div>
-                  </td>
-                  <StickyTableActionCell>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="link"
-                      className="text-button"
-                      onClick={() => setSelectedTrade(trade)}
-                    >
-                      查看详情
-                    </Button>
-                  </StickyTableActionCell>
+      <ListRefreshRegion refreshing={query.isRefetching && query.data !== undefined} label="正在刷新交易周期">
+        {query.isSuccess && trades.length === 0 && (
+          <EmptyListState
+            className="rounded-md border border-border py-8"
+            title={hasFilters ? '没有匹配的交易周期' : '暂无交易周期'}
+            description={
+              hasFilters ? '调整或清除筛选后再查看。' : '录入成交后，交易周期会显示在这里。'
+            }
+          />
+        )}
+        {trades.length > 0 && (
+          <TableContainer>
+            <table>
+              <thead>
+                <tr>
+                  <th>标的</th>
+                  <th className="text-left">账户</th>
+                  <th>开始 / 结束</th>
+                  <th className="text-right">数量</th>
+                  <th className="text-right">净实现盈亏</th>
+                  <th>状态</th>
+                  <StickyTableActionHeader>操作</StickyTableActionHeader>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableContainer>
-      )}
+              </thead>
+              <tbody>
+                {trades.map((trade) => (
+                  <tr key={trade.id}>
+                    <td>
+                      <strong>{trade.assetName ?? trade.symbol}</strong>
+                      <span className="text-xs text-muted-foreground">
+                        {trade.assetName ? trade.symbol : '标的名称暂不可用'}
+                      </span>
+                    </td>
+                    <td className="text-left">{accountName(displayAccounts, trade.accountId)}</td>
+                    <td>
+                      <span>{formatTradeDateTime(trade.openedAt)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatTradeDateTime(trade.closedAt)}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <span>{trade.sourceQuantity}</span>
+                      <span className="text-xs text-muted-foreground">
+                        剩余 {trade.remainingQuantity}
+                      </span>
+                    </td>
+                    <td className="text-right font-mono">{trade.netRealizedPnl ?? '—'}</td>
+                    <td>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="secondary">
+                          {tradeLifecycleLabel(trade.lifecycle)} · {tradeExitProgressLabel(trade.exitProgress)}
+                        </Badge>
+                        {trade.excludedReasons.length > 0 && <Badge variant="secondary">需复核</Badge>}
+                      </div>
+                    </td>
+                    <StickyTableActionCell>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="link"
+                        className="text-button"
+                        onClick={() => setSelectedTrade(trade)}
+                      >
+                        查看详情
+                      </Button>
+                    </StickyTableActionCell>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableContainer>
+        )}
+      </ListRefreshRegion>
       {query.hasNextPage && (
         <div className="flex justify-center">
           <Button
+            aria-busy={query.isFetchingNextPage}
             type="button"
             variant="outline"
             disabled={query.isFetchingNextPage}
             onClick={() => void query.fetchNextPage()}
           >
+            {query.isFetchingNextPage && <Spinner data-icon="inline-start" aria-hidden="true" />}
             {query.isFetchingNextPage ? '正在加载…' : '加载更多'}
           </Button>
         </div>

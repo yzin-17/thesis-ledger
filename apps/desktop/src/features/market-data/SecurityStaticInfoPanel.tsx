@@ -1,9 +1,10 @@
+import { InstrumentSymbolField } from './InstrumentSymbolField.js';
+import { Spinner } from '@/components/ui/spinner';
 import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { securityStaticSymbolSchema, type SecurityStaticAssetType, type SecurityStaticInfoResponse } from '@thesis-ledger/schemas';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '@/components/ui/select';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -65,8 +66,14 @@ export function SecurityStaticInfoPanel() {
         <FieldGroup>
           <Field invalid={Boolean(inputError)}>
             <FieldLabel>证券代码</FieldLabel>
-            <Input aria-label="证券资料代码" aria-invalid={Boolean(inputError)} value={symbol}
-              placeholder="00700.HK 或 AAPL.US" onChange={event => setSymbol(event.target.value)} />
+            <InstrumentSymbolField
+              markets={['HK', 'US']}
+              instrumentTypes={[assetType]}
+              aria-label="证券资料代码"
+              aria-invalid={Boolean(inputError)}
+              value={symbol}
+              onChange={(value) => setSymbol(value)}
+            />
           </Field>
           <Field>
             <FieldLabel>证券类型</FieldLabel>
@@ -79,7 +86,8 @@ export function SecurityStaticInfoPanel() {
               )}</SelectGroup></SelectContent>
             </Select>
           </Field>
-          <Button type="submit" variant="outline" disabled={query.isFetching}>
+          <Button aria-busy={query.isFetching} type="submit" variant="outline" disabled={query.isFetching}>
+            {query.isLoading && <Spinner data-icon="inline-start" aria-hidden="true" />}
             {query.isFetching ? '查询中…' : '查询证券资料'}
           </Button>
         </FieldGroup>
@@ -88,7 +96,7 @@ export function SecurityStaticInfoPanel() {
         <AlertTitle>资料未读取</AlertTitle>
         <AlertDescription>{inputError ?? query.error?.message}</AlertDescription>
       </Alert>}
-      {data && <Table frame="plain" aria-label={`${data.symbol} 当前证券资料`}>
+      {data && <Table frame="plain" refreshing={query.isRefetching} refreshLabel="正在刷新证券资料" aria-label={`${data.symbol} 当前证券资料`}>
         <TableBody>{rows.map(([label, value]) => <TableRow key={label}>
           <TableCell>{label}</TableCell><TableCell>{value}</TableCell>
         </TableRow>)}</TableBody>

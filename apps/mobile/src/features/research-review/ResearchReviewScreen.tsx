@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import type { ResearchStackParams } from '../../app/navigation-types';
-import { Action, Copy, Field, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Copy, Field, Page, QueryList, QueryStatus, Section } from '../../components/MobilePrimitives';
 import { ReviewAction } from './ReviewAction';
 const compareLabels = {
   compared: '可比较',
@@ -57,57 +57,74 @@ export function ResearchReviewScreen() {
           void comparison.refetch();
         }}
       />
-      <QueryStatus query={comparison} retry={() => void comparison.refetch()} />
-      {comparison.data ? (
-        <>
-          <Copy>{compareLabels[comparison.data.status]}</Copy>
-          {comparison.data.issues.map((v, i) => (
-            <Copy key={i}>{v.message}</Copy>
-          ))}
-          {comparison.data.groups.map((group) => (
-            <Section key={group.key} title={group.label}>
-              {group.fields.map((v) => (
-                <Copy key={v.key}>
-                  {v.label}：{displayValue(v.before)} → {displayValue(v.after)}
-                </Copy>
-              ))}
-            </Section>
-          ))}
-          <Copy muted>证据比较 {comparison.data.evidence.length} 项；保留两份原报告。</Copy>
-        </>
-      ) : null}
+      <QueryList
+        query={comparison}
+        retry={() => void comparison.refetch()}
+        label="正在刷新报告比较"
+      >
+        {comparison.data ? (
+          <>
+            <Copy>{compareLabels[comparison.data.status]}</Copy>
+            {comparison.data.issues.map((v, i) => (
+              <Copy key={i}>{v.message}</Copy>
+            ))}
+            {comparison.data.groups.map((group) => (
+              <Section key={group.key} title={group.label}>
+                {group.fields.map((v) => (
+                  <Copy key={v.key}>
+                    {v.label}：{displayValue(v.before)} → {displayValue(v.after)}
+                  </Copy>
+                ))}
+              </Section>
+            ))}
+            <Copy muted>证据比较 {comparison.data.evidence.length} 项；保留两份原报告。</Copy>
+          </>
+        ) : null}
+      </QueryList>
       <Section title="自动复核状态">
-        <QueryStatus query={observations} retry={() => void observations.refetch()} />
         <QueryStatus query={capability} retry={() => void capability.refetch()} />
         <Copy muted>此处读取服务端保存的复核与历史，受控写入沿用现有能力边界。</Copy>
-        {observations.data?.issues.map((v, i) => (
-          <Copy key={i}>{v}</Copy>
-        ))}
-        {observations.data?.items.map((row) => (
-          <Section key={row.claimId} title={row.claimId}>
-            <Copy>当前评估：{row.current?.evaluation.status ?? '尚无复核结果'}</Copy>
-            {row.current?.evaluation.reasons.map((r, i) => (
-              <Copy key={i}>{r}</Copy>
+        <QueryList
+          query={observations}
+          retry={() => void observations.refetch()}
+          label="正在刷新复核项目"
+          gap={12}
+        >
+          {observations.data?.issues.map((v, i) => (
+            <Copy key={i}>{v}</Copy>
+          ))}
+          {observations.data?.items.map((row) => (
+            <Section key={row.claimId} title={row.claimId}>
+              <Copy>当前评估：{row.current?.evaluation.status ?? '尚无复核结果'}</Copy>
+              {row.current?.evaluation.reasons.map((r, i) => (
+                <Copy key={i}>{r}</Copy>
+              ))}
+              {row.id ? (
+                <Action label={`读取复核历史 ${row.id}`} onPress={() => setObservationId(row.id!)} />
+              ) : null}
+              <ReviewAction
+                id={params.id}
+                locator={params.locator}
+                claimId={row.claimId}
+                canCreate={Boolean(capability.data?.canCreate && !capability.isError)}
+              />
+            </Section>
+          ))}
+        </QueryList>
+        {observationId && (
+          <QueryList
+            query={history}
+            retry={() => void history.refetch()}
+            label="正在刷新复核历史"
+            gap={12}
+          >
+            {history.data?.versions.map((v) => (
+              <Copy key={v.id}>
+                {v.recordedAt} · {v.evaluation.status} · 输入指纹 {v.inputFingerprint}
+              </Copy>
             ))}
-            {row.id ? (
-              <Action label={`读取复核历史 ${row.id}`} onPress={() => setObservationId(row.id!)} />
-            ) : null}
-            <ReviewAction
-              id={params.id}
-              locator={params.locator}
-              claimId={row.claimId}
-              canCreate={Boolean(capability.data?.canCreate && !capability.isError)}
-            />
-          </Section>
-        ))}
-        {observationId ? (
-          <QueryStatus query={history} retry={() => void history.refetch()} />
-        ) : null}
-        {history.data?.versions.map((v) => (
-          <Copy key={v.id}>
-            {v.recordedAt} · {v.evaluation.status} · 输入指纹 {v.inputFingerprint}
-          </Copy>
-        ))}
+          </QueryList>
+        )}
       </Section>
     </Page>
   );

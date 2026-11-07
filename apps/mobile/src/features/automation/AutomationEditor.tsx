@@ -83,7 +83,7 @@ function Editor({ row }: { row?: AutomationRecord }) {
       <Copy muted>
         任务 ID {id}。任务类型创建后不能修改；系统任务名称和类型固定。运行历史存在时无法删除。
       </Copy>
-      <Feedback message={message} />
+      <Feedback busy={command.pending} message={message} />
       <QueryStatus query={current} retry={() => void current.refetch()} />
       <Section title="任务设置">
         <Field

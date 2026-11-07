@@ -8,6 +8,8 @@ import { ResearchObservationsController } from '../../src/research/research-obse
 import { ResearchObservationService } from '../../src/research/research-observation.service.js';
 import { ResearchObservationQueries } from '../../src/research/research-observation.queries.js';
 import { ResearchObservationStore } from '../../src/research/research-observation.store.js';
+import { ResearchObservationScheduler } from '../../src/research/research-observation-scheduler.js';
+import { RESEARCH_OBSERVATION_METHOD } from '@thesis-ledger/schemas';
 import { ResearchObservationAccess } from '../../src/research/research-observation-access.js';
 import { ResearchObservationMaterials } from '../../src/research/research-observation-materials.js';
 import { ResearchScopeReader } from '../../src/research/research-scope-reader.js';
@@ -28,9 +30,11 @@ export async function createObservationHttpFixture(prisma: PrismaClient) {
   let revoked = false;
   const calendar = vi.fn<() => Promise<ObservationCalendar>>(async () => sample.method.calendar);
   const prices = vi.fn(async () => sample.selected);
+  const retained = vi.fn<() => Promise<typeof sample.selected | null>>(async () => null);
+  const published = vi.fn<() => Promise<Date | null>>(async () => null);
   const materials = new ResearchObservationMaterials(
     { read: calendar } as never,
-    { readV3: prices } as never,
+    { readV3: prices, readRetainedResearch: retained } as never,
   );
   const scopes = new ResearchScopeReader(prisma as never, new InstrumentService(prisma as never));
   const original = scopes.assertSnapshot.bind(scopes);
@@ -80,7 +84,8 @@ export async function createObservationHttpFixture(prisma: PrismaClient) {
   return {
     calendar,
     prices,
-    materials,
+    materials, retained, published,
+    scheduler: () => new ResearchObservationScheduler(prisma as never, app.get(ResearchObservationStore), app.get(ResearchObservationService), { researchCertificatePublishedAt: published } as never),
     reset() {
       sample = observationMarketFixture();
       revoked = false;
@@ -95,7 +100,7 @@ export async function createObservationHttpFixture(prisma: PrismaClient) {
     restore() {
       revoked = false;
     },
-    async seed(options: { ownerId?: string; retryOfRunId?: string; qualitative?: boolean } = {}) {
+    async seed(options: { ownerId?: string; retryOfRunId?: string; qualitative?: boolean; scheduled?: boolean } = {}) {
       const fixture = comparisonReport({
         result: (value) => {
           const evidenceIds = [value.evidenceBindings[0]!.audit.evidenceId];
@@ -137,7 +142,7 @@ export async function createObservationHttpFixture(prisma: PrismaClient) {
           retryOfRunId: options.retryOfRunId ?? null,
           context: {},
           result: row.result as Prisma.InputJsonValue,
-          modelMetadata: row.modelMetadata as Prisma.InputJsonValue,
+          modelMetadata: { ...(row.modelMetadata as Prisma.InputJsonObject), ...(options.scheduled ? { scheduledObservationMethod: RESEARCH_OBSERVATION_METHOD } : {}) },
           researchScopeSnapshot: row.researchScopeSnapshot as Prisma.InputJsonValue,
         },
       });

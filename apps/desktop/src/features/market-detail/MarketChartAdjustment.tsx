@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { MarketChartOptionsV3, MarketChartPlanV3 } from '@thesis-ledger/schemas';
@@ -88,6 +89,7 @@ export function MarketChartAdjustment({
           aria-label="图表价格口径"
           disabled={query.isError || !data || data.mode !== 'v3'}
         >
+          {query.isFetching && <Spinner aria-hidden="true" />}
           <SelectValue>{chartAdjustmentLabels[value]}</SelectValue>
         </SelectTrigger>
         <SelectContent>

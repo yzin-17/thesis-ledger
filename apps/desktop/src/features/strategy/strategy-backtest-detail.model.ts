@@ -1,4 +1,5 @@
 import type { BacktestExecutionModel } from '@thesis-ledger/schemas';
+import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
 import type { StrategyBacktestGroupPage } from './strategy-optimization.api.js';
 import type {
   BacktestJob,
@@ -26,10 +27,28 @@ export const backtestNumber = (value: unknown): number | null => {
   return null;
 };
 
-export const backtestMetricNumber = (value: unknown): number | null => {
+const availableMetricValue = (value: unknown): unknown => {
   const record = asRecord(value);
-  if (!record || !('status' in record)) return backtestNumber(value);
-  return record.status === 'available' ? backtestNumber(record.value) : null;
+  if (!record || !('status' in record)) return value;
+  return record.status === 'available' ? record.value : null;
+};
+
+export const backtestMetricNumber = (value: unknown): number | null =>
+  backtestNumber(availableMetricValue(value));
+
+const decimalText = (value: unknown): string | null => {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : null;
+  const amount = asRecord(value);
+  return amount && 'amount' in amount ? decimalText(amount.amount) : null;
+};
+
+/** 文本比例保留有效数字；回撤幅度只移除符号，不改变原指标。 */
+export const backtestMetricPercent = (value: unknown, magnitude = false): string | null => {
+  const text = decimalText(availableMetricValue(value));
+  if (text === null) return null;
+  const formatted = formatDecimalRatioPercent(magnitude ? text.replace(/^[+-]/, '') : text);
+  return formatted === '—' ? null : formatted;
 };
 
 export const backtestMetricReason = (value: unknown) => {

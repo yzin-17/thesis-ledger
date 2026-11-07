@@ -11,6 +11,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { instrumentLocatorSchema } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { InstrumentService } from './instrument.service.js';
@@ -118,6 +119,12 @@ export class MarketDataController {
     if (!query.trim()) return [];
     await this.readiness().ensureReady();
     return this.instruments.search(query, Number(limit));
+  }
+
+  @Get('instruments/identity')
+  locate(@Query() input: unknown) {
+    const { symbol, instrumentType } = instrumentLocatorSchema.parse(input);
+    return this.instruments.locate(symbol, instrumentType);
   }
 
   @Post('instruments/:id/confirm') confirm(@Param('id') id: string) {

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, type ComponentProps } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
@@ -9,8 +10,11 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root;
 let host: HTMLDivElement;
 const select = vi.fn();
+const client = new QueryClient();
+vi.mock('../src/shared/api/client.js', () => ({
+  getDesktopApiClient: () => ({ risk: { monitoring: async () => ({ eligibleRules: 0 }) } }),
+}));
 const props: ComponentProps<typeof RiskOverview> = {
-  mode: 'actual',
   portfolioValueAt: null,
   portfolioState: 'ready',
   loadState: 'ready',
@@ -32,9 +36,9 @@ async function render(changes: Partial<typeof props>) {
   }
   await act(async () =>
     root.render(
-      <ConfirmDialogProvider>
+      <QueryClientProvider client={client}><ConfirmDialogProvider>
         <RiskOverview {...props} {...changes} />
-      </ConfirmDialogProvider>,
+      </ConfirmDialogProvider></QueryClientProvider>,
     ),
   );
 }
@@ -44,6 +48,7 @@ afterEach(async () => {
   await act(async () => root?.unmount());
   host?.remove();
   host = undefined!;
+  client.clear();
   vi.clearAllMocks();
 });
 

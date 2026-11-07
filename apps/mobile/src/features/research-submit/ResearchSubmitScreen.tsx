@@ -31,9 +31,9 @@ const noRunCodes = new Map([
 export function ResearchSubmitScreen() {
   const { params } = useRoute<RouteProp<ResearchStackParams, 'ResearchSubmit'>>();
   if (params?.retryRunId) return <ResearchRetryScreen runId={params.retryRunId} />;
-  return <ResearchNewScreen />;
+  return <ResearchNewScreen key={params?.instrumentId ?? "new"} initialInstrumentId={params?.instrumentId ?? ""} />;
 }
-export function ResearchNewScreen() {
+export function ResearchNewScreen({initialInstrumentId = ""}: {initialInstrumentId?: string} = {}) {
   const { api, scope, baseUrl, mode } = useMobileRuntime();
   const client = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<ResearchStackParams>>();
@@ -48,7 +48,7 @@ export function ResearchNewScreen() {
   const effectivePending = pending === undefined ? restored.data : pending;
   const [selection, setSelection] = useState<ResearchSubmissionV2['scope']>({
     scope: 'instrument',
-    instrumentId: '',
+    instrumentId: initialInstrumentId,
   });
   const [question, setQuestion] = useState('');
   const [templateId, setTemplate] = useState('');
@@ -195,6 +195,7 @@ export function ResearchNewScreen() {
             }).map(([value, label]) => ({ value, label }))}
             onChange={setTemplate}
           />
+          <Copy muted>价格方向论点到期后，在报告中查看复核结果或缺少的材料。</Copy>
           <Action
             label="准备并提交研究"
             disabled={
@@ -211,7 +212,7 @@ export function ResearchNewScreen() {
           />
         </>
       )}
-      <Feedback message={message} error={submit.isError} />
+      <Feedback busy={submit.isPending} message={message} error={submit.isError} />
     </Page>
   );
 }

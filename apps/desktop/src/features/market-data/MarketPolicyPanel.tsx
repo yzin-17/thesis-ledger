@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -105,6 +106,7 @@ export function MarketPolicyPanel({
 
         {catalogMessage && (
           <Alert>
+            {catalogPending && <Spinner aria-hidden="true" />}
             <AlertTitle>{catalogPending ? '正在读取路由能力' : '暂不能修改路由'}</AlertTitle>
             <AlertDescription>{catalogMessage}</AlertDescription>
           </Alert>

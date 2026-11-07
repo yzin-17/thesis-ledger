@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoaderCircle, SlidersHorizontal } from 'lucide-react';
 import { useToastManager } from '@/components/ui/toast';
@@ -156,13 +156,7 @@ function AccountState({
   onNavigatePosition?: (() => void) | undefined;
 }) {
   if (pending) {
-    return (
-      <div className="flex flex-col gap-4" aria-busy="true" aria-label="正在加载账户">
-        <Skeleton className="h-5 w-28" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
+    return <LoadingState label="正在加载账户" />;
   }
   if (error) {
     return (
@@ -580,12 +574,10 @@ export function JournalDashboard({
   });
   if (accountState) {
     return (
-      <section className="module-page flex flex-col gap-6">
+      <section className="module-page flex flex-col gap-card">
         <PageHeader
-          className="mb-0"
           eyebrow="INVESTMENT JOURNAL"
           title="投资复盘"
-          description="回顾交易计划与执行，结合证据总结经验。"
         />
         {accountState}
       </section>
@@ -596,12 +588,10 @@ export function JournalDashboard({
   const periodJsonValue = periodTradesOverride ?? periodTrades;
 
   return (
-    <section className="module-page flex flex-col gap-6">
+    <section className="module-page flex flex-col gap-card">
       <PageHeader
-        className="mb-0"
         eyebrow="INVESTMENT JOURNAL"
         title="投资复盘"
-        description="回顾交易计划与执行，结合证据总结经验。"
       />
 
       <JournalAccountSelector accounts={accounts} value={accountId} onValueChange={selectAccount} />
@@ -620,7 +610,7 @@ export function JournalDashboard({
           <TabsTrigger value="single">单笔复盘</TabsTrigger>
           <TabsTrigger value="period">周期复盘</TabsTrigger>
         </TabsList>
-        <TabsContent value="single" className="flex flex-col gap-4 pt-4">
+        <TabsContent value="single" className="flex flex-col gap-4">
           {candidateQuery.isError && (
             <Alert variant="destructive">
               <AlertTitle>已平仓交易读取失败</AlertTitle>
@@ -714,7 +704,7 @@ export function JournalDashboard({
                         <div>
                           <p className="font-medium">准备好后开始计算确定性事实</p>
                           <p className="text-sm text-muted-foreground">
-                            不会创建订单，也不会修改 Ledger。
+                            不会创建订单或修改账本。
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -763,7 +753,7 @@ export function JournalDashboard({
                         aiPending={singleExplanation.isPending}
                         aiError={
                           singleExplanation.isError
-                            ? new Error(errorMessage(singleExplanation.error, 'Provider 不可用。'))
+                            ? new Error(errorMessage(singleExplanation.error, '提供方不可用。'))
                             : null
                         }
                         onExplain={() => {
@@ -828,7 +818,7 @@ export function JournalDashboard({
             />
           )}
         </TabsContent>
-        <TabsContent value="period" className="flex flex-col gap-4 pt-4">
+        <TabsContent value="period" className="flex flex-col gap-4">
           <Card className="shadow-none">
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1007,7 +997,7 @@ export function JournalDashboard({
               aiPending={periodExplanation.isPending}
               aiError={
                 periodExplanation.isError
-                  ? new Error(errorMessage(periodExplanation.error, 'Provider 不可用。'))
+                  ? new Error(errorMessage(periodExplanation.error, '提供方不可用。'))
                   : null
               }
               onExplain={() => {

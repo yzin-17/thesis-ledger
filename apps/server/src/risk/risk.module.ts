@@ -1,3 +1,6 @@
+import { RiskMonitoringStatusController } from './risk-monitoring.controller.js';
+import { RiskMonitoringService } from './risk-monitoring.service.js';
+import { RiskMarketDemandService } from './risk-market-demand.service.js';
 import { Module } from '@nestjs/common';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { MarketModule } from '../market/market.module.js';
@@ -12,8 +15,10 @@ import { StrategyRiskRuntimeService } from './strategy-risk-runtime.service.js';
 
 @Module({
   imports: [NotificationsModule, MarketModule],
-  controllers: [RiskController],
+  controllers: [RiskController, RiskMonitoringStatusController],
   providers: [
+    RiskMarketDemandService,
+    RiskMonitoringService,
     RiskRuleService,
     RiskContextService,
     RiskEventService,

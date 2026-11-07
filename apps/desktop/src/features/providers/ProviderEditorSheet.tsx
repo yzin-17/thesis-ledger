@@ -35,7 +35,7 @@ import type { AiAuthMode, AiProviderModelDetail, ProviderDraft } from './provide
 const saveProviderLabel = (saving: boolean, editing: boolean, ai: boolean) => {
   if (ai) return saving ? '正在检查并保存…' : '测试并保存';
   if (saving) return '保存中…';
-  return editing ? '保存修改' : '保存 Provider';
+  return editing ? '保存修改' : '保存提供方';
 };
 
 const providerTestLabel = (testing: boolean) => {
@@ -44,8 +44,8 @@ const providerTestLabel = (testing: boolean) => {
 };
 
 const providerSheetTitle = (editingProviderName: string | null) => {
-  if (editingProviderName) return '更新 Provider';
-  return '新增或更新 Provider';
+  if (editingProviderName) return '更新提供方';
+  return '新增或更新提供方';
 };
 
 export const ProviderEditorSheet = ({
@@ -120,7 +120,7 @@ export const ProviderEditorSheet = ({
               {providerSheetTitle(editingProviderName)}
             </SheetTitle>
             <SheetDescription id="provider-form-description">
-              凭证用于连接 Provider；已配置凭证不会回显，编辑时留空保存不会删除当前凭证。
+              凭证用于连接服务；已有凭证不会回显，留空保存将继续使用。
             </SheetDescription>
           </SheetHeader>
           <form
@@ -215,7 +215,7 @@ export const ProviderEditorSheet = ({
                       <TabsTrigger value="connection">连接配置</TabsTrigger>
                       <TabsTrigger value="model">模型与用途</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="connection" className="pt-4">
+                    <TabsContent value="connection">
                       <AiProviderEditorFields
                         section="connection"
                         draft={providerDraft}
@@ -232,7 +232,7 @@ export const ProviderEditorSheet = ({
                         {...(onTestPurpose ? { onTestPurpose } : {})}
                       />
                     </TabsContent>
-                    <TabsContent value="model" className="pt-4">
+                    <TabsContent value="model">
                       <AiProviderEditorFields
                         section="model"
                         draft={providerDraft}

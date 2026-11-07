@@ -1,0 +1,504 @@
+{
+  "dataVersion": "market-reference-v1",
+  "requestId": "478ace8e-99fc-42b4-888f-0b563b66b25a",
+  "dataset": "futures-daily-shfe",
+  "symbol": null,
+  "indexCode": null,
+  "start": "2026-11-06",
+  "end": "2026-11-06",
+  "page": 1,
+  "pageSize": 20,
+  "cursor": null,
+  "nextCursor": null,
+  "providerId": "akshare",
+  "upstreamSource": "shfe-futures-public",
+  "adapterRevision": "market-reference-projection-v1",
+  "sourceRevision": "shfe-futures-public-v1",
+  "fetchedAt": "2026-11-06T17:16:21.027131+00:00",
+  "sourceUrl": "https://www.shfe.com.cn/data/tradedata/future/dailydata/kx20261106.dat",
+  "columns": [
+    {
+      "key": "date",
+      "label": "交易日",
+      "format": "date",
+      "unit": null
+    },
+    {
+      "key": "exchange",
+      "label": "交易所",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "contract",
+      "label": "来源合约代码",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "product",
+      "label": "来源品种",
+      "format": "text",
+      "unit": null
+    },
+    {
+      "key": "open",
+      "label": "开盘价",
+      "format": "decimal",
+      "unit": "来源报价单位"
+    },
+    {
+      "key": "high",
+      "label": "最高价",
+      "format": "decimal",
+      "unit": "来源报价单位"
+    },
+    {
+      "key": "low",
+      "label": "最低价",
+      "format": "decimal",
+      "unit": "来源报价单位"
+    },
+    {
+      "key": "close",
+      "label": "收盘价",
+      "format": "decimal",
+      "unit": "来源报价单位"
+    },
+    {
+      "key": "settle",
+      "label": "结算价",
+      "format": "decimal",
+      "unit": "来源报价单位"
+    },
+    {
+      "key": "previousSettle",
+      "label": "前结算价",
+      "format": "decimal",
+      "unit": "来源报价单位"
+    },
+    {
+      "key": "volume",
+      "label": "成交量",
+      "format": "integer",
+      "unit": "手"
+    },
+    {
+      "key": "openInterest",
+      "label": "持仓量",
+      "format": "integer",
+      "unit": "手"
+    },
+    {
+      "key": "openInterestChange",
+      "label": "持仓变化",
+      "format": "integer",
+      "unit": "手"
+    },
+    {
+      "key": "turnover10k",
+      "label": "成交额",
+      "format": "decimal",
+      "unit": "万元"
+    }
+  ],
+  "items": [
+    {
+      "id": "c88400decf26ff1accd157b2f081e67e652213a44fc2c2c96bf1607dd6214e03",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2611",
+        "product": "铜",
+        "open": "108080",
+        "high": "108400",
+        "low": "106300",
+        "close": "106830",
+        "settle": "106920",
+        "previousSettle": "108000",
+        "volume": "24995",
+        "openInterest": "32905",
+        "openInterestChange": "-5830",
+        "turnover10k": "1336326.1"
+      }
+    },
+    {
+      "id": "2d1739152f693053263ac695a33dd3b43f017a37cad36ac172f2a7afcaf58b30",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2612",
+        "product": "铜",
+        "open": "106490",
+        "high": "107080",
+        "low": "104120",
+        "close": "104260",
+        "settle": "105110",
+        "previousSettle": "106320",
+        "volume": "193345",
+        "openInterest": "205726",
+        "openInterestChange": "9880",
+        "turnover10k": "10161291.08"
+      }
+    },
+    {
+      "id": "0ba3143afa131fb35ad4a2dd22c50c36fa96a9b75c4ff7ff449e86ff6a512920",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2701",
+        "product": "铜",
+        "open": "105780",
+        "high": "106260",
+        "low": "102900",
+        "close": "103080",
+        "settle": "104030",
+        "previousSettle": "105490",
+        "volume": "116384",
+        "openInterest": "167093",
+        "openInterestChange": "11318",
+        "turnover10k": "6053800.55"
+      }
+    },
+    {
+      "id": "72d7284d47dd475a3290fc0cc87c17607c88442487a0dd63015444da39fe427f",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2702",
+        "product": "铜",
+        "open": "105100",
+        "high": "105680",
+        "low": "102270",
+        "close": "102440",
+        "settle": "103420",
+        "previousSettle": "104950",
+        "volume": "34567",
+        "openInterest": "67317",
+        "openInterestChange": "5711",
+        "turnover10k": "1787540.095"
+      }
+    },
+    {
+      "id": "62e06019b8e963819cc26caa1361aea1c97fce7c2f1eb27d446c349bf44b9d6d",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2703",
+        "product": "铜",
+        "open": "105010",
+        "high": "105570",
+        "low": "102200",
+        "close": "102330",
+        "settle": "103200",
+        "previousSettle": "104890",
+        "volume": "16054",
+        "openInterest": "53626",
+        "openInterestChange": "3163",
+        "turnover10k": "828397.79"
+      }
+    },
+    {
+      "id": "4f25eed9ced480c358f72b56e9dc378e5e307b16c43ff99a3c35ba84df1af806",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2704",
+        "product": "铜",
+        "open": "104940",
+        "high": "105560",
+        "low": "102220",
+        "close": "102350",
+        "settle": "103280",
+        "previousSettle": "105010",
+        "volume": "6355",
+        "openInterest": "27794",
+        "openInterestChange": "1814",
+        "turnover10k": "328179.005"
+      }
+    },
+    {
+      "id": "be1609b73a9f2fc44ca80d4d50b8addeec6aa481a0d31523f61e891b92c5e45d",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2705",
+        "product": "铜",
+        "open": "105040",
+        "high": "105500",
+        "low": "102140",
+        "close": "102330",
+        "settle": "103230",
+        "previousSettle": "104910",
+        "volume": "4437",
+        "openInterest": "17724",
+        "openInterestChange": "1207",
+        "turnover10k": "229020.88"
+      }
+    },
+    {
+      "id": "f3824c730040c57056997047c59ab0f38724169eaa8b25d4daaa4cb9496f319b",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2706",
+        "product": "铜",
+        "open": "104840",
+        "high": "105420",
+        "low": "102060",
+        "close": "102260",
+        "settle": "102780",
+        "previousSettle": "104810",
+        "volume": "4128",
+        "openInterest": "15144",
+        "openInterestChange": "711",
+        "turnover10k": "212157.715"
+      }
+    },
+    {
+      "id": "c332ffe50128e00af1b71349623568ad2d4665490ed915d382cf025b4608f4ec",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2707",
+        "product": "铜",
+        "open": "104870",
+        "high": "105320",
+        "low": "102000",
+        "close": "102210",
+        "settle": "102700",
+        "previousSettle": "104790",
+        "volume": "1744",
+        "openInterest": "9325",
+        "openInterestChange": "287",
+        "turnover10k": "89560.375"
+      }
+    },
+    {
+      "id": "7646fe8d2f5b283ec3d491456f3ed2ed250f8760f4927f56e3173a0872d92be4",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2708",
+        "product": "铜",
+        "open": "104890",
+        "high": "105230",
+        "low": "101880",
+        "close": "102070",
+        "settle": "102610",
+        "previousSettle": "104790",
+        "volume": "1460",
+        "openInterest": "8247",
+        "openInterestChange": "125",
+        "turnover10k": "74906.12"
+      }
+    },
+    {
+      "id": "b417f3eb6d8fa04166e8e54dd727b3d825c94b745b8d8ad915951a790736ed56",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2709",
+        "product": "铜",
+        "open": "104740",
+        "high": "105030",
+        "low": "101610",
+        "close": "101940",
+        "settle": "102590",
+        "previousSettle": "104760",
+        "volume": "2762",
+        "openInterest": "7627",
+        "openInterestChange": "541",
+        "turnover10k": "141681.225"
+      }
+    },
+    {
+      "id": "5df978577e9995f977fd376cbdd1571d694325196c0f956764792e44585a8046",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "cu2710",
+        "product": "铜",
+        "open": "104570",
+        "high": "105110",
+        "low": "101470",
+        "close": "101800",
+        "settle": "102270",
+        "previousSettle": "104510",
+        "volume": "2123",
+        "openInterest": "4742",
+        "openInterestChange": "893",
+        "turnover10k": "108569.36"
+      }
+    },
+    {
+      "id": "2453b29bae1046aa6200ed1f9ca059024cfaa64424422e3eefc73f4711d28eb9",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "al2611",
+        "product": "铝",
+        "open": "23550",
+        "high": "23600",
+        "low": "23220",
+        "close": "23335",
+        "settle": "23355",
+        "previousSettle": "23345",
+        "volume": "8965",
+        "openInterest": "20840",
+        "openInterestChange": "-4270",
+        "turnover10k": "104692.5625"
+      }
+    },
+    {
+      "id": "8deb097ddd381423b652968fd33f00f4b698c0fd2e4213b31ef249b91511727a",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "al2612",
+        "product": "铝",
+        "open": "23230",
+        "high": "23330",
+        "low": "22895",
+        "close": "23030",
+        "settle": "23080",
+        "previousSettle": "23015",
+        "volume": "207059",
+        "openInterest": "227071",
+        "openInterestChange": "-2368",
+        "turnover10k": "2389951.42"
+      }
+    },
+    {
+      "id": "92343e09236e5847bf89ff397cfff53191ee1d0518b72eb4d3f4d559e9c4bf06",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "al2701",
+        "product": "铝",
+        "open": "23025",
+        "high": "23125",
+        "low": "22705",
+        "close": "22805",
+        "settle": "22875",
+        "previousSettle": "22810",
+        "volume": "123360",
+        "openInterest": "200907",
+        "openInterestChange": "7125",
+        "turnover10k": "1411125.0775"
+      }
+    },
+    {
+      "id": "2a7993e9060ae454a88342a5b4d5e44dd4c7b172f29e86a1776e55f247872961",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "al2702",
+        "product": "铝",
+        "open": "22935",
+        "high": "23030",
+        "low": "22625",
+        "close": "22700",
+        "settle": "22800",
+        "previousSettle": "22695",
+        "volume": "41030",
+        "openInterest": "89596",
+        "openInterestChange": "1256",
+        "turnover10k": "467797.79"
+      }
+    },
+    {
+      "id": "d45e45ab513b80bd24a5e4308ae8a4fd851c935444af691a0a77edb4e272c168",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "al2703",
+        "product": "铝",
+        "open": "23000",
+        "high": "23045",
+        "low": "22610",
+        "close": "22680",
+        "settle": "22775",
+        "previousSettle": "22670",
+        "volume": "20249",
+        "openInterest": "62296",
+        "openInterestChange": "-262",
+        "turnover10k": "230620.21"
+      }
+    },
+    {
+      "id": "6dfd29bc9500d81a6d183e1905cf93fdb26decc9e6a65ffe340d3fe161a3d9d7",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "al2704",
+        "product": "铝",
+        "open": "22895",
+        "high": "23040",
+        "low": "22620",
+        "close": "22675",
+        "settle": "22770",
+        "previousSettle": "22690",
+        "volume": "6421",
+        "openInterest": "30618",
+        "openInterestChange": "449",
+        "turnover10k": "73110.51"
+      }
+    },
+    {
+      "id": "89c19f29859441227b6edc0654cb2b19d3887e86273580f1963dad4665ec1895",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "al2705",
+        "product": "铝",
+        "open": "22900",
+        "high": "23030",
+        "low": "22630",
+        "close": "22685",
+        "settle": "22795",
+        "previousSettle": "22685",
+        "volume": "4680",
+        "openInterest": "19956",
+        "openInterestChange": "-187",
+        "turnover10k": "53350.6175"
+      }
+    },
+    {
+      "id": "8085e813e7a9bacd5af6495180507bbbfc67e29712ccacffebb74cc4c683a848",
+      "values": {
+        "date": "2026-11-06",
+        "exchange": "上期所",
+        "contract": "al2706",
+        "product": "铝",
+        "open": "22900",
+        "high": "23030",
+        "low": "22630",
+        "close": "22690",
+        "settle": "22765",
+        "previousSettle": "22690",
+        "volume": "1428",
+        "openInterest": "10931",
+        "openInterestChange": "331",
+        "turnover10k": "16256.67"
+      }
+    }
+  ],
+  "status": "ok",
+  "hasMore": true,
+  "totalSourceRecords": 238,
+  "historyComplete": false,
+  "notes": [
+    "历史完整性未声明；抓取时间与披露时间分别记录。",
+    "价格保留各合约来源报价单位，不按合约乘数折算为账户金额；成交量／持仓为手，成交额为万元。",
+    "仅为所选来源交易日的官方文件，不声明完整历史可见性、实时可交易性或停牌判断；来源填零的缺报价保留为空。"
+  ],
+  "contractVersion": 3,
+  "consumer": "thesis-ledger",
+  "policyRevision": 189,
+  "routeTarget": {
+    "providerId": "akshare",
+    "upstreamSource": "shfe-futures-public",
+    "routeIndex": 0
+  }
+}

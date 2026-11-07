@@ -126,14 +126,10 @@ describe('风险管理未过的异常与确认读取', () => {
     async (tab) => {
       const request =
         tab === 'events' ? vi.mocked(api.fetchRiskEvents) : vi.mocked(api.fetchRiskNotifications);
-      const title = tab === 'events' ? '风险事件' : '通知状态';
       const subject = tab === 'events' ? '风险事件' : '通知记录';
       request.mockRejectedValueOnce(new Error('受控独立读取失败')).mockResolvedValue([]);
       await mount(tab);
-      const panel = () =>
-        [...document.querySelectorAll<HTMLElement>('section.panel')].find(
-          (element) => element.querySelector('h2')?.textContent === title,
-        )!;
+      const panel = () => document.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])')!;
       expect(panel().textContent).toContain(`${subject}读取失败`);
       expect(panel().textContent).not.toContain('暂无');
       await act(async () => panel().querySelector<HTMLButtonElement>('button')!.click());
@@ -188,7 +184,17 @@ describe('风险管理未过的异常与确认读取', () => {
     vi.mocked(api.fetchRiskRules).mockResolvedValue([archived]);
     await click('确认归档');
     await flush();
+    expect(button('恢复规则')).toBeUndefined();
     await click('显示已归档');
+    expect(button('恢复规则')).toBeUndefined();
+    const archivedRow = () => document.querySelector<HTMLButtonElement>('[aria-label="风险规则列表"] button:not([aria-expanded])')!;
+    await act(async () => archivedRow().click());
+    expect(button('恢复规则')).toBeDefined();
+    await click('隐藏已归档');
+    expect(button('恢复规则')).toBeUndefined();
+    await click('显示已归档');
+    expect(button('恢复规则')).toBeUndefined();
+    await act(async () => archivedRow().click());
     vi.mocked(api.fetchRiskRules)
       .mockRejectedValueOnce(new Error('受控恢复后读取失败'))
       .mockResolvedValue([restored]);

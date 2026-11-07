@@ -1,108 +1,210 @@
 import * as React from 'react';
 import { CalendarIcon } from 'lucide-react';
 
-import { Input } from '@/components/ui/input';
+import { DateSelectionPanel } from '@/components/ui/date-selection-panel';
+import type { DateInputProps } from '@/components/ui/date-input.types';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-type DateInputType = 'date' | 'datetime-local' | 'month';
+export type { DateInputProps } from '@/components/ui/date-input.types';
 
-export type DateInputProps = Omit<React.ComponentPropsWithoutRef<typeof Input>, 'type'> & {
-  type: DateInputType;
-};
+const placeholders = { date: 'YYYY-MM-DD', month: 'YYYY-MM', 'datetime-local': 'YYYY-MM-DD HH:mm' };
 
-const dateInputDisplayValue = (value: DateInputProps['value'], type: DateInputType) => {
-  const inputValue = value == null ? '' : String(value);
-  if (!inputValue) {
-    if (type === 'month') return 'YYYY-MM';
-    if (type === 'date') return 'YYYY-MM-DD';
-    return 'YYYY-MM-DD HH:mm';
-  }
-
-  const [date, time] = inputValue.split('T');
-  if (type !== 'datetime-local') return date;
-  return time ? `${date} ${time.slice(0, 5)}` : date;
-};
-
-const inputClassName =
-  'absolute inset-0 z-10 h-full cursor-pointer border-0 bg-transparent shadow-none outline-none ring-0 focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0';
-
-const pickerInputClassName =
-  'select-none text-transparent caret-transparent opacity-0 placeholder:text-transparent selection:bg-transparent selection:text-transparent [-webkit-text-fill-color:transparent] [&::-webkit-datetime-edit]:opacity-0 [&::-webkit-datetime-edit-text]:opacity-0 [&::-webkit-datetime-edit-year-field]:opacity-0 [&::-webkit-datetime-edit-month-field]:opacity-0 [&::-webkit-datetime-edit-day-field]:opacity-0 [&::-webkit-datetime-edit-hour-field]:opacity-0 [&::-webkit-datetime-edit-minute-field]:opacity-0 [&::-webkit-datetime-edit-ampm-field]:opacity-0';
-
-const fallbackInputClassName =
-  'select-none text-transparent caret-transparent placeholder:text-transparent selection:bg-transparent selection:text-transparent [-webkit-text-fill-color:transparent] [&::-webkit-datetime-edit]:opacity-0 [&::-webkit-datetime-edit-text]:opacity-0 [&::-webkit-datetime-edit-year-field]:opacity-0 [&::-webkit-datetime-edit-month-field]:opacity-0 [&::-webkit-datetime-edit-day-field]:opacity-0 [&::-webkit-datetime-edit-hour-field]:opacity-0 [&::-webkit-datetime-edit-minute-field]:opacity-0 [&::-webkit-datetime-edit-ampm-field]:opacity-0';
-
-const useIsomorphicLayoutEffect =
-  typeof window === 'undefined' ? React.useEffect : React.useLayoutEffect;
-
-const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
-  function DateInput({ className, onPointerDown, type, value, ...props }, forwardedRef) {
-    const inputRef = React.useRef<HTMLInputElement | null>(null);
-    const [pickerSupported, setPickerSupported] = React.useState<boolean | null>(null);
-
-    const setInputRef = React.useCallback(
-      (input: HTMLInputElement | null) => {
-        inputRef.current = input;
-        if (typeof forwardedRef === 'function') forwardedRef(input);
-        else if (forwardedRef) forwardedRef.current = input;
-      },
-      [forwardedRef],
-    );
-
-    useIsomorphicLayoutEffect(() => {
-      const input = inputRef.current;
-      setPickerSupported(typeof input?.showPicker === 'function');
-    }, []);
-
-    const openDatePicker = (event: React.PointerEvent<HTMLInputElement>) => {
-      const input = event.currentTarget;
-      if (event.button !== 0 || typeof input.showPicker !== 'function') {
-        onPointerDown?.(event);
-        return;
-      }
-
-      event.preventDefault();
-      input.focus();
-      try {
-        input.showPicker();
-      } catch {
-        // The native picker can reject calls outside a user-activation context.
-      }
-      onPointerDown?.(event);
-    };
-
-    return (
-      <div className="relative flex h-9 w-full min-w-0 items-center justify-between rounded-md border border-input bg-transparent px-2.5 text-sm shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30">
-        <span
-        aria-hidden="true"
-        className={cn(
-          'pointer-events-none min-w-0 flex-1 truncate',
-          value ? 'text-foreground' : 'text-muted-foreground',
-        )}
-        >
-          {dateInputDisplayValue(value, type)}
-        </span>
-        {pickerSupported !== false && (
-          <CalendarIcon
-            aria-hidden="true"
-            className="pointer-events-none size-4 shrink-0 text-muted-foreground"
-          />
-        )}
-        <Input
-        {...props}
-        ref={setInputRef}
-        type={type}
-        value={value}
-        onPointerDown={openDatePicker}
-        className={cn(
-          inputClassName,
-          pickerSupported === false ? fallbackInputClassName : pickerInputClassName,
-          className,
-        )}
-      />
-      </div>
-    );
+const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(function DateInput(
+  {
+    className,
+    type,
+    value,
+    defaultValue,
+    disabled,
+    readOnly,
+    onChange,
+    onPointerDown,
+    onClick,
+    onKeyDown,
+    onFocus,
+    onBlur,
+    ...props
   },
-);
+  forwardedRef,
+) {
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const groupRef = React.useRef<HTMLDivElement | null>(null);
+  const popupRef = React.useRef<HTMLDivElement | null>(null);
+  const triggerId = React.useId();
+  const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue ?? '');
+  const [open, setOpen] = React.useState(false);
+  const [focused, setFocused] = React.useState(false);
+  const [selectionError, setSelectionError] = React.useState('');
+  const rawValue = String(value ?? uncontrolledValue);
+  const blocked = Boolean(disabled || readOnly);
+
+  const setInputRef = React.useCallback(
+    (input: HTMLInputElement | null) => {
+      inputRef.current = input;
+      if (typeof forwardedRef === 'function') forwardedRef(input);
+      else if (forwardedRef) forwardedRef.current = input;
+    },
+    [forwardedRef],
+  );
+
+  React.useEffect(() => {
+    const form = inputRef.current?.form;
+    const reset = () => queueMicrotask(() => setUncontrolledValue(inputRef.current?.value ?? ''));
+    form?.addEventListener('reset', reset);
+    return () => form?.removeEventListener('reset', reset);
+  }, []);
+
+  const changeOpen = (next: boolean) => {
+    setOpen(next && !blocked);
+    setSelectionError('');
+  };
+  const selectValue = (next: string) => {
+    const input = inputRef.current;
+    if (!input || blocked) return;
+    const previous = input.value;
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    descriptor?.set?.call(input, next);
+    if (
+      next &&
+      (input.validity.rangeUnderflow || input.validity.rangeOverflow || input.validity.stepMismatch)
+    ) {
+      descriptor?.set?.call(input, previous);
+      setSelectionError('请选择允许范围和间隔内的日期或时间。');
+      return;
+    }
+    if (input.value !== previous) input.dispatchEvent(new Event('input', { bubbles: true }));
+    setSelectionError('');
+    if (type !== 'datetime-local' || !next) setOpen(false);
+  };
+
+  return (
+    <Popover open={open && !blocked} triggerId={triggerId} onOpenChange={changeOpen}>
+      <InputGroup
+        ref={groupRef}
+        data-slot="date-input"
+        data-disabled={disabled ? 'true' : undefined}
+        className={cn('relative bg-transparent text-foreground has-disabled:opacity-50', className)}
+      >
+        <div className="relative min-w-0 flex-1">
+          {!focused && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                'pointer-events-none absolute inset-0 flex items-center truncate px-2.5 text-sm tabular-nums',
+                rawValue ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {rawValue ? rawValue.replace('T', ' ') : placeholders[type]}
+            </span>
+          )}
+          <InputGroupInput
+            {...props}
+            ref={setInputRef}
+            type={type}
+            value={value}
+            defaultValue={defaultValue}
+            disabled={disabled}
+            readOnly={readOnly}
+            aria-haspopup="dialog"
+            aria-expanded={open && !blocked}
+            className={cn(
+              'tabular-nums [&::-webkit-calendar-picker-indicator]:hidden',
+              !focused &&
+                'text-transparent caret-transparent [-webkit-text-fill-color:transparent]',
+            )}
+            onChange={(event) => {
+              if (value === undefined) setUncontrolledValue(event.currentTarget.value);
+              onChange?.(event);
+            }}
+            onFocus={(event) => {
+              setFocused(true);
+              onFocus?.(event);
+            }}
+            onBlur={(event) => {
+              setFocused(false);
+              onBlur?.(event);
+            }}
+            onPointerDown={(event) => {
+              onPointerDown?.(event);
+              if (!event.defaultPrevented && event.button === 0 && !blocked) {
+                event.preventDefault();
+                changeOpen(true);
+              }
+            }}
+            onClick={(event) => {
+              onClick?.(event);
+              if (!event.defaultPrevented && !blocked) {
+                event.preventDefault();
+                changeOpen(true);
+              }
+            }}
+            onKeyDown={(event) => {
+              onKeyDown?.(event);
+              if (
+                !event.defaultPrevented &&
+                (event.key === 'F4' ||
+                  event.key === ' ' ||
+                  event.key === 'Enter' ||
+                  (event.altKey && event.key === 'ArrowDown'))
+              ) {
+                event.preventDefault();
+                changeOpen(true);
+              }
+            }}
+          />
+        </div>
+        <InputGroupAddon align="inline-end">
+          <PopoverTrigger
+            id={triggerId}
+            disabled={blocked}
+            render={
+              <InputGroupButton
+                size="icon-xs"
+                aria-label={`打开${props['aria-label'] ?? '日期选择'}`}
+              />
+            }
+          >
+            <CalendarIcon aria-hidden="true" />
+          </PopoverTrigger>
+        </InputGroupAddon>
+      </InputGroup>
+      <PopoverContent
+        ref={popupRef}
+        align="start"
+        anchor={groupRef}
+        className="w-72 max-w-[calc(100vw-2rem)] gap-0 overflow-y-auto p-0"
+        aria-label={type === 'month' ? '选择月份' : '选择日期和时间'}
+        finalFocus={inputRef}
+        initialFocus={() =>
+          popupRef.current?.querySelector<HTMLElement>(
+            '[data-selected-single="true"], [aria-pressed="true"]',
+          ) ?? true
+        }
+      >
+        <DateSelectionPanel
+          type={type}
+          value={rawValue}
+          min={props.min}
+          max={props.max}
+          step={props.step}
+          onSelect={selectValue}
+          onClose={() => setOpen(false)}
+        />
+        {selectionError && (
+          <p role="alert" className="px-3 pb-3 text-xs text-destructive">
+            {selectionError}
+          </p>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+});
 
 export { DateInput };

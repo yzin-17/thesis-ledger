@@ -83,7 +83,9 @@ function runtime(initial: ChartData, autoLayout = true, deferPaint = false) {
       else apply();
     }),
   };
+  let tap:((e:{time:number})=>void)|undefined;
   const chart = {
+    subscribeClick:(cb:(e:{time:number})=>void)=>{tap=cb},
     timeScale: () => scale,
     applyOptions: vi.fn(),
     remove: vi.fn(),
@@ -123,7 +125,7 @@ function runtime(initial: ChartData, autoLayout = true, deferPaint = false) {
       return frameId;
     },
     cancelAnimationFrame: (id: number) => frames.delete(id),
-    LightweightCharts: { createChart, CandlestickSeries: 'candles', LineSeries: 'line' },
+    LightweightCharts: { createSeriesMarkers:()=>({setMarkers:vi.fn()}),createChart, CandlestickSeries: 'candles', LineSeries: 'line' },
   });
   const html = chartDocument('', 'chart-test', initial, colors, true);
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)![1];
@@ -134,6 +136,7 @@ function runtime(initial: ChartData, autoLayout = true, deferPaint = false) {
     renderFrame();
   }
   return {
+    tap:(time:number)=>tap?.({time}),
     chart,
     scale,
     series,
@@ -269,4 +272,15 @@ describe('本地图表窗口增量更新', () => {
     view.update(dataWindow(1, 7));
     expect(view.series[0].setData).toHaveBeenCalledTimes(calls);
   });
+});
+
+it('同一开盘的模拟点位回传所属蜡烛，撤去叠加后点击没有点位消息',()=>{
+ const time=1793583000;
+ const data:ChartData={candles:[{time,open:10,high:12,low:9,close:11}],lines:[],arenaMarkers:[{time,side:'buy',text:'模型甲 模拟买'},{time,side:'sell',text:'模型乙 模拟卖'}]};
+ const view=runtime(data);
+ view.tap(time);
+ expect(view.messages.at(-1)).toEqual({version:1,instanceId:'chart-test',kind:'arena',time});
+ view.update({...data,arenaMarkers:[]});
+ view.tap(time);
+ expect(view.messages.filter(m=>m.kind==='arena')).toHaveLength(1);
 });

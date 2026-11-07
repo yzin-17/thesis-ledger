@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import { useRef, useState, type FormEvent } from 'react';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -43,7 +44,6 @@ import {
   type AiProviderLifecycleOptions,
   type AiRoutingSettings,
 } from './ai-provider.api.js';
-
 const testSucceeded = (status: string | undefined) => status === 'healthy';
 
 type ActiveAiTest = {
@@ -52,11 +52,7 @@ type ActiveAiTest = {
   controller: AbortController;
 };
 
-const newTestRequestId = () => {
-  const requestId = globalThis.crypto?.randomUUID?.();
-  if (!requestId) throw new Error('当前环境不支持可取消的测试请求');
-  return requestId;
-};
+const newTestRequestId = createClientRequestId;
 
 export const useAiProviderEditor = (routingSettings?: AiRoutingSettings) => {
   const [draft, setDraft] = useState<ProviderDraft>(newProviderDraft);

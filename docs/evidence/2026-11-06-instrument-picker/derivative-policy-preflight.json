@@ -1,0 +1,437 @@
+{
+  "policy": {
+    "revision": 189,
+    "enabled": true,
+    "syncState": "applied",
+    "effectiveStale": false
+  },
+  "derivativeRoutes": [
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_SHFE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "shfe-futures-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_INE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "ine-futures-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_CZCE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "czce-futures-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_CFFEX"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "cffex-futures-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_GFEX"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "gfex-futures-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_RANK_SHFE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "shfe-member-rank-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_RANK_INE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "ine-member-rank-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_RANK_CZCE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "czce-member-rank-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_RANK_CFFEX"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "cffex-member-rank-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_QUOTE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "sina-futures-public-quote"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_KLINE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "sina-futures-public-kline"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_A50_SOURCE_QUOTE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "sina-a50-public-quote"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "OPTION",
+        "capability": "REFERENCE_ETF_OPTION_CONTRACTS"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "sina-etf-option-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "OPTION",
+        "capability": "REFERENCE_ETF_OPTION_QUOTE"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "sina-etf-option-public"
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "OPTION",
+        "capability": "REFERENCE_ETF_OPTION_GREEKS"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "sina-etf-option-public"
+        }
+      ],
+      "enabled": true
+    }
+  ],
+  "routes": {
+    "status": "complete",
+    "reason": null,
+    "catalogRevision": 1106839547598160
+  },
+  "derivativeCapabilities": [
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_SHFE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "shfe-futures-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_INE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "ine-futures-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_CZCE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "czce-futures-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_CFFEX"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "cffex-futures-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_DAILY_GFEX"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "gfex-futures-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_RANK_SHFE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "shfe-member-rank-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_RANK_INE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "ine-member-rank-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_RANK_CZCE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "czce-member-rank-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_RANK_CFFEX"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "cffex-member-rank-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_QUOTE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "sina-futures-public-quote"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_FUTURES_KLINE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "sina-futures-public-kline"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "FUTURE",
+        "capability": "REFERENCE_A50_SOURCE_QUOTE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "sina-a50-public-quote"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "OPTION",
+        "capability": "REFERENCE_ETF_OPTION_CONTRACTS"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "sina-etf-option-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "OPTION",
+        "capability": "REFERENCE_ETF_OPTION_QUOTE"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "sina-etf-option-public"
+      },
+      "state": "ready"
+    },
+    {
+      "key": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "OPTION",
+        "capability": "REFERENCE_ETF_OPTION_GREEKS"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "sina-etf-option-public"
+      },
+      "state": "ready"
+    }
+  ]
+}

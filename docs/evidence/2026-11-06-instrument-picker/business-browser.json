@@ -1,0 +1,87 @@
+{
+  "results": [
+    {
+      "width": 1440,
+      "actualRecurringFundComponent": true,
+      "selection": true,
+      "frozenEdit": true,
+      "cancel": true,
+      "bounds": {
+        "x": 826,
+        "y": 254,
+        "width": 533,
+        "height": 58
+      }
+    },
+    {
+      "width": 1024,
+      "actualRecurringFundComponent": true,
+      "selection": true,
+      "frozenEdit": true,
+      "cancel": true,
+      "bounds": {
+        "x": 410,
+        "y": 254,
+        "width": 533,
+        "height": 58
+      }
+    },
+    {
+      "width": 768,
+      "actualRecurringFundComponent": true,
+      "selection": true,
+      "frozenEdit": true,
+      "cancel": true,
+      "bounds": {
+        "x": 154,
+        "y": 254,
+        "width": 533,
+        "height": 58
+      }
+    },
+    {
+      "width": 390,
+      "actualRecurringFundComponent": true,
+      "selection": true,
+      "frozenEdit": true,
+      "cancel": true,
+      "bounds": {
+        "x": 42,
+        "y": 277,
+        "width": 267,
+        "height": 58
+      }
+    }
+  ],
+  "realDirectory": {
+    "directoryAvailable": true
+  },
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search",
+      "real": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search",
+      "real": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search",
+      "real": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search",
+      "real": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search",
+      "real": true
+    }
+  ],
+  "errors": []
+}

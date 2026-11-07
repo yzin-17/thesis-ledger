@@ -148,7 +148,7 @@ export function ResearchRetryScreen({ runId }: { runId: string }) {
           void command.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))
         }
       />
-      <Feedback message={message} error />
+      <Feedback busy={command.isPending} message={message} error />
     </Page>
   );
 }

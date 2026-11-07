@@ -1,3 +1,5 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { LoadingState } from '@/components/ui/spinner';
 import type { ReactNode } from 'react';
 import type { ImportDraftReviewRecord } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,7 @@ export function ImportDraftReviewList({
         审核已有持仓草稿。保存修订不会改变持仓；截图上传与识别尚未开放。
       </p>
       <Button
+        aria-busy={query.isRefetching || reloading}
         variant="outline"
         className="self-start"
         disabled={query.isFetching || busy || reloading}
@@ -37,7 +40,7 @@ export function ImportDraftReviewList({
       >
         重新读取草稿
       </Button>
-      {query.isPending && <p role="status">正在读取草稿……</p>}
+      {query.isPending && <LoadingState label="正在读取草稿" />}
       {(query.isError || readError) && (
         <Alert variant="destructive">
           <AlertTitle>草稿读取失败</AlertTitle>
@@ -46,22 +49,24 @@ export function ImportDraftReviewList({
           </AlertDescription>
         </Alert>
       )}
-      {!query.isPending && !query.isError && query.data?.length === 0 && (
-        <p role="status">当前账户暂无导入草稿。</p>
-      )}
-      <nav className="flex flex-wrap gap-2" aria-label="导入草稿列表">
-        {query.data?.map((draft) => (
-          <Button
-            key={draft.id}
-            disabled={busy || reloading || readError !== null}
-            variant={draft.id === selectedId ? 'default' : 'outline'}
-            onClick={() => onChoose(draft)}
-          >
-            {draftSourceLabel(draft.source)} · {draftStatusLabels[draft.status]} ·{' '}
-            {draft.createdAt.slice(0, 10)}
-          </Button>
-        ))}
-      </nav>
+      <ListRefreshRegion refreshing={(query.isRefetching || reloading) && query.data !== undefined} label="正在刷新导入草稿">
+        {!query.isPending && !query.isError && query.data?.length === 0 && (
+          <p role="status">当前账户暂无导入草稿。</p>
+        )}
+        <nav className="flex flex-wrap gap-2" aria-label="导入草稿列表">
+          {query.data?.map((draft) => (
+            <Button
+              key={draft.id}
+              disabled={busy || reloading || readError !== null}
+              variant={draft.id === selectedId ? 'default' : 'outline'}
+              onClick={() => onChoose(draft)}
+            >
+              {draftSourceLabel(draft.source)} · {draftStatusLabels[draft.status]} ·{' '}
+              {draft.createdAt.slice(0, 10)}
+            </Button>
+          ))}
+        </nav>
+      </ListRefreshRegion>
       {children}
     </div>
   );

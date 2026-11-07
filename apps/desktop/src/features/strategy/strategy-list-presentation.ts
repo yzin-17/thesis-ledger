@@ -1,7 +1,7 @@
 import type { OptimizationExperimentSource } from '@thesis-ledger/schemas';
 import { formatDateOnly } from '@/lib/date-display';
 import type { OptimizationExperimentSummary } from './strategy-optimization.api.js';
-import { backtestMetricNumber } from './strategy-backtest-detail.model.js';
+import { backtestMetricNumber, backtestMetricPercent } from './strategy-backtest-detail.model.js';
 import type { BacktestJobSummary } from './strategy.types.js';
 
 const businessDate = (value: string | undefined) => {
@@ -45,11 +45,11 @@ export const backtestResultSummary = (job: BacktestJobSummary) => {
   if (job.status === 'succeeded') {
     const metrics = job.resultMetrics;
     const facts: string[] = [];
-    const totalReturn = backtestMetricNumber(metrics?.cumulativeReturn ?? metrics?.totalReturn);
-    const maxDrawdown = backtestMetricNumber(metrics?.maxDrawdown);
+    const totalReturn = backtestMetricPercent(metrics?.cumulativeReturn ?? metrics?.totalReturn);
+    const maxDrawdown = backtestMetricPercent(metrics?.maxDrawdown, true);
     const sharpe = backtestMetricNumber(metrics?.sharpe);
-    if (totalReturn !== null) facts.push(`收益 ${(totalReturn * 100).toFixed(2)}%`);
-    if (maxDrawdown !== null) facts.push(`回撤 ${Math.abs(maxDrawdown * 100).toFixed(2)}%`);
+    if (totalReturn !== null) facts.push(`收益 ${totalReturn}`);
+    if (maxDrawdown !== null) facts.push(`回撤 ${maxDrawdown}`);
     if (sharpe !== null) facts.push(`夏普 ${sharpe.toFixed(2)}`);
     return facts.slice(0, 3).join(' · ') || '结果已生成';
   }

@@ -199,7 +199,7 @@ describe('市场数据 Provider 与主备路由', () => {
     );
   });
 
-  it('用三个一级 Tab 分隔任务并默认打开路由策略', () => {
+  it('用四个一级页签分隔任务并默认打开路由策略', () => {
     const html = renderToStaticMarkup(
       <MarketDataSectionTabs
         providerPanel={<div>provider-panel</div>}
@@ -209,7 +209,8 @@ describe('市场数据 Provider 与主备路由', () => {
     );
 
     expect(html).toContain('aria-label="市场数据功能"');
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/role="tab"/g)).toHaveLength(4);
+    expect(html).toContain('>规则监测<');
     expect(html).toContain('>数据源<');
     expect(html).toContain('>路由策略<');
     expect(html).toContain('>标的目录<');

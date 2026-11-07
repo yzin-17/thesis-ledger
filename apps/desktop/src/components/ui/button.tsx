@@ -21,7 +21,7 @@ const buttonVariants = cva(
         destructive:
           'bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40',
         link: 'text-primary underline-offset-4 hover:underline',
-        metric: 'metric h-auto w-full justify-start rounded-none text-left',
+        metric: 'min-w-0 w-full flex-col items-start justify-start rounded-md text-left whitespace-normal hover:bg-muted/40',
       },
       tone: {
         default: '',
@@ -41,6 +41,7 @@ const buttonVariants = cva(
         'icon-lg': 'size-10',
       },
     },
+    compoundVariants: [{ variant: 'metric', className: 'h-auto gap-1.5 px-2 py-2' }],
     defaultVariants: {
       variant: 'default',
       size: 'default',

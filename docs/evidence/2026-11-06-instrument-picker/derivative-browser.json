@@ -1,0 +1,224 @@
+{
+  "records": [
+    {
+      "width": 1440,
+      "futureSearch": true,
+      "sourcePage2": true,
+      "optionSearch": true,
+      "nearMonthPage2": true,
+      "errorRetainsValue": true,
+      "noPageOverflow": true
+    },
+    {
+      "width": 1024,
+      "futureSearch": true,
+      "sourcePage2": true,
+      "optionSearch": true,
+      "nearMonthPage2": true,
+      "errorRetainsValue": true,
+      "noPageOverflow": true
+    },
+    {
+      "width": 768,
+      "futureSearch": true,
+      "sourcePage2": true,
+      "optionSearch": true,
+      "nearMonthPage2": true,
+      "errorRetainsValue": true,
+      "noPageOverflow": true
+    },
+    {
+      "width": 390,
+      "futureSearch": true,
+      "sourcePage2": true,
+      "optionSearch": true,
+      "nearMonthPage2": true,
+      "errorRetainsValue": true,
+      "noPageOverflow": true
+    }
+  ],
+  "realSourceSelection": true,
+  "requests": [
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 2,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/instruments/search",
+      "method": "GET",
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 2,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 2,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/instruments/search",
+      "method": "GET",
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 2,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 2,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/instruments/search",
+      "method": "GET",
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 2,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 2,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/instruments/search",
+      "method": "GET",
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 1,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 2,
+      "real": false
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "futures-daily-shfe",
+      "page": 1,
+      "real": true
+    },
+    {
+      "path": "/api/market-data/instruments/search",
+      "method": "GET",
+      "real": true
+    },
+    {
+      "path": "/api/market-data/reference",
+      "method": "POST",
+      "dataset": "etf-option-contracts",
+      "page": 1,
+      "real": true
+    }
+  ],
+  "errors": [],
+  "businessWrites": 0
+}

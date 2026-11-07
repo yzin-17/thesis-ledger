@@ -1,3 +1,4 @@
+import { ArenaPage } from '../model-arena/ArenaPage.js';
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
@@ -20,6 +21,7 @@ import { useBacktestJobEvents } from './strategy.events.js';
 import { useToastManager } from '@/components/ui/toast';
 import { StrategyCenterLayout } from './StrategyCenterLayout.js';
 import { StrategyEditorPage } from './StrategyEditorPage.js';
+import { StrategySubmissionList } from './StrategySubmissionList.js';
 import { StrategyExperimentCreatePage } from './StrategyExperimentCreatePage.js';
 import { StrategyExperimentDetailPage } from './StrategyExperimentDetailPage.js';
 import { StrategyExperimentListPage } from './StrategyExperimentListPage.js';
@@ -61,12 +63,14 @@ function LegacyStrategyRedirect() {
 }
 
 function StrategyRiskApplicationRoute({
+  refreshing = false,
   strategies,
   loading,
   onBacktest,
   tabState,
   onTabChange,
 }: {
+  refreshing?: boolean;
   strategies: StrategyRecord[];
   loading: boolean;
   onBacktest: (strategy: StrategyRecord, version: StrategyVersion) => void;
@@ -79,6 +83,7 @@ function StrategyRiskApplicationRoute({
   return (
     <>
       <StrategyVersionPage
+        refreshing={refreshing}
         strategies={strategies}
         loading={loading}
         onBacktest={onBacktest}
@@ -91,12 +96,14 @@ function StrategyRiskApplicationRoute({
 }
 
 function StrategyEditorRoute({
+  refreshing = false,
   strategies,
   loading,
   onBacktest,
   tabState,
   onTabChange,
 }: {
+  refreshing?: boolean;
   strategies: StrategyRecord[];
   loading: boolean;
   onBacktest: (strategy: StrategyRecord, version: StrategyVersion) => void;
@@ -109,6 +116,7 @@ function StrategyEditorRoute({
   return (
     <>
       <StrategyVersionPage
+        refreshing={refreshing}
         strategies={strategies}
         loading={loading}
         onBacktest={onBacktest}
@@ -161,6 +169,7 @@ export function StrategyDashboard() {
   const { refreshing, refresh } = usePageRefresh([
     { queryKey: strategyKeys.root },
     { predicate: ({ queryKey }) => queryKey[0] === 'desktop' && typeof queryKey[1] === 'string' && queryKey[1].startsWith('authoring-') },
+    { predicate: ({ queryKey }) => queryKey[0] === 'desktop' && queryKey[3] === 'model-arenas' },
   ]);
   useBacktestJobEvents();
   const createMutation = useCreateStrategyMutation();
@@ -222,12 +231,15 @@ export function StrategyDashboard() {
           description={strategiesQuery.isError ? '策略列表暂未更新。已成功保存的策略或新版本无需再次提交，请重新读取列表。' : undefined}
           onRetry={() => void refresh()}
         />
+        <StrategySubmissionList />
         <Routes>
+          <Route path="arena/:match?/:round?" element={<ArenaPage />} />
           <Route index element={<LegacyStrategyRedirect />} />
           <Route
             path="library"
             element={
               <StrategyLibraryPage
+                refreshing={strategiesQuery.isRefetching || jobsQuery.isRefetching}
                 strategies={strategies}
                 jobs={jobs}
                 loading={strategiesQuery.isPending}
@@ -250,6 +262,7 @@ export function StrategyDashboard() {
             path="library/:strategyId/versions/:versionId"
             element={
               <StrategyVersionPage
+                refreshing={strategiesQuery.isRefetching}
                 strategies={strategies}
                 loading={strategiesQuery.isPending}
                 onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}
@@ -262,6 +275,7 @@ export function StrategyDashboard() {
             path="library/:strategyId/versions/:versionId/edit"
             element={
               <StrategyEditorRoute
+                refreshing={strategiesQuery.isRefetching}
                 strategies={strategies}
                 loading={strategiesQuery.isPending}
                 onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}
@@ -274,6 +288,7 @@ export function StrategyDashboard() {
             path="library/:strategyId/versions/:versionId/risk-application"
             element={
               <StrategyRiskApplicationRoute
+                refreshing={strategiesQuery.isRefetching}
                 strategies={strategies}
                 loading={strategiesQuery.isPending}
                 onBacktest={(strategy, version) => setBacktestSelection({ strategy, version })}

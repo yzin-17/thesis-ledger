@@ -79,7 +79,7 @@ export const AutomationEditorSheet = ({
 }) => {
   const requestClose = useDraftCloseGuard({
     open,
-    draft: draft,
+    draft: { jobId: editingJob?.id, fields: draft },
     busy: saving,
     onOpenChange: (nextOpen) => (nextOpen ? onOpenChange(true) : onClose()),
   });

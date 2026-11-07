@@ -10,6 +10,7 @@ import {
   type FxRatesResponse,
   type MarketQuoteIdentity,
 } from '@thesis-ledger/schemas';
+import { MarketObservationsService } from './market-observations.service.js';
 import { readQuoteBatch } from './market-quote-batch.js';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
@@ -33,6 +34,7 @@ export class MarketService {
     private readonly dsa: DsaClient,
     private readonly redis: RedisService,
     @Optional() private readonly prisma?: PrismaService,
+    @Optional() private readonly observations?: MarketObservationsService,
   ) {
     this.quoteReader = new MarketQuoteReader(dsa, redis);
     this.control = new MarketCacheControl(dsa);
@@ -118,20 +120,26 @@ export class MarketService {
         currencies,
         ...(asOf ? { asOf } : {}),
       });
-      return fxRatesResponseSchema.parse(raw);
+      const value = fxRatesResponseSchema.parse(raw);
+      await this.observations?.record({ kind: 'fx', value });
+      return value;
     });
   }
 
-  getQuote(input: string, options: QuoteReadOptions = {}) {
-    return this.quoteReader.getQuote(input, options);
+  async getQuote(input: string, options: QuoteReadOptions = {}) {
+    const value = await this.quoteReader.getQuote(input, options);
+    await this.observations?.record({ kind: 'quote', value });
+    return value;
   }
 
   getQuotes(items: readonly MarketQuoteIdentity[], options: Pick<QuoteReadOptions, 'allowStale' | 'refresh' | 'signal'> = {}) {
     return readQuoteBatch(items, (symbol, selected) => this.getQuote(symbol, selected), options);
   }
 
-  getFundNav(...args: Parameters<MarketFundReader['getFundNav']>) {
-    return this.fundReader.getFundNav(...args);
+  async getFundNav(...args: Parameters<MarketFundReader['getFundNav']>) {
+    const value = await this.fundReader.getFundNav(...args);
+    await this.observations?.record({ kind: 'nav', value });
+    return value;
   }
 
   /** 当前净值的原协议没有币种；只接受已确认、未变化的 CNY 基金元数据。 */
@@ -141,7 +149,7 @@ export class MarketService {
     if (!proof) return { status: 'unavailable' as const, reason: 'fund_currency_unverified' as const };
     if (proof.currency !== 'CNY') return { status: 'unavailable' as const, reason: 'fund_currency_unsupported' as const };
     signal?.throwIfAborted();
-    const nav = await this.fundReader.getFundNav(instrument.symbol, { allowStale: false, ...(signal ? { signal } : {}) });
+    const nav = await this.getFundNav(instrument.symbol, { allowStale: false, ...(signal ? { signal } : {}) });
     signal?.throwIfAborted();
     const current = await this.fundCurrencyProof(instrument);
     if (!current || current.currency !== 'CNY' || current.confirmedAt.getTime() !== proof.confirmedAt.getTime() || current.assetUpdatedAt.getTime() !== proof.assetUpdatedAt.getTime()) return { status: 'unavailable' as const, reason: 'fund_currency_changed' as const };

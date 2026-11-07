@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -78,7 +79,8 @@ function NavRunReadError({
       <AlertTitle>无法读取基金净值回测任务</AlertTitle>
       <AlertDescription className="flex flex-col gap-3">
         <p>{errorText(error, '请确认任务编号有效，并检查服务连接。')}</p>
-        <Button type="button" variant="outline" disabled={fetching} onClick={onRetry}>
+        <Button aria-busy={fetching} type="button" variant="outline" disabled={fetching} onClick={onRetry}>
+          {fetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {fetching ? '正在重试…' : '重新读取'}
         </Button>
       </AlertDescription>
@@ -167,7 +169,7 @@ function NavRunHeader({
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-2xl font-semibold tracking-tight">基金净值回测任务</h2>
+          <h2 className="text-xl font-semibold tracking-tight">基金净值回测任务</h2>
           <Badge variant={run.status === 'failed' ? 'destructive' : 'secondary'}>
             {statusLabel(run.status)}
           </Badge>
@@ -233,12 +235,14 @@ function NavRunActions({
         />
       ) : null}
       {cancellable ? (
-        <Button type="button" variant="destructive" disabled={actionPending} onClick={onCancel}>
+        <Button aria-busy={cancelPending} type="button" variant="destructive" disabled={actionPending} onClick={onCancel}>
+          {cancelPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {cancelPending ? '正在取消…' : '取消任务'}
         </Button>
       ) : null}
       {retryable ? (
-        <Button type="button" disabled={actionPending} onClick={onRetry}>
+        <Button aria-busy={retryPending} type="button" disabled={actionPending} onClick={onRetry}>
+          {retryPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {retryPending ? '正在重试…' : '重试 NAV 任务'}
         </Button>
       ) : null}

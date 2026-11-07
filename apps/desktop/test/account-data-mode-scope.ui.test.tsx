@@ -519,7 +519,7 @@ describe('账户数据页全局模式账户范围', () => {
     });
 
     await waitFor(() =>
-      expect(host?.textContent).toContain('先创建一个账户，再录入成交、持仓或现金。'),
+      expect(host?.textContent).toContain('当前模式暂无账户。'),
     );
     expect(requests.some((url) => url.pathname.endsWith('/portfolio/valuation'))).toBe(false);
     expect(requests.some((url) => /\/ledger\/[^/]+\/events$/.test(url.pathname))).toBe(false);

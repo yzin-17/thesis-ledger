@@ -1,10 +1,13 @@
+import { DailyFundComparison } from './DailyFundComparison';
 import { useState } from 'react';
+import { marketAnnouncementSymbolSchema } from '@thesis-ledger/schemas';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 import type { MarketStackParams } from '../../app/navigation-types';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { InstrumentResearch } from './InstrumentResearch';
 import { initialMarketFilters, MarketChartControls } from './MarketChartControls';
 import { MarketChartPanel } from './MarketChartPanel';
 import { MarketQuotePanel } from './MarketQuotePanel';
@@ -45,6 +48,7 @@ function InstrumentDetail({ instrument }: MarketStackParams['MarketDetail']) {
       </Copy>
       <QueryStatus query={quote} retry={() => void quote.refetch()} />
       {quote.data ? <MarketQuotePanel detail={quote.data} /> : null}
+      {fund && <DailyFundComparison symbol={instrument.symbol} />}
       {!fund ? (
         <>
           <MarketChartPanel
@@ -70,12 +74,13 @@ function InstrumentDetail({ instrument }: MarketStackParams['MarketDetail']) {
           label="标的新闻"
           onPress={() => navigation.navigate('MarketNews', { instrument })}
         />
-        <Action
+        {marketAnnouncementSymbolSchema.safeParse(instrument.symbol).success ? <Action
           label="公告与已收录原文"
-          onPress={() => navigation.navigate('MarketAnnouncements', { q: instrument.symbol })}
-        />
+          onPress={() => navigation.navigate('MarketAnnouncements', { symbol: instrument.symbol })}
+        /> : <Copy muted>公告来源暂未覆盖该市场。</Copy>}
         <Action label="已收录规则资料" onPress={() => navigation.navigate('MarketDocuments')} />
       </Section>
+      <InstrumentResearch instrument={instrument}/>
     </Page>
   );
 }

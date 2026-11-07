@@ -1,3 +1,5 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { Link } from 'react-router';
 import type { BacktestNavRunSummaryV3 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -22,11 +24,7 @@ export function NavBacktestJobsPage() {
   const query = useNavBacktestRunsQuery();
 
   if (query.isPending) {
-    return (
-      <div className="rounded-lg border p-6 text-sm text-muted-foreground">
-        正在读取基金净值回测历史…
-      </div>
-    );
+    return <LoadingState label="正在读取基金净值回测历史" />;
   }
   if (query.error) {
     return (
@@ -35,11 +33,13 @@ export function NavBacktestJobsPage() {
         <AlertDescription className="flex flex-col gap-3">
           <p>{errorText(query.error, '请检查服务连接后重新读取。')}</p>
           <Button
+            aria-busy={query.isFetching}
             type="button"
             variant="outline"
             disabled={query.isFetching}
             onClick={() => void query.refetch()}
           >
+            {query.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
             {query.isFetching ? '正在读取…' : '重新读取'}
           </Button>
         </AlertDescription>
@@ -51,7 +51,7 @@ export function NavBacktestJobsPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">基金净值回测历史</h2>
+          <h2 className="text-xl font-semibold tracking-tight">基金净值回测历史</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             打开任一历史任务，可继续查看结果、来源与研究假设。
           </p>
@@ -62,22 +62,24 @@ export function NavBacktestJobsPage() {
           variant="outline"
         />
       </div>
-      {query.data && query.data.length > 0 ? (
-        <NavBacktestJobsTable runs={query.data} />
-      ) : (
-        <Empty className="border border-dashed">
-          <EmptyHeader>
-            <EmptyTitle>还没有基金净值回测任务</EmptyTitle>
-            <EmptyDescription>
-              从基金策略版本进入基金净值回测，完成准备和确认后，任务会保留在这里。
-            </EmptyDescription>
-          </EmptyHeader>
-          <Button
-            nativeButton={false}
-            render={<Link to={strategyCenterPath.library}>浏览策略库</Link>}
-          />
-        </Empty>
-      )}
+      <ListRefreshRegion refreshing={query.isRefetching && !!query.data} label="正在刷新基金净值回测">
+        {query.data && query.data.length > 0 ? (
+          <NavBacktestJobsTable runs={query.data} />
+        ) : (
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyTitle>还没有基金净值回测任务</EmptyTitle>
+              <EmptyDescription>
+                从基金策略版本进入基金净值回测，完成准备和确认后，任务会保留在这里。
+              </EmptyDescription>
+            </EmptyHeader>
+            <Button
+              nativeButton={false}
+              render={<Link to={strategyCenterPath.library}>浏览策略库</Link>}
+            />
+          </Empty>
+        )}
+      </ListRefreshRegion>
     </div>
   );
 }

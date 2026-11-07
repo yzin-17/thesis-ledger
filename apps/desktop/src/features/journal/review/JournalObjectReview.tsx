@@ -4,7 +4,7 @@ import type { JournalAnalysisDraft, JournalReviewCandidateContract } from '@thes
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { getDesktopApiClient } from '@/shared/api/client';
 import { JournalFactSummary } from './JournalFactSummary.js';
 import { JournalDraftSheet } from './JournalDraftSheet.js';
@@ -109,7 +109,7 @@ export function JournalObjectReview({
     reviewRegion.current?.scrollIntoView?.({ block: 'start' });
   }, [focusRequest, hasCandidate]);
   const busy = analysis.isPending || save.isPending || object.isError;
-  if (object.isPending) return <Skeleton className="h-48 w-full" />;
+  if (object.isPending) return <LoadingState label="正在读取复盘对象" />;
   if (!object.data)
     return (
       <JournalRequestError
@@ -134,6 +134,7 @@ export function JournalObjectReview({
           核对与补充本次草稿
         </Button>
         <Button
+          aria-busy={analysis.isPending}
           disabled={busy}
           onClick={() => {
             save.reset();
@@ -147,13 +148,16 @@ export function JournalObjectReview({
             });
           }}
         >
+          {analysis.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {analysis.isPending ? '分析中…' : '开始复盘'}
         </Button>
         <Button
+          aria-busy={save.isPending}
           variant="outline"
           disabled={busy || !result || changed}
           onClick={() => save.mutate()}
         >
+          {save.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {save.isPending ? '保存中…' : '保存复盘快照'}
         </Button>
         <Button variant="ghost" onClick={onHistory}>

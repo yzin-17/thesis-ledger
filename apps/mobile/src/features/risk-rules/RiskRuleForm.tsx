@@ -1,3 +1,4 @@
+import { InstrumentOptionField } from '../market/InstrumentOptionField';
 import { useState } from 'react';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import type { AccountResponse, RiskRuleWire } from '@thesis-ledger/schemas';
@@ -166,10 +167,13 @@ export function RiskRuleForm({
         />
       ) : null}
       {form.scope === 'security' ? (
-        <Choices
+        <InstrumentOptionField
           label="规则持仓标的"
           value={form.symbol}
-          options={[...symbols].map(([value, label]) => ({ value, label: `${label} · ${value}` }))}
+          options={[...symbols].map(([value, label]) => ({
+            value,
+            label: `${label} · ${value}`,
+          }))}
           onChange={(symbol) => change({ symbol })}
           disabled={mutation.isPending}
         />
@@ -206,7 +210,7 @@ export function RiskRuleForm({
       {rule && current && rule.version !== current.version ? (
         <Feedback message="规则版本已变化，请重新核对；输入已保留。" error />
       ) : null}
-      <Feedback message={feedback} error={mutation.isError || locked} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError || locked} />
       <Action
         label="重新核对风险规则"
         disabled={mutation.isPending}

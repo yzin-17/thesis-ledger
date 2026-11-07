@@ -30,7 +30,7 @@ export function marketDetailNotices(
   );
   const staleNotice: MarketDetailNoticeState = refreshing
     ? {
-        state: 'stale',
+        state: 'loading',
         title: '正在刷新行情详情',
         description: '已保留当前可见内容，正在尝试获取更新数据。',
       }

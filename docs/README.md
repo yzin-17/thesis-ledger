@@ -9,8 +9,9 @@
 | 主题 | 当前入口 |
 | --- | --- |
 | 统一数据能力适配层与 Tushare 现金消费条件 | [任务](tasks/2026-10-09-unified-data-capability-adapter.md) |
-| 研究历史比较与价格复核 | [任务](tasks/2026-10-18-research-evidence-evolution.md) |
-| 单只基金盘中估值 | [任务](tasks/2026-11-04-fund-intraday-valuation.md) |
+| 研究历史比较与价格复核（已验收，保留证据） | [任务](tasks/2026-10-18-research-evidence-evolution.md) |
+| 单只基金盘中估值（已验收，保留证据） | [任务](tasks/2026-11-04-fund-intraday-valuation.md) |
+| 自选、模型竞技场与模型周报（已规划） | [自选与共享标的详情](tasks/2026-11-05-watchlist-foundation.md) → [多模型模拟交易竞技场](tasks/2026-11-05-model-arena.md) → [模型每周复盘](tasks/2026-11-05-arena-weekly-review.md) |
 | 已确认但尚未立项的后续实现 | [TODO](TODO.md) |
 | 当前审查、来源矩阵与待评估方案 | [Review 导航](reviews/README.md) |
 

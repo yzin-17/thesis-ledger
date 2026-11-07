@@ -118,7 +118,7 @@ describe('投资复盘工作台 UI 契约', () => {
     const noAccounts = renderJournal(<JournalDashboard accounts={[]} />);
     expect(noAccounts).toContain('还没有可用账户');
 
-    const candidates = renderToStaticMarkup(
+    const candidates = renderJournal(
       <ReviewCandidateList
         candidates={[]}
         filter=""
@@ -133,7 +133,7 @@ describe('投资复盘工作台 UI 契约', () => {
   });
 
   it('以中文展示候选完整度、行为三态和反事实假设', () => {
-    const list = renderToStaticMarkup(
+    const list = renderJournal(
       <ReviewCandidateList
         candidates={[candidate]}
         instrumentDirectory={{
@@ -158,7 +158,7 @@ describe('投资复盘工作台 UI 契约', () => {
     expect(list).toContain('证据完整');
     expect(list).toContain('贵州茅台');
 
-    const fallback = renderToStaticMarkup(
+    const fallback = renderJournal(
       <ReviewCandidateList candidates={[candidate]} filter="" onFilterChange={vi.fn()} />,
     );
     expect(fallback).toContain('600519.SH');

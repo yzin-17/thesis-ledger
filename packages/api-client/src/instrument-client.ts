@@ -1,4 +1,4 @@
-import { instrumentSearchResponseSchema } from '@thesis-ledger/schemas';
+import { instrumentLocatorResultSchema, instrumentSearchResponseSchema } from '@thesis-ledger/schemas';
 type Schema<T> = { safeParse(value: unknown): { success: true; data: T } | { success: false } };
 type Request = <T>(path: string, schema: Schema<T>, init?: RequestInit) => Promise<T>;
 type ResponseRequest = (path: string, init?: RequestInit) => Promise<Response>;
@@ -13,6 +13,10 @@ export function instrumentClient(request: Request, response: ResponseRequest) {
         instrumentSearchResponseSchema,
         signal ? { signal } : undefined,
       );
+    },
+    locateInstrument(symbol: string, instrumentType: string, signal?: AbortSignal) {
+      const query = new URLSearchParams({symbol, instrumentType});
+      return request(`/api/market-data/instruments/identity?${query}`, instrumentLocatorResultSchema, signal ? {signal} : undefined);
     },
     async confirmInstrument(id: string) {
       await response(`/api/market-data/instruments/${encodeURIComponent(id)}/confirm`, {

@@ -175,11 +175,11 @@ describe('回测独立详情模型', () => {
     }
     expect(markup).toContain('已平仓交易数');
     expect(markup).toContain('1');
-    expect(markup).toContain('1,100.00');
+    expect(markup).toContain('上下键逐点查看');
     expect(markup).toContain('权益与回撤联动图表');
-    expect(markup).toContain('查看权益明细（1 个时点）');
+    expect(markup).toContain('个权益时点');
     expect(markup).toContain('导出当前筛选区间');
-    expect(markup).toContain('每页权益时点数量');
+    expect(markup).not.toContain('<table');
   });
 
   it('列表仍只在存在非终态任务时启用兜底轮询', () => {

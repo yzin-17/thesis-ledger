@@ -22,6 +22,7 @@ export function AiChat() {
     historical,
     newResearchOpen,
     initialQuestion,
+    initialInstrument,
     retryOfRunId,
     listFallbackRef,
     searchInput,
@@ -46,10 +47,10 @@ export function AiChat() {
     <section
       ref={listFallbackRef}
       tabIndex={-1}
-      className="module-page flex flex-col gap-4 focus:outline-none"
+      className="module-page flex flex-col gap-card focus:outline-none"
     >
       <PageHeader
-        className="mb-0"
+        eyebrow="RESEARCH ASSISTANT"
         title="研究助手"
         actions={
           <>
@@ -143,6 +144,7 @@ export function AiChat() {
         />
       ) : (
         <ResearchSubmissionSheet
+          initialInstrument={initialInstrument}
           open={newResearchOpen}
           onOpenChange={changeNewResearchOpen}
           initialQuestion={initialQuestion}

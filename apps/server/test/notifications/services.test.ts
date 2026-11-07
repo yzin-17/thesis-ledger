@@ -59,7 +59,7 @@ describe('通知策略', () => {
     );
   });
 
-  it('通过 subject 契约读取投递状态并标记失败可重试', async () => {
+  it('通过 subject 契约读取投递状态，终止失败不被扫描无限补投', async () => {
     const findMany = vi.fn(async () => [{ status: 'delivered' }, { status: 'failed' }]);
     const service = new NotificationService(
       { notificationDelivery: { findMany } } as never,
@@ -73,7 +73,7 @@ describe('通知策略', () => {
       subjectType: 'risk-event',
       subjectId: 'event-1',
       statuses: ['delivered', 'failed'],
-      shouldRetry: true,
+      shouldRetry: false,
     });
     expect(findMany).toHaveBeenCalledWith({
       where: { subjectType: 'risk-event', subjectId: 'event-1' },

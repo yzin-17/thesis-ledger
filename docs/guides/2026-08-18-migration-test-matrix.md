@@ -28,6 +28,8 @@
 
 ## 当前新增验收项
 
+`20261106020000_fund_daily_estimate_error` 保存同次最后有效来源与每日误差，`20261106030000_strategy_submission` 保存带身份的准备意图和领取状态。两项均为保留数据的增量，旧分钟和回测记录继续按原合同读取。
+
 `20260928140000_market_window_catalog_revision_bigint` 保留数据地将 `MarketBarWindowEvidenceV3.catalogRevision` 从 `INTEGER` 扩为 `BIGINT`。DSA Catalog revision 可超过 32 位，但仍须落在 JavaScript 安全整数范围内；Server 写入前精确转换为 Prisma `BigInt`，读回时验证安全范围再返回协议数字。隔离 PostgreSQL 须验证旧行保留与大于 32 位的新值可往返；目标运行态需核对实际列类型、Schema head、Server/Worker 和真实 159516 窗口冻结。
 
 `20260927090000_market_derived_series_snapshot` 新建独立派生输入表，保留完整快照、算法版本和输入指纹；数据库检查列与 JSON 身份一致，应用读取须重算完整内容。同指纹只能同内容幂等，冲突不覆盖。该增量不修改原生窗口数据；隔离 PostgreSQL 和目标运行态验证分别记录，未执行前保持未通过。

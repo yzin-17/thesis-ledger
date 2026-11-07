@@ -256,18 +256,18 @@ describe('账户定投页签与成交来源', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('直接打开定投地址时空态紧凑，已结束计划默认收起且可展开', async () => {
+  it('直接打开定投地址时空态紧凑，仅有已结束计划时默认展开且可收起', async () => {
     await mount('fund-investments');
     expect(activeTab()).toBe('定投计划');
     expect(host.textContent?.match(/暂无待确认成交/g)).toHaveLength(1);
     expect(host.textContent).not.toContain('0 条');
     const details = host.querySelector('details')!;
-    expect(details.open).toBe(false);
+    expect(details.open).toBe(true);
     await act(async () => {
-      details.open = true;
+      details.open = false;
       details.dispatchEvent(new Event('toggle'));
     });
-    expect(details.open).toBe(true);
+    expect(details.open).toBe(false);
     expect(details.textContent).toContain(plan.name);
     expect(details.querySelector('button')).toBeNull();
   });

@@ -196,7 +196,7 @@ export function TransferEditor() {
           editable={!mutation.isPending}
         />
       ) : null}
-      <Feedback message={feedback} error={mutation.isError} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError} />
       <Action
         label="重新读取两侧账本"
         disabled={!target || mutation.isPending}

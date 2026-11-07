@@ -171,6 +171,7 @@ export function BaselineScreen() {
       <Copy muted>本次仅更新所选标的；其他持仓与现金保持原样。</Copy>
       <Feedback message={feedback} error={feedbackError} />
       <Action
+        busy={write.isPending}
         label={write.isPending ? '写入中…' : '写入持仓快照'}
         primary
         disabled={blocked || !instrument}

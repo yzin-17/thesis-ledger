@@ -88,6 +88,11 @@ const toDomainPositions = (
     ...(position.volatility === undefined ? {} : { volatility: position.volatility }),
   }));
 
+const isRiskPeakObservation = (context: SecurityContext) =>
+  Boolean(context.accountId && context.price !== undefined && context.price > 0 &&
+    context.dataQuality.marketData !== 'unavailable' &&
+    !Object.values(context.dataQuality).some((value) => value === 'stale'));
+
 @Injectable()
 export class RiskContextService {
   constructor(
@@ -99,7 +104,13 @@ export class RiskContextService {
     let parsed = this.parseScanInput(input);
     parsed = await this.enrichRiskLabels(parsed);
     this.rejectStaleContexts(parsed);
-    return this.enrichHoldingPeaks(parsed, persistHoldingPeaks);
+    if (!persistHoldingPeaks || typeof this.prisma.$executeRaw !== 'function')
+      return this.enrichHoldingPeaks(parsed, persistHoldingPeaks, this.prisma);
+    // Legacy schedules and data-driven scans share one atomic peak projection.
+    return this.prisma.$transaction(async (client) => {
+      await client.$executeRaw`SELECT pg_advisory_xact_lock(72411, 3)`;
+      return this.enrichHoldingPeaks(parsed, true, client);
+    }, { timeout: 20_000 });
   }
 
   candidatesForRule(rule: RiskRule, scan: ParsedScan): EvaluationCandidate[] {
@@ -214,8 +225,8 @@ export class RiskContextService {
       throw new BadRequestException('行情陈旧，Risk 默认拒绝评估；请在允许陈旧数据后重试');
   }
 
-  private riskPositionStateDelegate(): RiskPositionStateDelegate | null {
-    const delegate = (this.prisma as PrismaService & { riskPositionState?: unknown }).riskPositionState;
+  private riskPositionStateDelegate(prisma: Pick<PrismaService, 'riskPositionState'> = this.prisma): RiskPositionStateDelegate | null {
+    const delegate = (prisma as { riskPositionState?: unknown }).riskPositionState;
     if (!delegate || typeof delegate !== 'object') return null;
     const candidate = delegate as { findMany?: unknown; upsert?: unknown };
     if (typeof candidate.findMany !== 'function' || typeof candidate.upsert !== 'function')
@@ -223,16 +234,10 @@ export class RiskContextService {
     return candidate as unknown as RiskPositionStateDelegate;
   }
 
-  private async enrichHoldingPeaks(scan: ParsedScan, persist: boolean): Promise<ParsedScan> {
-    const contexts = scan.security.filter(
-      (context) =>
-        context.accountId &&
-        context.price !== undefined &&
-        context.price > 0 &&
-        !Object.values(context.dataQuality).some((value) => value === 'stale'),
-    );
+  private async enrichHoldingPeaks(scan: ParsedScan, persist: boolean, client: Pick<PrismaService, 'riskPositionState'>): Promise<ParsedScan> {
+    const contexts = scan.security.filter(isRiskPeakObservation);
     if (contexts.length === 0) return scan;
-    const delegate = this.riskPositionStateDelegate();
+    const delegate = this.riskPositionStateDelegate(client);
     if (!delegate) return scan;
 
     const mode = contexts[0]!.mode;

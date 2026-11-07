@@ -180,7 +180,7 @@ async function wait(check: () => void) {
   });
 }
 function button(text: string) {
-  const found = [...document.querySelectorAll('button')].find(
+  const found = [...(document.querySelector('[role=alertdialog]') ?? document.querySelector('[role=dialog]') ?? document).querySelectorAll('button')].find(
     (b) => b.textContent?.trim() === text,
   );
   expect(found, text).toBeDefined();
@@ -368,7 +368,7 @@ describe('写入与读取故障分离', () => {
 
   it.each([
     ['新建计划', '保存计划', 'createPlan'],
-    ['确认入账', '确认并写入 Ledger', 'confirm'],
+    ['确认入账', '确认入账', 'confirm'],
     ['跳过', '确认跳过', 'skip'],
   ] as const)('%s 成功后的计划读取故障可只重读恢复', async (entry, submit, method) => {
     await mount(<RecurringCashDeposits account={account} />);
@@ -404,8 +404,8 @@ describe('写入与读取故障分离', () => {
       source: { category: 'MANUAL', channel: 'desktop-account-data', externalId: 'old' },
       payload: {
         symbol: '600000.SH',
-        quantity: '10',
-        price: '8.25',
+        quantity: '17.125678901234567890',
+        price: '8.501234567890123456',
         currency: 'CNY',
         capabilityVerification: 'VERIFIED',
         charges: [],
@@ -420,13 +420,14 @@ describe('写入与读取故障分离', () => {
         account={{ ...account, type: 'stock' }}
         open
         editingEvent={originalEvent as never}
+        resolveInstrumentName={() => '目录中的浦发银行'}
         ledgerRevision="4"
         onOpenChange={onOpenChange}
         onDirtyChange={onDirtyChange}
       />,
     );
-    await fill('execution-quantity', '17.125');
-    await fill('execution-price', '8.5');
+    expect(document.body.textContent).toContain('目录中的浦发银行');
+    expect(document.body.textContent).toContain('600000.SH');
     await fill('execution-reason', '重新核对本次规则状态');
     await click('提交更正');
 
@@ -434,16 +435,18 @@ describe('写入与读取故障分离', () => {
     expect(api.replaceExecution).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({
-          quantity: '17.125',
-          price: '8.5',
+          quantity: '17.125678901234567890',
+          price: '8.501234567890123456',
           capabilityVerification: 'UNVERIFIED',
         }),
         reason: '重新核对本次规则状态',
       }),
     );
     expect((document.getElementById('execution-quantity') as HTMLInputElement).value).toBe(
-      '17.125',
+      '17.1256789',
     );
+    await act(async () => document.getElementById('execution-quantity')!.focus());
+    expect((document.getElementById('execution-quantity') as HTMLInputElement).value).toBe('17.125678901234567890');
     expect((document.getElementById('execution-reason') as HTMLTextAreaElement).value).toBe(
       '重新核对本次规则状态',
     );
@@ -536,21 +539,21 @@ describe('写入与读取故障分离', () => {
       await wait(() => expect(document.body.textContent).toContain(message));
     }
 
-    await fill('execution-quantity', '25.1256');
-    await fill('execution-price', '8.56789');
+    await fill('execution-quantity', '25.125678901234567890');
+    await fill('execution-price', '8.56789123456789012');
     await click('记录成交');
     await wait(() => expect(api.createExecution).toHaveBeenCalledOnce());
     expect(api.createExecution).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({
           symbol: scenario.symbol,
-          quantity: '25.1256',
-          price: '8.56789',
+          quantity: '25.125678901234567890',
+          price: '8.56789123456789012',
           capabilityVerification: 'UNVERIFIED',
         }),
       }),
     );
-    expect(document.body.textContent).toContain('交易规则未验证');
+    expect(document.body.textContent).not.toContain('交易规则未验证');
     expect(executionDraft(null, 'CNY').capabilityVerification).toBe('UNVERIFIED');
   });
 });

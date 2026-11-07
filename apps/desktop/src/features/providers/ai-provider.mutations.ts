@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import { useRef } from 'react';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { saveWithValidation, cancelValidatedSave } from './ai-provider-validated-save.js';
@@ -19,7 +20,6 @@ import type {
   AiRoutingSettingsUpdate,
 } from './ai-provider.api.js';
 import { providerKeys } from './providers.queries.js';
-
 const aiCapabilityKey = ['desktop', 'ai', 'capabilities'] as const;
 const aiRoutingSettingsKey = ['desktop', 'ai', 'routing-settings'] as const;
 const optimizationCapabilityKey = ['desktop', 'strategy', 'optimization', 'capabilities'] as const;
@@ -56,7 +56,7 @@ export const useSaveAiProviderMutation = () => {
       if (active.current) throw new Error('验证正在进行，请勿重复保存');
       const request = {
         name: input.name,
-        operationId: crypto.randomUUID(),
+        operationId: createClientRequestId(),
         controller: new AbortController(),
       };
       active.current = request;

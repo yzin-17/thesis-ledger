@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { researchStateMeta } from './research-state-display.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import {
   Table,
@@ -109,7 +110,7 @@ function ResearchSource({ run, onOpen }: { run: AiRunRecord; onOpen: (href: stri
       type="button"
       variant="link"
       size="sm"
-      className="h-auto max-w-full justify-start p-0 text-left whitespace-normal"
+      className="h-auto max-w-full justify-start p-0 text-left whitespace-normal hover:no-underline"
       onClick={(event) => {
         event.stopPropagation();
         onOpen(href);
@@ -409,6 +410,7 @@ function ResearchListResults(
   props: Pick<
     AiRunListProps,
     | 'runs'
+    | 'refreshing'
     | 'selectedId'
     | 'status'
     | 'source'
@@ -421,22 +423,18 @@ function ResearchListResults(
     | 'onClearFilters'
   >,
 ) {
-  const showSkeleton = props.loadState === 'loading' && props.runs.length === 0;
+  const showLoading = props.loadState === 'loading' && props.runs.length === 0;
   const showError = props.loadState === 'error' && props.runs.length === 0;
-  const showEmpty = !showSkeleton && !showError && props.loadState === 'empty';
+  const showEmpty = !showLoading && !showError && props.loadState === 'empty';
   const hasConditions =
     props.status !== 'all' ||
     props.source !== 'all' ||
     props.includeInternal ||
     props.search.length > 0;
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-card">
-      {showSkeleton && (
-        <div className="flex flex-col gap-2 p-4" aria-busy="true" aria-label="正在加载研究任务">
-          {[0, 1, 2, 3].map((item) => (
-            <Skeleton key={item} className="h-16 w-full rounded-md" />
-          ))}
-        </div>
+    <ListRefreshRegion refreshing={props.refreshing && !showLoading && !showError} label="正在刷新研究列表" className="overflow-hidden rounded-md border border-border bg-card">
+      {showLoading && (
+        <LoadingState label="正在加载研究任务" />
       )}
       {showError && (
         <Empty className="min-h-72 border-0 p-6">
@@ -480,7 +478,7 @@ function ResearchListResults(
           onOpenSource={props.onOpenSource}
         />
       )}
-    </div>
+    </ListRefreshRegion>
   );
 }
 
@@ -523,6 +521,7 @@ export function AiRunList({
       />
 
       <ResearchListResults
+        refreshing={refreshing}
         runs={runs}
         selectedId={selectedId}
         status={status}
@@ -537,6 +536,7 @@ export function AiRunList({
       />
       {hasMore && (
         <Button
+          aria-busy={isLoadingMore}
           type="button"
           variant="outline"
           size="sm"
@@ -544,6 +544,7 @@ export function AiRunList({
           onClick={onLoadMore}
           disabled={isLoadingMore}
         >
+          {isLoadingMore && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {isLoadingMore ? '加载中…' : '加载更多'}
         </Button>
       )}

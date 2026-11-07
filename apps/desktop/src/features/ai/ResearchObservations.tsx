@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { reportEvidenceLocator } from './research-report-display.js';
 import { useResearchIdentity, useResearchObservationsQuery } from './research.queries.js';
 import { researchObservationState, researchStateMeta } from './research-state-display.js';
@@ -75,7 +75,7 @@ function ObservationRead({
   locator: ResearchReportLocatorInput;
 }) {
   const query = useResearchObservationsQuery(report.id, locator, true);
-  if (query.isFetching || query.isPending) return <Skeleton className="h-40 w-full" />;
+  if (query.isFetching || query.isPending) return <LoadingState label="正在读取研究复核状态" />;
   if (query.isError || !query.data)
     return (
       <Alert variant="destructive">
@@ -180,12 +180,14 @@ function ObservationItem({
       )}
       {applicable && (
         <Button
+          aria-busy={command.mutation.isPending}
           type="button"
           variant="outline"
           className="self-start"
           disabled={command.mutation.isPending}
           onClick={command.submit}
         >
+          {command.mutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {command.label}
         </Button>
       )}

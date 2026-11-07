@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { desktopNavigation, desktopPathForView, desktopRoutes } from '../src/views.js';
 
 describe('Desktop routes', () => {
-  it('keeps the eight primary navigation entries in URL order', () => {
+  it('keeps the primary navigation entries in URL order', () => {
     expect(desktopRoutes.map(({ view, path }) => [view, path])).toEqual([
       ['performance', '/performance'],
+      ['watchlist','/watchlist'],
       ['position-entry', '/accounts'],
       ['risk-center', '/risk-center'],
       ['strategy', '/strategy'],
@@ -15,6 +16,7 @@ describe('Desktop routes', () => {
     ]);
     expect(desktopNavigation).toEqual([
       'performance',
+      'watchlist',
       'position-entry',
       'risk-center',
       'strategy',

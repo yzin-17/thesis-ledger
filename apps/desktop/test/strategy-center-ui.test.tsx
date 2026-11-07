@@ -78,7 +78,7 @@ describe('策略中心界面契约', () => {
     expect(strategyCenterLayout).toContain('<TabsTrigger');
     expect(strategyCenterLayout).toContain('nativeButton={false}');
     expect(strategyCenterLayout).toContain('<PageHeader');
-    expect(strategyCenterLayout).not.toContain('eyebrow=');
+    expect(strategyCenterLayout).toContain('eyebrow="STRATEGY CENTER"');
     expect(strategyCenterLayout).not.toContain('description=');
     expect(strategyCenterLayout).toContain('value={value}');
     expect(strategyCenterLayout).not.toContain('onValueChange={(nextValue)');
@@ -106,14 +106,14 @@ describe('策略中心界面契约', () => {
     expect(experimentList).toContain('experimentProgressLabel(experiment)');
     expect(experimentList).not.toMatch(/>\s*\{experiment\.id\}\s*</);
     expect(experimentList).not.toContain('model.provider');
-    expect(strategyLibrary).toContain('font-medium text-foreground hover:underline');
-    expect(experimentList).toContain('font-medium text-foreground hover:underline');
-    expect(backtestJobs.match(/font-medium text-foreground hover:underline/g)).toHaveLength(2);
+    for (const source of [strategyLibrary, experimentList, backtestJobs, listPresentation]) {
+      expect(source).not.toContain('hover:underline');
+    }
     expect(backtestJobs).toContain('text-left font-medium text-foreground');
   });
 
   it('版本记录使用紧凑列表而非独立卡片', () => {
-    expect(strategyLibrary).toContain('<TabsContent value="versions" className="mt-4">');
+    expect(strategyLibrary).toContain('<TabsContent value="versions">');
     expect(strategyLibrary).toContain('<th className="w-2/3 px-4 py-3 font-medium">版本</th>');
     expect(strategyLibrary).toContain('<th className="w-1/3 px-4 py-3 font-medium">创建时间</th>');
     expect(strategyLibrary).toContain('className="px-4 py-3 text-muted-foreground"');
@@ -125,7 +125,7 @@ describe('策略中心界面契约', () => {
     expect(backtestJobs).toContain("searchParams.get('expanded')");
     expect(backtestJobs).toContain('backtestStatusSummary(group.jobs)');
     expect(backtestJobs).toContain(
-      'md:grid-cols-[minmax(18rem,1fr)_max-content_max-content] md:items-center',
+      'lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)_max-content] lg:items-center',
     );
     expect(backtestJobs.match(/w-auto shrink-0 flex-row items-center gap-2/g)).toHaveLength(2);
     expect(backtestJobs.match(/className="w-fit"/g)).toHaveLength(2);

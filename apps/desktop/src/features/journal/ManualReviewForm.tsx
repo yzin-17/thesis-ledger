@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
@@ -133,11 +134,11 @@ export function ManualReviewForm({
           <div className="grid gap-4 sm:grid-cols-3">
             <Field invalid={Boolean(errors.symbol)}>
               <FieldLabel htmlFor="manual-review-symbol">标的代码</FieldLabel>
-              <Input
+              <InstrumentSymbolField
                 id="manual-review-symbol"
+                aria-label="标的代码"
                 value={draft.symbol}
-                onChange={(event) => update('symbol', event.target.value)}
-                placeholder="例如 600519.SH"
+                onChange={(value) => update('symbol', value)}
                 aria-invalid={Boolean(errors.symbol)}
               />
               {errors.symbol && <FieldError>{errors.symbol}</FieldError>}

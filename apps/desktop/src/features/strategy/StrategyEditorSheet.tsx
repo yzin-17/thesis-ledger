@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigationGuard } from '../shared/navigation-guard.js';
 import { LoaderCircle } from 'lucide-react';
 import { strategySchema } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,6 +16,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input';
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
   SheetFooter,
@@ -25,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { schemaFromVersion, schemaName } from './strategy.schema.js';
 import { hasUnappliedJson, shouldApplyAdvancedJson } from './strategy.formats.js';
-import { StrategyV2Summary } from './StrategyV2Summary.js';
+import { StrategyConfigurationFields } from './StrategyConfigurationFields.js';
 import type { StrategyRecord, StrategySchema, StrategyVersion } from './strategy.types.js';
 
 type EditorMode = 'create' | 'edit';
@@ -52,6 +54,7 @@ export function StrategyEditorSheet({
   triggerId,
   onOpenChange,
   onDirtyChange,
+  bypassNavigation,
   onSave,
 }: {
   open: boolean;
@@ -64,6 +67,7 @@ export function StrategyEditorSheet({
   triggerId?: string | undefined;
   onOpenChange: (open: boolean) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  bypassNavigation?: () => boolean;
   onSave: (schema: StrategySchema) => void;
 }) {
   const initialSchema = useMemo(
@@ -104,6 +108,12 @@ export function StrategyEditorSheet({
   const dirty =
     JSON.stringify(draft) !== JSON.stringify(initialSchema) ||
     (activeTab === 'advanced' && hasUnappliedJson(jsonText, draft));
+  useNavigationGuard({
+    dirty: open && dirty,
+    busy: open && busy,
+    bypass: () => bypassNavigation?.() ?? false,
+    draft: { sourceKey, draft, jsonText: activeTab === 'advanced' ? jsonText : undefined },
+  });
 
   useEffect(() => {
     onDirtyChange?.(open && dirty);
@@ -160,70 +170,53 @@ export function StrategyEditorSheet({
     onSave(validated.data);
   };
 
-  const canEditName = mode === 'create';
   let saveButtonLabel = '保存为新版本';
   if (busy) saveButtonLabel = '保存中…';
   else if (mode === 'create') saveButtonLabel = '创建策略';
 
-  const editorTitle = mode === 'create' ? '新建策略' : `编辑 ${strategy?.name ?? '策略'} 的新版本`;
+  const editorTitle = mode === 'create' ? '新建策略' : (strategy?.name ?? '编辑策略');
   const editorDescription =
     mode === 'create'
       ? '保存后可从策略库选择版本进行回测。'
-      : `基于 v${version?.version ?? '?'} 编辑，保存后创建新版本；已有版本和历史回测不会被覆盖。`;
-  const editorHeader =
-    presentation === 'page' ? (
-      <div className="flex flex-col gap-2">
-        <h3 className="font-heading text-xl leading-tight font-semibold text-foreground">
-          {editorTitle}
-        </h3>
-        <p
-          id="strategy-editor-description"
-          className="text-sm leading-relaxed text-muted-foreground"
-        >
-          {editorDescription}
-        </p>
-      </div>
-    ) : (
-      <SheetHeader>
-        <SheetTitle>{editorTitle}</SheetTitle>
-        <SheetDescription id="strategy-editor-description">{editorDescription}</SheetDescription>
-      </SheetHeader>
-    );
+      : `基于 v${version?.version ?? '?'} 编辑，保存为新版本；保留原版本和历史回测。`;
+  const editorHeader = presentation === 'sheet' && (
+    <SheetHeader>
+      <SheetTitle className="wrap-anywhere">{editorTitle}</SheetTitle>
+      <SheetDescription id="strategy-editor-description">{editorDescription}</SheetDescription>
+    </SheetHeader>
+  );
 
   const editorContent = (
     <>
       {editorHeader}
-      {errorMessage ? (
-        <Alert variant="destructive">
-          <AlertTitle>保存失败</AlertTitle>
-          <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
-      ) : null}
-      <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+      <SheetBody>
+        {errorMessage ? (
+          <Alert variant="destructive" className="mb-group">
+            <AlertTitle>保存失败</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        ) : null}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList variant="line" className="mb-6 w-full">
+          <TabsList variant="line" className="w-full">
             <TabsTrigger value="common">常用配置</TabsTrigger>
             <TabsTrigger value="advanced">高级 JSON</TabsTrigger>
           </TabsList>
-          <TabsContent value="common" className="mt-0">
-            <FieldGroup>
-              <StrategyV2Summary schema={draft} editable onChange={updateDraft} />
-              <Field invalid={Boolean(schemaError?.startsWith('name'))}>
-                <FieldLabel htmlFor="strategy-name">策略名称</FieldLabel>
-                <Input
-                  id="strategy-name"
-                  value={schemaName(draft, strategy?.name ?? '')}
-                  readOnly={!canEditName}
-                  onChange={(event) => updateDraft({ ...draft, name: event.target.value })}
-                  placeholder="例如：均线突破"
-                />
-                <FieldDescription>
-                  {canEditName ? '名称会同步写入策略配置。' : '编辑已有策略时名称保持不变。'}
-                </FieldDescription>
-                {schemaError?.startsWith('name') && <FieldError>{schemaError}</FieldError>}
-              </Field>
+          <TabsContent value="common">
+            <FieldGroup className="gap-6">
+              {mode === 'create' && (
+                <Field invalid={Boolean(schemaError?.startsWith('name'))}>
+                  <FieldLabel htmlFor="strategy-name">策略名称</FieldLabel>
+                  <Input
+                    id="strategy-name"
+                    value={schemaName(draft, strategy?.name ?? '')}
+                    onChange={(event) => updateDraft({ ...draft, name: event.target.value })}
+                    placeholder="例如：均线突破"
+                  />
+                  {schemaError?.startsWith('name') && <FieldError>{schemaError}</FieldError>}
+                </Field>
+              )}
               <Field>
-                <FieldLabel htmlFor="strategy-description">说明</FieldLabel>
+                <FieldLabel htmlFor="strategy-description">策略说明</FieldLabel>
                 <Textarea
                   id="strategy-description"
                   value={typeof draft.description === 'string' ? draft.description : ''}
@@ -232,9 +225,10 @@ export function StrategyEditorSheet({
                   placeholder="记录这条策略的假设和适用范围"
                 />
               </Field>
+              <StrategyConfigurationFields schema={draft} onChange={updateDraft} />
             </FieldGroup>
           </TabsContent>
-          <TabsContent value="advanced" className="mt-0">
+          <TabsContent value="advanced">
             <Field invalid={Boolean(jsonError)}>
               <FieldLabel htmlFor="strategy-json">策略配置 JSON</FieldLabel>
               <Textarea
@@ -257,12 +251,12 @@ export function StrategyEditorSheet({
             </Field>
           </TabsContent>
         </Tabs>
-        {schemaError && !schemaError.startsWith('name') && (
+        {schemaError && (mode === 'edit' || !schemaError.startsWith('name')) && (
           <p className="mt-4 text-sm text-destructive" role="alert">
             {schemaError}
           </p>
         )}
-      </div>
+      </SheetBody>
       <SheetFooter>
         <Button type="button" variant="outline" onClick={() => handleSheetOpenChange(false)}>
           取消
@@ -280,9 +274,7 @@ export function StrategyEditorSheet({
   return (
     <>
       {presentation === 'page' ? (
-        <div className="flex min-h-[680px] flex-col overflow-hidden rounded-lg border bg-card p-6">
-          {editorContent}
-        </div>
+        <div className="flex min-w-0 flex-col gap-5">{editorContent}</div>
       ) : (
         <Sheet open={open} triggerId={triggerId} onOpenChange={handleSheetOpenChange}>
           <SheetContent

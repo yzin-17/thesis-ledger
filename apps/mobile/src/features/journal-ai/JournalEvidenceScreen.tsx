@@ -3,7 +3,7 @@ import { useRoute, type RouteProp } from '@react-navigation/native';
 import type { JournalAiExplanation, JournalPeriodAiExplanation } from '@thesis-ledger/schemas';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import type { ResearchStackParams } from '../../app/navigation-types';
-import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Copy, Page, QueryList, Section } from '../../components/MobilePrimitives';
 export function JournalEvidenceScreen() {
   const { params } = useRoute<RouteProp<ResearchStackParams, 'JournalEvidence'>>();
   const { api, scope } = useMobileRuntime();
@@ -42,35 +42,48 @@ export function JournalEvidenceScreen() {
   });
   return (
     <Page title="复盘引用来源">
-      <QueryStatus query={run} retry={() => void run.refetch()} />
       {run.data && !references.length ? (
         <Copy>本任务没有该调用的引用，未读取其他来源。</Copy>
       ) : null}
-      {references.map((c, i) => (
-        <Section key={i} title={c.tool}>
-          <Copy>
-            来源 {c.provider} · {c.sourceId}
-          </Copy>
-          <Copy>
-            观察 {c.observedAt} · 可见 {c.availableAt ?? '未记录'} · 抓取 {c.fetchedAt ?? '未记录'}
-          </Copy>
-        </Section>
-      ))}
-      {references.length ? <QueryStatus query={tools} retry={() => void tools.refetch()} /> : null}
-      {tools.data?.pages
-        .flatMap((p) => p.items)
-        .filter((t) => t.id === params.toolCallId)
-        .map((t) => (
-          <Section key={t.id} title="服务端调用审计">
+      <QueryList
+        query={run}
+        retry={() => void run.refetch()}
+        label="正在刷新复盘引用"
+      >
+        {references.map((c, i) => (
+          <Section key={i} title={c.tool}>
             <Copy>
-              {t.status === 'ok' ? '成功' : '不可用或拒绝'} · {t.provider ?? '来源未记录'}
+              来源 {c.provider} · {c.sourceId}
             </Copy>
-            <Copy>输入 {t.inputSummary}</Copy>
-            <Copy>输出 {t.outputSummary ?? '未记录'}</Copy>
+            <Copy>
+              观察 {c.observedAt} · 可见 {c.availableAt ?? '未记录'} · 抓取 {c.fetchedAt ?? '未记录'}
+            </Copy>
           </Section>
         ))}
+      </QueryList>
+      {references.length > 0 && (
+        <QueryList
+          query={tools}
+          retry={() => void tools.refetch()}
+          label="正在刷新证据调用"
+        >
+          {tools.data?.pages
+            .flatMap((p) => p.items)
+            .filter((t) => t.id === params.toolCallId)
+            .map((t) => (
+              <Section key={t.id} title="服务端调用审计">
+                <Copy>
+                  {t.status === 'ok' ? '成功' : '不可用或拒绝'} · {t.provider ?? '来源未记录'}
+                </Copy>
+                <Copy>输入 {t.inputSummary}</Copy>
+                <Copy>输出 {t.outputSummary ?? '未记录'}</Copy>
+              </Section>
+            ))}
+        </QueryList>
+      )}
       {tools.hasNextPage ? (
         <Action
+          busy={tools.isFetchingNextPage}
           label="继续定位调用"
           onPress={() => void tools.fetchNextPage()}
           disabled={tools.isFetching}

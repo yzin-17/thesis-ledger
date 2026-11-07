@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isMarketMinuteTimeframe, type MarketTimeframe } from '@thesis-ledger/schemas';
@@ -119,7 +120,7 @@ export function MarketPeriodSelection({ symbol, enabled, adjustment, children }:
       <Button size="sm" variant="outline" onClick={() => void minuteReadiness.refetch()}>重试周期能力</Button>
     </AlertDescription></Alert>;
   } else if (waitingMinute) {
-    periodNotice = <Alert role="status"><AlertDescription>正在确认分钟周期…</AlertDescription></Alert>;
+    periodNotice = <Alert role="status"><Spinner aria-hidden="true" /><AlertDescription>正在确认分钟周期…</AlertDescription></Alert>;
   } else if (notice?.symbol === symbol) {
     periodNotice = <Alert role="status"><AlertDescription>{notice.text}</AlertDescription></Alert>;
   }

@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,7 +8,6 @@ import {
   type RuleMonitorStatus,
 } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '../../shared/api/client.js';
-
 export const ruleMonitorKey = ['desktop', 'market-data', 'rule-monitor'] as const;
 const api = () => getDesktopApiClient().market;
 type Draft = { enabled: boolean; sourceIds: string[]; revision: number };
@@ -63,7 +63,7 @@ export function useRuleSourceMonitor() {
     )
       request.current = {
         version: ruleSourceMonitorVersion,
-        requestId: crypto.randomUUID(),
+        requestId: createClientRequestId(),
         sourceIds: [...selection.sourceIds],
       };
     check.mutate(request.current);

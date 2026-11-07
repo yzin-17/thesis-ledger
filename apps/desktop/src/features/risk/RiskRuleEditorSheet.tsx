@@ -1,9 +1,11 @@
+import { percentTextToRatio, ratioToPercentText } from '@thesis-ledger/domain';
+import { InstrumentOptionField } from '../market-data/InstrumentOptionField.js';
 import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Combobox } from '@base-ui/react/combobox';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { DecimalInput } from '@/components/ui/decimal-input';
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
 import {
   Select,
@@ -72,12 +74,14 @@ const ALL_ACCOUNTS_VALUE = '__all__';
 
 const draftFromRule = (rule: RiskRuleRecord | null): RuleDraft => {
   if (!rule) return emptyDraft;
-  const threshold = isPercentageRule(rule.kind) ? rule.threshold * 100 : rule.threshold;
+  const threshold = isPercentageRule(rule.kind)
+    ? ratioToPercentText(rule.threshold)
+    : String(rule.threshold);
   return {
     kind: rule.kind,
     scope: rule.scope,
     severity: rule.severity,
-    threshold: String(threshold),
+    threshold,
     symbol: rule.symbol ?? '',
     accountId: rule.accountId ?? '',
     enabled: rule.enabled,
@@ -93,9 +97,10 @@ const saveRuleLabel = (pending: boolean, editing: boolean) => {
 };
 
 const parseThreshold = (kind: string, value: string) => {
+  if (!value.trim()) return null;
+  if (isPercentageRule(kind)) return percentTextToRatio(value);
   const parsed = Number(value);
-  if (!value.trim() || !Number.isFinite(parsed)) return null;
-  return isPercentageRule(kind) ? parsed / 100 : parsed;
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 type RiskRuleKindOption = (typeof riskRuleKindOptions)[number];
@@ -109,14 +114,6 @@ const filterRiskRuleKinds = (option: RiskRuleKindOption, query: string) => {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   if (!normalizedQuery) return true;
   return `${option.label} ${option.value}`.toLocaleLowerCase().includes(normalizedQuery);
-};
-
-const securityOptionLabel = (option: RiskSecurityOption) => `${option.symbol} · ${option.name}`;
-
-const filterRiskSecurityOptions = (option: RiskSecurityOption, query: string) => {
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  if (!normalizedQuery) return true;
-  return `${option.symbol} ${option.name}`.toLocaleLowerCase().includes(normalizedQuery);
 };
 
 const blockedPortfolioScopeChange = (
@@ -135,7 +132,7 @@ export const validateDraft = (
   existingScope: RiskRuleScope | null = null,
 ): RuleErrors => {
   const errors: RuleErrors = {};
-  const thresholdInput = Number(draft.threshold);
+  const thresholdInput = parseThreshold(draft.kind, draft.threshold);
   if (!draft.kind) errors.kind = '请选择规则类型。';
   if (!draft.scope) errors.scope = '请选择规则范围。';
   if (draft.kind && draft.scope && !isRiskRuleScopeAllowed(draft.kind, draft.scope)) {
@@ -147,9 +144,9 @@ export const validateDraft = (
   const scopeChangeError = blockedPortfolioScopeChange(existingScope, draft.scope);
   if (scopeChangeError) errors.scope = scopeChangeError;
   if (!draft.severity) errors.severity = '请选择严重级别。';
-  if (!draft.threshold.trim() || !Number.isFinite(thresholdInput)) {
+  if (thresholdInput === null) {
     errors.threshold = '请输入有效阈值。';
-  } else if (isPercentageRule(draft.kind) && (thresholdInput <= 0 || thresholdInput > 100)) {
+  } else if (isPercentageRule(draft.kind) && (thresholdInput <= 0 || thresholdInput > 1)) {
     errors.threshold = '百分比阈值需大于 0 且不超过 100%。';
   } else if (!isPercentageRule(draft.kind) && thresholdInput < 0) {
     errors.threshold = '数值阈值不能小于 0。';
@@ -163,7 +160,8 @@ export const validateDraft = (
 };
 
 export const toInput = (draft: RuleDraft): CreateRiskRuleInput => {
-  const threshold = parseThreshold(draft.kind, draft.threshold) ?? 0;
+  const threshold = parseThreshold(draft.kind, draft.threshold);
+  if (threshold === null) throw new Error('请输入有效阈值。');
   return {
     kind: draft.kind,
     scope: draft.scope,
@@ -198,8 +196,6 @@ export function RiskRuleEditorSheet({
   const [errors, setErrors] = useState<RuleErrors>({});
   const [kindOpen, setKindOpen] = useState(false);
   const [kindQuery, setKindQuery] = useState(riskRuleKindLabel(emptyDraft.kind));
-  const [securityOpen, setSecurityOpen] = useState(false);
-  const [securityQuery, setSecurityQuery] = useState('');
   const editing = Boolean(rule);
   const securityNeedsAccount = riskRuleNeedsAccount(draft.kind);
   const selectableAccounts = useMemo(
@@ -228,28 +224,13 @@ export function RiskRuleEditorSheet({
     const nextDraft = draftFromRule(rule);
     setDraft(nextDraft);
     setKindQuery(riskRuleKindLabel(rule?.kind ?? emptyDraft.kind));
-    setSecurityQuery(nextDraft.symbol);
     setKindOpen(false);
-    setSecurityOpen(false);
     setErrors({});
   }, [open, rule]);
 
   useEffect(() => {
     if (!kindOpen) setKindQuery(riskRuleKindLabel(draft.kind));
   }, [draft.kind, kindOpen]);
-
-  const selectedSecurityOption = useMemo(
-    () => securityOptions.find((option) => option.symbol === draft.symbol) ?? null,
-    [draft.symbol, securityOptions],
-  );
-
-  useEffect(() => {
-    if (!securityOpen) {
-      setSecurityQuery(
-        selectedSecurityOption ? securityOptionLabel(selectedSecurityOption) : draft.symbol,
-      );
-    }
-  }, [draft.symbol, securityOpen, selectedSecurityOption]);
 
   const thresholdPlaceholder = isPercentageRule(draft.kind) ? '例如 10' : '例如 120';
   const scopeOptions = useMemo(() => riskRuleScopeOptionsForKind(draft.kind), [draft.kind]);
@@ -292,10 +273,6 @@ export function RiskRuleEditorSheet({
   } else if (draft.accountId) {
     securityDescription = '所选账户暂无已导入标的。';
   }
-  let securityPlaceholder = '暂无已导入标的';
-  if (securityNeedsAccount && !draft.accountId) securityPlaceholder = '先选择账户';
-  else if (securityOptions.length > 0) securityPlaceholder = '搜索代码或名称';
-
   const updateDraft = <K extends keyof RuleDraft>(key: K, value: RuleDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: undefined }));
@@ -324,11 +301,6 @@ export function RiskRuleEditorSheet({
     setKindQuery(riskRuleKindLabel(kind));
   };
 
-  const handleSecurityChange = (option: RiskSecurityOption) => {
-    updateDraft('symbol', option.symbol);
-    setSecurityQuery(securityOptionLabel(option));
-  };
-
   const handleSecurityAccountChange = (accountId: string) => {
     setDraft((current) => {
       const symbolStillAvailable =
@@ -343,7 +315,6 @@ export function RiskRuleEditorSheet({
         symbol: symbolStillAvailable ? current.symbol : '',
       };
     });
-    setSecurityQuery('');
     setErrors((current) => {
       const next = { ...current };
       delete next.accountId;
@@ -368,7 +339,7 @@ export function RiskRuleEditorSheet({
 
   const requestClose = useDraftCloseGuard({
     open,
-    draft: null,
+    draft: { ruleId: rule?.id, version: rule?.version, fields: draft },
     dirty: JSON.stringify(draft) !== JSON.stringify(draftFromRule(rule)),
     busy: pending,
     onOpenChange,
@@ -389,7 +360,7 @@ export function RiskRuleEditorSheet({
           </SheetDescription>
         </SheetHeader>
         <form className="flex min-h-0 min-w-0 flex-1 flex-col gap-6" onSubmit={handleFormSubmit}>
-          <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+          <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto scroll-p-2 px-1 py-1">
             <FieldGroup inert={pending}>
               {readOnly && (
                 <Field invalid>
@@ -564,81 +535,18 @@ export function RiskRuleEditorSheet({
                   <Field invalid={Boolean(errors.symbol)}>
                     <FieldLabel htmlFor="risk-rule-symbol">证券标的</FieldLabel>
                     <FieldDescription>{securityDescription}</FieldDescription>
-                    <Combobox.Root
-                      items={securityOptions}
-                      value={selectedSecurityOption}
-                      inputValue={securityQuery}
-                      autoHighlight
-                      filter={filterRiskSecurityOptions}
-                      itemToStringLabel={securityOptionLabel}
-                      itemToStringValue={(option) => option.symbol}
-                      onOpenChange={(nextOpen) => {
-                        setSecurityOpen(nextOpen);
-                        if (nextOpen) setSecurityQuery('');
-                      }}
-                      onInputValueChange={(value) => setSecurityQuery(value)}
-                      onValueChange={(option) => {
-                        if (option) handleSecurityChange(option);
-                      }}
-                    >
-                      <InputGroup className="h-9" aria-invalid={Boolean(errors.symbol)}>
-                        <Combobox.Input
-                          id="risk-rule-symbol"
-                          data-slot="input-group-control"
-                          className="h-9 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2.5 py-2 pr-1 text-sm text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus-visible:border-0 focus-visible:ring-0"
-                          placeholder={securityPlaceholder}
-                          aria-label="搜索证券标的"
-                          aria-invalid={Boolean(errors.symbol)}
-                          disabled={securityOptions.length === 0}
-                        />
-                        <InputGroupAddon align="inline-end">
-                          <ChevronDownIcon aria-hidden="true" />
-                        </InputGroupAddon>
-                      </InputGroup>
-                      <Combobox.Portal>
-                        <Combobox.Positioner
-                          className="layer-popover"
-                          side="bottom"
-                          align="start"
-                          sideOffset={4}
-                        >
-                          <Combobox.Popup
-                            aria-label="已导入证券标的选项"
-                            className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
-                          >
-                            <Combobox.List className="max-h-72 overflow-auto p-1">
-                              <Combobox.Group>
-                                {securityOptions.map((option, index) => (
-                                  <Combobox.Item
-                                    key={option.symbol}
-                                    value={option}
-                                    index={index}
-                                    className="relative flex w-full cursor-default items-start rounded-sm px-3 py-2 pr-9 text-left outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
-                                  >
-                                    <span className="min-w-0">
-                                      <code className="block font-mono text-xs text-muted-foreground">
-                                        {option.symbol}
-                                      </code>
-                                      <strong className="mt-0.5 block truncate text-sm font-medium">
-                                        {option.name}
-                                      </strong>
-                                    </span>
-                                    <Combobox.ItemIndicator className="pointer-events-none absolute right-2 top-2 flex size-4 items-center justify-center">
-                                      <CheckIcon aria-hidden="true" />
-                                    </Combobox.ItemIndicator>
-                                  </Combobox.Item>
-                                ))}
-                              </Combobox.Group>
-                              <Combobox.Empty className="px-3 py-2 text-sm text-muted-foreground">
-                                {securityOptions.length > 0
-                                  ? '没有匹配的已导入标的'
-                                  : '暂无已导入标的'}
-                              </Combobox.Empty>
-                            </Combobox.List>
-                          </Combobox.Popup>
-                        </Combobox.Positioner>
-                      </Combobox.Portal>
-                    </Combobox.Root>
+                    <InstrumentOptionField
+                      label="搜索证券标的"
+                      id="risk-rule-symbol"
+                      options={securityOptions.map((option) => ({
+                        value: option.symbol,
+                        label: `${option.name} · ${option.symbol}`,
+                      }))}
+                      value={draft.symbol}
+                      disabled={!securityOptions.length}
+                      invalid={Boolean(errors.symbol)}
+                      onChange={(symbol) => updateDraft('symbol', symbol)}
+                    />
                     {errors.symbol && <FieldError>{errors.symbol}</FieldError>}
                   </Field>
                 </>
@@ -689,16 +597,13 @@ export function RiskRuleEditorSheet({
                 </FieldLabel>
                 <FieldDescription>
                   {isPercentageRule(draft.kind)
-                    ? `提交时将 ${draft.threshold || '输入值'}% 转换为 decimal。`
-                    : '按规则原始数值提交。'}
+                    ? '百分比阈值须大于 0 且不超过 100%。'
+                    : '阈值不能小于 0。'}
                 </FieldDescription>
-                <Input
+                <DecimalInput
                   id="risk-rule-threshold"
                   value={draft.threshold}
-                  type="number"
-                  min={isPercentageRule(draft.kind) ? 0 : undefined}
-                  max={isPercentageRule(draft.kind) ? 100 : undefined}
-                  step="any"
+                  fractionDigits={6}
                   placeholder={thresholdPlaceholder}
                   aria-invalid={Boolean(errors.threshold)}
                   onChange={(event) => updateDraft('threshold', event.target.value)}

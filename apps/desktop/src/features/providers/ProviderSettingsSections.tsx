@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { TableContainer } from '@/components/ui/table';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ const providerTestActionLabel = (busy: boolean, isAi: boolean) => {
 };
 
 export function ProviderTable({
+  refreshing = false,
   loadState,
   providers,
   priorityDrafts,
@@ -64,6 +66,7 @@ export function ProviderTable({
   onDelete,
   onCreate,
 }: {
+  refreshing?: boolean;
   loadState: LoadState;
   providers: ProviderRecord[];
   priorityDrafts: Record<string, number>;
@@ -89,7 +92,7 @@ export function ProviderTable({
           新增或更新提供方
         </Button>
       </div>
-      <TableContainer>
+      <TableContainer refreshing={refreshing} refreshLabel="正在刷新数据源列表">
         <table>
           <thead>
             <tr>
@@ -299,13 +302,14 @@ export function AutomationTable({
           <AlertTitle>任务列表暂未更新</AlertTitle>
           <AlertDescription>
             已成功保存的任务无需再次创建或保存。重新读取列表不会执行任务。
-            <Button type="button" variant="outline" disabled={reloading} onClick={onRetry}>
+            <Button aria-busy={reloading} type="button" variant="outline" disabled={reloading} onClick={onRetry}>
+              {reloading && <Spinner data-icon="inline-start" aria-hidden="true" />}
               重新读取任务
             </Button>
           </AlertDescription>
         </Alert>
       )}
-      <TableContainer>
+      <TableContainer refreshing={!!reloading && loadState !== 'loading'} refreshLabel="正在刷新自动化任务">
         <table>
           <thead>
             <tr>
@@ -431,7 +435,7 @@ export function HealthHistoryTable({
       {(loadState === 'error' || loadState === 'stale') && (
         <DataStateBanner state={loadState} {...(onRetry ? { onRetry } : {})} />
       )}
-      <TableContainer>
+      <TableContainer refreshing={loading && loadState !== 'loading'} refreshLabel="正在刷新健康历史">
         <table>
           <thead>
             <tr>
@@ -444,7 +448,7 @@ export function HealthHistoryTable({
           </thead>
           <tbody>
             {history.items.length === 0 ? (
-              <EmptyTableRow colSpan={5} label={providerReadEmptyLabel(loadState, '健康历史')} />
+              <EmptyTableRow colSpan={5} loading={loadState === 'loading'} label={providerReadEmptyLabel(loadState, '健康历史')} />
             ) : (
               history.items.map((item, index) => (
                 <tr key={`${item.provider}-${item.checkedAt}-${index}`}>
@@ -496,6 +500,7 @@ export function HealthHistoryTable({
 }
 
 function SimpleProviderTable({
+  refreshing = false,
   title,
   description,
   columns,
@@ -506,6 +511,7 @@ function SimpleProviderTable({
   loadState,
   onRetry,
 }: {
+  refreshing?: boolean;
   title: string;
   description: string;
   columns: string[];
@@ -525,7 +531,7 @@ function SimpleProviderTable({
       {(loadState === 'error' || loadState === 'stale') && (
         <DataStateBanner state={loadState} {...(onRetry ? { onRetry } : {})} />
       )}
-      <TableContainer>
+      <TableContainer refreshing={refreshing} refreshLabel={`正在刷新${title}`}>
         <table>
           <thead>
             <tr>
@@ -539,7 +545,7 @@ function SimpleProviderTable({
               ? (emptyState ?? (
                   <EmptyTableRow
                     colSpan={emptyColSpan}
-                    label={providerReadEmptyLabel(loadState, title)}
+                    loading={loadState === 'loading'} label={providerReadEmptyLabel(loadState, title)}
                   />
                 ))
               : rows.map((row) => (
@@ -573,8 +579,8 @@ export function AutomationRunHistoryTable({
   const jobNames = new Map(jobs.map((job) => [job.id, job.name]));
   const automationJobName = (jobId: string) => jobNames.get(jobId) ?? jobId.slice(0, 8);
   let emptyState: ReactNode = <EmptyTableRow colSpan={5} />;
-  if (loading || loadState === 'loading') {
-    emptyState = <EmptyTableRow colSpan={5} label="正在读取自动化运行历史…" />;
+  if (loadState === 'loading') {
+    emptyState = <EmptyTableRow colSpan={5} loading label="正在读取自动化运行历史…" />;
   } else if (loadState === 'error') {
     emptyState = <EmptyTableRow colSpan={5} label="自动化运行历史读取失败，请重新加载。" />;
   } else if (loadState === 'stale') {
@@ -582,6 +588,7 @@ export function AutomationRunHistoryTable({
   }
   return (
     <SimpleProviderTable
+      refreshing={loading && loadState !== 'loading'}
       title="自动化运行历史"
       description="失败任务和错误摘要可从这里定位，无需直接查数据库。"
       columns={['任务', '状态', '开始时间', '运行结果', '错误']}
@@ -634,10 +641,12 @@ export function AutomationRunHistoryTable({
 }
 
 export function NotificationFailuresTable({
+  refreshing = false,
   loadState,
   notificationFailures,
   onRetry,
 }: {
+  refreshing?: boolean;
   loadState: LoadState;
   notificationFailures: NotificationFailureRecord[];
   onRetry?: (() => void) | undefined;
@@ -645,6 +654,7 @@ export function NotificationFailuresTable({
   const normalizedState = isDataLoaded(loadState);
   return (
     <SimpleProviderTable
+      refreshing={refreshing}
       title="通知失败"
       description="只读展示投递失败状态，重试仍通过 Notification API 处理。"
       columns={['提供方', '状态', '错误']}
@@ -668,10 +678,12 @@ export function NotificationFailuresTable({
 }
 
 export function DataQualityIssuesTable({
+  refreshing = false,
   loadState,
   issues,
   onRetry,
 }: {
+  refreshing?: boolean;
   loadState: LoadState;
   issues: ProviderIssueRecord[];
   onRetry?: (() => void) | undefined;
@@ -679,6 +691,7 @@ export function DataQualityIssuesTable({
   const normalizedState = isDataLoaded(loadState);
   return (
     <SimpleProviderTable
+      refreshing={refreshing}
       title="开放数据质量问题"
       description="异常不会静默当作完整数据。"
       columns={['提供方', '标的', '级别', '问题']}

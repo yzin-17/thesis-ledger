@@ -56,10 +56,8 @@ const roundedQuotient = (numerator: bigint, denominator: bigint) => {
 };
 
 /**
- * Decimal arithmetic for domain projections.
- *
- * Values are kept as integer coefficients plus a decimal scale so projection
- * code never passes quantities or money through JavaScript `number`.
+ * 使用整数系数与十进制尺度保存领域投影。
+ * 金额和数量应直接传入原始十进制文本；已有 number 接口通过 fromNumber 显式接入。
  */
 export class DecimalValue {
   private readonly parts: DecimalParts;
@@ -70,6 +68,21 @@ export class DecimalValue {
 
   static from(value: string | DecimalValue) {
     return value instanceof DecimalValue ? value : new DecimalValue(parseDecimal(value));
+  }
+
+  /** 将有限 number 的规范十进制表示接入计算，不改变字符串输入合同。 */
+  static fromNumber(value: number) {
+    if (!Number.isFinite(value)) throw new Error('数值必须为有限数');
+    const [mantissa, exponent = '0'] = String(value).split('e');
+    const parts = parseDecimal(mantissa!);
+    const scale = parts.scale - Number(exponent);
+    if (scale < 0) {
+      return new DecimalValue({
+        coefficient: parts.coefficient * powerOfTen(-scale),
+        scale: 0,
+      });
+    }
+    return new DecimalValue({ coefficient: parts.coefficient, scale });
   }
 
   plus(value: string | DecimalValue) {
@@ -108,6 +121,16 @@ export class DecimalValue {
 
   compareTo(value: string | DecimalValue) {
     return compareParts(this.parts, DecimalValue.from(value).parts);
+  }
+
+  /** 精确判断十进制倍数，不经过除法舍入。 */
+  isMultipleOf(value: string | DecimalValue) {
+    const right = DecimalValue.from(value).parts;
+    if (right.coefficient === 0n) throw new Error('不能除以零');
+    const scale = Math.max(this.parts.scale, right.scale);
+    const numerator = this.parts.coefficient * powerOfTen(scale - this.parts.scale);
+    const denominator = right.coefficient * powerOfTen(scale - right.scale);
+    return numerator % denominator === 0n;
   }
 
   isZero() {

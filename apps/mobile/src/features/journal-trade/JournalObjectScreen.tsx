@@ -153,7 +153,7 @@ export function JournalObjectScreen() {
         disabled={busy || !result || changed || query.isError}
         onPress={() => execute(() => save.mutateAsync(undefined))}
       />
-      <Feedback message={message} error={analysis.isError || save.isError} />
+      <Feedback busy={analysis.isPending || save.isPending} message={message} error={analysis.isError || save.isError} />
       {changed ? <Copy>事实或草稿已修改，下方保留上次结果，请重新分析后保存。</Copy> : null}
       {result ? (
         <>

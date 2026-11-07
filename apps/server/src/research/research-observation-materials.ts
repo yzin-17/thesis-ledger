@@ -115,6 +115,7 @@ export class ResearchObservationMaterials {
     window: ResearchObservationEvaluation['window'],
     calendar: ObservationCalendar,
     asOf: string,
+    retainedOnly = false,
   ): Promise<MaterialRead<ObservationPrices>> {
     if (
       !window.startSession ||
@@ -140,7 +141,12 @@ export class ResearchObservationMaterials {
       priceResearch: true,
       tradabilityMode: 'assume-untradable-no-bar' as const,
     };
-    const response = await this.bars.readV3(request);
+    let response: MarketBarWindowReadResultV3 | null;
+    if(retainedOnly){
+      try { response = await this.bars.readRetainedResearch(request); }
+      catch { return {material:unavailable('price_unavailable'),audit:{request,status:'qualified_window_unavailable'}}; }
+    } else response=await this.bars.readV3(request);
+    if (!response) return { material: unavailable('price_unavailable'), audit: { request, status: 'qualified_window_missing' } };
     const audit = { request, response };
     if (response.status !== 'selected')
       return { material: unavailable('price_unavailable'), audit };

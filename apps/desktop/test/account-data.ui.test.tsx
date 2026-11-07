@@ -358,7 +358,6 @@ describe('账户数据页面契约', () => {
     );
 
     expect(markup).toContain('现金账户 · 现金 · CNY · 实际');
-    expect(markup).toContain('管理现金入账、账户划转和定期入账。');
     expect(markup).toContain('现金');
     expect(markup).not.toContain('持仓');
     expect(markup).not.toContain('成交记录');
@@ -428,9 +427,12 @@ describe('账户数据页面契约', () => {
     const loadingMarkup = renderPage('', [account], false);
     expect(loadingMarkup).toContain('账户数据');
     expect(loadingMarkup).toContain('aria-busy="true"');
+    expect(loadingMarkup).toContain('aria-label="正在加载成交记录"');
+    expect(loadingMarkup).toContain('data-slot="spinner"');
+    expect(loadingMarkup).not.toContain('data-slot="skeleton"');
 
     const emptyMarkup = renderPage('', []);
-    expect(emptyMarkup).toContain('先创建一个账户');
+    expect(emptyMarkup).toContain('暂无账户');
     expect(emptyMarkup).toContain('账户管理');
     expect(emptyMarkup).toContain('创建账户');
   });
@@ -469,21 +471,18 @@ describe('账户数据页面契约', () => {
     expect(accountDataSource).toContain('结算时间（可选）');
     expect(executionSource).toContain('settlementTiming');
     expect(executionSource).toContain('expectedAt');
-    expect(dateInputSource).toContain('showPicker');
+    expect(dateInputSource).toContain('DateSelectionPanel');
     expect(dateInputSource).toContain('YYYY-MM-DD');
     expect(dateInputSource).toContain('YYYY-MM-DD HH:mm');
-    expect(dateInputSource).toContain('onPointerDown={openDatePicker}');
     expect(dateInputSource).toContain('ref={setInputRef}');
     expect(dateInputSource).toContain('CalendarIcon');
-    expect(dateInputSource).toContain('opacity-0');
-    expect(dateInputSource).toContain('::-webkit-datetime-edit');
-    expect(dateInputSource).toContain('pickerSupported === false');
+    expect(dateInputSource).not.toContain('showPicker');
     expect(executionSource.match(/<DateInput/g)).toHaveLength(2);
     expect(executionSource).not.toContain('DatePickerInput');
     expect(accountDataSource).toContain('费用明细');
-    expect(accountDataSource).toContain('交易规则未验证');
+    expect(accountDataSource).toContain('交易规则参考');
     expect(executionSource).toContain('<ExecutionRuleReference');
-    expect(accountDataSource).toContain('重复重放不会重复写入');
+    expect(accountDataSource).toContain('记录实际发生的买入或卖出。');
     expect(accountDataSource).toContain('账本版本已变化');
     expect(executionSource).toContain('if (submitting) return;');
     expect(executionSource).not.toContain('window.confirm');
@@ -529,7 +528,7 @@ describe('账户数据页面契约', () => {
       'utf8',
     );
     expect(positionMarkup).toContain('持仓快照');
-    expect(positionMarkup).toContain('不产生 BUY / SELL 成交记录');
+    expect(positionMarkup).toContain('记录当前持仓，成交记录单独维护。');
     expect(positionManagementSource).toContain('...(onOpenImport ? { onOpenImport } : {})');
     expect(positionManagementSource).toContain(
       '...(onOpenReconciliation ? { onOpenReconciliation } : {})',

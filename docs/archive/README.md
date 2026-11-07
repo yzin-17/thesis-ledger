@@ -2,6 +2,17 @@
 
 本轮目录及归档依据见[三仓整理记录](reviews/2026-11-05-three-repository-documentation.md)；已结案报告见 [reviews/](reviews/)，被替代合同见 [specs/](specs/)，完成任务见 [tasks/](tasks/)。当前执行以[任务索引](../tasks/README.md)为准。
 
+- 2026-11-07 [风险阈值精度](tasks/2026-11-07-risk-threshold-precision.md)完成比例单位合同、两端原值提交及非零摘要；Domain 499、Desktop 1389、Mobile 193 项、构建、门禁与四宽 16 组浏览器通过，[当轮共享集成证据](evidence/2026-11-07-risk-threshold-precision.md)保留当轮输入与验证范围。
+- 2026-11-07 [日期选择统一](tasks/2026-11-06-desktop-date-selection.md)和 [Drawer 可见性](tasks/2026-11-06-drawer-visibility.md)完成最终一致性复核：核心日期摘要及 Sheet/Tabs 编译语义保持，复用原浏览器证据；新增日期消费者和当前 1377 项完整包验证已纳入。[日期证据](evidence/2026-11-06-desktop-date-selection.md)、[Drawer 证据](evidence/2026-11-06-drawer-visibility.md)随闭合任务归档，现行展示规格保留。
+- 2026-11-07 [配置目标精度](tasks/2026-11-07-allocation-target-precision.md)完成 Domain 单位投影及两端提交修复，Domain 496、Desktop 1377、Mobile 188 项测试、构建与四宽浏览器通过；[共享集成证据](evidence/2026-11-07-allocation-target-precision.md)保留原始往返回归及当轮集成结论。
+- 2026-11-07 [导航草稿快照保护](tasks/2026-11-07-navigation-draft-snapshots.md)完成 14 个登记入口及路由确认归属，稳定输入 1363 项测试、构建、门禁和四宽 12 组浏览器通过；[共享集成证据](evidence/2026-11-07-navigation-draft-snapshots.md)保留当轮验收。
+- 2026-11-07 [草稿关闭保护](tasks/2026-11-07-draft-close-races.md)完成共享 Hook、20 处调用与 AST 门禁，稳定输入 1352 项测试、构建及四宽浏览器通过；[当轮证据](evidence/2026-11-07-draft-close-races.md)归档，后续集成由导航保护记录承接。业务写入及运行态未扩大。
+- 2026-11-07 [Desktop 测试存储隔离](tasks/2026-11-07-desktop-test-storage.md)完成普通测试入口修复及 Node 24/26 回归，保留[原始失败与验证边界](evidence/2026-11-07-desktop-test-storage.md)；现行规格继续维护配置合同。
+
+- 2026-11-06 [桌面端间距与字号](tasks/2026-11-06-desktop-style-tokens.md)已完成，见[样式与浏览器验收](evidence/2026-11-06-desktop-style-tokens.md)。
+
+- 2026-11-05 [桌面展示与编辑一致性修复](tasks/2026-11-05-desktop-presentation-consistency.md)完成五处修复与同类页面排查；保留原始精度及业务逻辑，最终隔离1280项测试、构建和适用门禁通过，38组页面尺寸检查与九表前后摘要一致。[现行规格](../specs/2026-11-05-desktop-presentation-consistency.md)保留，[验证记录](evidence/2026-11-05-desktop-presentation-consistency.md)区分实际页面、受控提交及其他任务的并发检查差异；未提交或发布。
+
 - 2026-11-01 [AI配置、模型用途与测试后保存](tasks/2026-09-21-ai-provider-model-usage-configuration.md)当前Web/目标服务范围完成最终Review并归档，配置/迁移/并发/精确测试/三类真实SDK业务/取消/交付期限证据复用。用户明确将[实际正费用验收](../TODO.md#ai-provider-positive-cost-acceptance)转为后续范围，未计通过，费用上限0及原配置/账目保持；Electron不计本轮交付。[完整范围与复核](../evidence/2026-11-01-ai-fee-deferral-and-closeout.md)。
 
 - 2026-11-01 [来源即时启停与凭据配置](tasks/2026-09-14-market-provider-credentials.md)完成AC1～AC7及最终Review，当前获准范围的配置/加密/OAuth基础/目标Docker与Web/在线证据按原输入复用；关键Control和Alpha Vantage源码摘要与已验收版本相同。本次模型、来源和通知动作均0；Longbridge仍由TODO持有，Tushare现金正向消费保留原Task。[最终复核](../evidence/2026-11-01-provider-credentials-final-review.md)分列成功、范围外受限和延期，不扩大来源资格。
@@ -111,3 +122,38 @@
 - `2026-08-18-spec-traceability.md`：记录 V0.x/V1 历史追踪，不再作为当前 Spec 状态 SSOT。
 
 归档主题文档使用 `YYYY-MM-DD-<topic>.md` 命名。归档意味着退出当前实现入口，不意味着删除历史证据。当前导航直接链接实际正文；只为原始证据、测试输入或邻仓仍需要的路径保留短跳转，已无实际引用的跳转删除。归档记录里的原执行路径仅说明当时输入，不自动产生长期维持旧路径的义务。
+
+- [风险十进制边界实施](tasks/2026-11-07-risk-decimal-boundaries.md)：有限数值输入、精确成本比较与新事件摘要验收完成；[当轮集成证据](evidence/2026-11-07-risk-decimal-boundaries.md)随任务归档，后续由双端比例记录承接。
+- [风险阈值精度证据](evidence/2026-11-07-risk-threshold-precision.md)：两端原值提交、下溢拒绝与浏览器记录，最新包级结果由上述集成证据承接。
+
+- [优化参数精确步长](tasks/2026-11-07-optimization-step-precision.md)：长小数授权偏差、非正步长和候选前置拦截完成；[验证记录](evidence/2026-11-07-optimization-step-precision.md)保留完整包、Node 24 和构建证据。
+
+- [数值输入原生表单行为](tasks/2026-11-07-decimal-form-reset.md)：原生重置、取消时序及外置表单验收完成；[当轮集成证据](evidence/2026-11-07-decimal-form-reset.md)随任务归档，后续由双端比例记录承接。
+
+- [双端只读比例展示](tasks/2026-11-07-ratio-percent-display.md)：共享合同、两个首批消费与四宽 36 组真实组件完成；Domain 565、Desktop 1415、Mobile 206 项通过，[当轮共享证据](evidence/2026-11-07-ratio-percent-display.md)保留当轮输入与验证范围。
+
+- [收益、组合与风险比例读数](tasks/2026-11-07-financial-ratio-consumers.md)：七个消费者与无效合计提示完成，Desktop 1448 项及四宽 28 组通过，[当轮共享证据](evidence/2026-11-07-financial-ratio-consumers.md)保留当轮输入与验证范围。
+
+- [文本型比例展示](tasks/2026-11-07-decimal-ratio-display.md)：Domain 614、Desktop 1459、Mobile 210 项及四宽 32 组实际组件通过；[当轮集成证据](evidence/2026-11-07-decimal-ratio-display.md)保留当轮输入与验证范围。已被替代的两轮比例集成证据随闭合 Task 保留于归档。
+
+- [统一回测比例展示](tasks/2026-11-07-backtest-ratio-consistency.md)：列表、详情、基准状态和真实图表统一；1496 项、构建、门禁与四宽 28 组通过，[集成证据](evidence/2026-11-07-backtest-ratio-consistency.md)保留当轮输入与验证范围。
+
+- [策略摘要三位比例](tasks/2026-11-07-strategy-summary-ratio.md)：保留三位、千分位及原始定义，Domain 631、Desktop 1504、Mobile 210 项与四宽 36 组通过；[当轮集成证据](evidence/2026-11-07-strategy-summary-ratio.md)保留当轮输入与验证范围，前两轮闭合证据随任务归档。
+
+- [自选数值非零展示](tasks/2026-11-07-watchlist-number-display.md)：报价、净值、涨跌额与振幅完成；Domain 653、Desktop 1515、Mobile 210 项及四宽 80 组通过，[当轮集成证据](evidence/2026-11-07-watchlist-number-display.md)保留当轮输入与验证范围，上一轮策略摘要证据随闭合任务归档。
+
+- [行情详情比例与百分数值](tasks/2026-11-07-market-percent-units.md)：七条消费路径、Domain 678、Desktop 1559、Mobile 210 项及四宽 24 组通过，[当轮集成证据](evidence/2026-11-07-market-percent-units.md)保留当轮输入与验证范围；上一轮自选数值证据随闭合任务归档。
+
+- [行情数字事实读数](tasks/2026-11-07-market-number-readouts.md)：Domain 714、Desktop 1602、Mobile 210 项及四宽 132 场景通过；[当轮证据](evidence/2026-11-07-market-number-readouts.md)保留精度、图形与受控输入边界。
+
+- [基金收盘估算误差精确展示](tasks/2026-11-07-fund-daily-decimal-display.md)：Domain 767、Desktop 1614、Mobile 222 项，112 个每日误差场景与 32 组双端比例回归通过；[共享集成证据](../evidence/2026-11-07-fund-daily-decimal-display.md)继续供活动任务使用。
+
+- [Desktop 页面按需加载](tasks/2026-11-07-desktop-deferred-pages.md)：入口静态闭包减少 57.41%、默认收益页实际脚本减少 42.68%；Desktop 1620 项、构建、门禁和 32 个基线/当前生产浏览器场景通过，[当轮 Desktop 证据](evidence/2026-11-07-desktop-deferred-pages.md)保留加载与包体积验收。
+
+- [Desktop 公共导航图标与间距](tasks/2026-11-07-desktop-navigation-density.md)：19×2 图标和 800 宽标签缺失修复，9 宽 153 次检查、Desktop 1620 项、构建与门禁通过；[当轮 Desktop 证据](evidence/2026-11-07-desktop-navigation-density.md)保留九宽导航测量。
+
+- [持仓账户列与单项操作宽度](tasks/2026-11-07-portfolio-account-column.md)：窄屏普通账户由 5 行恢复为 1 行，行高降至 56.64px；两轮四宽各 20 场景、Desktop 1620 项、构建和门禁通过；[当轮 Desktop 证据](evidence/2026-11-07-portfolio-account-column.md)保留账户列测量与交互，最新包级输入由[刷新验收](../evidence/2026-11-07-arena-detail-refresh.md)持有。
+
+- [自然语言策略编写流程展示](tasks/2026-11-07-authoring-workflow-ui.md)：三阶段、结果应用、草稿操作与实际定义层级；25 项定向测试、1635 项 Desktop 回归及五宽浏览器验收，详见[证据](../evidence/2026-11-07-authoring-workflow-ui.md)。
+
+- [竞技场与周报详情刷新反馈](tasks/2026-11-07-arena-detail-refresh.md)：相关请求等待、保留旧结果和刷新入口已验收；冻结 Desktop 1629 项、Mobile 231 项及 100 个基线/当前浏览器场景通过。[本轮验收证据](../evidence/2026-11-07-arena-detail-refresh.md)继续供活动任务使用，并单独保存主工作区并行差异。

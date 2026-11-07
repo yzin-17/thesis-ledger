@@ -67,6 +67,24 @@ async function click(text: string) { await act(async () => button(text).click())
 async function input(value: string) { const field = document.querySelector('input')!; await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, value); field.dispatchEvent(new Event('input', { bubbles: true })); }); }
 
 describe('市场配置与策略实验恢复', () => {
+  it('缺少 randomUUID 时风险页可预览且失败重试保持同一幂等键', async () => {
+    const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+    vi.stubGlobal('crypto', { getRandomValues });
+    api.riskSave.mockRejectedValue(new Error('受控保存失败'));
+    await mount(<StrategyRiskApplicationPage strategies={[strategy]} presentation="drawer" />, `/strategy/library/strategy/versions/${version.id}/risk-application`);
+    await wait(() => expect(button('预览风险规则').disabled).toBe(false));
+    await click('预览风险规则');
+    await wait(() => expect(button('保存为停用').disabled).toBe(false));
+    await click('保存为停用');
+    await wait(() => expect(api.riskSave).toHaveBeenCalledTimes(1));
+    await wait(() => expect(button('保存为停用').disabled).toBe(false));
+    await click('保存为停用');
+    await wait(() => expect(api.riskSave).toHaveBeenCalledTimes(2));
+    const first = api.riskSave.mock.calls[0]![0].idempotencyKey;
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    expect(api.riskSave.mock.calls[1]![0].idempotencyKey).toBe(first);
+  });
+
   it('实验创建失败保留同一提交意图；确认创建后详情读取失败仍可恢复', async () => {
     await mount(<StrategyExperimentCreatePage strategies={[strategy]} />, '/strategy/experiments/new');
     await wait(() => expect(document.body.textContent).toContain('仓位'));

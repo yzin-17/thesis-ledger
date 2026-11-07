@@ -1,4 +1,4 @@
-import type { AiAdapter, AiChatImplementation, AiUpstreamFormat } from '@thesis-ledger/schemas';
+import type { AiProviderModelCatalogConfig, AiAdapter, AiChatImplementation, AiUpstreamFormat } from '@thesis-ledger/schemas';
 import type {
   AiAuthMode,
   AiProviderCapabilityRevocation,
@@ -70,6 +70,7 @@ export interface AiProvider {
   readonly models: readonly string[];
   readonly metadata?: AiProviderMetadata;
   sdkRuntime?(): {
+    modelCatalog?: AiProviderModelCatalogConfig;
     baseURL: string;
     apiKey: string;
     authMode?: AiAuthMode;

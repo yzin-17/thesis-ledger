@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { debounce } from 'es-toolkit';
+import { useState } from 'react';
 import type { AuthoringContent, AuthoringConfirmationDraft } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useInstrumentSearchQuery } from '../market-data/market-data.queries.js';
+import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
 import {
   strategyTimeframeLabel,
   strategyTimeframeValues,
@@ -25,12 +24,8 @@ export function AuthoringConfirmation({
   disabled: boolean;
 }) {
   const draft = confirmationDraft(content);
-  const [search, setSearch] = useState('');
-  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const delayedSearch = useMemo(() => debounce(setQuery, 300), []);
-  useEffect(() => () => delayedSearch.cancel(), [delayedSearch]);
-  const catalog = useInstrumentSearchQuery(query);
   const edit = (patch: Partial<AuthoringConfirmationDraft>) =>
     onChange({ ...content, confirmation: null, confirmationDraft: { ...draft, ...patch } });
   return (
@@ -49,61 +44,32 @@ export function AuthoringConfirmation({
       <FieldGroup>
         <Field>
           <FieldLabel>目录标的</FieldLabel>
-          <Input
+          <InstrumentSymbolField
             aria-label="搜索目录标的"
-            placeholder="输入代码或名称"
-            value={search}
+            value={search ?? draft.instrument?.symbol ?? ''}
             disabled={disabled}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              delayedSearch(event.target.value);
+            markets={['SH', 'SZ', 'BJ', 'OF', 'HK', 'US']}
+            instrumentTypes={['STOCK', 'ETF', 'MUTUAL_FUND']}
+            onChange={setSearch}
+            onSelect={(item) => {
+              let assetType: 'stock' | 'etf' | 'fund' = 'stock';
+              if (item.instrumentType === 'ETF') assetType = 'etf';
+              else if (item.instrumentType === 'MUTUAL_FUND') assetType = 'fund';
+              const market = ['SH', 'SZ', 'BJ', 'OF'].includes(item.market)
+                ? 'CN'
+                : item.market;
+              edit({
+                instrumentId: item.id,
+                instrument: {
+                  symbol: item.symbol,
+                  market: market as 'CN' | 'HK' | 'US',
+                  assetType,
+                },
+              });
             }}
           />
-          <FieldDescription>
-            已选：{draft.instrument?.symbol ?? '尚未选择'}。只支持单标的。
-          </FieldDescription>
+          <FieldDescription>已选：{draft.instrument?.symbol ?? '尚未选择'}。只支持单标的。</FieldDescription>
         </Field>
-        {catalog.isFetching && <p role="status">正在搜索…</p>}
-        {catalog.error && (
-          <Alert variant="destructive">
-            <AlertTitle>目录暂不可用</AlertTitle>
-            <AlertDescription>{catalog.error.message}</AlertDescription>
-          </Alert>
-        )}
-        {catalog.data && (
-          <Field>
-            <FieldLabel>搜索结果</FieldLabel>
-            <AuthoringSelect
-              label="选择目录标的"
-              value={draft.instrumentId}
-              disabled={disabled}
-              options={catalog.data
-                .filter(
-                  (item) =>
-                    item.active &&
-                    ['SH', 'SZ', 'BJ', 'OF', 'HK', 'US'].includes(item.market) &&
-                    ['STOCK', 'ETF', 'MUTUAL_FUND'].includes(item.instrumentType),
-                )
-                .map((item) => ({ value: item.id, label: `${item.displayName} · ${item.symbol}` }))}
-              onChange={(id) => {
-                const item = catalog.data.find((candidate) => candidate.id === id);
-                if (!item) return;
-                let assetType: 'stock' | 'etf' | 'fund' = 'stock';
-                if (item.instrumentType === 'ETF') assetType = 'etf';
-                else if (item.instrumentType === 'MUTUAL_FUND') assetType = 'fund';
-                const market = ['SH', 'SZ', 'BJ', 'OF'].includes(item.market) ? 'CN' : item.market;
-                edit({
-                  instrumentId: id,
-                  instrument: {
-                    symbol: item.symbol,
-                    market: market as 'CN' | 'HK' | 'US',
-                    assetType,
-                  },
-                });
-              }}
-            />
-          </Field>
-        )}
         <Field>
           <FieldLabel>信号周期</FieldLabel>
           <AuthoringSelect

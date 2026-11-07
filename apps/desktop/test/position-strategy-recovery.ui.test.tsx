@@ -80,17 +80,52 @@ async function fill(selector: string, value: string) {
 }
 
 describe('持仓与策略写入恢复', () => {
+  it.each(['position', 'strategy'] as const)('%s确认期间继续输入时拒绝离开并保留新值', async (kind) => {
+    function Screen() {
+      const location = useLocation();
+      const navigate = useNavigate();
+      if (location.pathname === '/away') return <p>已离开编辑器</p>;
+      return <>
+        {kind === 'position' ? (
+          <PortfolioManagement accounts={[account]} positions={[position]} step="position" showCash={false} calibrationMode onSaved={() => undefined} />
+        ) : (
+          <StrategyEditorSheet open mode="edit" presentation="page" strategy={strategy} version={strategy.versions[0]!} busy={false} onOpenChange={() => undefined} onSave={() => undefined} />
+        )}
+        <button onClick={() => void navigate('/away')}>离开编辑器</button>
+      </>;
+    }
+    const actualRouter = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><Screen /></NavigationGuardProvider> }], { initialEntries: ['/editor'] });
+    cleanups.push(() => actualRouter.dispose());
+    await mount(<RouterProvider router={actualRouter} />);
+    if (kind === 'position') await click('修改快照');
+    const selector = kind === 'position' ? 'input[aria-label="当前数量"]' : '#strategy-description';
+    await fill(selector, kind === 'position' ? '201' : '确认前的描述');
+    await click('离开编辑器');
+    const latest = kind === 'position' ? '202.1234567890123456789' : '确认期间更新的描述';
+    await fill(selector, latest);
+    await click('放弃修改并离开');
+    expect(actualRouter.state.location.pathname).toBe('/editor');
+    const retained = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!;
+    await act(async () => retained.focus());
+    expect(retained.value).toBe(latest);
+    expect(api.savePosition).not.toHaveBeenCalled();
+    expect(api.create).not.toHaveBeenCalled();
+    await click('离开编辑器');
+    await click('放弃修改并离开');
+    expect(actualRouter.state.location.pathname).toBe('/away');
+  });
+
   it('快照失败保留输入，重试等待读取且关闭被保护，读取失败仍保持写入成功', async () => {
     let finishRead!: () => void;
     const reading = new Promise<void>((resolve) => { finishRead = resolve; });
     const onSaved = vi.fn(() => reading);
     await mount(<PortfolioManagement accounts={[account]} positions={[position]} step="position" showCash={false} calibrationMode onSaved={onSaved} />);
     await click('修改快照');
-    await fill('input[name="quantity"]', '201');
+    await fill('input[aria-label="当前数量"]', '201');
     api.savePosition.mockRejectedValueOnce(new Error('503'));
     await act(async () => document.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     await wait(() => expect(api.toast).toHaveBeenCalledWith(expect.objectContaining({ title: '持仓快照更新失败' })));
-    expect(document.querySelector<HTMLInputElement>('input[name="quantity"]')!.value).toBe('201');
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="当前数量"]')!.value).toBe('201');
     await click('取消'); await click('继续编辑');
     await act(async () => document.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     await wait(() => expect(onSaved).toHaveBeenCalledOnce());

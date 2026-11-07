@@ -76,7 +76,7 @@ export function LocalHistoryDocumentsSheet({
                       href={document.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-sm text-sm font-medium text-primary underline underline-offset-4 wrap-anywhere"
+                      className="rounded-sm text-sm font-medium text-primary hover:text-primary/80 wrap-anywhere"
                     >
                       {document.title}
                     </a>

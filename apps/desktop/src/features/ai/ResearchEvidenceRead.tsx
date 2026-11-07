@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -114,9 +115,7 @@ export function ResearchEvidenceRead({
         {label}
       </Button>
       {expanded && query.isPending && (
-        <p className="text-sm" role="status">
-          正在读取保存的材料…
-        </p>
+        <LoadingState label="正在读取保存的材料" />
       )}
       {expanded && query.isError && (
         <Alert variant="destructive">
@@ -151,7 +150,7 @@ export function ResearchEvidenceRead({
           {evidence.evidence.audit.sourceUrls.map((url, index) => (
             <a
               key={url}
-              className="text-sm text-primary underline underline-offset-4"
+              className="text-sm text-primary hover:text-primary/80"
               href={url}
               target="_blank"
               rel="noopener noreferrer"

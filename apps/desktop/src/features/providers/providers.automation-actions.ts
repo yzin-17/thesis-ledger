@@ -1,6 +1,6 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import type { FormEvent } from 'react';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
-
 import type { ProviderActionDependencies, ProviderToastManager } from './providers.actions.js';
 import type {
   AutomationJob,
@@ -47,7 +47,7 @@ const addAutomationErrorToast = (
 export const buildCreateAutomationJobPayload = (
   draft: AutomationJobDraft,
 ): CreateAutomationJobInput => ({
-  id: crypto.randomUUID(),
+  id: createClientRequestId(),
   name: draft.name,
   type: draft.type,
   cron: draft.cron,

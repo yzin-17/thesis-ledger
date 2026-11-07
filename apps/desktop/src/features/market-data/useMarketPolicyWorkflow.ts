@@ -85,6 +85,7 @@ export function useMarketPolicyWorkflow({
   }, []);
 
   useNavigationGuard({
+    draft,
     dirty,
     busy: saveMutation.isPending || retryMutation.isPending,
     discard: () => {

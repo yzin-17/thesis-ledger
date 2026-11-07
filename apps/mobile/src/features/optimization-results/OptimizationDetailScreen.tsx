@@ -380,7 +380,7 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
           </Section>
         </>
       ) : null}
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
     </Page>
   );
 }

@@ -4,6 +4,11 @@ import { StrategyIdentityGuard } from '../backtest/strategy-identity.guard.js';
 import { AiModule } from '../ai/ai.module.js';
 import { BacktestModule } from '../backtest/backtest.module.js';
 import { RiskModule } from '../risk/risk.module.js';
+import { MarketModule } from '../market/market.module.js';
+import { StrategySubmissionsController } from './strategy-submissions.controller.js';
+import { StrategySubmissions } from './strategy-submissions.js';
+import { StrategySubmissionExecution } from './strategy-submission-execution.js';
+import { OptimizationPreparation } from './optimization-preparation.js';
 import { PlatformModule } from '../platform/platform.module.js';
 import { StrategyOptimizationCandidateService } from './strategy-optimization-candidate.service.js';
 import { StrategyOptimizationAiSettlementStore } from './strategy-optimization-ai-settlement.store.js';
@@ -18,10 +23,10 @@ import { StrategyRiskApplicationStoreService } from './strategy-risk-application
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
 
 @Module({
-  imports: [AiModule, BacktestModule, IdentityModule, RiskModule, PlatformModule],
-  controllers: [StrategyOptimizationController, StrategyOptimizationPreparationController],
+  imports: [AiModule, BacktestModule, IdentityModule, RiskModule, PlatformModule, MarketModule],
+  controllers: [StrategyOptimizationController, StrategyOptimizationPreparationController, StrategySubmissionsController],
   providers: [
-    StrategyIdentityGuard,
+    StrategyIdentityGuard, OptimizationPreparation, StrategySubmissionExecution, StrategySubmissions,
     StrategyOptimizationReadService,
     StrategyOptimizationRunService,
     StrategyOptimizationSdkExecutor,

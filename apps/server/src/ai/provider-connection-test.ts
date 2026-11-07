@@ -85,6 +85,7 @@ const contractForPurpose = (
   if (purpose === 'strategy_authoring_modification')
     return aiGenerationContracts.authoringModification;
   if (purpose === 'parameter_optimization') return aiGenerationContracts.parameterOptimization;
+  if (purpose === 'arena_decision') return aiGenerationContracts.arenaDecision;
   if (purpose === 'strategy_discovery') return aiGenerationContracts.strategyDiscovery;
   return aiGenerationContracts.research;
 };

@@ -92,10 +92,13 @@ export function marketInformationClient(request: Request) {
         page: String(params.page),
         pageSize: String(params.pageSize),
       });
+      for (const key of ['symbol','start','end'] as const) if (params[key]) suffix.set(key, params[key]);
       return request(
         `/api/market-data/announcements?${suffix}`,
         marketAnnouncementsSchema.refine(
-          (value) => value.page === params.page && value.pageSize === params.pageSize,
+          (value) => value.page === params.page && value.pageSize === params.pageSize &&
+            value.items.every(item => (!params.symbol || item.symbol === params.symbol) &&
+              (!params.start || item.publishedDate >= params.start) && (!params.end || item.publishedDate <= params.end)),
         ),
         signal ? { signal } : undefined,
       );

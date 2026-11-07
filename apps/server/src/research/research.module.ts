@@ -7,6 +7,7 @@ import { ResearchSubmissionService } from './research-submission.service.js';
 import { ResearchController } from './research.controller.js';
 import { ResearchReportsController } from './research-reports.controller.js';
 import { ResearchObservationStore } from './research-observation.store.js';
+import { ResearchObservationScheduler } from './research-observation-scheduler.js';
 import { ResearchObservationAccess } from './research-observation-access.js';
 import { ResearchObservationMaterials } from './research-observation-materials.js';
 import { ResearchObservationService } from './research-observation.service.js';
@@ -20,6 +21,7 @@ import { ResearchObservationsController } from './research-observations.controll
     ResearchScopeReader,
     ResearchSubmissionService,
     ResearchObservationStore,
+    ResearchObservationScheduler,
     ResearchObservationAccess,
     ResearchObservationMaterials,
     ResearchObservationService,

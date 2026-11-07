@@ -41,7 +41,7 @@ export function MarketColorMenu() {
               <DropdownMenuRadioItem value="red-up">
                 <span className="inline-flex min-w-[172px] flex-col gap-0.5">
                   <span>红涨绿跌</span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     <span className="text-[var(--color-negative)]">↑ +1.23%</span> /{' '}
                     <span className="text-[var(--color-positive)]">↓ −1.23%</span>
                   </span>
@@ -50,7 +50,7 @@ export function MarketColorMenu() {
               <DropdownMenuRadioItem value="green-up">
                 <span className="inline-flex min-w-[172px] flex-col gap-0.5">
                   <span>绿涨红跌</span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     <span className="text-[var(--color-positive)]">↑ +1.23%</span> /{' '}
                     <span className="text-[var(--color-negative)]">↓ −1.23%</span>
                   </span>
@@ -62,7 +62,7 @@ export function MarketColorMenu() {
       </DropdownMenu>
       {storageError ? (
         <span
-          className="absolute right-0 top-[calc(100%+4px)] z-[var(--z-toast)] w-max max-w-[240px] rounded-[5px] border border-[var(--color-error)] bg-[var(--color-error-soft)] px-2 py-1 text-[11px] text-[var(--color-error)]"
+          className="absolute right-0 top-[calc(100%+4px)] z-[var(--z-toast)] w-max max-w-[240px] rounded-[5px] border border-[var(--color-error)] bg-[var(--color-error-soft)] px-2 py-1 text-xs text-[var(--color-error)]"
           role="status"
         >
           {storageError}

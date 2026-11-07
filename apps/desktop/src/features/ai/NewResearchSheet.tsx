@@ -1,3 +1,5 @@
+import { InstrumentOptionField } from '../market-data/InstrumentOptionField.js';
+import { Spinner } from '@/components/ui/spinner';
 import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -195,7 +197,7 @@ export function NewResearchSheet({
     boundary = labels.length > 0 ? labels.join('、') : '当前没有可用的只读 Tool';
   }
 
-  let capabilityMessage = '正在检查 Provider、Tool 和执行 Worker…';
+  let capabilityMessage = '正在检查模型提供方、工具和执行服务…';
   if (capabilitiesQuery.isError) capabilityMessage = '能力预检失败，请先刷新后再提交研究。';
   else if (capabilitiesQuery.data && !capabilitiesQuery.data.canStart) {
     const unavailable = capabilitiesQuery.data.providers[0];
@@ -203,9 +205,9 @@ export function NewResearchSheet({
     const impact = unavailable?.impact[0] ?? '研究任务不会进入可执行队列。';
     capabilityMessage = `${missing}${impact}`;
   } else if (capabilitiesQuery.data?.providers.some((provider) => provider.state === 'demo'))
-    capabilityMessage = '当前使用演示 Provider，结果会明确标记为演示数据。';
+    capabilityMessage = '当前使用演示服务，结果会标记为演示数据。';
   else if (capabilitiesQuery.data?.canStart)
-    capabilityMessage = 'Provider、Tool 和执行 Worker 已就绪。';
+    capabilityMessage = '模型提供方、工具和执行服务已就绪。';
 
   const handleScopeChange = (next: string[]) => {
     const nextScope = next[0] as AiResearchScope | undefined;
@@ -266,7 +268,11 @@ export function NewResearchSheet({
 
   const requestClose = useDraftCloseGuard({
     open,
-    draft: null,
+    draft: {
+      mode, scope, accountId, symbol, strategyVersionId, question, templateId,
+      retryOfRunId, retryConfirmed, retryContextReselected, unknownRiskConfirmed,
+      modelKey: researchModel.selectedKey,
+    },
     dirty:
       researchModel.dirty ||
       question !== initialQuestion ||
@@ -342,7 +348,7 @@ export function NewResearchSheet({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                {accountsQuery.isPending && <FieldDescription>正在加载账户…</FieldDescription>}
+                {accountsQuery.isPending && <FieldDescription><Spinner aria-label="正在加载账户" /></FieldDescription>}
                 {accountsQuery.isError && <FieldError>账户读取失败，请重试后再提交。</FieldError>}
                 {!accountsQuery.isPending &&
                   !accountsQuery.isError &&
@@ -384,39 +390,25 @@ export function NewResearchSheet({
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                  {accountsQuery.isPending && <FieldDescription>正在加载账户…</FieldDescription>}
+                  {accountsQuery.isPending && <FieldDescription><Spinner aria-label="正在加载账户" /></FieldDescription>}
                   {accountsQuery.isError && <FieldError>账户读取失败，请重试后再提交。</FieldError>}
                 </Field>
                 <Field invalid={Boolean(visibleEntityError && Boolean(accountId))}>
                   <FieldLabel htmlFor="ai-position-symbol">实际持仓</FieldLabel>
-                  <Select
-                    items={positionOptions}
+                  <InstrumentOptionField
+                    label="实际持仓"
+                    id="ai-position-symbol"
+                    options={positionOptions}
                     value={symbol ?? ''}
-                    onValueChange={(value) => {
+                    disabled={!accountId || positionsQuery.isPending || positionsQuery.isError}
+                    invalid={Boolean(visibleEntityError && Boolean(accountId))}
+                    onChange={(value) => {
                       setSymbol(value || null);
                       if (retryOfRunId) setRetryContextReselected(true);
                     }}
-                    disabled={!accountId || positionsQuery.isPending}
-                  >
-                    <SelectTrigger
-                      id="ai-position-symbol"
-                      className="w-full"
-                      aria-invalid={Boolean(visibleEntityError && Boolean(accountId))}
-                    >
-                      <SelectValue placeholder={accountId ? '选择持仓' : '先选择账户'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {positionOptions.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {positionsQuery.isPending && (
-                    <FieldDescription>正在读取账户持仓…</FieldDescription>
+                  />
+                  {positionsQuery.isLoading && (
+                    <FieldDescription><Spinner aria-label="正在读取账户持仓" /></FieldDescription>
                   )}
                   {positionsQuery.isError && (
                     <FieldError>持仓读取失败，请重试后再提交。</FieldError>
@@ -462,7 +454,7 @@ export function NewResearchSheet({
                   </SelectContent>
                 </Select>
                 {strategiesQuery.isPending && (
-                  <FieldDescription>正在加载策略版本…</FieldDescription>
+                  <FieldDescription><Spinner aria-label="正在加载策略版本" /></FieldDescription>
                 )}
                 {strategiesQuery.isError && <FieldError>策略读取失败，请重试后再提交。</FieldError>}
                 {!strategiesQuery.isPending &&
@@ -534,6 +526,7 @@ export function NewResearchSheet({
           </Alert>
           {retryOfRunId && retryPrefillQuery.isPending && (
             <Alert>
+              <Spinner aria-hidden="true" />
               <AlertTitle>正在核对来源任务</AlertTitle>
               <AlertDescription>服务端正在确认来源类型、终态和研究对象访问状态。</AlertDescription>
             </Alert>

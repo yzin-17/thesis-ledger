@@ -236,7 +236,8 @@ describe('收益分析交互契约', () => {
   });
   it('没有快照时使用紧凑空状态而不是空表格', () => {
     const markup = renderToStaticMarkup(
-      <PerformanceSnapshotTable loadState="empty" snapshots={[]} onCompleteDataSetup={vi.fn()} />,
+      <PerformanceSnapshotTable loadState="empty" snapshots={[]} onCompleteDataSetup={vi.fn()}
+        range="1Y" interval="1d" onRangeChange={vi.fn()} onIntervalChange={vi.fn()} />,
     );
     expect(markup).toContain('暂无收益历史');
     expect(markup).toContain('完成数据配置');
@@ -405,5 +406,6 @@ describe('自动估值快照入口契约', () => {
     expect(markup).toContain('aria-label="走势粒度"');
     expect(markup).toContain('role="application"');
     expect(markup).toContain('可使用左右方向键逐点查看');
+    expect(markup).not.toContain('<table');
   });
 });

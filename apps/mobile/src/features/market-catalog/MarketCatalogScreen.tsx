@@ -8,7 +8,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList, QueryStatus,
   Section,
 } from '../../components/MobilePrimitives';
 import { useConfigCommand } from '../configuration/use-config-command';
@@ -105,7 +105,7 @@ export function MarketCatalogScreen() {
   };
   return (
     <Page title="标的目录与同步">
-      <Feedback message={message} />
+      <Feedback busy={command.pending} message={message} />
       <QueryStatus query={status} retry={() => void status.refetch()} />
       <StatusPanel
         query={status}
@@ -137,26 +137,29 @@ export function MarketCatalogScreen() {
           disabled={!queryText.trim()}
           onPress={() => setSearch(queryText.trim())}
         />
-        {search ? (
-          <QueryStatus
+        {search && (
+          <QueryList
             query={instruments}
             empty={instruments.data?.length === 0}
             retry={() => void instruments.refetch()}
-          />
-        ) : null}
-        {instruments.data?.map((item) => (
-          <Section key={item.id} title={item.displayName}>
-            <Copy>
-              {item.symbol} · {item.market} · {item.confirmable ? '可确认' : '不可确认'}
-            </Copy>
-            <Copy>{item.disabledReason ?? '目录身份有效，可提交确认。'}</Copy>
-            <Action
-              label={`确认标的 ${item.symbol}`}
-              disabled={command.pending || instruments.isError || !item.confirmable}
-              onPress={() => void confirm(item.id, `${item.displayName} / ${item.symbol}`)}
-            />
-          </Section>
-        ))}
+            label="正在刷新标的列表"
+            gap={12}
+          >
+            {instruments.data?.map((item) => (
+              <Section key={item.id} title={item.displayName}>
+                <Copy>
+                  {item.symbol} · {item.market} · {item.confirmable ? '可确认' : '不可确认'}
+                </Copy>
+                <Copy>{item.disabledReason ?? '目录身份有效，可提交确认。'}</Copy>
+                <Action
+                  label={`确认标的 ${item.symbol}`}
+                  disabled={command.pending || instruments.isError || !item.confirmable}
+                  onPress={() => void confirm(item.id, `${item.displayName} / ${item.symbol}`)}
+                />
+              </Section>
+            ))}
+          </QueryList>
+        )}
       </Section>
     </Page>
   );

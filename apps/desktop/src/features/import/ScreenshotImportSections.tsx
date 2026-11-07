@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
 import type { Dispatch, SetStateAction } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -270,10 +271,10 @@ function ScreenshotImportRow({
       </div>
       <div className="grid gap-1.5 text-xs text-muted-foreground">
         <span>代码</span>
-        <Input
+        <InstrumentSymbolField
           aria-label="代码"
           value={row.symbol ?? ''}
-          onChange={(event) => onUpdate(index, { symbol: event.target.value.toUpperCase() })}
+          onChange={(value) => onUpdate(index, { symbol: value.toUpperCase() })}
         />
       </div>
       <div className="grid gap-1.5 text-xs text-muted-foreground">

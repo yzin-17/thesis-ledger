@@ -97,7 +97,7 @@ export function RiskEvaluateScreen() {
       <Copy muted>
         通知路由 {routing.isError ? '读取失败，状态未知' : `${routing.data?.routes.length ?? 0} 条`}
       </Copy>
-      <Feedback message={feedback} error={mutation.isError} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError} />
       <Action
         label={trial ? '执行规则试算' : '执行风险扫描'}
         primary

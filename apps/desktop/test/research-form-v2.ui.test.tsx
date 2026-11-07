@@ -201,7 +201,7 @@ async function type(selector: string, value: string) {
   });
 }
 async function select(label: string, text: string) {
-  const trigger = document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  const trigger = document.querySelector<HTMLButtonElement | HTMLInputElement>(`[aria-label="${label}"]`);
   expect(trigger).toBeTruthy();
   await act(async () => trigger?.click());
   await wait(() =>
@@ -382,7 +382,7 @@ it('独立标的使用目录 ID 且不确认资产、不带账户；真正点击
   await act(async () => option?.click());
   await wait(() =>
     expect(document.querySelector<HTMLInputElement>('input[aria-label="研究标的"]')?.value).toBe(
-      '受控目录标的',
+      '600519.SH',
     ),
   );
   await type('textarea', '这个标的有哪些资料缺口？');
@@ -418,7 +418,7 @@ it.each(['portfolio', 'account', 'position', 'strategy'] as const)(
     }
     if (scope === 'position') {
       await wait(() =>
-        expect(document.querySelector('button[aria-label="研究持仓"]')).toBeTruthy(),
+        expect(document.querySelector('input[aria-label="研究持仓"]')).toBeTruthy(),
       );
       await select('研究持仓', '600519.SH');
     }

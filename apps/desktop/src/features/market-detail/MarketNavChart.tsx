@@ -103,7 +103,7 @@ function HistoricalFundNavChart({ history: sourceHistory, pnl, onToday }: FundNa
       layout: navChartLayoutOptions,
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true },
       handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true },
-      timeScale: { borderColor: 'rgba(148, 163, 184, 0.35)', timeVisible: false },
+      timeScale: { lockVisibleTimeRangeOnResize: true, borderColor: 'rgba(148, 163, 184, 0.35)', timeVisible: false },
       grid: {
         vertLines: { color: 'rgba(148, 163, 184, 0.16)' },
         horzLines: { color: 'rgba(148, 163, 184, 0.16)' },

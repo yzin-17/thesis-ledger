@@ -15,19 +15,31 @@ const confirmation = {
   confirmLabel: '关闭面板',
   variant: 'default' as const,
 };
-function Probe({ busy = false }: { busy?: boolean }) {
+function Probe({
+  busy = false,
+  open = true,
+  draft = 'retained',
+  dirty = true,
+  onOpenChange = api.close,
+}: {
+  busy?: boolean;
+  open?: boolean;
+  draft?: string;
+  dirty?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   close = useDraftCloseGuard({
-    open: true,
-    draft: { submissionId: 'retained' },
-    dirty: true,
+    open,
+    draft: { submissionId: draft },
+    dirty,
     busy,
-    onOpenChange: api.close,
+    onOpenChange,
     confirmation,
   });
   return null;
 }
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
 afterEach(async () => {
@@ -72,5 +84,115 @@ describe('关闭确认的调用方文案', () => {
     await act(async () => close(false));
     expect(api.confirm).not.toHaveBeenCalled();
     expect(api.close).not.toHaveBeenCalled();
+  });
+
+  it('未修改的草稿直接关闭，不打开确认', async () => {
+    await mount();
+    await act(async () => root.render(<Probe dirty={false} />));
+    await act(async () => close(false));
+    expect(api.confirm).not.toHaveBeenCalled();
+    expect(api.close).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it('确认期间开始提交时保留面板，提交结束后可重新确认关闭', async () => {
+    await mount();
+    let finish!: (value: boolean) => void;
+    api.confirm.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = close(false);
+    await act(async () => root.render(<Probe busy />));
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(api.close).not.toHaveBeenCalled();
+    await act(async () => root.render(<Probe />));
+    api.confirm.mockResolvedValueOnce(true);
+    await act(async () => close(false));
+    expect(api.close).toHaveBeenCalledExactlyOnceWith(false);
+    expect(api.confirm).toHaveBeenCalledTimes(2);
+  });
+
+  it('确认期间内容变化后保留新草稿，新的关闭请求重新确认', async () => {
+    await mount();
+    let finish!: (value: boolean) => void;
+    api.confirm.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = close(false);
+    await act(async () => root.render(<Probe draft="new-draft" />));
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(api.close).not.toHaveBeenCalled();
+    api.confirm.mockResolvedValueOnce(true);
+    await act(async () => close(false));
+    expect(api.close).toHaveBeenCalledExactlyOnceWith(false);
+    expect(api.confirm).toHaveBeenCalledTimes(2);
+  });
+
+  it('关闭后重新打开的面板不消费上次会话的确认', async () => {
+    await mount();
+    let finish!: (value: boolean) => void;
+    api.confirm.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = close(false);
+    await act(async () => root.render(<Probe open={false} />));
+    await act(async () => root.render(<Probe />));
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(api.close).not.toHaveBeenCalled();
+  });
+
+  it('卸载后忽略晚到确认', async () => {
+    await mount();
+    let finish!: (value: boolean) => void;
+    api.confirm.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = close(false);
+    await act(async () => root.unmount());
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(api.close).not.toHaveBeenCalled();
+  });
+
+  it('有效确认使用最新已提交的关闭回调', async () => {
+    await mount();
+    let finish!: (value: boolean) => void;
+    const latestClose = vi.fn();
+    api.confirm.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = close(false);
+    await act(async () => root.render(<Probe onOpenChange={latestClose} />));
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(api.close).not.toHaveBeenCalled();
+    expect(latestClose).toHaveBeenCalledExactlyOnceWith(false);
   });
 });

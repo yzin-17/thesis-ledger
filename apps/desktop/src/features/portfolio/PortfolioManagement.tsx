@@ -53,6 +53,7 @@ export const shouldAutoOpenEmptyAccountForm = ({
 export function PortfolioManagement({
   accounts,
   positions,
+  positionsRefreshing = false,
   cashValue,
   step,
   showCash = true,
@@ -77,6 +78,7 @@ export function PortfolioManagement({
 }: {
   accounts: Account[];
   positions: Position[];
+  positionsRefreshing?: boolean;
   cashValue?: number;
   step: 'account' | 'position';
   showCash?: boolean;
@@ -114,10 +116,19 @@ export function PortfolioManagement({
   const [entryAccountId, setEntryAccountId] = useState(initialEntryAccountId);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [draftRevision, setDraftRevision] = useState(0);
   const [instrumentQuery, setInstrumentQuery] = useState('');
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentLookup | null>(null);
   const [instrumentConfirmationBusy, setInstrumentConfirmationBusy] = useState(false);
-  useNavigationGuard({ dirty, busy: busyAction !== null || instrumentConfirmationBusy });
+  useNavigationGuard({
+    dirty,
+    busy: busyAction !== null || instrumentConfirmationBusy,
+    draft: {
+      revision: draftRevision, entryAccountId, entrySheetMode,
+      positionId: editing?.id, accountId: editingAccount?.id,
+      accountSheetOpen, entrySheetOpen: entrySheetOpen ?? uncontrolledEntrySheetOpen,
+    },
+  });
   const [instrumentSearchOpen, setInstrumentSearchOpen] = useState(false);
   const [manualInstrumentEntry, setManualInstrumentEntry] = useState(false);
   const [manualAssetType, setManualAssetType] = useState<HeldAssetType>('stock');
@@ -165,6 +176,7 @@ export function PortfolioManagement({
   } = instrumentSearch;
 
   const markDirty = (nextDirty = true) => {
+    if (nextDirty) setDraftRevision((value) => value + 1);
     setDirty(nextDirty);
     onDirtyChange?.(nextDirty);
   };
@@ -298,6 +310,7 @@ export function PortfolioManagement({
     <PortfolioManagementView
       accounts={accounts}
       positions={positions}
+      positionsRefreshing={positionsRefreshing}
       cashValue={cashValue}
       step={step}
       showCash={showCash}

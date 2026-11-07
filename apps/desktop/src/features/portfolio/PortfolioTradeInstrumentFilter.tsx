@@ -1,12 +1,5 @@
 import type { TradeInstrumentsResponse } from '@thesis-ledger/api-client';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { InstrumentOptionField } from '../market-data/InstrumentOptionField.js';
 
 export function PortfolioTradeInstrumentFilter({
   items,
@@ -29,36 +22,20 @@ export function PortfolioTradeInstrumentFilter({
         item.displayName === item.symbol ? item.symbol : `${item.displayName} · ${item.symbol}`,
     })),
   ];
-  let label = options.find((option) => option.value === (symbol || 'all'))?.label ?? '全部标的';
-  if (loading) label = '正在读取标的';
-  else if (unavailable) label = '标的暂不可用';
+  let status = '';
+  if (loading) status = '正在读取标的';
+  else if (unavailable) status = '标的暂不可用';
   return (
     <div className="flex min-w-0 flex-col gap-1 text-xs font-medium">
       标的筛选
-      <Select
+      <InstrumentOptionField
+        label="交易标的筛选"
         value={symbol || 'all'}
-        onValueChange={(value) => {
-          if (value) onChange(value === 'all' ? '' : value);
-        }}
-      >
-        <SelectTrigger
-          aria-label="交易标的筛选"
-          aria-busy={loading}
-          disabled={loading || unavailable}
-          className="w-full bg-background"
-        >
-          <SelectValue>{label}</SelectValue>
-        </SelectTrigger>
-        <SelectContent align="start" alignItemWithTrigger={false}>
-          <SelectGroup>
-            {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+        options={options}
+        status={status}
+        disabled={loading || unavailable}
+        onChange={(value) => onChange(value === 'all' ? '' : value)}
+      />
     </div>
   );
 }

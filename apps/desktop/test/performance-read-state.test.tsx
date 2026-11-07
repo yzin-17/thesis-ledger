@@ -1,4 +1,6 @@
-import { type ComponentProps } from 'react';
+// @vitest-environment jsdom
+import { act, type ComponentProps } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
@@ -6,12 +8,13 @@ import { PerformanceSnapshotTable } from '../src/features/performance/Performanc
 import { PerformanceAllocationSection } from '../src/features/performance/PerformanceSections.js';
 import type { LoadState } from '../src/features/shared/types.js';
 
-const render = (
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+
+const trendView = (
   loadState: LoadState,
   groupedByCurrency = false,
   series?: ComponentProps<typeof PerformanceSnapshotTable>['series'],
-) =>
-  renderToStaticMarkup(
+) => (
     <ConfirmDialogProvider>
       <PerformanceSnapshotTable
         loadState={loadState}
@@ -26,7 +29,9 @@ const render = (
         onCompleteDataSetup={vi.fn()}
       />
     </ConfirmDialogProvider>,
-  );
+);
+
+const render = (...args: Parameters<typeof trendView>) => renderToStaticMarkup(trendView(...args));
 
 describe('资产走势读取状态', () => {
   it.each(['error', 'stale', 'loading', 'empty', 'ready'] as const)('目标缺失引导只用于已确认的空状态（%s）', (loadState) => {
@@ -58,8 +63,8 @@ describe('资产走势读取状态', () => {
     expect(render('empty')).toContain('完成数据配置');
   });
 
-  it('刷新失败仍呈现已有估值点，不退为空配置引导', () => {
-    const markup = render('stale', false, {
+  it('刷新失败仍呈现已有估值点，不退为空配置引导', async () => {
+    const view = trendView('stale', false, {
       range: '1Y',
       interval: '1d',
       currency: 'CNY',
@@ -80,8 +85,19 @@ describe('资产走势读取状态', () => {
         },
       ],
     });
-    expect(markup).toContain('123,456.78');
+    const markup = renderToStaticMarkup(view);
     expect(markup).toContain('刷新失败');
     expect(markup).not.toContain('完成数据配置');
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      await act(() => root.render(view));
+      await act(() => host.querySelector<SVGSVGElement>('svg[role="application"]')!.focus());
+      expect(host.textContent).toContain('123,456.78');
+    } finally {
+      await act(() => root.unmount());
+      host.remove();
+    }
   });
 });

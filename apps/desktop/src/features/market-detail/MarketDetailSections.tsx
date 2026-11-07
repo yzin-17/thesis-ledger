@@ -1,3 +1,5 @@
+import { formatMarketNumber, formatRatioPercent } from '@thesis-ledger/domain';
+import { Spinner } from '@/components/ui/spinner';
 import type { ReactNode } from 'react';
 import type {
   MarketDisplayBarSeries as BarSeries,
@@ -45,7 +47,6 @@ import { FundCurrentValuation } from './FundCurrentValuation.js';
 import type { MarketDetailPosition } from './market-detail.types.js';
 
 const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
-const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
 export const sectionIsDataReady = (section: MarketDetailSection | undefined) =>
   section?.status === 'ready' || section?.status === 'stale';
@@ -111,6 +112,7 @@ export const MarketDetailNotice = ({
     aria-live="polite"
     aria-busy={state === 'loading'}
   >
+    {state === 'loading' && <Spinner aria-hidden="true" />}
     <AlertTitle>{title}</AlertTitle>
     <AlertDescription>
       <span>{description}</span>
@@ -123,41 +125,25 @@ export const MarketDetailNotice = ({
   </Alert>
 );
 
-export const MarketDetailLoadingSections = () => (
-  <div className="grid gap-6" data-market-detail-loading aria-label="行情分段加载中">
-    {['行情数据', '技术指标', '资产专属数据'].map((label) => (
-      <section key={label} className="grid gap-3" aria-busy="true">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="m-0 text-sm font-medium">{label}</h3>
-            <p className="mb-0 mt-1 text-xs text-muted-foreground">正在加载该分段数据。</p>
-          </div>
-          <Badge className="tag" variant="secondary">
-            加载中
-          </Badge>
-        </div>
-        <div className="skeleton table" aria-hidden="true" />
-      </section>
-    ))}
-  </div>
-);
-
 export const DetailMetric = ({
   label,
   value,
   detail,
   tone,
+  prominent = false,
 }: {
   label: string;
   value: string;
   detail?: string;
   tone?: MarketTone;
+  prominent?: boolean;
 }) => (
   <div className="min-w-0 py-2">
     <span className="block text-xs text-muted-foreground">{label}</span>
     <strong
       className={cn(
-        'mt-1 block break-words text-xl font-semibold tracking-tight tabular-nums',
+        'mt-1 block break-words font-semibold tracking-tight tabular-nums',
+        prominent ? 'text-3xl' : 'text-xl',
         marketToneClass(tone),
       )}
     >
@@ -188,7 +174,7 @@ const SectionStatus = ({
         )}
         variant="secondary"
       >
-        {retrying ? '加载中' : (upstreamWindowLabel ?? marketDetailStatusLabel(section.status))}
+        {retrying ? <Spinner aria-label="正在重新读取行情" /> : (upstreamWindowLabel ?? marketDetailStatusLabel(section.status))}
       </Badge>
       {showErrorMessage && (section.error || staleReason) ? (
         <span className="text-sm text-muted-foreground">{section.error?.message ?? staleReason}</span>
@@ -268,8 +254,9 @@ export const QuoteSection = ({
       {renderReadyOrEmpty(
         section,
         quote ? (
-          <div className="grid gap-4 sm:grid-cols-4 sm:gap-6">
+          <div className="grid grid-cols-2 gap-x-4 sm:grid-cols-4 sm:gap-6">
             <DetailMetric
+              prominent
               label="实时价"
               value={formatQuotePrice(quote.price, quote.units?.priceCurrency)}
               {...(quoteTone ? { tone: quoteTone } : {})}
@@ -456,8 +443,8 @@ export const ChipSection = ({
         chip ? (
           <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
             <DetailMetric label="平均成本" value={money.format(chip.averageCost)} />
-            <DetailMetric label="获利比例" value={`${(chip.profitRatio * 100).toFixed(2)}%`} />
-            <DetailMetric label="集中度" value={`${(chip.concentration * 100).toFixed(2)}%`} />
+            <DetailMetric label="获利比例" value={formatRatioPercent(chip.profitRatio)} />
+            <DetailMetric label="集中度" value={formatRatioPercent(chip.concentration)} />
           </div>
         ) : null,
         <p className="empty-inline">当前没有可用筹码摘要。</p>,
@@ -490,17 +477,13 @@ export const FundNavSection = ({
       {renderReadyOrEmpty(
         section,
         nav ? (
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
-            <DetailMetric label="单位净值" value={number.format(nav.unitNav)} />
-            <DetailMetric
-              label="净值日期"
-              value={new Date(nav.navDate).toLocaleDateString('zh-CN')}
-            />
-            <DetailMetric
-              label="抓取时间"
-              value={new Date(nav.fetchedAt).toLocaleString('zh-CN')}
-            />
+          <div className="grid max-w-lg grid-cols-2 items-start gap-x-4">
+            <DetailMetric prominent label="单位净值" value={formatMarketNumber(nav.unitNav)}
+              detail={`净值日期 · ${new Date(nav.navDate).toLocaleDateString('zh-CN')}`} />
             <FundCurrentValuation symbol={nav.symbol} />
+            <small className="col-span-2 text-xs text-muted-foreground">
+              抓取时间 · {new Date(nav.fetchedAt).toLocaleString('zh-CN')}
+            </small>
           </div>
         ) : null,
         <p className="empty-inline">当前没有可用基金净值。</p>,

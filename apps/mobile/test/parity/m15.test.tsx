@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { button, click, field, input, mount, setApi } from './mobile-view-harness';
 import { ledgerAccount, ledgerAccountId } from './ledger-fixture';
-import { portfolioValuationResponseSchema } from '@thesis-ledger/schemas';
+import { riskRuleResponseSchema, portfolioValuationResponseSchema } from '@thesis-ledger/schemas';
 import { buildRiskInput, riskForm } from '../../src/features/risk-rules/risk-rule-form';
 import { mobileRiskContexts } from '../../src/features/risk-rules/risk-context';
 import { RiskRuleForm } from '../../src/features/risk-rules/RiskRuleForm';
@@ -78,5 +78,43 @@ describe('M15 风险规则与试算输入', () => {
     expect(button('保存风险规则').disabled).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(JSON.parse(fetcher.mock.calls[0]![1].body).enabled).toBe(false);
+  });
+  it.each([1 / 3, 0.26645084677376735, 1e-9, Number.MIN_VALUE])(
+    '修改其他字段时保留阈值 %s',
+    (threshold) => {
+      const previous = riskRuleResponseSchema.parse({
+        id: ledgerAccountId,
+        version: 1,
+        kind: 'cost-stop',
+        scope: 'security',
+        severity: 'warning',
+        threshold,
+        enabled: false,
+        needsRepair: false,
+        repairReason: null,
+        archivedAt: null,
+        symbol: '510300.SH',
+        accountId: ledgerAccountId,
+        effectiveAt: '2026-11-06T01:00:00Z',
+      });
+      const form = riskForm(previous);
+      expect(buildRiskInput({ ...form, severity: 'critical' }, previous)).toMatchObject({
+        threshold,
+        severity: 'critical',
+      });
+    },
+  );
+  it('拒绝非零百分比下溢，同时保留普通数值阈值', () => {
+    const form = {
+      ...riskForm(),
+      kind: 'cost-stop' as const,
+      threshold: '1e-323',
+      symbol: '510300.SH',
+      accountId: ledgerAccountId,
+    };
+    expect(() => buildRiskInput(form)).toThrow();
+    expect(
+      buildRiskInput({ ...form, kind: 'price-below', threshold: '123.45678901234566' }).threshold,
+    ).toBe(123.45678901234567);
   });
 });

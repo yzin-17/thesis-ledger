@@ -105,7 +105,7 @@ async function render(content: ReactNode = <RecurringCashDeposits account={accou
 }
 
 async function clickButton(text: string) {
-  const button = [...document.querySelectorAll('button')].find(
+  const button = [...(document.querySelector('[role=alertdialog]') ?? document.querySelector('[role=dialog]') ?? document).querySelectorAll('button')].find(
     (element) => element.textContent?.trim() === text,
   );
   expect(button, text).toBeDefined();
@@ -181,12 +181,12 @@ describe('定期入账失败后的表单恢复', () => {
     await clickButton('确认入账');
     await fill('cash-occurrence-amount', '123.45');
     await fill('cash-occurrence-date', '2026-10-15T12:34');
-    await clickButton('确认并写入 Ledger');
+    await clickButton('确认入账');
     expectSubmissionError();
     expect(input('cash-occurrence-amount').value).toBe('123.45');
     expect(input('cash-occurrence-date').value).toBe('2026-10-15T12:34');
     mocks.confirm.mockResolvedValueOnce({});
-    await clickButton('确认并写入 Ledger');
+    await clickButton('确认入账');
     expect(mocks.confirm).toHaveBeenCalledTimes(2);
     expect(mocks.confirm.mock.calls[1]).toEqual(mocks.confirm.mock.calls[0]);
     expect(mocks.confirm).toHaveBeenLastCalledWith({

@@ -29,16 +29,17 @@ export function attachTradingOverlays(
   series: ISeriesApi<SeriesType, Time>,
   model: TradingOverlayModel,
 ) {
-  if (!model.markers.length && !model.lines.length && !model.measurement) return () => {};
+  if (!model.arenaMarkers?.length && !model.markers.length && !model.lines.length && !model.measurement) return () => {};
   const markers = createSeriesMarkers(
     series,
-    model.markers.map((marker) => ({
-      time: toChartTime(marker.key),
+    [...model.markers.map((marker) => ({
+      time: toChartTime(marker.key),order:marker.key,
       position: marker.side === 'buy' ? ('belowBar' as const) : ('aboveBar' as const),
       color: marker.side === 'buy' ? '#2563eb' : '#b45309',
       shape: marker.side === 'buy' ? ('arrowUp' as const) : ('arrowDown' as const),
       text: `${marker.side === 'buy' ? '买' : '卖'} ${marker.quantity} @${marker.price} ${markerClock(marker.currency, marker.occurredAt, marker.timePrecision)}`,
-    })),
+    })),...(model.arenaMarkers??[]).map(p=>({time:toChartTime(p.day),order:p.day,position:p.side==='buy'?'belowBar' as const:'aboveBar' as const,
+    color:'#7c3aed',shape:'circle' as const,text:p.model+' 模拟'+(p.side==='buy'?'买':'卖')}))].sort((a,b)=>a.order.localeCompare(b.order)),
     { autoScale: false },
   );
   const lines = model.lines.map((line) =>

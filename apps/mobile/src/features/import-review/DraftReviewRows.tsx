@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { draftIsFrozen, rowCanSubmit } from '@thesis-ledger/api-client';
 import type { ImportDraftReviewRecord, ImportDraftRow } from '@thesis-ledger/schemas';
 import { Action, Copy, Feedback, Field, Section } from '../../components/MobilePrimitives';
@@ -39,7 +40,7 @@ export function DraftReviewRows({
               {frozen ? '已冻结' : '待核对'} · {row.currency} ·{' '}
               {row.observedAt ?? opened.review?.observedAt ?? '观察时间缺失'}
             </Copy>
-            <Field
+            <InstrumentSymbolField
               label={`第 ${index + 1} 行标准代码`}
               value={row.symbol}
               onChange={(symbol) => onChange(row.rowId, { symbol })}

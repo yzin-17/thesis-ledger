@@ -2,7 +2,7 @@ import { valuationPositionLabel } from '@thesis-ledger/domain';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAccounts, useLedger, useValuation } from '../../app/query/mobile-queries';
-import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Copy, Page, QueryList, QueryStatus, Section } from '../../components/MobilePrimitives';
 import type { AccountStackParams } from '../../app/navigation-types';
 
 export function AccountWorkspace() {
@@ -60,16 +60,21 @@ export function AccountWorkspace() {
             />
             <Action label="账本审计" onPress={() => navigation.navigate('Audit', params)} />
           </Section>
-          <QueryStatus query={valuation} retry={() => void valuation.refetch()} />
-          {valuation.data?.positions.map((position) => (
-            <Section key={position.id} title={position.asset?.name ?? position.symbol}>
-              <Copy>
-                {position.symbol} · 数量 {position.quantity} · 成本 {position.costPrice}{' '}
-                {typeof position.currency === 'string' ? position.currency : account.currency}
-              </Copy>
-              <Copy muted>{valuationPositionLabel(position)}{position.navDate ? ` · 净值 ${position.navDate.slice(0, 10)} · 单位净值 ${position.marketPrice}` : ''}</Copy>
-            </Section>
-          ))}
+          <QueryList
+            query={valuation}
+            retry={() => void valuation.refetch()}
+            label="正在刷新持仓"
+          >
+            {valuation.data?.positions.map((position) => (
+              <Section key={position.id} title={position.asset?.name ?? position.symbol}>
+                <Copy>
+                  {position.symbol} · 数量 {position.quantity} · 成本 {position.costPrice}{' '}
+                  {typeof position.currency === 'string' ? position.currency : account.currency}
+                </Copy>
+                <Copy muted>{valuationPositionLabel(position)}{position.navDate ? ` · 净值 ${position.navDate.slice(0, 10)} · 单位净值 ${position.marketPrice}` : ''}</Copy>
+              </Section>
+            ))}
+          </QueryList>
         </>
       ) : null}
     </Page>

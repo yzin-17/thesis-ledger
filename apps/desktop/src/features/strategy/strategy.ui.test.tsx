@@ -68,7 +68,7 @@ describe('策略实验工作台 UI 契约', () => {
 
     expect(source).toContain('提交后将在后台准备行情并启动任务，进度可在回测任务中查看。');
     expect(source).toContain('grid-rows-[auto_minmax(0,1fr)_auto]');
-    expect(source).toContain('variant="compact"');
+    expect(source).toContain('<StrategyV2Summary');
     expect(source).toContain('<BacktestPricePreparation');
     expect(source).toContain('disabled={busy || !version || !currentStrategy || !prepared}');
     expect(source).not.toContain('可选，仅在需要覆盖执行假设时填写');

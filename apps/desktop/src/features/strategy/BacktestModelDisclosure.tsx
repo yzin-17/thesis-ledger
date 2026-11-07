@@ -59,7 +59,7 @@ export function BacktestModelDisclosure({
             </p>
           </div>
         ))}
-        <p>模型选择与事实支持状态分别校验；Provider 可用性及结果完整度以本次运行返回为准。</p>
+        <p>模型选择与事实支持状态分别校验；提供方可用性及结果完整度以本次运行返回为准。</p>
         <BacktestBrokerCommissionDisclosure model={model} />
         <BacktestResearchLotSizeDisclosure model={model} />
         {contentHash && <p className="break-all">模型内容哈希：{contentHash}</p>}

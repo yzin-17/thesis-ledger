@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/ui/spinner';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import type { ResearchSubmissionV2 } from '@thesis-ledger/schemas';
 import type { useResearchCapabilitiesQuery } from './research.queries.js';
@@ -33,11 +34,7 @@ export function ResearchCreationReadiness({
   capability: Capabilities;
 }) {
   if (settings.isPending || capability.isPending)
-    return (
-      <p role="status" className="text-sm text-muted-foreground">
-        正在核对创建资格和研究默认模型…
-      </p>
-    );
+    return <LoadingState label="正在核对创建资格和研究默认模型" />;
   if (capability.isError)
     return (
       <Alert variant="destructive">

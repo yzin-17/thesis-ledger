@@ -3,7 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { cn } from '@/lib/utils';
 import { marketToneClass, type MarketTone } from '@/ui/market-color';
@@ -20,11 +20,11 @@ export const Metric = ({
   detail?: string;
   tone?: MarketTone;
 }) => (
-  <Card className="metric metric-card shadow-none ring-0">
-    <CardContent className="metric-content">
-      <p>{label}</p>
-      <strong className={marketToneClass(tone)}>{value}</strong>
-      {detail && <span>{detail}</span>}
+  <Card className="gap-0 rounded-none border-0 bg-transparent py-0 shadow-none ring-0">
+    <CardContent className="flex min-w-0 flex-col gap-1.5 px-0 py-2">
+      <p className="m-0 text-xs text-muted-foreground">{label}</p>
+      <strong className={cn('block text-2xl font-semibold tracking-tight break-words tabular-nums', marketToneClass(tone))}>{value}</strong>
+      {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
     </CardContent>
   </Card>
 );
@@ -75,6 +75,7 @@ export const DataStateBanner = ({
       aria-live="polite"
       aria-busy={state === 'loading'}
     >
+      {state === 'loading' && <Spinner aria-hidden="true" />}
       <AlertTitle>{title ?? content.title}</AlertTitle>
       <AlertDescription>
         <span>{description ?? content.description}</span>
@@ -87,15 +88,3 @@ export const DataStateBanner = ({
     </Alert>
   );
 };
-
-export const DashboardSkeleton = () => (
-  <div aria-label="正在加载" aria-busy="true">
-    <Skeleton className="skeleton hero" />
-    <div className="metrics">
-      <Skeleton className="skeleton card" />
-      <Skeleton className="skeleton card" />
-      <Skeleton className="skeleton card" />
-    </div>
-    <Skeleton className="skeleton table" />
-  </div>
-);

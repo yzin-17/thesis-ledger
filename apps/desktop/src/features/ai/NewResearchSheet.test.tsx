@@ -133,7 +133,12 @@ async function choose(triggerId: string, text: string) {
       item.textContent?.includes(text),
     ),
   );
-  await click(option);
+  await act(async () => {
+    const down = new MouseEvent('pointerdown', { bubbles: true, button: 0 });
+    Object.defineProperty(down, 'pointerType', { value: 'mouse' });
+    option.dispatchEvent(down);
+    option.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0, detail: 1 }));
+  });
 }
 
 async function openScope(label: string) {
@@ -206,7 +211,7 @@ describe('新建研究的实体选择', () => {
     await until(() => mocks.valuation.mock.calls.length > 0);
     expect(mocks.valuation.mock.calls.at(-1)?.slice(0, 2)).toEqual([mode, accountId]);
     await choose('ai-position-symbol', '沪深300ETF');
-    expect(document.getElementById('ai-position-symbol')?.textContent).toContain(
+    expect((document.getElementById('ai-position-symbol') as HTMLInputElement)?.value).toContain(
       '510300.SH · 沪深300ETF',
     );
     expect(

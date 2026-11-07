@@ -1,3 +1,4 @@
+import { formatRatioPercent } from '@thesis-ledger/domain';
 import type { PerformanceFxMeta, PerformanceSummary } from './performance.types.js';
 
 const metricDisplay = (
@@ -15,7 +16,7 @@ const metricDisplay = (
     options.allowed && value !== null && value !== undefined && Number.isFinite(value);
   const display = { value: '—', detail: options.fallback };
   if (available) {
-    display.value = `${(value * 100).toFixed(2)}%`;
+    display.value = formatRatioPercent(value);
     display.detail = options.readyDetail;
   }
   if (options.error) return { ...display, detail: options.error };

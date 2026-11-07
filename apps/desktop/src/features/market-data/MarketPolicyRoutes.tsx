@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/ui/spinner';
 import { Field, FieldLabel, FieldGroup, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { MarketPolicyTargetSelect } from './MarketPolicyTargetSelect.js';
@@ -39,17 +40,12 @@ export function MarketPolicyRoutes({
   onChange: (policy: MarketPolicyDraftV3) => void;
 }) {
   if (!policy) {
-    return <p className="text-sm text-muted-foreground">正在读取路由策略…</p>;
+    return <LoadingState label="正在读取路由策略" />;
   }
   const rows = marketPolicyRouteRowsV3(catalog, policy);
   if (rows.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {catalog?.status === 'complete'
-          ? '当前目录没有可配置的数据能力。'
-          : '正在读取路由策略与精确能力目录…'}
-      </p>
-    );
+    if (catalog?.status !== 'complete') return null;
+    return <p className="text-sm text-muted-foreground">当前目录没有可配置的数据能力。</p>;
   }
   return (
     <FieldGroup>

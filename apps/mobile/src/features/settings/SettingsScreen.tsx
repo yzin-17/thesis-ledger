@@ -73,6 +73,7 @@ export function SettingsScreen() {
           editable={!check.isPending}
         />
         <Action
+          busy={check.isPending}
           label={check.isPending ? '正在连接…' : '验证并连接'}
           onPress={() => void connect()}
           disabled={check.isPending}

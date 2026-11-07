@@ -43,6 +43,14 @@ export const automationHistoryPageSchema = z.object({
   total: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
 });
+export const riskMonitoringEnableSchema = z.strictObject({ jobId: z.uuid().optional() });
+export const riskMonitoringStatusSchema = z.array(z.object({
+  id: z.uuid(), name: z.string(), enabled: z.boolean(), cron: z.string(), timezone: z.string(),
+  nextRunAt: z.iso.datetime().nullable(),
+  lastRun: z.object({ status: z.string(), startedAt: z.iso.datetime(),
+    actual: z.object({ contextCount: z.number(), events: z.number(), errors: z.number(), missing: z.number() }).nullable(),
+  }).nullable(),
+}));
 export type AutomationRecord = z.infer<typeof automationRecordSchema>;
 export type AutomationCreateInput = z.input<typeof automationCreateInputSchema>;
 export type AutomationUpdateInput = z.input<typeof automationUpdateInputSchema>;

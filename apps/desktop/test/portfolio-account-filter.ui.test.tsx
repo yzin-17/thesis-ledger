@@ -3,7 +3,7 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PerformanceWorkspace } from '../src/app/PerformanceWorkspace.js';
+import { PerformanceWorkspace, type PerformanceWorkspaceTab } from '../src/app/PerformanceWorkspace.js';
 import {
   fetchAccounts,
   fetchManagedAccounts,
@@ -88,8 +88,7 @@ let host: HTMLDivElement;
 let client: QueryClient;
 
 function Harness({ initialAccountId = '' }: { initialAccountId?: string }) {
-  const [tab, setTab] =
-    useState<import('../src/app/PerformanceWorkspace.js').PerformanceWorkspaceTab>('overview');
+  const [tab, setTab] = useState<PerformanceWorkspaceTab>('overview');
   const [mode, setMode] = useState<PortfolioMode>('actual');
   const [accountId, setAccountId] = useState(initialAccountId);
   const query = usePortfolioShellQueries(mode, { enableValuation: true, accountId });
@@ -127,8 +126,18 @@ async function mount(initialAccountId = '') {
   await settle();
 }
 async function settle() {
-  await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+  await vi.waitFor(
+    async () => {
+      await act(async () => {
+        await vi.dynamicImportSettled();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(document.querySelector('[aria-label="正在打开页面"]')).toBeNull();
+    },
+    { timeout: 5000 },
+  );
 }
+
 async function resolve(index: number) {
   await act(async () =>
     requests[index]!.resolve(portfolio(requests[index]!.accountId, requests[index]!.mode)),
@@ -136,15 +145,15 @@ async function resolve(index: number) {
   await settle();
 }
 async function click(label: string) {
-  const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+  const button = [...document.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input[role="combobox"]')].find(
     (item) => item.textContent?.trim() === label || item.getAttribute('aria-label') === label,
   );
   expect(button).toBeDefined();
   await act(async () => button!.click());
   await settle();
 }
-async function select(label: string) {
-  await click('收益账户范围');
+async function select(label: string, trigger = '收益账户范围') {
+  await click(trigger);
   const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) =>
     item.textContent?.includes(label),
   );
@@ -198,8 +207,10 @@ describe('投资组合账户筛选', () => {
     await resolve(0);
     vi.mocked(fetchPortfolioTradeInstruments).mockRejectedValueOnce(new Error('选项暂不可用'));
     await click('交易');
-    expect(host.querySelector('[aria-label="交易标的筛选"]')?.textContent).toContain(
-      '标的暂不可用',
+    await vi.waitFor(() =>
+      expect(host.querySelector<HTMLInputElement>('[aria-label="交易标的筛选"]')?.value).toContain(
+        '标的暂不可用',
+      ),
     );
     expect(
       [...host.querySelectorAll('button')].some((button) => button.textContent === '刷新交易'),
@@ -244,12 +255,16 @@ describe('投资组合账户筛选', () => {
     expect(host.querySelector<HTMLButtonElement>('[aria-label="刷新组合数据"]')?.disabled).toBe(
       false,
     );
-    expect(host.querySelector('[aria-label="交易标的筛选"]')?.textContent).toContain('全部标的');
+    expect(host.querySelector<HTMLInputElement>('[aria-label="交易标的筛选"]')?.value).toContain('全部标的');
     expect(host.querySelector('[aria-label="收益账户范围"]')?.textContent).toContain(
       '安卓基金账户',
     );
   });
-  it('选择账户后汇总和持仓同步切换，交易继承范围，清除筛选恢复全部', async () => {
+  it('选择账户后汇总和持仓同步切换，清除交易筛选保留账户范围', async () => {
+    vi.mocked(fetchPortfolioTradeInstruments).mockResolvedValue({
+      mode: 'actual', accountId: 'a',
+      items: [{ symbol: '000001.OF', displayName: '测试基金' }],
+    });
     await mount();
     await resolve(0);
     expect(host.textContent).toContain('¥160.00');
@@ -278,12 +293,38 @@ describe('投资组合账户筛选', () => {
       expect.objectContaining({ accountId: 'a', mode: 'actual' }),
     );
     expect(host.querySelector('[aria-label="交易账户范围"]')).toBeNull();
+    const clearButton = [...host.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input[role="combobox"]')].find(
+      (button) => button.textContent?.trim() === '清除筛选',
+    )!;
+    expect(clearButton.disabled).toBe(true);
+    expect(host.textContent).toContain('暂无交易周期');
+    expect(host.textContent).not.toContain('调整或清除筛选后再查看');
+    await select('测试基金', '交易标的筛选');
+    await select('进行中', '交易生命周期');
+    expect(clearButton.disabled).toBe(false);
+    expect(fetchPortfolioTrades).toHaveBeenLastCalledWith(
+      expect.objectContaining({ accountId: 'a', symbol: '000001.OF', lifecycle: 'ACTIVE' }),
+    );
+    expect(host.textContent).toContain('没有匹配的交易周期');
+    await act(async () => client.invalidateQueries({ queryKey: ['desktop', 'portfolio-trades', 'list'], refetchType: 'none' }));
+    vi.mocked(fetchPortfolioTrades).mockClear();
     await click('清除筛选');
     expect(fetchPortfolioTrades).toHaveBeenLastCalledWith(
-      expect.not.objectContaining({ accountId: 'a' }),
+      { accountId: 'a', mode: 'actual', limit: 50 },
     );
+    expect(vi.mocked(fetchPortfolioTrades).mock.calls.every(([params]) => params.accountId === 'a')).toBe(true);
+    expect(host.querySelector('[aria-label="收益账户范围"]')?.textContent).toContain(
+      '安卓基金账户',
+    );
+    expect(host.querySelector<HTMLInputElement>('[aria-label="交易标的筛选"]')?.value).toContain('全部标的');
+    expect(host.querySelector('[aria-label="交易生命周期"]')?.textContent).toContain('全部');
+    expect(clearButton.disabled).toBe(true);
+    expect(host.textContent).toContain('暂无交易周期');
     await click('组合概览');
-    expect(host.textContent).toContain('¥160.00');
+    expect(host.textContent).toContain('¥80.00');
+    expect(host.textContent).not.toContain('¥160.00');
+    expect(host.textContent).toContain('基金持仓-a');
+    expect(host.textContent).not.toContain('基金持仓-b');
   });
 
   it('快速切换和迟到结果不混用账户，失败时仍可恢复全部', async () => {

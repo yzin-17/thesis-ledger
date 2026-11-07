@@ -31,6 +31,14 @@ export const fundValuationSchema = z.strictObject({
   if (unavailable && value.reasons.length === 0)
     context.addIssue({ code: 'custom', message: '不可用估值必须保留原因' });
 });
+export const fundDailyErrorSchema = z.object({
+  symbol: fundValuationSymbolSchema, day: z.iso.date(), method: z.literal('disclosed-holdings-qfq-v1'),
+  estimatedAt: z.iso.datetime({offset:true}), estimatedNav: z.number().positive(),
+  pricedCoverage: z.number().min(0).max(1), quality: z.enum(['low_coverage','partial','complete']),
+  official: z.object({ unitNav:z.number().positive(), navDate:z.iso.datetime({offset:true}), provider:z.string(),
+    upstreamSource:z.string(), fetchedAt:z.iso.datetime({offset:true}), servedFromCache:z.boolean() }).nullable(),
+  errors:z.object({signed:z.string(),absolute:z.string(),relativeAbsolute:z.string()}).nullable(),
+}).nullable();
 export type FundValuation = z.infer<typeof fundValuationSchema>;
 
 export const fundValuationTodaySchema = z.strictObject({

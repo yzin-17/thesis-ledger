@@ -1,0 +1,146 @@
+[
+  {
+    "name": "ordinary",
+    "price": 4.124,
+    "previousClose": 4.195,
+    "open": 4.113,
+    "high": 4.2,
+    "low": 4,
+    "expected": {
+      "value": "4.124 CNY",
+      "change": "-1.69%",
+      "changeAmount": "-0.071",
+      "open": "4.113",
+      "previousClose": "4.195",
+      "high": "4.2",
+      "low": "4",
+      "amplitude": "4.77%"
+    }
+  },
+  {
+    "name": "tiny",
+    "price": 1e-7,
+    "previousClose": 2e-7,
+    "open": 1e-7,
+    "high": 2e-7,
+    "low": 5e-8,
+    "expected": {
+      "value": "1E-7 CNY",
+      "change": "-50.00%",
+      "changeAmount": "-1E-7",
+      "open": "1E-7",
+      "previousClose": "2E-7",
+      "high": "2E-7",
+      "low": "5E-8",
+      "amplitude": "75.00%"
+    }
+  },
+  {
+    "name": "near-positive",
+    "price": 1.000000001,
+    "previousClose": 1,
+    "open": 1.000000001,
+    "high": 1.000000001,
+    "low": 1,
+    "expected": {
+      "value": "1 CNY",
+      "change": "1E-7%",
+      "changeAmount": "1E-9",
+      "open": "1",
+      "previousClose": "1",
+      "high": "1",
+      "low": "1",
+      "amplitude": "1E-7%"
+    }
+  },
+  {
+    "name": "near-negative",
+    "price": 0.999999999,
+    "previousClose": 1,
+    "open": 0.999999999,
+    "high": 1,
+    "low": 0.999999999,
+    "expected": {
+      "value": "1 CNY",
+      "change": "-1E-7%",
+      "changeAmount": "-1E-9",
+      "open": "1",
+      "previousClose": "1",
+      "high": "1",
+      "low": "1",
+      "amplitude": "1E-7%"
+    }
+  },
+  {
+    "name": "maximum",
+    "price": 1.7976931348623157e308,
+    "previousClose": 1,
+    "open": 1.7976931348623157e308,
+    "high": 1.7976931348623157e308,
+    "low": 1.7976931348623157e308,
+    "expected": {
+      "value": "1.797693E308 CNY",
+      "change": "1.797693E310%",
+      "changeAmount": "1.797693E308",
+      "open": "1.797693E308",
+      "previousClose": "1",
+      "high": "1.797693E308",
+      "low": "1.797693E308",
+      "amplitude": "0.00%"
+    }
+  },
+  {
+    "name": "wide-range",
+    "price": 1,
+    "previousClose": 1,
+    "open": 1,
+    "high": 1.7976931348623157e308,
+    "low": 0,
+    "expected": {
+      "value": "1 CNY",
+      "change": "0.00%",
+      "changeAmount": "0",
+      "open": "1",
+      "previousClose": "1",
+      "high": "1.797693E308",
+      "low": "0",
+      "amplitude": "1.797693E310%"
+    }
+  },
+  {
+    "name": "zero",
+    "price": 0,
+    "previousClose": 0,
+    "open": 0,
+    "high": 0,
+    "low": 0,
+    "expected": {
+      "value": "0 CNY",
+      "change": "—",
+      "changeAmount": "—",
+      "open": "0",
+      "previousClose": "0",
+      "high": "0",
+      "low": "0",
+      "amplitude": "—"
+    }
+  },
+  {
+    "name": "grouped",
+    "price": 1234567.123456,
+    "previousClose": 1234567.123456,
+    "open": 1234567.123456,
+    "high": 1234567.123456,
+    "low": 1234567.123456,
+    "expected": {
+      "value": "1,234,567.1235 CNY",
+      "change": "0.00%",
+      "changeAmount": "0",
+      "open": "1,234,567.1235",
+      "previousClose": "1,234,567.1235",
+      "high": "1,234,567.1235",
+      "low": "1,234,567.1235",
+      "amplitude": "0.00%"
+    }
+  }
+]

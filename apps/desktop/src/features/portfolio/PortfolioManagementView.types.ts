@@ -10,6 +10,7 @@ import type {
 export type PortfolioManagementViewProps = {
   accounts: Account[];
   positions: Position[];
+  positionsRefreshing?: boolean;
   cashValue: number | undefined;
   step: 'account' | 'position';
   showCash?: boolean;

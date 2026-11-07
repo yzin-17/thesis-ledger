@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import {
   marketPolicyClientResponseSchema,
   type MarketProviderProbeRoute,
@@ -12,7 +13,6 @@ import type {
   ProviderManifest,
   ProviderCredentialDraft,
 } from './market-data.types.js';
-
 const api = () => getDesktopApiClient();
 
 export const parseMarketPolicyResponse = (value: unknown): MarketPolicyResponse => {
@@ -49,7 +49,7 @@ export const saveMarketPolicy = async (policy: MarketPolicyDraftV3) =>
   api().market.savePolicy({
     contractVersion: 3,
     consumer: 'thesis-ledger',
-    requestId: crypto.randomUUID(),
+    requestId: createClientRequestId(),
     revision: policy.revision + 1,
     expectedRevision: policy.revision,
     enabled: policy.enabled,

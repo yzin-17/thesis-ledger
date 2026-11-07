@@ -15,7 +15,7 @@ function Value({ value, column }: { value: string | null; column: ReferenceColum
   if (value === null) return <span className="text-muted-foreground">—</span>;
   if (column.format === 'url')
     return (
-      <a href={value} target="_blank" rel="noreferrer" className="underline">
+      <a href={value} target="_blank" rel="noreferrer" className="text-primary hover:text-primary/80">
         打开原文
       </a>
     );

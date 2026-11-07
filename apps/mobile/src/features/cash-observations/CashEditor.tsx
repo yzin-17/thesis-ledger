@@ -128,6 +128,7 @@ export function CashEditor() {
       ) : null}
       <Feedback message={feedback} error={mutation.isError} />
       <Action
+        busy={mutation.isPending}
         label={mutation.isPending ? '记录中…' : '保存现金记录'}
         disabled={blocked || !dirty}
         primary

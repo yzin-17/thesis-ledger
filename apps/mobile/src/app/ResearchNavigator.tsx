@@ -1,3 +1,4 @@
+import { ArenaWeekScreen } from '../features/model-arena/ArenaWeekScreen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { ResearchStackParams } from './navigation-types';
 import { ResearchHome } from '../features/research-read/ResearchHome';
@@ -15,10 +16,11 @@ import { StrategyNavigator } from './StrategyNavigator';
 const Stack = createNativeStackNavigator<ResearchStackParams>();
 export function ResearchNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerTitle: '', headerBackTitle: '返回' }}>
+    <Stack.Navigator initialRouteName="ResearchHome" screenOptions={{ headerTitle: '', headerBackTitle: '返回' }}>
       <Stack.Screen name="ResearchHome" component={ResearchHome} options={{ headerShown: false }} />
       <Stack.Screen name="Strategy" component={StrategyNavigator} options={{ headerShown: false }} />
       <Stack.Screen name="Journal" component={JournalScreen} />
+      <Stack.Screen name="ArenaWeek" component={ArenaWeekScreen} />
       <Stack.Screen name="JournalObject" component={JournalObjectScreen} />
       <Stack.Screen name="JournalPeriod" component={JournalPeriodScreen} />
       <Stack.Screen name="JournalHistory" component={JournalHistoryScreen} />

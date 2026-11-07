@@ -1,3 +1,8 @@
+import { MarketObservationsService } from './market-observations.service.js';
+import { MarketBackgroundQuotesService } from './market-background-quotes.service.js';
+import {MarketActionCoverage} from './market-action-coverage.js';
+import {MarketOpenEvidence} from './market-open-evidence.js';
+import {MarketInstrumentEvidence} from './market-instrument-evidence.js';
 import { MarketLifecycleReaderV3 } from './market-lifecycle-reader-v3.js';
 import { Module } from '@nestjs/common';
 import { DsaModule } from '../integration/dsa/dsa.module.js';
@@ -27,6 +32,8 @@ import { MarketChartReaderV3 } from './market-chart-reader-v3.js';
 import { MarketChartProofRepository } from './market-chart-proof.repository.js';
 import { MarketPitReconstructionRepository } from './market-pit-reconstruction.repository.js';
 import { MarketBarReader } from './market-bar-reader.js';
+import { MarketEventFreeReader } from './market-event-free-reader.js';
+import { MarketEventFreeRepository } from './market-event-free.repository.js';
 import { MarketController } from './market.controller.js';
 import { MarketQuotesController } from './market-quotes.controller.js';
 import { MarketNavReaderV3 } from './market-nav-reader-v3.js';
@@ -48,6 +55,7 @@ import { MarketReportMetadataRepository } from './market-report-metadata.reposit
 import { MarketReferenceController } from './market-reference.controller.js';
 import { MarketFundValuationController } from './market-fund-valuation.controller.js';
 import { MarketFundValuationService } from './market-fund-valuation.service.js';
+import { FundDailyErrorService } from './fund-daily-error.service.js';
 import { FundValuationPointRepository } from './fund-valuation-point.repository.js';
 
 @Module({
@@ -66,8 +74,14 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
     MarketReportMetadataController,
   ],
   providers: [
+    MarketBackgroundQuotesService,
+    MarketObservationsService,
+    MarketActionCoverage,
+    MarketOpenEvidence,
+    MarketInstrumentEvidence,
     MarketFundValuationService,
     FundValuationPointRepository,
+    FundDailyErrorService,
     MarketReportMetadataService,
     MarketReportMetadataRepository,
     MarketNewsReader,
@@ -103,8 +117,14 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
     MarketChartProofRepository,
     MarketPitReconstructionRepository,
     MarketBarReader,
+    MarketEventFreeReader,
+    MarketEventFreeRepository,
   ],
   exports: [
+    MarketBackgroundQuotesService,
+    MarketObservationsService,
+    MarketOpenEvidence,
+    MarketInstrumentEvidence,
     MarketFundValuationService,
     MarketPeriodCalendarReader,
     MarketNewsReader,

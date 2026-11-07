@@ -85,7 +85,7 @@ export function ReviewAction({
           void command.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))
         }
       />
-      <Feedback message={message} error={command.isError} />
+      <Feedback busy={command.isPending} message={message} error={command.isError} />
     </>
   );
 }

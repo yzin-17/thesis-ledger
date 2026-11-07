@@ -11,7 +11,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList, QueryStatus,
   Section,
 } from '../../components/MobilePrimitives';
 import { useConfigCommand } from '../configuration/use-config-command';
@@ -111,7 +111,7 @@ export function MarketPolicyScreen() {
   };
   return (
     <Page title="行情路由配置">
-      <Feedback message={message} />
+      <Feedback busy={command.pending} message={message} />
       <QueryStatus query={query} retry={() => void adopt()} />
       <PolicyStatus
         data={query.data}
@@ -155,13 +155,19 @@ export function MarketPolicyScreen() {
         </Section>
       ) : null}
       <Section title="可选择的精确能力">
-        <QueryStatus query={catalog} retry={() => void catalog.refetch()} />
         <Copy>
           目录状态 {catalog.data?.status ?? '未读取'}；原因 {catalog.data?.reason ?? '无'}
         </Copy>
-        {catalog.data?.entries.map((entry, index) => (
-          <Copy key={index}>{JSON.stringify(entry)}</Copy>
-        ))}
+        <QueryList
+          query={catalog}
+          retry={() => void catalog.refetch()}
+          label="正在刷新路由目录"
+          gap={12}
+        >
+          {catalog.data?.entries.map((entry, index) => (
+            <Copy key={index}>{JSON.stringify(entry)}</Copy>
+          ))}
+        </QueryList>
       </Section>
     </Page>
   );

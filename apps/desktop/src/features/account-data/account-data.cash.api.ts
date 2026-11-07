@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import type {
   CashFlowPayload,
   CashTransferMetadata,
@@ -16,7 +17,6 @@ import type {
   UpdateRecurringCashDepositPlan,
   VoidCashTransferCommand,
 } from '@thesis-ledger/api-client';
-
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import { createClientCommandId, sourceTimezone } from './account-data.helpers.js';
 
@@ -87,7 +87,7 @@ export const createManualCashTransfer = async (
   },
   client: CashOperationsClient = defaultClient(),
 ): Promise<LedgerCommandResponse> => {
-  const transferId = crypto.randomUUID();
+  const transferId = createClientRequestId();
   const [sourceLedger, targetLedger] = await Promise.all([
     client.ledger.getEvents(input.sourceAccountId),
     client.ledger.getEvents(input.targetAccountId),
@@ -185,7 +185,7 @@ export const replaceManualCashTransfer = async (
   client: CashOperationsClient = defaultClient(),
 ) => {
   const context = await loadTransferContext(input.event, client);
-  const externalId = crypto.randomUUID();
+  const externalId = createClientRequestId();
   const command: ReplaceCashTransferCommand = {
     command: 'REPLACE_CASH_TRANSFER',
     transferId: context.transfer.transferId,
@@ -214,7 +214,7 @@ export const voidManualCashTransfer = async (
   client: CashOperationsClient = defaultClient(),
 ) => {
   const context = await loadTransferContext(input.event, client);
-  const externalId = crypto.randomUUID();
+  const externalId = createClientRequestId();
   const command: VoidCashTransferCommand = {
     command: 'VOID_CASH_TRANSFER',
     transferId: context.transfer.transferId,
@@ -265,7 +265,7 @@ export const restoreManualCashTransfer = async (
   const targetTip = findTip(targetAudit.events, targetFact?.factId);
   if (!sourceFact || !targetFact || !isVoidLedgerEvent(sourceTip) || !isVoidLedgerEvent(targetTip))
     throw new Error('划转两端当前并非已作废状态，请刷新审计链后重试。');
-  const externalId = crypto.randomUUID();
+  const externalId = createClientRequestId();
   const occurredAt = input.event.occurredAt ?? new Date().toISOString();
   const timePrecision = input.event.timePrecision === 'DATE' ? 'DATE' : 'INSTANT';
   const command: RestoreCashTransferCommand = {

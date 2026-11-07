@@ -80,7 +80,7 @@ export function NavSetupHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-semibold tracking-tight">基金净值回测</h2>
+        <h2 className="text-xl font-semibold tracking-tight">基金净值回测</h2>
         <p className="text-sm text-muted-foreground">
           {selection.strategy.name} · v{selection.version.version} · {symbol}
         </p>

@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { PageHeader } from '../shared/PageHeader.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -250,11 +251,14 @@ export function RiskCenter({
   };
 
   return (
-    <section className="module-page">
+    <section
+      data-fill-height={tab === 'rules' ? '' : undefined}
+      className="module-page lg:data-fill-height:flex lg:data-fill-height:grow lg:data-fill-height:flex-col"
+    >
       <PageHeader
+        className="mb-card"
         eyebrow="RISK CENTER"
         title="风险中心"
-        description="设置监控规则，查看风险事件与通知记录。"
         actions={
           <>
             <RefreshIconButton
@@ -291,11 +295,13 @@ export function RiskCenter({
             完整规则列表读取失败；无需再次提交，重新读取后再继续操作。
           </AlertDescription>
           <Button
+            aria-busy={riskQueries.rules.isFetching}
             type="button"
             variant="outline"
             disabled={riskQueries.rules.isFetching}
             onClick={() => void riskQueries.rules.refetch()}
           >
+            {riskQueries.rules.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
             重新读取规则
           </Button>
         </Alert>
@@ -307,18 +313,20 @@ export function RiskCenter({
             风险历史读取失败，无需再次执行；重新读取后再继续扫描。
           </AlertDescription>
           <Button
+            aria-busy={riskRefreshing}
             type="button"
             variant="outline"
             disabled={riskRefreshing}
             onClick={() => void actions.loadRisk()}
           >
+            {riskRefreshing && <Spinner data-icon="inline-start" aria-hidden="true" />}
             重新读取风险历史
           </Button>
         </Alert>
       )}
 
-      <Tabs value={tab} onValueChange={(value) => selectTab(value as RiskTab)}>
-        <TabsList variant="line" className="mb-4 w-full">
+      <Tabs className="lg:grow" value={tab} onValueChange={(value) => selectTab(value as RiskTab)}>
+        <TabsList variant="line" className="w-full">
           <TabsTrigger value="overview">总览</TabsTrigger>
           <TabsTrigger value="rules">规则</TabsTrigger>
           <TabsTrigger value="strategy-applications">策略应用</TabsTrigger>
@@ -327,7 +335,7 @@ export function RiskCenter({
         </TabsList>
         <TabsContent value="overview">
           <RiskOverview
-            mode={mode}
+            eventsRefreshing={riskQueries.events.isRefetching}
             portfolioValueAt={portfolio?.valuedAt ?? null}
             portfolioState={portfolioState}
             loadState={eventReadState}
@@ -344,8 +352,9 @@ export function RiskCenter({
             onRetryEvents={() => void riskQueries.events.refetch()}
           />
         </TabsContent>
-        <TabsContent value="rules">
+        <TabsContent value="rules" className="lg:grid">
           <RiskRuleWorkbench
+            refreshing={riskQueries.rules.isRefetching}
             rules={rules}
             accounts={accounts}
             positions={portfolio?.positions ?? []}
@@ -368,6 +377,7 @@ export function RiskCenter({
         </TabsContent>
         <TabsContent value="events">
           <RiskEventTable
+            refreshing={riskQueries.events.isRefetching}
             loadState={eventReadState}
             events={events}
             severityFilter={eventSeverityFilter}
@@ -376,6 +386,7 @@ export function RiskCenter({
         </TabsContent>
         <TabsContent value="notifications">
           <RiskNotificationTable
+            refreshing={riskQueries.notifications.isRefetching}
             loadState={notificationReadState}
             deliveries={deliveries}
             statusFilter={notificationStatusFilter}

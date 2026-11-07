@@ -12,8 +12,8 @@ const switchVariants: Record<SwitchVariant, string> = {
 
 const switchThumbVariants: Record<SwitchVariant, string> = {
   default: '',
-  risk: 'inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-input bg-background px-0 text-[11px] font-semibold text-foreground shadow-xs transition-transform duration-150 ease-out data-checked:bg-primary-foreground data-checked:translate-x-5',
-  mode: 'relative z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--color-mode-switch-thumb-border)] bg-[color:var(--color-mode-switch-thumb)] px-0 text-[11px] font-medium text-foreground transition-transform duration-200 ease-out data-checked:translate-x-[40px] motion-reduce:transition-none',
+  risk: 'inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-input bg-background px-0 text-compact font-semibold text-foreground shadow-xs transition-transform duration-150 ease-out data-checked:bg-primary-foreground data-checked:translate-x-5',
+  mode: 'relative z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--color-mode-switch-thumb-border)] bg-[color:var(--color-mode-switch-thumb)] px-0 text-compact font-medium text-foreground transition-transform duration-200 ease-out data-checked:translate-x-[40px] motion-reduce:transition-none',
 };
 
 function Switch({

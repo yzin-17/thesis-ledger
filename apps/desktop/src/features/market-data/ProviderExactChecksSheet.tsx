@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useMutation } from '@tanstack/react-query';
@@ -127,11 +128,13 @@ export function ProviderExactChecksSheet({
           )}
           <div className="flex gap-2">
             <Button
+              aria-busy={test.isPending}
               disabled={!selected || test.isPending}
               onClick={() => {
                 if (selected) test.mutate({ key: selected.key, target: selected.target });
               }}
             >
+              {test.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
               检查所选能力
             </Button>
             {(provider.credentialSchema?.methods.length ?? 0) > 0 && (

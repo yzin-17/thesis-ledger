@@ -98,7 +98,14 @@ function AccountDataPageContent({
   const [accountManagerBusy, setAccountManagerBusy] = useState(false);
   const [positionSheetOpen, setPositionSheetOpen] = useState(false);
   const [positionSheetEditing, setPositionSheetEditing] = useState<Position | null>(null);
-  useNavigationGuard({ dirty: draftDirty, busy: accountManagerBusy });
+  useNavigationGuard({
+    dirty: draftDirty,
+    busy: accountManagerBusy,
+    draft: {
+      mode, executionOpen, executionEventId: editingEvent?.eventId,
+      importOpen, positionSheetOpen, positionId: positionSheetEditing?.id,
+    },
+  });
   const { confirm } = useConfirmDialog();
   const toastManager = useToastManager();
   const queryClient = useQueryClient();
@@ -369,7 +376,6 @@ function AccountDataPageContent({
     return (
       <AccountDataFrame>
         <PageHeader
-          className="mb-0"
           eyebrow="ACCOUNT DATA"
           title="账户数据"
           actions={refreshAction}
@@ -391,12 +397,15 @@ function AccountDataPageContent({
     return (
       <AccountDataFrame>
         <PageHeader
-          className="mb-0"
           eyebrow="ACCOUNT DATA"
           title="账户数据"
           actions={refreshAction}
-          description="先创建一个账户，再录入成交、持仓或现金。"
         />
+        {accounts.length > 0 && (
+          <p role="status" className="text-sm text-muted-foreground">
+            当前模式暂无账户。
+          </p>
+        )}
         <PortfolioManagement
           accounts={accounts}
           positions={[]}
@@ -415,15 +424,9 @@ function AccountDataPageContent({
   return (
     <AccountDataFrame>
       <PageHeader
-        className="mb-0"
         eyebrow="ACCOUNT DATA"
         title="账户数据"
         actions={refreshAction}
-        description={
-          isCashAccount
-            ? '管理现金入账、账户划转和定期入账。'
-            : '录入真实成交，管理持仓与现金快照。'
-        }
       />
 
       <AccountDataAccountSelector
@@ -444,7 +447,7 @@ function AccountDataPageContent({
         </TabsList>
         {!isCashAccount && (
           <>
-            <TabsContent value="transactions" className="mt-0 pt-3">
+            <TabsContent value="transactions">
               <TransactionSection
                 account={selectedAccount}
                 events={events}
@@ -475,7 +478,7 @@ function AccountDataPageContent({
                 }
               />
             </TabsContent>
-            <TabsContent value="positions" className="mt-0 pt-3">
+            <TabsContent value="positions">
               <PositionCalibrationSection
                 key={selectedAccount.id}
                 account={selectedAccount}
@@ -502,7 +505,7 @@ function AccountDataPageContent({
             </TabsContent>
           </>
         )}
-        <TabsContent value="cash" className="mt-0 pt-3">
+        <TabsContent value="cash">
           <CashSection
             account={selectedAccount}
             accounts={modeAccounts}
@@ -515,7 +518,7 @@ function AccountDataPageContent({
           />
         </TabsContent>
         {canManageFundInvestments(selectedAccount) && (
-          <TabsContent value="fund-investments" className="mt-0 pt-3">
+          <TabsContent value="fund-investments">
             <RecurringFundInvestments
               key={selectedAccount.id}
               account={selectedAccount}
@@ -529,6 +532,7 @@ function AccountDataPageContent({
         account={selectedAccount}
         open={executionOpen && !isCashAccount}
         editingEvent={editingEvent}
+        resolveInstrumentName={resolveInstrumentName}
         ledgerRevision={currentLedgerRevision}
         onOpenChange={(open, options) => {
           void closeExecution(open, options);

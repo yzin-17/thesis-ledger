@@ -1,3 +1,4 @@
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,23 +60,21 @@ export function EvidenceChainSheet({
     if (!toolCallsHasMore) return null;
     return (
       <Button
+        aria-busy={toolCallsLoadingMore}
         type="button"
         variant="outline"
         size="sm"
         onClick={onLoadMoreToolCalls}
         disabled={toolCallsLoadingMore}
       >
+        {toolCallsLoadingMore && <Spinner data-icon="inline-start" aria-hidden="true" />}
         {toolCallsLoadingMore ? '加载中…' : '加载更多 Tool 审计'}
       </Button>
     );
   };
   const renderToolCalls = () => {
     if (toolCallsLoading)
-      return (
-        <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-          正在加载 Tool 审计记录…
-        </p>
-      );
+      return <LoadingState label="正在加载 Tool 审计记录" />;
     if (toolCallsError)
       return (
         <p className="rounded-md border border-border p-4 text-sm text-destructive">
@@ -160,7 +159,7 @@ export function EvidenceChainSheet({
                       {citation.toolCallId && (
                         <>
                           <Badge variant="secondary">已关联 Tool 审计</Badge>
-                          <span className="font-mono text-[11px] text-muted-foreground">
+                          <span className="font-mono text-xs text-muted-foreground">
                             {citation.toolCallId}
                           </span>
                         </>

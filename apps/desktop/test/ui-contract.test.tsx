@@ -81,7 +81,7 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
       '../src/features/import/ImportReview.tsx',
       '../src/features/import/ScreenshotImportSections.tsx',
       '../src/features/journal/JournalAccountSelector.tsx',
-      '../src/features/performance/PerformanceSections.tsx',
+      '../src/features/performance/PerformanceScopeControls.tsx',
       '../src/features/portfolio/PortfolioManagementSections.tsx',
       '../src/features/portfolio/PortfolioAccountFilter.tsx',
       '../src/features/risk/RiskRuleEditorSheet.tsx',
@@ -165,7 +165,9 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
     expect(firstStep).toContain('创建账户');
     expect(firstStep).toContain('录入或导入持仓');
     expect(firstStep).toContain('配置数据源与通知');
-    expect(firstStep).toContain('设置风险规则');
+    expect(firstStep).toContain('启用风险规则');
+    expect(firstStep).not.toContain('后台扫描');
+    expect(firstStep).toMatch(/<button[^>]*>打开风险中心<\/button>/);
     expect(firstStep.match(/<li/g)).toHaveLength(4);
     expect(firstStep).toMatch(/<button[^>]*>资产录入<\/button>/);
     expect(firstStep).not.toMatch(/<button[^>]*>截图导入/);
@@ -370,10 +372,9 @@ describe('Desktop UI contract - providers and primitives', () => {
     expect(dateMarkup).toContain('min="2026-01-01"');
     expect(dateMarkup).toContain('max="2026-12-31"');
     expect(dateMarkup).toContain('required');
-    expect(dateMarkup).toContain('opacity-0');
-    expect(dateMarkup).toContain('::-webkit-datetime-edit');
+    expect(dateMarkup).toContain('data-slot="date-input"');
     expect(dateMarkup).toContain('<svg');
-    expect(dateTimeMarkup).toContain('>2026-09-02 03:04</span>');
+    expect(dateTimeMarkup).toContain('>2026-09-02 03:04:56</span>');
     expect(dateTimeMarkup).toContain('type="datetime-local"');
     expect(dateTimeMarkup).toContain('name="review-at"');
     expect(dateTimeMarkup).toContain('step="60"');

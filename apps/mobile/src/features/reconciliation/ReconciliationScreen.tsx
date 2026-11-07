@@ -16,7 +16,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
@@ -123,47 +123,49 @@ export function ReconciliationScreen() {
       }
     >
       <Copy muted>查看与选择均不会写入账本。只有填写原因并明确确认后才提交。</Copy>
-      <QueryStatus
+      <QueryList
         query={candidates}
         empty={candidates.data?.candidates.length === 0}
         retry={() => void refresh()}
-      />
-      {candidates.data?.candidates.map((candidate) => (
-        <Section key={candidate.candidateId} title={candidate.symbol}>
-          <Copy muted>
-            观察时间{' '}
-            {candidates.data?.checkpoints.find(
-              (row) => row.baselineFactId === candidate.baselineFactId,
-            )?.occurredAt ?? '未确认'}
-          </Copy>
-          <Copy>
-            观察数量 {candidate.observedQuantity} · 覆盖数量 {candidate.coveredQuantity} · 剩余数量{' '}
-            {candidate.remainingQuantity}
-          </Copy>
-          <Copy>
-            覆盖成本 {candidate.coveredCost} · 剩余成本 {candidate.remainingCost ?? '未知'}
-          </Copy>
-          <Copy muted>
-            {candidate.status === 'AVAILABLE' ? '候选可用' : '存在冲突'} ·{' '}
-            {candidate.executionFactIds.length} 笔成交
-          </Copy>
-          {candidate.conflictReasons.length ? (
-            <Feedback
-              message={candidate.conflictReasons.map(reconciliationConflictLabel).join('；')}
-              error
+        label="正在刷新对账候选"
+      >
+        {candidates.data?.candidates.map((candidate) => (
+          <Section key={candidate.candidateId} title={candidate.symbol}>
+            <Copy muted>
+              观察时间{' '}
+              {candidates.data?.checkpoints.find(
+                (row) => row.baselineFactId === candidate.baselineFactId,
+              )?.occurredAt ?? '未确认'}
+            </Copy>
+            <Copy>
+              观察数量 {candidate.observedQuantity} · 覆盖数量 {candidate.coveredQuantity} · 剩余数量{' '}
+              {candidate.remainingQuantity}
+            </Copy>
+            <Copy>
+              覆盖成本 {candidate.coveredCost} · 剩余成本 {candidate.remainingCost ?? '未知'}
+            </Copy>
+            <Copy muted>
+              {candidate.status === 'AVAILABLE' ? '候选可用' : '存在冲突'} ·{' '}
+              {candidate.executionFactIds.length} 笔成交
+            </Copy>
+            {candidate.conflictReasons.length ? (
+              <Feedback
+                message={candidate.conflictReasons.map(reconciliationConflictLabel).join('；')}
+                error
+              />
+            ) : null}
+            <Action
+              label={
+                selected?.candidate.candidateId === candidate.candidateId
+                  ? '已选择该候选'
+                  : '选择该候选'
+              }
+              disabled={blocked || candidate.status !== 'AVAILABLE'}
+              onPress={() => setSelected({ candidate, revision: ledger.data!.ledgerRevision })}
             />
-          ) : null}
-          <Action
-            label={
-              selected?.candidate.candidateId === candidate.candidateId
-                ? '已选择该候选'
-                : '选择该候选'
-            }
-            disabled={blocked || candidate.status !== 'AVAILABLE'}
-            onPress={() => setSelected({ candidate, revision: ledger.data!.ledgerRevision })}
-          />
-        </Section>
-      ))}
+          </Section>
+        ))}
+      </QueryList>
       {selected ? (
         <Section title="确认对账">
           <Field
@@ -181,7 +183,7 @@ export function ReconciliationScreen() {
           <Action label="取消选择" onPress={() => setSelected(null)} />
         </Section>
       ) : null}
-      <Feedback message={feedback} error={mutation.isError} />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError} />
     </Page>
   );
 }

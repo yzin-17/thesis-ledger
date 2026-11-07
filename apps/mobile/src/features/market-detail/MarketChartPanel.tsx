@@ -12,7 +12,7 @@ import {
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
-import { MobileChart } from '../../platform/charts/MobileChart';
+import {ArenaChartLayer} from '../model-arena/ArenaChartLayer';
 import {
   marketAdjustments,
   marketChartData,
@@ -116,7 +116,7 @@ export function MarketChartPanel({
         ))}
       <Feedback message={chartError} error />
       {chart?.candles.length ? (
-        <MobileChart
+        <ArenaChartLayer symbol={symbol} timeframe={filters.timeframe}
           key={`${viewRevision}:${chart.lines.map((line) => `${line.name}:${line.pane}:${line.kind}`).join('|')}`}
           data={chart}
           onOlder={more}

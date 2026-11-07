@@ -149,7 +149,7 @@ function ProviderForm({
   const editable = provider.configurationMode === 'control' && !command.pending && readable;
   return (
     <>
-      <Feedback message={message} />
+      <Feedback busy={command.pending} message={message} />
       {command.pending ? (
         <Action
           label="取消等待行情操作"

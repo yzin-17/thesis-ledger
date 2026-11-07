@@ -1,0 +1,58 @@
+[
+  {
+    "name": "ordinary",
+    "value": 1234.123456789,
+    "compact": "1,234.1235",
+    "valuation": "1,234.1235",
+    "measurement": "1,234.123457",
+    "quote": "¥1,234.123456789"
+  },
+  {
+    "name": "integer",
+    "value": 1.2,
+    "compact": "1.2",
+    "valuation": "1.2000",
+    "measurement": "1.2",
+    "quote": "¥1.20"
+  },
+  {
+    "name": "tiny",
+    "value": 1e-8,
+    "compact": "1E-8",
+    "valuation": "1E-8",
+    "measurement": "1E-8",
+    "quote": "¥0.00000001"
+  },
+  {
+    "name": "subnormal",
+    "value": 5e-324,
+    "compact": "5E-324",
+    "valuation": "5E-324",
+    "measurement": "5E-324",
+    "quote": "¥5E-324"
+  },
+  {
+    "name": "maximum",
+    "value": 1.7976931348623157e308,
+    "compact": "1.797693E308",
+    "valuation": "1.797693E308",
+    "measurement": "1.797693E308",
+    "quote": "¥1.797693E308"
+  },
+  {
+    "name": "zero",
+    "value": 0,
+    "compact": "0",
+    "valuation": "0.0000",
+    "measurement": "0",
+    "quote": "¥0.00"
+  },
+  {
+    "name": "missing",
+    "value": null,
+    "compact": "—",
+    "valuation": "—",
+    "measurement": "—",
+    "quote": "—"
+  }
+]

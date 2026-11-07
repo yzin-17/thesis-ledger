@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { SheetHeader, SheetFooter } from '../src/components/ui/sheet.js';
+import { SheetBody, SheetHeader, SheetFooter } from '../src/components/ui/sheet.js';
 
 const featureRoot = fileURLToPath(new URL('../src/features', import.meta.url));
 function sourceFiles(directory: string): string[] {
@@ -16,6 +16,41 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('Drawer 布局统一契约', () => {
+  it('独立正文滚动区保留焦点环空间，不再把无留白的 FieldGroup 当作滚动容器', () => {
+    const violations: string[] = [];
+    for (const path of sourceFiles(featureRoot)) {
+      const text = readFileSync(path, 'utf8');
+      if (!text.includes('<SheetContent')) continue;
+      const source = ts.createSourceFile(
+        path,
+        text,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      const visit = (node: ts.Node) => {
+        if (ts.isJsxOpeningElement(node)) {
+          const opening = node.getText(source);
+          if (/overflow-y-auto/.test(opening) && /flex-1/.test(opening)) {
+            if (
+              !/px-[1-9]/.test(opening) ||
+              !/py-[1-9]/.test(opening) ||
+              !/scroll-p-2/.test(opening)
+            ) {
+              violations.push(`${path}: 独立滚动正文没有四周焦点留白`);
+            }
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+    expect(violations).toEqual([]);
+    const body = renderToStaticMarkup(<SheetBody>输入</SheetBody>);
+    expect(body).toContain('scroll-p-2 px-1 py-1');
+    expect(body).toContain('-mx-1 -my-1');
+  });
+
   it('所有侧栏标题都由共享标题区管理，调用方不重新加标题边框或内边距', () => {
     const violations: string[] = [];
     let titleCount = 0;

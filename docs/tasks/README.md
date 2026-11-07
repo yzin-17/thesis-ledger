@@ -14,30 +14,39 @@
 
 ## P0：现有正确性修复
 
-当前无活动 P0 任务。后台风险估值、指标可见性及收益/目标保存修复已完成并[归档](../archive/README.md)，其产品规格继续有效。历史运行证据不能替代新增场景的验收。
+
+- [收益趋势粒度与读取反馈](2026-11-06-performance-trend-feedback.md)：代码与受控浏览器验收完成，目标运行态更新状态见 Task。
+
+桌面展示与编辑一致性修复及补充窄屏复核已完成，见[归档任务](../archive/tasks/2026-11-05-desktop-presentation-consistency.md)。后台风险估值、指标可见性及收益/目标保存修复已完成并[归档](../archive/README.md)，其产品规格继续有效。历史运行证据不能替代新增场景的验收。
 
 <a id="priority-p1"></a>
 
 ## P1：数据基础与核心验收
 
-| 唯一任务入口 | 尚未关闭的条件 |
+| 唯一任务入口 | 当前验收状态 |
 | --- | --- |
 | [统一数据能力适配层](2026-10-09-unified-data-capability-adapter.md) | H07-K37-event-batches / H07-K37e-live：Tushare 真实现金正向消费；当前账号权限和原准入条件未满足，保留未通过记录，条件不变不重试。RQData 后续范围由 TODO 持有。 |
-| [单只基金盘中估值](2026-11-04-fund-intraday-valuation.md) | G2.2：真实交易分钟的有效估值与同日官方净值误差记录；已有真实失败分钟及 HiThink/披露读取证据不代收该门禁。 |
+| [单只基金盘中估值](2026-11-04-fund-intraday-valuation.md) | G2.2已通过：11-06真实分钟与同日正式净值误差完成，保持39.93%低覆盖；任务按原要求保留，见[最终证据](../evidence/2026-11-06-fund-same-day-error.md)。 |
 
 <a id="priority-p2"></a>
 
 ## P2：研究闭环
 
-| 唯一任务入口 | 尚未关闭的条件 |
+| 唯一任务入口 | 当前验收状态 |
 | --- | --- |
-| [数据供给与研究增强](2026-10-18-research-evidence-evolution.md) | T13c / G4b.3：5 交易日观察窗口已到期，仍缺原口径的合格经济价格。沿用现行门槛和已冻结材料，不重复读取已知不合格来源。 |
+| [数据供给与研究增强](2026-10-18-research-evidence-evolution.md) | T13c / G4b.3已通过：原窗口合格实源、固定锚点、正向API/浏览器与旧事实保全完成；原价格门槛保持，任务保留，见[最终证据](../evidence/2026-11-06-research-economic-price-qualification.md)。 |
 
 <a id="priority-p3"></a>
+
+[新研究到期复核](2026-11-06-research-scheduled-observations.md)和[风险规则后台扫描](2026-11-06-risk-monitoring-schedule.md)负责一次操作后的服务端接续，分别验收。[回测与优化连续提交](2026-11-06-strategy-prepared-submission.md)与[每日基金估算误差](2026-11-06-fund-daily-estimate-error.md)继续承接策略和基金流程。
 
 ## P3：条件性增强
 
 阶段化执行已完成评估和决策，保留单链，不实施生产三阶段；T16a/T16b/G5 未触发、本轮不适用。当前没有独立 P3 执行叶，原实验事实与证据仍由[研究任务](2026-10-18-research-evidence-evolution.md)及其 Spec 保存。
+
+## 已规划的产品实施顺序
+
+[自选与共享标的详情](2026-11-05-watchlist-foundation.md) → [多模型模拟交易竞技场](2026-11-05-model-arena.md) → [模型每周复盘](2026-11-05-arena-weekly-review.md)。三组已接入本地应用。竞技场可直接从目录建赛，周报消费同一比赛的冻结事实。各阶段见对应 Task 与[本地验证记录](../evidence/2026-11-06-watchlist-arena-weekly-local.md)。
 
 <a id="cross-repository-priority"></a>
 
@@ -68,3 +77,10 @@
 ## 历史记录与兼容入口
 
 已完成任务见[归档](../archive/README.md)，原 Task 文件名和锚点保留在归档正文。原目录不保留任务跳转壳；原导航与阶段记录见[历史摘录](../archive/reviews/2026-11-05-task-index-history.md)。
+
+- [标的代码搜索与公共组件](2026-11-06-instrument-picker.md)
+
+
+
+
+- [自然语言策略编写流程展示](../archive/tasks/2026-11-07-authoring-workflow-ui.md)：三阶段展示、恢复菜单与审核保护已完成；五宽浏览器与分层证据见归档任务。

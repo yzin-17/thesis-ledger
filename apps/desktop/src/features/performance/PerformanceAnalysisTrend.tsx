@@ -32,10 +32,11 @@ export function PerformanceAnalysisTrend({
   return (
     <PerformanceSnapshotTable
       {...trend}
+      mode={mode}
       pnl={{
         points,
         currency,
-        loading: query.isPending,
+        loading: query.isFetching,
         error: query.isError,
         historyEmpty: history.length === 0,
         truncated: query.data?.truncated === true,

@@ -1,3 +1,5 @@
+import { formatMarketNumber, formatPercentValue } from '@thesis-ledger/domain';
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { createChart, CrosshairMode, LineSeries, type IChartApi, type ISeriesApi, type UTCTimestamp, type Time, type AutoscaleInfo } from 'lightweight-charts';
@@ -6,7 +8,6 @@ import { getDesktopApiClient } from '../../shared/api/client.js';
 import { MarketChartAttribution } from './MarketChartAttribution.js';
 import { fundIntradaySegments } from './fund-intraday-series.js';
 
-const number = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 const clock = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit' });
 const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' });
 const timeLabel = (time: Time) => typeof time === 'number' ? clock.format(new Date(time * 1000)) : '';
@@ -35,7 +36,7 @@ export function FundIntradayChart({ symbol, onHistory }: { symbol: string; onHis
       autoSize: true, height: 220,
       layout: { background: { color: 'transparent' }, textColor: '#64748b', attributionLogo: false },
       localization: { timeFormatter: timeLabel },
-      timeScale: { timeVisible: true, secondsVisible: false, tickMarkFormatter: timeLabel },
+      timeScale: { lockVisibleTimeRangeOnResize: true, timeVisible: true, secondsVisible: false, tickMarkFormatter: timeLabel },
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true },
       handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true },
       crosshair: { mode: CrosshairMode.Normal },
@@ -44,12 +45,9 @@ export function FundIntradayChart({ symbol, onHistory }: { symbol: string; onHis
     const hover = (event: { time?: unknown }) => setHovered(typeof event.time === 'number' ? event.time : null);
     const click = (event: { time?: unknown }) => setLocked(typeof event.time === 'number' ? event.time : null);
     instance.subscribeCrosshairMove(hover); instance.subscribeClick(click);
-    const resize = new ResizeObserver(() => instance.timeScale().fitContent());
-    resize.observe(container.current);
     chart.current = instance;
     return () => {
       instance.unsubscribeCrosshairMove(hover); instance.unsubscribeClick(click);
-      resize.disconnect();
       instance.remove(); chart.current = null; series.current = [];
     };
   }, []);
@@ -124,12 +122,12 @@ export function FundIntradayChart({ symbol, onHistory }: { symbol: string; onHis
       </div>
       <div className="relative min-w-0">
         <div ref={container} className="h-[220px] max-h-[220px] min-w-0 overflow-hidden [&_table]:h-auto [&_table]:min-w-0 [&_table]:w-auto [&_td]:min-w-0 [&_td]:p-0" />
-        {segments.length === 0 ? <p className="pointer-events-none absolute inset-0 m-0 flex items-center justify-center text-sm text-muted-foreground" role="status">{state}</p> : null}
+        {segments.length === 0 ? <p className="pointer-events-none absolute inset-0 m-0 flex items-center justify-center text-sm text-muted-foreground" role="status">{query.isFetching ? <Spinner aria-label="正在读取盘中走势" /> : state}</p> : null}
       </div>
       <div className="grid min-w-0 gap-1 text-xs text-muted-foreground" data-market-nav-readout role="status">
         <span className="min-w-0 overflow-x-auto whitespace-nowrap tabular-nums">
-          盘中估值 {current?.estimatedNav == null ? '—' : number.format(current.estimatedNav)}
-          {current?.changePercent == null ? '' : ` · ${current.changePercent >= 0 ? '+' : ''}${current.changePercent.toFixed(2)}%`}
+          盘中估值 {formatMarketNumber(current?.estimatedNav, 'valuation')}
+          {current?.changePercent == null ? '' : ` · ${formatPercentValue(current.changePercent, 'always')}`}
         </span>
         <span className="min-w-0 overflow-x-auto whitespace-nowrap tabular-nums">
           {selected ? clock.format(new Date(selected.at)) : '—'}{locked === null ? '' : ' · 已锁定'}{quality ? ` · ${quality}` : ''}

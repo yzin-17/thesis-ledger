@@ -1,0 +1,164 @@
+{
+  "controlled": true,
+  "results": [
+    {
+      "width": 1440,
+      "popup": {
+        "x": 826,
+        "y": 143,
+        "width": 533,
+        "height": 58
+      },
+      "focus": {
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.56235 -0.0234225 -0.239225 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px",
+        "clipSafe": true
+      },
+      "keyboardSelection": true,
+      "clear": true,
+      "empty": true,
+      "errorRetry": true,
+      "boundedSelection": true,
+      "cancel": true
+    },
+    {
+      "width": 1024,
+      "popup": {
+        "x": 410,
+        "y": 143,
+        "width": 533,
+        "height": 58
+      },
+      "focus": {
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.56235 -0.0234225 -0.239225 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px",
+        "clipSafe": true
+      },
+      "keyboardSelection": true,
+      "clear": true,
+      "empty": true,
+      "errorRetry": true,
+      "boundedSelection": true,
+      "cancel": true
+    },
+    {
+      "width": 768,
+      "popup": {
+        "x": 154,
+        "y": 143,
+        "width": 533,
+        "height": 58
+      },
+      "focus": {
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.56235 -0.0234225 -0.239225 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px",
+        "clipSafe": true
+      },
+      "keyboardSelection": true,
+      "clear": true,
+      "empty": true,
+      "errorRetry": true,
+      "boundedSelection": true,
+      "cancel": true
+    },
+    {
+      "width": 390,
+      "popup": {
+        "x": 42,
+        "y": 143,
+        "width": 267,
+        "height": 58
+      },
+      "focus": {
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.56235 -0.0234225 -0.239225 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px",
+        "clipSafe": true
+      },
+      "keyboardSelection": true,
+      "clear": true,
+      "empty": true,
+      "errorRetry": true,
+      "boundedSelection": true,
+      "cancel": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/market-data/instruments/search"
+    }
+  ],
+  "errors": []
+}

@@ -10,7 +10,7 @@ import {
   Feedback,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
@@ -69,48 +69,50 @@ export function AccountsScreen() {
       <Copy muted>{runtime.mode === 'shadow' ? '模拟账户' : '实际账户'} · 包含已停用账户</Copy>
       <Field label="按名称或机构筛选" value={search} onChange={setSearch} />
       {search ? <Action label="清除筛选" onPress={() => setSearch('')} /> : null}
-      <Feedback message={feedback} error={mutation.isError} />
-      <QueryStatus
-        query={query}
-        empty={query.data?.length === 0}
-        retry={() => void query.refetch()}
-      />
+      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError} />
       {query.isSuccess && query.data.length > 0 && accounts?.length === 0 ? (
         <Copy muted>没有匹配的账户。</Copy>
       ) : null}
-      {accounts?.map((account) => (
-        <Section key={account.id} title={account.name}>
-          <Copy muted>
-            {typeLabels[account.type]} · {account.currency} · {account.active ? '启用中' : '已停用'}
-          </Copy>
-          <Copy muted>{account.institution || '未填写机构'}</Copy>
-          <Action
-            label="查看账户数据"
-            disabled={mutation.isPending}
-            onPress={() =>
-              void runtime.changeAccount(account.id).then((ok) => {
-                if (ok) navigation.navigate('AccountWorkspace', { accountId: account.id });
-              })
-            }
-          />
-          <Action
-            label="编辑账户"
-            disabled={mutation.isPending}
-            onPress={() => navigation.navigate('AccountEditor', { account })}
-          />
-          <Action
-            label={account.active ? '停用账户' : '重新启用'}
-            disabled={mutation.isPending || !readable}
-            onPress={() => void change(account, false)}
-          />
-          <Action
-            label="永久删除"
-            destructive
-            disabled={mutation.isPending || !readable}
-            onPress={() => void change(account, true)}
-          />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={query.data?.length === 0}
+        retry={() => void query.refetch()}
+        label="正在刷新账户"
+      >
+        {accounts?.map((account) => (
+          <Section key={account.id} title={account.name}>
+            <Copy muted>
+              {typeLabels[account.type]} · {account.currency} · {account.active ? '启用中' : '已停用'}
+            </Copy>
+            <Copy muted>{account.institution || '未填写机构'}</Copy>
+            <Action
+              label="查看账户数据"
+              disabled={mutation.isPending}
+              onPress={() =>
+                void runtime.changeAccount(account.id).then((ok) => {
+                  if (ok) navigation.navigate('AccountWorkspace', { accountId: account.id });
+                })
+              }
+            />
+            <Action
+              label="编辑账户"
+              disabled={mutation.isPending}
+              onPress={() => navigation.navigate('AccountEditor', { account })}
+            />
+            <Action
+              label={account.active ? '停用账户' : '重新启用'}
+              disabled={mutation.isPending || !readable}
+              onPress={() => void change(account, false)}
+            />
+            <Action
+              label="永久删除"
+              destructive
+              disabled={mutation.isPending || !readable}
+              onPress={() => void change(account, true)}
+            />
+          </Section>
+        ))}
+      </QueryList>
     </Page>
   );
 }

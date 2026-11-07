@@ -9,7 +9,7 @@ import {
   Copy,
   Feedback,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 import { useConfigCommand } from '../configuration/use-config-command';
@@ -69,8 +69,7 @@ export function AiProvidersScreen({
       <Copy muted>
         配置对当前服务的全部账户生效；模拟账户范围不会隔离全局配置。连接检查、用途就绪、最近验证和默认模型分别记录。
       </Copy>
-      <Feedback message={message} />
-      <QueryStatus query={rows} empty={rows.data?.length === 0} retry={() => void rows.refetch()} />
+      <Feedback busy={command.pending} message={message} />
       <Action
         label="重新读取 AI 配置"
         disabled={rows.isFetching || settings.isFetching}
@@ -79,79 +78,92 @@ export function AiProvidersScreen({
           void settings.refetch();
         }}
       />
-      {rows.data?.map((row) => (
-        <Section key={row.name} title={row.name}>
-          <Copy>
-            {row.enabled ? '已启用' : '已停用'} ·{' '}
-            {row.credentialConfigured ? '凭证已配置' : '凭证未配置'} · 健康：{row.health}
-          </Copy>
-          <Copy>
-            模型：{row.models?.join('、') || '尚未选择'}；修订：{row.updatedAt ?? '未记录'}
-          </Copy>
-          {row.configError ? <Copy>{row.configError}</Copy> : null}
-          {row.executionRoutes?.map((route) => (
-            <Copy key={`${route.model}:${route.contract.id}`}>
-              {route.model} · {route.contract.id} · 就绪 {route.readiness.state}；最近验证{' '}
-              {route.liveValidation.status}；阻断原因 {route.readiness.reasons.join('、') || '无'}
-              ；配置指纹 {route.readiness.configurationFingerprint}；检查时间{' '}
-              {route.liveValidation.checkedAt ?? '未执行'}
+      <QueryList
+        query={rows}
+        empty={rows.data?.length === 0}
+        retry={() => void rows.refetch()}
+        label="正在刷新模型提供方"
+      >
+        {rows.data?.map((row) => (
+          <Section key={row.name} title={row.name}>
+            <Copy>
+              {row.enabled ? '已启用' : '已停用'} ·{' '}
+              {row.credentialConfigured ? '凭证已配置' : '凭证未配置'} · 健康：{row.health}
             </Copy>
-          ))}
-          <Action
-            label={`编辑 ${row.name}`}
-            onPress={() => navigation.navigate('AiProviderEditor', { name: row.name })}
-          />
-          {row.enabled ? (
+            <Copy>
+              模型：{row.models?.join('、') || '尚未选择'}；修订：{row.updatedAt ?? '未记录'}
+            </Copy>
+            {row.configError ? <Copy>{row.configError}</Copy> : null}
+            {row.executionRoutes?.map((route) => (
+              <Copy key={`${route.model}:${route.contract.id}`}>
+                {route.model} · {route.contract.id} · 就绪 {route.readiness.state}；最近验证{' '}
+                {route.liveValidation.status}；阻断原因 {route.readiness.reasons.join('、') || '无'}
+                ；配置指纹 {route.readiness.configurationFingerprint}；检查时间{' '}
+                {route.liveValidation.checkedAt ?? '未执行'}
+              </Copy>
+            ))}
             <Action
-              label={`停用 ${row.name}`}
-              disabled={blocked}
-              onPress={() => void lifecycle(row, false)}
+              label={`编辑 ${row.name}`}
+              onPress={() => navigation.navigate('AiProviderEditor', { name: row.name })}
             />
-          ) : (
-            <Copy muted>需要启用时，进入编辑并执行验证保存。</Copy>
-          )}
-          <Action
-            label={`删除 ${row.name}`}
-            destructive
-            disabled={blocked}
-            onPress={() => void lifecycle(row, true)}
-          />
-        </Section>
-      ))}
+            {row.enabled ? (
+              <Action
+                label={`停用 ${row.name}`}
+                disabled={blocked}
+                onPress={() => void lifecycle(row, false)}
+              />
+            ) : (
+              <Copy muted>需要启用时，进入编辑并执行验证保存。</Copy>
+            )}
+            <Action
+              label={`删除 ${row.name}`}
+              destructive
+              disabled={blocked}
+              onPress={() => void lifecycle(row, true)}
+            />
+          </Section>
+        ))}
+      </QueryList>
       <Section title="研究默认模型">
-        <QueryStatus query={settings} retry={() => void settings.refetch()} />
         <Copy>
           当前：
           {settings.data?.researchDefault
             ? `${settings.data.researchDefault.providerId} / ${settings.data.researchDefault.model}`
             : '未设置'}
         </Copy>
-        {settings.data?.candidates.map((item) => {
-          const reason = researchCandidateReason(
-            rows.data?.find((row) => row.name === item.providerId),
-            item.model,
-            item.priceConfigured,
-          );
-          return (
-            <Section key={`${item.providerId}:${item.model}`}>
-              <Copy>
-                {item.providerName} / {item.model} · {reason ?? '可选择'}
-              </Copy>
-              <Action
-                label={`设为默认 ${item.model}`}
-                disabled={blocked || Boolean(reason)}
-                onPress={() =>
-                  void run(() =>
-                    api.aiProviders.updateSettings({
-                      researchDefault: { providerId: item.providerId, model: item.model },
-                      expectedRevision: settings.data?.revision ?? '',
-                    }),
-                  )
-                }
-              />
-            </Section>
-          );
-        })}
+        <QueryList
+          query={settings}
+          retry={() => void settings.refetch()}
+          label="正在刷新候选模型"
+          gap={12}
+        >
+          {settings.data?.candidates.map((item) => {
+            const reason = researchCandidateReason(
+              rows.data?.find((row) => row.name === item.providerId),
+              item.model,
+              item.priceConfigured,
+            );
+            return (
+              <Section key={`${item.providerId}:${item.model}`}>
+                <Copy>
+                  {item.providerName} / {item.model} · {reason ?? '可选择'}
+                </Copy>
+                <Action
+                  label={`设为默认 ${item.model}`}
+                  disabled={blocked || Boolean(reason)}
+                  onPress={() =>
+                    void run(() =>
+                      api.aiProviders.updateSettings({
+                        researchDefault: { providerId: item.providerId, model: item.model },
+                        expectedRevision: settings.data?.revision ?? '',
+                      }),
+                    )
+                  }
+                />
+              </Section>
+            );
+          })}
+        </QueryList>
         <Action
           label="清除研究默认模型"
           disabled={blocked || !settings.data?.researchDefault}

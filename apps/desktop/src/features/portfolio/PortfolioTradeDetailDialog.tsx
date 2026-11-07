@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useState } from 'react';
 import type { TradeSummaryResponse } from '@thesis-ledger/api-client';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import { PortfolioTradeDetailTabs } from './PortfolioTradeDetailSections.js';
 import { PortfolioTradeOpeningBoundarySheet } from './PortfolioTradeOpeningBoundarySheet.js';
 import { usePortfolioTradeQuery } from './portfolio-trade.queries.js';
@@ -66,11 +67,7 @@ export function PortfolioTradeDetailDialog({
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {detailQuery.isPending ? (
-            <div className="grid gap-3" role="status" aria-label="正在读取交易详情">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </div>
+            <LoadingState label="正在读取交易详情" />
           ) : null}
           {detailQuery.isError ? (
             <Alert variant="destructive">
@@ -87,24 +84,26 @@ export function PortfolioTradeDetailDialog({
               </Button>
             </Alert>
           ) : null}
-          {detailQuery.data ? (
-            <>
-              <PortfolioTradeDetailTabs
-                detail={detailQuery.data}
-                accountLabel={accountName(accounts, detailQuery.data.accountId)}
-                onReview={onReview}
-                {...(detailQuery.isError || detailQuery.isFetching
-                  ? {}
-                  : { onSupplementOpening: () => setOpeningBoundaryOpen(true) })}
-              />
-              <PortfolioTradeOpeningBoundarySheet
-                detail={detailQuery.data}
-                open={openingBoundaryOpen}
-                onOpenChange={setOpeningBoundaryOpen}
-                readOnly={detailQuery.isError || detailQuery.isFetching}
-              />
-            </>
-          ) : null}
+          <ListRefreshRegion refreshing={detailQuery.isRefetching} label="正在刷新交易明细">
+            {detailQuery.data ? (
+              <>
+                <PortfolioTradeDetailTabs
+                  detail={detailQuery.data}
+                  accountLabel={accountName(accounts, detailQuery.data.accountId)}
+                  onReview={onReview}
+                  {...(detailQuery.isError || detailQuery.isFetching
+                    ? {}
+                    : { onSupplementOpening: () => setOpeningBoundaryOpen(true) })}
+                />
+                <PortfolioTradeOpeningBoundarySheet
+                  detail={detailQuery.data}
+                  open={openingBoundaryOpen}
+                  onOpenChange={setOpeningBoundaryOpen}
+                  readOnly={detailQuery.isError || detailQuery.isFetching}
+                />
+              </>
+            ) : null}
+          </ListRefreshRegion>
         </div>
       </DialogContent>
     </Dialog>

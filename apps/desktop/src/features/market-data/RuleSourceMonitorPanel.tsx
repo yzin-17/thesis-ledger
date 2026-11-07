@@ -1,5 +1,8 @@
+import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { TableContainer } from '@/components/ui/table';
+import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { useRuleSourceMonitor } from './useRuleSourceMonitor.js';
 import { RuleSourceMonitorVersions } from './RuleSourceMonitorVersions.js';
 
@@ -36,18 +39,18 @@ export function RuleSourceMonitorPanel() {
           </p>
         </div>
         <Button
+          aria-busy={monitor.status.isFetching}
           size="sm"
           variant="outline"
           onClick={monitor.reload}
-          disabled={monitor.save.isPending}
+          disabled={monitor.save.isPending || monitor.status.isFetching}
         >
+          {monitor.status.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
           重新载入配置
         </Button>
       </div>
       {monitor.status.isPending ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          正在读取监测配置…
-        </p>
+        <LoadingState label="正在读取监测配置" />
       ) : null}
       {monitor.status.isError ? (
         <p role="alert" className="text-sm text-destructive">
@@ -101,6 +104,7 @@ export function RuleSourceMonitorPanel() {
               定期检查：{selection.enabled ? '开启' : '关闭'}
             </Button>
             <Button
+              aria-busy={monitor.save.isPending}
               size="sm"
               disabled={
                 !monitor.dirty ||
@@ -109,14 +113,17 @@ export function RuleSourceMonitorPanel() {
               }
               onClick={monitor.saveConfig}
             >
+              {monitor.save.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
               {monitor.save.isPending ? '正在保存…' : '保存监测配置'}
             </Button>
             <Button
+              aria-busy={monitor.check.isPending}
               size="sm"
               variant="outline"
               disabled={monitor.busy || !selection.sourceIds.length || monitor.status.isError}
               onClick={monitor.run}
             >
+              {monitor.check.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
               {monitor.check.isPending ? '正在提交…' : '手动检查'}
             </Button>
             {monitor.dirty ? (
@@ -144,14 +151,14 @@ export function RuleSourceMonitorPanel() {
             </p>
           ) : null}
           {data.observations.length ? (
-            <div className="overflow-x-auto rounded-lg border">
+            <TableContainer refreshing={monitor.status.isRefetching} refreshLabel="正在刷新监测记录">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b text-muted-foreground">
                     <th className="p-3 font-medium">资料</th>
                     <th className="p-3 font-medium">检查状态</th>
                     <th className="p-3 font-medium">最后成功观察</th>
-                    <th className="p-3 font-medium">版本</th>
+                    <StickyTableActionHeader className="p-3 font-medium">版本</StickyTableActionHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -171,7 +178,7 @@ export function RuleSourceMonitorPanel() {
                           ? new Date(item.lastSuccessAt).toLocaleString('zh-CN', { hour12: false })
                           : '尚无成功观察'}
                       </td>
-                      <td className="p-3">
+                      <StickyTableActionCell className="p-3">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -186,12 +193,12 @@ export function RuleSourceMonitorPanel() {
                         >
                           {item.versionCount}个版本
                         </Button>
-                      </td>
+                      </StickyTableActionCell>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           ) : (
             <p className="text-sm text-muted-foreground">尚无检查记录。选择来源后可手动检查。</p>
           )}

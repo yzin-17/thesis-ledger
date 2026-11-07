@@ -1,6 +1,6 @@
 import {
   isMarketMinuteTimeframe,
-  type Currency,
+  type Currency,type ArenaPoint,
   type TradeChartMarker,
 } from '@thesis-ledger/schemas';
 import type { MarketChartBar } from './market-chart-types.js';
@@ -9,6 +9,7 @@ import { chartPointKey } from './market-chart-time.js';
 
 export type PlacedTradeMarker = TradeChartMarker & { key: string };
 export type TradingOverlayModel = {
+  arenaMarkers?: ArenaPoint[];
   markers: PlacedTradeMarker[];
   lines: Array<{ price: number; title: string; kind: 'cost' | 'risk' }>;
   measurement?: { from: string; to: string; fromPrice: number; toPrice: number } | undefined;

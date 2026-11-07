@@ -16,18 +16,21 @@ import { useToastManager } from '@/components/ui/toast';
 type Guard = {
   dirty: boolean;
   busy: boolean;
+  draft?: unknown;
   bypass?: () => boolean;
   blocksLocation?: (current: Location, next: Location) => boolean;
   discard?: () => void;
 };
+type RegisteredGuard = Omit<Guard, 'draft'> & { snapshot: string | undefined };
 type TransitionOptions = { title: string; description: string; confirmLabel: string };
 type GuardContextValue = {
-  update: (id: symbol, guard: Guard) => void;
+  update: (id: symbol, guard: RegisteredGuard) => void;
   remove: (id: symbol) => void;
   request: (
     commit: () => void,
     options: TransitionOptions,
     pending?: () => boolean,
+    isCurrent?: () => boolean,
   ) => Promise<boolean>;
   busy: boolean;
   checking: boolean;
@@ -36,14 +39,23 @@ const GuardContext = createContext<GuardContextValue | null>(null);
 
 /** UI 转换的草稿与在途事实源；不拥有业务提交或模式状态。 */
 export function NavigationGuardProvider({ children }: { children: ReactNode }) {
-  const guards = useRef(new Map<symbol, Guard>());
+  const guards = useRef(new Map<symbol, RegisteredGuard>());
   const checkingRef = useRef(false);
   const committing = useRef(false);
+  const lifetime = useRef({ mounted: false, epoch: 0 });
   const [revision, setRevision] = useState(0);
   const [checking, setChecking] = useState(false);
   const { confirm } = useConfirmDialog();
   const toast = useToastManager();
-  const update = useCallback((id: symbol, guard: Guard) => {
+  useLayoutEffect(() => {
+    lifetime.current = { mounted: true, epoch: lifetime.current.epoch + 1 };
+    return () => {
+      lifetime.current.mounted = false;
+      lifetime.current.epoch += 1;
+      checkingRef.current = false;
+    };
+  }, []);
+  const update = useCallback((id: symbol, guard: RegisteredGuard) => {
     const previous = guards.current.get(id);
     guards.current.set(id, guard);
     if (Boolean(previous?.dirty) !== guard.dirty || Boolean(previous?.busy) !== guard.busy)
@@ -58,9 +70,22 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
     () => [...guards.current.values()].filter((guard) => !guard.bypass?.()),
     [],
   );
+  const draftSnapshots = useCallback(() => {
+    const snapshots = new Map<symbol, string | undefined>();
+    for (const [id, guard] of guards.current) {
+      if (guard.dirty && !guard.bypass?.()) snapshots.set(id, guard.snapshot);
+    }
+    return snapshots;
+  }, []);
   const request = useCallback(
-    async (commit: () => void, options: TransitionOptions, pending?: () => boolean) => {
-      if (checkingRef.current) return false;
+    async (
+      commit: () => void,
+      options: TransitionOptions,
+      pending?: () => boolean,
+      isCurrent?: () => boolean,
+    ) => {
+      if (!lifetime.current.mounted || checkingRef.current || isCurrent?.() === false) return false;
+      const epoch = lifetime.current.epoch;
       checkingRef.current = true;
       setChecking(true);
       const isBusy = () => Boolean(pending?.()) || activeGuards().some((guard) => guard.busy);
@@ -73,7 +98,8 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
           });
           return false;
         }
-        if (activeGuards().some((guard) => guard.dirty)) {
+        const requestedDrafts = draftSnapshots();
+        if (requestedDrafts.size > 0) {
           const discard = await confirm({
             ...options,
             cancelLabel: '继续编辑',
@@ -81,11 +107,31 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
           });
           if (!discard) return false;
         }
+        if (
+          !lifetime.current.mounted ||
+          lifetime.current.epoch !== epoch ||
+          isCurrent?.() === false
+        )
+          return false;
         // 确认框打开期间可能开始提交，不能沿用确认前的在途状态。
         if (isBusy()) {
           toast.add({
             title: '操作尚未完成',
             description: '确认期间开始了提交，请等待完成后重新切换。',
+            type: 'warning',
+          });
+          return false;
+        }
+        const latestDrafts = draftSnapshots();
+        if (
+          latestDrafts.size !== requestedDrafts.size ||
+          [...requestedDrafts].some(
+            ([id, snapshot]) => !latestDrafts.has(id) || latestDrafts.get(id) !== snapshot,
+          )
+        ) {
+          toast.add({
+            title: '草稿已更新',
+            description: '请核对当前输入后重新切换或离开。',
             type: 'warning',
           });
           return false;
@@ -99,11 +145,13 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
         }
         return true;
       } finally {
-        checkingRef.current = false;
-        setChecking(false);
+        if (lifetime.current.mounted && lifetime.current.epoch === epoch) {
+          checkingRef.current = false;
+          setChecking(false);
+        }
       }
     },
-    [activeGuards, confirm, toast],
+    [activeGuards, draftSnapshots, confirm, toast],
   );
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -122,21 +170,23 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
   requestRef.current = request;
   useEffect(() => {
     if (blocker.state !== 'blocked') return;
+    const blockedRequest = blocker;
+    const isCurrent = () => blockerRef.current === blockedRequest;
     void requestRef
       .current(
-        () => {
-          if (blockerRef.current.state === 'blocked') blockerRef.current.proceed();
-        },
+        () => blockedRequest.proceed(),
         {
           title: '放弃未保存的修改？',
           description: '离开后，本页未保存的输入将丢失。',
           confirmLabel: '放弃修改并离开',
         },
+        undefined,
+        isCurrent,
       )
       .then((accepted) => {
-        if (!accepted && blockerRef.current.state === 'blocked') blockerRef.current.reset();
+        if (!accepted && isCurrent()) blockedRequest.reset();
       });
-  }, [blocker.state]);
+  }, [blocker]);
   useBeforeUnload(
     (event) => {
       if (activeGuards().some((guard) => guard.dirty || guard.busy)) event.preventDefault();
@@ -163,7 +213,8 @@ export function useNavigationGuard(guard: Guard) {
   const update = context?.update;
   const remove = context?.remove;
   useLayoutEffect(() => {
-    update?.(id.current, guard);
+    const { draft, ...state } = guard;
+    update?.(id.current, { ...state, snapshot: JSON.stringify(draft) });
   });
   useLayoutEffect(() => {
     const registration = id.current;

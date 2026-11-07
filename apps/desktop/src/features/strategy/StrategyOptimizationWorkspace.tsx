@@ -5,7 +5,7 @@ import type { StrategyRecord } from './strategy.types.js';
 
 export function StrategyOptimizationWorkspace({ strategies }: { strategies: StrategyRecord[] }) {
   return (
-    <Tabs defaultValue="ai" className="space-y-4">
+    <Tabs defaultValue="ai">
       <TabsList>
         <TabsTrigger value="ai">AI 策略实验</TabsTrigger>
         <TabsTrigger value="risk">策略风险规则</TabsTrigger>

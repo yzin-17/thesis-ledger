@@ -1,0 +1,29 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>风险自动监控受控验收</title></head><body><div id="root"></div>
+<script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RiskMonitoringSchedule } from '/src/features/risk/RiskMonitoringSchedule.tsx';
+import '/src/ui/styles.css';
+const params = new URLSearchParams(location.search);
+const fixture = {mode:'observed-data',continuousSource:false,eligibleRules:2,futureRules:1,unsupportedRules:1,checkedAt:new Date().toISOString(),evaluatedAt:new Date().toISOString(),gapAt:new Date().toISOString(),missingPrices:1,delayedPrices:1,processorAvailable:true,error:null,limitation:'当前行情按需获取，没有持续订阅。规则自动消费已取得的数据更新，无法保证关页后盘中及时预警；断线期间未取得的价格变化无法回溯。'};
+fixture.limitation='按当前来源能力自动获取并评估；没有持续订阅，采样间和断线期间未取得的价格变化无法回溯。';
+fixture.acquisitionAvailable=true;
+fixture.sources=[{symbol:'510300.SH',assetName:'沪深300ETF',assetType:'ETF',provider:'tencent',acquisition:'public-snapshot',reason:'source_request_window',minIntervalSeconds:600,sourceUpdateIntervalSeconds:null,sourceTime:'2026-11-06T02:00:00Z',fetchedAt:'2026-11-06T02:00:01Z',nextAttemptAt:'2026-11-06T02:10:00Z'}, {symbol:'600519.SH',assetName:'贵州茅台',assetType:'STOCK',provider:'hithink',acquisition:'blocked',reason:'background_budget_unverified',minIntervalSeconds:null,sourceUpdateIntervalSeconds:null,sourceTime:null,fetchedAt:null,nextAttemptAt:null}];
+window.fetch=async (url, init)=> {
+ if(String(url).includes('/risk/monitoring') && (!init?.method || init.method==='GET')) return Response.json(fixture);
+ throw new Error('Controlled QA forbids all other requests');
+};
+if(params.has('width')) {
+ document.body.style.margin='0'; document.body.style.padding='16px';
+ createRoot(document.getElementById('root')).render(React.createElement(QueryClientProvider,{client:new QueryClient()},React.createElement(RiskMonitoringSchedule,{enabledRules:3,onOpenRules:()=>{}})));
+ const report=document.createElement('p');report.id='qa-result';document.body.append(report);
+ setTimeout(()=>{report.textContent=`受控宽度 ${innerWidth}px · 横向溢出 ${document.documentElement.scrollWidth>innerWidth?'失败':'无'} · 16:05入口 ${document.body.textContent.includes('16:05')?'存在':'无'}`;},1000);
+} else {
+ const root=document.getElementById('root');
+ for(const width of [1440,1024,768,390]) {
+  const title=document.createElement('h2');title.textContent=`${width}px 受控组件`;root.append(title);
+  const frame=document.createElement('iframe');frame.title=`${width}px 风险监控`;frame.width=width;frame.height=420;frame.src=`?width=${width}`;frame.style.border='1px solid #ccc';root.append(frame);
+ }
+}
+</script></body></html>

@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ResearchReportDetail } from '@thesis-ledger/schemas';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -53,12 +54,14 @@ function ResearchRunStatus({
           </AlertTitle>
           <AlertDescription>状态来自服务端，完成后自动更新。</AlertDescription>
           <Button
+            aria-busy={cancel.isPending}
             type="button"
             variant="outline"
             size="sm"
             disabled={!report.submission || cancel.isPending}
             onClick={() => cancel.mutate()}
           >
+            {cancel.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
             {cancel.isPending ? '正在确认取消…' : '取消研究'}
           </Button>
         </Alert>

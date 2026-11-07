@@ -1,3 +1,4 @@
+import { createClientRequestId } from '../../lib/client-request-id';
 import type {
   InstrumentDirectory,
   LedgerCommandResponse,
@@ -5,7 +6,6 @@ import type {
 } from '@thesis-ledger/api-client';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
-
 import { accountCurrencyLabel, type InstrumentLookup } from '../portfolio/portfolio.types.js';
 import type { AccountDataEventFilter } from './account-data.queries.js';
 import type {
@@ -31,9 +31,9 @@ export const chargeCategoryLabel = (category: ChargeCategory) =>
   chargeCategoryOptions.find((option) => option.value === category)?.label ?? '其他';
 
 export const transactionFilters: Array<{ value: AccountDataEventFilter; label: string }> = [
+  { value: 'all', label: '全部' },
   { value: 'executions', label: '买卖成交' },
   { value: 'other', label: '其他事件' },
-  { value: 'all', label: '全部' },
 ];
 
 export const isExecutionEvent = (event: LedgerEvent): event is ExecutionEvent =>
@@ -270,11 +270,7 @@ export const isNonNegativeDecimal = (value: string) => {
   return decimalPattern.test(normalized) && !normalized.startsWith('-');
 };
 
-export const createClientCommandId = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
-    return crypto.randomUUID();
-  return `desktop-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-};
+export const createClientCommandId = createClientRequestId;
 
 export const localDateTimeValue = (value: string | null | undefined, precision: TimePrecision) => {
   if (precision === 'DATE') {

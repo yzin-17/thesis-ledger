@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
 import type { ImportDraftRow } from '@thesis-ledger/schemas';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -50,11 +51,11 @@ export function ImportDraftReviewRow({
       <div className="grid gap-3 sm:grid-cols-3">
         <Field>
           <FieldLabel>标准代码</FieldLabel>
-          <Input
+          <InstrumentSymbolField
             aria-label={`${name}标准代码`}
             value={row.symbol}
             disabled={frozen || busy}
-            onChange={(event) => change({ symbol: event.target.value })}
+            onChange={(value) => change({ symbol: value })}
           />
         </Field>
         <Field>

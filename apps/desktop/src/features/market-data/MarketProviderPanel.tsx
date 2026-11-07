@@ -1,13 +1,15 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ProviderManifest } from './market-data.types.js';
 import { MarketProviderRow, type MarketProviderRowProps } from './MarketProviderRow.js';
 
 type MarketProviderPanelProps = Omit<MarketProviderRowProps, 'provider'> & {
+  refreshing?: boolean;
   providers: ProviderManifest[];
 };
 
-export function MarketProviderPanel({ providers, ...rowProps }: MarketProviderPanelProps) {
+export function MarketProviderPanel({ providers, refreshing = false, ...rowProps }: MarketProviderPanelProps) {
   const enabled = providers.filter((provider) => provider.configured && provider.enabled);
   return (
     <Card>
@@ -26,14 +28,16 @@ export function MarketProviderPanel({ providers, ...rowProps }: MarketProviderPa
         </div>
       </CardHeader>
       <CardContent>
-        <div className="divide-y divide-border" aria-label="DSA 市场数据源">
-          {providers.map((provider) => (
-            <MarketProviderRow key={provider.providerId} {...rowProps} provider={provider} />
-          ))}
-        </div>
-        {providers.length === 0 && (
-          <p className="text-sm text-muted-foreground">暂无 Provider 清单。</p>
-        )}
+        <ListRefreshRegion refreshing={refreshing} label="正在刷新行情来源" aria-label="DSA 市场数据源">
+          <div className="divide-y divide-border">
+            {providers.map((provider) => (
+              <MarketProviderRow key={provider.providerId} {...rowProps} provider={provider} />
+            ))}
+          </div>
+          {providers.length === 0 && (
+            <p className="py-2 text-sm text-muted-foreground">暂无数据提供方。</p>
+          )}
+        </ListRefreshRegion>
       </CardContent>
     </Card>
   );

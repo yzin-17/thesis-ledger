@@ -24,7 +24,7 @@ export function FundInvestmentPlanList({
   onChangeState: (plan: Plan, action: PlanStateAction) => void;
 }) {
   const [current, ended] = partition(plans, (plan) => plan.status !== 'ENDED');
-  const [endedOpen, setEndedOpen] = useState(false);
+  const [endedOpen, setEndedOpen] = useState(current.length === 0);
   const linkedEnded = ended.some((plan) => plan.id === focusPlanId);
   useEffect(() => {
     if (linkedEnded) setEndedOpen(true);
@@ -45,9 +45,9 @@ export function FundInvestmentPlanList({
       />
     ));
   return (
-    <div className="space-y-5">
+    <div className="flex min-w-0 flex-col gap-4">
       {current.length > 0 && (
-        <section aria-label="当前定投计划" className="space-y-2">
+        <section aria-label="当前定投计划" className="flex min-w-0 flex-col gap-2">
           <h3 className="m-0 text-sm font-semibold">
             当前计划 <span className="font-normal text-muted-foreground">{current.length} 个</span>
           </h3>

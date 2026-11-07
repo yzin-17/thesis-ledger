@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { initialChartTimeRange } from './market-chart-range.js';
 import { toChartTime, chartTimeData, chartInteractionKey, marketChartTimeOptions } from './market-chart-time.js';
 export { rangeMonths, rangeCoverage, visibleBarsForRange } from './market-chart-range.js';
@@ -220,7 +221,7 @@ export function LightweightMarketChart({
       crosshair: { mode: CrosshairMode.Normal },
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true },
       handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true },
-      timeScale: { borderColor: 'rgba(148, 163, 184, 0.35)', timeVisible: false },
+      timeScale: { lockVisibleTimeRangeOnResize: true, borderColor: 'rgba(148, 163, 184, 0.35)', timeVisible: false },
     });
     const crosshairHandler = (param: { time?: unknown }) => {
       if (lockedTimestampRef.current) return;
@@ -649,7 +650,7 @@ export function LightweightMarketChart({
     const chart = chartRef.current;
     const series = seriesRef.current.get(chartMode === 'candles' ? 'candles' : 'close');
     if (!chartReady || !chart || !series || !tradingOverlays ||
-      (!tradingOverlays.markers.length && !tradingOverlays.lines.length && !tradingOverlays.measurement)) return;
+      (!tradingOverlays.arenaMarkers?.length && !tradingOverlays.markers.length && !tradingOverlays.lines.length && !tradingOverlays.measurement)) return;
     const detach = attachTradingOverlays(chart, series, tradingOverlays);
     return () => { if (chartRef.current === chart) detach(); };
   }, [chartReady, chartMode, chartPoints, tradingOverlays]);
@@ -663,12 +664,12 @@ export function LightweightMarketChart({
       />
       {isLeftHistoryBlank && historyLoading ? (
         <span className="pointer-events-none absolute top-3 left-3 text-xs text-muted-foreground">
-          正在加载更早行情…
+          <Spinner aria-label="正在加载更早行情" />
         </span>
       ) : null}
       {isLatestBoundaryReached && latestLoading ? (
         <span className="pointer-events-none absolute top-3 right-3 text-xs text-muted-foreground">
-          正在检查更新行情…
+          <Spinner aria-label="正在检查更新行情" />
         </span>
       ) : null}
     </div>

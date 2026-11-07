@@ -59,7 +59,7 @@ export function AdvancedJsonSheet({
 
   const requestClose = useDraftCloseGuard({
     open,
-    draft: null,
+    draft: { mode, text },
     dirty: text !== JSON.stringify(value, null, 2),
     busy: false,
     onOpenChange,
@@ -72,7 +72,7 @@ export function AdvancedJsonSheet({
           <SheetTitle>高级 JSON 入口</SheetTitle>
           <SheetDescription>
             {mode === 'single' ? '适用于单笔交易对象。' : '适用于交易数组。'}{' '}
-            仅参与本次只读复盘，不会自动写入 Ledger。
+            仅用于本次复盘，保留账本原记录。
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-3">

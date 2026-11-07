@@ -1,3 +1,4 @@
+import { StarIcon } from '@phosphor-icons/react/Star';
 import { useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
@@ -17,6 +18,7 @@ import { PortfolioModeSwitch } from '../features/shared/PortfolioModeSwitch.js';
 import { usePortfolioMode } from '../features/portfolio/portfolio-mode-context.js';
 
 const navIcons: Record<DesktopNavigationView, typeof HouseIcon> = {
+  watchlist: StarIcon,
   portfolio: HouseIcon,
   'position-entry': UploadSimpleIcon,
   'risk-center': ShieldCheckIcon,
@@ -28,6 +30,7 @@ const navIcons: Record<DesktopNavigationView, typeof HouseIcon> = {
   'market-data': ChartLineUpIcon,
 };
 const compactNavLabels: Record<DesktopNavigationView, string> = {
+  watchlist: '自选',
   portfolio: '组合',
   'position-entry': '账户',
   performance: '收益',
@@ -78,15 +81,21 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={view}
                 to={{ pathname: path, search: params.toString() }}
                 className={({ isActive }) =>
-                  cn('nav-item max-[800px]:flex-col max-[800px]:gap-1', isActive && 'active')
+                  cn(
+                    'nav-item min-h-10 gap-3 px-3 py-0',
+                    '[@media(max-width:800px)]:min-h-12 [@media(max-width:800px)]:flex-col [@media(max-width:800px)]:gap-1',
+                    '[@media(max-width:800px)]:px-0 [@media(max-width:800px)]:py-0.5',
+                    sidebarCollapsed && 'px-0',
+                    isActive && 'active',
+                  )
                 }
                 aria-label={label}
               >
                 {({ isActive }) => (
                   <>
-                    <Icon size={19} weight={isActive ? 'fill' : 'regular'} />
+                    <Icon className="shrink-0" size={19} weight={isActive ? 'fill' : 'regular'} />
                     <span>{label}</span>
-                    <small className="hidden text-[10px] whitespace-nowrap max-[800px]:block">
+                    <small className="hidden shrink-0 text-xs whitespace-nowrap [@media(max-width:800px)]:block">
                       {compactNavLabels[view]}
                     </small>
                   </>
@@ -126,7 +135,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </aside>
-      <main className="content">
+      <main className="content lg:has-[>[data-fill-height]]:flex lg:has-[>[data-fill-height]]:flex-col">
         <div className="mb-5 hidden flex-wrap items-start justify-between gap-3 border-b pb-3 [@media(max-width:800px)]:flex">
           <PortfolioModeSwitch
             mode={mode}

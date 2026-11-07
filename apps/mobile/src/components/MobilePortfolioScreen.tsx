@@ -1,4 +1,5 @@
 import { valuationPositionLabel } from '@thesis-ledger/domain';
+import { MobileListRefreshRegion } from './MobileListRefresh';
 import { ActivityIndicator, Text, View } from 'react-native';
 import type { MobileDashboardState } from '../index';
 import type { MobileThemeColors } from '../theme';
@@ -50,11 +51,13 @@ export function MobilePortfolioScreen({
   theme,
   styles,
   accounts = [],
+  refreshing = false,
   renderPositionAction,
 }: {
   state: MobileDashboardState;
   theme: MobileThemeColors;
   styles: MobileStyles;
+  refreshing?: boolean;
   accounts?: ReadonlyArray<{ id: string; name: string }>;
   renderPositionAction?: (
     position: NonNullable<MobileDashboardState['portfolio']>['positions'][number],
@@ -100,37 +103,39 @@ export function MobilePortfolioScreen({
         />
       </View>
       <Text style={styles.sectionTitle}>持仓</Text>
-      {state.portfolio.positions.length === 0 ? (
-        <Text style={styles.emptyText}>暂无持仓，可在「账户」录入持仓。</Text>
-      ) : null}
-      {state.portfolio.positions.map((position) => (
-        <View key={position.id} style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.symbol}>
-              {position.asset?.name && position.asset.name !== position.symbol
-                ? `${position.asset.name} · ${position.symbol}`
-                : position.symbol || '未知标的'}
+      <MobileListRefreshRegion refreshing={refreshing} gap={0} label="正在刷新持仓">
+        {state.portfolio.positions.length === 0 ? (
+          <Text style={styles.emptyText}>暂无持仓，可在「账户」录入持仓。</Text>
+        ) : null}
+        {state.portfolio.positions.map((position) => (
+          <View key={position.id} style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.symbol}>
+                {position.asset?.name && position.asset.name !== position.symbol
+                  ? `${position.asset.name} · ${position.symbol}`
+                  : position.symbol || '未知标的'}
+              </Text>
+              <Text style={position.stale ? styles.staleText : styles.mutedText}>
+                {valuationPositionLabel(position)}
+              </Text>
+            </View>
+            <Text style={styles.cardText}>
+              账户：{accountsById.get(position.accountId) ?? `账户信息不可用（${position.accountId}）`}
             </Text>
-            <Text style={position.stale ? styles.staleText : styles.mutedText}>
-              {valuationPositionLabel(position)}
+            {position.navDate ? <Text style={styles.cardText}>净值 {position.navDate.slice(0, 10)} · 单位净值 {position.marketPrice}</Text> : null}
+            <Text style={styles.cardText}>
+              数量 {position.quantity} · 成本 {formatNumber(position.costPrice, position.currency)}
             </Text>
+            <Text style={styles.cardText}>
+              市值 {formatNumber(position.marketValue, position.currency)} · 盈亏{' '}
+              <Text style={marketToneStyle(marketTone(position.pnl), styles)}>
+                {formatNumber(position.pnl, position.currency)}
+              </Text>
+            </Text>
+            {renderPositionAction?.(position)}
           </View>
-          <Text style={styles.cardText}>
-            账户：{accountsById.get(position.accountId) ?? `账户信息不可用（${position.accountId}）`}
-          </Text>
-          {position.navDate ? <Text style={styles.cardText}>净值 {position.navDate.slice(0, 10)} · 单位净值 {position.marketPrice}</Text> : null}
-          <Text style={styles.cardText}>
-            数量 {position.quantity} · 成本 {formatNumber(position.costPrice, position.currency)}
-          </Text>
-          <Text style={styles.cardText}>
-            市值 {formatNumber(position.marketValue, position.currency)} · 盈亏{' '}
-            <Text style={marketToneStyle(marketTone(position.pnl), styles)}>
-              {formatNumber(position.pnl, position.currency)}
-            </Text>
-          </Text>
-          {renderPositionAction?.(position)}
-        </View>
-      ))}
+        ))}
+      </MobileListRefreshRegion>
     </View>
   );
 }

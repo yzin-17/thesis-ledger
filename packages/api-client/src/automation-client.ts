@@ -1,5 +1,7 @@
 import {
   automationCreateInputSchema,
+  riskMonitoringEnableSchema,
+  riskMonitoringStatusSchema,
   automationUpdateInputSchema,
   automationRecordSchema,
   automationHistoryPageSchema,
@@ -16,6 +18,11 @@ const json = (method: string, body?: unknown): RequestInit => ({
 });
 export function automationClient(request: ParsedRequest) {
   return {
+    riskMonitoring: (signal?: AbortSignal) =>
+      request('/automations/risk-monitoring', riskMonitoringStatusSchema, { signal: signal ?? null, cache: 'no-store' }),
+    enableRiskMonitoring: (jobId?: string) =>
+      request('/automations/risk-monitoring/enable', riskMonitoringStatusSchema,
+        json('POST', riskMonitoringEnableSchema.parse(jobId ? { jobId } : {}))),
     list: (signal?: AbortSignal) =>
       request('/automations', automationRecordSchema.array(), { signal: signal ?? null }),
     create: (input: AutomationCreateInput) => {

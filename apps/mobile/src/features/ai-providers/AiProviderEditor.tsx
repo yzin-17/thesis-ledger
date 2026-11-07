@@ -196,6 +196,7 @@ function EditorForm({
         ))}
         <Action label="检查连接" disabled={blocked} onPress={() => void act('test')} />
         <Action
+          busy={command.pending}
           label={command.pending ? '正在处理…' : '验证并保存配置'}
           primary
           disabled={blocked}

@@ -1,9 +1,6 @@
-import { Combobox } from '@base-ui/react/combobox';
+import { InstrumentSearchCombobox } from '../market-data/InstrumentSearchCombobox.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
-import { MagnifyingGlassIcon } from '@phosphor-icons/react/MagnifyingGlass';
-import { SpinnerGapIcon } from '@phosphor-icons/react/SpinnerGap';
 
 import type { Position, InstrumentLookup, InstrumentSearchState } from './portfolio.types.js';
 import { instrumentTypeLabel, instrumentMarketLabel, assetTypeLabel } from './portfolio.types.js';
@@ -39,11 +36,9 @@ export function InstrumentCombobox({
   onSelect: (instrument: InstrumentLookup) => void;
   onStartSearch: () => void;
 }) {
-  const isLoading = busy;
-  const showPopup =
-    open && (Boolean(query.trim()) || isLoading || searchState !== 'idle' || results.length > 0);
   let searchStatus = '';
-  if (isLoading) searchStatus = '正在搜索...';
+  if (busy) searchStatus = '正在搜索...';
+  else if (searchState === 'empty') searchStatus = '未找到符合当前条件的标的';
   else if (searchState === 'error') searchStatus = '搜索暂时不可用，请稍后重试。';
 
   if (editing) {
@@ -129,94 +124,17 @@ export function InstrumentCombobox({
   }
 
   return (
-    <Combobox.Root
-      open={open}
-      items={results}
-      filter={null}
-      inputValue={query}
-      autoHighlight
-      onOpenChange={onOpenChange}
-      onInputValueChange={onQueryChange}
-      onValueChange={(instrument) => {
-        if (instrument) onSelect(instrument);
-      }}
-      itemToStringLabel={(instrument: InstrumentLookup) => instrument.displayName}
-      itemToStringValue={(instrument: InstrumentLookup) => instrument.symbol}
-    >
-      <InputGroup className="h-10">
-        <Combobox.Input
-          data-slot="input-group-control"
-          className="h-10 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2.5 py-2 text-base text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus-visible:border-0 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-          placeholder="搜索代码或名称"
-          aria-label="搜索代码或名称"
-          aria-busy={busy}
-          onFocus={onStartSearch}
-        />
-        <InputGroupAddon align="inline-start">
-          <MagnifyingGlassIcon aria-hidden="true" />
-        </InputGroupAddon>
-        {isLoading && (
-          <InputGroupAddon align="inline-end">
-            <SpinnerGapIcon className="animate-spin" aria-hidden="true" />
-          </InputGroupAddon>
-        )}
-      </InputGroup>
-      {showPopup && (
-        <Combobox.Portal>
-          <Combobox.Positioner
-            className="layer-popover"
-            side="bottom"
-            align="start"
-            sideOffset={4}
-          >
-            <Combobox.Popup
-              aria-label="标的搜索结果"
-              className="w-(--anchor-width) overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md"
-            >
-              <Combobox.List className="max-h-72 overflow-auto p-1">
-                <Combobox.Status className="px-3 py-2 text-sm text-muted-foreground">
-                  {searchStatus}
-                </Combobox.Status>
-                {!isLoading &&
-                  searchState === 'results' &&
-                  results.map((instrument, index) => (
-                    <Combobox.Item
-                      key={instrument.id}
-                      value={instrument}
-                      index={index}
-                      className="flex w-full cursor-default items-start gap-3 rounded-sm px-3 py-2 text-left outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <code className="block font-mono text-xs text-muted-foreground">
-                          {instrument.symbol}
-                        </code>
-                        <strong className="mt-0.5 block truncate text-sm font-medium">
-                          {instrument.displayName}
-                        </strong>
-                        <small className="mt-0.5 block text-xs text-muted-foreground">
-                          {instrumentTypeLabel(instrument.instrumentType)} ·{' '}
-                          {instrumentMarketLabel(instrument.market)}
-                        </small>
-                      </span>
-                    </Combobox.Item>
-                  ))}
-                <Combobox.Empty className="px-3 py-2">
-                  {searchState === 'empty' && (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 truncate text-sm text-muted-foreground">
-                        未找到“{query}”
-                      </span>
-                      <Button type="button" size="sm" variant="outline" onClick={onManualEntry}>
-                        手动录入标的
-                      </Button>
-                    </div>
-                  )}
-                </Combobox.Empty>
-              </Combobox.List>
-            </Combobox.Popup>
-          </Combobox.Positioner>
-        </Combobox.Portal>
+    <div className="grid min-w-0 gap-2">
+      <InstrumentSearchCombobox
+        input={query} items={results} busy={busy} status={searchStatus}
+        open={open} onOpenChange={(next) => { onOpenChange(next); if (next) onStartSearch(); }}
+        onInputChange={onQueryChange} onSelect={onSelect}
+      />
+      {searchState === 'empty' && !busy && (
+        <Button type="button" size="sm" variant="outline" onClick={onManualEntry}>
+          手动录入标的
+        </Button>
       )}
-    </Combobox.Root>
+    </div>
   );
 }

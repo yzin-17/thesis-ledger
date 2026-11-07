@@ -1,3 +1,6 @@
+import { MarketReferenceCodeField } from './MarketReferenceCodeField.js';
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { Spinner } from '@/components/ui/spinner';
 import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -18,8 +21,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Field, FieldGroup, FieldLabel, FieldDescription } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { DateInput } from '@/components/ui/date-input';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -115,27 +118,13 @@ function ReferenceQuery() {
               </SelectContent>
             </Select>
           </Field>
-          {codeInput ? (
-            <Field>
-              <FieldLabel htmlFor="reference-symbol">{codeInput.label}</FieldLabel>
-              <Input
-                id="reference-symbol"
-                value={symbol}
-                onChange={(e) => {
-                  setSymbol(e.target.value);
-                  clear();
-                }}
-                autoComplete="off"
-              />
-              <FieldDescription>{codeInput.example}</FieldDescription>
-            </Field>
-          ) : null}
+          <MarketReferenceCodeField dataset={dataset} value={symbol} onChange={(value) => { setSymbol(value); clear(); }} />
           {entry.scope === 'index' ? <p className="text-sm">指数：{index?.label}</p> : null}
           {entry.dateFilter ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="reference-start">起始日期</FieldLabel>
-                <Input
+                <DateInput
                   id="reference-start"
                   type="date"
                   value={start}
@@ -147,7 +136,7 @@ function ReferenceQuery() {
               </Field>
               <Field>
                 <FieldLabel htmlFor="reference-end">截止日期</FieldLabel>
-                <Input
+                <DateInput
                   id="reference-end"
                   type="date"
                   value={end}
@@ -160,7 +149,8 @@ function ReferenceQuery() {
             </div>
           ) : null}
         </FieldGroup>
-        <Button type="submit" disabled={query.isFetching}>
+        <Button aria-busy={query.isFetching} type="submit" disabled={query.isFetching}>
+          {query.isLoading && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {query.isFetching ? '正在读取资料…' : '查询资料'}
         </Button>
       </form>
@@ -169,14 +159,15 @@ function ReferenceQuery() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-      {query.isFetching ? <p role="status">正在读取来源，请稍候。</p> : null}
       {query.isError ? (
         <Alert variant="destructive">
           <AlertTitle>资料暂未读到</AlertTitle>
           <AlertDescription>{requestFailureMessage(query.error)}</AlertDescription>
         </Alert>
       ) : null}
-      {query.data ? <MarketReferenceResult result={query.data} /> : null}
+      <ListRefreshRegion refreshing={query.isRefetching && !!query.data} label="正在刷新市场资料">
+        {query.data ? <MarketReferenceResult result={query.data} /> : null}
+      </ListRefreshRegion>
       {query.data && submitted ? (
         <div className="flex items-center justify-between gap-3">
           <Button

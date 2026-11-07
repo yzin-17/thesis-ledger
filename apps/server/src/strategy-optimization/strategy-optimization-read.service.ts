@@ -417,24 +417,32 @@ export class StrategyOptimizationReadService {
       const association = associationByRunId.get(job.id);
       if (!association) {
         const strategyVersion = strategyVersionById.get(job.strategyVersionId);
+        let source: OptimizationExperimentSource | null = null;
+        if (strategyVersion) {
+          source = { kind: 'unknown', reason: 'missing_source', referenceId: strategyVersion.id };
+          if (
+            Number.isInteger(strategyVersion.version) && strategyVersion.version > 0 &&
+            Number.isInteger(strategyVersion.schemaVersion) && strategyVersion.schemaVersion > 0
+          ) {
+            source = {
+              kind: 'existing',
+              strategyId: strategyVersion.strategy.id,
+              strategyVersionId: strategyVersion.id,
+              strategyName: strategyVersion.strategy.name,
+              version: strategyVersion.version,
+              schemaVersion: strategyVersion.schemaVersion,
+            };
+          }
+        }
         groups.set(job.id, {
           id: job.id,
           kind: 'user',
-          name: strategyVersion
-            ? `${strategyVersion.strategy.name} · v${strategyVersion.version}`
-            : `来源信息未记录 ${job.id.slice(0, 8)}`,
+          name: source?.kind === 'existing'
+            ? `${source.strategyName} · v${source.version}`
+            : strategyVersion?.strategy.name || `来源信息未记录 ${job.id.slice(0, 8)}`,
           experimentId: null,
           experimentStage: null,
-          source: strategyVersion
-            ? {
-                kind: 'existing',
-                strategyId: strategyVersion.strategy.id,
-                strategyVersionId: strategyVersion.id,
-                strategyName: strategyVersion.strategy.name,
-                version: strategyVersion.version,
-                schemaVersion: strategyVersion.schemaVersion,
-              }
-            : null,
+          source,
           jobs: [summary],
           members: [{ jobId: job.id, relation: 'user', split: null, candidateSource: null }],
         });

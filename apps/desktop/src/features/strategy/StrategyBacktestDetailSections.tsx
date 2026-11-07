@@ -8,6 +8,7 @@ import { Metric } from '../shared/DesktopPrimitives.js';
 import {
   backtestBaseCurrency,
   backtestMetricNumber,
+  backtestMetricPercent,
   backtestNumber,
   backtestResultCollections,
   readableBacktestResult,
@@ -15,7 +16,7 @@ import {
 import type { BacktestJob, BacktestJobResult } from './strategy.types.js';
 import { buildBacktestChartModel } from './strategy-backtest-chart.model.js';
 import { StrategyBacktestEquityChart } from './StrategyBacktestEquityChart.js';
-import { StrategyBacktestEquityDetails } from './StrategyBacktestEquityDetails.js';
+import { StrategyBacktestEquityExport } from './StrategyBacktestEquityExport.js';
 import { StrategyBacktestDiagnostics } from './StrategyBacktestDiagnostics.js';
 import { BacktestRunDisclosure, completenessLabel } from './BacktestModelDisclosure.js';
 import {
@@ -51,13 +52,14 @@ const metricText = (
   const key = keys.find((candidate) => metrics?.[candidate] !== undefined);
   if (!key) return '不可用';
   const raw = metrics?.[key];
-  const value = backtestMetricNumber(raw);
+  const value =
+    kind === 'percent' ? backtestMetricPercent(raw, magnitude) : backtestMetricNumber(raw);
   if (value === null) {
     const reason = backtestMetricReasonLabel(raw);
     return reason ? `不可用：${reason}` : '不可用';
   }
-  const displayed = magnitude ? Math.abs(value) : value;
-  return kind === 'percent' ? `${(displayed * 100).toFixed(2)}%` : displayed.toFixed(2);
+  if (typeof value === 'string') return value;
+  return (magnitude ? Math.abs(value) : value).toFixed(2);
 };
 
 const moneyText = (value: unknown, currency: 'CNY' | 'HKD' | 'USD' | null) => {
@@ -191,7 +193,7 @@ function ResultOverview({ job, result }: { job: BacktestJob; result: BacktestJob
         resetKey={job.id}
         onRangeChange={setVisibleRange}
       />
-      <StrategyBacktestEquityDetails jobId={job.id} model={chartModel} range={visibleRange} />
+      <StrategyBacktestEquityExport jobId={job.id} model={chartModel} range={visibleRange} />
       {secondary.length > 0 && (
         <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-lg border bg-muted/10 px-4 py-3">
           {secondary.map(([label, value]) => (
@@ -370,17 +372,17 @@ export function StrategyBacktestResultTabs({ job }: { job: BacktestJob }) {
           <TabsTrigger value="data">数据与假设</TabsTrigger>
           <TabsTrigger value="diagnostics">诊断与复现</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview" className="pt-4">
+        <TabsContent value="overview">
           <ResultOverview job={job} result={result} />
         </TabsContent>
-        <TabsContent value="trades" className="pt-4">
+        <TabsContent value="trades">
           <TradesAndOrders result={result} />
         </TabsContent>
-        <TabsContent value="data" className="pt-4">
+        <TabsContent value="data">
           <BacktestRunDisclosure job={job} />
           <DataAndAssumptions job={job} result={result} />
         </TabsContent>
-        <TabsContent value="diagnostics" className="pt-4">
+        <TabsContent value="diagnostics">
           <StrategyBacktestDiagnostics job={job} result={result} />
         </TabsContent>
       </Tabs>

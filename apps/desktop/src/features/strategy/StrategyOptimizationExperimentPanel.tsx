@@ -1,3 +1,5 @@
+import { createClientRequestId } from '../../lib/client-request-id';
+import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
 import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
 import {
   experimentPreparationTarget,
@@ -9,7 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   strategySchema,
   type OptimizationReasoningEffort,
-  type OptimizationExperimentCreate,
+  type OptimizationExperimentCreate, type StrategySubmissionInput,
 } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -41,7 +43,6 @@ import {
 } from './StrategyOptimizationModelSelector.js';
 import { StrategyOptimizationExperimentResults } from './StrategyOptimizationExperimentResults.js';
 import type { StrategyRecord } from './strategy.types.js';
-
 const optimizationKey = ['desktop', 'strategy', 'optimization'] as const;
 const settledStatuses = new Set(['awaiting_finalization', 'succeeded', 'failed', 'cancelled']);
 const currencyByMarket = { CN: 'CNY', HK: 'HKD', US: 'USD' } as const;
@@ -195,15 +196,14 @@ export function StrategyOptimizationExperimentPanel({
     },
     primaryTimeframe: discoveryTimeframe,
   });
-  const createMutation = useMutation({
-    mutationFn: () => {
+  const settings = (): Extract<StrategySubmissionInput, {kind:'optimization'}>['settings'] => {
       if (sourceMode === 'existing' && !strategyVersionId) throw new Error('请选择策略版本');
       if (sourceMode === 'discovery' && !discoverySymbol.trim()) throw new Error('请输入探索标的');
       if (selectedModels.length === 0) throw new Error('至少选择一个模型');
       if (sourceMode === 'existing' && selectedParameters.length === 0)
         throw new Error('至少授权一个参数');
       if (hasInvalidReasoningSelection)
-        throw new Error('所选模型的推理强度不受 Provider 能力配置支持');
+        throw new Error('所选模型的推理强度不受提供方能力配置支持');
       const models = selectedProviderRoutes.map((route) => {
         const effort = reasoningEfforts[routeKey(route.provider, route.model)];
         return {
@@ -212,17 +212,7 @@ export function StrategyOptimizationExperimentPanel({
           ...(effort === undefined ? {} : { reasoningEffort: effort }),
         };
       });
-      const runConfig = requirePreparedOptimizationConfiguration(
-        preparedConfig,
-        preparationTarget,
-        startDate,
-        endDate,
-        currency,
-        initialCash,
-      );
-      const input: OptimizationExperimentCreate = {
-        contractVersion: 3,
-        ...preparationTarget,
+      return {
         ...(sourceMode === 'existing' ? { allowedParameterIds: selectedParameters } : {}),
         models,
         objective: { mode: objective, minClosedTrades: 1 },
@@ -231,7 +221,6 @@ export function StrategyOptimizationExperimentPanel({
           validation: { start: addDays(developmentEnd, 1), end: validationEnd },
           test: { start: addDays(validationEnd, 1), end: endDate },
         },
-        runConfig,
         budget: {
           maxAiCalls: Number(maxAiCalls),
           maxBacktestRuns: Number(maxBacktestRuns),
@@ -242,7 +231,21 @@ export function StrategyOptimizationExperimentPanel({
         },
         maxRounds: 2,
         acknowledgeUnknownCost: !hasUnknownCost || acknowledgeUnknownCost,
-        idempotencyKey: crypto.randomUUID(),
+      };
+  };
+  const createMutation = useMutation({
+    mutationFn: () => {
+      const runConfig = requirePreparedOptimizationConfiguration(
+        preparedConfig,
+        preparationTarget,
+        startDate,
+        endDate,
+        currency,
+        initialCash,
+      );
+      const input: OptimizationExperimentCreate = {
+        ...settings(), ...preparationTarget, contractVersion:3, runConfig,
+        idempotencyKey: createClientRequestId(),
       };
       return createOptimizationExperiment(input);
     },
@@ -310,10 +313,18 @@ export function StrategyOptimizationExperimentPanel({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Field>
                 <FieldLabel>探索标的</FieldLabel>
-                <Input
+                <InstrumentSymbolField
+                  aria-label="探索标的"
                   value={discoverySymbol}
-                  onChange={(event) => setDiscoverySymbol(event.target.value)}
-                  placeholder="如 600519.SH"
+                  markets={
+                    discoveryMarket === 'CN' ? ['SH', 'SZ', 'BJ', 'OF'] : [discoveryMarket]
+                  }
+                  instrumentTypes={[
+                    discoveryAssetType === 'fund'
+                      ? 'MUTUAL_FUND'
+                      : discoveryAssetType.toUpperCase(),
+                  ]}
+                  onChange={(value) => setDiscoverySymbol(value)}
                 />
               </Field>
               <Field>
@@ -466,7 +477,7 @@ export function StrategyOptimizationExperimentPanel({
             onReasoningEffortsChange={setReasoningEfforts}
           />
           {hasUnknownCost ? (
-            <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+            <div className="space-y-2 rounded-md border border-caution/40 bg-caution/5 p-3">
               <div className="text-sm font-medium">所选模型存在未知费用</div>
               <p className="text-xs text-muted-foreground">
                 系统仍会限制调用、Token、回测和计算时长，但没有价格表时不能保证费用上限。
@@ -621,8 +632,8 @@ export function StrategyOptimizationExperimentPanel({
             </Field>
           </div>
           <p className="text-xs text-muted-foreground">
-            预算为服务端硬上限；模型调用前预留保守输入 Token 与单次输出额度，完成后按 Provider 实际
-            usage 结算。
+            预算为服务端硬上限；模型调用前预留保守输入 Token 与单次输出额度，完成后按提供方实际
+            用量结算。
           </p>
           <div className="grid gap-3 lg:grid-cols-[180px_1fr]">
             <Field className="space-y-1 text-sm">
@@ -637,7 +648,8 @@ export function StrategyOptimizationExperimentPanel({
               endDate={endDate}
               currency={currency}
               initialCash={initialCash}
-              onPrepared={setPreparedConfig}
+              settings={settings}
+                onPrepared={setPreparedConfig}
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -663,6 +675,8 @@ export function StrategyOptimizationExperimentPanel({
       </Card>
 
       <StrategyOptimizationExperimentResults
+        experimentsRefreshing={experiments.isRefetching && !!experiments.data}
+        candidatesRefreshing={compare.isRefetching && !!compare.data}
         experiments={experiments.data?.items ?? []}
         compare={compare.data}
         settledStatuses={settledStatuses}

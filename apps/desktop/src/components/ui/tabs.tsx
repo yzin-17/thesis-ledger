@@ -10,19 +10,22 @@ function Tabs({ className, orientation = 'horizontal', ...props }: TabsPrimitive
     <TabsPrimitive.Root
       data-slot="tabs"
       data-orientation={orientation}
-      className={cn('group/tabs flex gap-2 data-horizontal:flex-col', className)}
+      className={cn(
+        'group/tabs flex gap-text data-horizontal:flex-col data-horizontal:gap-group',
+        className,
+      )}
       {...props}
     />
   );
 }
 
 const tabsListVariants = cva(
-  'group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-horizontal/tabs:h-9 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col data-[variant=line]:rounded-none',
+  'group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-0.75 text-muted-foreground group-data-horizontal/tabs:h-9 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col data-[variant=line]:rounded-none',
   {
     variants: {
       variant: {
         default: 'bg-muted',
-        line: 'w-full max-w-full justify-start gap-4 overflow-x-auto rounded-none bg-transparent p-0 group-data-horizontal/tabs:h-11',
+        line: '-mx-1 -my-1 w-[calc(100%+0.5rem)] max-w-none justify-start gap-4 overflow-x-auto scroll-p-2 rounded-none bg-transparent p-1 group-data-horizontal/tabs:h-13',
       },
     },
     defaultVariants: {
@@ -68,6 +71,7 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
       data-slot="tabs-content"
       className={cn(
         'flex-1 text-sm outline-none [&>.panel]:border-t-0 [&>div:first-child>.panel:first-child]:border-t-0',
+        '[&>.panel:first-child>.panel-heading:first-child]:pt-0 [&>div:first-child>.panel:first-child>.panel-heading:first-child]:pt-0',
         className,
       )}
       {...props}

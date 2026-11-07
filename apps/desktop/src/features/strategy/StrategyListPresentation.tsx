@@ -102,7 +102,7 @@ export function StrategyLibraryAction({
         nativeButton={false}
         render={
           <Link to={strategyCenterPath.navBacktestSetup(strategy.id, version.id)}>
-            基金净值回测
+            回测
           </Link>
         }
       />
@@ -125,7 +125,7 @@ export function StrategyRecentBacktest({ job }: { job: BacktestJobSummary | null
   if (!job) return <span className="text-muted-foreground">未回测</span>;
   return (
     <Link
-      className="inline-flex max-w-full flex-col gap-1 whitespace-normal hover:underline"
+      className="inline-flex max-w-full flex-col gap-1 whitespace-normal hover:text-primary/80"
       to={strategyCenterPath.job(job.id)}
     >
       <Badge variant={jobStatusVariant(job.status)}>{jobStatusLabel(job.status)}</Badge>

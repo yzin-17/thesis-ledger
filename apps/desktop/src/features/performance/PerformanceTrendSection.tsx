@@ -1,24 +1,16 @@
 import { pnlReasonLabels, type PnlChartPoint } from './performance-pnl-model.js';
-import { TableContainer } from '@/components/ui/table';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyTitle } from '@/components/ui/empty';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PerformanceTrendControls } from './PerformanceTrendControls.js';
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 
 import { money } from '../shared/display.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
-import { PerformanceTrendChart, performanceSeriesQualityLabel } from './PerformanceTrendChart.js';
+import { PerformanceTrendChart } from './PerformanceTrendChart.js';
 import type {
   Currency,
+  PortfolioMode,
   PerformanceSeriesInterval,
   PerformanceSeriesPoint,
   PerformanceSeriesRange,
@@ -32,50 +24,6 @@ const moneyByCurrency: Record<Currency, Intl.NumberFormat> = {
   USD: new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'USD' }),
 };
 const formatMoney = (value: number, currency: Currency) => moneyByCurrency[currency].format(value);
-const formatDate = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '尚无数据时点' : date.toLocaleString('zh-CN');
-};
-const formatCoverage = (value: number) => `${(value * 100).toFixed(2)}%`;
-
-const rangeOptions: Array<{ value: PerformanceSeriesRange; label: string }> = [
-  { value: '1D', label: '1日' },
-  { value: '5D', label: '5日' },
-  { value: '1M', label: '近1月' },
-  { value: '3M', label: '近3月' },
-  { value: 'YTD', label: '年初至今' },
-  { value: '1Y', label: '近1年' },
-  { value: '5Y', label: '近5年' },
-  { value: 'ALL', label: '全部' },
-];
-const intervalOptions: Array<{ value: PerformanceSeriesInterval; label: string }> = [
-  { value: '1min', label: '分线' },
-  { value: '1h', label: '时线' },
-  { value: '1d', label: '日线' },
-  { value: '1w', label: '周线' },
-  { value: '1mo', label: '月线' },
-  { value: '1y', label: '年线' },
-];
-const defaultIntervals: Record<PerformanceSeriesRange, PerformanceSeriesInterval> = {
-  '1D': '1min',
-  '5D': '1h',
-  '1M': '1d',
-  '3M': '1d',
-  YTD: '1d',
-  '1Y': '1d',
-  '5Y': '1mo',
-  ALL: '1mo',
-};
-const intervalsByRange: Record<PerformanceSeriesRange, readonly PerformanceSeriesInterval[]> = {
-  '1D': ['1min', '1h'],
-  '5D': ['1min', '1h', '1d'],
-  '1M': ['1h', '1d', '1w'],
-  '3M': ['1h', '1d', '1w', '1mo'],
-  YTD: ['1d', '1w', '1mo'],
-  '1Y': ['1d', '1w', '1mo'],
-  '5Y': ['1w', '1mo', '1y'],
-  ALL: ['1mo', '1y'],
-};
 
 const snapshotsForRange = (snapshots: SnapshotRecord[], range: PerformanceSeriesRange) => {
   if (range === 'ALL' || snapshots.length === 0) return snapshots;
@@ -104,116 +52,6 @@ const snapshotSeriesPoint = (snapshot: SnapshotRecord): PerformanceSeriesPoint =
   dataQuality: snapshot.partial ? 'PARTIAL' : 'COMPLETE',
   sourceSnapshotId: snapshot.id,
 });
-
-function TrendControls({
-  range,
-  interval,
-  series,
-  refreshing,
-  onRangeChange,
-  onIntervalChange,
-}: {
-  range: PerformanceSeriesRange;
-  interval: PerformanceSeriesInterval;
-  series?: PerformanceSeriesResponse | undefined;
-  refreshing?: boolean | undefined;
-  onRangeChange: (range: PerformanceSeriesRange, interval: PerformanceSeriesInterval) => void;
-  onIntervalChange: (interval: PerformanceSeriesInterval) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Select
-        value={range}
-        onValueChange={(value) => {
-          if (!value) return;
-          const nextInterval = intervalsByRange[value].includes(interval)
-            ? interval
-            : defaultIntervals[value];
-          onRangeChange(value, nextInterval);
-        }}
-      >
-        <SelectTrigger className="w-32" aria-label="走势区间">
-          <SelectValue>
-            {rangeOptions.find((option) => option.value === range)?.label ?? '区间'}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {rangeOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <Select value={interval} onValueChange={(value) => value && onIntervalChange(value)}>
-        <SelectTrigger className="w-28" aria-label="走势粒度">
-          <SelectValue>
-            {intervalOptions.find((option) => option.value === interval)?.label ?? '粒度'}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {intervalOptions.map((option) => (
-              <SelectItem
-                key={option.value}
-                value={option.value}
-                disabled={series !== undefined && !series.availableIntervals.includes(option.value)}
-              >
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      {refreshing ? <Badge variant="secondary">正在更新</Badge> : null}
-    </div>
-  );
-}
-
-function TrendPointDetails({ points }: { points: PerformanceSeriesPoint[] }) {
-  return (
-    <details className="mt-3 rounded-lg bg-muted/20 px-3 py-2 text-sm">
-      <summary className="cursor-pointer text-muted-foreground">查看估值点明细</summary>
-      <TableContainer className="mt-2">
-        <table>
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th className="text-right">资产总值</th>
-              <th>口径</th>
-              <th>覆盖率</th>
-              <th>质量</th>
-            </tr>
-          </thead>
-          <tbody>
-            {points.map((point) => (
-              <tr key={`${point.at}-${point.sourceSnapshotId ?? 'series'}`}>
-                <td>{formatDate(point.at)}</td>
-                <td className="text-right">{formatMoney(point.value, point.currency)}</td>
-                <td>{point.valuationBasis === 'OFFICIAL' ? '正式' : '估算'}</td>
-                <td>
-                  披露 {formatCoverage(point.disclosureCoverage)} / 定价{' '}
-                  {formatCoverage(point.pricedCoverage)}
-                </td>
-                <td>
-                  {point.dataQuality === 'COMPLETE' ? (
-                    <Badge variant="secondary">完整</Badge>
-                  ) : (
-                    <Badge variant="destructive">
-                      {performanceSeriesQualityLabel(point.dataQuality)}
-                    </Badge>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableContainer>
-    </details>
-  );
-}
 
 const EmptyTrend = ({
   hasHistory,
@@ -263,6 +101,7 @@ const EmptyTrend = ({
 
 export function PerformanceSnapshotTable({
   loadState,
+  mode = 'actual',
   snapshots,
   series,
   range,
@@ -275,6 +114,7 @@ export function PerformanceSnapshotTable({
   groupedByCurrency = false,
   pnl,
 }: {
+  mode?: PortfolioMode;
   loadState: 'loading' | 'error' | 'stale' | 'empty' | 'ready';
   snapshots: SnapshotRecord[];
   series?: PerformanceSeriesResponse | undefined;
@@ -310,7 +150,7 @@ export function PerformanceSnapshotTable({
   }
   if (groupedByCurrency && pnl && pnl.points.length > 0 && !groups.has(pnl.currency))
     groups.set(pnl.currency, []);
-  const pnlAvailable = pnl?.points.some((point) => point.value !== null) === true;
+  const chartLoading = Boolean((refreshing ?? (loadState === 'loading')) || pnl?.loading);
   const missingPnl = pnl?.points.filter((point) => point.value === null) ?? [];
   const pnlReasons = [
     ...new Set(
@@ -318,9 +158,7 @@ export function PerformanceSnapshotTable({
     ),
   ];
   let content: ReactNode;
-  if (loadState === 'loading' && seriesPoints.length === 0 && groups.size === 0 && !pnlAvailable) {
-    content = <Skeleton className="h-52 w-full rounded-lg" aria-label="资产走势加载中" />;
-  } else if (groups.size > 0) {
+  if (groups.size > 0) {
     content = (
       <div className="grid gap-3 lg:grid-cols-2">
         {[...groups.entries()].map(([currency, group]) => (
@@ -338,15 +176,12 @@ export function PerformanceSnapshotTable({
     );
   } else if (seriesPoints.length > 0) {
     content = (
-      <>
-        <PerformanceTrendChart
-          seriesPoints={seriesPoints}
-          interval={interval}
-          pnlPoints={pnl?.points}
-          pnlCurrency={pnl?.currency}
-        />
-        <TrendPointDetails points={seriesPoints} />
-      </>
+      <PerformanceTrendChart
+        seriesPoints={seriesPoints}
+        interval={interval}
+        pnlPoints={pnl?.points}
+        pnlCurrency={pnl?.currency}
+      />
     );
   } else if (pnl && pnl.points.length > 0) {
     content = (
@@ -357,6 +192,8 @@ export function PerformanceSnapshotTable({
         pnlCurrency={pnl.currency}
       />
     );
+  } else if (chartLoading) {
+    content = <div className="h-76" aria-hidden="true" />;
   } else if (loadState === 'empty' || loadState === 'ready') {
     content = (
       <EmptyTrend
@@ -382,36 +219,34 @@ export function PerformanceSnapshotTable({
             </p>
           </details>
         </div>
-        <TrendControls
+        <PerformanceTrendControls
+          mode={mode}
           range={range}
           interval={interval}
           series={series}
-          refreshing={refreshing}
           onRangeChange={onRangeChange}
           onIntervalChange={onIntervalChange}
         />
       </div>
       {loadState !== 'ready' && loadState !== 'empty' && loadState !== 'loading' ? (
         <DataStateBanner
-          state={loadState}
-          description={loadState === 'stale' ? '刷新失败，当前保留上次读取的估值数据。' : undefined}
+          state="error"
+          title="资产走势读取失败"
+          description={loadState === 'stale' ? '刷新失败，当前保留上次读取的估值数据。' : '暂时无法读取资产走势，请重新加载。'}
           onRetry={onRetry}
         />
       ) : null}
       {pnl?.error && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm" role="alert">
-          <span>历史盈亏读取失败，已保留可用数据。</span>
-          <Button type="button" variant="outline" size="sm" onClick={pnl.onRetry}>
-            重试盈亏历史
-          </Button>
-        </div>
+        <DataStateBanner
+          state="error"
+          title="历史盈亏读取失败"
+          description="暂时无法读取历史盈亏，已保留可用数据。"
+          onRetry={pnl.onRetry}
+        />
       )}
-      {pnl?.loading && (
-        <p className="m-0 text-xs text-muted-foreground" aria-label="正在读取盈亏历史">
-          正在读取盈亏历史…
-        </p>
-      )}
-      {content}
+      <ListRefreshRegion refreshing={chartLoading} label={pnl?.loading ? '正在读取盈亏历史' : '资产走势加载中'}>
+        {content}
+      </ListRefreshRegion>
       {pnl &&
         pnl.points.length > 0 &&
         seriesPoints.length === 0 &&

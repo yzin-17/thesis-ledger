@@ -1,8 +1,9 @@
 import type { StrategyRecord, StrategyVersion } from './strategy.types.js';
 
-export type StrategyCenterTab = 'library' | 'jobs' | 'experiments';
+export type StrategyCenterTab = 'library' | 'jobs' | 'experiments' | 'arena';
 
 export const strategyCenterPath = {
+  arena: '/strategy/arena',
   library: '/strategy/library',
   jobs: '/strategy/jobs',
   job: (jobId: string) => `/strategy/jobs/${encodeURIComponent(jobId)}`,
@@ -23,6 +24,7 @@ export const strategyCenterPath = {
 } as const;
 
 export const strategyCenterTabForPath = (pathname: string): StrategyCenterTab => {
+  if (pathname.startsWith(strategyCenterPath.arena)) return 'arena';
   if (pathname.startsWith(strategyCenterPath.jobs)) return 'jobs';
   if (pathname.startsWith(strategyCenterPath.experiments)) return 'experiments';
   return 'library';

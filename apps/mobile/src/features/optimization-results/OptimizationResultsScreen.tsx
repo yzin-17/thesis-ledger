@@ -10,7 +10,7 @@ import {
   Copy,
   Field,
   Page,
-  QueryStatus,
+  QueryList,
   Section,
 } from '../../components/MobilePrimitives';
 import { OptimizationDetailScreen } from './OptimizationDetailScreen';
@@ -79,34 +79,41 @@ function OptimizationList() {
           { value: 'discovery', label: '从零探索' },
         ]}
       />
-      <QueryStatus query={query} empty={!rows.length} retry={() => void query.refetch()} />
-      {rows.map((v) => (
-        <Section key={v.id} title={v.name}>
-          <Copy>
-            {optimizationStatusLabels[v.status] ?? '状态待核对'} ·{' '}
-            {
-              ({ existing: '现有正式策略', discovery: '从零探索', unknown: '来源未记录' } as const)[
-                v.source?.kind ?? 'unknown'
-              ]
-            }
-          </Copy>
-          <Copy>
-            模型费用：
-            {v.costSummary.knownAmount !== null
-              ? `${v.costSummary.currency ?? '币种未记录'} ${v.costSummary.knownAmount}（已确认部分）`
-              : '未知'}
-          </Copy>
-          <Copy>
-            实验 {v.id} · {v.createdAt}
-          </Copy>
-          <Action
-            label={`打开实验 ${v.id}`}
-            onPress={() => navigation.navigate('OptimizationResults', { id: v.id })}
-          />
-        </Section>
-      ))}
+      <QueryList
+        query={query}
+        empty={!rows.length}
+        retry={() => void query.refetch()}
+        label="正在刷新优化实验"
+      >
+        {rows.map((v) => (
+          <Section key={v.id} title={v.name}>
+            <Copy>
+              {optimizationStatusLabels[v.status] ?? '状态待核对'} ·{' '}
+              {
+                ({ existing: '现有正式策略', discovery: '从零探索', unknown: '来源未记录' } as const)[
+                  v.source?.kind ?? 'unknown'
+                ]
+              }
+            </Copy>
+            <Copy>
+              模型费用：
+              {v.costSummary.knownAmount !== null
+                ? `${v.costSummary.currency ?? '币种未记录'} ${v.costSummary.knownAmount}（已确认部分）`
+                : '未知'}
+            </Copy>
+            <Copy>
+              实验 {v.id} · {v.createdAt}
+            </Copy>
+            <Action
+              label={`打开实验 ${v.id}`}
+              onPress={() => navigation.navigate('OptimizationResults', { id: v.id })}
+            />
+          </Section>
+        ))}
+      </QueryList>
       {query.hasNextPage ? (
         <Action
+          busy={query.isFetchingNextPage}
           label="更多优化实验"
           disabled={query.isFetching}
           onPress={() => void query.fetchNextPage()}

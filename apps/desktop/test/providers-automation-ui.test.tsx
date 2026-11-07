@@ -419,10 +419,6 @@ describe('Provider 页接线', () => {
     );
     expect(refreshButtonSource).toContain('variant="ghost"');
     expect(refreshButtonSource).toContain('h-7 w-7 rounded-lg text-muted-foreground');
-    expect(refreshButtonSource).toContain(
-      "className={cn('size-[18px]', refreshing && 'animate-spin')}",
-    );
-    expect(refreshButtonSource).toContain('disabled={disabled || refreshing}');
   });
 
   it('页面按风险中心样式拆分三个 Tab，默认展示数据源', () => {

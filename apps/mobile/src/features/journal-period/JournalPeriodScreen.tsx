@@ -1,3 +1,4 @@
+import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
 import { useState } from 'react';
 import { useRoute, useNavigation, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -90,7 +91,7 @@ export function JournalPeriodScreen() {
           setEdited(true);
         }}
       />
-      <Field
+      <InstrumentSymbolField
         label="区间标的代码"
         value={symbol}
         onChange={(v) => {
@@ -106,7 +107,7 @@ export function JournalPeriodScreen() {
           void analysis.mutateAsync(undefined).catch((e) => setError(failureMessage(e)))
         }
       />
-      <Feedback message={error} error />
+      <Feedback busy={analysis.isPending} message={error} error />
       {result ? (
         <>
           <Copy>

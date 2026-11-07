@@ -1,3 +1,4 @@
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { TableContainer } from '@/components/ui/table';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -139,7 +140,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 md:grid-cols-[minmax(18rem,1fr)_max-content_max-content] md:items-center">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)_max-content] lg:items-center">
         <StrategyListSearchField
           value={draftSearch}
           onChange={setDraftSearch}
@@ -158,7 +159,7 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
                   ?.label ?? '全部策略'}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent className="w-max min-w-(--anchor-width) max-w-(--available-width)">
+            <SelectContent alignItemWithTrigger={false} className="w-max min-w-(--anchor-width) max-w-(--available-width)">
               <SelectGroup>
                 {strategyVersionOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
@@ -204,64 +205,111 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
           </Button>
         </div>
       )}
-      {!groups.isPending && !groups.isError && (groups.data?.items.length ?? 0) === 0 ? (
-        <div className="rounded-md border border-border p-6">
-          <EmptyListState
-            title="没有匹配的回测任务"
-            description="调整筛选条件，或从策略版本页发起回测。"
-          />
-        </div>
-      ) : null}
-      {groups.data && groups.data.items.length > 0 && (
-        <TableContainer>
-          <table className="w-full min-w-[1000px] table-fixed text-sm">
-            <thead className="border-b text-left">
-              <tr>
-                <th className="w-[34%] px-4 py-3 font-medium">任务 / 策略版本</th>
-                <th className="w-[21%] px-4 py-3 font-medium">回测区间</th>
-                <th className="w-[14%] px-4 py-3 font-medium">状态与进度</th>
-                <th className="w-[23%] px-4 py-3 font-medium">结果摘要</th>
-                <th data-table-action-static className="w-[8%] px-2 py-3 text-right font-medium">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.data?.items.map((group) => {
-                const open = expanded.has(group.id);
-                const latest = group.jobs[0];
-                if (!latest) return null;
-                if (group.kind === 'user') {
-                  const exact = resolveBacktestVersion(strategies, latest.strategyVersionId);
-                  const title = exact
-                    ? `${exact.strategy.name} · v${exact.version.version}`
-                    : group.name;
-                  const period = backtestPeriodLabel(latest);
-                  return (
-                    <tr key={group.id} className="border-b last:border-0 hover:bg-muted/20">
-                      <td className="overflow-hidden px-4 py-3">
-                        <Link
-                          className="block truncate font-medium text-foreground hover:underline"
-                          to={strategyCenterPath.job(latest.id)}
-                          state={detailState}
-                          title={title}
+      <ListRefreshRegion refreshing={groups.isRefetching && !!groups.data} label="正在刷新回测任务">
+        {!groups.isPending && !groups.isError && (groups.data?.items.length ?? 0) === 0 ? (
+          <div className="rounded-md border border-border p-6">
+            <EmptyListState
+              title="没有匹配的回测任务"
+              description="调整筛选条件，或从策略版本页发起回测。"
+            />
+          </div>
+        ) : null}
+        {groups.data && groups.data.items.length > 0 && (
+          <TableContainer>
+            <table className="w-full min-w-[1000px] table-fixed text-sm">
+              <thead className="border-b text-left">
+                <tr>
+                  <th className="w-[34%] px-4 py-3 font-medium">任务 / 策略版本</th>
+                  <th className="w-[21%] px-4 py-3 font-medium">回测区间</th>
+                  <th className="w-[14%] px-4 py-3 font-medium">状态与进度</th>
+                  <th className="w-[23%] px-4 py-3 font-medium">结果摘要</th>
+                  <th data-table-action-static className="w-[8%] px-2 py-3 text-right font-medium">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.data?.items.map((group) => {
+                  const open = expanded.has(group.id);
+                  const latest = group.jobs[0];
+                  if (!latest) return null;
+                  if (group.kind === 'user') {
+                    const exact = resolveBacktestVersion(strategies, latest.strategyVersionId);
+                    const title = exact
+                      ? `${exact.strategy.name} · v${exact.version.version}`
+                      : group.name;
+                    const period = backtestPeriodLabel(latest);
+                    return (
+                      <tr key={group.id} className="border-b last:border-0 hover:bg-muted/20">
+                        <td className="overflow-hidden px-4 py-3">
+                          <Link
+                            className="block truncate font-medium text-foreground hover:text-primary/80"
+                            to={strategyCenterPath.job(latest.id)}
+                            state={detailState}
+                            title={title}
+                          >
+                            {title}
+                          </Link>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            用户任务 · {formatDateTime(latest.createdAt, '时间未记录')} 发起
+                          </p>
+                        </td>
+                        <td className="overflow-hidden px-4 py-3">
+                          <span className="block truncate" title={period}>
+                            {period}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <BacktestStatusCell job={latest} />
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          <BacktestResultCell job={latest} />
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            nativeButton={false}
+                            render={
+                              <Link to={strategyCenterPath.job(latest.id)} state={detailState}>
+                                详情
+                              </Link>
+                            }
+                          />
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return [
+                    <tr key={group.id} className="border-b bg-muted/10">
+                      <td className="px-4 py-3">
+                        <button
+                          data-slot="button"
+                          type="button"
+                          className="flex items-center gap-2 text-left font-medium text-foreground"
+                          onClick={() => toggle(group.id)}
+                          title={group.name}
                         >
-                          {title}
-                        </Link>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          用户任务 · {formatDateTime(latest.createdAt, '时间未记录')} 发起
+                          {open ? (
+                            <ChevronDown className="size-4" />
+                          ) : (
+                            <ChevronRight className="size-4" />
+                          )}
+                          {group.name}
+                        </button>
+                        <p className="mt-1 pl-6 text-xs text-muted-foreground">
+                          AI 实验 · {group.jobs.length} 个匹配任务 ·{' '}
+                          {formatDateTime(latest.createdAt, '时间未记录')} 更新
                         </p>
                       </td>
-                      <td className="overflow-hidden px-4 py-3">
-                        <span className="block truncate" title={period}>
-                          {period}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <BacktestStatusCell job={latest} />
+                      <td className="px-4 py-3 text-muted-foreground">多个候选区间</td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm">{backtestStatusSummary(group.jobs)}</p>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        <BacktestResultCell job={latest} />
+                        {group.experimentStage
+                          ? experimentStageLabel(group.experimentStage)
+                          : '阶段未记录'}
                       </td>
                       <td className="px-2 py-3 text-right">
                         <Button
@@ -269,114 +317,69 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
                           variant="ghost"
                           nativeButton={false}
                           render={
-                            <Link to={strategyCenterPath.job(latest.id)} state={detailState}>
-                              详情
+                            <Link to={strategyCenterPath.experiment(group.experimentId ?? group.id)}>
+                              实验
                             </Link>
                           }
                         />
                       </td>
-                    </tr>
-                  );
-                }
-                return [
-                  <tr key={group.id} className="border-b bg-muted/10">
-                    <td className="px-4 py-3">
-                      <button
-                        data-slot="button"
-                        type="button"
-                        className="flex items-center gap-2 text-left font-medium text-foreground"
-                        onClick={() => toggle(group.id)}
-                        title={group.name}
-                      >
-                        {open ? (
-                          <ChevronDown className="size-4" />
-                        ) : (
-                          <ChevronRight className="size-4" />
-                        )}
-                        {group.name}
-                      </button>
-                      <p className="mt-1 pl-6 text-xs text-muted-foreground">
-                        AI 实验 · {group.jobs.length} 个匹配任务 ·{' '}
-                        {formatDateTime(latest.createdAt, '时间未记录')} 更新
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">多个候选区间</td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm">{backtestStatusSummary(group.jobs)}</p>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {group.experimentStage
-                        ? experimentStageLabel(group.experimentStage)
-                        : '阶段未记录'}
-                    </td>
-                    <td className="px-2 py-3 text-right">
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        nativeButton={false}
-                        render={
-                          <Link to={strategyCenterPath.experiment(group.experimentId ?? group.id)}>
-                            实验
-                          </Link>
-                        }
-                      />
-                    </td>
-                  </tr>,
-                  ...(open
-                    ? group.jobs.map((job) => {
-                        const identity = backtestIdentity(job, strategies, group);
-                        const period = backtestPeriodLabel(job);
-                        return (
-                          <tr key={job.id} className="border-b last:border-0 hover:bg-muted/20">
-                            <td className="overflow-hidden py-3 pr-4 pl-10">
-                              <Link
-                                className="block truncate font-medium text-foreground hover:underline"
-                                to={strategyCenterPath.job(job.id)}
-                                state={detailState}
-                                title={identity.title}
-                              >
-                                {identity.title}
-                              </Link>
-                              <p
-                                className="mt-1 truncate text-xs text-muted-foreground"
-                                title={identity.subtitle}
-                              >
-                                {identity.subtitle}
-                              </p>
-                            </td>
-                            <td className="overflow-hidden px-4 py-3">
-                              <span className="block truncate" title={period}>
-                                {period}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                              <BacktestStatusCell job={job} />
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground">
-                              <BacktestResultCell job={job} />
-                            </td>
-                            <td className="px-2 py-3 text-right">
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                nativeButton={false}
-                                render={
-                                  <Link to={strategyCenterPath.job(job.id)} state={detailState}>
-                                    详情
-                                  </Link>
-                                }
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })
-                    : []),
-                ];
-              })}
-            </tbody>
-          </table>
-        </TableContainer>
-      )}
+                    </tr>,
+                    ...(open
+                      ? group.jobs.map((job) => {
+                          const identity = backtestIdentity(job, strategies, group);
+                          const period = backtestPeriodLabel(job);
+                          return (
+                            <tr key={job.id} className="border-b last:border-0 hover:bg-muted/20">
+                              <td className="overflow-hidden py-3 pr-4 pl-10">
+                                <Link
+                                  className="block truncate font-medium text-foreground hover:text-primary/80"
+                                  to={strategyCenterPath.job(job.id)}
+                                  state={detailState}
+                                  title={identity.title}
+                                >
+                                  {identity.title}
+                                </Link>
+                                <p
+                                  className="mt-1 truncate text-xs text-muted-foreground"
+                                  title={identity.subtitle}
+                                >
+                                  {identity.subtitle}
+                                </p>
+                              </td>
+                              <td className="overflow-hidden px-4 py-3">
+                                <span className="block truncate" title={period}>
+                                  {period}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <BacktestStatusCell job={job} />
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                <BacktestResultCell job={job} />
+                              </td>
+                              <td className="px-2 py-3 text-right">
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  nativeButton={false}
+                                  render={
+                                    <Link to={strategyCenterPath.job(job.id)} state={detailState}>
+                                      详情
+                                    </Link>
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })
+                      : []),
+                  ];
+                })}
+              </tbody>
+            </table>
+          </TableContainer>
+        )}
+      </ListRefreshRegion>
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
           {groups.data ? (

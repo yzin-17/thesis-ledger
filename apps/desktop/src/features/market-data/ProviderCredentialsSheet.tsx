@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -254,7 +255,8 @@ export function ProviderCredentialsSheet({
             <Alert>
               <AlertTitle>配置已保存，数据源状态暂未更新</AlertTitle>
               <AlertDescription>已确认的配置无需再次提交。重新读取只更新页面状态，不测试连接。</AlertDescription>
-              <Button variant="outline" disabled={registry.isFetching} onClick={() => void registry.refetch()}>
+              <Button aria-busy={registry.isFetching} variant="outline" disabled={registry.isFetching} onClick={() => void registry.refetch()}>
+                {registry.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
                 重新读取数据源状态
               </Button>
             </Alert>

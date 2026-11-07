@@ -1,3 +1,4 @@
+import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
 import type { BacktestExecutionModelV3 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -11,8 +12,7 @@ type NavModelSegment = Extract<
   { execution: { mode: 'nav' } }
 >;
 type NavModelFee =
-  | NavModelSegment['execution']['subscriptionFee']
-  | NavModelSegment['execution']['redemptionFee'];
+  NavModelSegment['execution']['subscriptionFee'] | NavModelSegment['execution']['redemptionFee'];
 
 export function NavBacktestModel({
   text,
@@ -145,9 +145,8 @@ function navFeeDescription(fee: NavModelFee) {
 }
 
 function feeRateLabel(rate: string) {
-  const value = Number(rate);
-  if (!Number.isFinite(value)) return rate;
-  return `${(value * 100).toLocaleString('zh-CN', { maximumFractionDigits: 6 })}%`;
+  const formatted = formatDecimalRatioPercent(rate, 6);
+  return formatted === '—' ? rate : formatted;
 }
 
 function navModelCompatibilityError(

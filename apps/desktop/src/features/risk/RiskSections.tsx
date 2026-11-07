@@ -1,4 +1,6 @@
+import { LoadingState } from '@/components/ui/spinner';
 import { TableContainer } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import { useState, type ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +60,7 @@ export function NotificationProviderNotice({
   if (mode === 'shadow' || routingState === 'loading' || availability === 'available') return null;
   if (availability === 'unknown') {
     return (
-      <Alert className="mb-[var(--space-group)]">
+      <Alert className="mb-group">
         <CircleAlert aria-hidden="true" />
         <AlertTitle>通知提供方状态暂不可用</AlertTitle>
         <AlertDescription>风险规则仍可执行，但暂时无法确认通知投递能力。</AlertDescription>
@@ -66,7 +68,7 @@ export function NotificationProviderNotice({
     );
   }
   return (
-    <Alert className="mb-[var(--space-group)]">
+    <Alert className="mb-group">
       <BellOff aria-hidden="true" />
       <AlertTitle>尚未配置可用的通知提供方</AlertTitle>
       <AlertDescription className="flex flex-col items-start gap-2">
@@ -87,15 +89,17 @@ const riskReadEmptyLabel = (state: LoadState, subject: string) => {
 };
 
 export function RiskEventTable({
+  refreshing = false,
   loadState,
   events,
   severityFilter,
   limit,
-  title = '风险事件',
+  title,
   description,
   headerAction,
   onRetry,
 }: {
+  refreshing?: boolean;
   loadState: LoadState;
   events: RiskEventRecord[];
   severityFilter?: string | null;
@@ -112,17 +116,17 @@ export function RiskEventTable({
 
   return (
     <section className="panel mt-0 border-t-0">
-      <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
+      <div className={cn('flex flex-wrap items-start justify-between gap-3', title ? 'panel-heading' : 'mb-group')}>
         <div>
-          <h2>{title}</h2>
-          <p>{description ?? eventTableDescription(severityFilter)}</p>
+          {title && <h2>{title}</h2>}
+          <p className="text-sm text-muted-foreground">{description ?? eventTableDescription(severityFilter)}</p>
         </div>
         {headerAction}
       </div>
       {(loadState === 'error' || loadState === 'stale') && (
         <DataStateBanner state={loadState} {...(onRetry ? { onRetry } : {})} />
       )}
-      <TableContainer>
+      <TableContainer refreshing={refreshing} refreshLabel="正在刷新风险事件">
         <table>
           <thead>
             <tr>
@@ -135,7 +139,7 @@ export function RiskEventTable({
           </thead>
           <tbody>
             {empty ? (
-              <EmptyTableRow colSpan={5} label={riskReadEmptyLabel(loadState, '风险事件')} />
+              <EmptyTableRow colSpan={5} loading={loadState === 'loading'} label={riskReadEmptyLabel(loadState, '风险事件')} />
             ) : (
               <RiskEventRows events={visibleEvents} limit={limit} />
             )}
@@ -185,6 +189,7 @@ export function RiskEventRows({
 }
 
 export function RiskNotificationTable({
+  refreshing = false,
   loadState,
   deliveries,
   statusFilter,
@@ -192,6 +197,7 @@ export function RiskNotificationTable({
   routingState,
   onRetry,
 }: {
+  refreshing?: boolean;
   loadState: LoadState;
   deliveries: NotificationRecord[];
   statusFilter?: string | null;
@@ -213,18 +219,15 @@ export function RiskNotificationTable({
 
   return (
     <section className="panel mt-0 border-t-0">
-      <div className="panel-heading">
-        <h2>通知状态</h2>
-        <p>
-          {statusFilter
-            ? `当前筛选：${riskStatusLabel(statusFilter)}。`
-            : `${routingDescription} 通知失败不会回滚已写入的风险事件。`}
-        </p>
-      </div>
+      <p className="mb-group text-sm text-muted-foreground">
+        {statusFilter
+          ? `当前筛选：${riskStatusLabel(statusFilter)}。`
+          : `${routingDescription} 通知失败不会回滚已写入的风险事件。`}
+      </p>
       {(loadState === 'error' || loadState === 'stale') && (
         <DataStateBanner state={loadState} {...(onRetry ? { onRetry } : {})} />
       )}
-      <TableContainer>
+      <TableContainer refreshing={refreshing} refreshLabel="正在刷新通知记录">
         <table>
           <thead>
             <tr>
@@ -237,7 +240,7 @@ export function RiskNotificationTable({
           </thead>
           <tbody>
             {empty ? (
-              <EmptyTableRow colSpan={5} label={riskReadEmptyLabel(loadState, '通知记录')} />
+              <EmptyTableRow colSpan={5} loading={loadState === 'loading'} label={riskReadEmptyLabel(loadState, '通知记录')} />
             ) : (
               visibleDeliveries.map((delivery) => (
                 <tr key={delivery.id}>
@@ -305,7 +308,7 @@ export function RiskAuditDialog({
     ? `${riskRuleKindLabel(rule.kind)} · ${ruleTargetLabel(rule, accountName, rule.assetName)}`
     : '查看规则版本与操作时间。';
   let content: ReactNode = <EmptyListState />;
-  if (pending) content = <p role="status">正在读取审计记录…</p>;
+  if (pending) content = <LoadingState label="正在读取审计记录" />;
   else if (error)
     content = (
       <Alert variant="destructive">

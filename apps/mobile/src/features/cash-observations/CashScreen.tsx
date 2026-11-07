@@ -4,7 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AccountStackParams } from '../../app/navigation-types';
 import { useAccounts, useLedger, useValuation } from '../../app/query/mobile-queries';
 import { canUseReadForWrite } from '../../app/query/query-state';
-import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
+import { Action, Copy, Page, QueryList, QueryStatus, Section } from '../../components/MobilePrimitives';
 import { CashEventView } from './CashEventView';
 
 export function CashScreen() {
@@ -60,14 +60,20 @@ export function CashScreen() {
       />
       <Copy muted>现金流与计划按现行规则仅支持相应类型的实际账户。</Copy>
       <Action label="划转与更正" onPress={() => navigation.navigate('Transfers', params)} />
-      <QueryStatus query={ledger} empty={events.length === 0} retry={() => void ledger.refetch()} />
-      {events
-        .slice()
-        .reverse()
-        .slice(0, limit)
-        .map((event) => (
-          <CashEventView key={event.eventId} event={event} />
-        ))}
+      <QueryList
+        query={ledger}
+        empty={events.length === 0}
+        retry={() => void ledger.refetch()}
+        label="正在刷新现金流水"
+      >
+        {events
+          .slice()
+          .reverse()
+          .slice(0, limit)
+          .map((event) => (
+            <CashEventView key={event.eventId} event={event} />
+          ))}
+      </QueryList>
       {events.length > limit ? (
         <Action label="更多现金流水" onPress={() => setLimit((value) => value + 30)} />
       ) : null}

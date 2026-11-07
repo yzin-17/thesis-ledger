@@ -1,5 +1,5 @@
 import { TableContainer } from '@/components/ui/table';
-import { valuationPositionLabel } from '@thesis-ledger/domain';
+import { formatRatioPercent as formatPercent, valuationPositionLabel } from '@thesis-ledger/domain';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -26,8 +26,6 @@ const formatSignedMoney = (value: number, currency: Account['currency'] = 'CNY')
   const formatted = formatMoney(value, currency);
   return value > 0 ? `+${formatted}` : formatted;
 };
-
-const formatPercent = (value: number) => `${(value * 100).toFixed(2)}%`;
 
 const formatSignedPercent = (value: number) => {
   const formatted = formatPercent(Math.abs(value));
@@ -192,7 +190,7 @@ export function PortfolioSummary({ portfolio }: { portfolio: Portfolio }) {
   const realizedPnl = portfolio.realizedPnl ?? null;
   const realizedTone = tone(realizedPnl);
   return (
-    <section className="grid grid-cols-2 gap-x-6 gap-y-4 xl:grid-cols-4" aria-label="组合关键指标">
+    <section className="grid grid-cols-2 gap-x-6 gap-y-2 lg:grid-cols-4" aria-label="组合关键指标">
       <Metric
         label="总资产"
         value={formatMoney(portfolio.totalMarketValue, currency)}
@@ -225,10 +223,12 @@ export function PortfolioSummary({ portfolio }: { portfolio: Portfolio }) {
 }
 
 export function PortfolioPositionTable({
+  refreshing = false,
   portfolio,
   accounts,
   onSelectPosition,
 }: {
+  refreshing?: boolean;
   portfolio: Portfolio;
   accounts: Account[];
   onSelectPosition?: (position: Position) => void;
@@ -253,12 +253,12 @@ export function PortfolioPositionTable({
           </p>
         </div>
       </div>
-      <TableContainer>
+      <TableContainer refreshing={refreshing} refreshLabel="正在刷新当前持仓">
         <table>
           <thead>
             <tr>
               <th>标的</th>
-              <th className="text-left">账户</th>
+              <th className="min-w-32 text-left">账户</th>
               <th className="text-right">持有</th>
               <th className="text-right">现价</th>
               <SortablePositionHeader
@@ -283,7 +283,9 @@ export function PortfolioPositionTable({
                 onSort={handleSort}
               />
               <th>状态</th>
-              {onSelectPosition && <StickyTableActionHeader>操作</StickyTableActionHeader>}
+              {onSelectPosition && (
+                <StickyTableActionHeader className="w-28 min-w-28">操作</StickyTableActionHeader>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -299,7 +301,7 @@ export function PortfolioPositionTable({
                       <strong>{position.asset.name}</strong>
                       <span>{position.symbol}</span>
                     </td>
-                    <td className="text-left whitespace-normal break-words">
+                    <td className="min-w-32 text-left whitespace-normal break-words">
                       {accountsById.get(position.accountId) ??
                         `账户信息不可用（${position.accountId}）`}
                     </td>
@@ -349,7 +351,7 @@ export function PortfolioPositionTable({
                       </Badge>
                     </td>
                     {onSelectPosition && (
-                      <StickyTableActionCell>
+                      <StickyTableActionCell className="w-28 min-w-28">
                         <Button
                           className="text-button"
                           size="sm"

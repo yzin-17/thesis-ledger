@@ -1,5 +1,5 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LoadingState } from '@/components/ui/spinner';
 import type { StrategyVersion } from '../strategy/strategy.types.js';
 import { useAuthoringSource } from './use-authoring-source.js';
 
@@ -12,7 +12,7 @@ export function AuthoringRunIntents({
 }) {
   const source = useAuthoringSource(version, enabled);
   if (!enabled || version?.source?.kind !== 'ai_assisted') return null;
-  if (source.isLoading) return <Skeleton className="h-16" aria-label="读取编写时的回测意图" />;
+  if (source.isLoading) return <LoadingState label="读取编写时的回测意图" />;
   if (source.error)
     return (
       <Alert variant="destructive">
