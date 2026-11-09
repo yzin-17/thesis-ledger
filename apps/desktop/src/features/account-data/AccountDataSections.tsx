@@ -1,10 +1,11 @@
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import type { LedgerEvent } from '@thesis-ledger/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { Field, FieldLabel } from '@/components/ui/field';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +14,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LoadingState } from '@/components/ui/spinner';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { MoreHorizontalIcon } from 'lucide-react';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 
@@ -101,21 +109,40 @@ export function TransactionSection({
   const emptyTitle = filter === 'executions' ? '暂无成交记录' : '暂无其他账本事件';
   return (
     <section className="flex flex-col gap-4" aria-label="成交记录">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <ToggleGroup
-          value={[filter]}
-          aria-label="账本事件筛选"
-          onValueChange={(value) => {
-            const next = value[0] as AccountDataEventFilter | undefined;
-            if (next) onFilterChange(next);
-          }}
-        >
-          {transactionFilters.map((option) => (
-            <ToggleGroupItem key={option.value} value={option.value}>
-              {option.label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Field className="w-fit flex-row items-center gap-2">
+          <FieldLabel
+            id="account-transaction-filter-label"
+            htmlFor="account-transaction-filter"
+            className="text-muted-foreground"
+          >
+            事件类型
+          </FieldLabel>
+          <Select
+            items={transactionFilters}
+            value={filter}
+            onValueChange={(next) => {
+              if (next !== null) onFilterChange(next);
+            }}
+          >
+            <SelectTrigger
+              id="account-transaction-filter"
+              aria-labelledby="account-transaction-filter-label"
+              className="min-w-32"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {transactionFilters.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button type="button" onClick={onCreate} disabled={account.type === 'cash'}>
             录入成交
@@ -254,20 +281,20 @@ function TransactionResults({
           <col className="w-[10%]" />
           <col className="w-[15%]" />
         </colgroup>
-        <thead className="border-b text-xs text-muted-foreground">
+        <TableHeader className="border-b">
           <tr>
-            <th className="px-3 py-3 font-medium">标的 / 成交内容</th>
-            <th className="px-3 py-3 font-medium">发生时间</th>
-            <th className="px-3 py-3 font-medium text-right">
+            <TableHead>标的 / 成交内容</TableHead>
+            <TableHead>发生时间</TableHead>
+            <TableHead className="text-right">
               {filter === 'executions' ? '成交金额' : '金额 / 数量'}
-            </th>
-            <th className="px-3 py-3 font-medium">来源</th>
-            <th className="px-3 py-3 font-medium">状态</th>
-            <StickyTableActionHeader className="w-auto min-w-0 px-3 py-3 font-medium">
+            </TableHead>
+            <TableHead>来源</TableHead>
+            <TableHead>状态</TableHead>
+            <StickyTableActionHeader className="w-auto min-w-0">
               操作
             </StickyTableActionHeader>
           </tr>
-        </thead>
+        </TableHeader>
         <tbody className="divide-y">
           {filteredEvents.map((event) => (
             <TransactionRow

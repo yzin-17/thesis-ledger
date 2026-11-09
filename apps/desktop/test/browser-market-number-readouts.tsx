@@ -17,6 +17,7 @@ const values = marketNumberSample(scenario),
 const client = new QueryClient({
   defaultOptions: { queries: { enabled: false, retry: false, staleTime: Infinity } },
 });
+client.setQueryData(['desktop', window.location.origin, 'local-workspace', 'arena-overlay', 'list'], []);
 client.setQueryData(['market', 'fund-valuation', values.symbol], values.valuation);
 client.setQueryData(
   ['market', 'fund-valuation-today', values.symbol, values.day],

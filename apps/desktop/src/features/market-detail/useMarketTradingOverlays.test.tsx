@@ -182,6 +182,11 @@ describe('交易叠加的账户隔离与交互', () => {
     await click('2026-11-04');
     expect(host.querySelector('[aria-label="价格区间测量结果"]')?.textContent).toContain('20%');
     expect(model().measurement).toMatchObject({ bars: 3, difference: 2 });
+    expect([...host.querySelectorAll('button')].find((button) => button.textContent === '区间测量')?.getAttribute('aria-pressed')).toBe('true');
+    expect(host.textContent).not.toContain('请选择区间');
+    await click('区间测量');
+    expect(model().measurement).toBeUndefined();
+    expect(host.textContent).not.toContain('请选择区间');
     await click('区间测量');
     await click('2026-11-03');
     const parent = vi.fn();
@@ -191,6 +196,13 @@ describe('交易叠加的账户隔离与交互', () => {
     );
     expect(model().measurement).toBeUndefined();
     expect(parent).not.toHaveBeenCalled();
+    expect(host.textContent).not.toContain('请选择区间');
+    await click('区间测量');
+    await click('2026-11-02');
+    await click('2026-11-04');
+    await interact(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(model().measurement).toBeUndefined();
+    expect(host.textContent).not.toContain('请选择区间');
     window.removeEventListener('keydown', parent);
   });
   it('复权行情禁用交易和成本，仍可测量，身份切换后不保留参考', async () => {

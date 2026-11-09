@@ -1,6 +1,7 @@
-import { quoteCadence, type CadenceCatalog } from './watchlist-source-cadence.js';
+import type { CadenceCatalog } from './watchlist-source-cadence.js';
 import { WatchlistTrend } from './WatchlistTrend.js';
 import { WatchlistRange } from './WatchlistRange.js';
+import { WatchlistSource } from './WatchlistSource.js';
 import { Bookmark, Pin } from 'lucide-react';
 import type {
   WatchlistChange,
@@ -9,6 +10,8 @@ import type {
   WatchlistPrice,
 } from '@thesis-ledger/schemas';
 import { watchlistPriceDisplay } from '@thesis-ledger/domain';
+import { cn } from '@/lib/utils';
+import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { LoadingState } from '@/components/ui/spinner';
@@ -33,7 +36,7 @@ export function WatchlistTable({
   select,
   change,
   catalog,
-  period = '1m',
+  period = '1d',
   queryRoot = ['desktop', 'watchlist'],
 }: {
   catalog?: CadenceCatalog;
@@ -72,22 +75,21 @@ export function WatchlistTable({
   }
   return (
     <Table
-      className="table-fixed min-w-[64rem] max-sm:min-w-0 max-sm:table-auto"
+      className="table-fixed min-w-[56rem] max-sm:min-w-0 max-sm:table-auto"
       containerClassName="min-h-36"
       aria-label="自选标的"
       refreshing={refreshing}
       refreshAvoidText
       refreshLabel="正在刷新自选"
     >
-      <TableHeader className="bg-muted/60 max-sm:sr-only">
+      <TableHeader className="max-sm:sr-only">
         <TableRow>
           <TableHead className="w-44">标的</TableHead>
-          <TableHead className="w-28 text-right">价格 / 净值</TableHead>
+          <TableHead className="w-44 text-right">价格 / 净值</TableHead>
           <TableHead className="w-28 text-right">涨跌幅 / 涨跌额</TableHead>
           <TableHead className="w-44">走势</TableHead>
-          <TableHead className="w-40">日内区间</TableHead>
-          <TableHead className="w-52">行情与来源时间</TableHead>
-          <StickyTableActionHeader className="w-14 min-w-14 px-3 text-xs font-medium">
+          <TableHead className="w-44">日内分时</TableHead>
+          <StickyTableActionHeader className="w-14 min-w-14">
             操作
           </StickyTableActionHeader>
         </TableRow>
@@ -95,8 +97,12 @@ export function WatchlistTable({
       <TableBody>
         {page.items.map((item) => {
           const snap = prices?.find((p) => p.itemId === item.id);
-          const cadence = quoteCadence(item, snap, catalog);
           const value = watchlistPriceDisplay(snap?.price, snap?.quoteContext);
+          const quote = snap?.price.kind === 'quote' ? snap.price.quote : undefined;
+          const tone =
+            quote && quote.previousClose > 0
+              ? marketToneForValue(quote.price - quote.previousClose)
+              : undefined;
           return (
             <TableRow
               key={item.id}
@@ -122,16 +128,27 @@ export function WatchlistTable({
                   </span>
                 )}
               </TableCell>
-              <TableCell className="text-right whitespace-normal font-medium text-foreground tabular-nums max-sm:col-start-2 max-sm:row-start-1">
+              <TableCell className="text-right whitespace-normal font-medium text-foreground tabular-nums max-sm:col-span-3 max-sm:col-start-1 max-sm:row-start-2 max-sm:text-left">
                 <span className="mr-1 inline text-xs font-normal text-muted-foreground sm:hidden">
                   {item.instrument.instrumentType === 'MUTUAL_FUND' ? '净值' : '价格'}
                 </span>
                 {value.value}
+                <WatchlistSource
+                  item={item}
+                  snap={snap}
+                  catalog={catalog}
+                  className="mt-2 items-end font-normal max-sm:items-start"
+                />
               </TableCell>
-              <TableCell className="text-right tabular-nums max-sm:col-start-2 max-sm:row-start-2 max-sm:text-xs">
+              <TableCell
+                className={cn(
+                  'text-right tabular-nums max-sm:col-start-2 max-sm:row-start-1 max-sm:text-xs',
+                  marketToneClass(tone),
+                )}
+              >
                 <span className="mr-1 inline text-muted-foreground sm:hidden">涨跌幅</span>
                 {value.change}
-                <span className="block text-xs text-muted-foreground">{value.changeAmount}</span>
+                <span className="block text-xs text-inherit">{value.changeAmount}</span>
               </TableCell>
               <TableCell className="whitespace-normal max-sm:col-span-3 max-sm:row-start-3">
                 <WatchlistTrend
@@ -144,27 +161,21 @@ export function WatchlistTable({
                 />
               </TableCell>
               <TableCell className="whitespace-normal max-sm:col-span-3 max-sm:row-start-4">
-                <WatchlistRange snap={snap} />
+                <div className="flex min-w-0 flex-col gap-1">
+                  {item.instrument.instrumentType !== 'MUTUAL_FUND' && (
+                    <WatchlistTrend
+                      item={item}
+                      snap={snap}
+                      period="1m"
+                      queryRoot={queryRoot}
+                      catalog={catalog}
+                      select={() => select(item)}
+                    />
+                  )}
+                  <WatchlistRange snap={snap} />
+                </div>
               </TableCell>
-              <TableCell className="text-xs text-muted-foreground whitespace-normal max-sm:col-span-3 max-sm:row-start-5">
-                {value.status && (
-                  <span className="block max-sm:mr-1 max-sm:inline">{value.status}</span>
-                )}
-                <span className="block text-foreground">{value.source}</span>
-                <span className="block">
-                  {snap?.price.kind === 'nav' ? '净值日期' : '行情'} {value.time || '时间未知'}
-                </span>
-                {value.fetched && <span className="block">读取 {value.fetched}</span>}
-                {snap?.minRefreshSeconds && snap.minRefreshSeconds > 60 && (
-                  <span className="block">报价请求间隔至少 {snap.minRefreshSeconds / 60} 分钟</span>
-                )}
-                <span className="block">
-                  {cadence ? `检查基准：来源${cadence.label}` : '来源周期待确认，自动报价检查暂停'}
-                </span>
-                {value.refresh && <span className="block">{value.refresh}</span>}
-                {value.quality && <span className="block">{value.quality}</span>}
-              </TableCell>
-              <StickyTableActionCell className="w-14 min-w-14 px-2 max-sm:static max-sm:col-start-3 max-sm:row-span-2 max-sm:row-start-1 max-sm:w-auto max-sm:min-w-0 max-sm:bg-transparent max-sm:before:hidden">
+              <StickyTableActionCell className="w-14 min-w-14 px-2 max-sm:static max-sm:col-start-3 max-sm:row-start-1 max-sm:w-auto max-sm:min-w-0 max-sm:bg-transparent max-sm:before:hidden">
                 <WatchlistMenu item={item} page={page} busy={busy} change={change} />
               </StickyTableActionCell>
             </TableRow>

@@ -3,6 +3,7 @@ import {
   fetchRiskAudit,
   fetchRiskEvents,
   fetchNotificationRouting,
+  fetchRiskNotificationRouting,
   fetchRiskNotifications,
   fetchRiskRules,
 } from './risk.api.js';
@@ -15,6 +16,7 @@ export const riskKeys = {
   events: (mode: PortfolioMode) => [...riskKeys.root, 'events', mode] as const,
   notifications: () => [...riskKeys.root, 'notifications'] as const,
   notificationRouting: () => [...riskKeys.root, 'notification-routing'] as const,
+  riskNotificationRouting: () => [...riskKeys.root, 'risk-notification-routing'] as const,
   audit: (ruleId: string) => [...riskKeys.root, 'audit', ruleId] as const,
 };
 
@@ -52,3 +54,8 @@ export const useNotificationRoutingQuery = () =>
   });
 
 export const useRiskAuditQuery = (ruleId: string | null) => useQuery(riskAuditQueryOptions(ruleId));
+
+export const useRiskNotificationRoutingQuery = () => useQuery({
+  queryKey: riskKeys.riskNotificationRouting(),
+  queryFn: () => fetchRiskNotificationRouting(),
+});

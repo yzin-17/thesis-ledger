@@ -15,6 +15,7 @@ const reasonLabels: Record<FundValuation['reasons'][number], string> = {
   prices_unavailable: '报价不可用', source_unavailable: '来源不可用',
   low_coverage: '低覆盖', partial_coverage: '部分覆盖',
   currency_unverified: '币种待确认', currency_unsupported: '币种暂不支持',
+  calendar_unavailable: '交易日历不可用',
 };
 
 export function FundCurrentValuation({ symbol }: { symbol: string }) {
@@ -30,13 +31,14 @@ export function FundCurrentValuation({ symbol }: { symbol: string }) {
   let status = '估算';
   if (query.isPending) status = '读取中';
   else if (query.isError) status = '读取失败';
+  else if (value?.marketState === 'unknown') status = '交易时段未知';
   else if (value?.marketState === 'closed') {
     status = '已休市';
     if (value.quality === 'low_coverage') status += ' · 低覆盖';
     else if (value.quality === 'partial') status += ' · 部分覆盖';
   }
   else if (value?.reasons[0]) status = reasonLabels[value.reasons[0]];
-  const showRetry = query.isError || value?.quality === 'unavailable' && value.marketState === 'open';
+  const showRetry = query.isError || value?.quality === 'unavailable' && value.marketState !== 'closed';
   const change = value?.changePercent;
   const tone = marketToneForValue(change ?? null);
 

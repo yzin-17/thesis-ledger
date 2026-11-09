@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS,
-  isQuoteWithinUpstreamRefreshWindow,
   isRetryableMarketDetailSection,
-  marketDetailStatusClass,
+  marketDetailStatusVariant,
   marketDetailStatusLabel,
   mergeMarketDetail,
-  quoteServedAgeMs,
   getVisibleMarketDetail,
 } from './market-detail.types.js';
-import type { BarSeries, Quote } from '@thesis-ledger/schemas';
+import type { BarSeries } from '@thesis-ledger/schemas';
 import type { MarketDetailResponse } from '@thesis-ledger/api-client';
 
 const detail = (symbol: string): MarketDetailResponse => ({
@@ -88,32 +85,15 @@ describe('MarketDetail V2 类型辅助函数', () => {
     expect(isRetryableMarketDetailSection({ status: 'unavailable' } as never)).toBe(true);
     expect(isRetryableMarketDetailSection({ status: 'unsupported' } as never)).toBe(false);
     expect(marketDetailStatusLabel('empty')).toBe('暂无数据');
-    expect(marketDetailStatusClass('stale')).toBe('tag warning');
+    expect(marketDetailStatusVariant('stale')).toBe('outline');
+    expect(marketDetailStatusVariant('unavailable')).toBe('destructive');
   });
 
-  it('按取回时间判断行情是否仍在上游刷新间隔内', () => {
-    const now = Date.parse('2026-08-21T00:10:00.000Z');
-    const quote = (fetchedAt: string): Quote => ({
-      version: 3,
-      symbol: '600519.SH',
-      open: 100,
-      high: 110,
-      low: 90,
-      price: 105,
-      previousClose: 100,
-      volume: 100,
-      amount: 10_500,
-      stale: true,
-      provider: 'fixture',
-      marketTime: '2026-08-20T07:00:00.000Z',
-      fetchedAt,
-      freshness: 'stale',
-    });
-    expect(MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS).toBe(600);
-    expect(quoteServedAgeMs(quote('2026-08-21T00:05:00.000Z'), now)).toBe(5 * 60_000);
-    expect(isQuoteWithinUpstreamRefreshWindow(quote('2026-08-21T00:05:00.000Z'), now)).toBe(true);
-    // 间隔边界外视为真正过期，仍要给用户陈旧告警。
-    expect(isQuoteWithinUpstreamRefreshWindow(quote('2026-08-20T23:55:00.000Z'), now)).toBe(false);
-    expect(isQuoteWithinUpstreamRefreshWindow(undefined, now)).toBe(false);
+  it.each(['capability_not_enabled', 'capability_unsupported', 'market_data_unauthorized', 'market_data_contract_invalid'])('配置或契约问题 %s 不提供重试', code => {
+    expect(isRetryableMarketDetailSection({ status: 'unavailable', error: { code } } as never)).toBe(false);
   });
+  it.each(['market_data_timeout', 'market_data_unavailable', 'provider_policy_unavailable', 'daily_bar_unavailable'])('临时失败 %s 保留重试', code => {
+    expect(isRetryableMarketDetailSection({ status: 'unavailable', error: { code } } as never)).toBe(true);
+  });
+
 });

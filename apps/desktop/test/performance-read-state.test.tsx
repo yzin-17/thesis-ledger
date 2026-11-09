@@ -28,7 +28,7 @@ const trendView = (
         onRetry={vi.fn()}
         onCompleteDataSetup={vi.fn()}
       />
-    </ConfirmDialogProvider>,
+    </ConfirmDialogProvider>
 );
 
 const render = (...args: Parameters<typeof trendView>) => renderToStaticMarkup(trendView(...args));

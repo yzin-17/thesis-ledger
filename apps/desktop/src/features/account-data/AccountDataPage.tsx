@@ -631,7 +631,6 @@ function AccountDataPageContent({
       >
         <SheetContent
           side="right"
-          aria-describedby="account-manager-description"
           size="form"
           className="h-[100dvh] min-h-0 overflow-hidden p-6"
         >

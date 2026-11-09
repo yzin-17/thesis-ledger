@@ -195,71 +195,77 @@ export function RiskRuleWorkbench({
           </Button>
         </div>
 
-        {empty ? (
-          <ListRefreshRegion refreshing={refreshing} label="正在刷新风险规则" className="lg:grid lg:grow">
-          <Empty className="min-h-40 rounded-md border border-dashed p-8">
-            <EmptyTitle>还没有风险规则</EmptyTitle>
-            <EmptyDescription>创建第一条规则后，它会在这里集中管理。</EmptyDescription>
-            <Button type="button" disabled={!canCreate} onClick={openCreate}>
-              创建第一条规则
-            </Button>
-          </Empty>
-          </ListRefreshRegion>
-        ) : (
-          <div className={cn('grid grid-cols-1 gap-4', visibleRules.length > 0 && 'lg:grow lg:grid-cols-[minmax(200px,280px)_minmax(0,1fr)]')}>
-            <aside
-              className="flex flex-col gap-2 rounded-md border border-border bg-card p-2"
-              aria-label="风险规则列表"
-            >
-              <div className="flex items-center justify-between gap-2 px-2 py-1">
-                <span className="text-xs font-medium text-muted-foreground">全部规则</span>
-                <Badge variant="outline">{activeRules.length}</Badge>
-              </div>
-              <ListRefreshRegion refreshing={refreshing} label="正在刷新风险规则" className="flex grow flex-col gap-2">
-                {activeRules.length === 0 && archivedRules.length > 0 && (
-                  <p className="px-2 py-1 text-xs text-muted-foreground">
-                    当前没有活跃规则，仅剩已归档规则。
-                  </p>
-                )}
-                {activeRules.map((rule) => renderRuleItem(rule))}
-                {archivedRules.length > 0 && (
-                  <div className="mt-auto flex flex-col gap-2 border-t border-border pt-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-8 w-full justify-between px-2 py-1 text-xs text-muted-foreground"
-                      aria-expanded={showArchived}
-                      onClick={() => setShowArchived((current) => !current)}
-                    >
-                      {showArchived ? '隐藏已归档' : '显示已归档'}
-                      <Badge variant="outline">{archivedRules.length}</Badge>
-                    </Button>
-                    {showArchived && archivedRules.map((rule) => renderRuleItem(rule, true))}
-                  </div>
-                )}
-              </ListRefreshRegion>
-            </aside>
+        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grow lg:grid-cols-[minmax(200px,280px)_minmax(0,1fr)]">
+          <aside
+            className="flex flex-col gap-2 rounded-md border border-border bg-card p-2"
+            aria-label="风险规则列表"
+          >
+            <div className="flex items-center justify-between gap-2 px-2 py-1">
+              <span className="text-xs font-medium text-muted-foreground">全部规则</span>
+              <Badge variant="outline">{activeRules.length}</Badge>
+            </div>
+            <ListRefreshRegion refreshing={refreshing} label="正在刷新风险规则" className="flex grow flex-col gap-2">
+              {empty && (
+                <Empty className="min-h-40 p-2">
+                  <EmptyTitle>还没有风险规则</EmptyTitle>
+                  <EmptyDescription>创建第一条规则后，它会在这里集中管理。</EmptyDescription>
+                  <Button type="button" disabled={!canCreate} onClick={openCreate}>
+                    创建第一条规则
+                  </Button>
+                </Empty>
+              )}
+              {activeRules.length === 0 && archivedRules.length > 0 && (
+                <p className="px-2 py-1 text-xs text-muted-foreground">
+                  当前没有活跃规则，仅剩已归档规则。
+                </p>
+              )}
+              {activeRules.map((rule) => renderRuleItem(rule))}
+              {archivedRules.length > 0 && (
+                <div className="mt-auto flex flex-col gap-2 border-t border-border pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 w-full justify-between px-2 py-1 text-xs text-muted-foreground"
+                    aria-expanded={showArchived}
+                    onClick={() => setShowArchived((current) => !current)}
+                  >
+                    {showArchived ? '隐藏已归档' : '显示已归档'}
+                    <Badge variant="outline">{archivedRules.length}</Badge>
+                  </Button>
+                  {showArchived && archivedRules.map((rule) => renderRuleItem(rule, true))}
+                </div>
+              )}
+            </ListRefreshRegion>
+          </aside>
 
-            {selectedRule && (
-              <div className="min-w-0 rounded-md border border-border bg-card p-5">
-                <RuleDetail
-                  rule={selectedRule}
-                  {...(selectedAccountName ? { accountName: selectedAccountName } : {})}
-                  testResults={selectedTestRecord?.results ?? []}
-                  testTime={selectedTestRecord?.testedAt ?? null}
-                  busyAction={busyAction}
-                  readOnly={readOnly}
-                  onEdit={openEdit}
-                  onToggle={() => void onToggle(selectedRule)}
-                  onArchive={() => setArchiveRule(selectedRule)}
-                  onRestore={() => void onRestore(selectedRule)}
-                  onTest={() => void runTest()}
-                  onAudit={() => onAudit(selectedRule)}
-                />
-              </div>
+          <div
+            role="region"
+            aria-label="风险规则详情"
+            className="min-w-0 rounded-md border border-border bg-card p-5"
+          >
+            {selectedRule ? (
+              <RuleDetail
+                rule={selectedRule}
+                {...(selectedAccountName ? { accountName: selectedAccountName } : {})}
+                testResults={selectedTestRecord?.results ?? []}
+                testTime={selectedTestRecord?.testedAt ?? null}
+                busyAction={busyAction}
+                readOnly={readOnly}
+                onEdit={openEdit}
+                onToggle={() => void onToggle(selectedRule)}
+                onArchive={() => setArchiveRule(selectedRule)}
+                onRestore={() => void onRestore(selectedRule)}
+                onTest={() => void runTest()}
+                onAudit={() => onAudit(selectedRule)}
+              />
+            ) : (
+              <Empty className="h-full min-h-40 p-0">
+                <EmptyTitle>未选择规则</EmptyTitle>
+                <EmptyDescription>选择一条规则，查看详情并进行管理。</EmptyDescription>
+              </Empty>
             )}
           </div>
-        )}
+        </div>
       </section>
 
       <RiskRuleEditorSheet

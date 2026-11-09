@@ -55,7 +55,13 @@ export function WatchlistAddDialog({
           value={text}
           onChange={setText}
           disabled={busy}
-          accepts={(item) => watchlistInstrumentSchema.safeParse(item).success}
+          accepts={(item) => watchlistInstrumentSchema.safeParse({
+            id: item.id,
+            canonicalCode: item.canonicalCode,
+            market: item.market,
+            instrumentType: item.instrumentType,
+            active: item.active,
+          }).success}
           onSelect={(item) => add(item.id, () => setOpen(false))}
         />
         {error ? <p role="alert" className="text-destructive">{requestFailureMessage(error)}</p> : null}

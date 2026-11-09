@@ -348,6 +348,7 @@ export function StrategyDashboard() {
           if (!open) setBacktestSelection(null);
         }}
         onSubmit={startBacktest}
+        onSubmitted={() => void navigate(strategyCenterPath.jobs)}
       />
     </StrategyCenterLayout>
   );

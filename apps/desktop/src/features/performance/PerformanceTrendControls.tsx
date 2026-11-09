@@ -1,10 +1,9 @@
 import { defaultIntervals, intervalsByRange } from './performance-series-selection.js';
-import { useId } from 'react';
+import { PerformanceTrendSelectItem } from './PerformanceTrendSelectItem.js';
 import {
   Select,
   SelectContent,
   SelectGroup,
-  SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -25,9 +24,17 @@ const rangeOptions: Array<{ value: PerformanceSeriesRange; label: string }> = [
   { value: '5Y', label: '近5年' },
   { value: 'ALL', label: '全部' },
 ];
-const intervalOptions: Array<{ value: PerformanceSeriesInterval; label: string }> = [
-  { value: '1min', label: '分线' },
-  { value: '1h', label: '时线' },
+const intervalOptions: Array<{
+  value: PerformanceSeriesInterval;
+  label: string;
+  description?: string;
+}> = [
+  { value: '1min', label: '分线', description: '支持 1日、5日。盘中数据来自已记录的估值采样。' },
+  {
+    value: '1h',
+    label: '时线',
+    description: '支持 1日、5日、近1月、近3月。盘中数据来自已记录的估值采样。',
+  },
   { value: '1d', label: '日线' },
   { value: '1w', label: '周线' },
   { value: '1mo', label: '月线' },
@@ -48,7 +55,6 @@ export function PerformanceTrendControls({
   onRangeChange: (range: PerformanceSeriesRange, interval: PerformanceSeriesInterval) => void;
   onIntervalChange: (interval: PerformanceSeriesInterval) => void;
 }) {
-  const hintId = useId();
   const available = intervalsByRange[range].filter(
     (value) =>
       (mode === 'actual' || !['1min', '1h'].includes(value)) &&
@@ -75,19 +81,23 @@ export function PerformanceTrendControls({
           <SelectContent>
             <SelectGroup>
               {rangeOptions.map((option) => (
-                <SelectItem
+                <PerformanceTrendSelectItem
                   key={option.value}
                   value={option.value}
+                  label={option.label}
                   disabled={mode === 'shadow' && option.value === '1D'}
-                >
-                  {option.label}
-                </SelectItem>
+                  description={
+                    mode === 'shadow' && option.value === '1D'
+                      ? '模拟账户仅支持日线及更长周期。'
+                      : undefined
+                  }
+                />
               ))}
             </SelectGroup>
           </SelectContent>
         </Select>
         <Select value={interval} onValueChange={(value) => value && onIntervalChange(value)}>
-          <SelectTrigger className="w-28" aria-label="走势粒度" aria-describedby={hintId}>
+          <SelectTrigger className="w-28" aria-label="走势粒度">
             <SelectValue>
               {intervalOptions.find((option) => option.value === interval)?.label ?? '粒度'}
             </SelectValue>
@@ -95,23 +105,22 @@ export function PerformanceTrendControls({
           <SelectContent>
             <SelectGroup>
               {intervalOptions.map((option) => (
-                <SelectItem
+                <PerformanceTrendSelectItem
                   key={option.value}
                   value={option.value}
+                  label={option.label}
                   disabled={!available.includes(option.value)}
-                >
-                  {option.label}
-                </SelectItem>
+                  description={
+                    mode === 'shadow' && option.description
+                      ? '模拟账户仅支持日线及更长周期。'
+                      : option.description
+                  }
+                />
               ))}
             </SelectGroup>
           </SelectContent>
         </Select>
       </div>
-      <p id={hintId} className="m-0 max-w-80 text-xs text-muted-foreground">
-        {mode === 'shadow'
-          ? '模拟账户仅支持日线及更长周期。'
-          : '分线支持 1日、5日；时线支持 1日、5日、近1月、近3月。盘中数据来自已记录的估值采样。'}
-      </p>
     </div>
   );
 }

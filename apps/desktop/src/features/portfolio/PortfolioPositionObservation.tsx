@@ -1,4 +1,4 @@
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -131,19 +131,19 @@ export function PositionObservationContent({
           <col className="w-[10%]" />
           <col className="w-[15%]" />
         </colgroup>
-        <thead className="border-b bg-muted text-xs text-muted-foreground">
+        <TableHeader className="border-b">
           <tr>
-            <th className="px-3 py-3 font-medium">标的</th>
-            <th className="px-3 py-3 text-right font-medium">持仓市值</th>
-            <th className="px-3 py-3 text-right font-medium">盈亏</th>
-            <th className="px-3 py-3 font-medium">记录类型</th>
-            <th className="px-3 py-3 font-medium">来源</th>
-            <th className="px-3 py-3 font-medium">快照状态</th>
-            <StickyTableActionHeader className="w-auto min-w-0 px-3 py-3 font-medium">
+            <TableHead>标的</TableHead>
+            <TableHead className="text-right">持仓市值</TableHead>
+            <TableHead className="text-right">盈亏</TableHead>
+            <TableHead>记录类型</TableHead>
+            <TableHead>来源</TableHead>
+            <TableHead>快照状态</TableHead>
+            <StickyTableActionHeader className="w-auto min-w-0">
               操作
             </StickyTableActionHeader>
           </tr>
-        </thead>
+        </TableHeader>
         <tbody className="divide-y">
           {positions.map((position) => (
             <tr key={position.id} className="align-middle">

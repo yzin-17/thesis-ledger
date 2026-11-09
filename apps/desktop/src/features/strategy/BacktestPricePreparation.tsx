@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatDateTime } from '@/lib/date-display';
 import {
   backtestRunPreparationRequestV3Schema,
+  positiveDecimalStringSchema,
   type BacktestExecutionModelV3,
   type BacktestRunPreparationRequestV3,
   type BacktestRunPreparationResultV3,
@@ -13,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { BacktestModelConfiguration } from './BacktestModelConfiguration.js';
+import { useBacktestExecutionModel } from './use-backtest-execution-model.js';
 import { useBacktestPreparation } from './strategy.preparation.js';
 import { BacktestPreflightDiagnostics } from './BacktestPreflightDiagnostics.js';
 import { BacktestLifecycleResearchChoice } from './BacktestLifecycleResearchChoice.js';
@@ -43,6 +44,8 @@ export function BacktestPricePreparation({
   onPrepared,
   initialModel,
   onDirtyChange, onSubmitted,
+  formId,
+  onReadyChange,
 }: {
   strategyVersionId: string;
   adjustment: 'none' | 'qfq' | 'hfq';
@@ -53,11 +56,15 @@ export function BacktestPricePreparation({
   initialModel?: BacktestExecutionModelV3;
   onSubmitted?: ()=>void;
   onDirtyChange?: (dirty: boolean) => void;
+  formId?: string;
+  onReadyChange?: (ready: boolean) => void;
 }) {
-  const [text, setText] = useState(() =>
-    initialModel ? JSON.stringify(initialModel, null, 2) : '',
-  );
-  const [model, setModel] = useState<BacktestExecutionModelV3>();
+  const resolution = useBacktestExecutionModel({ strategyVersionId, period, currency, adjustment, initialModel });
+  const model = resolution.model;
+  const automatic=useStrategySubmission();
+  useEffect(() => {
+    onReadyChange?.(Boolean(model) && !resolution.loading && !automatic.isPending);
+  }, [model, resolution.loading, automatic.isPending, onReadyChange]);
   const [history, setHistory] = useState<keyof typeof histories>('fixed-provider-snapshot');
   const [evidence, setEvidence] = useState('');
   const [lifecycleResearch, setLifecycleResearch] = useState(false);
@@ -74,7 +81,6 @@ export function BacktestPricePreparation({
     period,
     initialCash,
     currency,
-    text,
     model,
     history,
     evidence,
@@ -83,10 +89,12 @@ export function BacktestPricePreparation({
     knownCashResearch: cashChoice.fingerprint,
   });
   const query = useBacktestPreparation(key, submitted);
-  const initialKey = useRef(key);
+  const draftKey = JSON.stringify({ strategyVersionId, adjustment, period, initialCash, currency,
+    history, evidence, ruleMode, lifecycleResearch, knownCashResearch: cashChoice.fingerprint });
+  const initialKey = useRef(draftKey);
   useEffect(() => {
-    if (key !== initialKey.current) onDirtyChange?.(true);
-  }, [key, onDirtyChange]);
+    if (draftKey !== initialKey.current) onDirtyChange?.(true);
+  }, [draftKey, onDirtyChange]);
   const cashResearch =
     adjustment === 'none' &&
     history === 'fixed-provider-snapshot' &&
@@ -107,8 +115,16 @@ export function BacktestPricePreparation({
   }, [result, onPrepared]);
   useEffect(() => () => onPrepared(null), [onPrepared]);
 
-  const automatic=useStrategySubmission();
   const prepare = (run=false) => {
+    if (automatic.isPending) return;
+    if (!positiveDecimalStringSchema.safeParse(initialCash).success) {
+      setError('初始资金必须是大于 0 的有效金额。');
+      return;
+    }
+    if (!model || resolution.loading) {
+      setError(resolution.message ?? '正在准备回测执行设置，请稍候。');
+      return;
+    }
     const timezones = { CNY: 'Asia/Shanghai', HKD: 'Asia/Hong_Kong', USD: 'America/New_York' };
     const parsed = backtestRunPreparationRequestV3Schema.safeParse({
       contractVersion: 3,
@@ -156,22 +172,30 @@ export function BacktestPricePreparation({
   };
 
   return (
+    <form id={formId} onSubmit={(event) => { event.preventDefault(); prepare(true); }}>
     <FieldGroup>
-      <BacktestModelConfiguration
-        version={3}
-        text={text}
-        confirmed={Boolean(model)}
-        onChange={(value) => {
-          setText(value);
-          setModel(undefined);
-          onPrepared(null);
-        }}
-        onInvalidate={() => {
-          setModel(undefined);
-          onPrepared(null);
-        }}
-        onConfirm={setModel}
-      />
+      <Field>
+        <FieldLabel>回测执行设置</FieldLabel>
+        {resolution.loading && <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status"><Spinner aria-hidden="true" />正在准备回测执行设置…</p>}
+        {model && <FieldDescription>{resolution.retained ? '沿用本次记录的回测执行设置。' : '费用与成交方式沿用当前策略，执行设置已自动准备。'}</FieldDescription>}
+        {resolution.policy === 'research-defaults' && <p className="text-sm font-medium">研究默认规则</p>}
+        {resolution.notes.length > 0 && <ul className="flex flex-col gap-1 text-xs text-muted-foreground">{resolution.notes.map((note) => <li key={note}>{note}</li>)}</ul>}
+        <FieldDescription>历史数据：{histories[history]}；准备完成时冻结。</FieldDescription>
+        {resolution.message && (
+          <Alert variant="destructive">
+            <AlertTitle>回测设置暂不可用</AlertTitle>
+            <AlertDescription>
+              <p>{resolution.message}</p>
+              <Button type="button" variant="outline" onClick={resolution.retry}>
+                重新准备执行设置
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+      </Field>
+      <details className="rounded-md border border-border p-3">
+        <summary className="cursor-pointer text-sm font-medium">高级回测选项</summary>
+        <div className="mt-4 flex flex-col gap-4">
       <Field>
         <FieldLabel>历史输入性质</FieldLabel>
         <ToggleGroup
@@ -243,9 +267,11 @@ export function BacktestPricePreparation({
           准备完成时冻结本次取得的行情，并显示实际冻结时间。
         </p>
       )}
-      <Button type="button" disabled={!model || automatic.isPending || query.isFetching} onClick={()=>prepare(true)}>准备并开始回测</Button>
-      {automatic.isError && <FieldError>{automatic.error.message}</FieldError>}
-      <Button
+        </div>
+      </details>
+      {!formId && <Button type="button" disabled={!model || resolution.loading || automatic.isPending || query.isFetching} onClick={()=>prepare(true)}>准备并开始回测</Button>}
+      {automatic.isError && <Field invalid><FieldError>{automatic.error.message}</FieldError></Field>}
+      {!formId && <Button
         aria-busy={query.isFetching}
         type="button"
         variant="outline"
@@ -254,7 +280,7 @@ export function BacktestPricePreparation({
       >
         {query.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
         {query.isFetching ? '正在准备并预检…' : '准备并核对配置'}
-      </Button>
+      </Button>}
       {error && <Field invalid><FieldError>{error}</FieldError></Field>}
       <AnnouncementPreparationStatus result={result} />
       {query.stale && <Field invalid><FieldError>路由配置已经改变，请重新准备。</FieldError></Field>}
@@ -300,5 +326,6 @@ export function BacktestPricePreparation({
         </Alert>
       )}
     </FieldGroup>
+    </form>
   );
 }

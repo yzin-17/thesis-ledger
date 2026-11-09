@@ -1,7 +1,7 @@
 import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { useRuleSourceMonitor } from './useRuleSourceMonitor.js';
 import { RuleSourceMonitorVersions } from './RuleSourceMonitorVersions.js';
@@ -153,14 +153,14 @@ export function RuleSourceMonitorPanel() {
           {data.observations.length ? (
             <TableContainer refreshing={monitor.status.isRefetching} refreshLabel="正在刷新监测记录">
               <table className="w-full text-left text-sm">
-                <thead>
+                <TableHeader>
                   <tr className="border-b text-muted-foreground">
-                    <th className="p-3 font-medium">资料</th>
-                    <th className="p-3 font-medium">检查状态</th>
-                    <th className="p-3 font-medium">最后成功观察</th>
-                    <StickyTableActionHeader className="p-3 font-medium">版本</StickyTableActionHeader>
+                    <TableHead>资料</TableHead>
+                    <TableHead>检查状态</TableHead>
+                    <TableHead>最后成功观察</TableHead>
+                    <StickyTableActionHeader>版本</StickyTableActionHeader>
                   </tr>
-                </thead>
+                </TableHeader>
                 <tbody>
                   {data.observations.map((item) => (
                     <tr key={`${item.kind}:${item.identity}`} className="border-b last:border-0">

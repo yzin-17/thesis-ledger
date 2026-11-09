@@ -1,5 +1,6 @@
 import type { ComponentPropsWithoutRef } from 'react';
 import { cn } from '@/lib/utils';
+import { TableHead } from '@/components/ui/table';
 
 const actionHeaderClasses =
   "sticky right-0 z-20 min-w-40 bg-muted text-right before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-border before:content-['']";
@@ -11,7 +12,7 @@ export function StickyTableActionHeader({
   ...props
 }: ComponentPropsWithoutRef<'th'>) {
   return (
-    <th
+    <TableHead
       {...props}
       data-sticky-table-action="header"
       className={cn(actionHeaderClasses, className)}

@@ -8,7 +8,7 @@ import type {
 import { ChevronDownIcon, LoaderCircle, PlusIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { LoadingState } from '@/components/ui/spinner';
-import { AccountDataInfoTip } from './AccountDataInfoTip.js';
+import { InfoTip } from '@/components/ui/info-tip';
 import { FundInvestmentPlanList } from './FundInvestmentPlanList.js';
 import { canManageFundInvestments } from './account-data.fund-investment.display.js';
 import { Button } from '@/components/ui/button';
@@ -98,9 +98,9 @@ export function RecurringFundInvestments({
           <h3 id="fund-investment-title" className="m-0 text-xl font-semibold">
             定投计划
           </h3>
-          <AccountDataInfoTip label="定投确认说明">
+          <InfoTip label="定投确认说明">
             到期核对实际份额和净值后确认成交，确认前不会改变持仓或现金。
-          </AccountDataInfoTip>
+          </InfoTip>
           {pending.length === 0 &&
             queries.occurrences.data !== undefined &&
             !queries.occurrences.isError && (

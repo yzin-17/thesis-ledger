@@ -85,6 +85,7 @@ it('切组取消旧行情请求，并以稳定身份打开详情', async () => {
     return new Promise(() => {});
   });
   await mount();
+  expect(document.querySelector('[aria-label="走势"]')).toBeNull();
   await wait(() => expect(signals.length).toBe(1));
   await act(async () => button('长期关注').click());
   await wait(() => expect(signals[0]?.aborted).toBe(true));
@@ -94,6 +95,34 @@ it('切组取消旧行情请求，并以稳定身份打开详情', async () => {
       .click(),
   );
   await wait(() => expect(document.body.textContent).toContain('000001.SZ 行情详情'));
+});
+it('添加标的接纳带名称与搜索元数据的目录结果，按真实目录 ID 提交', async () => {
+  watchlist.list.mockResolvedValue(page);
+  watchlist.prices.mockResolvedValue([]);
+  watchlist.add.mockResolvedValue({ revision: 2 });
+  const result = {
+    id: 'd8d7f67c-d521-4e9c-94be-91a3ae5e8996', canonicalCode: '600036', market: 'SH',
+    instrumentType: 'STOCK', active: true, symbol: '600036.SH', displayName: '招商银行',
+    pinyin: 'zhaoshangyinhang', pinyinInitials: 'zsyh', searchAliases: ['招商银行', '600036.SH'],
+    generation: 1, matchScore: 1, confirmable: true, disabledReason: null,
+    createdAt: '2026-10-07T05:29:17.524Z', updatedAt: '2026-10-07T05:29:17.524Z',
+  };
+  search.mockResolvedValue([result, { ...result, id, instrumentType: 'INDEX', displayName: '不支持的指数' }]);
+  await mount();
+  await wait(() => expect(button('添加标的').disabled).toBe(false));
+  await act(async () => button('添加标的').click());
+  await wait(() => expect(document.querySelector('input[aria-label="搜索标的"]')).toBeTruthy());
+  const field = document.querySelector('input[aria-label="搜索标的"]') as HTMLInputElement;
+  await act(async () => {
+    field.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '600036');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await wait(() => expect(search).toHaveBeenCalledWith({ q: '600036', limit: 30 }, expect.any(AbortSignal)));
+  await wait(() => expect(document.querySelector('[role="option"]')?.textContent).toContain('招商银行'));
+  expect(document.body.textContent).not.toContain('不支持的指数');
+  await act(async () => (document.querySelector('[role="option"]') as HTMLElement).click());
+  await wait(() => expect(watchlist.add).toHaveBeenCalledWith(result.id, undefined));
 });
 it('报价失败后仍能管理分组，冲突后重读服务端修订', async () => {
   watchlist.list.mockResolvedValue(page);

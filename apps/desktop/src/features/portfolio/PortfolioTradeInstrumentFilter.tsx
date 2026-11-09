@@ -31,6 +31,7 @@ export function PortfolioTradeInstrumentFilter({
       <InstrumentOptionField
         label="交易标的筛选"
         value={symbol || 'all'}
+        clearValue="all"
         options={options}
         status={status}
         disabled={loading || unavailable}

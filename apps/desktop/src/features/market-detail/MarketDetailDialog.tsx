@@ -1,7 +1,12 @@
+import { useMarketChartRequestWindow } from './useMarketChartRequestWindow.js';
+import { hasDifferentDetailChartScope, matchesDetailChartScope } from './market-detail-chart-scope.js';
+import { chartHistoryPointLimit } from './chart-date-range.js';
 import { isMarketMinuteTimeframe, marketCalculationAnchor } from '@thesis-ledger/schemas';
 import { useMarketTradingOverlays } from './useMarketTradingOverlays.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useMarketDetailQuery } from './useMarketDetailQuery.js';
+import { MarketDetailRefreshControls } from './MarketDetailRefreshControls.js';
 import type {
   MarketDisplayDetailResponse as MarketDetailResponse,
 } from '@thesis-ledger/api-client';
@@ -39,7 +44,7 @@ type DetailDialogProps = { position: MarketDetailPosition; onClose: () => void; 
 export function MarketDetailDialog(props: DetailDialogProps) {
   return <MarketDetailSelection position={props.position} initial={props.adjustment}>
     {({ timeframe, adjustment, select }) => <MarketDetailDialogView position={props.position} onClose={props.onClose}
-      {...(adjustment ? { adjustment } : {})} select={select} timeframe={timeframe} key={`${props.position.symbol}:${timeframe}`} />}
+      {...(adjustment ? { adjustment } : {})} select={select} timeframe={timeframe} key={props.position.symbol} />}
   </MarketDetailSelection>;
 }
 
@@ -60,10 +65,8 @@ function MarketDetailDialogView({
   const periodDataReady = useMarketPeriodDataReady();
   const queryClient = useQueryClient();
   const [refreshSequence, setRefreshSequence] = useState(0);
-  const [chartBarsLimit, setChartBarsLimit] = useState(timeframe === '1y' ? 2 : 90);
-  const historyScope = JSON.stringify([position.symbol, timeframe, adjustment ?? null]);
-  const [historyAnchorState, setHistoryAnchor] = useState<{ scope: string; timestamp: string }>();
-  const historyAnchor = historyAnchorState?.scope === historyScope ? historyAnchorState.timestamp : undefined;
+  const { limit: chartBarsLimit, setLimit: setChartBarsLimit, anchor: historyAnchor, setAnchor: setHistoryAnchor } =
+    useMarketChartRequestWindow(position.symbol, timeframe, adjustment);
   const historyEnd = marketCalculationAnchor({ symbol: position.symbol, calculationAnchor: historyAnchor })?.end;
   const chartWindowV3 = { barsLimit: chartBarsLimit, timeframe, ...(historyAnchor ? { calculationAnchor: historyAnchor } : {}) };
   const [detail, setDetail] = useState<MarketDetailResponse | null>(null);
@@ -75,7 +78,6 @@ function MarketDetailDialogView({
     mid: 12,
     long: 24,
   });
-  const activeSymbolRef = useRef(position.symbol);
   const requestGenerationRef = useRef(0);
   const requestSignatureRef = useRef('');
   const chartPointsRef = useRef<ChartPoint[]>([]);
@@ -91,6 +93,7 @@ function MarketDetailDialogView({
     requestGenerationRef.current += 1;
   }
   const requestGeneration = requestGenerationRef.current;
+  const retainedOtherPeriod = hasDifferentDetailChartScope(detail, position.symbol, timeframe, adjustment);
   const latestRefresh = useMarketChartLatestRefresh({
     queryClient,
     symbol: position.symbol,
@@ -101,9 +104,11 @@ function MarketDetailDialogView({
     indicatorParams,
     paramsKey: indicatorParamsKey(indicatorParams),
     detail,
+    chartOnly: retainedOtherPeriod,
     chartPointsRef,
     requestGeneration,
     onLatestDetail: (next) => {
+      if (!matchesDetailChartScope(next, position.symbol, timeframe, adjustment)) return;
       if (historyAnchor) {
         queryClient.setQueryData(latestDetailQueryKey(position.symbol, refreshSequence, indicatorParams, adjustment,
           { barsLimit: chartBarsLimit, timeframe }), next);
@@ -112,56 +117,35 @@ function MarketDetailDialogView({
       setDetail((current) => mergeMarketDetail(current, next));
     },
     onSectionRetry: (next) => {
+      if (!matchesDetailChartScope(next, position.symbol, timeframe, adjustment)) return;
       setDetail((current) => mergeMarketDetail(current, next));
     },
   });
-  const query = useQuery({
-    queryKey: latestDetailQueryKey(
-      position.symbol,
-      refreshSequence,
-      indicatorParams,
-      adjustment,
-      chartWindowV3,
-    ),
-    queryFn: latestRefresh.queryFn,
-    enabled: periodDataReady,
-    staleTime: 15_000,
-    retry: false,
-    // 详情重新挂载即使命中客户端 fresh cache 也要执行一次最新检查；缓存只负责先展示。
-    refetchOnMount: 'always',
-  });
-
-  useEffect(() => {
-    activeSymbolRef.current = position.symbol;
-    setDetail(null);
-    setHistoryAnchor(undefined);
-  }, [position.symbol, adjustment]);
-
-  useEffect(() => {
-    setChartBarsLimit(timeframe === '1y' ? 2 : 90);
-    setIndicatorParams({ fast: 12, slow: 26, signal: 9, short: 6, mid: 12, long: 24 });
-  }, [position.symbol, timeframe]);
+  const query = useMarketDetailQuery({ symbol: position.symbol, refreshSequence, indicatorParams,
+    adjustment, chartWindowV3, enabled: periodDataReady, latestRefresh });
 
   useEffect(() => {
     if (
       query.data &&
-      query.data.symbol === activeSymbolRef.current &&
-      (latestRefresh.queryResponseGenerationRef.current.get(query.data.requestId) === undefined ||
-        latestRefresh.queryResponseGenerationRef.current.get(query.data.requestId) === requestGeneration) &&
+      matchesDetailChartScope(query.data, position.symbol, timeframe, adjustment) &&
       responseMatchesIndicatorParams(query.data, indicatorParams)
     ) {
       setDetail((current) => mergeMarketDetail(current, query.data));
     }
-  }, [indicatorParams, query.data, requestGeneration]);
+  }, [indicatorParams, query.data, requestGeneration, position.symbol, timeframe, adjustment]);
 
   const queryDataForCurrentParams =
     query.data &&
-    (latestRefresh.queryResponseGenerationRef.current.get(query.data.requestId) === undefined ||
-      latestRefresh.queryResponseGenerationRef.current.get(query.data.requestId) === requestGeneration) &&
+    matchesDetailChartScope(query.data, position.symbol, timeframe, adjustment) &&
     responseMatchesIndicatorParams(query.data, indicatorParams)
       ? query.data
       : undefined;
-  const visibleDetail = getVisibleMarketDetail(detail, queryDataForCurrentParams, position.symbol);
+  const visibleDetail = useMemo(() => {
+    if (retainedOtherPeriod && queryDataForCurrentParams)
+      return mergeMarketDetail(detail, queryDataForCurrentParams);
+    return getVisibleMarketDetail(detail, queryDataForCurrentParams, position.symbol);
+  }, [detail, queryDataForCurrentParams, position.symbol, retainedOtherPeriod]);
+  const chartScopeReady = !hasDifferentDetailChartScope(visibleDetail, position.symbol, timeframe, adjustment);
   const indicatorCapabilities = useMemo(
     () =>
       visibleDetail
@@ -215,8 +199,8 @@ function MarketDetailDialogView({
   chartPointsRef.current = chartPoints;
   const overlayBars = useMemo(() => chartPoints.flatMap((point) => point.bar ? [point.bar] : []), [chartPoints]);
   const tradingOverlay = useMarketTradingOverlays(overlayBars, position);
-  const loadEarlier = () => {
-    if (query.isFetching) return;
+  const loadEarlier = (requestedStart?: string) => {
+    if (query.isFetching || !chartScopeReady) return;
     const last = visibleDetail?.barSeries?.points.at(-1);
     let timestamp = historyAnchor;
     if (!timestamp && last) {
@@ -224,11 +208,11 @@ function MarketDetailDialogView({
       else if ('bucketEndAt' in last && typeof last.bucketEndAt === 'string') timestamp = last.bucketEndAt;
       else timestamp = last.timestamp;
     }
-    if (typeof timestamp === 'string' && timestamp) setHistoryAnchor({ scope: historyScope, timestamp });
-    setChartBarsLimit((limit) => Math.min(3000, limit + 90));
+    if (typeof timestamp === 'string' && timestamp) setHistoryAnchor(timestamp);
+    setChartBarsLimit((limit) => chartHistoryPointLimit(limit, requestedStart, last?.timestamp, timeframe));
   };
   const canLoadEarlier = Boolean(
-    chartBarsLimit < 3000 && visibleDetail?.barSeries?.coverage.hasMoreBefore === true,
+    chartScopeReady && chartBarsLimit < 3000 && visibleDetail?.barSeries?.coverage.hasMoreBefore === true,
   );
   const updateIndicatorParams = (next: MarketIndicatorParams) => {
     if (JSON.stringify(indicatorParams) === JSON.stringify(next)) return;
@@ -243,7 +227,7 @@ function MarketDetailDialogView({
   const loading = query.isPending && query.isFetching && !visibleDetail;
   const queryError = query.isError && !visibleDetail;
   const refreshError = query.isError && Boolean(visibleDetail);
-  const { stale, staleNotice, quoteUpstreamNotice } = marketDetailNotices(visibleDetail, query.isFetching, retryAll);
+  const { stale, staleNotice, quoteInfoNotice } = marketDetailNotices(visibleDetail, query.isFetching && chartScopeReady);
 
   const queryNotice = () => {
     if (queryError)
@@ -252,7 +236,6 @@ function MarketDetailDialogView({
           state="error"
           title="行情详情读取失败"
           description="当前详情未能读取，请检查服务连接后重试。"
-          onRetry={retryAll}
         />
       );
     if (refreshError)
@@ -261,7 +244,6 @@ function MarketDetailDialogView({
           state="error"
           title="行情详情刷新失败"
           description="已保留上次可见内容，本次更新未成功，请稍后重试。"
-          onRetry={retryAll}
         />
       );
     return null;
@@ -269,9 +251,12 @@ function MarketDetailDialogView({
 
   return (
     <MarketDetailDialogContent
-      chartControls={position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ|HK|US)$/.test(position.symbol)
+      chartControls={<>{position.asset.assetType !== 'fund' && /\.(SH|SZ|BJ|HK|US)$/.test(position.symbol)
         ? <MarketChartAdjustment symbol={position.symbol} value={adjustment} onChange={select}
-          plan={{ barsLimit: chartBarsLimit, indicatorParams, ...(historyEnd ? { end: historyEnd } : {}), ...(isMarketMinuteTimeframe(timeframe) ? { timeframe: '1m' } : {}) }} refreshSequence={refreshSequence} /> : undefined}
+          plan={{ barsLimit: chartBarsLimit, indicatorParams, ...(historyEnd ? { end: historyEnd } : {}), ...(isMarketMinuteTimeframe(timeframe) ? { timeframe } : {}) }} refreshSequence={refreshSequence} /> : null}
+        <MarketDetailRefreshControls refreshing={query.isFetching || latestRefresh.latestLoading || latestRefresh.retrying !== null}
+          onRefresh={retryAll} automatic={query.autoRefresh} onAutomaticChange={query.setAutoRefresh}
+          minute={position.asset.assetType !== 'fund' && isMarketMinuteTimeframe(timeframe)} /></>}
       position={position}
       tradingOverlay={tradingOverlay}
       unit={unit}
@@ -281,7 +266,7 @@ function MarketDetailDialogView({
       staleNotice={staleNotice}
       retryError={latestRefresh.retryError}
       visibleDetail={visibleDetail}
-      quoteUpstreamNotice={quoteUpstreamNotice}
+      quoteInfoNotice={quoteInfoNotice}
       quoteSection={quoteSection}
       barsSection={barsSection}
       chartIndicators={chartIndicators}
@@ -292,9 +277,9 @@ function MarketDetailDialogView({
       historyLoading={query.isFetching}
       historyError={null}
       onRetryEarlier={() => { void query.refetch(); }}
-      onLoadLater={latestRefresh.loadLater}
-      onRetryLater={latestRefresh.retryLater}
-      canLoadLater={chartPoints.length > 0}
+      onLoadLater={() => { void latestRefresh.loadLater(); }}
+      onRetryLater={() => { void latestRefresh.retryLater(); }}
+      canLoadLater={chartScopeReady && chartPoints.length > 0}
       latestLoading={latestRefresh.latestLoading}
       latestNotice={latestRefresh.latestNotice}
       latestError={latestRefresh.latestError}
@@ -303,7 +288,6 @@ function MarketDetailDialogView({
       fundNavHistorySection={fundNavHistorySection}
       indicatorCapabilities={indicatorCapabilities}
       retrying={latestRefresh.retrying}
-      onRetryAll={retryAll}
       onRetrySection={latestRefresh.retrySection}
       onClose={onClose}
     />

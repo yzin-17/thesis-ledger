@@ -30,7 +30,7 @@ export function MarketDetailDialogContent({
   staleNotice,
   retryError,
   visibleDetail,
-  quoteUpstreamNotice,
+  quoteInfoNotice,
   quoteSection,
   barsSection,
   chartIndicators,
@@ -52,7 +52,6 @@ export function MarketDetailDialogContent({
   fundNavHistorySection,
   indicatorCapabilities,
   retrying,
-  onRetryAll,
   onRetrySection,
   onClose,
   tradingOverlay,
@@ -67,13 +66,13 @@ export function MarketDetailDialogContent({
   staleNotice: MarketDetailNoticeState;
   retryError: string | null;
   visibleDetail: MarketDetailResponse | null;
-  quoteUpstreamNotice: ReactNode;
+  quoteInfoNotice: ReactNode;
   quoteSection: MarketDetailSection | undefined;
   barsSection: MarketDetailSection | undefined;
   chartIndicators: MarketChartIndicator[];
   chartPoints: ChartPoint[] | undefined;
   onIndicatorParamsChange: (params: MarketIndicatorParams) => void;
-  onLoadEarlier: () => void;
+  onLoadEarlier: (start?: string) => void;
   canLoadEarlier: boolean;
   historyLoading: boolean;
   historyError: string | null;
@@ -89,7 +88,6 @@ export function MarketDetailDialogContent({
   fundNavHistorySection: MarketDetailSection | undefined;
   indicatorCapabilities: MarketDetailCapability[];
   retrying: string | null;
-  onRetryAll: () => void;
   onRetrySection: (capability: MarketDetailCapability) => Promise<void>;
   onClose: () => void;
 }) {
@@ -129,12 +127,11 @@ export function MarketDetailDialogContent({
             {queryNotice}
             {position.asset?.assetType==='fund' && <FundDailyComparison symbol={position.symbol}/>}
             {loading ? <LoadingState label="行情分段加载中" /> : null}
-            {stale && !quoteUpstreamNotice ? (
+            {stale && !quoteInfoNotice ? (
               <MarketDetailNotice
                 state={staleNotice.state}
                 title={staleNotice.title}
                 description={staleNotice.description}
-                onRetry={onRetryAll}
               />
             ) : null}
             {retryError ? (
@@ -150,7 +147,7 @@ export function MarketDetailDialogContent({
                 {sectionIsVisible(quoteSection) ? (
                   <QuoteSection
                     section={quoteSection}
-                    notice={quoteUpstreamNotice ?? undefined}
+                    notice={quoteInfoNotice ?? undefined}
                     onRetry={() => void onRetrySection('quote')}
                     retrying={retrying === 'quote'}
                   />

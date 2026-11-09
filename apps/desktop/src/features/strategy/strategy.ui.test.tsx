@@ -70,7 +70,7 @@ describe('策略实验工作台 UI 契约', () => {
     expect(source).toContain('grid-rows-[auto_minmax(0,1fr)_auto]');
     expect(source).toContain('<StrategyV2Summary');
     expect(source).toContain('<BacktestPricePreparation');
-    expect(source).toContain('disabled={busy || !version || !currentStrategy || !prepared}');
+    expect(source).toContain('form="saved-strategy-backtest"');
     expect(source).not.toContain('可选，仅在需要覆盖执行假设时填写');
     expect(source).not.toContain('排队成功后将在后台启动任务');
   });

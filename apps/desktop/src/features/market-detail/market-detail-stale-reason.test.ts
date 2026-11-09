@@ -39,7 +39,7 @@ describe('行情详情陈旧原因展示', () => {
   });
   it('正常上一交易日净值不误报陈旧，没有原因时明确未知', () => {
     expect(marketDetailStaleReason(history('ready'))).toBeNull();
-    expect(marketDetailStaleReason(history('stale'))).toContain('来源未返回具体陈旧原因');
+    expect(marketDetailStaleReason(history('stale'))).toContain('当前响应标记为陈旧，但缺少判定原因');
   });
   it('同一序列重复根因只显示一次，优先显示分段诊断', () => {
     const section = history('stale', 'timeout');

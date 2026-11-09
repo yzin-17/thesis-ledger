@@ -116,7 +116,7 @@ export const routeKeyLabelV3 = (key: MarketRouteKeyV3) => {
   if (key.kind === 'data') {
     return `${scope} · ${marketCapabilityLabel(key.capability)}`;
   }
-  const period = key.timeframe === '1d' ? '日线' : '分钟线';
+  const period = key.timeframe === '1d' ? '日线' : `${Number.parseInt(key.timeframe, 10)} 分钟线`;
   return `${scope} · ${capabilityLabel[key.capability] ?? key.capability}（${period}／${adjustmentLabel[key.adjustment]}）`;
 };
 

@@ -56,16 +56,6 @@ export function AuthoringWorkflow({ model }: { model: AuthoringEditorModel }) {
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <AuthoringEditorStatus model={model} />
-      {operation.data && (
-        <AuthoringOperation
-          operation={operation.data}
-          proposal={model.proposalView}
-          busy={busy}
-          stale={operation.data.revision !== draft.query.data?.revision || draft.dirty}
-          onAction={model.applyOperation}
-          onProposal={model.applyProposal}
-        />
-      )}
       <Tabs value={stage} onValueChange={(value) => setStage(value as Stage)}>
         <TabsList variant="line" aria-label="策略编写阶段" className="gap-3 sm:gap-6">
           <TabsTrigger value="describe">1 描述策略</TabsTrigger>
@@ -102,6 +92,16 @@ export function AuthoringWorkflow({ model }: { model: AuthoringEditorModel }) {
           )}
         </TabsContent>
       </Tabs>
+      {operation.data && (
+        <AuthoringOperation
+          operation={operation.data}
+          proposal={model.proposalView}
+          busy={busy}
+          stale={operation.data.revision !== draft.query.data?.revision || draft.dirty}
+          onAction={model.applyOperation}
+          onProposal={model.applyProposal}
+        />
+      )}
       <AuthoringEditorHistory model={model} />
     </div>
   );

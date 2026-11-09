@@ -1,17 +1,24 @@
-import type { MarketDisplayDetailResponse } from '@thesis-ledger/api-client';
-import { type Quote } from '@thesis-ledger/schemas';
+import type { MarketDisplayDetailResponse, MarketDisplayDetailSection } from '@thesis-ledger/api-client';
+import { isMarketClosedSnapshot, quoteFreshnessExplanation } from '@thesis-ledger/domain';
 import { marketDetailStaleReason, quoteUpstreamWindowLabel } from './market-detail-stale-reason.js';
 import { MarketDetailNotice, type MarketDetailNoticeState } from './MarketDetailSections.js';
 import {
-  MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS,
   marketDetailSectionTitle,
-  quoteServedAgeMs,
 } from './market-detail.types.js';
+
+function quoteInformation(section: MarketDisplayDetailSection | undefined, cooldown: boolean, normal: boolean) {
+  if (cooldown && section) return { title: '行情刷新冷却中', description: marketDetailStaleReason(section) ?? '' };
+  const quote = section?.capability === 'quote' ? section.data : undefined;
+  if (normal && quote && isMarketClosedSnapshot(quote)) return {
+    title: '休市快照', description: quoteFreshnessExplanation(quote) ?? '',
+  };
+  return null;
+}
 
 export function marketDetailNotices(
   detail: MarketDisplayDetailResponse | null,
   refreshing: boolean,
-  onRetry: () => void,
+  onRetry?: () => void,
 ) {
   const staleSections = Object.values(detail?.sections ?? {}).filter(
     (section) => section.status === 'stale',
@@ -23,11 +30,6 @@ export function marketDetailNotices(
     staleSections.every(
       (section) => section.capability === 'quote' && quoteUpstreamWindowLabel(section),
     );
-  const quoteAge = quoteServedAgeMs(quoteSection?.data as Quote | undefined);
-  const remainingMinutes = Math.max(
-    1,
-    Math.ceil((MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS * 1000 - (quoteAge ?? 0)) / 60_000),
-  );
   const staleNotice: MarketDetailNoticeState = refreshing
     ? {
         state: 'loading',
@@ -36,7 +38,7 @@ export function marketDetailNotices(
       }
     : {
         state: 'stale',
-        title: '行情详情可能陈旧',
+        title: '行情数据时效提示',
         description: staleSections
           .map(
             (section) =>
@@ -44,18 +46,19 @@ export function marketDetailNotices(
           )
           .join('；'),
       };
-  const quoteUpstreamNotice = onlyUpstreamWindow ? (
+  const info = quoteInformation(quoteSection, onlyUpstreamWindow, !refreshing && staleSections.length === 0);
+  const quoteInfoNotice = info ? (
     <MarketDetailNotice
       flush
       state="info"
-      title="行情按上游刷新间隔更新"
-      description={`上游对单标的行情有约 ${MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS / 60} 分钟最小刷新间隔，当前已是该间隔内的最新结果；约 ${remainingMinutes} 分钟后可再次刷新。`}
-      onRetry={onRetry}
+      title={info.title}
+      description={info.description}
+      {...(onRetry ? { onRetry } : {})}
     />
   ) : null;
   return {
     stale: staleSections.length > 0 || (refreshing && Boolean(detail)),
     staleNotice,
-    quoteUpstreamNotice,
+    quoteInfoNotice,
   };
 }

@@ -56,9 +56,16 @@ describe.each(marketPercentSamples)('$name：实际行情百分比读数', ({ na
     expect(html).toContain('已锁定 2026-11-07');
   });
   it('股票图表的区间说明不乘法溢出或归零', () => {
-    const { bars, sample } = marketPercentSample(name),
-      before = structuredClone(bars);
-    const html = renderToStaticMarkup(<MarketPriceChart bars={bars} />);
+    const { bars: sourceBars, sample } = marketPercentSample(name);
+    // 百分比样本处于默认一月范围内，确保断言比较完整起止价格。
+    const bars = sourceBars.map((bar, index) => {
+      const timestamp = new Date(Date.UTC(2026, 10, 5 + index)).toISOString();
+      return { ...bar, timestamp, availableAt: timestamp };
+    });
+    const before = structuredClone(bars);
+    const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
+    const html = renderToStaticMarkup(<QueryClientProvider client={client}><MarketPriceChart bars={bars} /></QueryClientProvider>);
+    client.clear();
     if (sample.ratio === null) expect(html).not.toContain('可视区间');
     else expect(html).toContain('可视区间 ' + sample.ratioLabel);
     expect(bars).toEqual(before);

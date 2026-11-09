@@ -10,11 +10,42 @@ const sample = watchlistNumberSample(scenario),
 const client = new QueryClient({
   defaultOptions: { queries: { enabled: false, retry: false, staleTime: Infinity } },
 });
-client.setQueryData([...root, 'trends', sample.symbol, scenario === 'nav' ? 'nav' : '1d'], {
-  points: [],
-  label: '受控走势',
-  notice: '受控暂无图形',
+const candles = Array.from({ length: 20 }, (_, index) => {
+  const close = 4.2 + Math.sin(index * 0.8) * 0.1 - index * 0.004;
+  const open = close + (index % 2 ? 0.03 : -0.03);
+  return {
+    at: new Date(Date.UTC(2026, 9, index + 10)).toISOString(),
+    open,
+    close,
+    high: Math.max(open, close) + 0.02,
+    low: Math.min(open, close) - 0.02,
+  };
 });
+client.setQueryData([...root, 'trends', sample.symbol, scenario === 'nav' ? 'nav' : '1d'], {
+  points: scenario === 'ordinary' ? candles.map((p) => ({ at: p.at, value: p.close })) : [],
+  ...(scenario === 'ordinary' && {
+    candles,
+    label: '日线 · 前复权',
+    source: 'tencent',
+    cutoff: candles.at(-1)!.at,
+  }),
+  ...(scenario !== 'ordinary' && { label: '受控走势', notice: '受控暂无图形' }),
+});
+const minutePoints = Array.from({ length: 242 }, (_, index) => {
+  const minute = index < 121 ? 90 + index : 300 + index - 121;
+  return {
+    at: new Date(Date.UTC(2026, 10, 6, 0, minute)).toISOString(),
+    value: 4.1 + Math.sin(index * 0.07) * 0.03 + Math.sin(index * 0.23) * 0.006,
+  };
+}).filter((_, index) => index !== 15 && index !== 80);
+if (scenario !== 'nav')
+  client.setQueryData([...root, 'trends', sample.symbol, '1m'], {
+    points: scenario === 'ordinary' ? minutePoints : [],
+    label: '分时 · 1分钟',
+    ...(scenario === 'ordinary'
+      ? { source: 'tencent', cutoff: minutePoints.at(-1)!.at }
+      : { notice: '未配置分钟行情来源' }),
+  });
 function Harness() {
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {

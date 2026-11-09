@@ -58,7 +58,7 @@ describe('本地策略编写直接开放草稿', () => {
       });
       expect(host.textContent).toContain('已保存的本地草稿');
     });
-    expect(mocks.request).toHaveBeenCalledWith('/identity/context');
+    expect(mocks.request).toHaveBeenCalledWith('/identity/context', { signal: expect.any(AbortSignal) });
     expect(mocks.list).toHaveBeenCalledWith(null);
     expect(host.textContent).not.toContain('登录');
     expect(host.querySelector('input[type="password"]')).toBeNull();

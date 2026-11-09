@@ -24,7 +24,7 @@ describe('行情空分段', () => {
     expect(html).toContain('当前没有可用行情。');
     expect(html).toContain('data-section-status="empty"');
     expect(html).toContain('行情数据');
-    expect(html).not.toContain('最近日线');
+    expect(html).not.toContain('历史行情');
     expect(html).not.toContain('data-market-price-chart');
   });
 });

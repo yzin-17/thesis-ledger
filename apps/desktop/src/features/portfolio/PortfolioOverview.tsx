@@ -1,4 +1,4 @@
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { formatRatioPercent as formatPercent, valuationPositionLabel } from '@thesis-ledger/domain';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -120,13 +120,13 @@ function SortablePositionHeader({
   if (active && sort.direction === 'asc') SortIcon = ChevronUpIcon;
   else if (active) SortIcon = ChevronDownIcon;
   return (
-    <th scope="col" aria-sort={ariaSort} className="text-right">
+    <TableHead scope="col" aria-sort={ariaSort} className="text-right">
       <Button
         type="button"
         variant="ghost"
         size="sm"
         className={cn(
-          'h-auto min-h-0 gap-1 px-0 text-xs font-semibold hover:bg-transparent',
+          'h-auto min-h-0 gap-1 px-0 text-xs font-medium hover:bg-transparent',
           active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
         )}
         aria-label={`按${label}排序，${status}`}
@@ -139,7 +139,7 @@ function SortablePositionHeader({
           className={cn('size-3.5', !active && 'text-muted-foreground/60')}
         />
       </Button>
-    </th>
+    </TableHead>
   );
 }
 
@@ -255,12 +255,12 @@ export function PortfolioPositionTable({
       </div>
       <TableContainer refreshing={refreshing} refreshLabel="正在刷新当前持仓">
         <table>
-          <thead>
+          <TableHeader>
             <tr>
-              <th>标的</th>
-              <th className="min-w-32 text-left">账户</th>
-              <th className="text-right">持有</th>
-              <th className="text-right">现价</th>
+              <TableHead>标的</TableHead>
+              <TableHead className="min-w-32 text-left">账户</TableHead>
+              <TableHead className="text-right">持有</TableHead>
+              <TableHead className="text-right">现价</TableHead>
               <SortablePositionHeader
                 label="市值"
                 sortKey="marketValue"
@@ -282,12 +282,12 @@ export function PortfolioPositionTable({
                 isDefault={sort === null}
                 onSort={handleSort}
               />
-              <th>状态</th>
+              <TableHead>状态</TableHead>
               {onSelectPosition && (
                 <StickyTableActionHeader className="w-28 min-w-28">操作</StickyTableActionHeader>
               )}
             </tr>
-          </thead>
+          </TableHeader>
           <tbody>
             {sortedPositions.length === 0 ? (
               <EmptyTableRow colSpan={onSelectPosition ? 9 : 8} />

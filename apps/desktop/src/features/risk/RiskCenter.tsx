@@ -26,9 +26,10 @@ import {
   useScanRiskMutation,
   useTestRiskRuleMutation,
 } from './risk.mutations.js';
-import { riskKeys, useNotificationRoutingQuery, useRiskAuditQuery, useRiskQueries } from './risk.queries.js';
+import { riskKeys, useRiskNotificationRoutingQuery, useRiskAuditQuery, useRiskQueries } from './risk.queries.js';
 import { RiskOverview } from './RiskOverview.js';
 import { RiskRuleWorkbench } from './RiskRuleWorkbench.js';
+import { RiskNotificationProviderPicker } from './RiskNotificationProviderPicker.js';
 import { StrategyRiskApplicationsSection } from './StrategyRiskApplicationsSection.js';
 import {
   NotificationProviderNotice,
@@ -83,7 +84,7 @@ export function RiskCenter({
   const { refreshing: riskRefreshing, refresh: refreshRisk } = usePageRefresh([
     { queryKey: riskKeys.root }, { queryKey: portfolioKeys.root }, { queryKey: strategyKeys.root },
   ]);
-  const notificationRoutingQuery = useNotificationRoutingQuery();
+  const notificationRoutingQuery = useRiskNotificationRoutingQuery();
   const auditQuery = useRiskAuditQuery(auditVisible ? (auditRule?.id ?? null) : null);
   const createRuleMutation = useCreateRiskRuleMutation();
   const patchRuleMutation = usePatchRiskRuleMutation();
@@ -124,8 +125,10 @@ export function RiskCenter({
   else if (notificationRoutingQuery.isPending) notificationRoutingState = 'loading';
   let notificationAvailability: 'available' | 'unconfigured' | 'unknown' = 'available';
   if (notificationRoutingState !== 'ready') notificationAvailability = 'unknown';
-  else if ((notificationRoutingQuery.data?.routes.length ?? 0) === 0) {
+  else if ((notificationRoutingQuery.data?.availableRoutes.length ?? 0) === 0) {
     notificationAvailability = 'unconfigured';
+  } else if (!notificationRoutingQuery.data?.availableRoutes.some((route) => notificationRoutingQuery.data.selectedProviders.includes(route.provider))) {
+    notificationAvailability = 'unknown';
   }
   const hasRiskData = Object.values(riskQueries).some((query) => query.data !== undefined);
   const loadState = resolveLoadState(
@@ -277,13 +280,6 @@ export function RiskCenter({
         </PortfolioModeNote>
       ) : null}
 
-      <NotificationProviderNotice
-        mode={mode}
-        availability={notificationAvailability}
-        routingState={notificationRoutingState}
-        onConfigure={() => void navigate('/providers')}
-      />
-
       {/* 规则、事件、通知全部为空时，指标卡和表格的 0 值已表达状态，不再叠加“暂无数据”横幅。 */}
       {loadState === 'empty' ? null : (
         <DataStateBanner state={loadState} onRetry={() => void refreshRisk()} />
@@ -333,6 +329,12 @@ export function RiskCenter({
           <TabsTrigger value="events">事件</TabsTrigger>
           <TabsTrigger value="notifications">通知</TabsTrigger>
         </TabsList>
+        <NotificationProviderNotice
+          mode={mode}
+          availability={notificationAvailability}
+          routingState={notificationRoutingState}
+          onConfigure={() => void navigate('/providers')}
+        />
         <TabsContent value="overview">
           <RiskOverview
             eventsRefreshing={riskQueries.events.isRefetching}
@@ -390,8 +392,7 @@ export function RiskCenter({
             loadState={notificationReadState}
             deliveries={deliveries}
             statusFilter={notificationStatusFilter}
-            routes={notificationRoutingQuery.data?.routes ?? []}
-            routingState={notificationRoutingState}
+            headerControls={<RiskNotificationProviderPicker />}
             onRetry={() => void riskQueries.notifications.refetch()}
           />
         </TabsContent>

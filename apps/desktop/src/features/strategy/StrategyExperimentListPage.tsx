@@ -1,6 +1,6 @@
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { Spinner } from '@/components/ui/spinner';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { useEffect, useRef, useState } from 'react';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -315,17 +315,17 @@ export function StrategyExperimentListPage() {
         {experiments.data && items.length > 0 ? (
           <TableContainer>
             <table className="w-full min-w-[900px] table-fixed text-sm">
-              <thead className="border-b text-left">
+              <TableHeader className="border-b text-left">
                 <tr>
-                  <th className="w-[38%] px-4 py-3 font-medium">实验名称 / 来源</th>
-                  <th className="w-[19%] px-4 py-3 font-medium">状态</th>
-                  <th className="w-[23%] px-4 py-3 font-medium">进展与产出</th>
-                  <th className="w-[12%] px-4 py-3 font-medium">更新时间</th>
-                  <th data-table-action-static className="w-[8%] px-4 py-3 text-right font-medium">
+                  <TableHead className="w-[38%]">实验名称 / 来源</TableHead>
+                  <TableHead className="w-[19%]">状态</TableHead>
+                  <TableHead className="w-[23%]">进展与产出</TableHead>
+                  <TableHead className="w-[12%]">更新时间</TableHead>
+                  <TableHead data-table-action-static className="w-[8%] text-right">
                     操作
-                  </th>
+                  </TableHead>
                 </tr>
-              </thead>
+              </TableHeader>
               <tbody>
                 {items.map((experiment) => (
                   <tr key={experiment.id} className="border-b last:border-0 hover:bg-muted/20">

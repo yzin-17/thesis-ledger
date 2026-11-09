@@ -63,7 +63,7 @@ describe('回测实时消费与限流恢复', () => {
     expect(current.items[0]!.jobs[0]!.status).toBe('running');
   });
 
-  it('同源 GET 共享冷却，等待期间不请求；取消等待不会发送请求', async () => {
+  it('同一操作的不同查询共享冷却，等待期间不请求；取消等待不会发送请求', async () => {
     vi.useFakeTimers();
     const fetcher = vi
       .fn()
@@ -71,9 +71,9 @@ describe('回测实时消费与限流恢复', () => {
       .mockResolvedValue(new Response('{}'));
     const transport = createRateLimitedFetch(fetcher);
     await transport('http://localhost/api/v1/backtests/runs');
-    const next = transport('http://localhost/api/v1/backtests/events');
+    const next = transport('http://localhost/api/v1/backtests/runs?page=2');
     const controller = new AbortController();
-    const cancelled = transport('http://localhost/api/v1/backtests/runs/1', {
+    const cancelled = transport('http://localhost/api/v1/backtests/runs', {
       signal: controller.signal,
     });
     const rejected = expect(cancelled).rejects.toBeDefined();
@@ -84,6 +84,21 @@ describe('回测实时消费与限流恢复', () => {
     await vi.advanceTimersByTimeAsync(1);
     await next;
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('启动任务被限流不拖延状态、POST 报价和取消，也不会重放写请求', async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 429, headers: { 'retry-after': '60' } }))
+      .mockResolvedValue(new Response('{}'));
+    const transport = createRateLimitedFetch(fetcher);
+    await transport('http://localhost/api/v1/backtests/runs', { method: 'POST' });
+    await transport('http://localhost/api/v1/backtests/runs');
+    await transport('http://localhost/api/v1/watchlist/prices', { method: 'POST' });
+    await transport('http://localhost/api/v1/backtests/runs/id/cancel', { method: 'POST' });
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(fetcher).toHaveBeenCalledTimes(4);
   });
 
   it('SSE 429 重连遵守冷却，跨分片 CRLF 解析并在关闭时释放读取', async () => {

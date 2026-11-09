@@ -1,7 +1,13 @@
-import { renderToStaticMarkup } from 'react-dom/server';
+import { renderToStaticMarkup as renderMarkup } from 'react-dom/server';
+import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import { MarketPriceChart } from './MarketDetailCharts.js';
 import type { MarketChartBar } from './market-chart-types.js';
+
+const renderToStaticMarkup = (node: ReactNode) => renderMarkup(
+  <QueryClientProvider client={new QueryClient()}>{node}</QueryClientProvider>,
+);
 
 const bar: MarketChartBar = {
   timestamp: '2026-09-15T00:00:00.000Z',

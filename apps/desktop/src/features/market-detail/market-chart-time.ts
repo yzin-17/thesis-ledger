@@ -34,25 +34,40 @@ export function chartInteractionKey(time: unknown): string | null {
   return null;
 }
 
+export function chartVisibleRange(range: { from: Time; to: Time } | null) {
+  if (!range) return null;
+  const from = chartInteractionKey(range.from), to = chartInteractionKey(range.to);
+  return from && to ? { from, to } : null;
+}
+
 export const chartTimeData = (data: readonly unknown[]) => data.map((point) =>
   point && typeof point === 'object' && 'time' in point && typeof point.time === 'string'
     ? { ...point, time: toChartTime(point.time) } : point);
 
-const marketZone = (bar: MarketChartBar) =>
-  bar.symbol?.endsWith('.HK') ? 'Asia/Hong_Kong' : 'America/New_York';
+const marketTime = (bar: MarketChartBar) => {
+  if (/\.(SH|SZ|BJ)$/.test(bar.symbol ?? '')) return { zone: 'Asia/Shanghai', label: '北京时间' };
+  if (bar.symbol?.endsWith('.HK')) return { zone: 'Asia/Hong_Kong', label: '香港时间' };
+  return { zone: 'America/New_York', label: '美东时间' };
+};
+
+export function formatChartBarDate(bar: MarketChartBar) {
+  const minute = isMarketMinuteTimeframe(bar.timeframe);
+  const date = new Date(minute ? bar.timestamp : bar.timestamp.slice(0, 10));
+  return new Intl.DateTimeFormat('zh-CN', { timeZone: minute ? marketTime(bar).zone : 'UTC' }).format(date);
+}
 
 export function formatChartBarTime(bar: MarketChartBar) {
-  if (!isMarketMinuteTimeframe(bar.timeframe)) return new Date(bar.timestamp.slice(0, 10)).toLocaleDateString('zh-CN');
+  if (!isMarketMinuteTimeframe(bar.timeframe)) return formatChartBarDate(bar);
   const text = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: marketZone(bar), year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: marketTime(bar).zone, year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).format(new Date(bar.timestamp));
-  return `${text} ${bar.symbol?.endsWith('.HK') ? '香港时间' : '美东时间'}`;
+  return `${text} ${marketTime(bar).label}`;
 }
 
 export function marketChartTimeOptions(bar: MarketChartBar | undefined): DeepPartial<ChartOptions> {
   if (!isMarketMinuteTimeframe(bar?.timeframe)) return { timeScale: { timeVisible: false } };
-  const zone = marketZone(bar);
+  const zone = marketTime(bar).zone;
   const tick = new Intl.DateTimeFormat('zh-CN', {
     timeZone: zone, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   });

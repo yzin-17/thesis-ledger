@@ -1,5 +1,6 @@
-import { formatMarketNumber, formatRatioPercent } from '@thesis-ledger/domain';
+import { formatMarketNumber, formatRatioPercent, quoteFreshnessLabel } from '@thesis-ledger/domain';
 import { Spinner } from '@/components/ui/spinner';
+import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import type { ReactNode } from 'react';
 import type {
   MarketDisplayBarSeries as BarSeries,
@@ -26,7 +27,7 @@ import {
 import {
   isRetryableMarketDetailSection,
   marketDetailSectionTitle,
-  marketDetailStatusClass,
+  marketDetailStatusVariant,
   marketDetailStatusLabel,
 } from './market-detail.types.js';
 import type { ChartPoint } from './market-chart-model.js';
@@ -115,11 +116,9 @@ export const MarketDetailNotice = ({
     {state === 'loading' && <Spinner aria-hidden="true" />}
     <AlertTitle>{title}</AlertTitle>
     <AlertDescription>
-      <span>{description}</span>
+      <span className="whitespace-pre-line">{description}</span>
       {onRetry && state !== 'loading' ? (
-        <Button className="text-button" size="sm" type="button" variant="link" onClick={onRetry}>
-          重新加载
-        </Button>
+        <RefreshIconButton label="刷新行情" refreshing={false} onClick={onRetry} />
       ) : null}
     </AlertDescription>
   </Alert>
@@ -169,10 +168,7 @@ const SectionStatus = ({
   return (
     <div className="flex flex-wrap items-center gap-2" data-section-status={section.status}>
       <Badge
-        className={cn(
-          retrying || upstreamWindowLabel ? 'tag' : marketDetailStatusClass(section.status),
-        )}
-        variant="secondary"
+        variant={retrying || upstreamWindowLabel ? 'secondary' : marketDetailStatusVariant(section.status)}
       >
         {retrying ? <Spinner aria-label="正在重新读取行情" /> : (upstreamWindowLabel ?? marketDetailStatusLabel(section.status))}
       </Badge>
@@ -180,9 +176,9 @@ const SectionStatus = ({
         <span className="text-sm text-muted-foreground">{section.error?.message ?? staleReason}</span>
       ) : null}
       {section.error?.diagnosticId ? (
-        <code className="text-xs text-muted-foreground">诊断 {section.error.diagnosticId}</code>
+        <code className="min-w-0 break-all text-xs text-muted-foreground">诊断 {section.error.diagnosticId}</code>
       ) : null}
-      {onRetry ? (
+      {onRetry && isRetryableMarketDetailSection(section) ? (
         <Button
           className="text-button"
           disabled={retrying}
@@ -203,11 +199,13 @@ const SectionHeading = ({
   section,
   onRetry,
   retrying,
+  showErrorMessage,
 }: {
   capability: MarketDetailCapability;
   section: MarketDetailSection;
   onRetry?: () => void;
   retrying: boolean;
+  showErrorMessage?: boolean;
 }) => {
   const title = capability === 'bars' && !sectionIsDataReady(section)
     ? '行情数据'
@@ -222,7 +220,7 @@ const SectionHeading = ({
           </span>
         ) : null}
       </div>
-      <SectionStatus section={section} {...(onRetry ? { onRetry } : {})} retrying={retrying} />
+      <SectionStatus section={section} {...(onRetry ? { onRetry } : {})} retrying={retrying} {...(showErrorMessage === undefined ? {} : { showErrorMessage })} />
     </div>
   );
 };
@@ -240,7 +238,7 @@ export const QuoteSection = ({
 }) => {
   const quote = section.data as Quote | undefined;
   let quoteDetail: string | undefined;
-  if (quote?.stale) quoteDetail = quoteUpstreamWindowLabel(section) ? '按上游间隔刷新' : '陈旧回退';
+  if (quote?.stale || quote?.sessionContext?.session === 'closed_snapshot') quoteDetail = quoteFreshnessLabel(quote);
   const quoteTone = quote ? quoteChangeTone(quote) : undefined;
   return (
     <section className="grid gap-3" data-market-detail-section="quote">
@@ -248,6 +246,7 @@ export const QuoteSection = ({
       <SectionHeading
         capability="quote"
         section={section}
+        showErrorMessage={section.status !== 'stale'}
         {...retryProps(section, onRetry)}
         retrying={retrying}
       />
@@ -304,7 +303,7 @@ export const BarsSection = ({
   indicators?: MarketChartIndicator[];
   chartPoints?: ChartPoint[];
   onIndicatorParamsChange?: (params: MarketIndicatorParams) => void;
-  onLoadEarlier?: () => void;
+  onLoadEarlier?: (start?: string) => void;
   canLoadEarlier?: boolean;
   historyLoading?: boolean;
   historyError?: string | null;

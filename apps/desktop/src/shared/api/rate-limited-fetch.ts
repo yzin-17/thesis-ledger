@@ -6,7 +6,8 @@ export function createRateLimitedFetch(fetcher: typeof fetch = fetch): typeof fe
   return async (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
-    const key = `${new URL(url).origin}:${method.toUpperCase()}`;
+    const target = new URL(url);
+    const key = `${target.origin}:${method.toUpperCase()}:${target.pathname}`;
     const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
     for (;;) {
       const remaining = (blockedUntil.get(key) ?? 0) - Date.now();

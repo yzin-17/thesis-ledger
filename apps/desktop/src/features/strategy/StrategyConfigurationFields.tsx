@@ -1,4 +1,4 @@
-import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
+import { StrategyExecutionInstrumentField } from './StrategyExecutionInstrumentField.js';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import {
   Field,
@@ -17,16 +17,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { StrategySchema } from './strategy.types.js';
+import { setStrategyPrimaryTimeframe } from './strategy.schema.js';
 import {
-  setStrategyExecutionAssetType,
-  setStrategyExecutionSymbol,
-  setStrategyPrimaryTimeframe,
-} from './strategy.schema.js';
-import {
-  strategyAssetTypeLabel,
   strategyExecutionModeLabel,
   strategyExecutionTimingLabel,
-  strategyMarketLabel,
   strategyOrderTypeLabel,
   strategyRiskTypeLabel,
   strategySizingTypeLabel,
@@ -58,7 +52,6 @@ export function StrategyConfigurationFields({
   schema: StrategySchema;
   onChange: (schema: StrategySchema) => void;
 }) {
-  const instrument = asRecord(schema.executionInstrument);
   const sizing = asRecord(schema.sizing);
   const execution = asRecord(schema.execution);
   const cost = asRecord(schema.cost);
@@ -79,30 +72,7 @@ export function StrategyConfigurationFields({
       <FieldSet className="min-w-0 gap-0">
         <FieldLegend className="mb-3 text-base font-semibold">交易标的</FieldLegend>
         <FieldGroup className="grid min-w-0 gap-3 sm:grid-cols-2">
-          <Field className="min-w-0 sm:col-span-2">
-            <FieldLabel htmlFor="strategy-v2-symbol">
-              执行标的{' '}
-              <span className="text-xs font-normal text-muted-foreground">
-                {strategyMarketLabel(instrument.market, '')}
-              </span>
-            </FieldLabel>
-            <InstrumentSymbolField
-              id="strategy-v2-symbol"
-              aria-label="执行标的"
-              markets={
-                text(instrument.market) === 'CN'
-                  ? ['SH', 'SZ', 'BJ', 'OF']
-                  : [text(instrument.market)]
-              }
-              instrumentTypes={[
-                execution.mode === 'nav'
-                  ? 'MUTUAL_FUND'
-                  : text(instrument.assetType, 'stock').toUpperCase(),
-              ]}
-              value={text(instrument.symbol, '')}
-              onChange={(value) => onChange(setStrategyExecutionSymbol(schema, value))}
-            />
-          </Field>
+          <StrategyExecutionInstrumentField schema={schema} onChange={onChange} />
           <Field>
             <FieldLabel htmlFor="strategy-v2-timeframe">主周期</FieldLabel>
             <Select
@@ -127,29 +97,6 @@ export function StrategyConfigurationFields({
               </SelectContent>
             </Select>
           </Field>
-          {execution.mode === 'exchange' && (
-            <Field>
-              <FieldLabel htmlFor="strategy-asset-type">资产类型</FieldLabel>
-              <Select
-                value={text(instrument.assetType, 'stock')}
-                onValueChange={(value) => {
-                  if (value === 'stock' || value === 'etf') {
-                    onChange(setStrategyExecutionAssetType(schema, value));
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full" id="strategy-asset-type">
-                  <SelectValue>{strategyAssetTypeLabel(instrument.assetType)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="stock">股票</SelectItem>
-                    <SelectItem value="etf">ETF</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-          )}
         </FieldGroup>
       </FieldSet>
       <FieldSet className="min-w-0 gap-0">

@@ -184,7 +184,7 @@ describe('Portfolio table contract', () => {
     );
 
     const table = html.match(
-      /<table>[\s\S]*?<thead>([\s\S]*?标的[\s\S]*?操作[\s\S]*?)<\/thead><tbody>([\s\S]*?)<\/tbody><\/table>/,
+      /<table>[\s\S]*?<thead[^>]*>([\s\S]*?标的[\s\S]*?操作[\s\S]*?)<\/thead><tbody>([\s\S]*?)<\/tbody><\/table>/,
     );
     expect(table).not.toBeNull();
     const headers = [...table![1]!.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((match) =>

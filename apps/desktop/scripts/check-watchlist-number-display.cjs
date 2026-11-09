@@ -1,5 +1,5 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const { mkdirSync, writeFileSync } = require('node:fs');
+const { mkdirSync, writeFileSync, rmSync } = require('node:fs');
 const { join } = require('node:path');
 const assert = require('node:assert/strict');
 const samples = require('../test/watchlist-number-samples.json');
@@ -22,7 +22,9 @@ mkdirSync(output, { recursive: true });
     requests = [];
   let activePage, activeCase;
   try {
-    for (const platform of ['desktop', 'mobile'])
+    for (const platform of (process.env.WATCHLIST_NUMBER_QA_PLATFORMS || 'desktop,mobile').split(
+      ',',
+    ))
       for (const width of [1440, 1024, 768, 390])
         for (const { name, expected } of scenarios) {
           activeCase = { platform, width, name };
@@ -62,6 +64,13 @@ mkdirSync(output, { recursive: true });
             const table = page.getByRole('table', { name: '自选标的' }),
               row = table.locator('tbody tr').first(),
               cells = row.locator('td');
+            assert.equal(
+              await table
+                .getByRole('columnheader', { name: '行情与来源时间', exact: true })
+                .count(),
+              0,
+            );
+            assert.equal(await cells.count(), 6);
             assert.equal((await cells.nth(1).innerText()).includes(expected.value), true);
             await page.evaluate(() => document.fonts.ready);
             const clippedPrice = await cells.nth(1).evaluate((el) => {
@@ -84,14 +93,71 @@ mkdirSync(output, { recursive: true });
             const changes = await cells.nth(2).innerText();
             assert.equal(changes.includes(expected.change), true);
             assert.equal(changes.includes(expected.changeAmount), true);
+            const quote = snapshot.prices[0].price.quote;
+            if (quote?.previousClose > 0 && quote.price !== quote.previousClose) {
+              const tone = quote.price > quote.previousClose ? 'up' : 'down';
+              const colors = await cells.nth(2).evaluate((cell, direction) => {
+                const probe = document.createElement('span');
+                probe.style.color = `var(--color-market-${direction})`;
+                cell.append(probe);
+                const expected = getComputedStyle(probe).color;
+                probe.remove();
+                return [
+                  getComputedStyle(cell).color,
+                  getComputedStyle(cell.querySelector('span.block')).color,
+                  expected,
+                ];
+              }, tone);
+              assert.equal(colors[0], colors[2]);
+              assert.equal(colors[1], colors[2]);
+            }
             const range = await cells.nth(4).innerText();
-            assert.equal(range.includes('振幅 ' + expected.amplitude), true);
             if (!['nav', 'unavailable'].includes(name)) {
+              assert.equal(range.includes('振幅 ' + expected.amplitude), true);
+              assert.equal(range.includes('今开 ' + expected.open), true);
+              assert.equal(range.includes('前收 ' + expected.previousClose), true);
               assert.equal(
-                range.includes('今开 ' + expected.open + ' · 前收 ' + expected.previousClose),
-                true,
+                await row.locator('svg[role="img"]').count(),
+                name === 'ordinary' ? 2 : 0,
               );
-              assert.equal(await row.locator('svg[role="img"]').count(), 1);
+              if (name === 'ordinary') {
+                const intraday = cells
+                  .nth(4)
+                  .getByRole('img', { name: '分时 · 1分钟，240个数据点', exact: true });
+                assert(await intraday.isVisible());
+                assert.equal(await intraday.locator('path').count(), 4);
+                assert.equal(
+                  await row
+                    .getByRole('img', { name: '日K线，20个交易日，前复权', exact: true })
+                    .locator('rect')
+                    .count(),
+                  20,
+                );
+                const info = row.getByRole('button', {
+                  name: '精度验收标的的来源与检查信息',
+                  exact: true,
+                });
+                assert.equal((await cells.nth(1).innerText()).includes('读取'), false);
+                assert(
+                  await cells
+                    .nth(1)
+                    .getByRole('button', { name: '精度验收标的的来源与检查信息', exact: true })
+                    .isVisible(),
+                );
+                await info.focus();
+                await page.getByText('来源与检查信息', { exact: true }).waitFor();
+                await page.getByText(/读取时间/).waitFor();
+                const tooltipBox = await page
+                  .locator('[data-slot="hover-card-content"]')
+                  .boundingBox();
+                assert(tooltipBox.x >= 0 && tooltipBox.x + tooltipBox.width <= width + 1);
+                assert(tooltipBox.y >= 0 && tooltipBox.y + tooltipBox.height <= 1001);
+                await page.keyboard.press('Escape');
+                await page
+                  .getByText('来源与检查信息', { exact: true })
+                  .waitFor({ state: 'hidden' });
+                await page.locator('body').click({ position: { x: 4, y: 4 } });
+              }
             } else assert.equal(await row.locator('svg[role="img"]').count(), 0);
             await cells.nth(0).getByRole('button').click();
             assert.equal(
@@ -129,7 +195,7 @@ mkdirSync(output, { recursive: true });
                 overflow: getComputedStyle(parent).overflowX,
               };
             });
-            if (width === 1024 || width === 768) {
+            if (width === 768) {
               assert.ok(contained.scroll > contained.client);
               assert.ok(['auto', 'scroll'].includes(contained.overflow));
             }
@@ -158,9 +224,9 @@ mkdirSync(output, { recursive: true });
           assert.equal(/NaN|Infinity/.test(body), false);
           if (name === 'ordinary') {
             for (const label of [
-              '休市 · 最近时段快照',
+              platform === 'desktop' ? '休市快照' : '休市 · 最近时段快照',
               '刷新失败，沿用上次报价',
-              '来源快照，非官方收盘价',
+              platform === 'desktop' ? '非官方收盘价' : '来源快照，非官方收盘价',
               '腾讯财经',
             ])
               assert.equal(body.includes(label), true);
@@ -169,7 +235,8 @@ mkdirSync(output, { recursive: true });
             for (const label of ['未覆盖最近交易时段', '请求冷却中，沿用上次报价', '腾讯财经'])
               assert.equal(body.includes(label), true);
           }
-          if (name === 'near-positive') assert.equal(body.includes('行情时间未知'), true);
+          if (name === 'near-positive')
+            assert.equal(body.replaceAll('行情 ', '行情').includes('行情时间未知'), true);
           if (name === 'nav') {
             assert.equal(body.includes('正式净值'), true);
             assert.equal(body.includes('2026-11-06'), true);
@@ -192,6 +259,8 @@ mkdirSync(output, { recursive: true });
         }
     assert.deepEqual(errors, []);
     assert.deepEqual(requests, []);
+    rmSync(join(output, 'failure.json'), { force: true });
+    rmSync(join(output, 'failure.png'), { force: true });
     writeFileSync(
       join(output, 'results.json'),
       JSON.stringify(

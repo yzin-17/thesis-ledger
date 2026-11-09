@@ -383,6 +383,8 @@ const mount = async (
   });
   requestMarketDetailMock.mockImplementationOnce(() => opening.promise);
   useQueryMock.mockImplementation((options: { queryKey: readonly unknown[]; queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => {
+    if (['market-minute-session', 'market-detail-auto'].includes(String(options.queryKey[1])))
+      return { data: null, dataUpdatedAt: 0, isError: false };
     if (options.queryKey[0] === 'market' && options.queryKey[1] === 'fund-daily-error')
       return { data: null, isSuccess: true };
     if (['market-period-options', 'market-minute-options', 'market-derived-minute-options', 'market-trade-chart'].includes(String(options.queryKey[1]))) return { data: { options: [] }, isSuccess: true };
@@ -474,7 +476,7 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
       await act(flushAsync);
       const request = requestMarketDetailMock.mock.calls.at(-1)![0];
       expect(request).toMatchObject({ chartContractVersion: 3, barsLimit: 180, refresh: true,
-        include: ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] });
+        include: [...(selector === '[data-market-retry]' ? ['quote'] : []), 'bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] });
       expect(request.start).toBeUndefined();
       expect(request.end).toBeUndefined();
       if (selector === '[data-market-section-retry]')
@@ -486,6 +488,7 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
 
   it.each(['none', 'qfq', 'hfq'] as const)('%s 口径贯穿打开、最新检查与分段重试', async (adjustment) => {
     const current = response(position.symbol, ['2026-09-15']);
+    current.barSeries!.identity.adjustment = adjustment;
     const mounted = await mount(current, adjustment);
     expect(requestMarketDetailMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ adjustment }), expect.any(AbortSignal),

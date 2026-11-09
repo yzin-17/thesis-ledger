@@ -1,4 +1,4 @@
-import { useRef, useState, type MutableRefObject } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import type { MarketDetailCapability, MarketDisplayDetailResponse as MarketDetailResponse } from '@thesis-ledger/api-client';
 import type { MarketIndicatorResult } from '@thesis-ledger/schemas';
@@ -24,6 +24,7 @@ export type UseMarketChartLatestRefreshOptions = {
   queryClient: QueryClient;
   symbol: string;
   navFund: boolean;
+  chartOnly?: boolean;
   adjustment?: 'none' | 'qfq' | 'hfq' | undefined;
   chartWindowV3: ChartWindowV3;
   refreshSequence: number;
@@ -52,11 +53,18 @@ export { latestDetailQueryKey };
 
 const expiredRequest = () => new DOMException('行情请求已过期', 'AbortError');
 
+function openingCapabilities(navFund: boolean, chartOnly: boolean | undefined): MarketDetailCapability[] | undefined {
+  if (navFund) return ['fund-nav', 'fund-nav-history'];
+  if (chartOnly) return ['quote', 'bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'];
+  return undefined;
+}
+
 export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefreshOptions) {
   const {
     queryClient,
     symbol,
     navFund,
+    chartOnly,
     adjustment,
     chartWindowV3,
     refreshSequence,
@@ -82,11 +90,19 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
     lifecycle,
     onLatestDetail,
   });
-  const queryResponseGenerationRef = useRef(new Map<string, number>());
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const retryQueryKeysRef = useRef<Array<readonly unknown[]>>([]);
   const retryRequestTokensRef = useRef(new Set<ActiveRequestToken>());
+
+  useEffect(() => {
+    setRetrying(null);
+    setRetryError(null);
+    for (const key of retryQueryKeysRef.current) void queryClient.cancelQueries({ queryKey: key });
+    retryQueryKeysRef.current = [];
+    for (const token of retryRequestTokensRef.current) lifecycle.finishRequest(token);
+    retryRequestTokensRef.current.clear();
+  }, [symbol, adjustment, chartWindowV3.timeframe]);
 
   const queryFn = async ({ signal }: LatestRefreshQueryContext) => {
     const queryKey = latestDetailQueryKey(
@@ -101,12 +117,11 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
     const requestToken = lifecycle.beginRequest();
     boundary.startOpeningLatest(queryKey, detail, attemptStartedAt, requestToken, latestCheck);
     try {
+      const include = openingCapabilities(navFund, chartOnly);
       const response = await requestMarketDetail(
         {
           symbol,
-          ...(navFund
-            ? { include: ['fund-nav', 'fund-nav-history'] as MarketDetailCapability[] }
-            : {}),
+          ...(include ? { include } : {}),
           ...(adjustment ? { adjustment } : {}),
           ...(chartWindowV3.calculationAnchor ? { calculationAnchor: chartWindowV3.calculationAnchor } : {}),
           barsLimit: chartWindowV3.barsLimit,
@@ -120,7 +135,6 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
       );
       if (!lifecycle.requestIsCurrent(requestToken, requestGeneration, symbol))
         throw expiredRequest();
-      queryResponseGenerationRef.current.set(response.requestId, requestGeneration);
       boundary.completeOpeningLatest(response, attemptStartedAt, latestCheck);
       return response;
     } finally {
@@ -210,7 +224,6 @@ export function useMarketChartLatestRefresh(options: UseMarketChartLatestRefresh
   return {
     ...boundary,
     queryFn,
-    queryResponseGenerationRef,
     retrying,
     retryError,
     retrySection,

@@ -4,7 +4,8 @@ import type {
   MarketDisplayDetailSection as MarketDetailSection,
   MarketDetailSectionStatus,
 } from '@thesis-ledger/api-client';
-import type { Currency, MarketDisplayBarSeries as BarSeries, Quote } from '@thesis-ledger/schemas';
+import type { Currency, MarketDisplayBarSeries as BarSeries } from '@thesis-ledger/schemas';
+import { isMarketMinuteTimeframe } from '@thesis-ledger/schemas';
 import { canCombineChartSeries } from './market-chart-acquisition.js';
 import type { MarketDetailResponse as NativeDetailResponse } from '@thesis-ledger/api-client';
 
@@ -59,7 +60,7 @@ export function mergeMarketDetail(
   let mergedBarSeries = nextSeries ?? currentSeries;
   if (currentSeries && nextSeries && canCombine && !('derivation' in currentSeries) && !('derivation' in nextSeries)) {
     // 日线按交易日合并，分钟保留同日每个独立时刻；重叠项由本次有效响应替换。
-    const key = (timestamp: string) => nextSeries.identity.timeframe === '1m'
+    const key = (timestamp: string) => isMarketMinuteTimeframe(nextSeries.identity.timeframe)
       ? new Date(timestamp).toISOString() : timestamp.slice(0, 10);
     const byDate = new Map(currentSeries.points.map((bar) => [key(bar.timestamp), bar]));
     nextSeries.points.forEach((bar) => byDate.set(key(bar.timestamp), bar));
@@ -115,16 +116,15 @@ export const marketDetailStatusLabel = (status: MarketDetailSectionStatus) => {
   return '暂时不可用';
 };
 
-export const marketDetailStatusClass = (status: MarketDetailSectionStatus) => {
-  if (status === 'ready') return 'tag';
-  if (status === 'stale') return 'tag warning';
-  if (status === 'unavailable') return 'tag danger';
-  return 'tag';
+export const marketDetailStatusVariant = (status: MarketDetailSectionStatus) => {
+  if (status === 'unavailable') return 'destructive';
+  if (status === 'ready') return 'secondary';
+  return 'outline';
 };
 
 export const marketDetailSectionTitle = (capability: MarketDetailCapability) => {
   if (capability === 'quote') return '实时行情';
-  if (capability === 'bars') return '最近日线';
+  if (capability === 'bars') return '历史行情';
   if (capability === 'chip') return '筹码摘要';
   if (capability === 'fund-nav') return '最新基金净值';
   if (capability === 'fund-nav-history') return '基金净值历史';
@@ -132,31 +132,6 @@ export const marketDetailSectionTitle = (capability: MarketDetailCapability) => 
 };
 
 export const isRetryableMarketDetailSection = (section: MarketDetailSection | undefined) =>
-  section?.status === 'unavailable';
-
-/**
- * DSA 对单标的 REALTIME_QUOTE 的最小上游刷新间隔（秒）。
- *
- * 依据 docs/specs/2026-09-14-portfolio-valuation-demand-guard.md §2（与 DSA
- * `PROVIDER_REQUEST_BUDGET_SECONDS` 一致）。Server 的 fresh 缓存只有 15 秒，
- * 因此间隔内的请求必然回退 last-valid 并携带 `stale=true`——这是真实语义，不是故障。
- * 该常量只用于展示层把「上游刷新间隔内的回退」与「真正过期的数据」区分开，
- * 不改变 stale / servedFromCache / marketTime 的任何语义。
- */
-export const MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS = 600;
-
-/** 以「这份行情被取回多久了」为口径，市场休市时 marketTime 可能远早于当前时间。 */
-export const quoteServedAgeMs = (quote: Quote | undefined, now = Date.now()) => {
-  if (!quote) return null;
-  const parsed = Date.parse(quote.fetchedAt ?? quote.marketTime);
-  if (!Number.isFinite(parsed)) return null;
-  return Math.max(0, now - parsed);
-};
-
-export const isQuoteWithinUpstreamRefreshWindow = (
-  quote: Quote | undefined,
-  now = Date.now(),
-) => {
-  const age = quoteServedAgeMs(quote, now);
-  return age !== null && age <= MARKET_QUOTE_UPSTREAM_REFRESH_SECONDS * 1_000;
-};
+  section?.status === 'unavailable' &&
+  !['capability_not_enabled', 'capability_unsupported', 'market_data_unauthorized',
+    'market_data_contract_invalid'].includes(section.error?.code ?? '');

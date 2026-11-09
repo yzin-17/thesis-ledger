@@ -12,6 +12,7 @@ import { MarketChartAttribution } from '../market-detail/MarketChartAttribution.
 import { chartBarsFromSeries } from '../market-detail/market-chart-types.js';
 import { chartCursorForKey, chartPointKey, formatChartBarTime } from '../market-detail/market-chart-time.js';
 import { fetchSecurityStaticQuote } from './security-static-info.api.js';
+import { quoteFreshnessLabel } from '@thesis-ledger/domain';
 
 const periods = ['1d', '1m'] as const;
 const labels = { '1d': '日线', '1m': '1 分钟' };
@@ -69,7 +70,7 @@ export function SecurityStaticPriceDialog({ info, onClose }: {
           <strong>最新价 {format.format(quote.data.price)} {quote.data.units?.priceCurrency ?? ''}</strong>
           <span>{quote.data.provider === 'futu' ? '富途 OpenAPI' : quote.data.provider}</span>
           <span>行情时间 {quote.data.marketTime ? new Date(quote.data.marketTime).toLocaleString('zh-CN') : '未知'}</span>
-          {quote.data.stale && <span>缓存行情</span>}
+          <span>{quoteFreshnessLabel(quote.data)}</span>
         </>}
         {quote.isPending && <LoadingState label="正在读取报价" />}
         {quote.error && <span role="alert">报价暂时无法读取，请检查来源配置或稍后刷新。</span>}

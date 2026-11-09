@@ -1,0 +1,90 @@
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const assert = require('node:assert/strict');
+const { mkdirSync, writeFileSync } = require('node:fs');
+const origin = process.env.CHART_TOOLS_QA_BASE_URL || 'http://localhost:5173';
+const output = process.env.CHART_TOOLS_QA_OUTPUT || '/tmp/chart-reference-tools-qa';
+mkdirSync(output, { recursive: true });
+async function chartGap(scope) {
+  const controls = await scope.locator('details').locator('..').boundingBox();
+  const plot = await scope.locator('[data-market-lightweight-chart]').boundingBox();
+  return plot.y - controls.y - controls.height;
+}
+(async () => {
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.CHART_TOOLS_CHROMIUM_EXECUTABLE });
+  const results = [];
+  try {
+    for (const width of [1440, 1024, 768, 390]) {
+      const page = await browser.newPage({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' });
+      page.setDefaultTimeout(10000);
+      const errors = [], reads = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      await page.route((url) => url.pathname.startsWith('/api/'), (route) => { reads.push(route.request().url()); return route.abort(); });
+      await page.goto(`${origin}/test/browser-market-number-readouts.html?case=ordinary`);
+      const chart = page.locator('[data-qa-stock]');
+      const model = chart.getByRole('button', { name: '模型模拟买卖点', exact: true });
+      await chart.locator('[data-market-lightweight-chart]').waitFor();
+      assert.equal(await model.isVisible(), true);
+      assert.equal(await model.evaluate((node) => node.closest('details') === null), true);
+      const summary = await chart.locator('summary').boundingBox();
+      assert(Math.abs((await model.boundingBox()).y - summary.y) < 1);
+      assert((await model.boundingBox()).x < summary.x);
+      assert.equal(await chart.getByRole('button', { name: '区间测量', exact: true }).isVisible(), false);
+      await chart.screenshot({ path: `${output}/collapsed-${width}.png`, animations: 'disabled' });
+      assert(await chartGap(chart) >= 11.5);
+      assert.equal(await chart.locator('details').evaluate((node) => node.open), false);
+      await model.click();
+      const notice = page.locator('[data-slot="toast"]').filter({ hasText: '暂无包含此标的的比赛' });
+      await notice.waitFor();
+      assert.equal(await chart.getByRole('button', { name: '模型模拟买卖点说明', exact: true }).count(), 0);
+      assert.equal(await notice.count(), 1);
+      await notice.locator('[data-slot="toast-close"]').click();
+      await notice.waitFor({ state: 'hidden' });
+      assert.equal(await model.getAttribute('aria-pressed'), 'false');
+      assert.equal(await chart.locator('[data-market-lightweight-chart]').count(), 1);
+      await model.click();
+      await notice.waitFor();
+      assert.equal(await notice.count(), 1);
+      await notice.locator('[data-slot="toast-close"]').click();
+      await notice.waitFor({ state: 'hidden' });
+      assert.equal(await model.getAttribute('aria-pressed'), 'false');
+      assert.equal(await chart.locator('details').evaluate((node) => node.open), false);
+      await chart.getByText('交易参考与测量', { exact: true }).click();
+      await model.waitFor();
+      const measure = chart.getByRole('button', { name: '区间测量', exact: true });
+      const actions = chart.getByRole('group', { name: '交易叠加与测量', exact: true });
+      assert.equal(await actions.getByRole('button', { name: '模型模拟买卖点', exact: true }).count(), 0);
+      assert((await measure.boundingBox()).y > (await model.boundingBox()).y);
+      assert(await chartGap(chart) >= 11.5);
+      await chart.screenshot({ path: `${output}/expanded-${width}.png`, animations: 'disabled' });
+      await measure.click();
+      await chart.getByText('请选择区间起点，再选择终点。', { exact: true }).waitFor();
+      await measure.click();
+      await chart.getByText('请选择区间起点，再选择终点。', { exact: true }).waitFor({ state: 'hidden' });
+      await chart.getByRole('button', { name: '全屏', exact: true }).click();
+      const fullscreen = page.getByRole('dialog').last();
+      await fullscreen.getByRole('button', { name: '模型模拟买卖点', exact: true }).waitFor();
+      assert.equal(await fullscreen.getByRole('button', { name: '区间测量', exact: true }).isVisible(), false);
+      assert(await chartGap(fullscreen) >= 11.5);
+      await page.keyboard.press('Escape');
+      await fullscreen.waitFor({ state: 'hidden' });
+      await chart.getByRole('button', { name: '全屏', exact: true }).waitFor();
+      await page.goto(`${origin}/test/browser-chart-choices.html`);
+      const standalone = page.getByRole('region', { name: '行情选项验证', exact: true });
+      const standaloneModel = standalone.getByRole('button', { name: '模型模拟买卖点', exact: true });
+      await standaloneModel.waitFor();
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const modelBox = await standaloneModel.boundingBox();
+      const standalonePlot = await standalone.locator('[data-market-lightweight-chart]').boundingBox();
+      assert(standalonePlot.y - modelBox.y - modelBox.height >= 11.5, JSON.stringify({ width, modelBox, standalonePlot }));
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      assert.deepEqual(errors, []);
+      assert.deepEqual(reads, []);
+      results.push({ width, emptyToast: true, alwaysVisibleModel: true, independentFold: true, chartGap: 12, modelToggle: true, measurementCancel: true, fullscreen: true, overflow: false });
+      console.log(JSON.stringify(results.at(-1)));
+      await page.close();
+    }
+  } finally {
+    writeFileSync(`${output}/results.json`, JSON.stringify(results, null, 2));
+    await browser.close();
+  }
+})().catch((error) => { console.error(error); process.exitCode = 1; });

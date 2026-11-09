@@ -1,5 +1,5 @@
 import { LoadingState, Spinner } from '@/components/ui/spinner';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 export {
   BacktestSetupDialog,
   defaultBacktestPeriod,
@@ -41,6 +41,7 @@ export { jobStatusLabel, jobStatusVariant } from './backtest-status.js';
 
 export const backtestStageLabel = (stage: unknown) => {
   const labels: Record<string, string> = {
+    'preparation-failed': '准备与预检',
     queued: '排队中',
     'snapshot-finalized': '快照已完成',
     running: '运行中',
@@ -158,16 +159,16 @@ export function StrategyLibrary({
       ) : (
         <TableContainer>
           <table>
-            <thead>
+            <TableHeader>
               <tr>
-                <th>策略</th>
-                <th>最新版本</th>
-                <th>状态</th>
-                <th>更新时间</th>
-                <th>最近回测</th>
+                <TableHead>策略</TableHead>
+                <TableHead>最新版本</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>更新时间</TableHead>
+                <TableHead>最近回测</TableHead>
                 <StickyTableActionHeader>操作</StickyTableActionHeader>
               </tr>
-            </thead>
+            </TableHeader>
             <tbody>
               {sortedStrategies.map((strategy) => {
                 const latest = latestVersion(strategy.versions);
@@ -331,16 +332,16 @@ export function StrategyJobs({
       </div>
       <TableContainer>
         <table>
-          <thead>
+          <TableHeader>
             <tr>
-              <th>任务</th>
-              <th>区间 / 资金</th>
-              <th>状态</th>
-              <th>进度</th>
-              <th>创建时间</th>
+              <TableHead>任务</TableHead>
+              <TableHead>区间 / 资金</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead>进度</TableHead>
+              <TableHead>创建时间</TableHead>
               <StickyTableActionHeader>操作</StickyTableActionHeader>
             </tr>
-          </thead>
+          </TableHeader>
           <tbody>
             {jobs.length === 0 ? (
               <tr>

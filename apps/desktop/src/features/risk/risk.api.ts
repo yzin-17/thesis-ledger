@@ -16,6 +16,10 @@ export const fetchRiskNotifications = (client?: DesktopRequestClient, signal?: A
   api(client).getNotifications(signal);
 export const fetchNotificationRouting = (client?: DesktopRequestClient, signal?: AbortSignal) =>
   api(client).getRouting(signal);
+export const fetchRiskNotificationRouting = (client?: DesktopRequestClient, signal?: AbortSignal) =>
+  api(client).getRiskRouting(signal);
+export const saveRiskNotificationRouting = (providers: string[], client?: DesktopRequestClient) =>
+  api(client).saveRiskRouting({ providers });
 export const createRiskRule = (input: CreateRiskRuleInput, client?: DesktopRequestClient) =>
   api(client).createRule(input);
 export const patchRiskRule = (ruleId: string, patch: object, client?: DesktopRequestClient) =>

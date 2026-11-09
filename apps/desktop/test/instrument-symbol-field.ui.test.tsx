@@ -208,3 +208,36 @@ it('keeps manually entered values on close and clears only on an explicit user a
   await act(async () => clear.click());
   expect(host.querySelector('output')!.textContent).toBe('');
 });
+
+it('清空标的筛选直接恢复全部并收起列表，默认状态不显示清空按钮', async () => {
+  function Filter() {
+    const [value, setValue] = useState('all');
+    return (
+      <InstrumentOptionField
+        label="交易标的筛选"
+        value={value}
+        clearValue="all"
+        options={[
+          { value: 'all', label: '全部标的' },
+          { value: '000001.OF', label: '我的基金' },
+        ]}
+        onChange={setValue}
+      />
+    );
+  }
+  await act(async () => root.render(<Filter />));
+  expect(input().value).toBe('全部标的');
+  expect(host.querySelector('[aria-label="清空标的"]')).toBeNull();
+  await act(async () => input().focus());
+  await act(async () =>
+    options()
+      .find((option) => option.textContent === '我的基金')!
+      .click(),
+  );
+  expect(input().value).toBe('我的基金');
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="清空标的"]')!.click());
+  expect(input().value).toBe('全部标的');
+  expect(input().getAttribute('aria-expanded')).toBe('false');
+  expect(host.querySelector('[aria-label="清空标的"]')).toBeNull();
+  expect(api.search).not.toHaveBeenCalled();
+});

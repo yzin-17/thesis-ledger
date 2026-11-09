@@ -9,6 +9,7 @@ import {
   type BacktestExecutionModelV3,
   type OptimizationPreparationTarget,
   type OptimizationRunPreparationRequest,
+  type StrategySubmissionInput,
 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,7 @@ export function OptimizationPricePreparation({
   endDate: string;
   currency: 'CNY' | 'HKD' | 'USD';
   initialCash: string;
-  settings: ()=>Extract<import('@thesis-ledger/schemas').StrategySubmissionInput,{kind:'optimization'}>['settings'];
+  settings: ()=>Extract<StrategySubmissionInput,{kind:'optimization'}>['settings'];
   onPrepared: (value: PreparedOptimizationConfiguration | null) => void;
 }) {
   const [adjustment, setAdjustment] = useState<keyof typeof adjustments>('qfq');
@@ -226,7 +227,7 @@ export function OptimizationPricePreparation({
       )}
       <Button type="button" disabled={!model||automatic.isPending||query.isFetching} onClick={()=>prepare(true)}>准备并创建零价模型实验</Button>
       {automatic.isSuccess && <p>提交已登记，可在策略中心查看后台进度。</p>}
-      {automatic.isError && <FieldError>{automatic.error.message}</FieldError>}
+      {automatic.isError && <Field invalid><FieldError>{automatic.error.message}</FieldError></Field>}
       <Button
         aria-busy={query.isFetching}
         type="button"

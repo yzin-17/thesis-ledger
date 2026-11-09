@@ -1,5 +1,5 @@
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -222,17 +222,17 @@ export function PortfolioTradeView({
         {trades.length > 0 && (
           <TableContainer>
             <table>
-              <thead>
+              <TableHeader>
                 <tr>
-                  <th>标的</th>
-                  <th className="text-left">账户</th>
-                  <th>开始 / 结束</th>
-                  <th className="text-right">数量</th>
-                  <th className="text-right">净实现盈亏</th>
-                  <th>状态</th>
+                  <TableHead>标的</TableHead>
+                  <TableHead className="text-left">账户</TableHead>
+                  <TableHead>开始 / 结束</TableHead>
+                  <TableHead className="text-right">数量</TableHead>
+                  <TableHead className="text-right">净实现盈亏</TableHead>
+                  <TableHead>状态</TableHead>
                   <StickyTableActionHeader>操作</StickyTableActionHeader>
                 </tr>
-              </thead>
+              </TableHeader>
               <tbody>
                 {trades.map((trade) => (
                   <tr key={trade.id}>

@@ -8,6 +8,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { requestDesktopJson } from '../shared/request.js';
+import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { setIdentitySession } from '../../shared/api/identity-session.js';
 import { useAuthoringContext } from './use-authoring-identity.js';
 
@@ -49,7 +50,7 @@ export function AuthoringIdentity({ disabled = false }: { disabled?: boolean }) 
     return (
       <Alert variant="destructive">
         <AlertTitle>无法读取工作区</AlertTitle>
-        <AlertDescription>{context.error.message}</AlertDescription>
+        <AlertDescription>{requestFailureMessage(context.error)}</AlertDescription>
         <AlertAction>
           <Button variant="outline" disabled={disabled} onClick={() => void context.refetch()}>
             重新读取

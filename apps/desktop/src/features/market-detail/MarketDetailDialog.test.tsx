@@ -115,6 +115,7 @@ const staleQuoteWithinUpstreamWindow = (fetchedAt: string) => ({
   stale: true,
   servedFromCache: true,
   freshness: 'stale' as const,
+  refreshFailure: 'budget_cooldown' as const,
   fetchedAt,
 });
 
@@ -331,7 +332,7 @@ describe('MarketDetailDialog UI contract', () => {
     expect(fundHtml).not.toContain('data-market-detail-section="quote"');
   });
 
-  it('上游刷新间隔内的行情回退只提示、不告警', () => {
+  it('有明确原因的行情冷却直接说明请求窗口', () => {
     const now = Date.now();
     useQueryMock.mockReturnValue({
       data: detailWithStaleQuote(new Date(now - 60_000).toISOString()),
@@ -340,34 +341,59 @@ describe('MarketDetailDialog UI contract', () => {
       isFetching: false,
     });
     const html = renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
-    expect(html).toContain('行情按上游刷新间隔更新');
-    expect(html).toContain('按上游间隔刷新');
-    expect(html).not.toContain('行情详情可能陈旧');
+    expect(html).toContain('行情刷新冷却中');
+    expect(html).toContain('本次未再次请求来源');
+    expect(html).not.toContain('行情数据时效提示');
     expect(html).not.toContain('陈旧回退');
     // 徽标与横幅保持一致：间隔内不显示告警色「陈旧」，契约状态仍为 stale。
-    expect(html).toContain('按上游间隔');
+    expect(html).toContain('刷新冷却中');
     expect(html).not.toMatch(/>陈旧</);
     expect(html).toContain('data-section-status="stale"');
     // 提示位于「实时行情」分段的分界线之下、标题之上。
     expect(html.indexOf('data-market-detail-section="quote"')).toBeLessThan(
-      html.indexOf('行情按上游刷新间隔更新'),
+      html.indexOf('行情刷新冷却中'),
     );
-    expect(html.indexOf('行情按上游刷新间隔更新')).toBeLessThan(html.indexOf('实时行情</h3>'));
+    expect(html.indexOf('行情刷新冷却中')).toBeLessThan(html.indexOf('实时行情</h3>'));
   });
 
-  it('超过上游刷新间隔的行情回退仍保持陈旧告警', () => {
+  it('正常休市快照使用信息提示，两个来源时点分行且不显示陈旧告警', () => {
+    useQueryMock.mockReturnValue({
+      data: detail({ requested: ['quote'], sections: { quote: {
+        capability: 'quote', status: 'ready', data: {
+          ...readyQuote, stale: false, freshness: 'delayed',
+          sessionContext: { session: 'closed_snapshot', evaluatedAt: '2026-11-09T02:00:00Z', latestTradingDate: '2026-11-06', calendarRevision: 'verified' },
+        },
+      } } }), isPending: false, isError: false, isFetching: false,
+    });
+    const html = renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
+    expect(html).toContain('休市快照'); expect(html).toContain('最近交易日（2026-11-06）');
+    expect(html).toContain('whitespace-pre-line');
+    expect(html).toMatch(/\n行情时间：[^\n]+\n抓取时间：/);
+    expect(html).not.toContain('行情数据时效提示'); expect(html).not.toMatch(/>陈旧</);
+  });
+
+  it('刷新超时不能因刚读取缓存而被当成正常刷新间隔', () => {
     const now = Date.now();
     useQueryMock.mockReturnValue({
-      data: detailWithStaleQuote(new Date(now - 30 * 60_000).toISOString()),
+      data: detail({ requested: ['quote'], sections: { quote: {
+        capability: 'quote', status: 'stale', data: {
+          ...staleQuoteWithinUpstreamWindow(new Date(now - 60_000).toISOString()),
+          refreshFailure: 'fetch_failed',
+          staleReason: { code: 'timeout', message: '数据源请求超时，当前展示上次成功取得的数据。' },
+        },
+      } } }),
       isPending: false,
       isError: false,
       isFetching: false,
     });
     const html = renderToStaticMarkup(<MarketDetailDialog position={position} onClose={vi.fn()} />);
-    expect(html).toContain('行情详情可能陈旧');
-    expect(html).toContain('陈旧回退');
+    expect(html).toContain('行情数据时效提示');
+    expect(html).toContain('数据源请求超时');
+    expect(html).toContain('刷新失败，保留旧数据');
+    expect(html).toContain('行情时间：');
+    expect(html).toContain('抓取时间：');
     expect(html).toMatch(/>陈旧</);
-    expect(html).not.toContain('行情按上游刷新间隔更新');
+    expect(html).not.toContain('行情刷新冷却中');
   });
 
   it('保留 loading 和整页读取失败状态', () => {
@@ -392,7 +418,7 @@ describe('MarketDetailDialog UI contract', () => {
       <MarketDetailDialog position={position} onClose={vi.fn()} />,
     );
     expect(errorHtml).toContain('行情详情读取失败');
-    expect(errorHtml).toContain('重新加载');
+    expect(errorHtml).toContain('aria-label="刷新行情"');
   });
 
   it('重新打开即使命中客户端缓存也始终重新执行最新检查', () => {

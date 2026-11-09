@@ -17,6 +17,8 @@ vi.mock('../src/features/risk/risk.api.js', () => ({
   fetchRiskEvents: vi.fn(),
   fetchRiskNotifications: vi.fn(),
   fetchNotificationRouting: vi.fn(),
+  fetchRiskNotificationRouting: vi.fn(),
+  saveRiskNotificationRouting: vi.fn(),
   fetchRiskAudit: vi.fn(),
   createRiskRule: vi.fn(),
   patchRiskRule: vi.fn(),
@@ -111,6 +113,7 @@ beforeEach(() => {
   vi.mocked(api.fetchRiskEvents).mockResolvedValue([]);
   vi.mocked(api.fetchRiskNotifications).mockResolvedValue([]);
   vi.mocked(api.fetchNotificationRouting).mockResolvedValue({ routes: [] });
+  vi.mocked(api.fetchRiskNotificationRouting).mockResolvedValue({ availableRoutes: [], selectedProviders: [], updatedAt: null });
 });
 afterEach(async () => {
   if (root) await act(async () => root.unmount());
@@ -132,7 +135,7 @@ describe('风险管理未过的异常与确认读取', () => {
       const panel = () => document.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])')!;
       expect(panel().textContent).toContain(`${subject}读取失败`);
       expect(panel().textContent).not.toContain('暂无');
-      await act(async () => panel().querySelector<HTMLButtonElement>('button')!.click());
+      await act(async () => [...panel().querySelectorAll<HTMLButtonElement>('button')].find((element) => element.textContent?.trim() === '重新加载')!.click());
       await flush();
       expect(panel().textContent).toContain('暂无');
       expect(panel().textContent).not.toContain('读取失败');
@@ -224,6 +227,18 @@ describe('风险管理未过的异常与确认读取', () => {
     expect(api.fetchRiskAudit).toHaveBeenCalledTimes(2);
     await click('关闭');
     expect(api.testRiskRule).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { evaluatedRuleCount: 0, results: [], title: '未执行风险扫描', type: 'info', message: '当前没有可执行的风险规则' },
+    { evaluatedRuleCount: 1, results: [{ ruleId: rule.id, errorCode: 'input-unavailable', error: '组合持仓权重缺失，请补齐估值' }], title: '风险扫描未完成', type: 'error', message: '组合持仓权重缺失' },
+  ])('扫描响应正确反馈 $title', async ({ title, type, message, ...response }) => {
+    vi.mocked(api.scanRisk).mockResolvedValue({ traceId: 'trace', scanId: 'scan-controlled', ...response });
+    await mount('overview');
+    await click('立即执行风险规则');
+    expect(toast.add).toHaveBeenCalledWith(expect.objectContaining({
+      title, type, description: expect.stringContaining(message),
+    }));
   });
 
   it('人工测试和扫描失败反馈不变成成功，重试不发送通知', async () => {

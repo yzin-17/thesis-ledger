@@ -74,14 +74,9 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
         data-account-manager-view={accountFormInline ? 'list' : undefined}
       >
         {accountFormInline && (
-          <SheetHeader className="mb-6">
-            <SheetTitle>账户设置</SheetTitle>
-            <SheetDescription id="account-manager-description">
-              账户是成交、持仓快照和现金快照的容器。
-            </SheetDescription>
-          </SheetHeader>
+          <SheetTitle className="sr-only p-0">账户设置</SheetTitle>
         )}
-        <div className="flex items-center justify-between gap-4">
+        <div className={cn('flex items-center justify-between gap-4', accountFormInline && 'pr-10')}>
           <h2 className="m-0 text-xl font-semibold">已有账户</h2>
           <Button
             type="button"

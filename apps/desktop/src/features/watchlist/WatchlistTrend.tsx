@@ -1,18 +1,18 @@
-import { cn } from '@/lib/utils';
 import { dataSourceDisplay } from '../market-data/market-data.types.js';
 import { useQuery } from '@tanstack/react-query';
 import type { WatchlistItem, WatchlistPrice } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
-import { marketToneClass, marketToneForValue } from '../../ui/market-color.js';
 import { useWatchlistPageVisible, useWatchlistRowVisible } from './useWatchlistVisibility.js';
 import {
   watchlistSourceCadence,
   sourceNextCheck,
   type CadenceCatalog,
 } from './watchlist-source-cadence.js';
-import { trendPaths, watchlistTrend, type WatchlistTrend as TrendData } from './watchlist-trend.js';
+import { watchlistTrend, type WatchlistTrend as TrendData } from './watchlist-trend.js';
+import { watchlistTrendGeometry } from './watchlist-trend-geometry.js';
+import { WatchlistCandles } from './WatchlistCandles.js';
 
 export function WatchlistTrend({
   item,
@@ -57,8 +57,8 @@ export function WatchlistTrend({
             label: '分时 · 1分钟',
             notice:
               option?.reason === 'route_not_configured'
-                ? '未配置分时来源，可切换近20交易日'
-                : '当前分时来源不可用，可切换近20交易日',
+                ? '未配置分钟行情来源'
+                : '当前分钟行情来源不可用',
           };
       }
       // This endpoint validates the source/window; include only the needed series, no indicators.
@@ -95,9 +95,9 @@ export function WatchlistTrend({
   const data = query.data;
   const points = data?.points ?? [];
   const cadence = cadenceFor(data);
-  const paths = trendPaths(points, minute);
-  const delta = points.length > 1 ? points.at(-1)!.value - points[0]!.value : undefined;
-  let label = '近20交易日 · 前复权';
+  const session = snap?.quoteContext ?? (snap?.price.kind === 'quote' ? snap.price.quote.sessionContext : undefined);
+  const { paths, dividers } = watchlistTrendGeometry(points, minute, session?.marketSession?.sessions);
+  let label = '日线 · 前复权';
   if (fund) label = '近20期净值';
   else if (minute) label = '分时 · 1分钟';
   let state = '滚动到此处后读取';
@@ -116,29 +116,39 @@ export function WatchlistTrend({
         <span className="text-left text-xs font-normal text-muted-foreground">
           {data?.label ?? label}
         </span>
-        {paths.length > 0 && (
-          <svg
-            viewBox="0 0 160 44"
-            className={cn(
-              'size-full h-11',
-              marketToneClass(marketToneForValue(delta)) ?? 'text-foreground',
-            )}
-            role="img"
-            aria-label={`${label}，${points.length}个数据点`}
-          >
-            {paths.map((d, index) => (
-              <path key={index} d={d} fill="none" stroke="currentColor" strokeWidth="1.6" />
-            ))}
-          </svg>
-        )}
-        {data?.source && (
-          <span className="text-left text-xs font-normal text-muted-foreground">
-            {dataSourceDisplay(data.source)}
-          </span>
+        {!fund && !minute && data?.candles ? (
+          <WatchlistCandles candles={data.candles} />
+        ) : (
+          paths.length > 0 && (
+            <svg
+              viewBox="0 0 160 44"
+              className="size-full h-11 text-chart-1"
+              role="img"
+              aria-label={`${label}，${points.length}个数据点`}
+            >
+              {dividers.map((x) => (
+                <line
+                  key={x}
+                  x1={x}
+                  x2={x}
+                  y1="3"
+                  y2="41"
+                  className="stroke-muted-foreground/50"
+                  strokeWidth="1"
+                  strokeDasharray="2 2"
+                >
+                  <title>交易时段间隔</title>
+                </line>
+              ))}
+              {paths.map((d, index) => (
+                <path key={index} d={d} fill="none" stroke="currentColor" strokeWidth="1.6" />
+              ))}
+            </svg>
+          )
         )}
         {data?.cutoff && (
           <span className="text-left text-xs font-normal text-muted-foreground">
-            截至{' '}
+            {data.source && <>{dataSourceDisplay(data.source)} · </>}
             {new Date(data.cutoff).toLocaleString('zh-CN', {
               year: 'numeric',
               month: '2-digit',
@@ -148,10 +158,8 @@ export function WatchlistTrend({
           </span>
         )}
       </Button>
-      {data?.source && (
-        <span className="block text-muted-foreground">
-          {cadence ? `检查基准：来源${cadence.label}` : '来源周期待确认，自动走势检查暂停'}
-        </span>
+      {data?.source && !cadence && (
+        <span className="block text-muted-foreground">自动走势检查暂停</span>
       )}
       {(query.error || data?.notice || points.length < 2) && (
         <span className="block break-words text-muted-foreground">{state}</span>

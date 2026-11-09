@@ -1,7 +1,7 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { InputGroupAddon, InputGroupButton } from '@/components/ui/input-group';
+import { InputGroupButton } from '@/components/ui/input-group';
 import type { InstrumentSearchResult } from '@thesis-ledger/schemas';
 import {
   Combobox,
@@ -34,6 +34,8 @@ export type InstrumentSearchComboboxProps<T extends CatalogChoice> = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onInputChange: (input: string) => void;
+  onClear?: () => void;
+  clearable?: boolean;
   onSelect: (item: T) => void;
   label?: string | undefined;
   id?: string | undefined;
@@ -51,6 +53,8 @@ export function InstrumentSearchCombobox<T extends CatalogChoice>({
   open,
   onOpenChange,
   onInputChange,
+  onClear,
+  clearable = true,
   onSelect,
   label = '搜索代码或名称',
   id,
@@ -97,9 +101,8 @@ export function InstrumentSearchCombobox<T extends CatalogChoice>({
         onClick={() => onOpenChange(true)}
         onKeyDown={closeOnEscape}
         className="w-full min-w-0"
-      >
-        {input && (
-          <InputGroupAddon align="inline-end">
+        endActions={
+          input && clearable ? (
             <InputGroupButton
               aria-label="清空标的"
               size="icon-xs"
@@ -107,15 +110,20 @@ export function InstrumentSearchCombobox<T extends CatalogChoice>({
               disabled={disabled}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
+                if (onClear) {
+                  inputRef.current?.focus();
+                  onClear();
+                  return;
+                }
                 onInputChange('');
                 inputRef.current?.focus();
               }}
             >
               <X aria-hidden="true" />
             </InputGroupButton>
-          </InputGroupAddon>
-        )}
-      </ComboboxInput>
+          ) : null
+        }
+      />
       <ComboboxContent className="min-w-0" onKeyDown={closeOnEscape}>
         <ListRefreshRegion refreshing={busy && items.length > 0} label="正在刷新标的搜索">
           <ComboboxEmpty aria-live="polite">

@@ -1,29 +1,21 @@
-import { useState, useSyncExternalStore, type ComponentProps } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Link, useLocation } from 'react-router';
+import { ArenaEmptyToast } from './ArenaEmptyToast.js';
+import { useArenaEmptyToast, type ArenaAvailability } from './useArenaEmptyToast.js';
+import { InfoTip } from '@/components/ui/info-tip';
+import { arenaChartWindow } from './arena-price-points.js';
+import { useArenaPriceData, readArenaOverlayPreference, rememberArenaOverlayPreference, type ArenaPriceData } from './useArenaPriceData.js';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from 'react';
+import { ArenaPointDetails } from './ArenaPointDetails.js';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LightweightMarketChart } from '../market-detail/MarketPriceLightweightChart.js';
-import { getDesktopApiClient } from '../../shared/api/client.js';
 import {
   currentIdentitySession,
   subscribeIdentitySession,
 } from '../../shared/api/identity-session.js';
 type Props = ComponentProps<typeof LightweightMarketChart>;
-function stored(key: string) {
-  try {
-    return window.sessionStorage.getItem(key) ?? '';
-  } catch {
-    return '';
-  }
-}
-function remember(key: string, value: string) {
-  try {
-    window.sessionStorage.setItem(key, value);
-  } catch {
-    /* 当前页仍保留用户选择。 */
-  }
-}
-export function ArenaPriceLayer(props: Props) {
+export function ArenaPriceLayer({ renderControls, ...props }: Props & {
+  renderControls?: ((modelToggle: ReactNode) => ReactNode) | undefined;
+}) {
   const symbol = props.bars[0]?.symbol;
   const owner = useSyncExternalStore(
     subscribeIdentitySession,
@@ -32,121 +24,66 @@ export function ArenaPriceLayer(props: Props) {
   );
   const key = 'arena-layer:' + owner + ':' + (symbol ?? '');
   const [choice, setChoice] = useState<{ key: string; enabled: boolean } | null>(null);
-  const enabled = choice?.key === key ? choice.enabled : stored(key) === 'open';
+  const notice = useArenaEmptyToast(JSON.stringify([key, props.bars[0]?.timeframe, props.bars[0]?.adjustment]));
+  const enabled = choice?.key === key ? choice.enabled : readArenaOverlayPreference(key) === 'open';
   function toggle() {
+    notice.request(!enabled);
     setChoice({ key, enabled: !enabled });
-    remember(key, enabled ? 'closed' : 'open');
+    rememberArenaOverlayPreference(key, enabled ? 'closed' : 'open');
   }
-  if (!symbol || props.bars[0]?.timeframe !== '1d') return <LightweightMarketChart {...props} />;
+  const supported = Boolean(arenaChartWindow(props.bars));
+  const active = supported && enabled && Boolean(symbol);
+  const data = useArenaPriceData(props.bars, owner, active);
+  const report = useCallback((availability: ArenaAvailability) => {
+    notice.report(availability);
+    if (availability === 'empty') {
+      rememberArenaOverlayPreference(key, 'closed');
+      setChoice({ key, enabled: false });
+    }
+  }, [key, notice.report]);
+  useEffect(() => { if (active) report(data.availability); }, [active, data.availability, report]);
+  const overlay = useMemo(() => {
+    if (!data.markers.length) return props.tradingOverlays;
+    return { markers: [], lines: [], ...props.tradingOverlays, arenaMarkers: data.markers };
+  }, [data.markers, props.tradingOverlays]);
+  let hint: ReactNode = null;
+  if (!supported) hint = <InfoTip label="模型模拟买卖点说明">模型点位按交易日记录，请切换日线、周线等日级周期查看。</InfoTip>;
+  const modelToggle = symbol ? (
+    <span className="inline-flex items-center gap-2"><Button type="button" size="sm" variant={active ? 'default' : 'outline'} className="justify-self-start" disabled={!supported} aria-pressed={active} aria-busy={active && data.availability === 'pending'} onClick={toggle}>
+      模型模拟买卖点
+    </Button>{hint}</span>
+  ) : null;
   return (
-    <>
-      <Button size="sm" variant="outline" aria-pressed={enabled} onClick={toggle}>
-        模型模拟买卖点
-      </Button>
-      {enabled ? (
-        <SelectedLayer key={symbol} symbol={symbol} {...props} />
-      ) : (
-        <LightweightMarketChart {...props} />
-      )}
-    </>
+    <div ref={notice.anchor} className="grid min-w-0 gap-3" data-market-chart-reference-region>
+      <ArenaEmptyToast notice={notice} />
+      {renderControls ? renderControls(modelToggle) : modelToggle}
+      <ArenaSelection data={data} enabled={active} />
+      {active && data.availability === 'error' ? <p>模拟点位读取失败</p> : null}
+      <LightweightMarketChart {...props} tradingOverlays={overlay} onClick={(key) => {
+        if (active) data.selectDay(key);
+        props.onClick(key);
+      }} />
+    </div>
   );
 }
-function SelectedLayer({ symbol, ...props }: Props & { symbol: string }) {
-  const origin = useLocation();
-  const api = getDesktopApiClient().modelArenas;
-  const owner = useSyncExternalStore(
-    subscribeIdentitySession,
-    () => currentIdentitySession()?.principal.id ?? 'local-workspace',
-  );
-  const key = 'arena-overlay:' + window.location.origin + ':' + owner + ':' + symbol;
-  const [match, setMatch] = useState(() => stored(key)),
-    [entrant, setEntrant] = useState(() => stored(key + ':model')),
-    [day, setDay] = useState('');
-  const root = ['desktop', window.location.origin, owner, 'arena-overlay'];
-  const list = useQuery({ queryKey: [...root, 'list'], queryFn: ({ signal }) => api.list(signal) });
-  const choices =
-    list.data?.filter((m) => m.protocol.instruments.some((i) => i.symbol === symbol)) ?? [];
-  const active = choices.find((m) => m.id === match);
-  const detail = useQuery({
-    queryKey: [...root, 'match', match],
-    enabled: !!active,
-    queryFn: ({ signal }) => api.get(match, signal),
-  });
-  const start = props.bars[0]!.timestamp.slice(0, 10),
-    end = props.bars.at(-1)!.timestamp.slice(0, 10);
-  const selected = detail.data?.entrants.find((e) => e.id === entrant)?.id;
-  const points = useQuery({
-    queryKey: [...root, match, symbol, start, end, selected],
-    enabled: !!active,
-    queryFn: ({ signal }) =>
-      api.points(match, { symbol, start, end, ...(selected && { entrantId: selected }) }, signal),
-  });
-  const data = active ? (points.data ?? []) : [];
-  const valid = new Set(props.bars.map((b) => b.timestamp.slice(0, 10)));
-  const overlay = {
-    markers: [],
-    lines: [],
-    ...props.tradingOverlays,
-    arenaMarkers: data.filter((f) => valid.has(f.day)),
-  };
-  return (
-    <>
-      <div className="flex flex-wrap gap-2">
-        {choices.map((m) => (
-          <Button
-            size="sm"
-            variant={m.id === match ? 'default' : 'outline'}
-            key={m.id}
-            onClick={() => {
-              remember(key, m.id);
-              remember(key + ':model', '');
-              setMatch(m.id);
-              setEntrant('');
-              setDay('');
-            }}
-          >
-            {m.protocol.title}
-          </Button>
-        ))}
-        {active &&
-          [{ id: '', model: '全部模型' }, ...(detail.data?.entrants ?? [])].map((e) => (
-            <Button
-              key={e.id}
-              aria-pressed={e.id === entrant}
-              variant="outline"
-              onClick={() => {
-                remember(key + ':model', e.id);
-                setEntrant(e.id);
-                setDay('');
-              }}
-            >
-              {e.model}
-            </Button>
-          ))}
-      </div>
-      {(list.isError || points.isError) && <p>模拟点位读取失败</p>}
-      {list.isSuccess && !points.isError && !choices.length && <p>暂无包含此标的的比赛</p>}
-      <LightweightMarketChart
-        {...props}
-        tradingOverlays={overlay}
-        onClick={(k) => {
-          setDay(k ?? '');
-          props.onClick(k);
-        }}
-      />
-      {data
-        .filter((p) => !day || p.day === day)
-        .map((p) => (
-          <div key={p.id}>
-            <Link
-              state={{ arenaReturn: origin.pathname + origin.search }}
-              to={'/strategy/arena/' + p.arenaId + '/' + p.roundId + '#model-' + p.entrantId}
-            >
-              {p.day} · {p.model} · 模拟{p.side === 'buy' ? '买入' : '卖出'} {p.quantity} 股 ×{' '}
-              {p.price}
-            </Link>
-          </div>
-        ))}
-    </>
-  );
+function ArenaSelection({ data, enabled }: { data: ArenaPriceData; enabled: boolean }) {
+  if (!enabled) return null;
+  const matches = data.choices.map(match => ({ value: match.id, label: match.protocol.title }));
+  const models = [{ value: 'all', label: '全部模型' }, ...(data.detail?.entrants ?? []).map(entrant => ({ value: entrant.id, label: entrant.model }))];
+  const selected = models.some(model => model.value === data.state.entrant) ? data.state.entrant : 'all';
+  return <div className="flex flex-wrap items-center gap-2 empty:hidden" data-arena-selection>
+    {matches.length > 0 && <Select items={matches} value={data.active?.id ?? null} onValueChange={value => { if (value) data.selectMatch(value); }}>
+      <SelectTrigger size="sm" aria-label="模型比赛" className="w-full sm:w-80"><SelectValue placeholder="选择比赛" /></SelectTrigger>
+      <SelectContent align="start" alignItemWithTrigger={false}><SelectGroup>
+        {matches.map(match => <SelectItem key={match.value} value={match.value}>{match.label}</SelectItem>)}
+      </SelectGroup></SelectContent>
+    </Select>}
+    {data.active && <Select items={models} value={selected} onValueChange={value => { if (value) data.selectEntrant(value === 'all' ? '' : value); }}>
+      <SelectTrigger size="sm" aria-label="模型筛选" className="w-full sm:w-64"><SelectValue /></SelectTrigger>
+      <SelectContent align="start" alignItemWithTrigger={false}><SelectGroup>
+        {models.map(model => <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>)}
+      </SelectGroup></SelectContent>
+    </Select>}
+    {data.active && data.markers.length > 0 && <ArenaPointDetails data={data} />}
+  </div>;
 }

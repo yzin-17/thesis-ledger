@@ -2,7 +2,7 @@ import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { LoadingState } from '@/components/ui/spinner';
 import { useSyncExternalStore } from 'react';
 import { ArenaSetup } from './ArenaSetup.js';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'react-router';
@@ -152,7 +152,7 @@ export function ArenaPage() {
                 </p>
                 <TableContainer>
                   <table>
-                    <thead>
+                    <TableHeader>
                       <tr>
                         {[
                           '参赛模型或基准',
@@ -163,12 +163,12 @@ export function ArenaPage() {
                           '换手',
                           '交易费',
                         ].map((s) => (
-                          <th key={s} className="px-2 text-start">
+                          <TableHead key={s} className="text-start">
                             {s}
-                          </th>
+                          </TableHead>
                         ))}
                       </tr>
-                    </thead>
+                    </TableHeader>
                     <tbody>
                       {comparison.data.rows.map((r) => (
                         <tr key={r.id}>

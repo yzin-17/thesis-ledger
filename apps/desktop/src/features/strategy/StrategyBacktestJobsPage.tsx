@@ -1,5 +1,5 @@
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -217,17 +217,17 @@ export function StrategyBacktestJobsPage({ strategies }: { strategies: StrategyR
         {groups.data && groups.data.items.length > 0 && (
           <TableContainer>
             <table className="w-full min-w-[1000px] table-fixed text-sm">
-              <thead className="border-b text-left">
+              <TableHeader className="border-b text-left">
                 <tr>
-                  <th className="w-[34%] px-4 py-3 font-medium">任务 / 策略版本</th>
-                  <th className="w-[21%] px-4 py-3 font-medium">回测区间</th>
-                  <th className="w-[14%] px-4 py-3 font-medium">状态与进度</th>
-                  <th className="w-[23%] px-4 py-3 font-medium">结果摘要</th>
-                  <th data-table-action-static className="w-[8%] px-2 py-3 text-right font-medium">
+                  <TableHead className="w-[34%]">任务 / 策略版本</TableHead>
+                  <TableHead className="w-[21%]">回测区间</TableHead>
+                  <TableHead className="w-[14%]">状态与进度</TableHead>
+                  <TableHead className="w-[23%]">结果摘要</TableHead>
+                  <TableHead data-table-action-static className="w-[8%] text-right">
                     操作
-                  </th>
+                  </TableHead>
                 </tr>
-              </thead>
+              </TableHeader>
               <tbody>
                 {groups.data?.items.map((group) => {
                   const open = expanded.has(group.id);

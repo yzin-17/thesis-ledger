@@ -1,5 +1,5 @@
 import { Spinner } from '@/components/ui/spinner';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -94,18 +94,18 @@ export function ProviderTable({
       </div>
       <TableContainer refreshing={refreshing} refreshLabel="正在刷新数据源列表">
         <table>
-          <thead>
+          <TableHeader>
             <tr>
-              <th className="text-left">提供方</th>
-              <th className="text-left">能力</th>
-              <th className="text-right">
+              <TableHead className="text-left">提供方</TableHead>
+              <TableHead className="text-left">能力</TableHead>
+              <TableHead className="text-right">
                 <ProviderPriorityHeader />
-              </th>
-              <th className="text-left">状态</th>
-              <th className="text-left">凭证</th>
+              </TableHead>
+              <TableHead className="text-left">状态</TableHead>
+              <TableHead className="text-left">凭证</TableHead>
               <StickyTableActionHeader>操作</StickyTableActionHeader>
             </tr>
-          </thead>
+          </TableHeader>
           <tbody>
             {isDataLoaded(loadState) && providers.length === 0 ? (
               <EmptyTableRow colSpan={6} />
@@ -311,15 +311,15 @@ export function AutomationTable({
       )}
       <TableContainer refreshing={!!reloading && loadState !== 'loading'} refreshLabel="正在刷新自动化任务">
         <table>
-          <thead>
+          <TableHeader>
             <tr>
-              <th>任务</th>
-              <th>类型（market 类休市日自动跳过）</th>
-              <th>下一次运行</th>
-              <th>状态</th>
+              <TableHead>任务</TableHead>
+              <TableHead>类型（market 类休市日自动跳过）</TableHead>
+              <TableHead>下一次运行</TableHead>
+              <TableHead>状态</TableHead>
               <StickyTableActionHeader>操作</StickyTableActionHeader>
             </tr>
-          </thead>
+          </TableHeader>
           <tbody>
             {isDataLoaded(loadState) && jobs.length === 0 ? (
               <EmptyTableRow colSpan={5} />
@@ -437,15 +437,15 @@ export function HealthHistoryTable({
       )}
       <TableContainer refreshing={loading && loadState !== 'loading'} refreshLabel="正在刷新健康历史">
         <table>
-          <thead>
+          <TableHeader>
             <tr>
-              <th>提供方</th>
-              <th>状态</th>
-              <th className="text-right">延迟</th>
-              <th>检查时间</th>
-              <th>来源</th>
+              <TableHead>提供方</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead className="text-right">延迟</TableHead>
+              <TableHead>检查时间</TableHead>
+              <TableHead>来源</TableHead>
             </tr>
-          </thead>
+          </TableHeader>
           <tbody>
             {history.items.length === 0 ? (
               <EmptyTableRow colSpan={5} loading={loadState === 'loading'} label={providerReadEmptyLabel(loadState, '健康历史')} />
@@ -533,13 +533,13 @@ function SimpleProviderTable({
       )}
       <TableContainer refreshing={refreshing} refreshLabel={`正在刷新${title}`}>
         <table>
-          <thead>
+          <TableHeader>
             <tr>
               {columns.map((column) => (
-                <th key={column}>{column}</th>
+                <TableHead key={column}>{column}</TableHead>
               ))}
             </tr>
-          </thead>
+          </TableHeader>
           <tbody>
             {rows.length === 0
               ? (emptyState ?? (

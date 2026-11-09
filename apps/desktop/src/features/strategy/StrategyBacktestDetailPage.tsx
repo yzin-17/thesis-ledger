@@ -3,6 +3,8 @@ import { ArrowLeft, LoaderCircle, Play, RefreshCw, X } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
+import { backtestPreparationFailureInputSchema } from '@thesis-ledger/schemas';
+import { BacktestPreparationFailureDetails } from './BacktestPreparationFailureDetails.js';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -93,6 +95,7 @@ export function StrategyBacktestDetailPage({
   }
 
   const job = jobQuery.data;
+  const preparationFailure = backtestPreparationFailureInputSchema.safeParse(job.input).success;
   const group =
     groupQuery.data?.items.find((candidate) =>
       candidate.jobs.some((candidateJob) => candidateJob.id === job.id),
@@ -175,7 +178,7 @@ export function StrategyBacktestDetailPage({
                 }
               />
             )}
-            <Button
+            {!preparationFailure && <Button
               size="sm"
               variant="outline"
               disabled={!rerun.setup || !exact || rerunMissing.length > 0}
@@ -192,7 +195,7 @@ export function StrategyBacktestDetailPage({
             >
               <RefreshCw />
               再次运行
-            </Button>
+            </Button>}
             {job.status === 'queued' && (
               <Button size="sm" disabled={busyAction !== null} aria-busy={busyAction === `run:${job.id}`} onClick={() => onRun(job)}>
                 {busyAction === `run:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Play />}
@@ -210,7 +213,7 @@ export function StrategyBacktestDetailPage({
                 取消
               </Button>
             )}
-            {job.mode === 'V3' && job.status === 'failed' && (
+            {!preparationFailure && job.mode === 'V3' && job.status === 'failed' && (
               <Button size="sm" disabled={busyAction !== null} aria-busy={busyAction === `retry:${job.id}`} onClick={() => onRetry(job)}>
                 {busyAction === `retry:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Play />}
                 重试执行
@@ -235,7 +238,7 @@ export function StrategyBacktestDetailPage({
             </Progress>
           )}
         </div>
-        {rerunMissing.length > 0 && (
+        {!preparationFailure && rerunMissing.length > 0 && (
           <p className="text-xs text-muted-foreground">
             再次运行不可用：缺少 {rerunMissing.join('、')}。不会用当前默认配置替代历史配置。
           </p>
@@ -258,7 +261,8 @@ export function StrategyBacktestDetailPage({
           </AlertDescription>
         </Alert>
       )}
-      {job.status === 'failed' && (
+      {preparationFailure && <BacktestPreparationFailureDetails job={job} />}
+      {!preparationFailure && job.status === 'failed' && (
         <Alert variant="destructive">
           <AlertTitle>
             {job.errorCode?.toLowerCase().includes('timeout') ? '任务超时' : '任务失败'}
@@ -269,7 +273,7 @@ export function StrategyBacktestDetailPage({
           </AlertDescription>
         </Alert>
       )}
-      <StrategyBacktestResultTabs job={job} />
+      {!preparationFailure && <StrategyBacktestResultTabs job={job} />}
     </div>
   );
 }

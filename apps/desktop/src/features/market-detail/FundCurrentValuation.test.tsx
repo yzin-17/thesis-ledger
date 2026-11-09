@@ -36,6 +36,14 @@ afterEach(async () => {
 });
 
 describe('详情页盘中估值', () => {
+  it('日历未知不显示已休市，也不伪造估值，允许重试', async () => {
+    getFundValuation.mockResolvedValue({ ...result, marketState: 'unknown', quality: 'unavailable', estimatedNav: null, estimatedAt: null, changePercent: null, reasons: ['calendar_unavailable'] });
+    await mount(result.symbol);
+    expect(host.textContent).toContain('交易时段未知');
+    expect(host.textContent).toContain('重试估值');
+    expect(host.textContent).not.toContain('已休市');
+    expect(host.textContent).not.toContain('1.0250');
+  });
   it('休市保留最后有效值的日期与低覆盖状态', async () => {
     getFundValuation.mockResolvedValue({ ...result, marketState: 'closed', reasons: ['market_closed', 'low_coverage'] });
     await mount(result.symbol);

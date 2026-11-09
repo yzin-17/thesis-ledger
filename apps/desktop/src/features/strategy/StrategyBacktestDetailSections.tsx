@@ -1,4 +1,4 @@
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,18 +86,18 @@ function CompactTable({
   return (
     <TableContainer>
       <table className="w-full min-w-[640px] text-sm">
-        <thead className="border-b text-left">
+        <TableHeader className="border-b text-left">
           <tr>
             {headers.map((header, index) => (
-              <th
+              <TableHead
                 key={header}
-                className={`px-3 py-2 font-medium ${numericColumns.includes(index) ? 'text-right' : 'text-left'}`}
+                className={numericColumns.includes(index) ? 'text-right' : undefined}
               >
                 {header}
-              </th>
+              </TableHead>
             ))}
           </tr>
-        </thead>
+        </TableHeader>
         <tbody>
           {rows.length === 0 ? (
             <tr>

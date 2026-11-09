@@ -101,7 +101,7 @@ export function NavBacktestJobsTable({ runs }: { runs: BacktestNavRunSummaryV3[]
                 <TableHead>回测区间</TableHead>
                 <TableHead>创建时间</TableHead>
                 <TableHead>最近更新</TableHead>
-                <StickyTableActionHeader className="h-10 px-2 align-middle font-medium whitespace-nowrap">
+                <StickyTableActionHeader>
                   操作
                 </StickyTableActionHeader>
               </TableRow>

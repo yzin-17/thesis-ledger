@@ -85,6 +85,8 @@ export function useMarketChartLatestBoundary({
   const openingRefreshSymbolRef = useRef<string | null>(null);
   const pendingRefreshSequenceRef = useRef<number | null>(null);
   const boundaryRevisionRef = useRef(0);
+  const scope = JSON.stringify([symbol, adjustment, chartWindowV3]);
+  const latestRequestScopeRef = useRef<string | null>(null);
 
   const openingState = (): OpeningLatestState => {
     const openingRefresh = openingRefreshSymbolRef.current !== symbol;
@@ -101,6 +103,7 @@ export function useMarketChartLatestBoundary({
     latestCheck: boolean,
   ) => {
     if (!latestCheck) return;
+    latestRequestScopeRef.current = scope;
     latestRequestTokenRef.current = token;
     latestQueryKeyRef.current = queryKey;
     const cachedBaseline = cachedDetail?.barSeries?.points.at(-1)?.timestamp.slice(0, 10);
@@ -125,6 +128,7 @@ export function useMarketChartLatestBoundary({
     latestCheck: boolean,
   ) => {
     if (!latestCheck) return;
+    setLaterPages([]);
     const latestDate =
       response.barSeries?.coverage.actualEnd?.slice(0, 10) ??
       response.barSeries?.points.at(-1)?.timestamp.slice(0, 10);
@@ -143,6 +147,7 @@ export function useMarketChartLatestBoundary({
 
   useEffect(() => {
     boundaryRevisionRef.current += 1;
+    if (latestRequestScopeRef.current !== scope) cancelLatest();
     openingRefreshSymbolRef.current = null;
     pendingRefreshSequenceRef.current = null;
     latestProbeRef.current = null;
@@ -172,13 +177,14 @@ export function useMarketChartLatestBoundary({
     const queryKey = ['desktop', 'market-detail', symbol, 'latest', paramsKey, baseline, adjustment ?? null,
       'chart-v3', chartWindowV3.barsLimit, chartWindowV3.timeframe ?? '1d'] as const;
     const requestToken = lifecycle.beginRequest();
+    latestRequestScopeRef.current = scope;
     latestRequestTokenRef.current = requestToken;
     latestQueryKeyRef.current = queryKey;
     latestProbeRef.current = { baseline, at: Date.now() };
     setLatestLoading(true);
     setLatestError(null);
     setLatestNotice(null);
-    void queryClient
+    return queryClient
       .fetchQuery({
         queryKey,
         queryFn: ({ signal }) =>
@@ -186,7 +192,7 @@ export function useMarketChartLatestBoundary({
             {
               symbol,
               ...(adjustment ? { adjustment } : {}),
-              include: ['bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'],
+              include: ['quote', 'bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'],
               barsLimit: chartWindowV3.barsLimit,
               ...(chartWindowV3.timeframe ? { timeframe: chartWindowV3.timeframe } : {}),
               navLimit: 90,

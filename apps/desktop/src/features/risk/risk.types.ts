@@ -80,10 +80,12 @@ export interface RiskTestRecord {
 export interface RiskScanResult {
   traceId: string;
   scanId: string;
-  results: Array<{ ruleId: string; eventId?: string; error?: string }>;
+  evaluatedRuleCount?: number | undefined;
+  results: Array<{ ruleId: string; eventId?: string; error?: string; errorCode?: string }>;
 }
 
 export interface NotificationRecord {
+  provider?: string;
   id: string;
   subjectId: string;
   subjectType: string;

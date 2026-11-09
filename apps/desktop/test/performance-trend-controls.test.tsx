@@ -50,8 +50,14 @@ describe('收益趋势选择约束', () => {
     expect(option('分线').getAttribute('aria-disabled')).toBe('true');
     expect(option('时线').getAttribute('aria-disabled')).toBe('true');
     expect(option('日线').getAttribute('aria-disabled')).not.toBe('true');
-    const hint = host.querySelector('[aria-label="走势粒度"]')!.getAttribute('aria-describedby')!;
-    expect(document.getElementById(hint)!.textContent).toContain('分线支持 1日、5日');
+    expect(host.querySelector('p')).toBeNull();
+    const hint = document.querySelector<HTMLButtonElement>('[aria-label="分线说明"]')!;
+    await act(() => hint.click());
+    expect(document.querySelector('[data-slot="hover-card-content"]')!.textContent).toBe(
+      '支持 1日、5日。盘中数据来自已记录的估值采样。',
+    );
+    expect(document.querySelector('[role="listbox"]')).not.toBeNull();
+    expect(defaults.onIntervalChange).not.toHaveBeenCalled();
   });
   it('不同区间的旧响应不禁用新范围的分线和时线', async () => {
     const series = { range: '1Y', availableIntervals: ['1d'] } as ComponentProps<

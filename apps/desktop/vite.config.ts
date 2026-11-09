@@ -24,6 +24,8 @@ export default defineConfig(({ command }) => ({
     proxy: { '/api': process.env.THESIS_LEDGER_API_URL || 'http://localhost:3000' },
   },
   test: {
+    // 限制并行 jsdom 进程，避免整仓运行时路由懒加载争用 CPU 而超时。
+    maxWorkers: 2,
     poolOptions: {
       forks: {
         // 浏览器存储由 jsdom 提供，避免宿主 Node 的全局实现抢占。

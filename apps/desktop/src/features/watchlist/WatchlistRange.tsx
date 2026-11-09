@@ -7,32 +7,31 @@ export function WatchlistRange({ snap }: { snap?: WatchlistPrice | undefined }) 
   let amplitude = '—';
   if (valid && q.previousClose != null && q.previousClose > 0)
     amplitude = formatRatioPercent((q.high - q.low) / q.previousClose);
+  if (!valid)
+    return (
+      <span className="text-xs text-muted-foreground">
+        {snap?.price.kind === 'nav' ? '净值无分时数据' : '暂无日内区间'}
+      </span>
+    );
   return (
     <div className="flex flex-col gap-1 text-xs tabular-nums">
-      <span className="flex justify-between gap-2">
-        <span>{value.low}</span>
-        <span>{value.high}</span>
+      <span className="flex flex-wrap justify-between gap-x-2 text-muted-foreground">
+        <span>
+          低 <span className="inline text-foreground">{value.low}</span>
+        </span>
+        <span>
+          高 <span className="inline text-foreground">{value.high}</span>
+        </span>
       </span>
-      {valid && (
-        <svg
-          viewBox="0 0 100 10"
-          className="h-2 w-full text-foreground"
-          role="img"
-          aria-label={`日内最低${value.low}，最高${value.high}，当前${value.value}`}
-        >
-          <line x1="3" x2="97" y1="5" y2="5" stroke="currentColor" opacity="0.2" strokeWidth="3" />
-          <circle
-            cx={q.high === q.low ? 50 : 3 + ((q.price - q.low) / (q.high - q.low)) * 94}
-            cy="5"
-            r="3"
-            fill="currentColor"
-          />
-        </svg>
-      )}
-      <span className="text-muted-foreground">振幅 {amplitude}</span>
-      <span className="text-muted-foreground">
-        今开 {value.open} · 前收 {value.previousClose}
-      </span>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+        <span>
+          今开 <span className="inline text-foreground">{value.open}</span>
+        </span>
+        <span>
+          前收 <span className="inline text-foreground">{value.previousClose}</span>
+        </span>
+        <span>振幅 {amplitude}</span>
+      </div>
     </div>
   );
 }

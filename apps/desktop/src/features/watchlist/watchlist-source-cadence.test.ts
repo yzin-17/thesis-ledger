@@ -59,7 +59,7 @@ it('不完整、不可用、无资格目录不猜频率；报价请求限额仍�
     watchlistSourceCadence(item('a'), source, {
       ...catalog,
       entries: [{ ...catalog.entries[0]!, accountAccess: { state: 'unknown', attempted: false } }],
-    } as MarketRouteCatalogReadClientV3),
+    }),
   ).toBeNull();
   expect(quoteCadence(item('a'), row('a', 'minute', 600), catalog)?.seconds).toBe(600);
   expect(
@@ -68,7 +68,7 @@ it('不完整、不可用、无资格目录不猜频率；报价请求限额仍�
 });
 it('混合页只读取到期来源，手动刷新读取显式集合；下一次返回新来源后重算', async () => {
   const items = [item('a'), item('b')];
-  const read = vi.fn(async () => [row('a', 'day')]);
+  const read = vi.fn<(ids: string[]) => Promise<WatchlistPrice[]>>().mockResolvedValue([row('a', 'day')]);
   const previous = { rows: [row('a', 'minute'), row('b', 'day')], checkedAt: { a: 0, b: 0 } };
   const result = await readDueWatchlistPrices(previous, items, catalog, read, false, 60_000);
   expect(read).toHaveBeenCalledWith(['a']);

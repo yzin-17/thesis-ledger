@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useMarketPeriodControls } from './MarketPeriodSelection.js';
 
-function ToolbarGroup({ label, children }: { label: string; children: ReactNode }) {
+export function MarketChartToolbarGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section
       className="flex min-w-0 max-w-full flex-none flex-col gap-1"
@@ -29,16 +29,11 @@ export function MarketChartToolbar({
   const periodControls = useMarketPeriodControls();
   return (
     <div className="flex flex-wrap items-start gap-x-4 gap-y-2" data-market-chart-toolbar>
-      <ToolbarGroup label="图形">{chartControls}</ToolbarGroup>
-      {periodControls ? <ToolbarGroup label="周期">{periodControls}</ToolbarGroup> : null}
-      <ToolbarGroup label="视图">{viewControls}</ToolbarGroup>
-      <details className="basis-full text-sm">
-        <summary className="w-fit cursor-pointer text-muted-foreground">区间与指标</summary>
-        <div className="mt-3 flex flex-wrap gap-4">
-          <ToolbarGroup label="区间">{rangeControls}</ToolbarGroup>
-          <ToolbarGroup label="指标">{indicatorControls}</ToolbarGroup>
-        </div>
-      </details>
+      <MarketChartToolbarGroup label="图形">{chartControls}</MarketChartToolbarGroup>
+      {periodControls ? <MarketChartToolbarGroup label="周期">{periodControls}</MarketChartToolbarGroup> : null}
+      <MarketChartToolbarGroup label="区间">{rangeControls}</MarketChartToolbarGroup>
+      <MarketChartToolbarGroup label="视图">{viewControls}</MarketChartToolbarGroup>
+      <MarketChartToolbarGroup label="指标">{indicatorControls}</MarketChartToolbarGroup>
     </div>
   );
 }

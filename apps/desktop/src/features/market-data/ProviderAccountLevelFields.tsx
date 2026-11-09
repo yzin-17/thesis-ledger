@@ -17,7 +17,7 @@ export function parseAccountLevelDraft(draft: AccountLevelDraft): MarketProvider
   return result.success ? result.data : null;
 }
 
-const permissions = [{ api: 'hk_daily', label: '港股日线' }, { api: 'rt_k', label: '股票实时行情' }] as const;
+const permissions = [{ api: 'hk_daily', label: '港股日线' }, { api: 'rt_k', label: '股票实时行情' }, { api: 'stk_mins', label: '股票分钟行情' }, { api: 'etf_mins', label: 'ETF 分钟行情' }] as const;
 
 export function ProviderAccountLevelFields({ value, onChange, disabled }: {
   value: AccountLevelDraft; onChange: (value: AccountLevelDraft) => void; disabled: boolean;

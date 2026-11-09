@@ -1,6 +1,6 @@
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { LoadingState } from '@/components/ui/spinner';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { useEffect, useMemo } from 'react';
 import { StrategyDefinitionFields } from './StrategyDefinitionFields.js';
 import { AuthoringVersionSource } from '../strategy-authoring/AuthoringVersionSource.js';
@@ -55,6 +55,8 @@ import {
 } from './strategy-version-summary.model.js';
 import { riskCenterApplicationPath } from './strategy-risk-application.model.js';
 import { strategyTimeframeLabel } from './strategy-display-labels.js';
+import { StrategyVersionBacktests } from './StrategyVersionBacktests.js';
+import { StrategyVersionExperiments } from './StrategyVersionExperiments.js';
 
 const PAGE_SIZE = 20;
 
@@ -174,20 +176,19 @@ export function StrategyLibraryPage({
         ) : (
           <TableContainer>
             <table className="w-full table-fixed text-sm">
-              <thead className="border-b text-left">
+              <TableHeader className="border-b text-left">
                 <tr>
-                  <th className="w-[34%] px-2 py-3 font-medium sm:px-4">策略名称 / 标的</th>
-                  <th className="hidden w-[16%] px-4 py-3 font-medium sm:table-cell">最新版本</th>
-                  <th className="w-[20%] px-2 py-3 font-medium sm:px-4">最近回测</th>
-                  <th className="hidden w-[18%] px-4 py-3 font-medium sm:table-cell">更新时间</th>
-                  <th
-                    data-table-action-static
-                    className="w-24 px-1 py-3 text-right font-medium whitespace-nowrap sm:px-3"
+                  <TableHead className="w-[34%]">策略名称 / 标的</TableHead>
+                  <TableHead className="hidden w-[16%] sm:table-cell">最新版本</TableHead>
+                  <TableHead className="w-[20%]">最近回测</TableHead>
+                  <TableHead className="hidden w-[18%] sm:table-cell">更新时间</TableHead>
+                  <TableHead
+                    data-table-action-static className="w-24 text-right"
                   >
                     操作
-                  </th>
+                  </TableHead>
                 </tr>
-              </thead>
+              </TableHeader>
               <tbody>
                 {visible.map((strategy) => {
                   const latest = latestStrategyVersion(strategy.versions);
@@ -334,8 +335,7 @@ export function StrategyVersionPage({
   const actionsAvailable = summary.kind === 'ready';
   const sourceKey = `${strategy.id}:${version.id}`;
   const requestedTab = tabState.sourceKey === sourceKey ? tabState.value : 'definition';
-  const activeTab =
-    requestedTab === 'experiments' && !actionsAvailable ? 'definition' : requestedTab;
+  const activeTab = requestedTab;
   const savedRiskApplicationId = searchParams.get('riskApplicationId');
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -470,7 +470,7 @@ export function StrategyVersionPage({
           <TabsTrigger value="definition">策略定义</TabsTrigger>
           <TabsTrigger value="versions">版本记录</TabsTrigger>
           <TabsTrigger value="backtests">回测记录</TabsTrigger>
-          <TabsTrigger value="experiments" disabled={!actionsAvailable}>
+          <TabsTrigger value="experiments">
             AI 实验
           </TabsTrigger>
         </TabsList>
@@ -503,12 +503,12 @@ export function StrategyVersionPage({
         <TabsContent value="versions">
           <TableContainer refreshing={refreshing} refreshLabel="正在刷新策略版本">
             <table className="w-full table-fixed text-sm">
-              <thead className="border-b text-left">
+              <TableHeader className="border-b text-left">
                 <tr>
-                  <th className="w-2/3 px-4 py-3 font-medium">版本</th>
-                  <th className="w-1/3 px-4 py-3 font-medium">创建时间</th>
+                  <TableHead className="w-2/3">版本</TableHead>
+                  <TableHead className="w-1/3">创建时间</TableHead>
                 </tr>
-              </thead>
+              </TableHeader>
               <tbody>
                 {versions.map((candidate) => (
                   <tr key={candidate.id} className="border-b last:border-0 hover:bg-muted/20">
@@ -530,26 +530,10 @@ export function StrategyVersionPage({
           </TableContainer>
         </TabsContent>
         <TabsContent value="backtests">
-          <h3 className="text-xl font-semibold">当前版本回测</h3>
-          <p className="mt-2 text-sm text-muted-foreground">可在「回测任务」查看执行进度和结果。</p>
+          <StrategyVersionBacktests key={version.id} strategyVersionId={version.id} />
         </TabsContent>
         <TabsContent value="experiments">
-          <div className="flex flex-col items-start gap-3">
-            <h3 className="text-xl font-semibold">基于当前版本创建实验</h3>
-            <p className="wrap-anywhere text-sm text-muted-foreground">
-              实验来源会锁定为 {strategy.name} v{version.version}。
-            </p>
-            <Button
-              nativeButton={false}
-              render={
-                <Link
-                  to={`${strategyCenterPath.newExperiment}?strategyVersionId=${encodeURIComponent(version.id)}`}
-                >
-                  新建 AI 实验
-                </Link>
-              }
-            />
-          </div>
+          <StrategyVersionExperiments key={version.id} strategyVersionId={version.id} canCreate={actionsAvailable} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,3 +1,4 @@
+import { measureChartValues } from './chart-measurement-model.js';
 import {
   isMarketMinuteTimeframe,
   type Currency,type ArenaPoint,
@@ -9,7 +10,7 @@ import { chartPointKey } from './market-chart-time.js';
 
 export type PlacedTradeMarker = TradeChartMarker & { key: string };
 export type TradingOverlayModel = {
-  arenaMarkers?: ArenaPoint[];
+  arenaMarkers?: Array<ArenaPoint & { key?: string }>;
   markers: PlacedTradeMarker[];
   lines: Array<{ price: number; title: string; kind: 'cost' | 'risk' }>;
   measurement?: { from: string; to: string; fromPrice: number; toPrice: number } | undefined;
@@ -143,18 +144,10 @@ export function measureChartRange(
   from: string | null,
   to: string | null,
 ) {
-  const first = bars.findIndex((bar) => chartPointKey(bar.timestamp, bar.timeframe) === from);
-  const last = bars.findIndex((bar) => chartPointKey(bar.timestamp, bar.timeframe) === to);
-  if (first < 0 || last < 0) return undefined;
-  const start = bars[first]!,
-    end = bars[last]!;
-  return {
-    from: from!,
-    to: to!,
-    fromPrice: start.close,
-    toPrice: end.close,
-    difference: end.close - start.close,
-    percent: start.close > 0 ? (end.close / start.close - 1) * 100 : null,
-    bars: Math.abs(last - first) + 1,
-  };
+  const result = measureChartValues(bars.map((bar) => ({
+    key: chartPointKey(bar.timestamp, bar.timeframe), value: bar.close,
+  })), from, to);
+  if (!result) return undefined;
+  const { count, ...measurement } = result;
+  return { ...measurement, bars: count };
 }

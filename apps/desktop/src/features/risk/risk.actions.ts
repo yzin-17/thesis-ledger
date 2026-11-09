@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 import type { useToastManager } from '@/components/ui/toast';
 import type { Portfolio } from '../portfolio/portfolio.types.js';
+import { riskScanFeedback } from './risk-scan-feedback.js';
 import type {
   CreateRiskRuleInput,
   NotificationAvailability,
@@ -264,7 +265,8 @@ export const createRiskActionHandlers = (dependencies: Dependencies) => {
         notificationAvailability,
         result.results.filter((item) => item.eventId).length,
       );
-      toastManager.add({ title: '风险扫描已完成', ...feedback, timeout: 7000 });
+      const scanFeedback = riskScanFeedback(result, feedback);
+      toastManager.add({ ...scanFeedback, timeout: scanFeedback.type === 'error' ? 0 : 7000 });
       return true;
     } catch (error) {
       notifyFailure('风险扫描失败', requestFailureMessage(error));

@@ -168,6 +168,7 @@ export const dataSourceDisplay = (
   let providerName = provider?.displayName ?? providerId;
   if (!provider && providerId === 'akshare') providerName = 'AKShare';
   else if (!provider && providerId === 'tencent') providerName = '腾讯财经';
+  else if (!provider && providerId === 'hithink') providerName = '同花顺';
   const upstreamName =
     provider?.upstreamSources?.find((source) => source.sourceId === upstreamSource)?.displayName ??
     upstreamSourceDisplay(upstreamSource);

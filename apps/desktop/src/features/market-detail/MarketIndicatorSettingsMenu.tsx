@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDownIcon } from 'lucide-react';
 import {
@@ -45,6 +46,7 @@ export function MarketIndicatorSettingsMenu({
   onMacdDraftChange,
   onApplyMacdParams,
   onResetMacdParams,
+  paneControls,
 }: {
   visibleIndicators: ChartPreference['visibleIndicators'];
   visibleMA: ChartPreference['visibleMA'];
@@ -57,6 +59,7 @@ export function MarketIndicatorSettingsMenu({
   onMacdDraftChange: (name: keyof MarketIndicatorDraft, value: string) => void;
   onApplyMacdParams: () => void;
   onResetMacdParams: () => void;
+  paneControls?: ReactNode;
 }) {
   const maEnabled = visibleIndicators.includes('MA');
 
@@ -112,6 +115,14 @@ export function MarketIndicatorSettingsMenu({
               ))}
             </ToggleGroup>
           </section>
+          {paneControls ? (
+            <section className="flex flex-col gap-2 px-3 pb-3" aria-labelledby="indicator-pane-title">
+              <h6 id="indicator-pane-title" className="m-0 text-xs font-medium text-muted-foreground">
+                普通视图副图
+              </h6>
+              {paneControls}
+            </section>
+          ) : null}
           <Separator />
           <section className="flex flex-col gap-3 px-3 py-3" aria-labelledby="macd-settings-title">
             <h6 id="macd-settings-title" className="m-0 text-xs font-medium text-muted-foreground">

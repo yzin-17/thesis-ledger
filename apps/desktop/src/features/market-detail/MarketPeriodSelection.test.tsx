@@ -60,14 +60,14 @@ describe('周期能力与偏好消费', () => {
     expect(html).toContain('<output>false</output>');
     expect(html).toContain(isError ? '重试周期能力' : '正在确认分钟周期');
   });
-  it('港美分钟周期复用中文标签并以独立QueryKey及取消信号规划', async () => {
+  it.each(['SPY.US', '510300.SH'])('%s分钟周期复用中文标签并以独立QueryKey及取消信号规划', async (symbol) => {
     useQueryMock.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[1] === 'market-derived-minute-options') return { isSuccess: true,
-        data: { version: 'market-minute-options-v1', symbol: 'SPY.US', options: [{ timeframe: '5m', available: true }, { timeframe: '60m', available: false }] } };
+        data: { version: 'market-minute-options-v1', symbol, options: [{ timeframe: '5m', available: true }, { timeframe: '60m', available: false }] } };
       return { isSuccess: true };
     });
     storage.set('thesis-ledger:market-period-preference', '5m');
-    const html = renderToStaticMarkup(<MarketPeriodSelection symbol="SPY.US" enabled>
+    const html = renderToStaticMarkup(<MarketPeriodSelection symbol={symbol} enabled>
       {(period) => <><output>{period}</output><Controls /></>}
     </MarketPeriodSelection>);
     expect(html).toContain('<output>5m</output>');
@@ -78,8 +78,8 @@ describe('周期能力与偏好消费', () => {
     };
     const signal = new AbortController().signal;
     await options.queryFn({ signal });
-    expect(getMinuteOptions).toHaveBeenCalledWith('SPY.US', { barsLimit: 90, signal });
-    expect(options.queryKey).toEqual(['desktop', 'market-derived-minute-options', 'SPY.US', 90]);
+    expect(getMinuteOptions).toHaveBeenCalledWith(symbol, { barsLimit: 90, signal });
+    expect(options.queryKey).toEqual(['desktop', 'market-derived-minute-options', symbol, 90]);
   });
   it.each(['none', 'qfq', 'hfq'] as const)('能力查询与当前 %s 口径同键同请求', async (adjustment) => {
     render(true, adjustment);

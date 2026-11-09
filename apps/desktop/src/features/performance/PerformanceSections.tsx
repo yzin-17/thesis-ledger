@@ -1,3 +1,4 @@
+import { TableHeader, TableHead } from '@/components/ui/table';
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { CATEGORY_LABELS, CATEGORY_ORDER } from './performance.target-draft.js';
 import { Button } from '@/components/ui/button';
@@ -287,16 +288,16 @@ export function PerformanceAllocationSection({
           >
             <div className="table-wrap">
               <table className="min-w-[680px] md:min-w-0">
-                <thead>
+                <TableHeader>
                   <tr>
-                    <th>分类</th>
-                    <th className="text-right">当前金额</th>
-                    <th className="text-right">当前权重</th>
-                    <th className="text-right">目标权重</th>
-                    <th className="text-right">权重偏差</th>
-                    <th className="text-right">再平衡建议</th>
+                    <TableHead>分类</TableHead>
+                    <TableHead className="text-right">当前金额</TableHead>
+                    <TableHead className="text-right">当前权重</TableHead>
+                    <TableHead className="text-right">目标权重</TableHead>
+                    <TableHead className="text-right">权重偏差</TableHead>
+                    <TableHead className="text-right">再平衡建议</TableHead>
                   </tr>
-                </thead>
+                </TableHeader>
                 <tbody>
                   {rows.map((row) => {
                     const adjustment = adjustmentLabel(

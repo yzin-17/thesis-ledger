@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { AccountDataInfoTip } from './AccountDataInfoTip.js';
+import { InfoTip } from './info-tip.js';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -14,7 +14,7 @@ beforeEach(async () => {
   document.body.append(container);
   root = createRoot(container);
   await act(async () => {
-    root.render(<AccountDataInfoTip label="定投确认说明">{description}</AccountDataInfoTip>);
+    root.render(<InfoTip label="定投确认说明">{description}</InfoTip>);
     await Promise.resolve();
   });
 });

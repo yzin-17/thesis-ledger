@@ -11,6 +11,7 @@ export function InstrumentOptionField({
   id,
   invalid = false,
   status,
+  clearValue = '',
 }: {
   options: readonly { value: string; label: string }[];
   value: string;
@@ -20,6 +21,7 @@ export function InstrumentOptionField({
   id?: string;
   invalid?: boolean;
   status?: string;
+  clearValue?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -38,6 +40,12 @@ export function InstrumentOptionField({
       {...(id ? { id } : {})}
       invalid={invalid}
       disabled={disabled}
+      clearable={value !== clearValue || (open && Boolean(input))}
+      onClear={() => {
+        onChange(clearValue);
+        setInput('');
+        setOpen(false);
+      }}
       open={open}
       onOpenChange={(next) => {
         setOpen(next);

@@ -114,8 +114,14 @@ describe('周期选择的实际组件交互', () => {
     const button = Array.from(host.querySelectorAll('button')).find(
       (item) => item.textContent === label,
     );
-    expect(button, label).toBeDefined();
-    await interact(() => button!.click());
+    if (button) {
+      await interact(() => button.click());
+      return;
+    }
+    await interact(() => host.querySelector<HTMLButtonElement>('[aria-label="更多周期"]')!.click());
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) => item.textContent === label);
+    expect(option, label).toBeDefined();
+    await interact(() => option!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   };
   const period = () => host.querySelector('[data-period]')?.textContent;
   const buttons = () => host.querySelector('[data-market-chart-toolbar-group="周期"]')?.textContent;
@@ -125,9 +131,15 @@ describe('周期选择的实际组件交互', () => {
       Promise.resolve(options(request.barsLimit === 90 ? ['1w'] : ['1mo', '1y'])),
     );
     await render();
-    await wait(() => expect(buttons()).toContain('年线'));
+    await wait(() => expect(buttons()).toContain('更多'));
     expect(buttons()).toContain('周线');
-    expect(buttons()).not.toContain('月线');
+    expect(buttons()).not.toContain('年线');
+    await interact(() => host.querySelector<HTMLButtonElement>('[aria-label="更多周期"]')!.click());
+    expect(document.querySelector('[role="option"]')?.textContent).toBe('年线');
+    expect(document.body.textContent).not.toContain('月线');
+    const more = host.querySelector<HTMLButtonElement>('[aria-label="更多周期"]')!;
+    await interact(() => more.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(more.getAttribute('aria-expanded')).toBe('false');
     expect(api.getPeriodOptions.mock.calls.map((call) => call[1].barsLimit).sort()).toEqual([
       2, 90,
     ]);
@@ -140,7 +152,7 @@ describe('周期选择的实际组件交互', () => {
     await click('周线');
     expect(period()).toBe('1w');
     expect(readPreference().visibleRange).toBe(30);
-    await click('1年');
+    await click('一年');
     expect(readPreference().visibleRange).toBe(365);
     expect(localStorage.getItem(key())).toBe('1w');
     await click('月线');
@@ -150,7 +162,7 @@ describe('周期选择的实际组件交互', () => {
     root = createRoot(host);
     await render();
     expect(period()).toBe('1mo');
-    expect(host.querySelector('[aria-label="行情区间"] [data-pressed]')?.textContent).toBe('1年');
+    expect([...host.querySelectorAll('button')].find((item) => item.textContent === '一年')?.getAttribute('aria-pressed')).toBe('true');
     expect(host.textContent).toContain('派生');
     expect(host.textContent).toContain('腾讯');
   });
@@ -167,7 +179,7 @@ describe('周期选择的实际组件交互', () => {
     expect(localStorage.getItem(key())).toBe('1d');
     expect(host.textContent).toContain('周线当前不可用，已切换为日线。');
     await render('600519.SH');
-    await wait(() => expect(buttons()).toContain('月线'));
+    await wait(() => expect(buttons()).toContain('更多'));
     expect(period()).toBe('1d');
     expect(host.textContent).not.toContain('已切换为日线');
     expect(localStorage.getItem(key())).toBe('1d');

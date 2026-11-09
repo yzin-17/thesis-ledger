@@ -280,6 +280,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
       return createOptimizationExperiment(input);
     },
     onSuccess: (experiment) => {
+      void queryClient.invalidateQueries({ queryKey: [...optimizationKey, 'experiments'] });
       toast.add({ title: '实验已创建', description: '已收到创建确认，无需重复提交。', type: 'success' });
       queryClient.setQueryData([...optimizationKey, 'experiment', experiment.id], {
         experiment, candidates: [], attempts: [],

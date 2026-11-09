@@ -105,7 +105,7 @@ export function JournalCandidateBrowser({
                 <TableHead>标的与粒度</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>统计资格</TableHead>
-                <StickyTableActionHeader className="h-10 w-28 min-w-28 px-2 align-middle font-medium whitespace-nowrap">
+                <StickyTableActionHeader className="w-28 min-w-28">
                   选择
                 </StickyTableActionHeader>
               </TableRow>

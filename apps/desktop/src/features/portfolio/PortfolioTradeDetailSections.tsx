@@ -1,4 +1,4 @@
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import type { ReactNode } from 'react';
 import type { TradeDetailResponse } from '@thesis-ledger/api-client';
 import { Badge } from '@/components/ui/badge';
@@ -166,16 +166,16 @@ function EntryLegs({ detail }: { detail: TradeDetailResponse }) {
         <EmptyDetail>暂无建仓成交。</EmptyDetail>
       ) : (
         <DetailTable label="建仓明细">
-          <thead className="border-b text-muted-foreground">
+          <TableHeader className="border-b">
             <tr>
-              <th className="px-3 py-2">时间</th>
-              <th className="px-3 py-2">币种</th>
-              <th className="px-3 py-2 text-right">价格</th>
-              <th className="px-3 py-2 text-right">数量</th>
-              <th className="px-3 py-2 text-right">剩余数量</th>
-              <th className="px-3 py-2 text-right">剩余成本</th>
+              <TableHead>时间</TableHead>
+              <TableHead>币种</TableHead>
+              <TableHead className="text-right">价格</TableHead>
+              <TableHead className="text-right">数量</TableHead>
+              <TableHead className="text-right">剩余数量</TableHead>
+              <TableHead className="text-right">剩余成本</TableHead>
             </tr>
-          </thead>
+          </TableHeader>
           <tbody>
             {detail.entryLegs.map((entry) => (
               <tr key={entry.id} className="border-b last:border-0">
@@ -209,16 +209,16 @@ function BaselineComponents({ detail }: { detail: TradeDetailResponse }) {
         description="快照是来源证据，不代表真实买入。"
       />
       <DetailTable label="持仓快照组成">
-        <thead className="border-b text-muted-foreground">
+        <TableHeader className="border-b">
           <tr>
-            <th className="px-3 py-2">批次</th>
-            <th className="px-3 py-2">范围</th>
-            <th className="px-3 py-2 text-right">快照数量</th>
-            <th className="px-3 py-2 text-right">已纳入数量</th>
-            <th className="px-3 py-2 text-right">剩余数量</th>
-            <th className="px-3 py-2 text-right">平均成本</th>
+            <TableHead>批次</TableHead>
+            <TableHead>范围</TableHead>
+            <TableHead className="text-right">快照数量</TableHead>
+            <TableHead className="text-right">已纳入数量</TableHead>
+            <TableHead className="text-right">剩余数量</TableHead>
+            <TableHead className="text-right">平均成本</TableHead>
           </tr>
-        </thead>
+        </TableHeader>
         <tbody>
           {detail.baselineComponents.map((component) => (
             <tr key={component.id} className="border-b last:border-0">
@@ -256,17 +256,17 @@ function CloseSlices({
         <EmptyDetail>暂无真实卖出记录。</EmptyDetail>
       ) : (
         <DetailTable label="平仓明细">
-          <thead className="border-b text-muted-foreground">
+          <TableHeader className="border-b">
             <tr>
-              <th className="px-3 py-2">时间</th>
-              <th className="px-3 py-2">币种</th>
-              <th className="px-3 py-2 text-right">退出价格</th>
-              <th className="px-3 py-2 text-right">数量</th>
-              <th className="px-3 py-2 text-right">剩余数量</th>
-              <th className="px-3 py-2 text-right">净实现盈亏</th>
-              <StickyTableActionHeader className="px-3 py-2">操作</StickyTableActionHeader>
+              <TableHead>时间</TableHead>
+              <TableHead>币种</TableHead>
+              <TableHead className="text-right">退出价格</TableHead>
+              <TableHead className="text-right">数量</TableHead>
+              <TableHead className="text-right">剩余数量</TableHead>
+              <TableHead className="text-right">净实现盈亏</TableHead>
+              <StickyTableActionHeader>操作</StickyTableActionHeader>
             </tr>
-          </thead>
+          </TableHeader>
           <tbody>
             {detail.closeSlices.map((slice) => (
               <tr key={slice.id} className="border-b last:border-0">

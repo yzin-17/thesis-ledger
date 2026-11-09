@@ -6,9 +6,18 @@ import {
   restoreRiskRule,
   scanRisk,
   testRiskRule,
+  saveRiskNotificationRouting,
 } from './risk.api.js';
 import { riskKeys } from './risk.queries.js';
 import type { CreateRiskRuleInput, RiskContext, RiskRuleRecord } from './risk.types.js';
+
+export const useSaveRiskNotificationRoutingMutation = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (providers: string[]) => saveRiskNotificationRouting(providers),
+    onSuccess: (saved) => client.setQueryData(riskKeys.riskNotificationRouting(), saved),
+  });
+};
 
 // 先保留已确认的版本，再重取完整列表；单条响应未带标的名时保留原名称。
 const invalidateRulesOnSuccess = (client: QueryClient) => async (saved: RiskRuleRecord) => {

@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import type { MarketChartBar } from './market-chart-types.js';
 import type { MarketDetailPosition } from './market-detail.types.js';
+import { chartMeasurementActive } from './chart-measurement-model.js';
+import { chartOverlayHandlesEscape } from './market-chart-keyboard.js';
 import {
   measureChartRange,
   overlayPriceScope,
@@ -45,6 +47,7 @@ export function useMarketTradingOverlays(bars: MarketChartBar[], position?: Mark
   ]);
   const [selection, setSelection] = useState(() => initial(scope));
   const state = selection.scope === scope ? selection : initial(scope);
+  const measurementActive = chartMeasurementActive(state);
   const price = useMemo(() => overlayPriceScope(bars, position), [bars, position]);
   const start = bars[0]?.bucketStartDate ?? (bars[0] ? overlayTradingDate(bars[0]) : undefined);
   const end =
@@ -109,16 +112,17 @@ export function useMarketTradingOverlays(bars: MarketChartBar[], position?: Mark
     return { markers: placed.markers, lines, measurement };
   }, [placed.markers, state.cost, state.risk, price.cost, risk, riskInvalid, measurement]);
   useEffect(() => {
-    if (!state.measuring) return;
+    if (!measurementActive) return;
     const cancel = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (chartOverlayHandlesEscape(event.target)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       setSelection((current) => ({ ...current, measuring: false, from: null, to: null }));
     };
     window.addEventListener('keydown', cancel, true);
     return () => window.removeEventListener('keydown', cancel, true);
-  }, [state.measuring]);
+  }, [measurementActive]);
   let notice: string | undefined;
   if (state.trades && query.isPending) notice = '正在读取当前账户成交…';
   else if (state.trades && query.isError) notice = '成交读取失败，图表仍可查看。';

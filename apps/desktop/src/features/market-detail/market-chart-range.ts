@@ -3,6 +3,8 @@ import type { MarketChartBar } from './market-chart-types.js';
 import type { ChartPoint } from './market-chart-model.js';
 import { toChartTime } from './market-chart-time.js';
 import { isMarketMinuteTimeframe } from '@thesis-ledger/schemas';
+import { chartDateInterval, chartMarketDate, type ChartRange } from './chart-date-range.js';
+export { chartRangeLabel, type ChartRange } from './chart-date-range.js';
 
 export const rangeMonths = (range: number): number | null => {
   if (range === 30) return 1;
@@ -12,57 +14,55 @@ export const rangeMonths = (range: number): number | null => {
   return null;
 };
 
-export const visibleBarsForRange = (bars: MarketChartBar[], range: number) => {
+export const chartBarDate = (bar: MarketChartBar) =>
+  isMarketMinuteTimeframe(bar.timeframe) ? bar.tradingDate ?? chartMarketDate(bar.timestamp, bar.symbol) : bar.timestamp.slice(0, 10);
+
+export const visibleBarsForRange = (bars: MarketChartBar[], range: ChartRange) => {
   const latest = bars.at(-1);
   if (!latest) return [];
-  if (isMarketMinuteTimeframe(latest.timeframe)) return range > 0 ? bars.slice(-range) : bars;
-  const months = rangeMonths(range);
-  if (months === null) return bars;
-  const cutoffDate = new Date(latest.timestamp);
-  cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - months);
-  const cutoff = cutoffDate.getTime();
-  return bars.filter((bar) => Date.parse(bar.timestamp) >= cutoff);
+  const interval = chartDateInterval(range, chartBarDate(latest));
+  if (interval) return bars.filter((bar) => {
+    const date = chartBarDate(bar);
+    return interval.from <= date && date <= interval.to;
+  });
+  if (isMarketMinuteTimeframe(latest.timeframe) && typeof range === 'number' && range > 0) return bars.slice(-range);
+  return bars;
 };
 
-export const rangeCoverage = (bars: MarketChartBar[], range: number) => {
-  const months = rangeMonths(range);
-  const earliest = bars[0];
-  const latest = bars.at(-1);
-  if (months === null || !earliest || !latest) return null;
-  if (isMarketMinuteTimeframe(latest.timeframe)) return { available: bars.length >= range,
-    earliest: earliest.timestamp, latest: latest.timestamp, months };
-  const cutoffDate = new Date(latest.timestamp);
-  cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - months);
+export const rangeCoverage = (bars: MarketChartBar[], range: ChartRange) => {
+  const earliest = bars[0], latest = bars.at(-1);
+  if (!earliest || !latest) return null;
+  const requested = chartDateInterval(range, chartBarDate(latest));
+  if (!requested) return null;
   return {
-    available: Date.parse(earliest.timestamp) <= cutoffDate.getTime(),
-    earliest: earliest.timestamp.slice(0, 10),
-    latest: latest.timestamp.slice(0, 10),
-    months,
+    available: chartBarDate(earliest) <= requested.from && chartBarDate(latest) >= requested.to,
+    earliest: chartBarDate(earliest), latest: chartBarDate(latest), requested,
+    months: typeof range === 'number' ? rangeMonths(range) : null,
   };
 };
 
-export function chartRangeLabel(range: number, timeframe?: string) {
-  if (range === 0) return '全部已加载';
-  if (isMarketMinuteTimeframe(timeframe)) return `最近${range}根`;
-  if (range === 30) return '1月';
-  if (range === 90) return '3月';
-  if (range === 180) return '6月';
-  return '1年';
-}
+export type ChartViewportPoint = Pick<ChartPoint, 'date' | 'bar'>;
 
-export function initialChartTimeRange(points: readonly ChartPoint[], range: number): { from: Time; to: Time } | null {
+export function initialChartTimeRange(points: readonly ChartViewportPoint[], range: ChartRange): { from: Time; to: Time } | null {
   const latest = points.at(-1);
   if (!latest) return null;
+  const interval = chartDateInterval(range, latest.bar ? chartBarDate(latest.bar) : latest.date.slice(0, 10));
   if (isMarketMinuteTimeframe(latest.bar?.timeframe) || latest.date.length > 10) {
-    const first = points[range > 0 ? Math.max(0, points.length - range) : 0];
+    if (interval) {
+      const visible = points.filter((point) => {
+        const date = point.bar ? chartBarDate(point.bar) : chartMarketDate(point.date, latest.bar?.symbol);
+        return interval.from <= date && date <= interval.to;
+      });
+      const first = visible[0], last = visible.at(-1);
+      return first && last ? { from: toChartTime(first.date), to: toChartTime(last.date) } : null;
+    }
+    const first = points[typeof range === 'number' && range > 0 ? Math.max(0, points.length - range) : 0];
     return first ? { from: toChartTime(first.date), to: toChartTime(latest.date) } : null;
   }
-  const months = rangeMonths(range);
-  if (months === null) {
-    const first = points[0];
-    return first ? { from: first.date, to: latest.date } : null;
+  if (interval) {
+    if (!points.some((point) => interval.from <= point.date.slice(0, 10) && point.date.slice(0, 10) <= interval.to)) return null;
+    return interval;
   }
-  const cutoff = new Date(`${latest.date}T00:00:00Z`);
-  cutoff.setUTCMonth(cutoff.getUTCMonth() - months);
-  return { from: cutoff.toISOString().slice(0, 10), to: latest.date };
+  const first = points[0];
+  return first ? { from: first.date, to: latest.date } : null;
 }

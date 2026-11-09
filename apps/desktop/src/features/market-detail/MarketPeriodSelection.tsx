@@ -2,7 +2,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isMarketMinuteTimeframe, type MarketTimeframe } from '@thesis-ledger/schemas';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { MarketChartChoiceControls } from './MarketChartChoiceControls.js';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getDesktopApiClient } from '../../shared/api/client.js';
@@ -14,6 +14,7 @@ export const marketPeriodLabels: Record<ChartPeriod, string> = {
   '1d': '日线', '5d': '5 日线', '1w': '周线', '1mo': '月线', '1y': '年线',
 };
 const periods = Object.keys(marketPeriodLabels) as ChartPeriod[];
+const quickPeriods: ChartPeriod[] = ['1m', '1d', '1w'];
 export const marketPeriodPreferenceKey = 'thesis-ledger:market-period-preference';
 const keyFor = (symbol: string) => `thesis-ledger:market-period:${symbol}`;
 export function readMarketPeriod(symbol: string): ChartPeriod {
@@ -55,7 +56,7 @@ export function MarketPeriodSelection({ symbol, enabled, adjustment, children }:
   });
   const standardQuery = useQuery(optionsQuery(90));
   const annualQuery = useQuery(optionsQuery(2));
-  const minuteMarket = /\.(HK|US)$/.test(symbol);
+  const minuteMarket = /\.(SH|SZ|BJ|HK|US)$/.test(symbol);
   const minuteQuery = useQuery({
     queryKey: ['desktop', 'market-minute-options', symbol, '1m'],
     queryFn: ({ signal }) => getDesktopApiClient().market.getChartOptions(symbol, signal, undefined, '1m'),
@@ -103,15 +104,9 @@ export function MarketPeriodSelection({ symbol, enabled, adjustment, children }:
     savePeriod(value);
   };
   const controls = enabled ? (
-    <>
-      <ToggleGroup aria-label="行情周期" value={[period]} onValueChange={(value) => {
-        if (value[0] && periods.includes(value[0] as ChartPeriod)) select(value[0] as ChartPeriod);
-      }}>
-        {periods.filter((value) => available.has(value)).map((value) => (
-          <ToggleGroupItem key={value} value={value}>{marketPeriodLabels[value]}</ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-    </>
+    <MarketChartChoiceControls label="行情周期" moreLabel="更多周期" value={period} quickValues={quickPeriods}
+      options={periods.filter((value) => available.has(value)).map((value) => ({ value, label: marketPeriodLabels[value] }))}
+      onValueChange={(value) => { if (periods.includes(value as ChartPeriod)) select(value as ChartPeriod); }} />
   ) : null;
   let periodNotice: ReactNode = null;
   if (waitingMinute && minuteReadiness.isError) {

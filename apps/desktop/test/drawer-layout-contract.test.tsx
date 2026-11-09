@@ -51,7 +51,7 @@ describe('Drawer 布局统一契约', () => {
     expect(body).toContain('-mx-1 -my-1');
   });
 
-  it('所有侧栏标题都由共享标题区管理，调用方不重新加标题边框或内边距', () => {
+  it('可见侧栏标题由共享标题区管理，无障碍标题不占用布局', () => {
     const violations: string[] = [];
     let titleCount = 0;
     for (const path of sourceFiles(featureRoot)) {
@@ -70,9 +70,10 @@ describe('Drawer 布局统一契约', () => {
           if (tag === 'SheetTitle') {
             titleCount += 1;
             const parent = node.parent;
+            const screenReaderOnly = /className="[^"]*\bsr-only\b[^"]*"/.test(node.openingElement.getText(source));
             if (
-              !ts.isJsxElement(parent) ||
-              parent.openingElement.tagName.getText(source) !== 'SheetHeader'
+              !screenReaderOnly && (!ts.isJsxElement(parent) ||
+              parent.openingElement.tagName.getText(source) !== 'SheetHeader')
             ) {
               violations.push(`${path}: 标题没有使用 SheetHeader`);
             }

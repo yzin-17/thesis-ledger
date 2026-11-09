@@ -15,7 +15,7 @@ describe('分钟点位与图表时间', () => {
     const points = bars.map((bar) => ({ ...bar, timeframe, timeframeKind: 'derived' as const }));
     expect(buildChartPoints(points, [])).toHaveLength(3);
     expect(visibleBarsForRange(points, 2)).toEqual(points.slice(-2));
-    expect(chartRangeLabel(90, timeframe)).toBe('最近90根');
+    expect(chartRangeLabel(30, timeframe)).toBe('一月');
     expect(formatChartBarTime(points[0]!)).toContain('香港时间');
     expect(chartCursorForKey(points, null, 'Home')).toBe('2026-05-18T01:30:00.000Z');
   });
@@ -64,8 +64,8 @@ describe('分钟点位与图表时间', () => {
     expect(initialChartTimeRange(points, 2)).toEqual({
       from: Date.parse(bars[1]!.timestamp) / 1000, to: Date.parse(bars[2]!.timestamp) / 1000,
     });
-    expect(chartRangeLabel(90, '1m')).toBe('最近90根');
-    expect(chartRangeLabel(90, '1d')).toBe('3月');
+    expect(chartRangeLabel(30, '1m')).toBe('一月');
+    expect(chartRangeLabel(30, '1d')).toBe('一月');
     expect(formatChartBarTime(bars[0]!)).toContain('09:30');
     expect(formatChartBarTime(bars[0]!)).toContain('香港时间');
     expect(formatChartBarTime({ ...bars[0]!, symbol: 'SPY.US', timestamp: '2026-07-13T13:30:00Z' })).toContain('09:30');

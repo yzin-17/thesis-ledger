@@ -114,8 +114,8 @@ describe('策略中心界面契约', () => {
 
   it('版本记录使用紧凑列表而非独立卡片', () => {
     expect(strategyLibrary).toContain('<TabsContent value="versions">');
-    expect(strategyLibrary).toContain('<th className="w-2/3 px-4 py-3 font-medium">版本</th>');
-    expect(strategyLibrary).toContain('<th className="w-1/3 px-4 py-3 font-medium">创建时间</th>');
+    expect(strategyLibrary).toContain('<TableHead className="w-2/3">版本</TableHead>');
+    expect(strategyLibrary).toContain('<TableHead className="w-1/3">创建时间</TableHead>');
     expect(strategyLibrary).toContain('className="px-4 py-3 text-muted-foreground"');
   });
 

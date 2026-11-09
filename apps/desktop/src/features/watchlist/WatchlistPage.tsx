@@ -40,7 +40,6 @@ function WatchlistWorkspace({ owner }: { owner: string }) {
   const { mode } = usePortfolioMode();
   const root = ['desktop', window.location.origin, 'watchlist', owner];
   const visible = useWatchlistPageVisible();
-  const [period, setPeriod] = useState<'1m' | '1d'>('1m');
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const trendFetching = useIsFetching({ queryKey: [...root, 'trends'] });
   const [params, setParams] = useSearchParams();
@@ -207,17 +206,6 @@ function WatchlistWorkspace({ owner }: { owner: string }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <WatchlistSelect
-              label="走势"
-              options={[
-                { value: '1m', label: '分时' },
-                { value: '1d', label: '近20交易日' },
-              ]}
-              value={period}
-              onChange={(value) => {
-                if (value === '1m' || value === '1d') setPeriod(value);
-              }}
-            />
-            <WatchlistSelect
               label="市场"
               options={watchlistMarketOptions}
               value={market}
@@ -244,13 +232,12 @@ function WatchlistWorkspace({ owner }: { owner: string }) {
           </p>
         )}
         <p className="text-xs text-muted-foreground">
-          按当前来源最小周期检查，遵守请求间隔；后台暂停
+          自动检查 · 后台暂停
           {prices.dataUpdatedAt > 0 && (
             <> · 报价检查 {new Date(prices.dataUpdatedAt).toLocaleTimeString('zh-CN')}</>
           )}
         </p>
         <WatchlistTable
-          period={period}
           queryRoot={root}
           page={data}
           prices={prices.data?.rows}

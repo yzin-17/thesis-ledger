@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import {
   backtestNavPreparationResultV3Schema,
@@ -25,6 +25,7 @@ const labels = {
 };
 const names = { ordinary: '普通回测', nav: '净值回测', optimization: '优化实验' };
 export function StrategySubmissionList() {
+  const client = useQueryClient();
   const api = getDesktopApiClient().strategySubmissions;
   const list = useQuery({
     queryKey: submissionKey,
@@ -35,6 +36,16 @@ export function StrategySubmissionList() {
         ? 3000
         : false,
   });
+  const delivered = (list.data ?? []).filter((row) => row.state === 'submitted' && row.outcome?.id);
+  const deliveryKey = delivered.map((row) => row.id).join(',');
+  useEffect(() => {
+    if (!deliveryKey) return;
+    void client.invalidateQueries({ queryKey: ['desktop', 'strategy', 'backtest-groups'] });
+    void client.invalidateQueries({ queryKey: ['desktop', 'strategy', 'jobs'] });
+    void client.invalidateQueries({ queryKey: ['desktop', 'strategy', 'optimization'] });
+  }, [client, deliveryKey]);
+  const visible = (list.data ?? []).filter((row) =>
+    !(row.kind === 'ordinary' && row.state === 'submitted' && row.outcome?.id));
   if (list.isError)
     return (
       <p role="status">
@@ -44,14 +55,14 @@ export function StrategySubmissionList() {
         </Button>
       </p>
     );
-  if (!list.data?.length) return null;
+  if (!visible.length) return null;
   return (
     <details
-      open={list.data.some((r) => r.state === 'awaiting_confirmation') || undefined}
+      open={visible.some((r) => r.state === 'awaiting_confirmation') || undefined}
       className="mb-card rounded-md border p-3"
     >
-      <summary>后台提交（{list.data.length}）</summary>
-      {list.data.map((row) => (
+      <summary>后台提交（{visible.length}）</summary>
+      {visible.map((row) => (
         <Receipt key={row.id} row={row} refresh={() => void list.refetch()} />
       ))}
     </details>

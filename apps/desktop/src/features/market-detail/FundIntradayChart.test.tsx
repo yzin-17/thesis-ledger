@@ -16,7 +16,7 @@ vi.mock('lightweight-charts', () => ({
   createChart: () => ({
     addSeries: () => ({ setData: mocks.setData, createPriceLine: mocks.createPriceLine }),
     removeSeries: vi.fn(), remove: vi.fn(),
-    timeScale: () => ({ getVisibleRange: () => null, setVisibleRange: vi.fn(), fitContent: vi.fn() }),
+    timeScale: () => ({ getVisibleRange: () => null, getVisibleLogicalRange: () => null, setVisibleLogicalRange: vi.fn(), setVisibleRange: vi.fn(), fitContent: vi.fn() }),
     subscribeCrosshairMove: (handler: typeof mocks.crosshair) => { mocks.crosshair = handler; },
     subscribeClick: (handler: typeof mocks.click) => { mocks.click = handler; },
     unsubscribeCrosshairMove: vi.fn(), unsubscribeClick: vi.fn(),

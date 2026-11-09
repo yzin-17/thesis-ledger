@@ -138,6 +138,7 @@ async function choose(triggerId: string, text: string) {
     Object.defineProperty(down, 'pointerType', { value: 'mouse' });
     option.dispatchEvent(down);
     option.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0, detail: 1 }));
+    await Promise.resolve();
   });
 }
 

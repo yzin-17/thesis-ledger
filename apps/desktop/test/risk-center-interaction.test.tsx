@@ -343,16 +343,12 @@ describe('风险中心 AB 交互契约', () => {
     const html = renderToStaticMarkup(
       <RiskNotificationTable
         loadState="ready"
-        routes={[
-          { channel: 'feishu', provider: 'lark-webhook' },
-          { channel: 'feishu', provider: '飞书' },
-        ]}
-        routingState="ready"
         deliveries={[
           {
             id: 'delivery-1',
             subjectType: 'risk-event',
             subjectId: 'event-1',
+            provider: '通知一',
             channel: 'feishu',
             severity: 'warning',
             status: 'delivered',
@@ -375,10 +371,8 @@ describe('风险中心 AB 交互契约', () => {
       />,
     );
 
+    expect(html).toContain('通知一（飞书） · 风险事件');
     expect(html).toContain('飞书 · 风险事件');
-    expect(html).toContain('lark-webhook（飞书）');
-    // Provider 名称与渠道中文名相同时不追加括号，避免“飞书（飞书）”
-    expect(html).not.toContain('飞书（飞书）');
     // 错误码转为可读文案（渠道已在行标题展示，不再重复），不展示原始代码
     expect(html).toContain('通知 Provider 未配置');
     expect(html).not.toContain('notification_provider_unconfigured');
@@ -412,7 +406,7 @@ describe('风险中心 AB 交互契约', () => {
 
   it('通知表不内嵌 Provider 缺失提示，提示提升到风险中心主上下文', () => {
     const html = renderToStaticMarkup(
-      <RiskNotificationTable loadState="ready" deliveries={[]} routes={[]} routingState="ready" />,
+      <RiskNotificationTable loadState="ready" deliveries={[]} />,
     );
 
     expect(html).not.toContain('尚未配置可用的通知提供方');
@@ -430,7 +424,14 @@ describe('风险中心 AB 交互契约', () => {
     );
 
     expect(html).toContain('通知提供方状态暂不可用');
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('通知失败不会回滚已写入的风险事件');
     expect(html).not.toContain('尚未配置可用的通知提供方');
+    const table = renderToStaticMarkup(
+      <RiskNotificationTable loadState="ready" deliveries={[]} />,
+    );
+    expect(table).not.toContain('暂时无法确认当前通知提供方');
+    expect(table).not.toContain('当前没有可投递的通知提供方');
   });
 
   it('Provider 缺失提示在风险中心主上下文可见，模拟模式不重复警告', () => {
@@ -570,7 +571,7 @@ describe('风险中心 AB 交互契约', () => {
     expect(html).toContain('半导体设备ETF国泰 · 159516.SZ · v2');
   });
 
-  it('只有已归档规则时，默认列表没有选中项或规则详情', () => {
+  it('只有已归档规则时，默认没有选中项，详情区展示选择空态', () => {
     const html = renderToStaticMarkup(
       <RiskRuleWorkbench
         rules={[
@@ -609,6 +610,8 @@ describe('风险中心 AB 交互契约', () => {
 
     expect(html).toContain('已归档');
     expect(html).toContain('显示已归档');
+    expect(html).toContain('未选择规则');
+    expect(html).toContain('aria-label="风险规则详情"');
     expect(html).not.toContain('aria-current="true"');
     expect(html).not.toContain('恢复规则');
     expect(html).not.toContain('查看审计');

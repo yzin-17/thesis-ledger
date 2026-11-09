@@ -54,6 +54,7 @@ export function BacktestSetupDialog({
   intent = 'new',
   onOpenChange,
   onSubmit,
+  onSubmitted,
 }: {
   open: boolean;
   strategy: StrategyRecord | null;
@@ -63,6 +64,7 @@ export function BacktestSetupDialog({
   intent?: 'new' | 'rerun';
   onOpenChange: (open: boolean) => void;
   onSubmit: (setup: BacktestSetupInput) => Promise<boolean>;
+  onSubmitted?: () => void;
 }) {
   const [period, setPeriod] = useState(defaultBacktestPeriod);
   const [initialCash, setInitialCash] = useState('100000');
@@ -71,6 +73,7 @@ export function BacktestSetupDialog({
   const [adjustment, setAdjustment] = useState<'none' | 'qfq' | 'hfq'>('none');
   const [prepared, setPrepared] = useState<PreparedBacktest | null>(null);
   const [preparationDirty, setPreparationDirty] = useState(false);
+  const [executionReady, setExecutionReady] = useState(false);
   const requestOpenChange = useDraftCloseGuard({
     open,
     busy,
@@ -82,10 +85,15 @@ export function BacktestSetupDialog({
     if (open) {
       setPeriod(initialSetup?.period ?? defaultBacktestPeriod());
       setInitialCash(String(initialSetup?.initialCash ?? 100000));
-      setBaseCurrency(initialSetup?.baseCurrency ?? 'CNY');
+      const definition = strategySchema.safeParse(version?.schema);
+      let currency: 'CNY' | 'HKD' | 'USD' = 'CNY';
+      if (definition.success && definition.data.executionInstrument.market === 'HK') currency = 'HKD';
+      else if (definition.success && definition.data.executionInstrument.market === 'US') currency = 'USD';
+      setBaseCurrency(initialSetup?.baseCurrency ?? currency);
       setError(null);
       setAdjustment(initialSetup?.adjustment ?? 'none');
       setPrepared(null);
+      setExecutionReady(false);
       setPreparationDirty(false);
     }
   }, [initialSetup, open, version?.id]);
@@ -148,7 +156,7 @@ export function BacktestSetupDialog({
               : '提交后将在后台准备行情并启动任务，进度可在回测任务中查看。'}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 pt-1 pb-6" onChange={() => setPreparationDirty(true)}>
+        <div className="grid min-h-0 auto-rows-max grid-cols-1 content-start gap-5 overflow-y-auto px-6 pt-1 pb-6" onChange={() => setPreparationDirty(true)}>
           <AuthoringRunIntents version={version} enabled={open} />
           {version?.schema && currentStrategy && (
             <StrategyV2Summary
@@ -243,6 +251,8 @@ export function BacktestSetupDialog({
           )}
           {open && version && currentStrategy && (
             <BacktestPricePreparation
+              formId="saved-strategy-backtest"
+              onReadyChange={setExecutionReady}
               key={`${version.id}:${adjustment}`}
               strategyVersionId={version.id}
               adjustment={adjustment}
@@ -253,7 +263,10 @@ export function BacktestSetupDialog({
                 ? { initialModel: initialSetup.executionModel }
                 : {})}
               onPrepared={setPrepared}
-              onSubmitted={()=>onOpenChange(false)}
+              onSubmitted={() => {
+                onOpenChange(false);
+                onSubmitted?.();
+              }}
               onDirtyChange={setPreparationDirty}
             />
           )}
@@ -266,9 +279,10 @@ export function BacktestSetupDialog({
               取消
             </Button>
             <Button
-              type="button"
-              disabled={busy || !version || !currentStrategy || !prepared}
-              onClick={() => void submit()}
+              type={prepared ? 'button' : 'submit'}
+              form="saved-strategy-backtest"
+              disabled={busy || !version || !currentStrategy || (!prepared && !executionReady)}
+              onClick={prepared ? () => void submit() : undefined}
             >
               {busy && (
                 <LoaderCircle

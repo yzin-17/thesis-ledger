@@ -1,5 +1,6 @@
+import { chartMarketDate, isChartDateRange, type ChartRange } from './chart-date-range.js';
 export type ChartPreference = {
-  visibleRange: number;
+  visibleRange: ChartRange;
   chartMode: 'candles' | 'close';
   activePane: 'MACD' | 'RSI';
   visibleIndicators: Array<'MA' | 'MACD' | 'RSI'>;
@@ -19,7 +20,7 @@ export type MarketIndicatorParams = {
 
 export const preferenceKey = 'thesis-ledger:market-chart-preferences';
 export const defaultPreference: ChartPreference = {
-  visibleRange: 90,
+  visibleRange: 30,
   chartMode: 'candles',
   activePane: 'MACD',
   visibleIndicators: ['MA', 'MACD', 'RSI'],
@@ -51,9 +52,11 @@ export const readPreference = (): ChartPreference => {
     const raw = window.localStorage.getItem(preferenceKey);
     if (!raw) return defaultPreference;
     const parsed = JSON.parse(raw) as Partial<ChartPreference>;
-    const visibleRange = [0, 30, 90, 180, 365].includes(parsed.visibleRange ?? -1)
-      ? parsed.visibleRange!
-      : defaultPreference.visibleRange;
+    let visibleRange: ChartRange = defaultPreference.visibleRange;
+    if (typeof parsed.visibleRange === 'number' && [1, 7, 30, 180, 365, 1095].includes(parsed.visibleRange))
+      visibleRange = parsed.visibleRange;
+    else if (isChartDateRange(parsed.visibleRange) && parsed.visibleRange.to <= chartMarketDate(new Date().toISOString()))
+      visibleRange = parsed.visibleRange;
     const activePane = parsed.activePane === 'RSI' ? 'RSI' : 'MACD';
     const chartMode = parsed.chartMode === 'close' ? 'close' : 'candles';
     const visibleIndicators = Array.isArray(parsed.visibleIndicators)

@@ -8,6 +8,8 @@ import {
 } from 'lightweight-charts';
 import { toChartTime } from './market-chart-time.js';
 import type { TradingOverlayModel } from './market-trading-overlay-model.js';
+import { createMeasurementPrimitive } from './market-measurement-primitive.js';
+import { createArenaMarkerPrimitive } from './market-arena-marker-primitive.js';
 
 const markerClock = (currency: string, occurredAt: string, precision: string) => {
   if (precision === 'DATE') return '（按日）';
@@ -30,18 +32,28 @@ export function attachTradingOverlays(
   model: TradingOverlayModel,
 ) {
   if (!model.arenaMarkers?.length && !model.markers.length && !model.lines.length && !model.measurement) return () => {};
+  const style = getComputedStyle(document.documentElement);
+  const buyColor = style.getPropertyValue('--color-market-up').trim() || '#c7393c';
+  const sellColor = style.getPropertyValue('--color-market-down').trim() || '#2f7a66';
   const markers = createSeriesMarkers(
     series,
     [...model.markers.map((marker) => ({
       time: toChartTime(marker.key),order:marker.key,
       position: marker.side === 'buy' ? ('belowBar' as const) : ('aboveBar' as const),
-      color: marker.side === 'buy' ? '#2563eb' : '#b45309',
+      color: marker.side === 'buy' ? buyColor : sellColor,
       shape: marker.side === 'buy' ? ('arrowUp' as const) : ('arrowDown' as const),
       text: `${marker.side === 'buy' ? '买' : '卖'} ${marker.quantity} @${marker.price} ${markerClock(marker.currency, marker.occurredAt, marker.timePrecision)}`,
-    })),...(model.arenaMarkers??[]).map(p=>({time:toChartTime(p.day),order:p.day,position:p.side==='buy'?'belowBar' as const:'aboveBar' as const,
-    color:'#7c3aed',shape:'circle' as const,text:p.model+' 模拟'+(p.side==='buy'?'买':'卖')}))].sort((a,b)=>a.order.localeCompare(b.order)),
+    }))].sort((a,b)=>a.order.localeCompare(b.order)),
     { autoScale: false },
   );
+  const arena = model.arenaMarkers?.length ? createArenaMarkerPrimitive(model.arenaMarkers, {
+    buy: buyColor, sell: sellColor,
+    background: style.getPropertyValue('--popover').trim() || '#fff',
+    foreground: style.getPropertyValue('--popover-foreground').trim() || '#171717',
+    border: style.getPropertyValue('--border').trim() || '#e5e7eb',
+    font: style.fontFamily || 'sans-serif',
+  }) : undefined;
+  if (arena) series.attachPrimitive(arena);
   const lines = model.lines.map((line) =>
     series.createPriceLine({
       price: line.price,
@@ -53,10 +65,15 @@ export function attachTradingOverlays(
     }),
   );
   let measurement: ISeriesApi<'Line', Time> | undefined;
+  const measurementArea = model.measurement ? createMeasurementPrimitive(model.measurement) : undefined;
   if (model.measurement) {
+    if (measurementArea) series.attachPrimitive(measurementArea);
     measurement = chart.addSeries(LineSeries, {
       color: '#2563eb',
-      lineWidth: 2,
+      priceScaleId: 'right',
+      lineWidth: 3,
+      pointMarkersVisible: true,
+      pointMarkersRadius: 4,
       lastValueVisible: false,
       priceLineVisible: false,
       crosshairMarkerVisible: false,
@@ -69,7 +86,9 @@ export function attachTradingOverlays(
   }
   return () => {
     markers.detach();
+    if (arena) series.detachPrimitive(arena);
     lines.forEach((line) => series.removePriceLine(line));
+    if (measurementArea) series.detachPrimitive(measurementArea);
     if (measurement) chart.removeSeries(measurement);
   };
 }

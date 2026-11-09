@@ -309,7 +309,7 @@ function ResearchDesktopTable({
             <TableHead className="hidden w-44 @min-[1080px]:table-cell">来源</TableHead>
             <TableHead className="w-32">状态</TableHead>
             <TableHead className="w-28">更新时间</TableHead>
-            <StickyTableActionHeader className="h-10 w-20 px-2 align-middle font-medium whitespace-nowrap">
+            <StickyTableActionHeader className="w-20">
               操作
             </StickyTableActionHeader>
           </TableRow>

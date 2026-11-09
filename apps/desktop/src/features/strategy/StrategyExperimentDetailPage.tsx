@@ -1,6 +1,6 @@
 import { createClientRequestId } from '../../lib/client-request-id';
 import { LoadingState, Spinner } from '@/components/ui/spinner';
-import { TableContainer } from '@/components/ui/table';
+import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { requestFailureMessage } from '@/shared/api/request-error';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -409,19 +409,19 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
             <CardContent className="space-y-3">
               <TableContainer frame="plain" refreshing={compareQuery.isRefetching || detailQuery.isRefetching} refreshLabel="正在刷新实验候选">
                 <table className="w-full min-w-[900px] text-sm">
-                  <thead className="text-left text-xs text-muted-foreground">
+                  <TableHeader className="text-left">
                     <tr>
-                      <th className="px-3 py-2 font-medium">候选</th>
-                      <th className="px-3 py-2 font-medium">主要变更</th>
-                      <th className="px-3 py-2 text-right font-medium">验证收益</th>
-                      <th className="px-3 py-2 text-right font-medium">最大回撤</th>
-                      <th className="px-3 py-2 text-right font-medium">已平仓交易</th>
-                      <th className="px-3 py-2 font-medium">资格</th>
-                      <StickyTableActionHeader className="px-3 py-2 font-medium">
+                      <TableHead>候选</TableHead>
+                      <TableHead>主要变更</TableHead>
+                      <TableHead className="text-right">验证收益</TableHead>
+                      <TableHead className="text-right">最大回撤</TableHead>
+                      <TableHead className="text-right">已平仓交易</TableHead>
+                      <TableHead>资格</TableHead>
+                      <StickyTableActionHeader>
                         操作
                       </StickyTableActionHeader>
                     </tr>
-                  </thead>
+                  </TableHeader>
                   <tbody className="divide-y">
                     <tr>
                       <td className="px-3 py-3 font-medium">

@@ -248,13 +248,15 @@ type ListOptions = Parameters<ReturnType<typeof optimization>['list']>[0];
 export const fetchOptimizationExperiments = (
   options: ListOptions = {},
   client?: DesktopRequestClient,
+  signal?: AbortSignal,
 ): Promise<OptimizationExperimentPage> =>
-  optimization(client).list(options).then(omitUndefinedDeep);
+  optimization(client).list(options, signal).then(omitUndefinedDeep);
 export const fetchStrategyBacktestGroups = (
   options: ListOptions = {},
   client?: DesktopRequestClient,
+  signal?: AbortSignal,
 ): Promise<StrategyBacktestGroupPage> =>
-  optimization(client).groups(options).then(omitUndefinedDeep);
+  optimization(client).groups(options, signal).then(omitUndefinedDeep);
 export const fetchOptimizationExperiment = (
   id: string,
   client?: DesktopRequestClient,

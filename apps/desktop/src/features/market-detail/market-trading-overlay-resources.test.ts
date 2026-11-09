@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { attachTradingOverlays } from './market-trading-overlay-resources.js';
 
@@ -13,6 +14,8 @@ describe('交易图层资源生命周期', () => {
     const series = {
       createPriceLine: vi.fn((line: Record<string, unknown>) => ({ ...line })),
       removePriceLine: vi.fn(),
+      attachPrimitive: vi.fn(),
+      detachPrimitive: vi.fn(),
     };
     const cleanup = attachTradingOverlays(chart as never, series as never, {
       markers: [
@@ -36,16 +39,9 @@ describe('交易图层资源生命周期', () => {
       ],
       measurement: { from: '2026-11-04', to: '1999-12-31', fromPrice: 11, toPrice: 10 },
     });
-    expect(createSeriesMarkers.mock.calls.at(-1)).toMatchObject([
-      series,
-      [
-        {
-          time: '2026-11-04',
-          shape: 'arrowUp',
-        },
-      ],
-      { autoScale: false },
-    ]);
+    expect(createSeriesMarkers).toHaveBeenLastCalledWith(series, [
+      expect.objectContaining({ time: '2026-11-04', shape: 'arrowUp', color: '#c7393c' }),
+    ], { autoScale: false });
     expect(JSON.stringify(createSeriesMarkers.mock.calls.at(-1)?.[1])).toContain('（按日）');
     expect(series.createPriceLine).toHaveBeenCalledTimes(2);
     expect(measure.setData).toHaveBeenCalledWith([
@@ -57,13 +53,17 @@ describe('交易图层资源生命周期', () => {
     if (last?.type !== 'return') throw new Error('标记资源未创建');
     expect(last.value.detach).toHaveBeenCalledOnce();
     expect(series.removePriceLine).toHaveBeenCalledTimes(2);
+    expect(series.detachPrimitive).toHaveBeenCalledWith(series.attachPrimitive.mock.calls[0]?.[0]);
     expect(chart.removeSeries).toHaveBeenCalledWith(measure);
   });
   it('空图层不分配资源，同一点测量不会创建重复时间', () => {
     const markerCount = createSeriesMarkers.mock.calls.length;
     const measure = { setData: vi.fn() },
       chart = { addSeries: vi.fn(() => measure), removeSeries: vi.fn() };
-    const series = { createPriceLine: vi.fn(), removePriceLine: vi.fn() };
+    const series = {
+      createPriceLine: vi.fn(), removePriceLine: vi.fn(),
+      attachPrimitive: vi.fn(), detachPrimitive: vi.fn(),
+    };
     attachTradingOverlays(chart as never, series as never, { markers: [], lines: [] })();
     expect(createSeriesMarkers.mock.calls).toHaveLength(markerCount);
     const cleanup = attachTradingOverlays(chart as never, series as never, {
@@ -74,4 +74,16 @@ describe('交易图层资源生命周期', () => {
     expect(measure.setData).toHaveBeenCalledWith([{ time: '2026-11-04', value: 11 }]);
     cleanup();
   });
+  it('聚合模型点位使用绘图坐标，保留模拟事实日期和标记语义', () => {
+    const point = { id: 'p1', arenaId: 'a1', roundId: 'r1', entrantId: 'e1', model: '验证模型', symbol: '600036.SH',
+      day: '2026-11-04', key: '2026-11-06', executedAt: '2026-11-04T07:00:00Z', side: 'buy' as const, price: '10.123456', quantity: '100' };
+    const series = { attachPrimitive: vi.fn(), detachPrimitive: vi.fn() };
+    const cleanup = attachTradingOverlays({} as never, series as never, { markers: [], lines: [], arenaMarkers: [point] });
+    expect(createSeriesMarkers).toHaveBeenLastCalledWith(series, [], { autoScale: false });
+    expect(series.attachPrimitive).toHaveBeenCalledOnce();
+    expect(point.day).toBe('2026-11-04');
+    cleanup();
+    expect(series.detachPrimitive).toHaveBeenCalledWith(series.attachPrimitive.mock.calls[0]?.[0]);
+  });
+
 });

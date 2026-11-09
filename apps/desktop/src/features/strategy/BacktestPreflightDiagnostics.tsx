@@ -6,11 +6,12 @@ const capabilityLabels: Record<string, string> = {
   INSTRUMENT_FACTS: '证券事实', CASH_DISTRIBUTION: '现金分红', SPLIT_EVENT: '份额拆并',
 };
 
-export function BacktestPreflightDiagnostics({ diagnostics }: {
+export function BacktestPreflightDiagnostics({ diagnostics, title = '配置暂不可用' }: {
   diagnostics: readonly BacktestPreflightDiagnosticV3[];
+  title?: string;
 }) {
   return <Alert variant="destructive">
-    <AlertTitle>配置暂不可用</AlertTitle>
+    <AlertTitle>{title}</AlertTitle>
     <AlertDescription>
       {diagnostics.map((diagnostic, index) => <div key={index} className="flex flex-col gap-1">
         <p>{diagnostic.message}</p>
