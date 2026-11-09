@@ -50,7 +50,7 @@ export function MarketChartControls({
         value={draft.timeframe}
         options={marketTimeframes}
         onChange={(timeframe) =>
-          change({ timeframe, adjustment: timeframe === '1m' ? 'none' : draft.adjustment })
+          change({ timeframe, adjustment: /m$/.test(timeframe) ? 'none' : draft.adjustment })
         }
       />
       <Choices

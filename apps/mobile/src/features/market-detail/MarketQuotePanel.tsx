@@ -1,6 +1,7 @@
 import type { MarketDisplayDetailResponse } from '@thesis-ledger/schemas';
 import { Copy, Section } from '../../components/MobilePrimitives';
 import { MobileChart } from '../../platform/charts/MobileChart';
+import { MarketCurrentQuote } from './MarketCurrentQuote';
 export function MarketQuotePanel({ detail }: { detail: MarketDisplayDetailResponse }) {
   return (
     <>
@@ -11,23 +12,7 @@ export function MarketQuotePanel({ detail }: { detail: MarketDisplayDetailRespon
           section.data &&
           (section.status === 'ready' || section.status === 'stale')
         ) {
-          const quote = section.data;
-          return (
-            <Section key="quote" title="当前报价">
-              <Copy>
-                {quote.price} {quote.units?.priceCurrency ?? '币种未提供'} ·{' '}
-                {quote.stale ? '行情陈旧' : '最新读取'}
-              </Copy>
-              <Copy>
-                开盘 {quote.open} · 最高 {quote.high} · 最低 {quote.low} · 前收{' '}
-                {quote.previousClose}
-              </Copy>
-              <Copy muted>
-                来源 {quote.provider} · 行情时间 {quote.marketTime ?? '未知'} · 抓取{' '}
-                {quote.fetchedAt}
-              </Copy>
-            </Section>
-          );
+          return <MarketCurrentQuote key="quote" quote={section.data} />;
         }
         if (
           section.capability === 'fund-nav' &&

@@ -47,7 +47,11 @@ export type MarketChartFilters = {
   macdSignal: string;
 };
 export const marketTimeframes = [
-  { value: '1m', label: '分钟' },
+  { value: '1m', label: '1 分钟' },
+  { value: '5m', label: '5 分钟' },
+  { value: '15m', label: '15 分钟' },
+  { value: '30m', label: '30 分钟' },
+  { value: '60m', label: '60 分钟' },
   { value: '1d', label: '日线' },
   { value: '5d', label: '五交易日' },
   { value: '1w', label: '周线' },
@@ -93,7 +97,7 @@ export function marketChartRequest(
   return {
     symbol,
     timeframe: filters.timeframe,
-    adjustment: filters.adjustment,
+    adjustment: /m$/.test(filters.timeframe) ? 'none' : filters.adjustment,
     barsLimit,
     indicatorParams: params,
     include,

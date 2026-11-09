@@ -5,7 +5,7 @@ import { RiskMonitoringSchedule } from '../../src/features/risk-rules/RiskMonito
 
 describe('移动风险规则自动监控状态', () => {
   it('两端消费相同状态契约，不再要求用户另开收盘扫描', async () => {
-    const fetcher = vi.fn(async (_url: string, _init?: RequestInit) =>
+    const fetcher = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>().mockResolvedValue(
       Response.json({
         mode: 'observed-data',
         continuousSource: false,

@@ -1,4 +1,4 @@
-import { InstrumentSymbolField } from '../market/InstrumentSymbolField';
+import { StrategyExecutionInstrumentField } from './StrategyExecutionInstrumentField';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -123,7 +123,6 @@ function StrategyEditorForm({
   } catch {
     /* 无效 JSON 保留供修正。 */
   }
-  const instrument = (definition.executionInstrument ?? {}) as Record<string, unknown>;
   const patch = (values: Record<string, unknown>) => {
     try {
       change({
@@ -133,18 +132,6 @@ function StrategyEditorForm({
     } catch {
       setMessage('请先修正高级 JSON，再修改常用配置。');
     }
-  };
-  const setInstrument = (field: string, value: string) => {
-    const sources = Array.isArray(definition.signalSources) ? definition.signalSources : [];
-    patch({
-      executionInstrument: { ...instrument, [field]: value },
-      signalSources: sources.map((source: unknown) => {
-        if (!source || typeof source !== 'object' || !('id' in source) || source.id !== 'execution')
-          return source;
-        const row = source as Record<string, unknown>;
-        return { ...row, asset: { ...(row.asset as Record<string, unknown>), [field]: value } };
-      }),
-    });
   };
   const command = useMobileCommand(
     async (action: 'local' | 'save' | 'recover') => {
@@ -246,10 +233,8 @@ function StrategyEditorForm({
       {advanced === 'common' ? (
         <StrategyCommonFields
           definition={definition}
-          instrument={instrument}
           locked={!!draft.pending || command.isPending}
           onPatch={patch}
-          onInstrument={setInstrument}
         />
       ) : (
         <Field
@@ -280,16 +265,12 @@ function StrategyEditorForm({
 
 function StrategyCommonFields({
   definition,
-  instrument,
   locked,
   onPatch,
-  onInstrument,
 }: {
   definition: Record<string, unknown>;
-  instrument: Record<string, unknown>;
   locked: boolean;
   onPatch: (v: Record<string, unknown>) => void;
-  onInstrument: (field: string, value: string) => void;
 }) {
   return (
     <Section title="常用配置">
@@ -300,41 +281,10 @@ function StrategyCommonFields({
         multiline
         onChange={(description) => onPatch({ description })}
       />
-      <InstrumentSymbolField
-        label="执行标的"
-        markets={
-          instrument.market === 'CN' ? ['SH', 'SZ', 'BJ', 'OF'] : [String(instrument.market)]
-        }
-        instrumentTypes={[
-          instrument.assetType === 'fund'
-            ? 'MUTUAL_FUND'
-            : String(instrument.assetType).toUpperCase(),
-        ]}
-        value={typeof instrument.symbol === 'string' ? instrument.symbol : ''}
-        editable={!locked}
-        onChange={(v) => onInstrument('symbol', v)}
-      />
-      <Choices
-        label="市场"
-        value={typeof instrument.market === 'string' ? instrument.market : 'CN'}
-        disabled={locked}
-        onChange={(v) => onInstrument('market', v)}
-        options={[
-          { value: 'CN', label: '境内' },
-          { value: 'HK', label: '香港' },
-          { value: 'US', label: '美国' },
-        ]}
-      />
-      <Choices
-        label="资产类型"
-        value={typeof instrument.assetType === 'string' ? instrument.assetType : 'stock'}
-        disabled={locked}
-        onChange={(v) => onInstrument('assetType', v)}
-        options={[
-          { value: 'stock', label: '股票' },
-          { value: 'etf', label: '场内基金' },
-          { value: 'fund', label: '净值基金' },
-        ]}
+      <StrategyExecutionInstrumentField
+        definition={definition}
+        locked={locked}
+        onChange={onPatch}
       />
       <Copy>
         周期：
