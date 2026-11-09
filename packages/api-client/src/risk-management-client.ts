@@ -12,6 +12,8 @@ import {
   riskAuditResponseSchema,
   riskNotificationsResponseSchema,
   notificationRoutingResponseSchema,
+  riskNotificationRoutingInputSchema,
+  riskNotificationRoutingResponseSchema,
   omitUndefinedDeep,
 } from '@thesis-ledger/schemas';
 type Schema<T> = { safeParse(value: unknown): { success: true; data: T } | { success: false } };
@@ -85,5 +87,9 @@ export function riskManagementClient(request: Request) {
       read('/notifications', riskNotificationsResponseSchema, signal),
     getRouting: (signal?: AbortSignal) =>
       read('/notifications/routing', notificationRoutingResponseSchema, signal),
+    getRiskRouting: (signal?: AbortSignal) =>
+      read('/notifications/routing/risk', riskNotificationRoutingResponseSchema, signal),
+    saveRiskRouting: (input: unknown) =>
+      write('/notifications/routing/risk', riskNotificationRoutingResponseSchema, riskNotificationRoutingInputSchema.parse(input), 'PUT'),
   };
 }

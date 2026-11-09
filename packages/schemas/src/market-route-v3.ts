@@ -19,7 +19,7 @@ export const marketRouteKeyV3Schema = z
       market,
       assetType,
       capability: z.enum(['DAILY_BAR', 'MINUTE_BAR']),
-      timeframe: z.enum(['1d', '1m']),
+      timeframe: z.enum(['1m', '5m', '15m', '30m', '60m', '1d']),
       adjustment: priceAdjustmentSchema,
     }),
     z.strictObject({
@@ -38,7 +38,7 @@ export const marketRouteKeyV3Schema = z
           message: '日线能力只能匹配日线周期',
         });
       }
-      if (value.capability === 'MINUTE_BAR' && value.timeframe !== '1m') {
+      if (value.capability === 'MINUTE_BAR' && value.timeframe === '1d') {
         context.addIssue({
           code: 'custom',
           path: ['timeframe'],

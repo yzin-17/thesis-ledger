@@ -85,9 +85,12 @@ export const riskRuleUpdateSchema = riskRuleFields
 
 const riskModeSchema = z.enum(['actual', 'shadow']);
 const riskDataQualitySchema = z.record(z.string(), z.string()).default({});
+const riskWeightSchema = z
+  .number({ error: '持仓权重必须是有效的有限数字' })
+  .finite({ error: '持仓权重必须是有效的有限数字' });
 const riskPositionSchema = z.object({
   symbol: z.string(),
-  weight: z.number().min(0).max(1),
+  weight: riskWeightSchema,
   sector: z.string().optional(),
   assetType: z.string().optional(),
   volatility: z.number().nonnegative().optional(),
@@ -112,8 +115,8 @@ export const riskSecurityContextSchema = z.object({
   price: z.number().nonnegative().optional(),
   costPrice: z.number().nonnegative().optional(),
   quantity: z.number().nonnegative().optional(),
-  weight: z.number().min(0).max(1).optional(),
-  accountWeight: z.number().min(0).max(1).optional(),
+  weight: riskWeightSchema.optional(),
+  accountWeight: riskWeightSchema.optional(),
   holdingPeak: z.number().positive().optional(),
   positionUpdatedAt: z.iso.datetime({ offset: true }).optional(),
   portfolioValues: z.array(z.number()).optional(),

@@ -93,7 +93,15 @@ export function journalReviewClient(get: RequestParsed, post: PostParsed, suffix
       );
     },
     explain: (input: JournalReviewSnapshotRequest) => {
-      const request = journalReviewExplanationRequestSchema.parse(input);
+      const snapshot = journalReviewSnapshotRequestSchema.parse(input);
+      const request = journalReviewExplanationRequestSchema.parse({
+        accountId: snapshot.accountId,
+        mode: snapshot.mode,
+        reference: snapshot.reference,
+        evidenceFingerprint: snapshot.evidenceFingerprint,
+        analysisDraft: snapshot.analysisDraft,
+        expectedAlgorithmVersion: snapshot.expectedAlgorithmVersion,
+      });
       return post(
         '/journal/explanations',
         request,

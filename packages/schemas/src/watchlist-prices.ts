@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { quoteSchema, fundNavSchema } from './market.js';
+import { marketQuoteSessionSchema } from './market-quote-session.js';
 
 export const watchlistPricesInputSchema = z.strictObject({
   itemIds: z.array(z.uuid()).min(1).max(50),
@@ -17,22 +18,7 @@ export const watchlistPricesSchema = z
       held: z.boolean().nullable(),
       price,
       minRefreshSeconds: z.number().int().positive().optional(),
-      quoteContext: z
-        .strictObject({
-          session: z.enum(['closed_snapshot', 'older_snapshot', 'trading', 'unknown']),
-          evaluatedAt: z.iso.datetime({ offset: true }),
-          nextBoundaryAt: z.iso.datetime({ offset: true }).optional(),
-          calendarRevision: z.string().optional(),
-          reason: z
-            .enum([
-              'calendar_unavailable',
-              'source_time_unknown',
-              'source_time_future',
-              'calendar_no_session',
-            ])
-            .optional(),
-        })
-        .optional(),
+      quoteContext: marketQuoteSessionSchema.optional(),
     }),
   )
   .max(50);

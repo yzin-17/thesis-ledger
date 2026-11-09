@@ -27,7 +27,7 @@ const barRouteKeyShapeV3Schema = z.strictObject({
   market: z.enum(['CN', 'HK', 'US']),
   assetType: barSeriesIdentitySchema.shape.assetType,
   capability: z.enum(['DAILY_BAR', 'MINUTE_BAR']),
-  timeframe: z.enum(['1d', '1m']),
+  timeframe: z.enum(['1m', '5m', '15m', '30m', '60m', '1d']),
   adjustment: z.enum(['none', 'qfq', 'hfq']),
 });
 

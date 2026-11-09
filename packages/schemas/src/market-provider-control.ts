@@ -47,7 +47,7 @@ export const marketProviderAccountAccessReportSchema = z.strictObject({
   validUntil: z.iso.datetime({ offset: true }).optional(),
   persisted: z.literal(true).optional(),
   accountLevel: marketProviderAccountLevelSchema.optional(),
-  routes: z.array(marketProviderProbeRouteSchema.extend({ access: marketAccountAccessSchema })).min(1).max(6),
+  routes: z.array(marketProviderProbeRouteSchema.extend({ access: marketAccountAccessSchema })).min(1).max(64),
 }).superRefine((value, context) => {
   for (const route of value.routes) {
     if (route.access.configVersion !== value.configVersion || route.access.checkedAt !== value.checkedAt || route.access.validUntil !== value.validUntil || route.access.persisted !== value.persisted)

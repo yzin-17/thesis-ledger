@@ -46,7 +46,11 @@ export * from './simulation-valuation.js';
 export * from './nav-simulation.js';
 export * from './nav-simulation-rules.js';
 export * from './strategy-monitoring.js';
+export * from './strategy-instrument-selection.js';
 export * from './valuation-display.js';
+export * from './market-quote-freshness-display.js';
+export * from './market-quote-session.js';
+export * from './market-session.js';
 
 export * from './market-civil-clock.js';
 export * from './market-minute-aggregation.js';

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const marketProviderAccountLevelSchema = z.strictObject({
   points: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  independentApis: z.array(z.enum(['hk_daily', 'rt_k'])).max(2),
+  independentApis: z.array(z.enum(['hk_daily', 'rt_k', 'stk_mins', 'etf_mins'])).max(4),
 });
 export type MarketProviderAccountLevel = z.infer<typeof marketProviderAccountLevelSchema>;
 

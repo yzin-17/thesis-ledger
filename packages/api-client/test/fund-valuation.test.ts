@@ -41,3 +41,19 @@ describe('基金估值公共客户端', () => {
     }
   });
 });
+
+it('基金区间读取传递日期和取消信号，拒绝跨标的历史', async () => {
+  const point = { version: 3, symbol: '000001.OF', navDate: '2026-11-06T00:00:00Z', unitNav: 1.2,
+    provider: 'fixture', fetchedAt: '2026-11-08T00:00:00Z', freshness: 'delayed' };
+  const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify([point])));
+  const client = new ThesisLedgerApiClient('http://fixture.invalid', fetcher);
+  const signal = new AbortController().signal;
+  expect(await client.market.getFundNavHistory('000001.OF', { start: '2023-11-06', end: '2026-11-06' }, signal)).toEqual([point]);
+  const url = new URL(String(fetcher.mock.calls[0]![0]));
+  expect(url.pathname).toContain('/000001.OF/fund-nav/history');
+  expect(url.searchParams.get('start')).toBe('2023-11-06');
+  expect(url.searchParams.get('limit')).toBe('3650');
+  expect(fetcher.mock.calls[0]![1]?.signal).toBe(signal);
+  fetcher.mockResolvedValueOnce(new Response(JSON.stringify([{ ...point, symbol: '161725.OF' }])));
+  await expect(client.market.getFundNavHistory('000001.OF', { start: '2023-11-06', end: '2026-11-06' })).rejects.toThrow();
+});

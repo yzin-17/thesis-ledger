@@ -21,6 +21,13 @@ const quote = {
 };
 
 describe('基础 Quote 可空量额合同', () => {
+  it('报价保留结构化原因，旧响应继续兼容', () => {
+    const staleReason = { code: 'timeout', message: '数据源请求超时。', httpStatus: 504 };
+    expect(quoteSchema.parse({ ...quote, staleReason }).staleReason).toEqual(staleReason);
+    expect(quoteSchema.parse(quote).staleReason).toBeUndefined();
+    expect(quoteSchema.safeParse({ ...quote, staleReason: { code: 'invented', message: '未知' } }).success).toBe(false);
+  });
+
   it('保留价格、双时钟和未知单位，不将缺失量额补零', () => {
     expect(quoteSchema.parse(quote)).toEqual(quote);
     expect(

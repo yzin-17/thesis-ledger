@@ -52,6 +52,7 @@ export const riskScanResponseSchema = z
   .object({
     traceId: z.uuid(),
     scanId: z.uuid(),
+    evaluatedRuleCount: z.number().int().nonnegative().optional(),
     results: z.array(
       z
         .object({
@@ -101,6 +102,15 @@ export const notificationRoutingResponseSchema = z
     routes: z.array(z.object({ channel: z.string(), provider: z.string() }).passthrough()),
   })
   .passthrough();
+export const riskNotificationRoutingInputSchema = z.object({
+  providers: z.array(z.string().trim().min(1)).min(1).max(100)
+    .refine((providers) => new Set(providers).size === providers.length, '通知提供方不能重复'),
+});
+export const riskNotificationRoutingResponseSchema = z.object({
+  availableRoutes: z.array(z.object({ channel: z.string(), provider: z.string(), priority: z.number() })),
+  selectedProviders: z.array(z.string()),
+  updatedAt: z.iso.datetime().nullable(),
+});
 export type RiskRuleWire = z.infer<typeof riskRuleResponseSchema>;
 export type RiskTestResultsWire = z.infer<typeof riskTestResultsResponseSchema>;
 

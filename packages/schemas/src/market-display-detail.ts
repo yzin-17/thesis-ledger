@@ -11,7 +11,7 @@ import {
   type MarketDetailSection,
 } from './market.js';
 
-export const marketDisplayBarSeriesSchema = z.union([barSeriesSchema, marketPeriodBarSeriesSchema, marketMinuteBarSeriesSchema]);
+export const marketDisplayBarSeriesSchema = z.union([marketMinuteBarSeriesSchema, marketPeriodBarSeriesSchema, barSeriesSchema]);
 export type MarketDisplayBarSeries = z.infer<typeof marketDisplayBarSeriesSchema>;
 export type MarketDisplayDetailSection =
   | Exclude<MarketDetailSection, { capability: 'bars' }>

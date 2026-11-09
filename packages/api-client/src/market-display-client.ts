@@ -45,7 +45,7 @@ export type MarketChartQuery = {
   signal?: AbortSignal;
 };
 const displayIdentitySchema = barSeriesIdentitySchema.extend({ timeframe: marketTimeframeSchema });
-const displaySeriesSchema = barSeriesSchema.or(marketPeriodBarSeriesSchema).or(marketMinuteBarSeriesSchema);
+const displaySeriesSchema = marketMinuteBarSeriesSchema.or(marketPeriodBarSeriesSchema).or(barSeriesSchema);
 
 function chartQuery(symbol: string, params: MarketChartQuery) {
   const identity = displayIdentitySchema.parse({

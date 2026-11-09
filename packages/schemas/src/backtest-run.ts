@@ -156,6 +156,7 @@ export const backtestRunStatusSchema = z.enum([
 export type BacktestRunStatus = z.infer<typeof backtestRunStatusSchema>;
 
 export const backtestRunStageSchema = z.enum([
+  'preparation-failed',
   'queued',
   'snapshot-finalized',
   'running',

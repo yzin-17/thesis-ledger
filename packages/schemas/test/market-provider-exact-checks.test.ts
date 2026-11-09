@@ -39,6 +39,22 @@ describe('精确来源检查合同', () => {
     expect(marketProviderTestResponseSchema.safeParse({ ...account, accountAccess: { ...account.accountAccess,
       routes: [{ key, target: { ...target, providerId: 'tushare' }, access }] } }).success).toBe(false);
   });
+  it('账号报告容纳原生分钟周期，保留 64 条输出边界', () => {
+    const access = { state: 'unknown', attempted: false, errorCode: 'not_tested', configVersion: 1,
+      checkedAt: '2026-11-07T06:00:00Z', validUntil: '2026-11-07T06:05:00Z' };
+    const routes = (['STOCK', 'ETF'] as const).flatMap(assetType =>
+      (['1m', '5m', '15m', '30m', '60m'] as const).map(timeframe => ({
+        key: { kind: 'bar', market: 'CN', assetType, capability: 'MINUTE_BAR', timeframe, adjustment: 'none' },
+        target: { providerId: 'tushare', upstreamSource: 'tushare' }, access,
+      })));
+    const account = { ...response, providerId: 'tushare', status: 'degraded', purpose: 'account_access',
+      capabilityResults: {}, routeResults: undefined, accountAccess: { scope: 'account_interfaces',
+        credentialContext: 'current', configVersion: 1, checkedAt: access.checkedAt,
+        validUntil: access.validUntil, routes } };
+    expect(marketProviderTestResponseSchema.safeParse(account).success).toBe(true);
+    expect(marketProviderTestResponseSchema.safeParse({ ...account,
+      accountAccess: { ...account.accountAccess, routes: Array.from({ length: 65 }, () => routes[0]) } }).success).toBe(false);
+  });
   it('接收精确目标及逐路由结果', () => {
     expect(marketProviderProbeRouteSchema.parse({ key, target })).toEqual({ key, target });
     expect(marketProviderTestResponseSchema.parse(response).routeResults).toHaveLength(1);

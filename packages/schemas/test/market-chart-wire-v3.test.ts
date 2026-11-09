@@ -144,3 +144,21 @@ describe('图表交互 V3 契约', () => {
     ).toBe(false);
   });
 });
+
+
+describe('原生小时来源语义', () => {
+  it('保留中国 ETF 小时和未知完成状态，拒绝未来时间', () => {
+    const { response } = fixture();
+    const timestamp = '2026-05-18T10:30:00+08:00';
+    const native = { ...response, symbol: '510300.SH', session: 'regular', timestampConvention: 'source-native',
+      routeKey: { ...response.routeKey, timeframe: '60m', capability: 'MINUTE_BAR', adjustment: 'none' },
+      sourcePriceBasis: { ...response.sourcePriceBasis, adjustment: 'none' },
+      bars: [{ ...response.bars[0]!, timestamp, completionStatus: 'unknown', volume: 0, amount: null }],
+      coverage: { ...response.coverage, actualStart: timestamp, actualEnd: timestamp, latestCompleteTradingDate: null } };
+    expect(marketChartBarsResponseV3Schema.safeParse(native).success).toBe(true);
+    expect(marketChartBarsResponseV3Schema.safeParse({ ...native,
+      bars: native.bars.map((bar) => ({ ...bar, completionStatus: 'complete' })) }).success).toBe(false);
+    expect(marketChartBarsResponseV3Schema.safeParse({ ...native, sourcePriceBasis: {
+      ...native.sourcePriceBasis, observedAt: '2026-05-18T02:29:00Z' } }).success).toBe(false);
+  });
+});

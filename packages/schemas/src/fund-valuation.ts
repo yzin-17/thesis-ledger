@@ -1,15 +1,17 @@
 import { z } from 'zod';
+import { marketSessionSchema } from './market-session.js';
 
 export const fundValuationSymbolSchema = z.string().regex(/^\d{6}\.OF$/);
 export const fundValuationReasonSchema = z.enum([
   'market_closed', 'nav_unavailable', 'disclosure_unavailable',
   'prices_unavailable', 'source_unavailable', 'low_coverage', 'partial_coverage',
-  'currency_unverified', 'currency_unsupported',
+  'currency_unverified', 'currency_unsupported', 'calendar_unavailable',
 ]);
 export const fundValuationSchema = z.strictObject({
   version: z.literal(1),
   symbol: fundValuationSymbolSchema,
-  marketState: z.enum(['open', 'closed']),
+  marketState: z.enum(['open', 'closed', 'unknown']),
+  marketSession: marketSessionSchema.optional(),
   quality: z.enum(['complete', 'partial', 'low_coverage', 'unavailable']),
   estimatedNav: z.number().finite().positive().nullable(),
   changePercent: z.number().finite().nullable(),
@@ -22,6 +24,10 @@ export const fundValuationSchema = z.strictObject({
   method: z.literal('disclosed-holdings-qfq-v1'),
 }).superRefine((value, context) => {
   const unavailable = value.quality === 'unavailable';
+  if (value.marketState === 'unknown' && (!unavailable || !value.reasons.includes('calendar_unavailable')))
+    context.addIssue({ code: 'custom', message: '交易时段未知时必须保留日历不可用且不得生成估值' });
+  if (value.marketSession && value.marketSession.state !== value.marketState)
+    context.addIssue({ code: 'custom', message: '市场状态与共享日历事实不一致' });
   if (unavailable !== (value.estimatedNav === null) || unavailable !== (value.changePercent === null))
     context.addIssue({ code: 'custom', message: '估值可用性与数值不一致' });
   if (!unavailable && (!value.anchor || !value.estimatedAt || !value.oldestPriceAt || value.pricedCoverage === 0))

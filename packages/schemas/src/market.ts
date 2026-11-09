@@ -11,6 +11,11 @@ import { marketTimeframeSchema, type MarketTimeframe } from './market-period.js'
 import { priceAdjustmentSchema } from './market-price-protocol.js';
 import { marketQuoteSymbolSchema } from './market-quote-identity.js';
 import { fundDisclosureEvidenceSchema } from './fund-disclosure-evidence.js';
+import { marketStaleReasonSchema, quoteStaleReasonSchema } from './market-stale-reason.js';
+import { marketQuoteSessionSchema } from './market-quote-session.js';
+export { marketQuoteSessionSchema, type MarketQuoteSession } from './market-quote-session.js';
+export { marketSessionSchema, type MarketSession } from './market-session.js';
+export { marketStaleReasonSchema, quoteStaleReasonSchema, type MarketStaleReason, type QuoteStaleReason } from './market-stale-reason.js';
 
 const isoDate = z.iso.datetime({ offset: true });
 const isoCalendarDate = z.iso.date();
@@ -67,6 +72,8 @@ export const quoteSchema = z
     fallbackUsed: z.boolean().optional(),
     servedFromCache: z.boolean().optional(),
     refreshFailure: z.enum(['budget_cooldown', 'fetch_failed', 'cache_unavailable']).optional(),
+    staleReason: quoteStaleReasonSchema.optional(),
+    sessionContext: marketQuoteSessionSchema.optional(),
     units: z
       .object({
         priceCurrency: currencySchema,
@@ -105,13 +112,6 @@ export const chipDistributionSchema = z.object({
   engineVersion: z.string().min(1),
   calculatedAt: isoDate,
 });
-
-export const marketStaleReasonSchema = z.object({
-  code: z.enum(['timeout', 'rate_limited', 'unauthorized', 'permission_denied', 'invalid_response', 'control_rejected', 'source_unavailable', 'unknown']),
-  message: z.string().min(1),
-  httpStatus: z.number().int().min(400).max(599).optional(),
-});
-export type MarketStaleReason = z.infer<typeof marketStaleReasonSchema>;
 
 export const fundNavSchema = z.object({
   version: z.literal(3),

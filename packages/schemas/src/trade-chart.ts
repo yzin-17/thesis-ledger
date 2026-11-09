@@ -3,11 +3,13 @@ import { currencySchema } from './market.js';
 import { marketQuoteSymbolSchema } from './market-quote-identity.js';
 import { positiveDecimalStringSchema } from './monetary-values.js';
 
+const tradeChartSymbolSchema = z.union([marketQuoteSymbolSchema, z.string().regex(/^\d{6}\.OF$/)]);
+
 export const tradeChartQuerySchema = z
   .strictObject({
     accountId: z.uuid(),
     mode: z.enum(['actual', 'shadow']).default('actual'),
-    symbol: marketQuoteSymbolSchema,
+    symbol: tradeChartSymbolSchema,
     start: z.iso.date(),
     end: z.iso.date(),
   })
@@ -30,7 +32,7 @@ const scope = z.strictObject({
   version: z.literal('trade-chart-v1'),
   accountId: z.uuid(),
   mode: z.enum(['actual', 'shadow']),
-  symbol: marketQuoteSymbolSchema,
+  symbol: tradeChartSymbolSchema,
   start: z.iso.date(),
   end: z.iso.date(),
   ledgerRevision: z.string().regex(/^\d+$/),

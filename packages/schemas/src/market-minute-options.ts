@@ -17,7 +17,7 @@ const availability = z
     window: window.optional(),
   })
   .superRefine((value, context) => {
-    if (value.available !== (value.reason === null) || (value.available && !value.window))
+    if (value.available !== (value.reason === null))
       context.addIssue({ code: 'custom', message: '分钟能力就绪必须包含完整规划窗口且无失败原因' });
   });
 const indicator = availability.safeExtend({
@@ -27,13 +27,14 @@ const indicator = availability.safeExtend({
 const option = availability
   .safeExtend({
     timeframe: marketMinutePeriodSchema,
-    kind: z.literal('derived'),
+    kind: z.enum(['native', 'derived']),
     limit: z.number().int().positive().max(3000),
     indicators: z.array(indicator).length(3),
   })
   .superRefine((value, context) => {
     if (
       new Set(value.indicators.map((item) => item.name)).size !== 3 ||
+      (value.kind === 'derived' && ((value.available && !value.window) || value.indicators.some((item) => item.available && !item.window))) ||
       (!value.available && value.indicators.some((item) => item.available))
     )
       context.addIssue({ code: 'custom', message: '分钟周期及三个独立指标声明不一致' });

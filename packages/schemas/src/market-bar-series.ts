@@ -7,7 +7,7 @@ const isoDateTime = z.iso.datetime({ offset: true });
 export const barSeriesIdentitySchema = z.object({
   symbol: z.string().min(1),
   assetType: z.enum(['STOCK', 'ETF', 'MUTUAL_FUND', 'LOF', 'INDEX', 'BOND', 'CONVERTIBLE_BOND']),
-  timeframe: z.enum(['1m', '1d']),
+  timeframe: z.enum(['1m', '5m', '15m', '30m', '60m', '1d']),
   adjustment: z.enum(['none', 'qfq', 'hfq']),
 });
 export type BarSeriesIdentity = z.infer<typeof barSeriesIdentitySchema>;
@@ -109,6 +109,7 @@ export const barSeriesSchema = z.object({
     requestedEnd: z.iso.date(),
     acquisitionFingerprint: z.string().min(1),
     session: z.literal('regular').optional(),
+    timestampConvention: z.enum(['interval-start', 'interval-end', 'source-native']).optional(),
   }).optional(),
 });
 export type BarSeries = z.infer<typeof barSeriesSchema>;

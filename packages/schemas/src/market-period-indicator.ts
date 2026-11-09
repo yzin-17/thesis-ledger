@@ -73,7 +73,7 @@ export const marketPeriodIndicatorCapabilitiesSchema = z
     engineVersion: z.literal('dsa-indicator-v3'),
     calculation: z.literal('provided-points'),
     periodProtocol: z.literal(MARKET_PERIOD_INDICATOR_PROTOCOL),
-    nativeTimeframes: z.tuple([z.literal('1m'), z.literal('1d')]),
+    nativeTimeframes: z.array(z.enum(['1m', '5m', '15m', '30m', '60m', '1d'])).min(2).refine((values) => values.includes('1m') && values.includes('1d') && new Set(values).size === values.length),
     periods: z.array(periodCapabilitySchema).length(8),
   })
   .superRefine((value, ctx) => {

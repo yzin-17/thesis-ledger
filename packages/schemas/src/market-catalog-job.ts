@@ -6,6 +6,7 @@ export const marketCatalogJobSchema = z
     consumer: z.literal('thesis-ledger'),
     requestId: z.string().min(1).optional(),
     id: z.string().min(1),
+    scope: z.enum(['CN', 'HK_US']).optional(),
     status: z.enum(['pending', 'running', 'succeeded', 'failed', 'timeout']),
     generation: z.number().int().nonnegative(),
     checksum: z.string(),

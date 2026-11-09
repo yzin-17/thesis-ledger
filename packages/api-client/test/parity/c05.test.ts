@@ -83,4 +83,28 @@ describe('C05 风险与通知共享请求', () => {
     expect(await api.risk.getRouting()).toEqual({ routes: [] });
     await expect(api.risk.getNotifications()).rejects.toBeInstanceOf(ThesisLedgerApiError);
   });
+  it('风险通知多选读取可取消，保存发送完整提供方名称且拒绝空选', async () => {
+    const routing = {
+      availableRoutes: [
+        { channel: 'feishu', provider: '优先通知', priority: 1 },
+        { channel: 'feishu', provider: '备用通知', priority: 2 },
+      ],
+      selectedProviders: ['优先通知'], updatedAt: null,
+    };
+    const saved = { ...routing, selectedProviders: ['优先通知', '备用通知'], updatedAt: time };
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json(routing)).mockResolvedValueOnce(Response.json(saved));
+    const api = new ThesisLedgerApiClient('https://ledger.test/api/v1', fetcher);
+    const signal = new AbortController().signal;
+    expect(await api.risk.getRiskRouting(signal)).toEqual(routing);
+    expect(fetcher.mock.calls[0]![1].signal).toBe(signal);
+    expect(await api.risk.saveRiskRouting({ providers: saved.selectedProviders })).toEqual(saved);
+    expect(fetcher.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+      '/api/v1/notifications/routing/risk', '/api/v1/notifications/routing/risk',
+    ]);
+    expect(fetcher.mock.calls[1]![1].method).toBe('PUT');
+    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toEqual({ providers: saved.selectedProviders });
+    expect(() => api.risk.saveRiskRouting({ providers: [] })).toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
 });

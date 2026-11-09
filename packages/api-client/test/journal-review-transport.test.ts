@@ -26,6 +26,48 @@ const setup = (response: unknown) => {
   };
 };
 describe('正式复盘传输范围', () => {
+  it('AI 解读从完整快照请求投影，旧任务引用不进入新任务请求，严格边界仍保留', async () => {
+    const row = candidate();
+    const request = {
+      accountId: row.input.trade.accountId,
+      mode: 'actual' as const,
+      reference: row.input.reference,
+      evidenceFingerprint: row.input.projection.evidenceFingerprint,
+      analysisDraft: { stopLoss: '8' },
+      expectedAlgorithmVersion: 'expected',
+      aiRunId: '00000000-0000-4000-8000-000000000080',
+    };
+    const response = {
+      id: '00000000-0000-4000-8000-000000000081',
+      accountId: request.accountId, mode: request.mode,
+      reviewObjectId: request.reference.reviewObjectId,
+      evidenceFingerprint: request.evidenceFingerprint,
+      analysisDraft: request.analysisDraft,
+      algorithmVersion: request.expectedAlgorithmVersion,
+      provider: 'fixture', model: 'fixture-model', promptVersion: 'fixture-v1',
+      status: 'queued', errorCode: null, errorSummary: null, result: null,
+      createdAt: '2026-10-04T09:00:00Z',
+    };
+    const { api, fetcher } = setup(response);
+    await expect(api.explain(request)).resolves.toMatchObject({ id: response.id });
+    expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).toEqual({
+      accountId: request.accountId, mode: request.mode, reference: request.reference,
+      evidenceFingerprint: request.evidenceFingerprint, analysisDraft: request.analysisDraft,
+      expectedAlgorithmVersion: request.expectedAlgorithmVersion,
+    });
+    for (const invalid of [
+      { ...request, accountId: 'invalid' },
+      { ...request, aiRunId: 'invalid' },
+      { ...request, evidenceFingerprint: '' },
+      { ...request, inputSnapshot: row.input },
+      { ...request, analysisDraft: { sourceQuantity: '999' } },
+    ]) {
+      const rejected = setup(response);
+      expect(() => rejected.api.explain(invalid as never)).toThrow();
+      expect(rejected.fetcher).not.toHaveBeenCalled();
+    }
+    await expect(setup({ ...response, accountId: '00000000-0000-4000-8000-000000000090' }).api.explain(request)).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  });
   it('保留 decimal 数量并传递取消信号，拒绝跨账户或模式响应', async () => {
     const row = candidate();
     row.input.trade.sourceQuantity = '9007199254740993.000000000000000001';

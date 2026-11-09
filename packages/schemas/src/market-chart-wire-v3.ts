@@ -9,8 +9,15 @@ import { marketRouteKeyIdV3 } from './market-route-v3.js';
 
 const supportedChartRoute = (key: { timeframe: string; market: string; assetType: string; adjustment: string }) =>
   key.timeframe === '1d' ||
-  (key.timeframe === '1m' && ['HK', 'US'].includes(key.market) &&
+  (['1m', '5m', '15m', '30m', '60m'].includes(key.timeframe) && ['CN', 'HK', 'US'].includes(key.market) &&
     ['STOCK', 'ETF'].includes(key.assetType) && key.adjustment === 'none');
+
+const chartSymbolMarket = (symbol: string) => {
+  if (/\.(SH|SZ|BJ)$/.test(symbol)) return 'CN';
+  if (symbol.endsWith('.HK')) return 'HK';
+  if (symbol.endsWith('.US')) return 'US';
+  return undefined;
+};
 
 /** Interactive observations never constitute a complete backtest window. */
 export const marketChartBarsRequestV3Schema = marketDataBarSeriesRequestV3Schema
@@ -19,8 +26,8 @@ export const marketChartBarsRequestV3Schema = marketDataBarSeriesRequestV3Schema
     routeTarget: marketDataRouteTargetPinV3Schema,
   })
   .superRefine((request, context) => {
-    if (!supportedChartRoute(request.routeKey)) {
-      context.addIssue({ code: 'custom', path: ['routeKey'], message: '分钟图表仅支持港美股票/ETF不复权正常时段' });
+    if (!supportedChartRoute(request.routeKey) || (request.routeKey.timeframe !== '1d' && chartSymbolMarket(request.symbol) !== request.routeKey.market)) {
+      context.addIssue({ code: 'custom', path: ['routeKey'], message: '分钟图表仅支持中港美股票/ETF不复权正常时段' });
     }
   });
 export type MarketChartBarsRequestV3 = z.infer<typeof marketChartBarsRequestV3Schema>;
@@ -39,12 +46,14 @@ export const marketChartBarsResponseV3Schema = z
     provenance: completeShape.provenance,
     inputFingerprint: completeShape.inputFingerprint,
     session: z.literal('regular').optional(),
+    timestampConvention: z.enum(['interval-start', 'interval-end', 'source-native']).optional(),
   })
   .superRefine((response, context) => {
     const issue = (path: (string | number)[], message: string) =>
       context.addIssue({ code: 'custom', path, message });
-    if (!supportedChartRoute(response.routeKey)) issue(['routeKey'], '分钟图表仅支持港美股票/ETF不复权正常时段');
-    const minute = response.routeKey.timeframe === '1m';
+    if (!supportedChartRoute(response.routeKey) || (response.routeKey.timeframe !== '1d' && chartSymbolMarket(response.symbol) !== response.routeKey.market)) issue(['routeKey'], '分钟图表仅支持中港美股票/ETF不复权正常时段');
+    const minute = response.routeKey.timeframe !== '1d';
+    if (minute && response.timestampConvention === 'source-native' && response.bars.some((point) => point.completionStatus !== 'unknown')) issue(['bars'], '来源时间约定未知时完成状态必须保持未知');
     if (minute && response.session !== 'regular') issue(['session'], '分钟图表必须声明正常交易时段');
     if (response.sourcePriceBasis.adjustment !== response.routeKey.adjustment) {
       issue(['sourcePriceBasis', 'adjustment'], '来源价格口径必须匹配路由');
@@ -69,10 +78,12 @@ export const marketChartBarsResponseV3Schema = z
       previousDate = date;
       if (minute && Date.parse(point.timestamp) % 60_000 !== 0) issue(['bars', index, 'timestamp'], '分钟时间必须对齐整分钟');
       if (minute && point.completionStatus === 'complete' &&
-        Date.parse(point.timestamp) + 60_000 > Date.parse(response.sourcePriceBasis.observedAt)) {
+        Date.parse(point.timestamp) + (response.timestampConvention === 'interval-end' ? 0 : Number.parseInt(response.routeKey.timeframe, 10) * 60_000) > Date.parse(response.sourcePriceBasis.observedAt)) {
         issue(['bars', index, 'completionStatus'], '分钟结束晚于观察时间，不能声明完成');
       }
       if (!minute && point.completionStatus === 'complete') latestComplete = date;
+      if (minute && Date.parse(point.timestamp) > Date.parse(response.sourcePriceBasis.observedAt))
+        issue(['bars', index, 'timestamp'], '分钟时间不能晚于来源观察时间');
       if (Date.parse(point.availableAt) > Date.parse(response.sourcePriceBasis.observedAt)) {
         issue(['bars', index, 'availableAt'], '可用时间不能晚于本次来源观测时间');
       }

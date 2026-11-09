@@ -30,10 +30,10 @@ export function marketChartOptionsClient(requestParsed: RequestParsed, queryStri
       return response;
     },
     getChartOptions: async (symbol: string, signal?: AbortSignal,
-      requestedWindow?: MarketChartOptionsWindowV3, timeframe: '1m' | '1d' = '1d') => {
+      requestedWindow?: MarketChartOptionsWindowV3, timeframe: '1m' | '5m' | '15m' | '30m' | '60m' | '1d' = '1d') => {
       const window = requestedWindow ? marketChartOptionsWindowV3Schema.parse(requestedWindow) : undefined;
       const path = `/api/market/${encodeURIComponent(symbol)}/chart-options${queryString({
-        ...window, ...(timeframe === '1m' ? { timeframe } : {}),
+        ...window, ...(timeframe !== '1d' ? { timeframe } : {}),
       })}`;
       const response = await requestParsed(path, marketChartOptionsV3Schema, signal ? { signal } : undefined);
       if (response.symbol !== symbol || (response.timeframe ?? '1d') !== timeframe ||
