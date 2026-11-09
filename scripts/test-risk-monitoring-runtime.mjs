@@ -5,6 +5,9 @@ import { spawnSync } from 'node:child_process';
 
 // Dedicated, disposable resources. Never connects to the development stack,
 // pulls/builds images, creates volumes, or changes application/notification setup.
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== '--notification-providers')) throw new Error('仅支持 --notification-providers');
+const notificationProviders = args[0] === '--notification-providers';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const id = randomUUID();
 const postgres = `ledger-risk-pg-${id.slice(0, 8)}`;
@@ -103,8 +106,17 @@ try {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  for (const migration of migrations)
+  for (const migration of migrations) {
+    if (notificationProviders && migration === '20261107010000_risk_notification_providers') {
+      sql(`INSERT INTO "NotificationDelivery"
+        ("id", "subjectType", "subjectId", "message", "channel", "provider", "severity", "status", "attemptCount", "dedupKey", "scheduledAt")
+        VALUES ('11111111-1111-4111-8111-111111111111', 'risk-event', 'legacy-event',
+          '{"title":"历史提醒","body":"保持历史","severity":"warning","traceId":"legacy-isolated"}',
+          'feishu', '优先通知', 'warning', 'delivered', 1,
+          'risk-event:legacy-event:warning:legacy-event', CURRENT_TIMESTAMP);`);
+    }
     sql(readFileSync(`${directory}/${migration}/migration.sql`, 'utf8'));
+  }
   run('docker', ['exec', redis, 'redis-cli', 'SET', 'fixture:owner', id]);
   const pgPort = run('docker', ['port', postgres, '5432/tcp']).split(':').at(-1);
   const redisPort = run('docker', ['port', redis, '6379/tcp']).split(':').at(-1);
@@ -121,7 +133,7 @@ try {
   );
   const result = spawnSync(
     `${root}node_modules/.bin/vitest`,
-    ['run', 'test/risk/monitoring-runtime.integration.test.ts'],
+    ['run', notificationProviders ? 'test/risk/notification-providers-postgres.integration.test.ts' : 'test/risk/monitoring-runtime.integration.test.ts'],
     {
       cwd: `${root}apps/server`,
       encoding: 'utf8',

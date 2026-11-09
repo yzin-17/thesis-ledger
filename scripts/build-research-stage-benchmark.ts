@@ -237,7 +237,7 @@ const benchmark = liveBenchmarkSchema.parse({
 const evaluation = liveEvaluationSchema.parse({
   version: 'research-stage-evaluation-v1',
   metric: 'fact-and-boundary-coverage-v1',
-  cases: definitions.map(([caseId, topic, _facts, terms]) => ({
+  cases: definitions.map(([caseId, topic, , terms]) => ({
     caseId,
     criteria: terms.map((term, index) => ({
       description: `${topic}：固定概念核对${index + 1}`,

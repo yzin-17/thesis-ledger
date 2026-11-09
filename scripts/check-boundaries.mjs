@@ -6,6 +6,8 @@ import { aiCatalogBoundaryViolation } from './ai-catalog-boundaries.mjs';
 import { instrumentDisplayBoundaryViolation } from './instrument-display-boundaries.mjs';
 import { browserRequestIdBoundaryViolation } from './browser-request-id-boundaries.mjs';
 import { dateInputBoundaryViolation } from './date-input-boundaries.mjs';
+import { marketSessionBoundaryViolation } from './market-session-boundaries.mjs';
+import { marketWindowConsumerBoundaryViolation } from './market-window-consumer-boundaries.mjs';
 import { draftCloseSnapshotBoundaryViolation, navigationDraftSnapshotBoundaryViolation } from './draft-close-boundaries.mjs';
 const root = new URL('..', import.meta.url).pathname;
 const violations = [];
@@ -15,6 +17,9 @@ const serverProvidersPrefix = 'apps/server/src/providers/';
 const serverBacktestPrefix = 'apps/server/src/backtest/';
 const serverBacktestTestPrefix = 'apps/server/test/backtest/';
 const forbiddenFeatureDependencies = [
+  ['apps/server/src/market/', 'apps/server/src/watchlist/', '交易时段与报价时效属于 Market，自选只能单向消费'],
+  ['apps/desktop/src/components/ui/info-tip.tsx', 'apps/desktop/src/features/', '通用图标说明属于 UI 层，不得依赖业务 feature'],
+  ['apps/server/src/platform/api-rate-limit', 'apps/server/src/identity/', '平台限流只接收已验证主体投影，不得反向依赖身份业务；组合由根启动入口负责'],
   ['apps/server/src/watchlist/', 'apps/server/src/integration/', '自选报价与日历只消费 Market 领域边界，不得直连 DSA 绕过控制和缓存'],
   ['apps/server/src/market/', 'apps/server/src/risk/', 'Market拥有行情观察事实，必须由Risk单向消费，禁止行情反向编排风险'],
   ['apps/server/src/risk/risk-monitoring.service.ts', 'apps/server/src/integration/', '自动监控只消费已取得的数据，不得隐式扩展远程行情调用'],
@@ -442,7 +447,7 @@ async function inspect(path) {
   ) {
     violations.push(`${file} -> 旧工具审计入口 (研究报告必须携带正文 locator 读取审计)`);
   }
-  for (const check of [aiCatalogBoundaryViolation, instrumentDisplayBoundaryViolation, dateInputBoundaryViolation, browserRequestIdBoundaryViolation, draftCloseSnapshotBoundaryViolation, navigationDraftSnapshotBoundaryViolation]) {
+  for (const check of [aiCatalogBoundaryViolation, instrumentDisplayBoundaryViolation, dateInputBoundaryViolation, marketSessionBoundaryViolation, marketWindowConsumerBoundaryViolation, browserRequestIdBoundaryViolation, draftCloseSnapshotBoundaryViolation, navigationDraftSnapshotBoundaryViolation]) {
     const violation = check(file, source);
     if (violation) violations.push(`${file} -> ${violation}`);
   }
