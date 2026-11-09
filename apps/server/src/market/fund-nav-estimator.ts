@@ -35,7 +35,7 @@ export const estimateFundNavFromHoldings = (
 export async function readFundNavEstimate(input: {
   symbol: string;
   at: Date;
-  market: Pick<MarketService, 'getFundNav' | 'getFundHoldings' | 'getQuote'>;
+  market: Pick<MarketService, 'getFundNav' | 'getFundHoldings' | 'getQuote' | 'getSession'>;
   bars: Pick<MarketBarReader, 'readChartV3'>;
   current?: boolean;
 }) {

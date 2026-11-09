@@ -145,6 +145,26 @@ describe('多市场盘中门禁', () => {
     expect(handler.run).toHaveBeenCalledWith(expect.any(AbortSignal), now, 'manual');
   });
 
+  it('默认门禁在日历未知时跳过，不创建执行记录；手动仍可运行', async () => {
+    const create = vi.fn(async () => ({ id: 'run-unknown' }));
+    const current = { ...job, type: 'market-sync' as const };
+    const handler = { type: current.type, run: vi.fn(async () => ({})) };
+    const service = new AutomationService({
+      automationJob: {
+        findUniqueOrThrow: vi.fn(async () => current),
+        update: vi.fn(async () => current),
+      },
+      automationRun: { create, update: vi.fn(async () => ({})) },
+    } as never, redisFixture() as never, { enqueue: vi.fn(async () => []) } as never, {
+      read: vi.fn(async () => ({ state: 'unknown', tradingDayState: 'unknown', sessions: [], reason: 'calendar_unavailable' })),
+    } as never);
+    await expect(service.executeScheduled(current.id, handler, new Date('2027-01-04T02:00:00Z'))).resolves.toMatchObject({ skipped: true, reason: expect.stringContaining('交易日历') });
+    expect(create).not.toHaveBeenCalled();
+    expect(handler.run).not.toHaveBeenCalled();
+    await service.execute(current.id, handler);
+    expect(handler.run).toHaveBeenCalledOnce();
+  });
+
   it('估值 handler 仅在自动调度时启用账户级市场过滤', async () => {
     const scheduledSamplingGate = vi.fn(async () => ({ allowed: true as const, markets: ['US'] }));
     const sample = vi.fn(async () => ({ sampled: 1 }));

@@ -22,14 +22,15 @@ describe('database structure input', () => {
   it('自动发现全部 migration、Prisma 表和 raw-owned 表', async () => {
     const input = await discoverDatabaseStructure();
 
-    expect(input.currentHead).toBe('20261106030000_strategy_submission');
-    expect(input.migrations).toHaveLength(48);
-    expect(input.prismaTables).toHaveLength(84);
+    expect(input.currentHead).toBe('20261107010000_risk_notification_providers');
+    expect(input.migrations).toHaveLength(49);
+    expect(input.prismaTables).toHaveLength(85);
     expect(input.rawOwnedTables).toHaveLength(16);
-    expect(input.expectedTables).toHaveLength(100);
+    expect(input.expectedTables).toHaveLength(101);
     expect(input.expectedTables).toEqual(
       expect.arrayContaining([
         'StrategyRiskApplication',
+        'NotificationRoutingPreference',
         'AutomationRunLease',
         'LedgerEvent',
         'NavBacktestPreparation',

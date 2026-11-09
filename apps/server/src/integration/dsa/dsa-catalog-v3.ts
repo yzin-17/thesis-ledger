@@ -8,6 +8,7 @@ const jobSchema = z
     ...envelope,
     requestId: z.string().min(1).optional(),
     id: z.string().min(1),
+    scope: z.enum(['CN', 'HK_US']).optional(),
     status: z.enum(['pending', 'running', 'succeeded', 'failed', 'timeout']),
     generation: z.number().int().nonnegative(),
     checksum: z.string(),
@@ -41,10 +42,14 @@ function parse<T>(schema: z.ZodType<T>, raw: unknown): T {
   return result.data;
 }
 
-export function parseCatalogJob(raw: unknown, expected: { id?: string; requestId?: string }) {
+export function parseCatalogJob(
+  raw: unknown,
+  expected: { id?: string; requestId?: string; scope?: 'CN' | 'HK_US' },
+) {
   const job = parse(jobSchema, raw);
   if (
     (expected.id !== undefined && job.id !== expected.id) ||
+    (expected.scope !== undefined && (job.scope ?? 'CN') !== expected.scope) ||
     (expected.requestId !== undefined && job.requestId !== expected.requestId)
   )
     throw new DsaV3ProtocolError('DSA Catalog Job 身份不匹配', 'invalid-response');

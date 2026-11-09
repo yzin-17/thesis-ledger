@@ -1,10 +1,10 @@
 import {
-  marketDataBarSeriesRequestResponseV3Schema,
   marketFrozenWindowRefV3Schema,
   type MarketFrozenWindowRefV3,
 } from '@thesis-ledger/schemas';
 import type { FrozenMarketWindowV3 } from './market-frozen-window-view-v3.js';
 import { marketFrozenWindowHashV3 } from './market-frozen-window-v3.js';
+import { parseMarketWindowEvidenceResponseV3 } from './market-window-response-v3.js';
 import type { MarketDerivedSeriesInputV3 } from './market-derived-series-v3.js';
 import { freezeMarketDerivedSeriesV3 } from './market-derived-series-snapshot-v3.js';
 import { compareDerivedInstantV3, latestDerivedInstantV3 } from './market-derived-instant-v3.js';
@@ -25,10 +25,7 @@ export function freezeDerivedRawWindowV3(
     marketFrozenWindowHashV3(frozen.response) !== ref.responseHash
   )
     throw new Error('派生转换证据未绑定同一完整 raw 窗口');
-  const { response } = marketDataBarSeriesRequestResponseV3Schema.parse({
-    request: frozen.request,
-    response: frozen.response,
-  });
+  const response = parseMarketWindowEvidenceResponseV3(frozen.response, frozen.request);
   if (
     response.routeKey.adjustment !== 'none' ||
     response.sourcePriceBasis.adjustment !== 'none' ||

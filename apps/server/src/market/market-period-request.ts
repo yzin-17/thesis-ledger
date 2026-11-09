@@ -15,9 +15,9 @@ export function parseMarketTimeframe(value: string | undefined) {
 export function requireNativeMarketTimeframe(
   value: string | undefined,
   assetType: string | undefined,
-): '1m' | '1d' {
+): '1m' | '5m' | '15m' | '30m' | '60m' | '1d' {
   const timeframe = parseMarketTimeframe(value);
-  if (timeframe === '1m' || timeframe === '1d') return timeframe;
+  if (timeframe === '1m' || timeframe === '5m' || timeframe === '15m' || timeframe === '30m' || timeframe === '60m' || timeframe === '1d') return timeframe;
   const supportedAsset = assetType === 'STOCK' || assetType === 'ETF';
   if (!supportedAsset) {
     throw new HttpException(

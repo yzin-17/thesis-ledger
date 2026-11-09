@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { makeMultiWindowResponseV3 } from './v3-multi-window-fixtures.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   backtestPreflightRequestV3Schema,
@@ -331,6 +332,19 @@ const refreshFixtureChecksum = (fixture: ValidFixture) => {
 };
 
 describe('execution-window V3 preflight', () => {
+  it('接纳已校验的多窗口响应，保留固定协议与请求关联约束', async () => {
+    const fixture = validFixture();
+    if (fixture.result.status !== 'selected') throw Error('selected fixture required');
+    const response = makeMultiWindowResponseV3(fixture.result.selection.response);
+    fixture.result.selection.response = response;
+    fixture.result.evidence.sourcePriceBasis = response.sourcePriceBasis;
+    fixture.result.evidence.inputFingerprint = response.inputFingerprint;
+    fixture.input.runConfig.executionPriceProtocol.priceBasis = { ...response.sourcePriceBasis, quantityBasis: 'normalized-units' };
+    refreshFixtureChecksum(fixture);
+    expect((await preflightBacktestExecutionWindowV3({ ...fixture.input, reader: readerFor(fixture.result) })).status).toBe('ready');
+    response.inputFingerprint = '0'.repeat(64);
+    expect((await preflightBacktestExecutionWindowV3({ ...fixture.input, reader: readerFor(fixture.result) })).status).toBe('blocked');
+  });
   it('reads the exact planned window once and returns a comparable revision stamp', async () => {
     const fixture = validFixture();
     const reader = readerFor(fixture.result);

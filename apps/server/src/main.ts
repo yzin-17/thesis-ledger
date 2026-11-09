@@ -7,6 +7,8 @@ import { ApiExceptionFilter } from './platform/api-exception.filter.js';
 import { runWithTrace, StructuredLogger } from './platform/structured-logger.js';
 import type { NextFunction, Request, Response } from 'express';
 import { createApiRateLimitMiddleware } from './platform/api-rate-limit.js';
+import { IdentityService } from './identity/identity.service.js';
+import { identityRateLimitSubject } from './identity/identity-rate-limit-subject.js';
 import { ErrorTrackingService } from './platform/error-tracking.service.js';
 import { backtestResearchBodyParserOptions } from './backtest/backtest-research-body-parser.js';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -23,8 +25,6 @@ const bootstrap = async () => {
   });
   app.enableShutdownHooks();
   app.enableCors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : false });
-  app.use(createApiRateLimitMiddleware());
-  if (network.mode === 'lan') app.use(createLanAuthMiddleware(network.apiToken!));
   const requestLogger = new StructuredLogger('thesis-ledger.http');
   app.use((request: Request, response: Response, next: NextFunction) => {
     const traceId = request.header('x-trace-id') ?? crypto.randomUUID();
@@ -39,11 +39,16 @@ const bootstrap = async () => {
           durationMs: Date.now() - started,
           method: request.method,
           path: request.path,
+          rateLimitPolicy: response.locals.apiRateLimitPolicy,
         }),
       );
       next();
     });
   });
+  app.use(createApiRateLimitMiddleware({
+    resolveSubject: identityRateLimitSubject(app.get(IdentityService)),
+  }));
+  if (network.mode === 'lan') app.use(createLanAuthMiddleware(network.apiToken!));
   app.useBodyParser('json', backtestResearchBodyParserOptions());
   app.useBodyParser('json', { limit: '100kb' });
   app.useGlobalFilters(new ApiExceptionFilter(app.get(ErrorTrackingService)));

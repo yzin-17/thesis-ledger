@@ -286,15 +286,17 @@ describe('结构化日志', () => {
 
 describe('API 限流', () => {
   it('普通与重任务使用独立窗口并返回可重试时间', () => {
-    const limiter = new ApiRateLimiter(2, 1, 1000);
-    expect(limiter.consume('client', false, 0).allowed).toBe(true);
-    expect(limiter.consume('client', false, 1).allowed).toBe(true);
-    expect(limiter.consume('client', false, 2)).toMatchObject({
+    const limiter = new ApiRateLimiter(1000);
+    const read = [{ key: 'client:read', limit: 2 }];
+    const task = [{ key: 'client:task', limit: 1 }];
+    expect(limiter.consume(read, 0).allowed).toBe(true);
+    expect(limiter.consume(read, 1).allowed).toBe(true);
+    expect(limiter.consume(read, 2)).toMatchObject({
       allowed: false,
       retryAfterMs: 998,
     });
-    expect(limiter.consume('client', true, 2).allowed).toBe(true);
-    expect(limiter.consume('client', false, 1001).allowed).toBe(true);
+    expect(limiter.consume(task, 2).allowed).toBe(true);
+    expect(limiter.consume(read, 1001).allowed).toBe(true);
   });
 });
 

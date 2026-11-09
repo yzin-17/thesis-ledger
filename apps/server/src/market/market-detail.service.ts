@@ -110,7 +110,7 @@ const hasStaleValue = (value: unknown, seen = new Set<unknown>()): boolean => {
   seen.add(value);
   if (Array.isArray(value)) return value.some((item) => hasStaleValue(item, seen));
   const record = value as Record<string, unknown>;
-  if (record.stale === true || record.freshness === 'stale' || record.fallbackUsed === true)
+  if (record.stale === true || record.freshness === 'stale')
     return true;
   return Object.values(record).some((item) => hasStaleValue(item, seen));
 };

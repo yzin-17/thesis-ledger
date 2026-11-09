@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { evaluateCompleteRule, type RiskRule } from '@thesis-ledger/domain';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -85,7 +85,9 @@ export class RiskService {
       );
       return evaluated.event ? [evaluated.event] : [];
     }
-    const events = this.evaluateStoredRule(stored, parsed).map(({ event }) => event);
+    const events = this.evaluateStoredRule(stored, parsed, (reason) => {
+      throw new BadRequestException({ error: 'input-unavailable', message: reason });
+    }).map(({ event }) => event);
     await this.rules.recordTestAudit(id, stored.version, events.length);
     return events;
   }
@@ -93,18 +95,18 @@ export class RiskService {
   async scan(input: unknown, options: RiskScanOptions = {}) {
     const parsed = await this.contexts.prepare(input, true);
     const scanId = parsed.scanId ?? crypto.randomUUID();
-    const rules = await this.rules.listEnabledRules();
+    const includeStrategyRules = options.includeStrategyRules ?? true;
+    const rules = (await this.rules.listEnabledRules()).filter((stored) =>
+      (!options.ruleIds || options.ruleIds.includes(stored.id)) &&
+      (!stored.sourcePlanId || includeStrategyRules));
     const traceId = crypto.randomUUID();
     const evaluatedAt = options.evaluatedAt ?? this.scanEvaluationTime(parsed);
-    const includeStrategyRules = options.includeStrategyRules ?? true;
     const results: RiskScanResult[] = [];
 
     for (const stored of rules) {
-      if (options.ruleIds && !options.ruleIds.includes(stored.id)) continue;
       try {
         if (stored.sourcePlanId) {
-          if (includeStrategyRules)
-            await this.evaluateStrategyStoredRule(stored, evaluatedAt, scanId, traceId, results);
+          await this.evaluateStrategyStoredRule(stored, evaluatedAt, scanId, traceId, results);
           continue;
         }
         const evaluated = this.evaluateStoredRule(stored, parsed, (reason, candidate) => {
@@ -143,7 +145,7 @@ export class RiskService {
         });
       }
     }
-    return { traceId, scanId, results };
+    return { traceId, scanId, evaluatedRuleCount: rules.length, results };
   }
 
   async evaluateStrategyApplication(applicationId: string, evaluatedAt = new Date()) {

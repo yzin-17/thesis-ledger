@@ -1,3 +1,4 @@
+import { hasNativeChartRoute } from './market-native-chart-route.js';
 import { marketCalculationAnchor } from '@thesis-ledger/schemas';
 import { BadRequestException, Controller, Get, Optional, Param, Query } from '@nestjs/common';
 import {
@@ -33,7 +34,6 @@ import { type QuoteAssetType } from './market-quote-reader.js';
 import { MarketChartReaderV3 } from './market-chart-reader-v3.js';
 import { parseChartOptionsQuery, planChartOptionsRequest } from './market-chart-options-request.js';
 import { indicatorReadInput, indicatorWindows, projectIndicatorResponse, MAX_CHART_V3_INDICATOR_INPUT_POINTS } from './market-indicator-window.js';
-
 type IndicatorName = 'MA' | 'MACD' | 'RSI';
 
 @Controller('api/market')
@@ -76,7 +76,7 @@ export class MarketController {
     return response;
   }
 
-  @Get(':symbol/bars') bars(
+  @Get(':symbol/bars') async bars(
     @Param('symbol') symbol: string,
     @Query('assetType') assetType?: string,
     @Query('timeframe') timeframe?: string,
@@ -90,7 +90,7 @@ export class MarketController {
   ) {
     const displayTimeframe = parseMarketTimeframe(timeframe);
     const minute = marketMinutePeriodSchema.safeParse(displayTimeframe);
-    if (minute.success && this.minutes)
+    if (minute.success && this.minutes && !await hasNativeChartRoute(this.chartReader, symbol, displayTimeframe, assetType))
       return this.minutes.bars(symbol, minute.data,
         { assetType, adjustment, start, end, limit, acceptance, refresh, asOf });
     if (this.periods && !minute.success && displayTimeframe !== '1m' && displayTimeframe !== '1d')
@@ -121,7 +121,7 @@ export class MarketController {
     const requests = [{ name: normalizedName, parameters: selectIndicatorParameters(normalizedName, parameters) }];
     const displayTimeframe = parseMarketTimeframe(timeframe);
     const minute = marketMinutePeriodSchema.safeParse(displayTimeframe);
-    if (minute.success && this.minutes)
+    if (minute.success && this.minutes && !await hasNativeChartRoute(this.chartReader, symbol, displayTimeframe, assetType))
       return this.minutes.indicator(symbol, minute.data,
         { assetType, adjustment, start, end, limit, acceptance, refresh, asOf }, requests);
     if (this.periods && !minute.success && displayTimeframe !== '1m' && displayTimeframe !== '1d')
@@ -164,7 +164,7 @@ export class MarketController {
     const requested = this.parseDetailInclude(include) ?? [...supported];
     const parsedBarsLimit = this.parseDetailLimit(barsLimit ?? (displayTimeframe === '1y' ? '10' : undefined), 'barsLimit', 3000);
     const parsedNavLimit = this.parseDetailLimit(navLimit, 'navLimit');
-    if (this.periodDetail && displayTimeframe !== '1m' && displayTimeframe !== '1d') {
+    if (this.periodDetail && displayTimeframe !== '1m' && displayTimeframe !== '1d' && !await hasNativeChartRoute(this.chartReader, identity.symbol, displayTimeframe, identity.assetType)) {
       return this.periodDetail.get(identity, displayTimeframe, {
         requested, barsLimit: parsedBarsLimit, navLimit: parsedNavLimit,
         adjustment, start, end: chartEnd, acceptance, indicatorParams, refresh, calculationAnchor: anchor?.timestamp,

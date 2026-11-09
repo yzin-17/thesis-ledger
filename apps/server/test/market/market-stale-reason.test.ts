@@ -15,6 +15,6 @@ describe('行情缓存回退根因', () => {
     const result = marketStaleReason(error);
     expect(result.code).toBe(code);
     expect(result.message).not.toContain('secret');
-    if (code === 'unknown') expect(result.message).toContain('未提供');
+    if (code === 'unknown') expect(result.message).toContain('未取得可识别的错误诊断');
   });
 });

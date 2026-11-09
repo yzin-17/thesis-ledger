@@ -1,5 +1,4 @@
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
-import { openTradingMarketsAt } from '@thesis-ledger/domain';
 import { fundValuationSchema, fundValuationSymbolSchema, fundValuationTodaySchema, type FundValuation } from '@thesis-ledger/schemas';
 import { MarketService } from './market.service.js';
 import { MarketBarReader } from './market-bar-reader.js';
@@ -44,15 +43,17 @@ export class MarketFundValuationService {
   }
 
   private async calculate(symbol: string, at: Date): Promise<Calculation> {
-    const marketState = openTradingMarketsAt(at).includes('CN') ? 'open' : 'closed';
+    const marketSession = await this.market.getSession('CN', at);
+    const marketState = marketSession.state;
     const base: FundValuation = {
-      version: 1, symbol, marketState, quality: 'unavailable',
+      version: 1, symbol, marketState, marketSession, quality: 'unavailable',
       estimatedNav: null, changePercent: null, anchor: null, estimatedAt: null, oldestPriceAt: null,
       disclosureCoverage: 0, pricedCoverage: 0, reasons: [], method: 'disclosed-holdings-qfq-v1',
     };
+    if (marketState === 'unknown') return { value: fundValuationSchema.parse({ ...base, reasons: ['calendar_unavailable'] }), evidence: null };
     if (marketState === 'closed') {
       const last = await this.points?.latest(symbol, at);
-      const value = last ? { ...last, marketState, reasons: ['market_closed', ...last.reasons] }
+      const value = last ? { ...last, marketState, marketSession, reasons: ['market_closed', ...last.reasons] }
         : { ...base, reasons: ['market_closed'] };
       return { value: fundValuationSchema.parse(value), evidence: null };
     }

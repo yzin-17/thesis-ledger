@@ -27,16 +27,14 @@ const positionsFor = (contexts: readonly SecurityContext[], scope: 'account' | '
   const bySymbol = new Map<string, PositionContext>();
   for (const context of contexts) {
     let weight = context.weight;
-    if (scope === 'account' && context.dataQuality.accountWeight !== undefined)
+    if (scope === 'account' && context.accountWeight !== undefined)
       weight = context.accountWeight;
-    if (weight === undefined) continue;
+    if (weight === undefined) return undefined;
     const previous = bySymbol.get(context.symbol)?.weight ?? 0;
     const total = Number(
       DecimalValue.fromNumber(previous).plus(DecimalValue.fromNumber(weight)).toString(),
     );
-    // 浮点接口的末位舍入不得把经济上等于 1 的权重变成非法输入。
-    const bounded = total > 1 && total <= 1 + Number.EPSILON * 4 ? 1 : total;
-    bySymbol.set(context.symbol, { symbol: context.symbol, weight: bounded });
+    bySymbol.set(context.symbol, { symbol: context.symbol, weight: total });
   }
   return bySymbol.size > 0 ? [...bySymbol.values()] : undefined;
 };

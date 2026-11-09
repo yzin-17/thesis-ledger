@@ -42,9 +42,9 @@ describe('风险上下文的科学计数权重', () => {
     ]);
   });
 
-  it('保留汇总末位超出 1 的容差及缺失权重语义', () => {
-    const contexts = [row({ weight: 0.6 }), row({ weight: 0.4000000000000001 })];
-    expect(derivePortfolioContext(contexts)?.positions).toEqual([{ symbol: 'TEST.US', weight: 1 }]);
+  it('汇总不截断超过 100% 的原值，并保留缺失权重语义', () => {
+    const contexts = [row({ weight: 0.6 }), row({ weight: 0.4000000000000002 })];
+    expect(derivePortfolioContext(contexts)?.positions).toEqual([{ symbol: 'TEST.US', weight: 1.0000000000000002 }]);
     expect(concentrationGroups([row({ weight: 1e-9 }), row()])[0]?.weight).toBeUndefined();
     expect(derivePortfolioContext([])).toBeUndefined();
   });

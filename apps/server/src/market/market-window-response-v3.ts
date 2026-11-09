@@ -29,3 +29,12 @@ export const parseMarketWindowEvidenceResponseV3 = (
     ...(response.historicalTradabilityWindows ? { tradabilityMode: 'assume-untradable-no-bar' as const } : {}),
   }, multiWindow ? 'market-multi-window-content-v1' : undefined);
 };
+
+/** 布尔门禁与抛错入口复用同一完整证据合同，不能降为单窗校验。 */
+export function safeParseMarketWindowEvidenceResponseV3(raw: unknown, request?: MarketDataBarSeriesRequestV3) {
+  try {
+    return { success: true, data: parseMarketWindowEvidenceResponseV3(raw, request) } as const;
+  } catch {
+    return { success: false } as const;
+  }
+}

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketQuoteReader } from '../../src/market/market-quote-reader.js';
 import { quoteControlFixture } from './quote-control-fixture.js';
 
@@ -46,10 +46,14 @@ function harness(value: unknown = quote) {
 }
 
 describe('基础 Quote 量额降级的读取与缓存', () => {
+  beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-09T02:00:00Z')));
+  afterEach(() => vi.restoreAllMocks());
   it('上游与缓存均保留量额 null、来源和原行情时间', async () => {
     const { reader, dsa } = harness();
-    expect(await reader.getQuote('510300.SH')).toEqual({ ...quote, servedFromCache: false });
-    expect(await reader.getQuote('510300.SH')).toEqual({ ...quote, servedFromCache: true });
+    const staleReason = expect.objectContaining({ code: 'market_time_aged' });
+    const sessionContext = { session: 'unknown', reason: 'calendar_unavailable', evaluatedAt: '2026-11-09T02:00:00.000Z', marketSession: { state: 'unknown', tradingDayState: 'unknown', evaluatedAt: '2026-11-09T02:00:00.000Z', sessions: [], reason: 'calendar_unavailable' } };
+    expect(await reader.getQuote('510300.SH')).toEqual({ ...quote, servedFromCache: false, staleReason, sessionContext });
+    expect(await reader.getQuote('510300.SH')).toEqual({ ...quote, servedFromCache: true, staleReason, sessionContext });
     expect(dsa.get).toHaveBeenCalledTimes(1);
   });
 
@@ -62,6 +66,8 @@ describe('基础 Quote 量额降级的读取与缓存', () => {
       ...quote,
       servedFromCache: true,
       refreshFailure: 'fetch_failed',
+      staleReason: expect.objectContaining({ code: 'unknown' }),
+      sessionContext: { session: 'unknown', reason: 'calendar_unavailable', evaluatedAt: '2026-11-09T02:00:00.000Z', marketSession: { state: 'unknown', tradingDayState: 'unknown', evaluatedAt: '2026-11-09T02:00:00.000Z', sessions: [], reason: 'calendar_unavailable' } },
     });
   });
 

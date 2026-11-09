@@ -13,12 +13,12 @@ import { parseChartOptionsQuery, planChartOptionsRequest } from '../../src/marke
 const fixture = (name: string): unknown => JSON.parse(readFileSync(
   new URL(`../../../../packages/schemas/fixtures/${name}`, import.meta.url), 'utf8'));
 
-function setup(market: 'HK' | 'US', assetType: 'ETF' | 'STOCK', symbol: string) {
+function setup(market: 'CN' | 'HK' | 'US', assetType: 'ETF' | 'STOCK', symbol: string, timeframe: '1m' | '60m' = '1m') {
   const desired = desiredProviderPolicyV3Schema.parse(fixture('market-route-v3.etf-qfq.json'));
   const effective = effectiveProviderPolicyV3Schema.parse(fixture('market-control-v3.effective.etf-qfq.json'));
   const catalog = marketRouteCatalogV3Schema.parse(fixture('market-route-catalog-v3.complete.json'));
   const key = { kind: 'bar' as const, market, assetType, capability: 'MINUTE_BAR' as const,
-    timeframe: '1m' as const, adjustment: 'none' as const };
+    timeframe, adjustment: 'none' as const };
   const target = { providerId: 'futu', upstreamSource: 'futu' };
   desired.routes = [{ key, targets: [target] }];
   effective.routes = [{ key, targets: [{ ...target, routeIndex: 0, eligible: true, reason: null }], reason: null }];
@@ -26,12 +26,12 @@ function setup(market: 'HK' | 'US', assetType: 'ETF' | 'STOCK', symbol: string) 
   const original = marketDataBarSeriesResponseV3Schema.parse(fixture('market-data-v3.response.etf-qfq.json'));
   const { coverageProof: _proof, ...base } = original;
   void _proof;
-  const offset = market === 'HK' ? '+08:00' : '-04:00';
+  const offset = market !== 'US' ? '+08:00' : '-04:00';
   const bars = original.bars.slice(0, 2).map((point, index) => ({
-    ...point, timestamp: `2026-05-18T09:3${index}:00${offset}`, availableAt: '2026-05-18T14:00:00Z',
+    ...point, timestamp: timeframe === '60m' ? `2026-05-18T${10 + index}:30:00${offset}` : `2026-05-18T09:3${index}:00${offset}`, availableAt: '2026-05-18T14:00:00Z',
   }));
   const response = marketChartBarsResponseV3Schema.parse({ ...base, routeKey: key, symbol,
-    purpose: 'interactive-chart', session: 'regular', bars,
+    purpose: 'interactive-chart', session: 'regular', timestampConvention: 'interval-end', bars,
     coverage: { requestedStart: '2026-05-18', requestedEnd: '2026-05-18',
       actualStart: bars[0]!.timestamp, actualEnd: bars[1]!.timestamp,
       hasMoreBefore: false, latestCompleteTradingDate: null },
@@ -71,6 +71,23 @@ describe('富途分钟图表 Server 消费', () => {
     ]);
   });
 
+  it('中国ETF原生小时路由无需1分钟基础来源并保留时间语义', async () => {
+    const { reader, dsa } = setup('CN', 'ETF', '510300.SH', '60m');
+    const result = await reader.read({ identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '60m', adjustment: 'none' },
+      acceptance: 'interactive', window: { start: '2026-05-18', end: '2026-05-18' } });
+    expect(result.points).toHaveLength(2);
+    expect(result.chartContextV3?.timestampConvention).toBe('interval-end');
+    expect(result.coverage.latestCompleteTradingDate).toBeNull();
+    expect(dsa.marketChartBarsV3).toHaveBeenCalledWith(expect.objectContaining({
+      routeKey: expect.objectContaining({ market: 'CN', timeframe: '60m', capability: 'MINUTE_BAR' }),
+    }));
+    const options = await reader.options({ symbol: '510300.SH', assetType: 'ETF', timeframe: '60m' });
+    expect(options.timeframe).toBe('60m');
+    expect(options.options[0]?.available).toBe(true);
+    const minute = await reader.options({ symbol: '510300.SH', assetType: 'ETF', timeframe: '1m' });
+    expect(minute.options[0]?.available).toBe(false);
+  });
+
   it('分钟窗口有界并按市场当地日期规划，日线既有跨度保持', () => {
     const end = '2026-05-18T21:00:00Z';
     expect(planMarketChartWindow({ end, limit: 90 }, { symbol: 'SPY.US', timeframe: '1m' }))
@@ -83,7 +100,7 @@ describe('富途分钟图表 Server 消费', () => {
   it('分钟请求默认不复权并在读取前拒绝非法市场和口径', () => {
     expect(marketChartRequest('SPY.US', { timeframe: '1m', assetType: 'ETF' }).identity.adjustment).toBe('none');
     expect(() => marketChartRequest('SPY.US', { timeframe: '1m', adjustment: 'qfq', assetType: 'ETF' })).toThrow();
-    expect(() => marketChartRequest('600519.SH', { timeframe: '1m', assetType: 'STOCK' })).toThrow();
+    expect(marketChartRequest('600519.SH', { timeframe: '1m', assetType: 'STOCK' }).identity.adjustment).toBe('none');
   });
 
   it('港美只读规划允许显式类型，并在规划中回显而不改变本地未知身份', () => {
@@ -95,7 +112,7 @@ describe('富途分钟图表 Server 消费', () => {
     expect(selected.plan?.assetType).toBe('ETF');
     expect(identity.assetType).toBe('UNKNOWN');
     expect(() => planChartOptionsRequest({ symbol: 'SPY.US', assetType: 'STOCK' }, query)).toThrow();
-    expect(() => planChartOptionsRequest({ symbol: '510300.SH', assetType: 'UNKNOWN' }, query)).toThrow();
+    expect(planChartOptionsRequest({ symbol: '510300.SH', assetType: 'UNKNOWN' }, query).identity).toMatchObject({ symbol: '510300.SH', assetType: 'ETF' });
   });
 
   it('没有显式类型的未知身份保持未知，非法显式类型在身份查询前拒绝', () => {

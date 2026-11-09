@@ -1,21 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import { nextCronOccurrence, runWithRetry } from '../../src/automation/automation.service.js';
 import { AutomationRuntimeHandlers } from '../../src/automation/automation-runtime.service.js';
+import { controlledMarketSession } from '../market/market-session.fixture.js';
 import {
   dailyDigest,
   dailyRiskSummary,
   dataHealthAlert,
   intradayRiskScan,
-  isTradingDay,
   openingScan,
   preMarketPositionEvents,
   weeklyStrategyReview,
 } from '../../src/automation/workflows.service.js';
 
 describe('Automation 工作流', () => {
-  it('交易日感知、持仓事件过滤和批量风险扫描可复用手动逻辑', () => {
-    expect(isTradingDay('2025-01-04T00:00:00Z')).toBe(false);
-    expect(isTradingDay('2025-01-03T00:00:00Z')).toBe(true);
+  it('交易日感知、持仓事件过滤和批量风险扫描可复用手动逻辑', async () => {
+    expect((await controlledMarketSession('CN', new Date('2025-01-04T00:00:00Z'))).tradingDayState).toBe('closed');
+    expect((await controlledMarketSession('CN', new Date('2025-01-03T00:00:00Z'))).tradingDayState).toBe('open');
     expect(
       preMarketPositionEvents(
         [{ symbol: '600519.SH', quantity: 100 }],

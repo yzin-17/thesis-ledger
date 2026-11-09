@@ -38,6 +38,7 @@ import { MarketController } from './market.controller.js';
 import { MarketQuotesController } from './market-quotes.controller.js';
 import { MarketNavReaderV3 } from './market-nav-reader-v3.js';
 import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
+import { MarketSessionReader } from './market-session-reader.js';
 import { MarketPeriodReader } from './market-period-reader.js';
 import { MarketPeriodViewCache } from './market-period-view-cache.js';
 import { MarketPeriodIndicatorReader } from './market-period-indicator-reader.js';
@@ -89,6 +90,7 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
     MarketLifecycleReaderV3,
     MarketAnnouncementPreparationService,
     MarketPeriodCalendarReader,
+    MarketSessionReader,
     MarketPeriodReader,
     MarketPeriodViewCache,
     MarketPeriodIndicatorReader,
@@ -127,6 +129,7 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
     MarketInstrumentEvidence,
     MarketFundValuationService,
     MarketPeriodCalendarReader,
+    MarketSessionReader,
     MarketNewsReader,
     MarketLifecycleReaderV3,
     MarketAnnouncementPreparationService,

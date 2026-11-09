@@ -3,7 +3,7 @@ import type { MarketQuoteIdentity, WatchlistPrice } from '@thesis-ledger/schemas
 import { watchlistPricesInputSchema } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketPeriodCalendarReader } from '../market/market-period-calendar-reader.js';
-import { WatchlistQuoteContext } from './watchlist-quote-context.js';
+import { MarketQuoteSessionReader } from '../market/market-quote-session-reader.js';
 import { MarketService } from '../market/market.service.js';
 import { quoteBatchFailure } from '../market/market-quote-batch.js';
 import { localIdentityPrincipal } from '../identity/local-workspace.js';
@@ -15,13 +15,13 @@ function unavailable(error: unknown): WatchlistPrice['price'] {
 
 @Injectable()
 export class WatchlistPrices {
-  private readonly quoteContext: WatchlistQuoteContext;
+  private readonly quoteContext: MarketQuoteSessionReader;
   constructor(
     @Inject(PrismaService) private readonly db: PrismaService,
     @Inject(MarketService) private readonly market: MarketService,
     @Optional() @Inject(MarketPeriodCalendarReader) calendar?: MarketPeriodCalendarReader,
   ) {
-    this.quoteContext = new WatchlistQuoteContext(calendar);
+    this.quoteContext = new MarketQuoteSessionReader(calendar);
   }
   async read(ownerId: string, raw: unknown, signal: AbortSignal): Promise<WatchlistPrice[]> {
     const { itemIds, mode } = watchlistPricesInputSchema.parse(raw);
@@ -89,7 +89,7 @@ export class WatchlistPrices {
           reason: i.active ? 'unavailable' : 'inactive_instrument',
         };
         const quoteContext =
-          price.kind === 'quote' ? await this.quoteContext.read(price.quote) : undefined;
+          price.kind === 'quote' ? price.quote.sessionContext ?? await this.quoteContext.read(price.quote) : undefined;
         return {
           itemId: i.id,
           price,

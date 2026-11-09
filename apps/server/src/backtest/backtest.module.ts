@@ -19,6 +19,8 @@ import { LocalSnapshotStore } from './backtest-snapshot.js';
 import { BACKTEST_SNAPSHOT_BUILDER, BacktestRunService } from './backtest-run.service.js';
 import { BACKTEST_V3_RUNNER, LocalSnapshotV3Runner } from './backtest-v3-runner.js';
 import { BacktestRunPreparationService } from './backtest-run-preparation.service.js';
+import { BacktestModelResolutionService } from './backtest-model-resolution.service.js';
+import { BacktestModelResolutionController } from './backtest-model-resolution.controller.js';
 import { BacktestCreationGuardService } from './backtest-creation-guard.service.js';
 import { BacktestKnownCashGuardV3 } from './backtest-known-cash-guard-v3.service.js';
 import { BacktestKnownCashAcquisitionV3 } from './backtest-known-cash-acquisition-v3.service.js';
@@ -47,6 +49,7 @@ import { StrategyAccessService } from './strategy-access.service.js';
 @Module({
   imports: [DsaModule, MarketModule, PlatformModule, IdentityModule],
   controllers: [
+    BacktestModelResolutionController,
     BacktestNavRunController,
     BacktestNavPreparationController,
     BacktestController,
@@ -64,6 +67,7 @@ import { StrategyAccessService } from './strategy-access.service.js';
     { provide: NAV_PREPARATION_TIMEOUT_MS, useFactory: () => loadConfig().dsaTimeoutMs },
     BacktestService,
     BacktestRunPreparationService,
+    BacktestModelResolutionService,
     BacktestRunPreflightService,
     BacktestCreationGuardService,
     BacktestKnownCashGuardV3,

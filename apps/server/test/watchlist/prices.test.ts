@@ -121,6 +121,7 @@ it('本地持仓提示只查所选模式；陈旧行情保留来源时间', asyn
           session: 'unknown',
           reason: 'calendar_unavailable',
           evaluatedAt: expect.any(String),
+          marketSession: { state: 'unknown', tradingDayState: 'unknown', evaluatedAt: expect.any(String), reason: 'calendar_unavailable', sessions: [] },
         },
       },
     ]);

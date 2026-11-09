@@ -544,15 +544,16 @@ export class DsaClient {
     ).then((raw) => parseV3Response(() => parseEffectivePolicyEnvelopeV3(raw)));
   }
 
-  triggerCatalogJob(requestId = crypto.randomUUID()) {
+  triggerCatalogJob(requestId = crypto.randomUUID(), scope?: 'CN' | 'HK_US') {
     return this.control<unknown>('/api/v3/thesis-ledger/control/catalog/jobs', {
       method: 'POST',
       body: JSON.stringify({
         contractVersion: 3,
         consumer: 'thesis-ledger',
         requestId,
+        ...(scope ? { scope } : {}),
       }),
-    }).then((raw) => parseCatalogJob(raw, { requestId }));
+    }).then((raw) => parseCatalogJob(raw, { requestId, ...(scope ? { scope } : {}) }));
   }
 
   catalogJob(jobId: string) {

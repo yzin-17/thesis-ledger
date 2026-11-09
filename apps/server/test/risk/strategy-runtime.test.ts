@@ -1,3 +1,4 @@
+import { controlledMarketSession } from '../market/market-session.fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import { DsaError } from '../../src/integration/dsa/dsa.client.js';
 import { RiskService } from '../../src/risk/risk.service.js';
@@ -66,7 +67,7 @@ describe('统一策略风险运行时', () => {
           storedBar('2026-10-16T00:00:00Z', '9.73', '2026-10-17T08:00:00.500Z'),
         ]).readV3();
       });
-      const service = new StrategyRiskContextService(prisma as never, reader as never);
+      const service = new StrategyRiskContextService(prisma as never, reader as never, { getSession: controlledMarketSession } as never);
       const target = {
         executionInstrument: { symbol: '600000.SH', assetType: 'stock', market: 'CN' },
         primaryTimeframe: '1d',
@@ -90,7 +91,7 @@ describe('统一策略风险运行时', () => {
       trade: { findFirst: vi.fn(async () => null) },
     };
     const reader = marketReader([storedBar(`${expectedDate}T00:00:00Z`, '10', `${expectedDate}T08:00:00Z`)]);
-    const service = new StrategyRiskContextService(prisma as never, reader as never);
+    const service = new StrategyRiskContextService(prisma as never, reader as never, { getSession: controlledMarketSession } as never);
     const actual = await service.load(accountId, '600000.SH', {
       executionInstrument: { symbol: '600000.SH', assetType: 'stock', market: 'CN' }, primaryTimeframe: '1d',
     }, new Date(at!));
@@ -108,7 +109,7 @@ describe('统一策略风险运行时', () => {
       trade: { findFirst: vi.fn(async () => ({ id: 'trade', openedAt: new Date('2026-09-01T02:00:00Z') })) },
     };
     const reader = marketReader([storedBar('2026-09-11T00:00:00Z', '10', '2026-09-11T08:00:00Z')]);
-    const service = new StrategyRiskContextService(prisma as never, reader as never);
+    const service = new StrategyRiskContextService(prisma as never, reader as never, { getSession: controlledMarketSession } as never);
     const target = { executionInstrument: { symbol: '600000.SH', assetType: 'stock', market: 'CN' },
       primaryTimeframe: '1d', requiresHoldingPeriods: true };
     await service.load(accountId, '600000.SH', target, evaluatedAt);
@@ -262,7 +263,7 @@ describe('统一策略风险运行时', () => {
     const reader = marketReader([
       storedBar('2026-09-10T00:00:00.000Z', '92', '2026-09-10T08:01:00.000Z'),
     ]);
-    const service = new StrategyRiskContextService(prisma as never, reader as never);
+    const service = new StrategyRiskContextService(prisma as never, reader as never, { getSession: controlledMarketSession } as never);
 
     const actual = await service.load(
       accountId,
@@ -301,7 +302,7 @@ describe('统一策略风险运行时', () => {
           throw new DsaError('V2 BarSeries 暂时不可用', code, 503);
         }),
       };
-      const service = new StrategyRiskContextService(prisma as never, reader as never);
+      const service = new StrategyRiskContextService(prisma as never, reader as never, { getSession: controlledMarketSession } as never);
 
       const actual = await service.load(
         accountId,
@@ -328,7 +329,7 @@ describe('统一策略风险运行时', () => {
         throw new DsaError('BarSeries 响应不完整', 'invalid-response', 502);
       }),
     };
-    const service = new StrategyRiskContextService(prisma as never, reader as never);
+    const service = new StrategyRiskContextService(prisma as never, reader as never, { getSession: controlledMarketSession } as never);
 
     await expect(
       service.load(
@@ -360,7 +361,7 @@ describe('统一策略风险运行时', () => {
       storedBar('2026-09-11T00:00:00.000Z', '80', '2026-09-11T05:30:00.000Z'),
       storedBar('2026-09-10T00:00:00.000Z', '95', '2026-09-10T08:01:00.000Z'),
     ]);
-    const service = new StrategyRiskContextService(prisma as never, reader as never);
+    const service = new StrategyRiskContextService(prisma as never, reader as never, { getSession: controlledMarketSession } as never);
 
     const actual = await service.load(
       accountId,
@@ -396,7 +397,7 @@ describe('统一策略风险运行时', () => {
       trade: { findFirst: vi.fn(async () => null) },
     };
     const reader = marketReader(minuteBars);
-    const service = new StrategyRiskContextService(prisma as never, reader as never);
+    const service = new StrategyRiskContextService(prisma as never, reader as never, { getSession: controlledMarketSession } as never);
 
     const actual = await service.load(
       accountId,

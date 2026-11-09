@@ -42,6 +42,14 @@ function setup() {
 }
 
 describe('成交图表只读投影', () => {
+  it('场外基金按完整代码、账户模式和净值日期窗口读取原始成交', async () => {
+    const { service, tx } = setup();
+    tx.tradeEntryLeg.findMany.mockResolvedValue([{ ...row('buy', '2026-11-04T02:00:00Z'), currency: 'CNY' }]);
+    tx.tradeCloseSlice.findMany.mockResolvedValue([]);
+    const result = await service.read({ ...request, symbol: '000001.OF' });
+    expect(result).toMatchObject({ status: 'ready', symbol: '000001.OF', markers: [{ tradingDate: '2026-11-04', currency: 'CNY', price: '100.125', quantity: '2' }] });
+    expect(tx.tradeEntryLeg.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ trade: expect.objectContaining({ accountId: request.accountId, accountMode: 'actual', symbol: '000001.OF' }) }) }));
+  });
   it('账户／模式、代次和原始成交值在同一一致事务内绑定', async () => {
     const { service, tx, prisma } = setup();
     const result = await service.read(request);

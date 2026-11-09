@@ -5,12 +5,10 @@ import {
   type CanActivate,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { Request } from 'express';
-import type { IdentityPrincipal } from '@thesis-ledger/schemas';
+import type { PrincipalRequest } from './identity-rate-limit-subject.js';
 import { IdentityService, IDENTITY_SESSION_HEADER } from './identity.service.js';
 import { localIdentityPrincipal } from './local-workspace.js';
 
-type PrincipalRequest = Request & { identityPrincipal?: IdentityPrincipal };
 @Injectable()
 export class IdentityGuard implements CanActivate {
   constructor(private readonly identities: IdentityService) {}
@@ -18,6 +16,7 @@ export class IdentityGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<PrincipalRequest>();
     request.identityPrincipal =
       localIdentityPrincipal() ??
+      request.identityPrincipal ??
       (await this.identities.requireSession(request.header(IDENTITY_SESSION_HEADER)));
     return true;
   }

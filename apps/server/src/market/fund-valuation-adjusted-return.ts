@@ -1,4 +1,4 @@
-import { tradingCalendars, tradingMarketForAssetMarket } from '@thesis-ledger/domain';
+import { marketTimezones, marketTradingDate, tradingMarketForAssetMarket } from '@thesis-ledger/domain';
 import type { SourcePriceBasisFact } from '@thesis-ledger/schemas';
 import type { MarketService } from './market.service.js';
 import type { MarketBarReader } from './market-bar-reader.js';
@@ -40,24 +40,11 @@ const marketParts = (at: Date, timezone: string) => {
 const symbolMarket = (symbol: string) =>
   tradingMarketForAssetMarket(symbol.split('.').at(-1) ?? '');
 
-/** 报价观察发生在盘前或休市日时，价格属于上一已开市交易日。 */
-export function fundQuoteTradingDate(symbol: string, marketTime: string) {
+/** 来源交易日由共享日历状态决定，不再回溯内置年度日历。 */
+export async function fundQuoteTradingDate(symbol: string, marketTime: string, marketReader: Pick<MarketService, 'getSession'>) {
   const market = symbolMarket(symbol);
   if (!market || !Number.isFinite(Date.parse(marketTime))) return undefined;
-  const calendar = tradingCalendars[market];
-  let { day, minute } = marketParts(new Date(marketTime), calendar.timezone);
-  for (let lookback = 0; lookback < 31; lookback += 1) {
-    // 各支持市场的本地日期在 UTC 正午保持同一天，避免美国落到前一日。
-    const noon = new Date(day + 'T12:00:00Z');
-    const status = calendar.status(noon);
-    if (status.reason === 'calendar-unavailable') return undefined;
-    const first = calendar.sessionsForDate(noon)[0];
-    if (status.open && first && minute >= first.start) return day;
-    noon.setUTCDate(noon.getUTCDate() - 1);
-    day = noon.toISOString().slice(0, 10);
-    minute = 24 * 60;
-  }
-  return undefined;
+  return marketTradingDate(await marketReader.getSession(market, new Date(marketTime)));
 }
 
 /** 两个价格始终位于同一份原生 qfq 序列，不推断 Quote 转换因子。 */
@@ -66,7 +53,7 @@ export async function readFundAdjustedHoldingReturn(input: {
   assetType: 'STOCK' | 'ETF';
   navDate: string;
   at: Date;
-  market: Pick<MarketService, 'getQuote'>;
+  market: Pick<MarketService, 'getQuote' | 'getSession'>;
   bars: Pick<MarketBarReader, 'readChartV3'>;
   maxPriceAgeMs?: number;
 }): Promise<{ change?: number; evidence: FundHoldingPriceEvidence }> {
@@ -88,10 +75,10 @@ export async function readFundAdjustedHoldingReturn(input: {
         (quote.stale || quote.freshness === 'stale' || quote.freshness === 'unknown' ||
          input.at.getTime() - Date.parse(quote.marketTime) > input.maxPriceAgeMs))
       return unavailable('quote_too_old');
-    const tradingDate = fundQuoteTradingDate(input.symbol, quote.marketTime);
+    const tradingDate = await fundQuoteTradingDate(input.symbol, quote.marketTime, input.market);
     if (!tradingDate) return unavailable('quote_calendar_unavailable');
     if (input.maxPriceAgeMs !== undefined &&
-        tradingDate !== marketParts(input.at, tradingCalendars.CN.timezone).day)
+        tradingDate !== marketParts(input.at, marketTimezones.CN).day)
       return unavailable('quote_before_current_session');
     evidence.quoteTradingDate = tradingDate;
     const anchorDate = input.navDate.slice(0, 10);
@@ -125,7 +112,7 @@ export async function readFundAdjustedHoldingReturn(input: {
       return unavailable('adjusted_basis_too_old');
     const market = symbolMarket(input.symbol);
     if (!market) return unavailable('quote_calendar_unavailable');
-    const timezone = tradingCalendars[market].timezone;
+    const timezone = marketTimezones[market];
     const onDay = (day: string) =>
       series.points.filter((point) => marketParts(new Date(point.timestamp), timezone).day === day);
     const anchors = onDay(anchorDate),

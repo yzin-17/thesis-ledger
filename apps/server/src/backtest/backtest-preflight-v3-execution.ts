@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { safeParseMarketWindowEvidenceResponseV3 } from '../market/market-window-response-v3.js';
 import { backtestResearchReadOptionsV3 } from './backtest-research-read-options-v3.js';
 import { hasExecutableBacktestWindowV3 } from './backtest-snapshot-v3-tradability.js';
 import { z } from 'zod';
@@ -8,7 +9,6 @@ import {
   backtestPreflightRequirementV3Schema,
   backtestPreflightResultV3Schema,
   backtestPreflightRevisionStampV3Schema,
-  marketDataBarSeriesRequestResponseV3Schema,
   marketDataBarRouteKeyV3Schema,
   runConfigSchemaV3,
   strategySchema,
@@ -613,10 +613,7 @@ export const preflightBacktestExecutionWindowV3 = async (
     ]);
   }
 
-  const correlated = marketDataBarSeriesRequestResponseV3Schema.safeParse({
-    request,
-    response: selection.response,
-  });
+  const correlated = safeParseMarketWindowEvidenceResponseV3(selection.response, request);
   if (
     !correlated.success ||
     selection.response.coverage.requestedStart !== dataset.range.startDate ||

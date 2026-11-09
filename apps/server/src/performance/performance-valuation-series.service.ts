@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
-import { assetMarketsByTradingMarket, openTradingMarketsAt } from '@thesis-ledger/domain';
+import { assetMarketsByTradingMarket, type TradingMarket } from '@thesis-ledger/domain';
 import type {
   PerformanceSeriesInterval,
   PerformanceSeriesRange,
@@ -114,10 +114,13 @@ export class PerformanceValuationSeriesService {
     @Optional() private readonly fundValuations?: MarketFundValuationService,
   ) {}
 
-  private openAssetMarkets(at: Date) {
-    const markets = openTradingMarketsAt(at);
+  private async openAssetMarkets(at: Date) {
+    const supported: TradingMarket[] = ['CN', 'HK', 'US'];
+    const states = await Promise.all(supported.map((market) => this.market.getSession(market, at)));
+    const markets = supported.filter((_, index) => states[index]?.state === 'open');
     return {
       markets,
+      unknown: states.some((state) => state.state === 'unknown'),
       assetMarkets: markets.flatMap((market) => assetMarketsByTradingMarket[market]),
     };
   }
@@ -135,9 +138,9 @@ export class PerformanceValuationSeriesService {
   }
 
   async scheduledSamplingGate(at = new Date(), mode: PortfolioMode = 'actual') {
-    const { markets, assetMarkets } = this.openAssetMarkets(at);
+    const { markets, assetMarkets, unknown } = await this.openAssetMarkets(at);
     if (markets.length === 0) {
-      return { allowed: false, reason: '当前没有处于常规交易时段的支持市场' } as const;
+      return { allowed: false, reason: unknown ? '交易日历不可用，暂不能确认开市市场' : '当前没有处于常规交易时段的支持市场' } as const;
     }
     const account = await this.prisma.account.findFirst({
       where: this.samplingAccountWhere(mode, assetMarkets),
@@ -160,7 +163,7 @@ export class PerformanceValuationSeriesService {
   ) {
     const sampledAt = new Date(at);
     sampledAt.setUTCSeconds(0, 0);
-    const openMarkets = options.marketGate ? this.openAssetMarkets(at) : undefined;
+    const openMarkets = options.marketGate ? await this.openAssetMarkets(at) : undefined;
     const accounts = await this.prisma.account.findMany({
       where: {
         ...(openMarkets

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { tradingMarketForAssetMarket } from '@thesis-ledger/domain';
 import {
   correlateBackgroundQuotePlan,
   type BackgroundQuotePlan,
@@ -10,21 +11,6 @@ import { MarketService } from './market.service.js';
 
 export type BackgroundQuoteDemand = { symbol: string; assetType?: QuoteAssetType };
 export const backgroundQuoteStatusKey = redisKey('cache', 'market-background-quotes');
-
-/** Only the currently implemented CN source uses this exchange clock. No holiday claim. */
-export function cnQuoteSession(now: Date) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Shanghai',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now);
-  const value = (name: string) => parts.find((p) => p.type === name)?.value ?? '';
-  if (['Sat', 'Sun'].includes(value('weekday'))) return false;
-  const time = Number(value('hour')) * 60 + Number(value('minute'));
-  return (time >= 570 && time <= 690) || (time >= 780 && time <= 900);
-}
 
 @Injectable()
 export class MarketBackgroundQuotesService {
@@ -102,8 +88,11 @@ export class MarketBackgroundQuotesService {
       row.acquisition = plan.acquisition;
       row.minIntervalSeconds = plan.minIntervalSeconds;
       if (plan.acquisition !== 'public-snapshot') return row;
-      if (!cnQuoteSession(now)) {
-        row.reason = 'outside_market_session';
+      const tradingMarket = tradingMarketForAssetMarket(demand.symbol.split('.').at(-1) ?? '');
+      if (!tradingMarket) return row;
+      const session = await this.market.getSession(tradingMarket, now);
+      if (session.state !== 'open') {
+        row.reason = session.state === 'unknown' ? 'calendar_unavailable' : 'outside_market_session';
         return row;
       }
       const window = redisKey(

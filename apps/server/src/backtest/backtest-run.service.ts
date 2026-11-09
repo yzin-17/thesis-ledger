@@ -208,6 +208,8 @@ export class BacktestRunService {
   async runCurrent(id: string, execution?: BacktestExecutionAttempt) {
     const job = await this.prisma.backtestJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('回测 Run 不存在');
+    if (job.errorCode === 'PREPARATION_FAILED')
+      throw new BadRequestException('准备阶段失败，请返回原策略重新创建回测。');
     if (persistedContractVersion(job) !== 3)
       throw new BadRequestException('旧 Run 持久化合同拒绝执行');
     return runBacktestAttempt({
@@ -242,6 +244,8 @@ export class BacktestRunService {
   async retryRun(id: string) {
     const job = await this.prisma.backtestJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('回测 Run 不存在');
+    if (job.errorCode === 'PREPARATION_FAILED')
+      throw new BadRequestException('准备阶段失败，请返回原策略重新创建回测。');
     if (persistedContractVersion(job) !== 3)
       throw new BadRequestException('旧 Run 持久化合同拒绝重试');
     if (job.status === 'succeeded') return job;

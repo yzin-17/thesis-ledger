@@ -4,6 +4,7 @@ import {
   PerformanceValuationSeriesService,
 } from '../../src/performance/performance-valuation-series.service.js';
 import { PerformanceSnapshotService } from '../../src/performance/performance-snapshot.service.js';
+import { controlledMarketSession } from '../market/market-session.fixture.js';
 
 describe('组合估值走势', () => {
   it.each([
@@ -92,7 +93,7 @@ describe('组合估值走势', () => {
       { account: { findFirst, findMany } } as never,
       {} as never,
       {} as never,
-      {} as never,
+      { getSession: controlledMarketSession } as never,
     );
     const usSession = new Date('2026-09-08T17:04:06.000Z');
 
@@ -151,7 +152,7 @@ describe('组合估值走势', () => {
       { account: { findMany } } as never,
       {} as never,
       {} as never,
-      {} as never,
+      { getSession: controlledMarketSession } as never,
     );
     const closed = new Date('2026-09-09T08:30:00.000Z');
 
@@ -245,4 +246,13 @@ describe('组合估值走势', () => {
       valuationBasis: 'OFFICIAL',
     });
   });
+});
+
+ it('所有市场日历未知时不读取账户、不发起估值', async () => {
+  const findMany = vi.fn();
+  const service = new PerformanceValuationSeriesService({ account: { findMany } } as never, {} as never, {} as never, {
+    getSession: vi.fn(async () => ({ state: 'unknown', tradingDayState: 'unknown', sessions: [] })),
+  } as never);
+  await expect(service.scheduledSamplingGate(new Date('2027-01-04T02:00:00Z'), 'actual')).resolves.toMatchObject({ allowed: false, reason: expect.stringContaining('交易日历不可用') });
+  expect(findMany).not.toHaveBeenCalled();
 });

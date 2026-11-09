@@ -1,6 +1,6 @@
 import { Prisma, type FundValuationPoint } from '@prisma/client';
 import { fundValuationSchema, type FundNav } from '@thesis-ledger/schemas';
-import { cnTradingCalendar } from '@thesis-ledger/domain';
+import type { MarketSessionState } from '@thesis-ledger/domain';
 import { z } from 'zod';
 import { fundValuationDay } from './fund-valuation-point.repository.js';
 
@@ -23,11 +23,12 @@ const evidenceSchema = z.object({
     }),
   ),
 });
-export function closingEstimate(row: FundValuationPoint, now: Date) {
+export function closingEstimate(row: FundValuationPoint, now: Date, session: MarketSessionState) {
   const at = row.lastValidAt;
-  if (!at || !cnTradingCalendar.isTradingSession(at)) return null;
+  if (!at || session.state !== 'open' || Date.parse(session.evaluatedAt) !== at.getTime()) return null;
   const day = fundValuationDay(at);
-  if (now.getTime() < Date.parse(day + 'T15:00:00+08:00')) return null;
+  const closingAt = session.sessions.filter((window) => window.tradingDate === day).at(-1)?.endAt;
+  if (!closingAt || now.getTime() < Date.parse(closingAt)) return null;
   const snapshot = fundValuationSchema.safeParse(row.lastValidSnapshot);
   if (!snapshot.success) return null;
   const value = snapshot.data;
@@ -88,6 +89,7 @@ export function fundErrorFor(
   estimate: number,
   nav: FundNav,
   now: Date,
+  closingAt: string,
 ) {
   if (
     nav.symbol !== symbol ||
@@ -98,7 +100,7 @@ export function fundErrorFor(
     nav.fallbackUsed ||
     nav.provider !== 'akshare' ||
     !(
-      Date.parse(nav.fetchedAt) >= Date.parse(day + 'T15:00:00+08:00') &&
+      Date.parse(nav.fetchedAt) >= Date.parse(closingAt) &&
       Date.parse(nav.fetchedAt) <= now.getTime()
     )
   )

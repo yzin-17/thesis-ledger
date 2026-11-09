@@ -7,7 +7,11 @@ import { type RedisService, redisKey } from '../platform/redis.service.js';
 import { StructuredLogger, currentTraceId } from '../platform/structured-logger.js';
 import { MARKET_CACHE_POLICIES } from './market-result-cache.js';
 import { MarketCacheControl } from './market-cache-control.js';
-import { quoteCacheSeconds, quoteRefreshFailure, reserveQuoteWindow, observeQuoteTime } from './market-quote-cache-policy.js';
+import { quoteCacheSeconds, quoteRefreshFailure, reserveQuoteWindow, observeQuoteTime, projectQuoteSessionFreshness } from './market-quote-cache-policy.js';
+import { quoteFallbackReason } from './market-quote-diagnostics.js';
+import { MarketQuoteSessionReader } from './market-quote-session-reader.js';
+import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
+import type { MarketSessionReader } from './market-session-reader.js';
 
 const DEFAULT_DSA_TIMEOUT_MS = 5_000;
 const QUOTE_LOCK_SAFETY_MARGIN_MS = 5_000;
@@ -32,11 +36,13 @@ type QuoteRedisMulti = {
 export class MarketQuoteReader {
   private readonly logger = new StructuredLogger('thesis-ledger.market');
   private readonly flights = new Map<string, Promise<Quote>>();
+  private readonly sessionReader: MarketQuoteSessionReader;
 
   constructor(
     private readonly dsa: DsaClient,
     private readonly redis: RedisService,
-  ) {}
+    sessions?: MarketSessionReader,
+  ) { this.sessionReader = new MarketQuoteSessionReader(new MarketPeriodCalendarReader(dsa), sessions); }
 
   private singleFlight(key: string, work: () => Promise<Quote>) {
     const existing = this.flights.get(key);
@@ -66,12 +72,24 @@ export class MarketQuoteReader {
     return this.dsa.get<Record<string, unknown>>(path, 1);
   }
 
+  private async writeQuoteCache(quote: Quote, freshKey: string, lastValidKey: string, assetType?: QuoteAssetType) {
+    const multi = this.client()?.multi;
+    if (typeof multi !== 'function') return false;
+    const serialized = JSON.stringify(quote);
+    await multi.call(this.client())
+      .set(freshKey, serialized, 'EX', quoteCacheSeconds(assetType))
+      .set(lastValidKey, serialized, 'EX', MARKET_CACHE_POLICIES.realtimeQuote.lastValidSeconds)
+      .exec();
+    return true;
+  }
+
   private async readFreshOrLastValid(
     freshKey: string,
     lastValidKey: string,
     symbol: string,
     startedAt: number,
     status: string,
+    error?: unknown,
   ): Promise<Quote> {
     const client = this.client();
     let fresh: string | null = null;
@@ -103,7 +121,8 @@ export class MarketQuoteReader {
             stale: true,
             freshness: 'stale',
             servedFromCache: true,
-            refreshFailure: quoteRefreshFailure(status),
+            refreshFailure: quoteRefreshFailure(status, error),
+            staleReason: quoteFallbackReason(status, error),
           },
           symbol,
         );
@@ -200,10 +219,10 @@ export class MarketQuoteReader {
       await control.assertCurrent(scope, options.signal);
       quote = observeQuoteTime(quote);
       if (options.allowStale === false && quote.stale) throw new Error('行情陈旧，当前操作要求新鲜行情');
-      return quote;
+      return projectQuoteSessionFreshness(quote, await this.sessionReader.read(quote));
     };
-    const readFallback = async (status: string) => {
-      const value = await this.readFreshOrLastValid(freshKey, lastValidKey, symbol, startedAt, status);
+    const readFallback = async (status: string, error?: unknown) => {
+      const value = await this.readFreshOrLastValid(freshKey, lastValidKey, symbol, startedAt, status, error);
       if (assetType === 'ETF' && value.refreshFailure)
         await this.client()?.multi?.().set(freshKey, JSON.stringify(value), 'EX', quoteCacheSeconds(assetType)).exec().catch(() => {});
       return checked(value);
@@ -258,33 +277,23 @@ export class MarketQuoteReader {
           } catch (error) {
             this.logStage(symbol, 'dsa-call', dsaStartedAt, 'failure', error instanceof DsaError ? error.code : 'unknown');
             try {
-              return await readFallback(error instanceof DsaError ? (error.sourceReason ?? error.code) : 'dsa-error');
+              return await readFallback(error instanceof DsaError ? (error.sourceReason ?? error.code) : 'dsa-error', error);
             } catch {
               if (error instanceof DsaError) throw error;
               throw new DsaError('行情暂时不可用', 'unavailable');
             }
           }
 
+          let fallbackStage = 'invalid-response';
           try {
             const quote = parseCurrentQuote({ ...raw, servedFromCache: false }, symbol);
-            const serialized = JSON.stringify(quote);
             await control.assertCurrent(scope, options.signal);
-            const multi = this.client()?.multi;
-            if (typeof multi !== 'function') return readFallback('cache-unavailable');
-            await multi
-              .call(this.client())
-              .set(freshKey, serialized, 'EX', quoteCacheSeconds(assetType))
-              .set(
-                lastValidKey,
-                serialized,
-                'EX',
-                MARKET_CACHE_POLICIES.realtimeQuote.lastValidSeconds,
-              )
-              .exec();
+            fallbackStage = 'cache-write';
+            if (!await this.writeQuoteCache(quote, freshKey, lastValidKey, assetType)) return readFallback('cache-unavailable');
             return quote;
           } catch (error) {
             try {
-              return await readFallback('unavailable');
+              return await readFallback(fallbackStage, error);
             } catch {
               if (error instanceof DsaError) throw error;
               throw new DsaError('行情暂时不可用', 'unavailable');

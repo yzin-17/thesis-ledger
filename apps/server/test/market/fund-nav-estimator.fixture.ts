@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { fundHoldingsSchema, fundNavSchema } from '@thesis-ledger/schemas';
+import { controlledMarketSession } from './market-session.fixture.js';
 
 export const at = new Date('2026-11-04T06:00:00Z');
 export const fixture = (options: { quoteAt?: string; basisAt?: string; stale?: boolean; missingDay?: boolean; disclosure?: string; futureNav?: boolean } = {}) => {
@@ -22,6 +23,7 @@ export const fixture = (options: { quoteAt?: string; basisAt?: string; stale?: b
       symbol: '000001.OF', at, current: true,
       bars: { readChartV3 } as never,
       market: {
+        getSession: controlledMarketSession,
         getQuote,
         getFundNav: async () => fundNavSchema.parse({
           version: 3, symbol: '000001.OF', unitNav: 1,

@@ -9,6 +9,13 @@ import {
 } from '../src/notifications/notification.service.js';
 import { encryptProviderCredential } from '../src/platform/credential-security.js';
 
+const notificationServiceFixture = (...[prisma, redis, health]: ConstructorParameters<typeof NotificationService>) =>
+  new NotificationService({
+    ...prisma,
+    $transaction: prisma.$transaction ?? ((operations: Promise<unknown>[]) => Promise.all(operations)),
+    notificationRoutingPreference: prisma.notificationRoutingPreference ?? { findUnique: vi.fn(async () => null) },
+  } as never, redis, health);
+
 const providerWebhook = 'https://open.feishu.cn/open-apis/bot/v2/hook/provider-test';
 
 const message: NotificationMessage = {
@@ -118,7 +125,7 @@ describe('Notification cooldown', () => {
   it('critical 重复入队不重新打开已投递记录，也不覆盖冻结消息', async () => {
     const delivered = { status: 'delivered', attemptCount: 1, message: { body: 'frozen' } };
     const upsert = vi.fn(async ({ update }: { update: Record<string, unknown> }) => ({ ...delivered, ...update }));
-    const service = new NotificationService({ notificationDelivery: { upsert }, providerConfig: providerConfigFixture() } as never,
+    const service = notificationServiceFixture({ notificationDelivery: { upsert }, providerConfig: providerConfigFixture() } as never,
       redisFixture() as never, { record: vi.fn() } as never);
     const subject = riskSubject('event-critical', '600519.SH', 'account-1', 'critical');
     const result = await service.enqueue(subject, { ...message, severity: 'critical' }, policy);
@@ -133,7 +140,7 @@ describe('Notification cooldown', () => {
       notificationDelivery: { upsert },
       providerConfig: providerConfigFixture(),
     };
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -174,7 +181,7 @@ describe('Notification cooldown', () => {
       notificationDelivery: { upsert },
       providerConfig: providerConfigFixture(),
     };
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -201,7 +208,7 @@ describe('Notification cooldown', () => {
       notificationDelivery: { upsert },
       providerConfig: providerConfigFixture(),
     };
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -227,7 +234,7 @@ describe('Notification provider gating', () => {
   const enqueueWith = async (providerConfig: unknown) => {
     const redis = redisFixture();
     const upsert = vi.fn(async ({ create }: { create: object }) => create);
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       { notificationDelivery: { upsert }, providerConfig } as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -351,7 +358,7 @@ describe('Notification provider gating', () => {
       ]),
     };
     const { result, upsert } = await enqueueWith(providerConfig);
-    const service = new NotificationService({ providerConfig } as never, {} as never, {} as never);
+    const service = notificationServiceFixture({ providerConfig } as never, {} as never, {} as never);
 
     expect(result).toHaveLength(1);
     expect(upsert).toHaveBeenCalledWith(
@@ -404,7 +411,7 @@ describe('Notification dispatch', () => {
     };
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0 }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -464,7 +471,7 @@ describe('Notification dispatch', () => {
     };
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0 }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -521,7 +528,7 @@ describe('Notification dispatch', () => {
     };
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0 }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -577,7 +584,7 @@ describe('Notification dispatch', () => {
           new Response(JSON.stringify({ code: 19002, msg: 'bad webhook' }), { status: 200 }),
       ),
     );
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -644,7 +651,7 @@ describe('Notification dispatch', () => {
         }),
     );
     vi.stubGlobal('fetch', fetchMock);
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redis as never,
       { record: vi.fn() } as never,
@@ -674,7 +681,7 @@ describe('Notification dispatch', () => {
         findMany: vi.fn(async () => due),
       },
     };
-    const service = new NotificationService(
+    const service = notificationServiceFixture(
       prisma as never,
       redisFixture() as never,
       { record: vi.fn() } as never,

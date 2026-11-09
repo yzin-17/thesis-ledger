@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { marketChartOptionsWindowV3Schema, marketChartPlanV3Schema } from '@thesis-ledger/schemas';
 import { marketChartRequest } from './market-chart-request.js';
-import { parseMarketTimeframe } from './market-period-request.js';
+import { requireNativeMarketTimeframe } from './market-period-request.js';
 import { planMarketChartWindow } from './market-chart-window.js';
 import { indicatorReadInput, MAX_CHART_V3_INDICATOR_INPUT_POINTS } from './market-indicator-window.js';
 import { selectIndicatorParameters } from './market-indicator-request.js';
@@ -10,8 +10,7 @@ type Query = Record<'start' | 'end' | 'barsLimit' | 'indicatorParams' | 'planEnd
   & { assetType?: string | undefined };
 
 export function parseChartOptionsQuery(query: Query) {
-  const timeframe = parseMarketTimeframe(query.timeframe);
-  if (timeframe !== '1d' && timeframe !== '1m') throw new BadRequestException('图表原生选项只支持日线或1分钟');
+  const timeframe = requireNativeMarketTimeframe(query.timeframe, query.assetType);
   const explicitTimeframe = query.timeframe !== undefined;
   if (query.assetType !== undefined && query.assetType !== 'STOCK' && query.assetType !== 'ETF')
     throw new BadRequestException('显式图表类型必须为 STOCK 或 ETF');
@@ -35,7 +34,7 @@ export function parseChartOptionsQuery(query: Query) {
 export function planChartOptionsRequest(identity: { symbol: string; assetType: string },
   query: ReturnType<typeof parseChartOptionsQuery>) {
   const { timeframe } = query;
-  if (query.assetType && (!/\.(HK|US)$/.test(identity.symbol) ||
+  if (query.assetType && (!/\.(SH|SZ|BJ|HK|US)$/.test(identity.symbol) ||
       (identity.assetType !== 'UNKNOWN' && identity.assetType !== query.assetType)))
     throw new BadRequestException('显式图表类型与当前市场或已知身份不一致');
   const selectedIdentity = { ...identity, assetType: query.assetType ?? identity.assetType };
@@ -43,7 +42,7 @@ export function planChartOptionsRequest(identity: { symbol: string; assetType: s
   if (!query.plan) return { identity: selected, window: query.window };
   const plan = query.plan;
   const input = marketChartRequest(identity.symbol, { assetType: selectedIdentity.assetType, timeframe,
-    adjustment: timeframe === '1m' ? 'none' : 'qfq', limit: String(plan.barsLimit), acceptance: 'interactive',
+    adjustment: timeframe !== '1d' ? 'none' : 'qfq', limit: String(plan.barsLimit), acceptance: 'interactive',
     ...(plan.end ? { end: planMarketChartWindow({ end: plan.end }, { ...selectedIdentity, timeframe }).end } : {}) });
   const requests = (['MA', 'MACD', 'RSI'] as const).map((name) => ({ name,
     parameters: selectIndicatorParameters(name, JSON.stringify(plan.indicatorParams)) }));

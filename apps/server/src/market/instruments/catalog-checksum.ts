@@ -16,11 +16,14 @@ export const stableCatalogChecksum = (items: CatalogItem[]) =>
   createHash('sha256')
     .update(
       stableJson(
-        [...items].sort((left, right) =>
-          `${left.canonicalCode}.${left.market}.${left.instrumentType}`.localeCompare(
-            `${right.canonicalCode}.${right.market}.${right.instrumentType}`,
-          ),
-        ),
+        [...items].sort((left, right) => {
+          // 与 DSA 的身份元组顺序一致；不能拼接带点号的变长代码或使用地区排序。
+          for (const field of ['canonicalCode', 'market', 'instrumentType'] as const) {
+            if (left[field] < right[field]) return -1;
+            if (left[field] > right[field]) return 1;
+          }
+          return 0;
+        }),
       ),
     )
     .digest('hex');

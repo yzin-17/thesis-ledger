@@ -12,6 +12,14 @@ const currencyPrisma = {
 };
 
 describe('单只基金当前估值', () => {
+  it('未覆盖年份明确返回未知，不冒充休市也不生成分钟事实', async () => {
+    const { input, getQuote } = fixture(); const record = vi.fn();
+    const service = new MarketFundValuationService(input.market, input.bars as never, { record } as never, currencyPrisma as never);
+    expect(await service.current(input.symbol, new Date('2027-01-04T02:00:00Z'))).toMatchObject({
+      marketState: 'unknown', quality: 'unavailable', reasons: ['calendar_unavailable'], estimatedNav: null,
+    });
+    expect(getQuote).not.toHaveBeenCalled(); expect(record).not.toHaveBeenCalled();
+  });
   it.each(['unknown', 'USD'])('币种或身份未确认时不请求估值价格 %s', async (currency) => {
     const { input, getQuote } = fixture();
     const prisma = { instrumentAssetAssociation: { findUnique: async () => currency === 'unknown' ? null : ({

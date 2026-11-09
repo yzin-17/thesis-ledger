@@ -924,9 +924,15 @@ model NotificationDelivery {
   errorCode       String?
   responseSummary String?
 
-  @@unique([dedupKey, channel])
+  @@unique([dedupKey, channel, provider])
   @@index([status, scheduledAt])
   @@index([subjectType, subjectId])
+}
+
+model NotificationRoutingPreference {
+  scope     String   @id
+  providers String[]
+  updatedAt DateTime @updatedAt
 }
 
 model RecurringCashDepositPlan {

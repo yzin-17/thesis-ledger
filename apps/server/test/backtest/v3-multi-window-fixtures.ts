@@ -8,6 +8,7 @@ import {
 
 export const makeMultiWindowResponseV3 = (
   base: MarketDataBarSeriesResponseV3,
+  observation = { startedAt: '2026-05-20T07:00:00Z', completedAt: '2026-05-20T07:02:00Z' },
 ): MarketDataMultiWindowResponseV3 => {
   if (base.bars.length < 3) throw new Error('多窗口样本至少需要三条 Bar');
   const middle = Math.floor(base.bars.length / 2);
@@ -41,8 +42,8 @@ export const makeMultiWindowResponseV3 = (
       );
     }
     return {
-      startedAt: '2026-05-20T07:00:00Z',
-      completedAt: '2026-05-20T07:02:00Z',
+      startedAt: observation.startedAt,
+      completedAt: observation.completedAt,
       response: child,
     };
   });
@@ -59,7 +60,7 @@ export const makeMultiWindowResponseV3 = (
     sourcePriceBasis: {
       ...base.sourcePriceBasis,
       basisScope: 'request-window',
-      observedAt: '2026-05-20T07:02:00Z',
+      observedAt: observation.completedAt,
       revision: { origin: 'local-observation', contentHash: '0'.repeat(64) },
     },
   };

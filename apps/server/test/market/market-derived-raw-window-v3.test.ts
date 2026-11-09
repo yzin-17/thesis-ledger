@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { makeMultiWindowResponseV3 } from '../backtest/v3-multi-window-fixtures.js';
 import { describe, expect, it } from 'vitest';
 import { marketDataBarSeriesResponseV3Schema } from '@thesis-ledger/schemas';
 import { freezeDerivedRawWindowV3 } from '../../src/market/market-derived-raw-window-v3.js';
@@ -63,6 +64,17 @@ function fixture() {
 }
 
 describe('冻结 raw 响应派生接缝', () => {
+  it('多窗口 raw 按完整证据校验和绑定，不因观测字段被单窗 Schema 拒绝', () => {
+    const f = fixture();
+    f.frozen.response = makeMultiWindowResponseV3(f.frozen.response);
+    const hash = marketFrozenWindowHashV3(f.frozen.response);
+    f.reference.responseHash = hash;
+    f.frozen.completeResponseHash = hash;
+    f.conversion.rawResponseHash = hash;
+    const result = freezeDerivedRawWindowV3(f.frozen, f.reference, f.conversion, '2026-09-27T00:00:00Z');
+    expect(result.input.bars).toHaveLength(f.frozen.response.bars.length);
+    expect(result.input.rawEvidenceRef).toContain(hash);
+  });
   it('从冻结响应固定标的和 Bar，绑定完整响应引用', () => {
     const f = fixture();
     const result = freezeDerivedRawWindowV3(

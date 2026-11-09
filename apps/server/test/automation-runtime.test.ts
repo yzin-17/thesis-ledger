@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AutomationJobType } from '@thesis-ledger/schemas';
+import { controlledMarketSession } from './market/market-session.fixture.js';
 import { AutomationScheduler } from '../src/automation/automation.scheduler.js';
 import { AutomationController } from '../src/automation/automation.controller.js';
 import { AutomationWorkflowRunner } from '../src/automation/workflow-runner.service.js';
@@ -118,6 +119,7 @@ describe('AutomationService scheduled execution', () => {
       prisma as never,
       redisFixture() as never,
       notificationsFixture() as never,
+      { read: controlledMarketSession } as never,
     );
     const now = new Date('2026-02-20T01:00:00Z');
 

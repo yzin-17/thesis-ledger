@@ -18,6 +18,9 @@ import { PrismaService } from '../platform/prisma.service.js';
 import { MarketFundReader } from './market-fund-reader.js';
 import { MarketCacheControl } from './market-cache-control.js';
 import { MarketQuoteReader, type QuoteReadOptions } from './market-quote-reader.js';
+import { MarketSessionReader } from './market-session-reader.js';
+import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
+import type { TradingMarket } from '@thesis-ledger/domain';
 import {
   MARKET_CACHE_POLICIES,
   MarketResultCache,
@@ -29,14 +32,17 @@ export class MarketService {
   private readonly fundReader: MarketFundReader;
   private readonly control: MarketCacheControl;
   private readonly resultCache: MarketResultCache;
+  private readonly sessions: MarketSessionReader;
 
   constructor(
     private readonly dsa: DsaClient,
     private readonly redis: RedisService,
     @Optional() private readonly prisma?: PrismaService,
     @Optional() private readonly observations?: MarketObservationsService,
+    @Optional() sessions?: MarketSessionReader,
   ) {
-    this.quoteReader = new MarketQuoteReader(dsa, redis);
+    this.sessions = sessions ?? new MarketSessionReader(new MarketPeriodCalendarReader(dsa));
+    this.quoteReader = new MarketQuoteReader(dsa, redis, this.sessions);
     this.control = new MarketCacheControl(dsa);
     this.fundReader = new MarketFundReader(dsa, redis, this.singleFlight.bind(this),
       this.withDistributedLock.bind(this), prisma);
@@ -130,6 +136,10 @@ export class MarketService {
     const value = await this.quoteReader.getQuote(input, options);
     await this.observations?.record({ kind: 'quote', value });
     return value;
+  }
+
+  getSession(market: TradingMarket, at = new Date(Date.now())) {
+    return this.sessions.read(market, at);
   }
 
   getQuotes(items: readonly MarketQuoteIdentity[], options: Pick<QuoteReadOptions, 'allowStale' | 'refresh' | 'signal'> = {}) {

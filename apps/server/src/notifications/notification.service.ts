@@ -3,13 +3,13 @@ import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { Severity } from '@thesis-ledger/domain';
 import type { Prisma } from '@prisma/client';
-import { normalizeProviderCredential } from '../platform/credential-security.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import { ProviderHealthService } from '../providers/provider-health.service.js';
+import { availableNotificationRoutes, riskNotificationRouting } from './notification-routes.js';
+import { admitNotificationDeliveries } from './notification-delivery-admission.js';
 import {
   assertAllowedFeishuWebhookUrl,
-  detectFeishuWebhookUrl,
 } from '../providers/feishu-webhook-security.js';
 
 export interface NotificationPolicy {
@@ -220,7 +220,9 @@ export class NotificationService {
     policy: NotificationPolicy,
     now = new Date(),
   ) {
-    const routes = await this.configuredRoutes();
+    const routes = subject.type === 'risk-event'
+      ? (await riskNotificationRouting(this.prisma)).routes
+      : await this.configuredRoutes();
     if (routes.length === 0) return [];
     const messageSnapshot: Prisma.InputJsonValue = {
       title: message.title,
@@ -236,49 +238,36 @@ export class NotificationService {
     const bypassCooldown =
       message.severity === 'critical' && policy.criticalBypassCooldown === true;
 
-    return Promise.all(
-      routes.map(async (route) => {
-        const { channel } = route;
-        const deliveryDedupKey = `${fingerprint}:${subject.id}`;
-        const cooldownKey = redisKey('cache', `notification:${channel}:${fingerprint}`);
-        const reservationToken = crypto.randomUUID();
+    const reservations: Array<{ route: typeof routes[number]; index: number; cooldownKey: string; token: string }> = [];
+    try {
+      for (const [index, route] of routes.entries()) {
+        const cooldownTarget = route.legacyDefault ? route.channel : `${route.channel}:${encodeURIComponent(route.provider)}`;
+        const cooldownKey = redisKey('cache', `notification:${cooldownTarget}:${fingerprint}`);
+        const token = crypto.randomUUID();
         if (!bypassCooldown) {
           const reserved = await this.redis.client.set(
-            cooldownKey,
-            reservationToken,
-            'EX',
-            Math.max(1, policy.cooldownMinutes * 60),
-            'NX',
+            cooldownKey, token, 'EX', Math.max(1, policy.cooldownMinutes * 60), 'NX',
           );
-          if (!reserved) return null;
+          if (!reserved) continue;
         }
-        try {
-          return await this.prisma.notificationDelivery.upsert({
-            where: { dedupKey_channel: { dedupKey: deliveryDedupKey, channel } },
-            // Repeated enqueue must not reopen a delivered/terminal subject or
-            // rewrite its frozen message, even when critical bypasses cooldown.
-            update: {},
-            create: {
-              subjectType: subject.type,
-              subjectId: subject.id,
-              message: messageSnapshot,
-              severity: message.severity,
-              channel,
-              provider: route.provider,
-              status: 'pending',
-              dedupKey: deliveryDedupKey,
-              scheduledAt,
-            },
-          });
-        } catch (error) {
-          if (!bypassCooldown) {
-            const current = await this.redis.client.get(cooldownKey);
-            if (current === reservationToken) await this.redis.client.del(cooldownKey);
-          }
-          throw error;
+        reservations.push({ route, index, cooldownKey, token });
+      }
+      if (reservations.length === 0) return routes.map(() => null);
+      const deliveries = await admitNotificationDeliveries(this.prisma, reservations.map(({ route }) => ({
+        subjectType: subject.type, subjectId: subject.id, message: messageSnapshot,
+        severity: message.severity, channel: route.channel, provider: route.provider,
+        status: 'pending', dedupKey: `${fingerprint}:${subject.id}`, scheduledAt,
+      })), subject.type === 'risk-event');
+      const byIndex = new Map(reservations.map((reservation, index) => [reservation.index, deliveries[index]]));
+      return routes.map((_, index) => byIndex.get(index) ?? null);
+    } catch (error) {
+      if (!bypassCooldown) {
+        for (const { cooldownKey, token } of reservations) {
+          if (await this.redis.client.get(cooldownKey) === token) await this.redis.client.del(cooldownKey);
         }
-      }),
-    );
+      }
+      throw error;
+    }
   }
 
   async subjectDeliveryStatus(
@@ -389,27 +378,14 @@ export class NotificationService {
     }
   }
 
-  /** Provider 配置是通知路由的唯一来源；渠道按凭证形态识别，同一渠道按优先级只选择一个可投递配置。 */
+  /** 其它通知主题沿用每渠道最高优先级路由。 */
   private async configuredRoutes() {
-    const configs = await this.prisma.providerConfig.findMany({
-      where: { type: 'notification', enabled: true },
-      orderBy: [{ priority: 'asc' }, { name: 'asc' }],
-    });
-    const routedChannels = new Set<string>();
-    const routes: Array<NotificationRoute & ReturnType<typeof normalizeProviderCredential>> = [];
-    for (const config of configs) {
-      if (routedChannels.has(SUPPORTED_CHANNEL) || !config.encryptedCredentials) continue;
-      try {
-        const credential = normalizeProviderCredential(config.encryptedCredentials);
-        // 渠道只按凭证形态识别，与 Provider 名称无关；名称仅用于展示与按名解析。
-        if (!detectFeishuWebhookUrl(credential.credential.trim())) continue;
-        routedChannels.add(SUPPORTED_CHANNEL);
-        routes.push({ channel: SUPPORTED_CHANNEL, provider: config.name, ...credential });
-      } catch {
-        // 损坏或无法解密的凭证不构成可投递路由，也不向调用方泄露凭证错误细节。
-      }
-    }
-    return routes;
+    const channels = new Set<string>();
+    return (await availableNotificationRoutes(this.prisma)).filter((route) => {
+      if (channels.has(route.channel)) return false;
+      channels.add(route.channel);
+      return true;
+    }).map((route) => ({ ...route, legacyDefault: true }));
   }
 
   private async resolveProvider(
@@ -419,7 +395,7 @@ export class NotificationService {
     if (channel !== SUPPORTED_CHANNEL)
       throw new Error(`notification_provider_unconfigured:${channel}`);
 
-    const route = (await this.configuredRoutes()).find(
+    const route = (await availableNotificationRoutes(this.prisma)).find(
       (candidate) => candidate.channel === channel && candidate.provider === providerName,
     );
     if (route) {

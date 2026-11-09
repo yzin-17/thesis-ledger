@@ -4,6 +4,7 @@ import {
   backtestResultSchemaV3,
   backtestSnapshotManifestV3Schema,
   runConfigSchemaV3,
+  backtestPreparationFailureInputSchema,
   type BacktestResultV3,
   type BacktestSnapshotManifestV3,
   type RunConfigV3,
@@ -20,6 +21,10 @@ type RunReadRecord = {
   strategyVersionId?: string;
   snapshotId?: string | null;
   resultChecksum?: string | null;
+  stage?: string | null;
+  errorCode?: string | null;
+  runConfig?: unknown;
+  snapshotManifest?: unknown;
 };
 
 type CompleteRunReadRecord = RunReadRecord & {
@@ -93,6 +98,14 @@ const matchesFrozenRunIdentity = (
 export const isCurrentRunSummaryRecord = (job: RunReadRecord): boolean => {
   if (persistedContractVersion(job) !== 3) return false;
   const input = asRecord(job.input);
+  if (input?.kind === 'preparation-failure') {
+    const parsed = backtestPreparationFailureInputSchema.safeParse(input);
+    return parsed.success && job.status === 'failed' && job.stage === 'preparation-failed' &&
+      job.errorCode === 'PREPARATION_FAILED' &&
+      parsed.data.preparation.strategyVersionId === job.strategyVersionId &&
+      job.result == null && job.resultChecksum == null && job.runConfig == null &&
+      job.snapshotId == null && job.snapshotManifest == null;
+  }
   if (!runConfigSchemaV3.safeParse(input?.runConfig).success) return false;
   if (job.result === null || job.result === undefined) return job.status !== 'succeeded';
   if (job.status !== 'succeeded') return false;
@@ -113,6 +126,7 @@ export const isCurrentRunSummaryRecord = (job: RunReadRecord): boolean => {
 export const assertCurrentRunForRead = (job: CompleteRunReadRecord): void => {
   if (!isCurrentRunSummaryRecord(job)) unsupported();
   const input = asRecord(job.input)!;
+  if (input.kind === 'preparation-failure') return;
   const storedConfig = runConfigSchemaV3.safeParse(job.runConfig);
   const inputConfig = runConfigSchemaV3.safeParse(input.runConfig);
   if (!storedConfig.success || !inputConfig.success) return unsupported();

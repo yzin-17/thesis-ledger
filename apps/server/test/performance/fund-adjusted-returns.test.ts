@@ -1,3 +1,4 @@
+import { controlledMarketSession } from '../market/market-session.fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   barSeriesSchema,
@@ -176,6 +177,7 @@ async function sample(options: Options = {}) {
         }),
       ),
       getQuote,
+      getSession: controlledMarketSession,
     } as never,
     { readChartV3 } as never,
   );

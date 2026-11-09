@@ -23,7 +23,7 @@ export async function prepareModelReceipt(runtime: Runtime, model: string) {
     catalog.idPath !== '/key' ||
     new URL(catalog.url).href !== new URL('/api/v1/models', runtime.baseURL).href
   ) {
-    return { verify: async (actual: string | null) => ({ accepted: actual === model }) };
+    return { verify: (actual: string | null) => Promise.resolve({ accepted: actual === model }) };
   }
   const key = pinned[1]!,
     quantization = pinned[2]!.toUpperCase();

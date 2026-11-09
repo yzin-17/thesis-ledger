@@ -1,7 +1,7 @@
+import { controlledMarketSession } from './market-session.fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   MarketBackgroundQuotesService,
-  cnQuoteSession,
 } from '../../src/market/market-background-quotes.service.js';
 import { RiskMarketDemandService } from '../../src/risk/risk-market-demand.service.js';
 const at = new Date('2026-11-06T02:00:00Z');
@@ -43,7 +43,7 @@ function harness() {
     new MarketBackgroundQuotesService(
       { post } as never,
       { client } as never,
-      { getQuote } as never,
+      { getQuote, getSession: controlledMarketSession } as never,
     );
   return {
     client,
@@ -147,10 +147,16 @@ describe('source-specific automatic quotes', () => {
     expect(row?.reason).toBe('disabled');
     expect(h.getQuote).toHaveBeenCalledTimes(1);
   });
-  it('uses CN exchange clock only for the implemented CN source', () => {
-    expect(cnQuoteSession(at)).toBe(true);
-    expect(cnQuoteSession(new Date('2026-11-06T04:00:00Z'))).toBe(false);
-    expect(cnQuoteSession(new Date('2026-11-07T02:00:00Z'))).toBe(false);
+  it.each([
+    ['2026-11-06T04:00:00Z', 'outside_market_session'],
+    ['2026-11-07T02:00:00Z', 'outside_market_session'],
+    ['2026-10-01T02:00:00Z', 'outside_market_session'],
+    ['2027-01-04T02:00:00Z', 'calendar_unavailable'],
+  ])('共享日历门禁阻止午休、周末、节假日及未知日历的后台报价：%s', async (time, reason) => {
+    const h = harness();
+    expect((await h.service.reconcile([demand], new Date(time)))[0]?.reason).toBe(reason);
+    expect(h.getQuote).not.toHaveBeenCalled();
+    expect(h.client.set).not.toHaveBeenCalledWith(expect.stringContaining('background-quote-attempt:'), expect.anything(), 'PX', expect.anything(), 'NX');
   });
 });
 

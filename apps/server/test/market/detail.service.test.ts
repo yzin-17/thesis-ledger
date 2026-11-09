@@ -70,6 +70,17 @@ const makeControl = () => ({
 });
 
 describe('MarketDetailService（非 bars/indicator helper）', () => {
+  it('备用来源本身不代表陈旧，真实陈旧标记仍保留', async () => {
+    const getQuote = vi.fn(async () => ({ ...quote, fallbackUsed: true }));
+    const service = new MarketDetailService(
+      { getQuote } as never, makeControl() as never,
+      makePrisma({ assetType: 'stock', identityStatus: 'confirmed' }) as never,
+    );
+    expect((await service.getDetail('600519', { include: 'quote' })).sections.quote?.status).toBe('ready');
+    getQuote.mockResolvedValueOnce({ ...quote, fallbackUsed: true, stale: true });
+    expect((await service.getDetail('600519', { include: 'quote' })).sections.quote?.status).toBe('stale');
+  });
+
   it('默认只编排非 bars/indicator 能力', async () => {
     const market = {
       getQuote: vi.fn(async () => quote),

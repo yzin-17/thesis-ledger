@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma, type FundDailyEstimateError, type FundValuationPoint } from '@prisma/client';
 import {
   fundValuationSchema,
@@ -12,17 +12,21 @@ import { MarketCacheControl } from './market-cache-control.js';
 import { parseCurrentFundNav } from './market-current-data.js';
 import { fundValuationDay } from './fund-valuation-point.repository.js';
 import { closingEstimate, fundErrorFor } from './fund-daily-error-method.js';
+import { MarketSessionReader } from './market-session-reader.js';
+import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
 
 @Injectable()
 export class FundDailyErrorService {
   private busy = false;
   private timer?: ReturnType<typeof setInterval>;
   private readonly log = new Logger(FundDailyErrorService.name);
+  private readonly sessions: MarketSessionReader;
   constructor(
     @Inject(PrismaService) private readonly db: PrismaService,
     @Inject(RedisService) private readonly redis: RedisService,
     @Inject(DsaClient) private readonly dsa: DsaClient,
-  ) {}
+    @Optional() sessions?: MarketSessionReader,
+  ) { this.sessions = sessions ?? new MarketSessionReader(new MarketPeriodCalendarReader(dsa)); }
   onModuleInit() {
     if (process.env.NODE_ENV === 'test') return;
     const tick = () => void this.run().catch(() => this.log.warn('基金收盘估值检查失败'));
@@ -39,7 +43,9 @@ export class FundDailyErrorService {
     this.busy = true;
     try {
       const today = fundValuationDay(now);
-      const closed = now.getTime() >= Date.parse(today + 'T15:00:00+08:00');
+      const current = await this.sessions.read('CN', now);
+      const closingAt = current.sessions.filter((window) => window.tradingDate === today).at(-1)?.endAt;
+      const closed = current.state !== 'unknown' && (!closingAt || now.getTime() >= Date.parse(closingAt));
       const limit = new Date(Date.parse(today + 'T00:00:00+08:00') + (closed ? 86400000 : 0));
       const points = await this.db.$queryRaw<FundValuationPoint[]>(Prisma.sql`
         SELECT DISTINCT ON (p."symbol",p."method",(p."minute"+interval '8 hours')::date) p.*
@@ -49,7 +55,8 @@ export class FundDailyErrorService {
           AND e."day"=to_char(p."minute"+interval '8 hours','YYYY-MM-DD'))
         ORDER BY p."symbol",p."method",(p."minute"+interval '8 hours')::date,p."lastValidAt" DESC LIMIT 100`);
       for (const point of points) {
-        const data = closingEstimate(point, now);
+        const at = point.lastValidAt ?? point.minute;
+        const data = closingEstimate(point, now, await this.sessions.read('CN', at));
         if (data)
           await this.db.fundDailyEstimateError.createMany({ data: [data], skipDuplicates: true });
       }
@@ -97,6 +104,9 @@ export class FundDailyErrorService {
       return;
     const estimate = fundValuationSchema.parse(row.estimate).estimatedNav;
     if (estimate === null) return;
+    const session = await this.sessions.read('CN', new Date(row.day + 'T12:00:00+08:00'));
+    const closingAt = session.sessions.filter((window) => window.tradingDate === row.day).at(-1)?.endAt;
+    if (session.state === 'unknown' || !closingAt) return;
     const prefix = 'fund-nav:4:' + row.symbol + ':' + scope.context.generation;
     const candidates = await this.redis.client.mget(
       redisKey('cache', prefix + ':fresh'),
@@ -104,7 +114,7 @@ export class FundDailyErrorService {
     );
     const settle = async (raw: unknown, fromCache: boolean) => {
       const nav = parseCurrentFundNav(raw, row.symbol);
-      const errors = fundErrorFor(row.day, row.symbol, estimate, nav, fromCache ? now : new Date());
+      const errors = fundErrorFor(row.day, row.symbol, estimate, nav, fromCache ? now : new Date(), closingAt);
       if (!errors) return false;
       await control.assertCurrent(scope);
       await this.db.fundDailyEstimateError.updateMany({

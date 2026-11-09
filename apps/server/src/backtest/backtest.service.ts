@@ -137,6 +137,8 @@ export class BacktestService {
       });
     }
     assertCurrentRunForRead(job);
+    if (job.errorCode === 'PREPARATION_FAILED')
+      throw new ConflictException('准备阶段失败，请返回原策略重新创建回测。');
   }
 
   async currentRunForRead(id: string) {

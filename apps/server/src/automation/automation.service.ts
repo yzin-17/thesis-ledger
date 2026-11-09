@@ -3,10 +3,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Cron } from 'croner';
 import { Prisma } from '@prisma/client';
-import { cnTradingCalendar } from '@thesis-ledger/domain';
+import { projectMarketSession } from '@thesis-ledger/domain';
+import { MarketSessionReader } from '../market/market-session-reader.js';
 import {
   automationJobSchema,
   automationJobTypeSchema,
@@ -119,6 +121,7 @@ export class AutomationService {
     private readonly prisma: PrismaService,
     redis: RedisService,
     private readonly notifications: NotificationService,
+    @Optional() private readonly sessions?: MarketSessionReader,
   ) {
     // Redis 仍由 AutomationModule 保持兼容注入，但不再参与执行所有权或 lease 正确性。
     void redis;
@@ -380,12 +383,12 @@ export class AutomationService {
   private async scheduledGate(type: AutomationJobType, handler: AutomationHandler, scheduledAt: Date) {
     if (handler.scheduledGate) return handler.scheduledGate(scheduledAt);
     if (!isMarketAutomationJobType(type)) return { allowed: true } as const;
-    const tradingDay = cnTradingCalendar.status(scheduledAt);
-    if (tradingDay.open) return { allowed: true } as const;
+    const session = this.sessions ? await this.sessions.read('CN', scheduledAt) : projectMarketSession(null, scheduledAt);
+    if (session.tradingDayState === 'open') return { allowed: true } as const;
     return {
       allowed: false,
       reason:
-        tradingDay.reason === 'calendar-unavailable'
+        session.tradingDayState === 'unknown'
           ? '交易日历未覆盖，保守跳过市场任务'
           : '休市日跳过市场任务',
     } as const;

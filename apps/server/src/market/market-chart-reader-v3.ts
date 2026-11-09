@@ -33,7 +33,7 @@ export class MarketChartReaderV3 {
   ) {}
 
   async options(
-    identity: { symbol: string; assetType: string; timeframe?: '1m' | '1d' },
+    identity: { symbol: string; assetType: string; timeframe?: '1m' | '5m' | '15m' | '30m' | '60m' | '1d' },
     window?: MarketChartOptionsWindowV3,
   ) {
     if (window) marketChartOptionsWindowV3Schema.parse(window);
@@ -67,7 +67,7 @@ export class MarketChartReaderV3 {
         enabled: policy.enabled,
         routes: policy.routes,
       };
-      if (window && this.proofs && identity.timeframe !== '1m')
+      if (window && this.proofs && (identity.timeframe ?? '1d') === '1d')
         return await resolveChartWindowOptions({
           identity: { symbol: identity.symbol, assetType: identity.assetType },
           desired,
@@ -97,7 +97,7 @@ export class MarketChartReaderV3 {
       input.acceptance !== 'interactive' ||
       input.history ||
       input.asOf ||
-      !['1d', '1m'].includes(input.identity.timeframe) ||
+      !['1d', '1m', '5m', '15m', '30m', '60m'].includes(input.identity.timeframe) ||
       !/\.(SH|SZ|BJ|HK|US)$/.test(input.identity.symbol)
     ) {
       throw new Error('交互 V3 只支持已接入的日线/分钟图表，不提供回测或历史可见性验收');
@@ -108,7 +108,7 @@ export class MarketChartReaderV3 {
       market: marketRouteMarket(input.identity.symbol),
       assetType: input.identity.assetType,
       timeframe: input.identity.timeframe,
-      capability: input.identity.timeframe === '1m' ? 'MINUTE_BAR' : 'DAILY_BAR',
+      capability: input.identity.timeframe !== '1d' ? 'MINUTE_BAR' : 'DAILY_BAR',
       adjustment: input.identity.adjustment,
     };
     const policy = await this.control.getPolicy();
@@ -136,7 +136,7 @@ export class MarketChartReaderV3 {
     if (!result.ok) throw new DsaError(`图表 V3 路由不可用：${result.reason}`, 'control-rejected');
     const [primary, backup] = result.context.targets;
     const resolveCompatibility = async () => {
-      if (input.identity.timeframe === '1m' || !this.proofs || !primary || !backup) return null;
+      if (input.identity.timeframe !== '1d' || !this.proofs || !primary || !backup) return null;
       return this.proofs.findExact({
         routeKey,
         symbol: input.identity.symbol,
@@ -197,6 +197,7 @@ export class MarketChartReaderV3 {
         requestedEnd: end,
         acquisitionFingerprint,
         ...(response.session ? { session: response.session } : {}),
+        ...(response.timestampConvention ? { timestampConvention: response.timestampConvention } : {}),
       },
     });
     return sliceBarSeries(series, input.window);

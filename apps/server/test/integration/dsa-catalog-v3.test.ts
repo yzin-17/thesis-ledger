@@ -114,4 +114,14 @@ describe('Catalog 当前传输身份', () => {
     ])
       expect(() => assertCatalogSyncInput(raw)).toThrow();
   });
+  it('同步范围显式传递且不能误认另一市场任务', () => {
+    expect(assertCatalogSyncInput({ scope: 'HK_US' })).toEqual({ scope: 'HK_US' });
+    expect(assertCatalogSyncInput({ scope: 'CN' })).toEqual({ scope: 'CN' });
+    for (const scope of ['US', 'all', [], null])
+      expect(() => assertCatalogSyncInput({ scope })).toThrow();
+    expect(parseCatalogJob({ ...job, scope: 'HK_US' }, { scope: 'HK_US' }).scope).toBe('HK_US');
+    expect(() => parseCatalogJob(job, { scope: 'HK_US' })).toThrow();
+    expect(() => parseCatalogJob({ ...job, scope: 'CN' }, { scope: 'HK_US' })).toThrow();
+    expect(parseCatalogJob(job, { scope: 'CN' }).id).toBe('job-1');
+  });
 });

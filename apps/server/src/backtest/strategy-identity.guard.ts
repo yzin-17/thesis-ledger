@@ -5,13 +5,13 @@ import {
   type CanActivate,
   type ExecutionContext,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { PrincipalRequest } from '../identity/identity-rate-limit-subject.js';
 import { z } from 'zod';
 import { IdentityService, IDENTITY_SESSION_HEADER } from '../identity/identity.service.js';
 import { StrategyAccessService } from './strategy-access.service.js';
 import { localIdentityPrincipal } from '../identity/local-workspace.js';
 
-type StrategyRequest = Request & { strategyOwnerId?: string | null };
+type StrategyRequest = PrincipalRequest & { strategyOwnerId?: string | null };
 @Injectable()
 export class StrategyIdentityGuard implements CanActivate {
   constructor(
@@ -23,7 +23,8 @@ export class StrategyIdentityGuard implements CanActivate {
     const token = request.header(IDENTITY_SESSION_HEADER);
     const local = localIdentityPrincipal();
     let owner: string | null = local?.id ?? null;
-    if (!local && token) owner = (await this.identities.requireSession(token)).id;
+    if (!local && token)
+      owner = request.identityPrincipal?.id ?? (await this.identities.requireSession(token)).id;
     request.strategyOwnerId = owner;
     const id = request.params.id;
     if (typeof id === 'string' && request.path.includes('/strategies/'))

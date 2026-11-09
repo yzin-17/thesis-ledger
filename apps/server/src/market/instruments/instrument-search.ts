@@ -57,6 +57,7 @@ export const searchFieldsForInstrument = (
 export const instrumentMatchRank = (
   instrument: {
     canonicalCode: string;
+    market?: string;
     displayName: string;
     pinyin?: string | null;
     pinyinInitials?: string | null;
@@ -72,7 +73,7 @@ export const instrumentMatchRank = (
   const aliases = Array.isArray(instrument.searchAliases)
     ? instrument.searchAliases.map((value) => normalizedQuery(String(value)))
     : [];
-  if (code === needle) return 0;
+  if (code === needle || (instrument.market && `${code}.${normalizedQuery(instrument.market)}` === needle)) return 0;
   if (code.startsWith(needle)) return 1;
   if (name === needle || name.startsWith(needle)) return 2;
   if (

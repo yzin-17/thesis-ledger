@@ -248,10 +248,10 @@ describe('行情详情显式图表 V3 接入', () => {
     await controller.bars('159516.SZ');
     expect(reader.readChartV3).toHaveBeenCalledOnce();
     expect(reader.read).not.toHaveBeenCalled();
-    expect(() => controller.bars('159516.SZ', undefined, undefined, undefined,
-      undefined, undefined, undefined, 'complete')).toThrow('interactive');
-    expect(() => controller.bars('159516.SZ', undefined, undefined, undefined,
-      undefined, undefined, undefined, undefined, undefined, '2026-05-20T00:00:00.000Z')).toThrow('asOf');
+    await expect(controller.bars('159516.SZ', undefined, undefined, undefined,
+      undefined, undefined, undefined, 'complete')).rejects.toThrow('interactive');
+    await expect(controller.bars('159516.SZ', undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, '2026-05-20T00:00:00.000Z')).rejects.toThrow('asOf');
   });
   it('基金净值继续走既有非日线消费者', async () => {
     const { controller, reader, detail } = setup();

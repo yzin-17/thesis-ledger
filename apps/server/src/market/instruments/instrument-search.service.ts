@@ -50,7 +50,9 @@ export class InstrumentSearchService {
             OR similarity(COALESCE("pinyin", ''), ${needle}) >= 0.2
             OR similarity(COALESCE("pinyinInitials", ''), ${needle}) >= 0.2
           )
-        ORDER BY GREATEST(
+        ORDER BY CASE WHEN LOWER("canonicalCode") = LOWER(${needle})
+          OR LOWER("canonicalCode" || '.' || "market") = LOWER(${needle}) THEN 0 ELSE 1 END,
+        GREATEST(
           similarity("canonicalCode", ${needle}),
           similarity("displayName", ${needle}),
           similarity(COALESCE("pinyin", ''), ${needle}),

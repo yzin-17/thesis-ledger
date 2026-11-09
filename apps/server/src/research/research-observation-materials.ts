@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  marketDataBarSeriesResponseV3Schema,
   type ResearchScopeSnapshotV2,
   researchScopeInstrumentsV2,
   type ResearchObservationEvaluation,
@@ -8,6 +7,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { MarketPeriodCalendarReader } from '../market/market-period-calendar-reader.js';
 import { MarketBarReader, type MarketBarWindowReadResultV3 } from '../market/market-bar-reader.js';
+import { safeParseMarketWindowEvidenceResponseV3 } from '../market/market-window-response-v3.js';
 import { researchObservationDigest } from './research-observation-identity.js';
 import {
   observationMarketDate,
@@ -150,7 +150,7 @@ export class ResearchObservationMaterials {
     const audit = { request, response };
     if (response.status !== 'selected')
       return { material: unavailable('price_unavailable'), audit };
-    const parsed = marketDataBarSeriesResponseV3Schema.safeParse(response.selection.response);
+    const parsed = safeParseMarketWindowEvidenceResponseV3(response.selection.response);
     if (!parsed.success) return { material: unavailable('coverage_incomplete'), audit };
     const data = parsed.data;
     const contextFailure = qualifyEconomicContext(data, response, instrument, asOf);

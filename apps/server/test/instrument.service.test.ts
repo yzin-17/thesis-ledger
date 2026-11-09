@@ -81,6 +81,7 @@ const keyFor = (item: CatalogItem) => `${item.canonicalCode}:${item.instrumentTy
 
 const rankInput = (record: Record<string, unknown>): Parameters<typeof instrumentMatchRank>[0] => ({
   canonicalCode: String(record.canonicalCode ?? ''),
+  market: String(record.market ?? ''),
   displayName: String(record.displayName ?? ''),
   pinyin: typeof record.pinyin === 'string' ? record.pinyin : null,
   pinyinInitials: typeof record.pinyinInitials === 'string' ? record.pinyinInitials : null,
@@ -192,7 +193,9 @@ describe('InstrumentService catalog fields and generation', () => {
       expect.arrayContaining(['贵州茅台', 'guizhoumaotai', 'gzmt', '600519.SH']),
     );
     expect(instrumentMatchRank(rankInput(saved), 'gzmt')).toBe(3);
-    expect(instrumentMatchRank(rankInput(saved), '600519.SH')).toBe(4);
+    expect(instrumentMatchRank(rankInput(saved), '600519.SH')).toBe(0);
+    expect(instrumentMatchRank(rankInput(saved), '600519.sh')).toBe(0);
+    expect(instrumentMatchRank(rankInput(saved), '600519.SZ')).toBe(99);
   });
 
   it('delta refreshes generated search fields when the display name changes', async () => {

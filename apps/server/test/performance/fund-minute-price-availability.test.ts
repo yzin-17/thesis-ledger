@@ -1,3 +1,4 @@
+import { controlledMarketSession } from '../market/market-session.fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   fundNavSchema,
@@ -158,6 +159,7 @@ async function sample(
         }),
       ),
       getQuote,
+      getSession: controlledMarketSession,
     } as never,
     { readChartV3 } as never,
   );

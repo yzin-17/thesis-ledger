@@ -5,9 +5,9 @@ describe('策略风险通知发送前门禁', () => {
   it('投递前先清理已经失效的策略应用修订', async () => {
     const calls: string[] = [];
     const prisma = {
-      $executeRaw: vi.fn(async (_query: unknown) => {
+      $executeRaw: vi.fn<(_query: unknown) => Promise<number>>().mockImplementation(() => {
         calls.push('guard');
-        return 1;
+        return Promise.resolve(1);
       }),
     };
     const notifications = {

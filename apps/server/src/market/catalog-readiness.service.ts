@@ -143,8 +143,8 @@ export class CatalogReadinessService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Preserve the existing manual trigger endpoint for operator diagnostics. */
-  async triggerAndProject() {
-    const job = await this.dsa.triggerCatalogJob();
+  async triggerAndProject(scope?: 'CN' | 'HK_US') {
+    const job = await this.dsa.triggerCatalogJob(undefined, scope);
     if (job.status !== 'succeeded') return { ...job, acknowledged: false };
     return { ...job, ...(await this.projectSucceededJob(job)) };
   }

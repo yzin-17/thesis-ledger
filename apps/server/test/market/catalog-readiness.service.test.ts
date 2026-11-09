@@ -129,6 +129,13 @@ const createHarness = (initialStatus = emptyStatus()) => {
 };
 
 describe('CatalogReadinessService', () => {
+  it('手动港美目录同步只传递指定范围并沿用快照投影', async () => {
+    const harness = createHarness();
+    const service = new CatalogReadinessService(harness.instruments as never, harness.dsa as never);
+    const result = await service.triggerAndProject('HK_US');
+    expect(harness.dsa.triggerCatalogJob).toHaveBeenCalledWith(undefined, 'HK_US');
+    expect(result.acknowledged).toBe(true);
+  });
   it.each([{ generation: 2 }, { checksum: 'other' }, { cursor: 'generation:9' }])(
     '投影前拒绝成功 Job 错配 %j',
     async (change) => {

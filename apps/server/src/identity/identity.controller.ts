@@ -5,22 +5,24 @@ import {
   Headers,
   HttpCode,
   Post,
+  Req,
   UnauthorizedException,
 } from '@nestjs/common';
 import { IdentityService, IDENTITY_SESSION_HEADER } from './identity.service.js';
 import { localIdentityPrincipal } from './local-workspace.js';
+import type { PrincipalRequest } from './identity-rate-limit-subject.js';
 
 @Controller('identity')
 export class IdentityController {
   constructor(private readonly identities: IdentityService) {}
   @Get('context')
-  async context(@Headers(IDENTITY_SESSION_HEADER) token: string | undefined) {
+  async context(@Headers(IDENTITY_SESSION_HEADER) token: string | undefined, @Req() request?: PrincipalRequest) {
     const local = localIdentityPrincipal();
     if (local) return { mode: 'local', principal: local };
     try {
       return {
         mode: 'account',
-        principal: token ? await this.identities.requireSession(token) : null,
+        principal: request?.identityPrincipal ?? (token ? await this.identities.requireSession(token) : null),
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) return { mode: 'account', principal: null };
@@ -37,7 +39,10 @@ export class IdentityController {
     return this.identities.login(input);
   }
   @Get('session')
-  current(@Headers(IDENTITY_SESSION_HEADER) token: string | undefined) {
+  current(@Headers(IDENTITY_SESSION_HEADER) token: string | undefined, @Req() request?: PrincipalRequest) {
+    // Local context is separate from the account-session endpoint.
+    if (token && process.env.STRATEGY_IDENTITY_MODE === 'account' && request?.identityPrincipal)
+      return request.identityPrincipal;
     return this.identities.requireSession(token);
   }
   @Post('session/revoke')

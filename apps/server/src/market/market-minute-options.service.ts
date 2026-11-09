@@ -35,7 +35,10 @@ export class MarketMinuteOptionsService {
     const route = native.options.find((option) => option.adjustment === 'none');
     const options = [];
     for (const timeframe of ['5m', '15m', '30m', '60m'] as const) {
+      const nativePeriod = await this.chart.options({ ...identity, timeframe });
+      const nativeReady = nativePeriod.options.some((option) => option.adjustment === 'none' && option.available);
       const check = async (indicators: MarketIndicatorRequest[]): Promise<Availability> => {
+        if (nativeReady) return { available: true, reason: null };
         if (!route?.available)
           return { available: false, reason: route?.reason ?? 'price_unavailable' };
         try {
@@ -59,7 +62,7 @@ export class MarketMinuteOptionsService {
       for (const request of requests) indicators.push({ ...request, ...(await check([request])) });
       options.push({
         timeframe,
-        kind: 'derived',
+        kind: nativeReady ? 'native' : 'derived',
         limit: Number(scoped.limit),
         ...base,
         indicators,

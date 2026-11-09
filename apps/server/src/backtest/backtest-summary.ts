@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { ExecutionModelDisclosure, ResultReadEligibility } from '@thesis-ledger/schemas';
+import { backtestPreparationFailureInputSchema } from '@thesis-ledger/schemas';
 import { withBacktestModelDisclosure } from './backtest-model-disclosure.js';
 
 export const backtestJobSummarySelect = {
@@ -64,7 +65,8 @@ export const toBacktestJobSummary = (record: BacktestJobSummaryRecord): Backtest
   void storedConfig;
   void snapshotManifest;
   const currentInput = input && typeof input === 'object' && !Array.isArray(input) ? input : null;
-  const config = currentInput?.runConfig as
+  const failure = backtestPreparationFailureInputSchema.safeParse(input);
+  const config = (failure.success ? failure.data.preparation.runConfig : currentInput?.runConfig) as
     | {
         baseCurrency?: string;
         initialCash?: Record<string, string>;

@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
-  aggregateMinuteBars,
-  tradingCalendars,
+  marketSessionDate,
+  marketTimezones,
+  marketCivilInstant,
   tradingMarketForAssetMarket,
-  type BacktestMinuteBar,
   type DerivedBacktestBar,
   type TradingMarket,
 } from '@thesis-ledger/domain';
@@ -69,39 +69,6 @@ const timeframeMinutes = (timeframe: string) => {
 const isDerivedTimeframe = (timeframe: string): timeframe is DerivedBacktestBar['timeframe'] =>
   timeframe === '5m' || timeframe === '15m' || timeframe === '30m' || timeframe === '60m';
 
-const utcForLocalMinute = (date: string, minute: number, timeZone: string) => {
-  const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = date.split('-').map(Number);
-  const hour = Math.floor(minute / 60);
-  const localMinute = minute % 60;
-  let candidate = new Date(Date.UTC(year, month - 1, day, hour, localMinute));
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const rendered = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(candidate);
-    const values = Object.fromEntries(
-      rendered.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]),
-    );
-    const renderedUtc = Date.UTC(
-      Number(values.year),
-      Number(values.month) - 1,
-      Number(values.day),
-      Number(values.hour),
-      Number(values.minute),
-    );
-    const wantedUtc = Date.UTC(year, month - 1, day, hour, localMinute);
-    const offset = renderedUtc - wantedUtc;
-    if (offset === 0) return candidate;
-    candidate = new Date(candidate.getTime() - offset);
-  }
-  return candidate;
-};
-
 @Injectable()
 export class StrategyRiskContextService {
   constructor(
@@ -150,17 +117,16 @@ export class StrategyRiskContextService {
     return tradingMarketForAssetMarket(market);
   }
 
-  private completedAt(timestamp: Date, timeframe: string, market: TradingMarket | null) {
+  private async completedAt(timestamp: Date, timeframe: string, market: TradingMarket | null) {
     const minutes = timeframeMinutes(timeframe);
     if (minutes !== null) return new Date(timestamp.getTime() + minutes * 60_000);
-    if (timeframe !== '1d' || !market) return null;
-    const calendar = tradingCalendars[market];
+    if (timeframe !== '1d' || !market || !this.market) return null;
     const tradingDate = timestamp.toISOString().slice(0, 10);
-    const localNoon = utcForLocalMinute(tradingDate, 12 * 60, calendar.timezone);
-    const sessions = calendar.sessionsForDate(localNoon);
-    const end = sessions.at(-1)?.end;
-    if (end === undefined) return null;
-    return utcForLocalMinute(tradingDate, end, calendar.timezone);
+    const probe = marketCivilInstant(tradingDate, 12 * 60, marketTimezones[market]);
+    const session = await this.market.getSession(market, new Date(probe));
+    if (session.state === 'unknown') return null;
+    const end = session.sessions.filter((window) => window.tradingDate === tradingDate).at(-1)?.endAt;
+    return end ? new Date(end) : null;
   }
 
   private effectiveBars(rows: RiskBar[]) {
@@ -175,20 +141,13 @@ export class StrategyRiskContextService {
     return result.sort((left, right) => left.timestamp.getTime() - right.timestamp.getTime());
   }
 
-  private latestCompletedDailyDate(evaluatedAt: Date, market: TradingMarket) {
-    const calendar = tradingCalendars[market];
-    const cursor = new Date(`${calendar.status(evaluatedAt).date}T00:00:00.000Z`);
-    for (let offset = 0; offset < 366; offset += 1) {
-      const date = cursor.toISOString().slice(0, 10);
-      const noon = utcForLocalMinute(date, 12 * 60, calendar.timezone);
-      if (calendar.status(noon).reason === 'calendar-unavailable')
-        throw new MarketBarUnavailableError('策略风险交易日历未覆盖评价时点');
-      const end = calendar.sessionsForDate(noon).at(-1)?.end;
-      if (end !== undefined && utcForLocalMinute(date, end, calendar.timezone) <= evaluatedAt)
-        return date;
-      cursor.setUTCDate(cursor.getUTCDate() - 1);
-    }
-    throw new MarketBarUnavailableError('策略风险缺少可确认的已收盘交易日');
+  private async latestCompletedDailyDate(evaluatedAt: Date, market: TradingMarket) {
+    const session = await this.market?.getSession(market, evaluatedAt);
+    if (!session || session.state === 'unknown')
+      throw new MarketBarUnavailableError('策略风险交易日历未覆盖评价时点');
+    if (!session.latestCompletedTradingDate)
+      throw new MarketBarUnavailableError('策略风险缺少可确认的已收盘交易日');
+    return session.latestCompletedTradingDate;
   }
 
   private async storedBars(
@@ -210,8 +169,8 @@ export class StrategyRiskContextService {
     else if (/\.HK$/.test(symbol)) market = 'HK';
     else if (/\.US$/.test(symbol)) market = 'US';
     else throw new MarketBarUnavailableError('策略风险标的市场无法识别');
-    const end = this.latestCompletedDailyDate(evaluatedAt, market);
-    const first = start ? tradingCalendars[market].status(start).date : end;
+    const end = await this.latestCompletedDailyDate(evaluatedAt, market);
+    const first = start ? marketSessionDate(start, marketTimezones[market]) : end;
     if (first > end) return [];
     const selected = await this.bars.readV3({
       market,
@@ -247,57 +206,6 @@ export class StrategyRiskContextService {
     return this.effectiveBars(take ? rows.slice(-take) : rows);
   }
 
-  private minuteInputs(rows: RiskBar[], market: TradingMarket): BacktestMinuteBar[] {
-    return rows.map((row) => {
-      if (row.volume === null || row.amount === null)
-        throw new Error('分钟聚合的成交量或成交额不可用');
-      return {
-        symbol: row.symbol,
-        market,
-        timeframe: '1m',
-        occurredAt: row.timestamp.toISOString(),
-        availableAt: row.availableAt.toISOString(),
-        open: row.open.toString(),
-        high: row.high.toString(),
-        low: row.low.toString(),
-        close: row.close.toString(),
-        volume: row.volume.toString(),
-        amount: row.amount.toString(),
-        provider: row.provider,
-        quality: 'complete',
-      };
-    });
-  }
-
-  private async derivedBars(
-    symbol: string,
-    timeframe: DerivedBacktestBar['timeframe'],
-    market: TradingMarket,
-    assetType: string,
-    evaluatedAt: Date,
-    start?: Date,
-    availabilityCutoff?: () => Date,
-  ) {
-    const rows = await this.storedBars(
-      symbol,
-      '1m',
-      evaluatedAt,
-      assetType,
-      start,
-      start ? undefined : 1000,
-      availabilityCutoff,
-    );
-    return aggregateMinuteBars(this.minuteInputs(rows, market), timeframe, {
-      calendar: tradingCalendars[market],
-      includePartialTail: false,
-    }).filter(
-      (bar) =>
-        bar.completeness === 'complete' &&
-        new Date(bar.occurredAt) <= evaluatedAt &&
-        new Date(bar.availableAt) <= evaluatedAt,
-    );
-  }
-
   private async directBars(
     symbol: string,
     timeframe: '1m' | '1d',
@@ -316,47 +224,11 @@ export class StrategyRiskContextService {
       start ? undefined : 64,
       availabilityCutoff,
     );
-    return rows.filter((row) => {
-      const completedAt = this.completedAt(row.timestamp, timeframe, market);
-      return completedAt !== null && completedAt <= evaluatedAt;
+    const completed = await Promise.all(rows.map((row) => this.completedAt(row.timestamp, timeframe, market)));
+    return rows.filter((_, index) => {
+      const completedAt = completed[index];
+      return completedAt !== null && completedAt !== undefined && completedAt <= evaluatedAt;
     });
-  }
-
-  private async derivedExchangeValues(
-    symbol: string,
-    timeframe: DerivedBacktestBar['timeframe'],
-    market: TradingMarket,
-    assetType: string,
-    source: StrategyRiskPositionTradeContext,
-    evaluatedAt: Date,
-    requiresHoldingPeriods: boolean,
-    availabilityCutoff?: () => Date,
-  ): Promise<ExchangeValues> {
-    const bars = await this.derivedBars(symbol, timeframe, market, assetType, evaluatedAt, undefined, availabilityCutoff);
-    const bar = bars.at(-1);
-    const holdingPeriods =
-      requiresHoldingPeriods && source.trade?.openedAt && bar
-        ? Math.max(
-            0,
-            (
-              await this.derivedBars(
-                symbol,
-                timeframe,
-                market,
-                assetType,
-                evaluatedAt,
-                source.trade.openedAt,
-                availabilityCutoff,
-              )
-            ).length - 1,
-          )
-        : undefined;
-    return {
-      ...(bar
-        ? { price: bar.close, occurredAt: bar.occurredAt, availableAt: bar.availableAt }
-        : {}),
-      ...(holdingPeriods === undefined ? {} : { holdingPeriods }),
-    };
   }
 
   private async directExchangeValues(
@@ -413,16 +285,7 @@ export class StrategyRiskContextService {
     let values: ExchangeValues = {};
     try {
       if (isDerivedTimeframe(target.primaryTimeframe)) {
-        values = await this.derivedExchangeValues(
-          symbol,
-          target.primaryTimeframe,
-          market,
-          target.executionInstrument.assetType,
-          source,
-          evaluatedAt,
-          target.requiresHoldingPeriods === true,
-          availabilityCutoff,
-        );
+        throw new MarketBarUnavailableError('分钟线现行合同仅支持交互图表，风险监控尚未接入已完成分钟线更新');
       } else if (target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d') {
         values = await this.directExchangeValues(
           symbol,

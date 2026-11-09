@@ -1,3 +1,4 @@
+import { controlledMarketSession } from './market-session.fixture.js';
 import { PrismaClient } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { assertIsolated, databaseUrl } from '../ai/ai-provider-postgres.fixture.js';
@@ -84,7 +85,7 @@ describe.skipIf(!databaseUrl)('单基金每日误差持久化', () => {
     };
     const mget = vi.fn(async (): Promise<(string | null)[]> => [null, null]);
     const worker = () =>
-      new FundDailyErrorService(db as never, { client: { mget } } as never, dsa as never);
+      new FundDailyErrorService(db as never, { client: { mget } } as never, dsa as never, { read: controlledMarketSession } as never);
     try {
       await repo.record(value, last, evidence);
       const unavailable: FundValuation = {

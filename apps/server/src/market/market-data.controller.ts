@@ -146,7 +146,7 @@ export class MarketDataController {
   }
 
   @Post('catalog/sync') async syncCatalog(@Body() body?: unknown) {
-    assertCatalogSyncInput(body);
-    return this.readiness().triggerAndProject();
+    const input = assertCatalogSyncInput(body);
+    return this.readiness().triggerAndProject(input.scope);
   }
 }

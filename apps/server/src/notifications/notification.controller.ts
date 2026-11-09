@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { notificationMessageSchema } from '@thesis-ledger/schemas';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { notificationMessageSchema, riskNotificationRoutingInputSchema } from '@thesis-ledger/schemas';
 import { z } from 'zod';
 import { NotificationService } from './notification.service.js';
+import { RiskNotificationRoutingService } from './risk-notification-routing.service.js';
 
 const notificationDeliveryMessageSchema = notificationMessageSchema.extend({
   severity: z.enum(['info', 'warning', 'error', 'critical']),
@@ -10,7 +11,10 @@ const notificationDeliveryMessageSchema = notificationMessageSchema.extend({
 
 @Controller('notifications')
 export class NotificationController {
-  constructor(private readonly notifications: NotificationService) {}
+  constructor(
+    private readonly notifications: NotificationService,
+    private readonly riskRouting: RiskNotificationRoutingService,
+  ) {}
 
   @Get()
   list(@Query('status') status?: string) {
@@ -20,6 +24,16 @@ export class NotificationController {
   @Get('routing')
   routing() {
     return this.notifications.routing();
+  }
+
+  @Get('routing/risk')
+  riskNotificationRouting() {
+    return this.riskRouting.read();
+  }
+
+  @Put('routing/risk')
+  saveRiskNotificationRouting(@Body() input: unknown) {
+    return this.riskRouting.save(riskNotificationRoutingInputSchema.parse(input).providers);
   }
 
   @Post(':id/deliver/feishu')

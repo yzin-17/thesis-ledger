@@ -59,7 +59,7 @@ describe('HTTP runtime validation', () => {
 
   it('Notification manual delivery requires severity and traceId', () => {
     const service = { dispatchOne: vi.fn(), list: vi.fn() };
-    const controller = new NotificationController(service as never);
+    const controller = new NotificationController(service as never, {} as never);
 
     expect(() => controller.deliver('delivery', { title: 'x', body: 'y' })).toThrow(z.ZodError);
     expect(service.dispatchOne).not.toHaveBeenCalled();
