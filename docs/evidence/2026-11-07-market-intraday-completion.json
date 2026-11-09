@@ -1,0 +1,1534 @@
+{
+  "policyRevision": 192,
+  "syncState": "applied",
+  "preservedRoutes": 100,
+  "totalRoutes": 116,
+  "nativeRoutes": 30,
+  "nativeTargets": 60,
+  "catalogStatus": "complete",
+  "catalogEntries": 449,
+  "nativeCatalogEntries": 191,
+  "businessSources": [
+    "akshare",
+    "baostock",
+    "efinance",
+    "futu",
+    "tencent",
+    "tushare",
+    "yfinance"
+  ],
+  "nativePolicy": [
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "efinance",
+          "upstreamSource": "eastmoney",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "5m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "efinance",
+          "upstreamSource": "eastmoney",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "15m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "efinance",
+          "upstreamSource": "eastmoney",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "30m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "efinance",
+          "upstreamSource": "eastmoney",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "efinance",
+          "upstreamSource": "eastmoney",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "5m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "baostock",
+          "upstreamSource": "baostock",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "tencent",
+          "upstreamSource": "tencent",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "15m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "baostock",
+          "upstreamSource": "baostock",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "efinance",
+          "upstreamSource": "eastmoney",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "30m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "baostock",
+          "upstreamSource": "baostock",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "baostock",
+          "upstreamSource": "baostock",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "5m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "15m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "30m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "akshare",
+          "upstreamSource": "sina",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "tushare",
+          "upstreamSource": "tushare",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "5m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "15m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "30m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "5m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "15m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "30m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "5m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "15m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "30m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    },
+    {
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "targets": [
+        {
+          "providerId": "futu",
+          "upstreamSource": "futu",
+          "routeIndex": 0,
+          "eligible": true,
+          "reason": null
+        },
+        {
+          "providerId": "yfinance",
+          "upstreamSource": "yfinance",
+          "routeIndex": 1,
+          "eligible": true,
+          "reason": null
+        }
+      ],
+      "reason": null
+    }
+  ],
+  "remainingMatrixProbes": [
+    {
+      "provider": "efinance",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "efinance",
+        "upstreamSource": "eastmoney"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 4446
+      },
+      "sample": {
+        "symbol": "600519.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "efinance",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "efinance",
+        "upstreamSource": "eastmoney"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 2947
+      },
+      "sample": {
+        "symbol": "600519.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1485
+      },
+      "sample": {
+        "symbol": "600519.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1121
+      },
+      "sample": {
+        "symbol": "600519.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1534
+      },
+      "sample": {
+        "symbol": "00700.HK",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1540
+      },
+      "sample": {
+        "symbol": "00700.HK",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1525
+      },
+      "sample": {
+        "symbol": "02800.HK",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1463
+      },
+      "sample": {
+        "symbol": "02800.HK",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1567
+      },
+      "sample": {
+        "symbol": "AAPL.US",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 897
+      },
+      "sample": {
+        "symbol": "AAPL.US",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1156
+      },
+      "sample": {
+        "symbol": "SPY.US",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 670
+      },
+      "sample": {
+        "symbol": "SPY.US",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": true,
+        "errorCode": "invalid_response"
+      },
+      "sample": null
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 528
+      },
+      "sample": {
+        "symbol": "510300.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 524
+      },
+      "sample": {
+        "symbol": "510300.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": true,
+        "errorCode": "invalid_response"
+      },
+      "sample": null
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 612
+      },
+      "sample": {
+        "symbol": "AAPL.US",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": true,
+        "errorCode": "invalid_response"
+      },
+      "sample": null
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 580
+      },
+      "sample": {
+        "symbol": "SPY.US",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 530
+      },
+      "sample": {
+        "symbol": "SPY.US",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    }
+  ],
+  "newUpstreamAndFutuCorrection": [
+    {
+      "provider": "tencent",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "tencent",
+        "upstreamSource": "tencent"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 394
+      },
+      "sample": {
+        "symbol": "600519.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "tencent",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "tencent",
+        "upstreamSource": "tencent"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 338
+      },
+      "sample": {
+        "symbol": "510300.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "akshare",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "sina"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 512
+      },
+      "sample": {
+        "symbol": "600519.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "akshare",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "sina"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 443
+      },
+      "sample": {
+        "symbol": "510300.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 555
+      },
+      "sample": {
+        "symbol": "AAPL.US",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    }
+  ],
+  "businessConsumption": [
+    {
+      "symbol": "600519.SH",
+      "identity": {
+        "symbol": "600519.SH",
+        "assetType": "STOCK",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "count": 4,
+      "source": "baostock"
+    },
+    {
+      "symbol": "00700.HK",
+      "identity": {
+        "symbol": "00700.HK",
+        "assetType": "STOCK",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "count": 5,
+      "source": "futu"
+    },
+    {
+      "symbol": "SPY.US",
+      "identity": {
+        "symbol": "SPY.US",
+        "assetType": "ETF",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "count": 5,
+      "source": "futu"
+    }
+  ]
+}

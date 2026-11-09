@@ -1,0 +1,585 @@
+{
+  "policyRevision": 190,
+  "originalRoutesPreserved": 86,
+  "addedRoutes": 14,
+  "probes": [
+    {
+      "provider": "akshare",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "akshare",
+        "upstreamSource": "eastmoney"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": true,
+        "errorCode": "network_failure"
+      },
+      "sample": null
+    },
+    {
+      "provider": "efinance",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "efinance",
+        "upstreamSource": "eastmoney"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 3126
+      },
+      "sample": {
+        "symbol": "510300.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "efinance",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "efinance",
+        "upstreamSource": "eastmoney"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1461
+      },
+      "sample": {
+        "symbol": "510300.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "baostock",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "5m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "baostock",
+        "upstreamSource": "baostock"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 4956
+      },
+      "sample": {
+        "symbol": "600519.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "baostock",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "baostock",
+        "upstreamSource": "baostock"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 3132
+      },
+      "sample": {
+        "symbol": "600519.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "pytdx",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "pytdx",
+        "upstreamSource": "pytdx"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": true,
+        "errorCode": "upstream_failure"
+      },
+      "sample": null
+    },
+    {
+      "provider": "tickflow",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "tickflow",
+        "upstreamSource": "tickflow"
+      },
+      "enabledBefore": false,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": true,
+        "errorCode": "NO_KLINE_PERMISSION"
+      },
+      "sample": null
+    },
+    {
+      "provider": "tushare",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "tushare",
+        "upstreamSource": "tushare"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": false,
+        "errorCode": "independent_permission_not_enabled"
+      },
+      "sample": null
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 6848
+      },
+      "sample": {
+        "symbol": "510300.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "yfinance",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "yfinance",
+        "upstreamSource": "yfinance"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 1640
+      },
+      "sample": {
+        "symbol": "510300.SH",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 716
+      },
+      "sample": {
+        "symbol": "02800.HK",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "futu",
+      "key": {
+        "kind": "bar",
+        "market": "HK",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "60m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "futu",
+        "upstreamSource": "futu"
+      },
+      "enabledBefore": true,
+      "result": {
+        "status": "healthy",
+        "readOnly": true,
+        "attempted": true,
+        "latencyMs": 621
+      },
+      "sample": {
+        "symbol": "02800.HK",
+        "start": "2026-11-06",
+        "end": "2026-11-06"
+      }
+    },
+    {
+      "provider": "alphavantage",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "alphavantage",
+        "upstreamSource": "alphavantage"
+      },
+      "enabledBefore": false,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": true,
+        "errorCode": "quota_unavailable"
+      },
+      "sample": null
+    },
+    {
+      "provider": "finnhub",
+      "key": {
+        "kind": "bar",
+        "market": "US",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "finnhub",
+        "upstreamSource": "finnhub"
+      },
+      "enabledBefore": false,
+      "result": {
+        "status": "unavailable",
+        "readOnly": true,
+        "attempted": true,
+        "errorCode": "permission_denied"
+      },
+      "sample": null
+    },
+    {
+      "provider": "longbridge",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "longbridge",
+        "upstreamSource": "longbridge"
+      },
+      "enabledBefore": false,
+      "result": {
+        "status": "unconfigured",
+        "readOnly": true,
+        "attempted": false,
+        "errorCode": "credential_missing"
+      },
+      "sample": null
+    },
+    {
+      "provider": "rqdata",
+      "key": {
+        "kind": "bar",
+        "market": "CN",
+        "assetType": "ETF",
+        "capability": "MINUTE_BAR",
+        "timeframe": "1m",
+        "adjustment": "none"
+      },
+      "target": {
+        "providerId": "rqdata",
+        "upstreamSource": "rqdata"
+      },
+      "enabledBefore": false,
+      "result": {
+        "status": "unconfigured",
+        "readOnly": true,
+        "attempted": false,
+        "errorCode": "credential_missing"
+      },
+      "sample": null
+    }
+  ],
+  "browser": {
+    "minuteStatus": "ready",
+    "minutePoints": 240,
+    "minuteSource": {
+      "providerId": "efinance",
+      "upstreamSource": "eastmoney",
+      "routeIndex": 0,
+      "effectivePolicyRevision": 190,
+      "providerRevision": "9a99e408e602ecf28b1ee8740fd26c364b0cb744208c273cdcb59ddccc88a8ff",
+      "fetchedAt": "2026-11-07T07:17:32.760529+00:00",
+      "freshUntil": "2026-11-07T07:17:32.760529+00:00",
+      "servedFromCache": false,
+      "cacheStatus": "miss"
+    },
+    "hourStatus": "ready",
+    "hourPoints": 90,
+    "hourSource": {
+      "providerId": "efinance",
+      "upstreamSource": "eastmoney",
+      "routeIndex": 0,
+      "effectivePolicyRevision": 190,
+      "providerRevision": "f9a4ebc3e699f9561d1aabe7480e94594715e5073cc612ba4d9ac05609226024",
+      "fetchedAt": "2026-11-07T07:17:42.459897+00:00",
+      "freshUntil": "2026-11-07T07:17:42.459897+00:00",
+      "servedFromCache": false,
+      "cacheStatus": "miss"
+    },
+    "layouts": [
+      {
+        "width": 1440,
+        "dialogFits": true,
+        "pageOverflow": false
+      },
+      {
+        "width": 1024,
+        "dialogFits": true,
+        "pageOverflow": false
+      },
+      {
+        "width": 768,
+        "dialogFits": true,
+        "pageOverflow": false
+      },
+      {
+        "width": 390,
+        "dialogFits": true,
+        "pageOverflow": false
+      }
+    ],
+    "minuteReads": [
+      {
+        "timeframe": "1m",
+        "status": 200,
+        "url": "/api/market/510300.SH/detail"
+      },
+      {
+        "timeframe": "60m",
+        "status": 200,
+        "url": "/api/market/510300.SH/detail"
+      }
+    ],
+    "writes": [],
+    "errors": []
+  },
+  "controlledBrowser": [
+    {
+      "width": 1440,
+      "period": "60m",
+      "timezone": "北京时间",
+      "overflow": false,
+      "apiReads": 0,
+      "pageErrors": []
+    },
+    {
+      "width": 1024,
+      "period": "60m",
+      "timezone": "北京时间",
+      "overflow": false,
+      "apiReads": 0,
+      "pageErrors": []
+    },
+    {
+      "width": 768,
+      "period": "60m",
+      "timezone": "北京时间",
+      "overflow": false,
+      "apiReads": 0,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "period": "60m",
+      "timezone": "北京时间",
+      "overflow": false,
+      "apiReads": 0,
+      "pageErrors": []
+    }
+  ],
+  "minuteSummary": {
+    "identity": {
+      "symbol": "510300.SH",
+      "assetType": "ETF",
+      "timeframe": "1m",
+      "adjustment": "none"
+    },
+    "count": 240,
+    "firstTimestamp": "2026-11-06T09:31:00+08:00",
+    "lastTimestamp": "2026-11-06T15:00:00+08:00",
+    "lastClose": 4.124,
+    "sourcePriceBasis": {
+      "adjustment": "none",
+      "method": "provider-native",
+      "methodVersion": "dsa-market-bars-v3-native-source-v1",
+      "basisScope": "provider-defined",
+      "anchor": null,
+      "revision": {
+        "origin": "local-observation",
+        "contentHash": "39256f5156a09319b9e38e1258adbbbdebdb65c3236f96ad47052d141bfdd954"
+      },
+      "observedAt": "2026-11-07T07:17:32.760529+00:00",
+      "volumeBasis": "unknown",
+      "fieldUnits": {
+        "volume": "hand",
+        "amount": "CNY"
+      },
+      "dividendMeaning": "provider-defined",
+      "dividendEvidenceRef": null,
+      "conversionAvailable": false,
+      "conversionEvidenceRef": null,
+      "derivation": null
+    },
+    "timestampConvention": "interval-end",
+    "sectionStatuses": {
+      "bars": "ready"
+    }
+  },
+  "hourSummary": {
+    "identity": {
+      "symbol": "510300.SH",
+      "assetType": "ETF",
+      "timeframe": "60m",
+      "adjustment": "none"
+    },
+    "count": 90,
+    "firstTimestamp": "2026-09-30T14:00:00+08:00",
+    "lastTimestamp": "2026-11-06T15:00:00+08:00",
+    "lastClose": 4.124,
+    "sourcePriceBasis": {
+      "adjustment": "none",
+      "method": "provider-native",
+      "methodVersion": "dsa-market-bars-v3-native-source-v1",
+      "basisScope": "provider-defined",
+      "anchor": null,
+      "revision": {
+        "origin": "local-observation",
+        "contentHash": "006c09c3691aa2e97bc2be5516e93d409ef2c9f545d4d0b1c88e7f4b9c2884fc"
+      },
+      "observedAt": "2026-11-07T07:17:42.459897+00:00",
+      "volumeBasis": "unknown",
+      "fieldUnits": {
+        "volume": "hand",
+        "amount": "CNY"
+      },
+      "dividendMeaning": "provider-defined",
+      "dividendEvidenceRef": null,
+      "conversionAvailable": false,
+      "conversionEvidenceRef": null,
+      "derivation": null
+    },
+    "timestampConvention": "interval-end",
+    "sectionStatuses": {
+      "quote": "unavailable",
+      "bars": "ready",
+      "indicator:MA": "ready",
+      "indicator:MACD": "ready",
+      "indicator:RSI": "ready"
+    }
+  }
+}

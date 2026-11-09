@@ -34,8 +34,10 @@ Context 可包含 Quote、Position、Portfolio 历史、Indicators、Chip、Perf
 
 ## 通知治理
 
-`info`、`warning`、`error` 和 `critical` 可分别路由到 Provider。未配置专用渠道时使用显式 fallback。静默时段使用 IANA timezone，支持跨午夜；是否允许 `critical` 穿透由策略决定。相同事件和渠道按 cooldown 去重。
+通知模块从启用、可解密且具备适配器的 Provider 配置中确定可投递候选；当前支持飞书。风险通知的 `NotificationRoutingPreference` 以 `risk-event` 为作用域保存提供方名称，多选设置由 `GET/PUT /notifications/routing/risk` 读写；未设置时按优先级升序、名称升序选择第一家。已保存但失效的选择保留意图，不静默更换。其它通知主题和 `GET /notifications/routing` 保持每渠道优先选一家；其它主题的入队事务以渠道身份加锁并复用已有投递，提供方优先级变化不重开旧记录。
+
+风险多选在同一数据库事务内按提供方分别创建 outbox 记录，`dedupKey/channel/provider` 保证幂等，额外提供方独立冷却；原优先路由兼容既有渠道冷却键。任一入队失败回滚整批并释放本批冷却占用。静默时段及 `critical` 穿透沿用通知策略。设置变更只影响后续风险通知，已入队记录继续按冻结的提供方名称解析，历史消息、状态与目标不改写。
 
 可重试错误按 backoff 继续发送，永久错误立即进入 `failed`，每次尝试及最终状态均写入 `NotificationDelivery`。通知排队或发送失败不得回滚已经保存的 `RiskEvent`。低优先级事件可以聚合为日报，但单条事件仍须保留。
 
-运维排查时先查询事件是否已落库，再检查通知状态、`attemptCount`、`errorCode`、`lastError` 与 Provider 配置。Webhook 地址只能通过环境变量提供，不得写入日志、数据库快照或客户端。
+运维排查时先查询事件是否已落库，再检查通知状态、`attemptCount`、`errorCode`、`lastError` 与 Provider 配置。Webhook 凭据由 Provider 配置加密保存，不得返回客户端或写入普通日志；路由响应只返回名称、渠道与优先级。产品选择和验收合同见[风险通知提供方多选](../specs/2026-11-07-risk-notification-providers.md)。

@@ -4,6 +4,8 @@
 
 ## 系统与接口架构
 
+- [API 成本分类与限流](2026-11-07-api-rate-limits.md)
+
 - [DSA 能力与主仓边界审计摘要](2026-08-18-dsa-capability-audit.md)
 - [DSA Fork 与上游边界](2026-08-18-dsa-upstream.md)
 - [市场数据与标的中心 v1.2 实施说明（已归档）](2026-08-18-market-data-provider-v1-2-implementation.md)

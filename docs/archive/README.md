@@ -1,5 +1,27 @@
 # 历史文档归档
 
+- [富途与 HiThink 筹码账号核查](tasks/2026-11-09-chip-provider-expansion.md)：当前 Key／OpenD 条件核查完成；HiThink 筹码拒绝外部读取、富途 REST 缺独立认证，用户暂不新增认证，因此未触发新来源接入，详见[DSA 证据](../../../daily-stock-analysis/docs/evidence/2026-11-09-chip-provider-accounts.md)。
+
+- 2026-11-08 [行情日期区间](tasks/2026-11-08-chart-date-ranges.md)：七类区间、自定义日期、按需历史、四宽和真实基金三年读取已验收；[验证记录](evidence/2026-11-08-chart-date-ranges.md)保留来源覆盖及本地运行边界。
+
+- 2026-11-07 [已保存策略回测入口](tasks/2026-11-07-saved-strategy-backtest.md)：自动复用策略与市场规则、直接提交及高级选项分组已验收；[验证记录](evidence/2026-11-07-saved-strategy-backtest.md)区分受控成功与当前真实规则来源阻塞。
+
+- 2026-11-07 [风险权重按规则校验](tasks/2026-11-07-risk-weight-validation.md)：真实比例、规则输入检查及扫描中文反馈已验收；[验证记录](evidence/2026-11-07-risk-weight-validation.md)保留 1670 项 Desktop 测试、正式快更及四宽运行态边界。
+
+- 2026-11-07 [全接口按成本限流](tasks/2026-11-07-api-cost-rate-limits.md)：328 项操作分类、可信主体和独立预算、6240 次受控 HTTP、四宽真实浏览及维护同步验收完成；[验证记录](evidence/2026-11-07-api-cost-rate-limits.md)。
+
+- 2026-11-07 [策略读取限流修复](tasks/2026-11-07-strategy-read-rate-limit.md)：读取分类、有界恢复、维护入口同步与四宽实际页面验收完成；[验证记录](evidence/2026-11-07-strategy-read-rate-limit.md)。
+
+- 2026-11-07 [风险通知提供方多选](tasks/2026-11-07-risk-notification-providers.md)：持久化多选、最高优先级默认、独立投递与历史兼容、保留数据升级及四宽实际页面验收完成；[验证记录](evidence/2026-11-07-risk-notification-providers.md)。
+
+- [Desktop 列表表头统一](tasks/2026-11-07-desktop-table-headers.md)：34 处表头共用展示合同，1652 项测试、构建及四宽双主题浏览器通过；[验收记录](evidence/2026-11-07-desktop-table-headers.md)区分真实读取与受控快照。
+
+- [自选日内分时](tasks/2026-11-07-watchlist-intraday-line.md)：复用分钟行情、缺口断线及简要区间读数；[验收记录](evidence/2026-11-07-watchlist-intraday-line.md)区分 26 项测试、四宽 40 场景与真实分钟来源状态。
+
+- [自选图表与行情信息密度](tasks/2026-11-07-watchlist-chart-density.md)：默认日 K 线、日内区间参考价图形及精简来源提示；[验收记录](evidence/2026-11-07-watchlist-chart-density.md)保留 36 项定向测试、四宽 40 场景与真实页面结果。
+
+- [基金净值账户成交标记](tasks/2026-11-07-fund-nav-trade-markers.md)：净值日期买卖点、精确成交明细、当前账户隔离完成；[验收记录](evidence/2026-11-07-fund-nav-trade-markers.md)保留 54 项定向测试、四宽实际浏览器及只读真实接口证据。
+
 本轮目录及归档依据见[三仓整理记录](reviews/2026-11-05-three-repository-documentation.md)；已结案报告见 [reviews/](reviews/)，被替代合同见 [specs/](specs/)，完成任务见 [tasks/](tasks/)。当前执行以[任务索引](../tasks/README.md)为准。
 
 - 2026-11-07 [风险阈值精度](tasks/2026-11-07-risk-threshold-precision.md)完成比例单位合同、两端原值提交及非零摘要；Domain 499、Desktop 1389、Mobile 193 项、构建、门禁与四宽 16 组浏览器通过，[当轮共享集成证据](evidence/2026-11-07-risk-threshold-precision.md)保留当轮输入与验证范围。
@@ -157,3 +179,29 @@
 - [自然语言策略编写流程展示](tasks/2026-11-07-authoring-workflow-ui.md)：三阶段、结果应用、草稿操作与实际定义层级；25 项定向测试、1635 项 Desktop 回归及五宽浏览器验收，详见[证据](../evidence/2026-11-07-authoring-workflow-ui.md)。
 
 - [竞技场与周报详情刷新反馈](tasks/2026-11-07-arena-detail-refresh.md)：相关请求等待、保留旧结果和刷新入口已验收；冻结 Desktop 1629 项、Mobile 231 项及 100 个基线/当前浏览器场景通过。[本轮验收证据](../evidence/2026-11-07-arena-detail-refresh.md)继续供活动任务使用，并单独保存主工作区并行差异。
+
+- [普通回测研究默认规则](tasks/2026-11-07-backtest-research-defaults.md)：用户确认的研究假设已接通，截图区间真实模型解析可用，四宽 24 组检查通过；[验收证据](evidence/2026-11-07-backtest-research-defaults.md)区分模型准备、真实准入和受控提交。
+
+- [回测提交后的任务页导航](evidence/2026-11-07-backtest-submit-navigation.md)：提交成功进入回测任务，失败保留配置并支持重试；51 项定向验证及四宽浏览器通过。
+
+- [回测准备失败任务](tasks/2026-11-08-backtest-preparation-failure-jobs.md)：准备及预检失败进入任务列表与详情；已有阻塞记录只读原请求后幂等关联，四宽 12 组验证通过，详见[验收证据](evidence/2026-11-08-backtest-preparation-failure-jobs.md)。
+
+- [策略版本关联记录](tasks/2026-11-08-strategy-version-records.md)：两个页签直接显示当前版本的回测与实验，1697 项 Desktop 测试及四宽 28 组检查通过，见[验收证据](evidence/2026-11-08-strategy-version-records.md)。
+
+- [基金净值参考与测量](tasks/2026-11-08-fund-nav-reference-measurement.md)：成本可见性、双点蒙层、取消与账户隔离完成，四宽浏览器及真实持仓通过，详见[验收记录](evidence/2026-11-08-fund-nav-reference-measurement.md)。
+
+- [行情常用选项](tasks/2026-11-08-common-chart-choices.md)：周期四项、区间三项直接显示，其余使用更多菜单；197 项测试及两套四宽浏览器验收通过，详见[验收记录](evidence/2026-11-08-common-chart-choices.md)。
+
+- [行情工具栏加载稳定性](tasks/2026-11-08-chart-toolbar-stability.md)：周期能力分批返回时保持分组位置和行数，两套四宽浏览器通过，详见[验收记录](evidence/2026-11-08-chart-toolbar-stability.md)。
+
+- [行情参考工具区布局](evidence/2026-11-08-chart-reference-tools.md)：模型与测量共用展开区，图表前统一留白；197 项回归及四宽实际浏览器通过。
+
+- [行情图标说明](tasks/2026-11-08-chart-info-tips.md)：共享提示用于账户与行情，199 项回归及四宽浏览器通过，详见[验收记录](evidence/2026-11-08-chart-info-tips.md)。
+
+- [MACD 图层遮挡](tasks/2026-11-08-macd-series-layering.md)：柱体置于 DIF、DEA 下方；197 项回归、四宽原生画布及副图恢复验证通过，详见[验收记录](evidence/2026-11-08-macd-series-layering.md)。
+
+- [统一市场开闭市状态](tasks/2026-11-09-unified-market-session.md)：报价、基金、调度、后台报价、风险与采样接入同一日历，项目规则及边界门禁落地，详见[验收记录](evidence/2026-11-09-unified-market-session.md)。
+
+- [严格校验与对象投影排查](tasks/2026-11-09-schema-projection-audit.md)：330 个生产校验调用及关联消费路径排查，修复复盘请求及三个多窗口消费者，详见[验收记录](evidence/2026-11-09-schema-projection-audit.md)。
+
+- [模型筛选选中态](evidence/2026-11-09-arena-model-selection.md)：共享单选组、模型请求与点位同步、四宽浏览器验证，以及实际零成交和筹码来源未配置的核对。

@@ -1,5 +1,6 @@
 # 当前实施任务
 
+
 最近核对：2026-11-05。此页只维护阅读顺序、任务入口与接续条件；任务的具体状态、授权及证据以各 Task 为准。原阶段汇报已保存在[历史摘录](../archive/reviews/2026-11-05-task-index-history.md)。
 
 <a id="priority-policy"></a>
@@ -15,6 +16,8 @@
 ## P0：现有正确性修复
 
 
+
+
 - [收益趋势粒度与读取反馈](2026-11-06-performance-trend-feedback.md)：代码与受控浏览器验收完成，目标运行态更新状态见 Task。
 
 桌面展示与编辑一致性修复及补充窄屏复核已完成，见[归档任务](../archive/tasks/2026-11-05-desktop-presentation-consistency.md)。后台风险估值、指标可见性及收益/目标保存修复已完成并[归档](../archive/README.md)，其产品规格继续有效。历史运行证据不能替代新增场景的验收。
@@ -25,6 +28,7 @@
 
 | 唯一任务入口 | 当前验收状态 |
 | --- | --- |
+| [多来源分钟与小时行情接入](2026-11-07-market-intraday-sources.md) | 策略 192 生效，七家来源及中港美 30 条原生周期路由已补齐；外部阻塞和既有全仓门禁保留，见 Task。 |
 | [统一数据能力适配层](2026-10-09-unified-data-capability-adapter.md) | H07-K37-event-batches / H07-K37e-live：Tushare 真实现金正向消费；当前账号权限和原准入条件未满足，保留未通过记录，条件不变不重试。RQData 后续范围由 TODO 持有。 |
 | [单只基金盘中估值](2026-11-04-fund-intraday-valuation.md) | G2.2已通过：11-06真实分钟与同日正式净值误差完成，保持39.93%低覆盖；任务按原要求保留，见[最终证据](../evidence/2026-11-06-fund-same-day-error.md)。 |
 
@@ -84,3 +88,5 @@
 
 
 - [自然语言策略编写流程展示](../archive/tasks/2026-11-07-authoring-workflow-ui.md)：三阶段展示、恢复菜单与审核保护已完成；五宽浏览器与分层证据见归档任务。
+
+- [普通回测研究默认规则](../archive/tasks/2026-11-07-backtest-research-defaults.md)：默认模型、截图标的真实解析、四宽受控提交已验收。
