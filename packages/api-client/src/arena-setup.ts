@@ -6,10 +6,11 @@ import {
   type WatchlistPage,
 } from '@thesis-ledger/schemas';
 import type { ThesisLedgerApiClient } from './index.js';
+import { arenaSetupDateOrderFields, arenaSetupIssueFields, ArenaSetupValidationError, type ArenaSetupErrors } from './arena-setup-validation.js';
 export const arenaSetupFields = [
   ['title', '比赛名称', ''],
-  ['startsOn', '开始日期（YYYY-MM-DD）', ''],
-  ['endsOn', '结束日期（YYYY-MM-DD）', ''],
+  ['startsOn', '开始日期', ''],
+  ['endsOn', '结束日期', ''],
   ['initialCash', '每个模型的模拟本金', '100000'],
   ['maxPositionBps', '单标的仓位上限（万分比）', '5000'],
   ['buyBps', '买入费率（万分比）', '0'],
@@ -80,7 +81,7 @@ export function arenaMerge(pool: ArenaChoice[], items: ArenaChoice[]) {
     throw Error('同场比赛请选择同一市场的标的');
   return merged;
 }
-export async function copyArenaGroup(api: ThesisLedgerApiClient, group: string) {
+export async function copyArenaGroup(api: ThesisLedgerApiClient, group: string, onInstrument?: (symbol: string, name: string) => void) {
   let offset: number | null = 0,
     revision: number | undefined;
   const result: ArenaChoice[] = [];
@@ -96,6 +97,7 @@ export async function copyArenaGroup(api: ThesisLedgerApiClient, group: string) 
         symbol: i.instrument.canonicalCode + '.' + i.instrument.market,
       });
       if (!item) throw Error('分组包含未启用或不支持模拟交易的标的');
+      onInstrument?.(item.symbol, i.displayName);
       result.push(item);
     }
     if (result.length > 50) throw Error('分组超过单场标的上限');
@@ -105,19 +107,17 @@ export async function copyArenaGroup(api: ThesisLedgerApiClient, group: string) 
 }
 const integer = (n: string) => (/^\d+$/.test(n) ? Number(n) : NaN);
 function micros(value: string) {
-  if (!/^(0|[1-9]\d*)(\.\d{1,6})?$/.test(value)) throw Error('模型费用须为非负金额，最多六位小数');
+  if (!/^(0|[1-9]\d*)(\.\d{1,6})?$/.test(value)) return NaN;
   const [units, decimal = ''] = value.split('.');
   return Number(units) * 1000000 + Number(decimal.padEnd(6, '0'));
 }
-export async function saveArenaSetup(
-  api: ThesisLedgerApiClient,
+export function validateArenaSetup(
   f: ArenaForm,
   instruments: ArenaChoice[],
   models: ArenaBinding[],
   budgetCurrency: ArenaProtocol['budgetCurrency'],
 ) {
-  if (!instruments[0] || models.length < 2) throw Error('请选择标的及至少两个参赛模型');
-  const market = arenaChoiceMarket(instruments[0].symbol);
+  const market = instruments[0] ? arenaChoiceMarket(instruments[0].symbol) : 'CN';
   const currency = { CN: 'CNY', HK: 'HKD', US: 'USD' }[market];
   const raw = {
     version: 1,
@@ -163,11 +163,19 @@ export async function saveArenaSetup(
     calendarId: market,
     calendarVersion: 'preview',
   });
-  if (!checked.success) throw Error('请核对赛期、费用、额度、仓位和模型上限');
+  if (!checked.success) return { success: false as const, errors: { ...arenaSetupIssueFields(checked.error.issues, false), ...arenaSetupDateOrderFields(f.startsOn, f.endsOn) } };
+  return { success: true as const, protocol: checked.data, errors: {} as ArenaSetupErrors };
+}
+export async function saveArenaSetup(
+  api: ThesisLedgerApiClient, f: ArenaForm, instruments: ArenaChoice[], models: ArenaBinding[], budgetCurrency: ArenaProtocol['budgetCurrency'],
+) {
+  const result = validateArenaSetup(f, instruments, models, budgetCurrency);
+  if (!result.success) throw new ArenaSetupValidationError(result.errors);
+  const checked = result.protocol;
   const calendar = await api.modelArenas.calendar({
-    market,
-    startsOn: f.startsOn,
-    endsOn: f.endsOn,
+    market: checked.market,
+    startsOn: checked.startsOn,
+    endsOn: checked.endsOn,
   });
-  return api.modelArenas.create({ ...checked.data, ...calendar });
+  return api.modelArenas.create({ ...checked, ...calendar });
 }

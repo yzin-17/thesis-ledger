@@ -1,0 +1,8 @@
+BEGIN;
+CREATE TABLE "ArenaLiveTimeline" (
+  "matchId" UUID PRIMARY KEY REFERENCES "ArenaLiveMatch"("id") ON DELETE CASCADE,
+  "clock" JSONB NOT NULL,
+  "revision" INTEGER NOT NULL DEFAULT 0 CHECK ("revision" >= 0),
+  "updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+COMMIT;

@@ -32,6 +32,13 @@ const baseInput = (overrides: Partial<BacktestAnalyticsInput> = {}): BacktestAna
 });
 
 describe('V2 backtest analytics', () => {
+  it('无平仓时保留期末市值收益，交易指标不可用不降低行情完整性', () => {
+    const result = buildBacktestAnalytics(baseInput({ trades: [], turnover: '0' }));
+    expect(result.completeness).toBe('complete');
+    expect(result.metrics.totalReturn).toMatchObject({ status: 'available', value: '0.35' });
+    expect(result.metrics.winRate).toEqual({ status: 'unavailable', reason: 'NO_CLOSED_TRADES' });
+    expect(result.metrics.profitFactor).toEqual({ status: 'unavailable', reason: 'NO_CLOSED_TRADES' });
+  });
   it('builds Decimal equity/drawdown curves and core return risk metrics', () => {
     const result = buildBacktestAnalytics(baseInput());
     expect(result.completeness).toBe('partial');
@@ -174,6 +181,9 @@ describe('V2 backtest analytics', () => {
     });
   });
 
+});
+
+describe("基准未验证、成本与可复现性", () => {
   it('leaves an explicit benchmark unverified when its identity is missing', () => {
     const result = buildBacktestAnalytics(
       baseInput({

@@ -39,7 +39,7 @@ export type UpgradeDataWitness = {
   tables: Array<Descriptor[number] & { sha256: string; rows: number }>;
 };
 
-/** 在无业务写入的隔离副本上调用；仅返回摘要，不输出业务记录。SchemaVersion 单独核验。 */
+/** 在无业务写入的副本或消费者已停止的源库上调用；仅返回摘要，SchemaVersion单独核验。 */
 export async function captureUpgradeDataWitness(
   container: string,
   target: DatabaseExecutionTarget,

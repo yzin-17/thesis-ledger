@@ -267,6 +267,9 @@ describe('CnNavSimulation', () => {
     });
   });
 
+});
+
+describe("NAV 确认、可用份额与赎回交收", () => {
   it('rejects confirmation, share and cash events that occur before their source is known', () => {
     const simulation = new CnNavSimulation(config());
     const events = subscriptionEvents();
@@ -418,6 +421,9 @@ describe('CnNavSimulation', () => {
     });
   });
 
+});
+
+describe("NAV 取消与事件重放", () => {
   it('cancels a pending request once and rejects unsupported NAV instruments', () => {
     const simulation = new CnNavSimulation(config());
     expect(simulation.submitRequest(request('cancel-1'))).toMatchObject({ applied: true });

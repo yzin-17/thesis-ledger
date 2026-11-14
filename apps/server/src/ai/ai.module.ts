@@ -1,4 +1,6 @@
 import { MarketModule } from '../market/market.module.js';
+import { DsaModule } from '../integration/dsa/dsa.module.js';
+import { ResearchPublicSearch } from './research-public-search.js';
 import { Module } from '@nestjs/common';
 import { AiProviderValidationJournal } from './ai-provider-validation-journal.js';
 import { AiProviderSaveService } from './ai-provider-save.service.js';
@@ -25,9 +27,10 @@ import { AiAdaptiveExecution } from './adaptive/ai-adaptive-execution.js';
 import { RedisAdaptiveObservationStore } from './adaptive/ai-adaptive-history.store.js';
 
 @Module({
-  imports: [ProviderModule, MarketModule],
+  imports: [ProviderModule, MarketModule, DsaModule],
   controllers: [AiController, AiProviderController, AiSettingsController],
   providers: [
+    ResearchPublicSearch,
     AiResearchReportsQuery,
     AiRunService,
     AiExecutionStateStore,
@@ -69,6 +72,7 @@ import { RedisAdaptiveObservationStore } from './adaptive/ai-adaptive-history.st
     AiResearchExecutor,
   ],
   exports: [
+    ResearchPublicSearch,
     AiResearchReportsQuery,
     AiRunService,
     AiExecutionStateStore,
@@ -79,6 +83,7 @@ import { RedisAdaptiveObservationStore } from './adaptive/ai-adaptive-history.st
     PromptVersionRegistry,
     AiResearchExecutor,
     AiProviderService,
+    AiRoutingSettingsService,
   ],
 })
 export class AiModule {}

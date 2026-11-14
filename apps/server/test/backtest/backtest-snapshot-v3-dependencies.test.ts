@@ -335,6 +335,9 @@ describe('Snapshot V3 dependency artifacts', () => {
     );
   });
 
+});
+
+describe("标的身份、模型范围与依赖能力", () => {
   it('rejects wrong instrument identity, future facts, and missing historical tradability', async () => {
     const input = inputFor();
     const wrongIdentity = instrumentFactsResponse({
@@ -449,6 +452,9 @@ describe('Snapshot V3 dependency artifacts', () => {
     );
   });
 
+});
+
+describe("冻结快照离线防篡改", () => {
   it('rejects tampered fact rows and altered coverage proof during offline validation', async () => {
     const input = inputFor();
     const result = await collectSnapshotDependenciesV3(input, dsaFixture());

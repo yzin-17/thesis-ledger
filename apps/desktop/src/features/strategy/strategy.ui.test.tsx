@@ -63,10 +63,10 @@ describe('策略实验工作台 UI 契约', () => {
     expect(source).not.toContain("from 'lucide-react'");
   });
 
-  it('回测弹窗说明后台准备行情与任务进度位置', () => {
+  it('回测弹窗说明提交完成后的任务列表入口', () => {
     const source = readFileSync(new URL('./BacktestSetupDialog.tsx', import.meta.url), 'utf8');
 
-    expect(source).toContain('提交后将在后台准备行情并启动任务，进度可在回测任务中查看。');
+    expect(source).toContain('提交完成后自动前往回测任务列表查看进度。');
     expect(source).toContain('grid-rows-[auto_minmax(0,1fr)_auto]');
     expect(source).toContain('<StrategyV2Summary');
     expect(source).toContain('<BacktestPricePreparation');
@@ -115,6 +115,9 @@ describe('策略实验工作台 UI 契约', () => {
     expect(readyHtml).toContain('title="未配置标的 · 这是一段足够长的策略描述');
   });
 
+});
+
+describe('回测任务状态与失败恢复', () => {
   it('任务表使用中文状态、运行进度和可重试操作', () => {
     expect(jobStatusLabel('queued')).toBe('排队中');
     expect(jobStatusLabel('unknown')).toBe('未知状态（unknown）');
@@ -205,6 +208,9 @@ describe('策略实验工作台 UI 契约', () => {
     expect(html).not.toContain('创建策略');
   });
 
+});
+
+describe('策略编辑与结果完整性', () => {
   it('编辑 Schema 会同步父策略名称，执行标的来自当前合同', () => {
     const editedSchema = schemaFromVersion(version, strategy.name);
     expect(editedSchema.name).toBe(strategy.name);
@@ -241,6 +247,9 @@ describe('策略实验工作台 UI 契约', () => {
     expect(completenessLabel('partial')).toBe('部分完整');
   });
 
+});
+
+describe('回测及新建策略输入边界', () => {
   it('回测配置拒绝反向日期和非正资金', () => {
     expect(
       validateBacktestSetup({
@@ -255,7 +264,7 @@ describe('策略实验工作台 UI 契约', () => {
 
   it('新建策略使用当前合同且不预填标的，比例显示与存储转换一致', () => {
     const emptySchema = createDefaultStrategySchema();
-    expect(emptySchema.schemaVersion).toBe('2');
+    expect(emptySchema.schemaVersion).toBe('3');
     expect(emptySchema.description).toContain('示例规则');
     expect(schemaSymbols(emptySchema)).toEqual([]);
     expect(strategySchema.safeParse(emptySchema).success).toBe(false);

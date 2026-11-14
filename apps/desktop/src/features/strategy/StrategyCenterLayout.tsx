@@ -8,7 +8,6 @@ const entries = [
   { value: 'library', to: '/strategy/library', label: '策略库' },
   { value: 'jobs', to: '/strategy/jobs', label: '回测任务' },
   { value: 'experiments', to: '/strategy/experiments', label: 'AI 实验' },
-  {value:'arena',to:'/strategy/arena',label:'模型竞技场'},
 ] as const;
 
 export function StrategyCenterLayout({

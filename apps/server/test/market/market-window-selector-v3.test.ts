@@ -182,10 +182,14 @@ describe('未知上市信息的行情窗口读取', () => {
         if (mode === 'price') response.bars[0]!.close = -1;
         return response;
       });
-      const result = await selectMarketWindowV3(makeInput({
-        read,
-        ...(mode === 'warmup' ? { warmup: { analysisStart: '2026-05-20', minimumSessions: 3 } } : {}),
-      }));
+      const result = await selectMarketWindowV3(
+        makeInput({
+          read,
+          ...(mode === 'warmup'
+            ? { warmup: { analysisStart: '2026-05-20', minimumSessions: 3 } }
+            : {}),
+        }),
+      );
       if (mode === 'complete') {
         expect(result.status).toBe('selected');
       } else {
@@ -200,41 +204,105 @@ describe('未知上市信息的行情窗口读取', () => {
 });
 
 describe('market window selector V3', () => {
-  it.each([true, false])('共同价格来源免证明回退只对固定价格研究启用（%s）', async (priceResearch) => {
-    const policies = makePolicies();
-    const targets = [
-      { providerId: 'hithink', upstreamSource: 'fund-market-historical' },
-      { providerId: 'tencent', upstreamSource: 'tencent' },
-    ];
-    policies.desired.routes[0]!.targets = targets;
-    policies.effective.routes[0]!.targets = targets.map((target, routeIndex) => ({
-      ...target, routeIndex, eligible: true, reason: null,
-    }));
-    policies.catalog.entries = targets.map((target) => ({ key: routeKey, target, state: 'ready' as const, barQuery: barQueryFixture(routeKey.adjustment) }));
-    const read = vi.fn(async ({ request, target, routeIndex }: MarketWindowReadRequestV3) => {
-      if (routeIndex === 0) throw new Error('主源故障');
-      return makeResponse(request, target, routeIndex);
-    });
-    const result = await selectMarketWindowV3(makeInput({ ...policies, priceResearch, read }));
-    if (priceResearch) {
-      expect(result).toMatchObject({ status: 'selected', source: 'backup', target: targets[1] });
-      expect(read).toHaveBeenCalledTimes(2);
-    } else {
-      expect(result).toMatchObject({ status: 'unavailable', reason: 'incompatible_backup' });
-      expect(read).toHaveBeenCalledTimes(1);
+  it.each(['none', 'hfq'] as const)('成对研究的 %s 严格使用路由内来源', async (adjustment) => {
+    for (const mode of ['backup', 'missing', 'unready', 'failure', 'strict']) {
+      const policies = makePolicies();
+      const rawKey = { ...routeKey, adjustment };
+      policies.desired.routes[0]!.key = rawKey;
+      policies.effective.routes[0]!.key = rawKey;
+      for (const entry of policies.catalog.entries) entry.key = rawKey;
+      if (mode === 'unready') policies.effective.routes[0]!.targets[1]!.eligible = false;
+      const before = structuredClone(policies);
+      const read = vi.fn(async ({ request, target, routeIndex }: MarketWindowReadRequestV3) => {
+        if (mode === 'failure') throw Error('原价同源目标失败');
+        return makeResponse(request, target, routeIndex, {
+          priceBasis: { ...responseTemplate.sourcePriceBasis, adjustment },
+        });
+      });
+      const result = await selectMarketWindowV3(
+        makeInput({
+          ...policies,
+          routeKey: rawKey,
+          priceResearch: mode !== 'strict',
+          requiredSource:
+            mode === 'missing'
+              ? { providerId: 'unconfigured', upstreamSource: 'unconfigured' }
+              : backupTarget,
+          read,
+        }),
+      );
+      if (mode === 'backup') {
+        expect(result).toMatchObject({
+          status: 'selected',
+          source: 'backup',
+          target: backupTarget,
+          routeIndex: 1,
+        });
+        expect(read).toHaveBeenCalledOnce();
+        expect(read).toHaveBeenCalledWith(
+          expect.objectContaining({ target: backupTarget, routeIndex: 1 }),
+        );
+      } else {
+        expect(result.status).toBe('unavailable');
+        expect(read).toHaveBeenCalledTimes(mode === 'failure' ? 1 : 0);
+      }
+      expect(policies).toEqual(before);
     }
   });
+  it.each([true, false])(
+    '共同价格来源免证明回退只对固定价格研究启用（%s）',
+    async (priceResearch) => {
+      const policies = makePolicies();
+      const targets = [
+        { providerId: 'hithink', upstreamSource: 'fund-market-historical' },
+        { providerId: 'tencent', upstreamSource: 'tencent' },
+      ];
+      policies.desired.routes[0]!.targets = targets;
+      policies.effective.routes[0]!.targets = targets.map((target, routeIndex) => ({
+        ...target,
+        routeIndex,
+        eligible: true,
+        reason: null,
+      }));
+      policies.catalog.entries = targets.map((target) => ({
+        key: routeKey,
+        target,
+        state: 'ready' as const,
+        barQuery: barQueryFixture(routeKey.adjustment),
+      }));
+      const read = vi.fn(async ({ request, target, routeIndex }: MarketWindowReadRequestV3) => {
+        if (routeIndex === 0) throw new Error('主源故障');
+        return makeResponse(request, target, routeIndex);
+      });
+      const result = await selectMarketWindowV3(makeInput({ ...policies, priceResearch, read }));
+      if (priceResearch) {
+        expect(result).toMatchObject({ status: 'selected', source: 'backup', target: targets[1] });
+        expect(read).toHaveBeenCalledTimes(2);
+      } else {
+        expect(result).toMatchObject({ status: 'unavailable', reason: 'incompatible_backup' });
+        expect(read).toHaveBeenCalledTimes(1);
+      }
+    },
+  );
 
   it.each([true, false])('多窗口二次解析要求明确能力（%s）并保留子响应', async (supported) => {
-    const golden = fixture('market-data-v3.multi-window-hash.json') as { response: MarketDataMultiWindowResponseV3 };
+    const golden = fixture('market-data-v3.multi-window-hash.json') as {
+      response: MarketDataMultiWindowResponseV3;
+    };
     const response = golden.response;
-    const readCapabilities = vi.fn(async () => ({ dataContractVersions: [3] as [3], serviceCapabilities: { fundNav: true as const },
-      ...(supported ? { multiWindowProtocols: ['market-multi-window-content-v1' as const] } : {}) }));
+    const readCapabilities = vi.fn(async () => ({
+      dataContractVersions: [3] as [3],
+      serviceCapabilities: { fundNav: true as const },
+      ...(supported ? { multiWindowProtocols: ['market-multi-window-content-v1' as const] } : {}),
+    }));
     const read = vi.fn(async ({ request, target, routeIndex }: MarketWindowReadRequestV3) => {
       response.requestId = request.requestId;
       response.provenance = { ...target, routeIndex, effectivePolicyRevision: 12 };
-      for (const child of response.windowObservations) child.response.provenance = response.provenance;
-      const hash = createHash('sha256').update(canonicalMarketMultiWindowEncodingV3(response)).digest('hex');
+      for (const child of response.windowObservations)
+        child.response.provenance = response.provenance;
+      const hash = createHash('sha256')
+        .update(canonicalMarketMultiWindowEncodingV3(response))
+        .digest('hex');
       response.inputFingerprint = hash;
       response.sourcePriceBasis.revision = { origin: 'local-observation', contentHash: hash };
       return response;
@@ -244,6 +312,9 @@ describe('market window selector V3', () => {
     expect(result.status).toBe(supported ? 'selected' : 'unavailable');
     if (result.status === 'selected') expect(result.response).toEqual(response);
   });
+});
+
+describe("完整主来源与有证据的备用窗口", () => {
   it('accepts a complete primary response and validates actual provenance', async () => {
     const read = vi.fn(async ({ request, target, routeIndex }: MarketWindowReadRequestV3) =>
       makeResponse(request, target, routeIndex),
@@ -362,10 +433,16 @@ describe('market window selector V3', () => {
     expect(read).toHaveBeenCalledTimes(1);
   });
 
+});
+
+describe("覆盖诊断、身份和修订门禁", () => {
   it('distinguishes pre-listing, missing-window, and insufficient-warmup diagnostics', async () => {
     const preListingRead = vi.fn(async (input: MarketWindowReadRequestV3) => {
       const response = makeResponse(input.request, input.target, input.routeIndex);
-      response.coverageProof.listing = { ...response.coverageProof.listing, firstTradingDate: '2026-05-21' };
+      response.coverageProof.listing = {
+        ...response.coverageProof.listing,
+        firstTradingDate: '2026-05-21',
+      };
       return response;
     });
     const preListing = await selectMarketWindowV3(makeInput({ read: preListingRead }));

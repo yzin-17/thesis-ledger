@@ -3,6 +3,7 @@ import {
   backtestRunListReadSchema,
   backtestRunIdReadSchema,
   backtestRunCreateSchemaV3,
+  backtestInstrumentSeriesSchema,
   type BacktestRunCreateV3,
 } from '@thesis-ledger/schemas';
 import type { ParsedRequest, ParsedPost } from './parsed-request.js';
@@ -27,6 +28,8 @@ export const backtestRunClient = (request: ParsedRequest, post: ParsedPost) => {
     },
     getRun: (runId: string, signal?: AbortSignal) =>
       request(path(runId), bound(runId), signal ? { signal } : undefined),
+    getInstrumentSeries: (runId: string, signal?: AbortSignal) =>
+      request(`${path(runId)}/instrument-series`, backtestInstrumentSeriesSchema.refine((series) => series.runId === runId), signal ? { signal } : undefined),
     cancelRun: (runId: string, signal?: AbortSignal) =>
       post(`${path(runId)}/cancel`, {}, bound(runId), signal),
     retryRun: (runId: string, signal?: AbortSignal) =>

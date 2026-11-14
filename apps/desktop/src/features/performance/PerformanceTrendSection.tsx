@@ -139,6 +139,95 @@ export function PerformanceSnapshotTable({
 }) {
   const visibleSnapshots = useMemo(() => snapshotsForRange(snapshots, range), [snapshots, range]);
   const seriesPoints = series?.points ?? [];
+  const { groups, chartLoading, missingPnl, pnlReasons } = snapshotChartMaterials(
+    visibleSnapshots,
+    groupedByCurrency,
+    pnl,
+    refreshing,
+    loadState,
+  );
+  const content = snapshotChartContent({
+    groups,
+    seriesPoints,
+    interval,
+    pnl,
+    chartLoading,
+    loadState,
+    snapshots,
+    series,
+    onCompleteDataSetup,
+  });
+
+  return (
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="m-0 text-xl font-semibold tracking-tight">
+            {pnl ? '资产总值与累计盈亏' : '资产走势'}
+          </h2>
+          <details className="mt-1 text-xs text-muted-foreground">
+            <summary className="cursor-pointer">计算口径</summary>
+            <p className="mt-2">
+              资产取周期末有效估值。
+              {pnl ? '盈亏为收盘记录与当前估值。' : ''}
+            </p>
+          </details>
+        </div>
+        <PerformanceTrendControls
+          mode={mode}
+          range={range}
+          interval={interval}
+          series={series}
+          onRangeChange={onRangeChange}
+          onIntervalChange={onIntervalChange}
+        />
+      </div>
+      {loadState !== 'ready' && loadState !== 'empty' && loadState !== 'loading' ? (
+        <DataStateBanner
+          state="error"
+          title="资产走势读取失败"
+          description={
+            loadState === 'stale'
+              ? '刷新失败，当前保留上次读取的估值数据。'
+              : '暂时无法读取资产走势，请重新加载。'
+          }
+          onRetry={onRetry}
+        />
+      ) : null}
+      {pnl?.error && (
+        <DataStateBanner
+          state="error"
+          title="历史盈亏读取失败"
+          description="暂时无法读取历史盈亏，已保留可用数据。"
+          onRetry={pnl.onRetry}
+        />
+      )}
+      <ListRefreshRegion
+        refreshing={chartLoading}
+        label={pnl?.loading ? '正在读取盈亏历史' : '资产走势加载中'}
+      >
+        {content}
+      </ListRefreshRegion>
+      {showAssetEmptyAlongsidePnl(pnl, seriesPoints, visibleSnapshots, loadState) && (
+        <EmptyTrend
+          hasHistory={snapshots.length > 0 || series !== undefined}
+          onCompleteDataSetup={onCompleteDataSetup}
+        />
+      )}
+      {pnl && <SnapshotPnlNotes pnl={pnl} missingPnl={missingPnl} pnlReasons={pnlReasons} />}
+    </section>
+  );
+}
+
+type SnapshotTableProps = Parameters<typeof PerformanceSnapshotTable>[0];
+type SnapshotPnl = NonNullable<SnapshotTableProps['pnl']>;
+function snapshotChartMaterials(
+  visibleSnapshots: SnapshotRecord[],
+  groupedByCurrency: boolean,
+  pnl: SnapshotPnl | undefined,
+  refreshing: boolean | undefined,
+  loadState: SnapshotTableProps['loadState'],
+) {
   const groups = new Map<string, SnapshotRecord[]>();
   if (groupedByCurrency) {
     for (const snapshot of visibleSnapshots) {
@@ -150,13 +239,35 @@ export function PerformanceSnapshotTable({
   }
   if (groupedByCurrency && pnl && pnl.points.length > 0 && !groups.has(pnl.currency))
     groups.set(pnl.currency, []);
-  const chartLoading = Boolean((refreshing ?? (loadState === 'loading')) || pnl?.loading);
+  const chartLoading = Boolean((refreshing ?? loadState === 'loading') || pnl?.loading);
   const missingPnl = pnl?.points.filter((point) => point.value === null) ?? [];
   const pnlReasons = [
     ...new Set(
       missingPnl.flatMap((point) => (point.reason ? [pnlReasonLabels[point.reason]] : [])),
     ),
   ];
+
+  return { groups, chartLoading, missingPnl, pnlReasons };
+}
+function snapshotChartContent({
+  groups,
+  seriesPoints,
+  interval,
+  pnl,
+  chartLoading,
+  loadState,
+  snapshots,
+  series,
+  onCompleteDataSetup,
+}: {
+  [
+    K in 'interval' | 'pnl' | 'loadState' | 'snapshots' | 'series' | 'onCompleteDataSetup'
+  ]: SnapshotTableProps[K];
+} & {
+  groups: Map<string, SnapshotRecord[]>;
+  seriesPoints: PerformanceSeriesPoint[];
+  chartLoading: boolean;
+}): ReactNode {
   let content: ReactNode;
   if (groups.size > 0) {
     content = (
@@ -204,86 +315,57 @@ export function PerformanceSnapshotTable({
   } else {
     content = null;
   }
+  return content;
+}
+function SnapshotPnlNotes({
+  pnl,
+  missingPnl,
+  pnlReasons,
+}: {
+  pnl: SnapshotPnl;
+  missingPnl: PnlChartPoint[];
+  pnlReasons: string[];
+}) {
   return (
-    <section className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="m-0 text-xl font-semibold tracking-tight">
-            {pnl ? '资产总值与累计盈亏' : '资产走势'}
-          </h2>
-          <details className="mt-1 text-xs text-muted-foreground">
-            <summary className="cursor-pointer">计算口径</summary>
-            <p className="mt-2">
-              资产取周期末有效估值。
-              {pnl ? '盈亏为收盘记录与当前估值。' : ''}
-            </p>
-          </details>
-        </div>
-        <PerformanceTrendControls
-          mode={mode}
-          range={range}
-          interval={interval}
-          series={series}
-          onRangeChange={onRangeChange}
-          onIntervalChange={onIntervalChange}
-        />
-      </div>
-      {loadState !== 'ready' && loadState !== 'empty' && loadState !== 'loading' ? (
-        <DataStateBanner
-          state="error"
-          title="资产走势读取失败"
-          description={loadState === 'stale' ? '刷新失败，当前保留上次读取的估值数据。' : '暂时无法读取资产走势，请重新加载。'}
-          onRetry={onRetry}
-        />
-      ) : null}
-      {pnl?.error && (
-        <DataStateBanner
-          state="error"
-          title="历史盈亏读取失败"
-          description="暂时无法读取历史盈亏，已保留可用数据。"
-          onRetry={pnl.onRetry}
-        />
+    <div className="flex flex-col gap-1 text-xs text-muted-foreground" aria-live="polite">
+      {pnl.points.some((point) => point.current) && (
+        <p className="m-0">
+          当前累计盈亏{' '}
+          <strong className="font-semibold text-foreground">
+            {pnl.points.at(-1)?.value === null || pnl.points.at(-1)?.value === undefined
+              ? '—'
+              : formatMoney(pnl.points.at(-1)!.value!, pnl.currency)}
+          </strong>
+        </p>
       )}
-      <ListRefreshRegion refreshing={chartLoading} label={pnl?.loading ? '正在读取盈亏历史' : '资产走势加载中'}>
-        {content}
-      </ListRefreshRegion>
-      {pnl &&
-        pnl.points.length > 0 &&
-        seriesPoints.length === 0 &&
-        visibleSnapshots.length === 0 &&
-        (loadState === 'empty' || loadState === 'ready') && (
-          <EmptyTrend
-            hasHistory={snapshots.length > 0 || series !== undefined}
-            onCompleteDataSetup={onCompleteDataSetup}
-          />
-        )}
-      {pnl && (
-        <div className="flex flex-col gap-1 text-xs text-muted-foreground" aria-live="polite">
-          {pnl.points.some((point) => point.current) && (
-            <p className="m-0">
-              当前累计盈亏{' '}
-              <strong className="font-semibold text-foreground">
-                {pnl.points.at(-1)?.value === null || pnl.points.at(-1)?.value === undefined
-                  ? '—'
-                  : formatMoney(pnl.points.at(-1)!.value!, pnl.currency)}
-              </strong>
-            </p>
-          )}
-          {pnl.currentUnavailable && <p className="m-0">当前盈亏不可用。</p>}
-          {pnl.points.filter((point) => point.value !== null).length === 1 && (
-            <p className="m-0">当前仅有一个可用盈亏点。</p>
-          )}
-          {missingPnl.length > 0 && (
-            <p className="m-0">
-              {missingPnl.length} 个盈亏时点{pnlReasons.join('、')}，已留空。
-            </p>
-          )}
-          {pnl.historyEmpty && !pnl.error && !pnl.loading && pnl.points.length === 0 && (
-            <p className="m-0">暂无历史盈亏记录。</p>
-          )}
-          {pnl.truncated && <p className="m-0">仅展示最近 2000 个收盘记录。</p>}
-        </div>
+      {pnl.currentUnavailable && <p className="m-0">当前盈亏不可用。</p>}
+      {pnl.points.filter((point) => point.value !== null).length === 1 && (
+        <p className="m-0">当前仅有一个可用盈亏点。</p>
       )}
-    </section>
+      {missingPnl.length > 0 && (
+        <p className="m-0">
+          {missingPnl.length} 个盈亏时点{pnlReasons.join('、')}，已留空。
+        </p>
+      )}
+      {pnl.historyEmpty && !pnl.error && !pnl.loading && pnl.points.length === 0 && (
+        <p className="m-0">暂无历史盈亏记录。</p>
+      )}
+      {pnl.truncated && <p className="m-0">仅展示最近 2000 个收盘记录。</p>}
+    </div>
+  );
+}
+
+function showAssetEmptyAlongsidePnl(
+  pnl: SnapshotPnl | undefined,
+  seriesPoints: PerformanceSeriesPoint[],
+  visibleSnapshots: SnapshotRecord[],
+  loadState: SnapshotTableProps['loadState'],
+) {
+  return (
+    pnl &&
+    pnl.points.length > 0 &&
+    seriesPoints.length === 0 &&
+    visibleSnapshots.length === 0 &&
+    (loadState === 'empty' || loadState === 'ready')
   );
 }

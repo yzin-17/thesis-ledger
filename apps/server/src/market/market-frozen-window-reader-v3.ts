@@ -50,17 +50,20 @@ export class MarketFrozenWindowReaderV3 {
     if (
       revisions.desiredRevision !== source.desiredRevision ||
       revisions.effectiveRevision !== source.effectivePolicyRevision ||
-      revisions.catalogRevision !== source.catalogRevision ||
       selected?.providerId !== source.target.providerId ||
       selected?.upstreamSource !== source.target.upstreamSource ||
       !readiness?.eligible ||
-      !readiness.catalogReady
+      !readiness.catalogReady ||
+      (input.requiredSource &&
+        (input.requiredSource.providerId !== source.target.providerId ||
+          input.requiredSource.upstreamSource !== source.target.upstreamSource))
     )
       return {
         status: 'unavailable',
         selection: { status: 'unavailable', reason: 'policy_mismatch' },
       };
-    const evidence = view.exactWindow
+    // Catalog 是全局准入目录。来源与策略仍一致时，保留父事实，另记当前校验证据。
+    const evidence = view.exactWindow && revisions.catalogRevision === source.catalogRevision
       ? source
       : await this.evidence.record({
           request: view.request,
@@ -68,7 +71,7 @@ export class MarketFrozenWindowReaderV3 {
           seriesVersion: view.seriesVersion,
           desiredRevision: source.desiredRevision,
           effectivePolicyRevision: source.effectivePolicyRevision,
-          catalogRevision: source.catalogRevision,
+          catalogRevision: revisions.catalogRevision,
           fetchedAt: source.fetchedAt,
         });
     return {
@@ -87,7 +90,7 @@ export class MarketFrozenWindowReaderV3 {
         routeIndex: source.target.routeIndex,
         desiredRevision: source.desiredRevision,
         effectivePolicyRevision: source.effectivePolicyRevision,
-        catalogRevision: source.catalogRevision,
+        catalogRevision: revisions.catalogRevision,
         response: view.response,
       },
     };

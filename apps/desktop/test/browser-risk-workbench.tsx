@@ -1,0 +1,24 @@
+import { createRoot } from 'react-dom/client';
+import { MemoryRouter } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ToastProvider } from '../src/components/ui/toast.js';
+import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
+import { RiskCenter } from '../src/features/risk/RiskCenter.js';
+import { riskKeys } from '../src/features/risk/risk.queries.js';
+import { strategyKeys } from '../src/features/strategy/strategy.queries.js';
+import { riskAccount, riskPosition, precisionRiskRule } from './risk-threshold.fixture.js';
+import '../src/ui/styles.css';
+
+const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, refetchOnWindowFocus: false } } });
+const active = precisionRiskRule();
+const archived = { ...active, id: '00000000-0000-4000-8000-000000000099', version: 2, archivedAt: '2026-11-12T00:00:00Z', enabled: false };
+client.setQueryData(riskKeys.rules(), [active, archived]);
+client.setQueryData(riskKeys.events('actual'), []);
+client.setQueryData(riskKeys.notifications(), []);
+client.setQueryData(riskKeys.riskNotificationRouting(), { availableRoutes: [], providers: [] });
+client.setQueryData(riskKeys.notificationRouting(), { availableRoutes: [], providers: [] });
+client.setQueryData(riskKeys.audit(active.id), []);
+client.setQueryData(riskKeys.audit(archived.id), []);
+client.setQueryData([...strategyKeys.root, 'risk-applications'], []);
+client.setQueryData(strategyKeys.strategies(), []);
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}><MemoryRouter><ToastProvider><ConfirmDialogProvider><main className="content"><RiskCenter accounts={[riskAccount]} portfolio={{ mode: 'actual', totalMarketValue: 1000, totalCost: 900, totalPnl: 100, cashValue: 0, partial: false, positions: [riskPosition], valuedAt: '2026-11-12T00:00:00Z' }} portfolioState="ready" mode="actual" /></main></ConfirmDialogProvider></ToastProvider></MemoryRouter></QueryClientProvider>);

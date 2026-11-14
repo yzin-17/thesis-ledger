@@ -169,6 +169,13 @@ it.each([
   expect(() => verifyResearchNumericEvidenceV2(fixture.frozen, fixture.inference)).not.toThrow();
 });
 
+it('派生比例单位错误明确报告预期与实际值，拒绝默默修正模型输出', () => {
+  const fixture = derived('percentage_change', -0.98, '/price', '/other', 'price', 'CNY');
+  expect(() => verifyResearchNumericEvidenceV2(fixture.frozen, fixture.inference)).toThrow(
+    'percentage_change 应为 ratio/null，模型返回 price/CNY',
+  );
+});
+
 it.each([
   ['add', 100, '/price', '/ratio', 'price', 'CNY'],
   ['multiply', 200, '/price', '/other', 'price', 'CNY'],

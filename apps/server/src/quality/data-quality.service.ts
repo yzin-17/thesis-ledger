@@ -1,12 +1,28 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
+import { StructuredLogger } from '../platform/structured-logger.js';
+import {
+  recordDataQualityObservation,
+  type DataQualityObservation,
+} from './data-quality-observation.js';
 
 export type DataQualityStatus = 'open' | 'acknowledged' | 'resolved';
+type DataQualityQueryStatus = DataQualityStatus | 'unresolved';
 
 @Injectable()
 export class DataQualityService {
+  private readonly logger = new StructuredLogger('thesis-ledger.quality');
   constructor(private readonly prisma: PrismaService) {}
+
+  async observe(input: DataQualityObservation) {
+    try {
+      return await recordDataQualityObservation(this.prisma, input);
+    } catch {
+      this.logger.warn({ operation: 'data_quality.persist_failed', code: input.code });
+      return null;
+    }
+  }
 
   record(input: {
     capability: string;
@@ -28,9 +44,12 @@ export class DataQualityService {
     });
   }
 
-  list(status?: DataQualityStatus) {
+  list(status?: DataQualityQueryStatus) {
+    let where: Prisma.DataQualityIssueWhereInput = {};
+    if (status === 'unresolved') where = { status: { in: ['open', 'acknowledged'] } };
+    else if (status) where = { status };
     return this.prisma.dataQualityIssue.findMany({
-      where: status ? { status } : {},
+      where,
       orderBy: { detectedAt: 'desc' },
       take: 500,
     });
@@ -46,10 +65,10 @@ export class DataQualityService {
     });
   }
 
-  validateStatus(status?: string): DataQualityStatus | undefined {
+  validateStatus(status?: string): DataQualityQueryStatus | undefined {
     if (status === undefined) return undefined;
-    if (!['open', 'acknowledged', 'resolved'].includes(status))
+    if (!['open', 'acknowledged', 'resolved', 'unresolved'].includes(status))
       throw new BadRequestException('数据质量状态无效');
-    return status as DataQualityStatus;
+    return status as DataQualityQueryStatus;
   }
 }

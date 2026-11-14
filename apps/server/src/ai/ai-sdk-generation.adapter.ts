@@ -24,6 +24,7 @@ import { AiGenerationTiming } from './timeout/ai-generation-timing.js';
 import { traceSdkGeneration } from './trace/ai-trace-sdk.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
 import { createGenerationModel } from './ai-sdk-generation-model.js';
+import { assertFinishedGeneration } from './ai-generation-finished-output.js';
 import {
   createGenerationDiagnostics,
   generationDiagnosticSnapshots,
@@ -226,7 +227,7 @@ export class AiSdkGenerationAdapter {
       captureUsage(result.usage);
       completion = resultMetadata(result.usage, result.finishReason, result.rawFinishReason,
         result.response, result.providerMetadata, { firstEvent: null, firstText: null });
-      assertFinishReason(result.finishReason, input.requestId, observedUsage);
+      assertFinishedGeneration(result, input, observedUsage, completion);
       return {
         output: parseGenerationOutput(input.mode, input.schema, result.output),
         ...(input.timeoutDecision ? { timing: timing.snapshot(true) } : {}),

@@ -1,4 +1,5 @@
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Field } from '../src/components/ui/field.js';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup as renderMarkup } from 'react-dom/server';
@@ -32,7 +33,7 @@ import {
 import type { Portfolio } from '../src/features/portfolio/portfolio.types.js';
 
 const renderToStaticMarkup = (node: ReactNode) =>
-  renderMarkup(<ConfirmDialogProvider>{node}</ConfirmDialogProvider>);
+  renderMarkup(<QueryClientProvider client={new QueryClient()}><ConfirmDialogProvider>{node}</ConfirmDialogProvider></QueryClientProvider>);
 
 describe('风险事件数值标签', () => {
   it('优先读取服务端 valueMetric 语义标识', () => {
@@ -208,6 +209,9 @@ describe('风险中心 AB 交互契约', () => {
     });
   });
 
+});
+
+describe('风险扫描范围与事件语义', () => {
   it('空组合是已加载空态，不满足扫描条件', () => {
     expect(portfolioDataStatus('empty')).toBe('空组合');
     expect(isPortfolioScanReady('empty')).toBe(false);
@@ -333,6 +337,9 @@ describe('风险中心 AB 交互契约', () => {
     expect(riskSubjectLabel('recurring-cash-deposit-plan')).toBe('定期入账计划');
   });
 
+});
+
+describe('风险表格与提示层级', () => {
   it('事件表不重复绘制页签基线', () => {
     const html = renderToStaticMarkup(<RiskEventTable loadState="ready" events={[]} />);
 
@@ -413,6 +420,9 @@ describe('风险中心 AB 交互契约', () => {
     expect(html).not.toContain('配置通知提供方');
   });
 
+});
+
+describe('通知路由的读取状态', () => {
   it('路由读取失败时不误报为未配置', () => {
     const html = renderToStaticMarkup(
       <NotificationProviderNotice
@@ -470,6 +480,9 @@ describe('风险中心 AB 交互契约', () => {
     expect(html).toBe('');
   });
 
+});
+
+describe('风险动作反馈及版本匹配', () => {
   it('风险动作反馈明确区分规则试算、Provider 缺失和模拟模式', () => {
     expect(riskActionFeedback('test', 'actual', 'unconfigured', 1)).toMatchObject({
       type: 'warning',
@@ -527,6 +540,9 @@ describe('风险中心 AB 交互契约', () => {
     expect(riskTestRecordForRule(records, { id: 'rule-2', version: 1 })).toBeNull();
   });
 
+});
+
+describe('待修复与归档规则空态', () => {
   it('旧账户缺失规则显示待修复，和主动停用保持区分', () => {
     const html = renderToStaticMarkup(
       <RiskRuleWorkbench

@@ -18,7 +18,8 @@ const props = { route: { params: undefined }, navigation: {} } as never;
 async function fillAi() {
   await input(field('来源名称'), 'B5-fixture');
   await input(field('模型服务地址'), 'https://fixture.test/v1');
-  await input(field('已选模型（每行一个）'), 'fixture');
+  await input(field('模型列表'), 'fixture');
+  await click(button('添加 fixture'));
   await input(field('API Key'), 'fixture-dummy-key');
 }
 describe('第 5 批手机配置交互', () => {
@@ -185,6 +186,9 @@ describe('第 5 批手机配置交互', () => {
     expect(document.body.textContent).toContain('取消');
     expect(document.body.textContent).toContain('重新读取服务端状态');
   });
+});
+
+describe('手机行情配置、OAuth 与管理诊断', () => {
   it('行情配置冲突清空秘密、保留设置并绑定原配置代次', async () => {
     const posts: unknown[] = [];
     setApi(

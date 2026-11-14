@@ -31,7 +31,10 @@ it.each([
   await input(field('执行标的'), '目录'); await click(button('搜索标的'));
   expect(button('选择 目录000001.OF')).toBeUndefined();
   await click(button(`选择 目录${symbol}`));
-  expect(field('执行标的').value).toBe(symbol);
+  expect(field('执行标的').value).toBe(`目录${symbol} · ${symbol}`);
+  await click(button('高级 JSON'));
+  await click(button('常用配置'));
+  expect(field('执行标的').value).toBe(`目录${symbol} · ${symbol}`);
   await click(button('确认创建策略'));
   expect(writes).toHaveLength(1);
   expect(writes[0]).toMatchObject({ schema: { executionInstrument: { symbol, market, assetType }, signalSources: [{ id: 'execution', asset: { symbol, market, assetType } }] } });

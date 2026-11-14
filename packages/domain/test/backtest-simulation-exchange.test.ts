@@ -150,6 +150,9 @@ describe('Domain Exchange execution composition', () => {
     });
   });
 
+});
+
+describe("交易所 T+1 交收与目标开盘", () => {
   it('plans a T+1 sell for its target open and applies same-time position settlement first', () => {
     const run = exchangeRunInput();
     const signalAt = ['2026-09-08T07:00:00.000Z', '2026-09-09T07:00:00.000Z'] as const;
@@ -289,6 +292,9 @@ describe('Domain Exchange execution composition', () => {
     });
   });
 
+});
+
+describe("拆分后的未结算份额", () => {
   it('projects unsettled shares after an applied split before their target settlement', () => {
     const split: BacktestCorporateActionFact = {
       symbol: '600519.SH',
@@ -362,6 +368,9 @@ describe('Domain Exchange execution composition', () => {
     });
   });
 
+});
+
+describe("归一化成交与公司行动记账", () => {
   it('sizes a qfq normalized run from its frozen segment, reserves cash, ignores split and dividend postings, and preserves T+1 execution order', () => {
     const qfqSnapshot = JSON.parse(
       readFileSync(
@@ -512,6 +521,9 @@ describe('Domain Exchange execution composition', () => {
     });
   });
 
+});
+
+describe("归一化执行模型拒绝路径", () => {
   it('fails closed when normalized sizing has no frozen applicable segment', () => {
     const run = exchangeRunInput({ accountingBasis: 'normalized-series' });
     const sizingForIntent = (intent: SimulationTargetIntent, state: SimulationLedgerState) => ({

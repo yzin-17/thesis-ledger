@@ -129,6 +129,9 @@ describe('组合估值按消费路由与影响范围失效', () => {
     );
   });
 
+});
+
+describe('账户写入的精确查询失效', () => {
   it('具体账户 mutation 只重取 active selected，inactive all 不请求', async () => {
     const client = makeClient();
     const requestClient = makeRequestClient();
@@ -234,6 +237,9 @@ describe('组合估值按消费路由与影响范围失效', () => {
     ).toBe(true);
   });
 
+});
+
+describe('活跃组合消费者与模式隔离', () => {
   it('存在 active all consumer 时，mutation 只重取 all 一次', async () => {
     const client = makeClient();
     const requestClient = makeRequestClient();

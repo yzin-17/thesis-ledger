@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { tradingCalendarFromFact, marketCivilInstant, type MarketPeriodCalendarFact } from '@thesis-ledger/domain';
+import { tradingCalendarFromFact, marketCivilInstant, marketSessionDate, type MarketPeriodCalendarFact } from '@thesis-ledger/domain';
 import {
   backtestCalendarResponseSchema,
   marketPeriodCalendarSchema,
@@ -30,6 +30,7 @@ export type MarketPeriodCalendarResult =
 type Fact = BacktestCalendarResponse['facts'][number];
 const DAY = 86_400_000;
 const MAX_CALENDAR_DAYS = 20000;
+const timezones = { CN: 'Asia/Shanghai', HK: 'Asia/Hong_Kong', US: 'America/New_York' };
 
 function dateMillis(value: string): number {
   const milliseconds = Date.parse(`${value}T00:00:00Z`);
@@ -46,7 +47,9 @@ export function validatePeriodCalendarRequest(input: MarketPeriodCalendarRequest
   const start = dateMillis(input.start);
   const end = dateMillis(input.end);
   const instant = parseMarketPitEvidenceInstantV1(input.evaluationAsOf);
-  const evaluationDay = Math.floor((Number(instant.seconds) * 1000) / DAY) * DAY;
+  const timezone = timezones[input.market];
+  if (!timezone) throw new Error('日历市场无效');
+  const evaluationDay = dateMillis(marketSessionDate(new Date(Number(instant.seconds) * 1000), timezone));
   if (
     !['CN', 'HK', 'US'].includes(input.market) ||
     end < start ||
@@ -154,7 +157,6 @@ export function projectPeriodCalendar(
       fact.providerRevision !== response.providerRevision
     )
       return { status: 'unavailable', reason: 'calendar_invalid' };
-    const timezones = { CN: 'Asia/Shanghai', HK: 'Asia/Hong_Kong', US: 'America/New_York' };
     if (fact.market !== input.market || fact.timezone !== timezones[input.market])
       return { status: 'unavailable', reason: 'calendar_model_unsupported' };
     if (

@@ -366,12 +366,7 @@ export const aiProviderDraftFromRecord = (provider: ProviderRecord): ProviderDra
       return [[model, pricing] as const];
     }),
   ),
-  timeoutMs: provider.timeoutMs?.toString() ?? '',
-  firstOutputTimeoutMs: provider.firstOutputTimeoutMs?.toString() ?? '',
-  outputIdleTimeoutMs: provider.outputIdleTimeoutMs?.toString() ?? '',
-  costPer1kInput: provider.costPer1kInput?.toString() ?? '',
-  costPer1kOutput: provider.costPer1kOutput?.toString() ?? '',
-  costCurrency: provider.costCurrency ?? '',
+  ...providerTimingAndPricingDraft(provider),
   pricingVersion: provider.pricingVersion ?? '',
   updatedAt: provider.updatedAt ?? '',
 });
@@ -397,24 +392,8 @@ export const aiProviderDraftError = (input: AiProviderInput) => {
   if (input.models.length === 0) return '请至少填写一个模型。';
   if (new Set(input.models).size !== input.models.length) return '模型不得重复。';
   if (input.capabilities.length === 0) return '请至少选择一项能力。';
-  const selectedModels = new Set(input.models);
-  const routeKeys = new Set<string>();
-  for (const route of input.executionRoutes ?? []) {
-    if (!selectedModels.has(route.model)) return '执行路由必须选择已配置的模型。';
-    const routeKey = `${route.model}:${route.contract.id}`;
-    if (routeKeys.has(routeKey)) return '同一模型、同一业务用途只能配置一条执行路由。';
-    routeKeys.add(routeKey);
-    if (
-      route.firstOutputTimeoutMs !== undefined &&
-      !aiTimeoutDurationSchema.safeParse(route.firstOutputTimeoutMs).success
-    )
-      return `首输出超时必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
-    if (
-      route.outputIdleTimeoutMs !== undefined &&
-      !aiTimeoutDurationSchema.safeParse(route.outputIdleTimeoutMs).success
-    )
-      return `输出空闲超时必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
-  }
+  const routeError = executionRouteDraftError(input);
+  if (routeError) return routeError;
   if (!Number.isInteger(input.priority) || input.priority < 0) return '优先级必须是非负整数。';
   if (input.timeoutMs !== undefined && !aiTimeoutDurationSchema.safeParse(input.timeoutMs).success)
     return `完成等待必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
@@ -462,3 +441,37 @@ export const requestAiProviderDeletion = async (
   else await remove(provider.name);
   return true;
 };
+
+function providerTimingAndPricingDraft(provider: ProviderRecord) {
+  return {
+    timeoutMs: provider.timeoutMs?.toString() ?? '',
+    firstOutputTimeoutMs: provider.firstOutputTimeoutMs?.toString() ?? '',
+    outputIdleTimeoutMs: provider.outputIdleTimeoutMs?.toString() ?? '',
+    costPer1kInput: provider.costPer1kInput?.toString() ?? '',
+    costPer1kOutput: provider.costPer1kOutput?.toString() ?? '',
+    costCurrency: provider.costCurrency ?? '',
+  };
+}
+
+function executionRouteDraftError(input: AiProviderInput) {
+  const selectedModels = new Set(input.models);
+  const routeKeys = new Set<string>();
+  for (const route of input.executionRoutes ?? []) {
+    if (!selectedModels.has(route.model)) return '执行路由必须选择已配置的模型。';
+    const routeKey = `${route.model}:${route.contract.id}`;
+    if (routeKeys.has(routeKey)) return '同一模型、同一业务用途只能配置一条执行路由。';
+    routeKeys.add(routeKey);
+    if (
+      route.firstOutputTimeoutMs !== undefined &&
+      !aiTimeoutDurationSchema.safeParse(route.firstOutputTimeoutMs).success
+    )
+      return `首输出超时必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
+    if (
+      route.outputIdleTimeoutMs !== undefined &&
+      !aiTimeoutDurationSchema.safeParse(route.outputIdleTimeoutMs).success
+    )
+      return `输出空闲超时必须是 1 到 ${AI_MAX_TIMEOUT_MS} 毫秒的整数。`;
+  }
+
+  return null;
+}

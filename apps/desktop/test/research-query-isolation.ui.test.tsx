@@ -12,6 +12,7 @@ import {
   type ResearchReportLocatorInput,
   type ResearchReportSummary,
   type ResearchReportListInput,
+  type InstrumentDirectory,
 } from '@thesis-ledger/schemas';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import {
@@ -20,7 +21,12 @@ import {
 } from '../src/features/ai/research.queries.js';
 import { setIdentitySession } from '../src/shared/api/identity-session.js';
 
-type Page = { items: ResearchReportSummary[]; hasMore: boolean; nextCursor: string | null };
+type Page = {
+  items: ResearchReportSummary[];
+  hasMore: boolean;
+  nextCursor: string | null;
+  instrumentDirectory?: InstrumentDirectory;
+};
 const api = vi.hoisted(() => ({
   detail:
     vi.fn<
@@ -180,6 +186,58 @@ it('身份变化不复用前一个主体的详情缓存或占位正文', async (
   expect(host.textContent).not.toContain(saved.question);
   expect(api.detail).toHaveBeenCalledTimes(2);
 });
+it('列表单次响应利用目录名称显示标的与代码，且研究类型不重复', async () => {
+  const summary = researchReportSummarySchema.strip().parse(saved);
+  api.list.mockResolvedValueOnce({
+    items: [summary],
+    hasMore: false,
+    nextCursor: null,
+    instrumentDirectory: {
+      generation: 1,
+      items: [{
+        symbol: '600519.SH',
+        canonicalCode: '600519',
+        instrumentType: 'STOCK',
+        market: 'SH',
+        displayName: '贵州茅台',
+        active: true,
+      }],
+      unresolvedSymbols: [],
+    },
+  });
+  await mount(<List kind="instrument" />);
+  await vi.waitFor(async () => {
+    await tick();
+    expect(listed.data?.pages[0]?.items[0]?.display?.object.name).toBe('贵州茅台');
+  });
+  const row = listed.data?.pages[0]?.items[0]?.display;
+  expect(row?.object).toMatchObject({
+    label: '标的研究',
+    code: '600519.SH',
+    name: '贵州茅台',
+  });
+  expect(row?.source.label).toBe('模拟 · 标的研究');
+  expect(api.list).toHaveBeenCalledTimes(1);
+});
+
+it('目录未匹配时继续显示原规范标的代码，不编造名称', async () => {
+  api.list.mockResolvedValueOnce({
+    items: [researchReportSummarySchema.strip().parse(saved)],
+    hasMore: false,
+    nextCursor: null,
+    instrumentDirectory: { generation: 1, items: [], unresolvedSymbols: ['600519.SH'] },
+  });
+  await mount(<List kind="instrument" />);
+  await vi.waitFor(async () => {
+    await tick();
+    expect(listed.data?.pages[0]?.items).toHaveLength(1);
+  });
+  expect(listed.data?.pages[0]?.items[0]?.display?.object).toMatchObject({
+    code: '600519.SH',
+  });
+  expect(listed.data?.pages[0]?.items[0]?.display?.object.name).toBeUndefined();
+});
+
 it('对象类别变化立即隐藏旧列表；不把保留占位当成当前结果', async () => {
   let resolve!: (value: Page) => void;
   const summary = researchReportSummarySchema.strip().parse(saved);

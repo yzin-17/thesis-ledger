@@ -11,8 +11,12 @@ import { useBacktestExecutionModel } from '../src/features/strategy/use-backtest
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import { NavigationGuardProvider } from '../src/features/shared/navigation-guard.js';
 import type * as ApiClient from '@thesis-ledger/api-client';
+import { projectPriceResearchStrategy } from '@thesis-ledger/schemas';
 
-const api = vi.hoisted(() => ({ resolve: vi.fn(), submit: vi.fn() }));
+const api = vi.hoisted(() => ({ resolve: vi.fn(), submit: vi.fn(), list: vi.fn(), adopt: vi.fn() }));
+vi.mock('../src/features/strategy/strategy.api.js', async (original) => ({
+  ...await original<object>(), createStrategyVersion: api.adopt,
+}));
 vi.mock('@thesis-ledger/api-client', async (original) => {
   const actual = await original<typeof ApiClient>();
   return {
@@ -24,7 +28,7 @@ vi.mock('@thesis-ledger/api-client', async (original) => {
   };
 });
 vi.mock('../src/shared/api/client.js', () => ({
-  getDesktopApiClient: () => ({ strategySubmissions: { submit: api.submit } }),
+  getDesktopApiClient: () => ({ strategySubmissions: { submit: api.submit, list: api.list } }),
 }));
 vi.mock('../src/features/strategy-authoring/AuthoringRunIntents.js', () => ({
   AuthoringRunIntents: () => null,
@@ -33,13 +37,19 @@ vi.mock('../src/features/strategy-authoring/AuthoringRunIntents.js', () => ({
 const model = JSON.parse(
   readFileSync('../../packages/schemas/fixtures/backtest-execution-model.cn-2024q1.json', 'utf8'),
 );
+model.segments[0].execution.price = { kind: 'noDailyLimit', reason: '归一化价格坐标' };
+model.segments[0].execution.normalizedExecution = {
+  priceCoordinate: 'continuous-decimal', quantityUnits: 'continuous-normalized-decimal',
+  lotSizeConstraint: 'not-applied', tickSizeConstraint: 'not-applied',
+  dailyPriceLimit: 'not-applied', feeBasis: 'simulatedTurnover',
+};
 const schema = JSON.parse(
   readFileSync('../../packages/schemas/fixtures/backtest-v2.exchange.json', 'utf8'),
 );
 const version = {
   id: '11111111-1111-4111-8111-111111111111',
   version: 1,
-  schema,
+  schema: projectPriceResearchStrategy(schema),
   createdAt: '2026-11-07T00:00:00Z',
 };
 const strategy = {
@@ -116,6 +126,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   api.resolve.mockResolvedValue({ status: 'available', policy: 'research-defaults', notes: ['不模拟涨跌停；停牌、退市和行情仍核验。', '未配置税费暂不计入。'], model });
   api.submit.mockResolvedValue({ id: 'submission', state: 'queued' });
+  api.list.mockResolvedValue([{ id: 'submission', state: 'preparing' }]);
 });
 afterEach(async () => {
   if (root) await act(async () => root.unmount());
@@ -125,7 +136,7 @@ afterEach(async () => {
 });
 
 describe('已保存策略的普通回测入口', () => {
-  it('自动读取设置，无需 JSON 或额外确认即可提交原有准备和运行链', async () => {
+  it('自动读取设置，提交后等待任务创建再关闭弹窗并通知跳转', async () => {
     const onOpenChange = vi.fn();
     const onSubmitted = vi.fn();
     await render(dialog(onOpenChange, undefined, onSubmitted));
@@ -134,11 +145,13 @@ describe('已保存策略的普通回测入口', () => {
     expect(document.body.textContent).toContain('研究默认规则');
     expect(document.body.textContent).toContain('未配置税费暂不计入');
     expect(button('开始回测').disabled).toBe(false);
+    expect(document.body.textContent).toContain('后复权');
+    expect(button('不复权 · 原始份额')).toBeUndefined();
     expect(api.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         strategyVersionId: version.id,
         startDate: '2024-01-02',
-        adjustment: 'none',
+        adjustment: 'hfq',
       }),
       expect.any(AbortSignal),
     );
@@ -150,10 +163,24 @@ describe('已保存策略的普通回测入口', () => {
         kind: 'ordinary',
         preparation: expect.objectContaining({
           strategyVersionId: version.id,
+          adjustment: 'hfq',
+          priceResearch: 'price-research-v1',
+          accountingBasis: 'normalized-series',
           runConfig: expect.objectContaining({ executionModel: model }),
         }),
       }),
     );
+    expect(button('正在提交…').disabled).toBe(true);
+    expect(button('正在提交…').getAttribute('aria-busy')).toBe('true');
+    expect(button('取消').disabled).toBe(true);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(onSubmitted).not.toHaveBeenCalled();
+    await act(async () => {
+      client.setQueryData(['desktop', 'strategy', 'submissions', 'submission'], {
+        id: 'submission', state: 'submitted', outcome: { id: 'created-job' },
+      });
+    });
+    await flush();
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onSubmitted).toHaveBeenCalledOnce();
   });
@@ -192,6 +219,26 @@ describe('已保存策略的普通回测入口', () => {
     expect(button('开始回测').disabled).toBe(false);
   });
 
+  it('历史版本先确认并另存研究口径，再用后复权准备模型', async () => {
+    const original = JSON.parse(readFileSync('../../packages/schemas/fixtures/backtest-execution-model.cn-2024q1.json', 'utf8'));
+    const frozen = structuredClone(original);
+    api.adopt.mockResolvedValue(version);
+    await render(<BacktestSetupDialog open busy={false} intent="rerun" strategy={strategy} version={{ ...version, schema }}
+      initialSetup={{ period: { start: '2024-01-02', end: '2024-03-29' }, initialCash: 100000, adjustment: 'none', executionModel: original }}
+      onOpenChange={vi.fn()} onSubmit={vi.fn(async () => true)} />);
+    expect(api.resolve).not.toHaveBeenCalled();
+    expect(button('创建新任务').disabled).toBe(true);
+    expect(document.body.textContent).toContain('确认策略的研究口径');
+    await act(async () => button('采用研究口径并保存新版本').click()); await flush();
+    expect(api.adopt).toHaveBeenCalledWith(expect.objectContaining({ schema: expect.objectContaining({ schemaVersion: '3' }) }));
+    expect(api.resolve).toHaveBeenCalledWith(expect.objectContaining({ adjustment: 'hfq' }), expect.any(AbortSignal));
+    expect(original).toEqual(frozen);
+    await act(async () => button('创建新任务').click()); await flush();
+    expect(api.submit).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      preparation: expect.objectContaining({ adjustment: 'hfq', accountingBasis: 'normalized-series' }),
+    }));
+  });
+
   it('日期切换后，迟到配置不会替代当前日期的结果', async () => {
     const old = deferred<{ status: string; model: typeof model }>();
     api.resolve
@@ -202,7 +249,7 @@ describe('已保存策略的普通回测入口', () => {
         strategyVersionId: version.id,
         period: { start: '2024-01-02', end },
         currency: 'CNY',
-        adjustment: 'none',
+        adjustment: 'qfq',
       });
       return <p>{result.model?.id ?? 'loading'}</p>;
     }

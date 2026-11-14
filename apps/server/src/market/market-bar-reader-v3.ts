@@ -9,6 +9,8 @@ import {
   type MarketFrozenWindowRefV3,
 } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
+import { DataQualityService } from '../quality/data-quality.service.js';
+import { readWithDataQuality } from './market-data-quality.js';
 import type { EffectivePolicyEnvelopeV3 } from '../integration/dsa/dsa-v3-protocol.js';
 import { MarketControlService } from './market-control.service.js';
 import {
@@ -34,6 +36,7 @@ export type MarketBarWindowReadInputV3 = {
   frozenWindowRef?: MarketFrozenWindowRefV3;
   tradabilityMode?: 'assume-untradable-no-bar';
   priceResearch?: boolean;
+  requiredSource?: MarketWindowSelectionInputV3['requiredSource'];
 };
 
 type SelectedWindowV3 = Extract<MarketWindowSelectionV3, { status: 'selected' }>;
@@ -89,11 +92,16 @@ export class MarketBarWindowReaderV3 {
     private readonly marketControl: MarketControlService,
     private readonly dsa: DsaClient,
     private readonly evidenceRepository: MarketWindowEvidenceV3Repository,
-    @Optional() @Inject(MarketFrozenWindowReaderV3) private readonly frozenReader?: MarketFrozenWindowReaderV3,
+    @Optional()
+    @Inject(MarketFrozenWindowReaderV3)
+    private readonly frozenReader?: MarketFrozenWindowReaderV3,
+    private readonly quality?: DataQualityService,
   ) {}
 
   async read(input: MarketBarWindowReadInputV3): Promise<MarketBarWindowReadResultV3> {
-    if (input.frozenWindowRef) return this.frozenReader?.read(input) ?? unavailable('invalid_input');
+    if (input.requiredSource && !input.priceResearch) return unavailable('invalid_input');
+    if (input.frozenWindowRef)
+      return this.frozenReader?.read(input) ?? unavailable('invalid_input');
     const routeKey = marketDataBarRouteKeyV3Schema.safeParse(input.routeKey);
     if (!routeKey.success || routeKey.data.market !== input.market) {
       return unavailable('invalid_input');
@@ -141,15 +149,22 @@ export class MarketBarWindowReaderV3 {
       window: { start: validatedRequest.data.start, end: validatedRequest.data.end },
       requestId: randomUUID(),
       now: new Date().toISOString(),
-      ...(input.priceResearch ? { priceResearch: true } : {}),
-      ...(input.tradabilityMode ? { tradabilityMode: input.tradabilityMode } : {}),
+      ...marketReadResearchConstraints(input),
       readCapabilities: () => this.dsa.marketDataCapabilitiesV3(),
-      ...(input.compatibility ? { compatibility: input.compatibility } : {}),
-      ...(input.warmup ? { warmup: input.warmup } : {}),
+      ...marketReadWindowRequirements(input),
       read: async ({ request, target, routeIndex }) => {
         const pinnedRequest = createPinnedRequest(request, target, routeIndex);
         requests.set(routeIndex, pinnedRequest);
-        return this.dsa.marketBarsV3(pinnedRequest);
+        return readWithDataQuality(
+          this.quality,
+          {
+            capability: pinnedRequest.routeKey.capability,
+            provider: target.providerId,
+            symbol: pinnedRequest.symbol,
+            scope: `${target.upstreamSource}:${pinnedRequest.routeKey.timeframe}:${pinnedRequest.routeKey.adjustment}`,
+          },
+          () => this.dsa.marketBarsV3(pinnedRequest),
+        );
       },
     });
     if (selection.status !== 'selected') {
@@ -169,4 +184,19 @@ export class MarketBarWindowReaderV3 {
     });
     return { status: 'selected', selection, request, seriesVersion, evidence };
   }
+}
+
+function marketReadResearchConstraints(input: MarketBarWindowReadInputV3) {
+  return {
+    ...(input.priceResearch ? { priceResearch: true } : {}),
+    ...(input.requiredSource ? { requiredSource: input.requiredSource } : {}),
+    ...(input.tradabilityMode ? { tradabilityMode: input.tradabilityMode } : {}),
+  };
+}
+
+function marketReadWindowRequirements(input: MarketBarWindowReadInputV3) {
+  return {
+    ...(input.compatibility ? { compatibility: input.compatibility } : {}),
+    ...(input.warmup ? { warmup: input.warmup } : {}),
+  };
 }

@@ -14,11 +14,15 @@ import { marketDataKeys } from '../src/features/market-data/market-data.queries.
 import type { ProviderManifest } from '../src/features/market-data/market-data.types.js';
 import type { OptimizationExperimentSummary } from '../src/features/strategy/strategy-optimization.api.js';
 import fixture from './fixtures/experiment-risk-ui-recovery.json';
+import { projectPriceResearchStrategy } from '@thesis-ledger/schemas';
+
+const versionApi = vi.hoisted(() => ({ save: vi.fn() }));
+vi.mock('../src/features/strategy/strategy.api.js', async original => ({ ...await original<object>(), createStrategyVersion: versionApi.save }));
 
 const api = vi.hoisted(() => ({ save: vi.fn(), clear: vi.fn(), probe: vi.fn(), providers: vi.fn(), accounts: vi.fn(), applications: vi.fn(), preview: vi.fn(), riskSave: vi.fn(), detail: vi.fn(), compare: vi.fn(), clone: vi.fn(), cancel: vi.fn(), finalize: vi.fn(), adopt: vi.fn(), adoption: vi.fn(), toast: vi.fn(), close: vi.fn(), capabilities: vi.fn(), parameters: vi.fn(), create: vi.fn() }));
 vi.mock('../src/features/market-data/market-data.api', async (original) => ({ ...(await original<object>()), saveMarketProviderCredentials: api.save, clearMarketProviderCredential: api.clear, testMarketProvider: api.probe, fetchMarketProviders: api.providers }));
 vi.mock('../src/features/portfolio/portfolio.api', async (original) => ({ ...(await original<object>()), fetchAccounts: api.accounts }));
-vi.mock('../src/features/risk/risk.queries', () => ({ useNotificationRoutingQuery: () => ({ isPending: false, isError: false, data: { routes: [] } }) }));
+vi.mock('../src/features/risk/risk.queries', () => ({ useNotificationRoutingQuery: () => ({ isPending: false, isError: false, data: { routes: [] } }), useRiskNotificationRoutingQuery: () => ({ isPending: false, isError: false, data: { availableRoutes: [], selectedProviders: [] } }) }));
 vi.mock('../src/features/strategy/strategy-optimization.api', async (original) => ({
   ...(await original<object>()), fetchStrategyRiskApplications: api.applications, previewStrategyRiskApplication: api.preview, createStrategyRiskApplication: api.riskSave,
   fetchOptimizationExperiment: api.detail, fetchOptimizationCompare: api.compare, cloneOptimizationExperiment: api.clone, cancelOptimizationExperiment: api.cancel, finalizeOptimizationExperiment: api.finalize,
@@ -26,9 +30,9 @@ vi.mock('../src/features/strategy/strategy-optimization.api', async (original) =
   fetchOptimizationCapabilities: api.capabilities, fetchStrategyOptimizationParameters: api.parameters, createOptimizationExperiment: api.create,
 }));
 // 只隔离配置准备子组件；创建表单、路由、mutation 和后续读取使用实际实现。
-vi.mock('../src/features/strategy/OptimizationPricePreparation', () => ({ OptimizationPricePreparation: ({ target, startDate, endDate, initialCash, currency, onPrepared }: { target: unknown; startDate: string; endDate: string; initialCash: string; currency: string; onPrepared: (value: unknown) => void }) => <button onClick={() => onPrepared({ target, result: { runConfig: { startDate, endDate, baseCurrency: currency, initialCash: { [currency]: initialCash } } } })}>受控准备完成</button> }));
+vi.mock('../src/features/strategy/OptimizationPricePreparation', () => ({ OptimizationPricePreparation: ({ target, startDate, endDate, initialCash, currency, onPrepared }: { target: unknown; startDate: string; endDate: string; initialCash: string; currency: string; onPrepared: (value: unknown) => void }) => <button onClick={() => onPrepared({ target, result: { runConfig: { startDate, endDate, baseCurrency: currency, initialCash: { [currency]: initialCash }, priceResearch: { actualPriceWindow: {} }, executionPriceProtocol: { priceBasis: { adjustment: 'hfq' } } } } })}>受控准备完成</button> }));
 vi.mock('../src/components/ui/toast', () => ({ useToastManager: () => ({ add: api.toast, close: api.close }) }));
-const version = { id: fixture.experiment.baselineStrategyVersionId, version: 1, schemaVersion: 2, schema: setStrategyExecutionSymbol(createDefaultStrategySchema('恢复验收策略'), '600519.SH') };
+const version = { id: fixture.experiment.baselineStrategyVersionId, version: 1, schemaVersion: 3, schema: setStrategyExecutionSymbol(createDefaultStrategySchema('恢复验收策略'), '600519.SH') };
 const strategy = { id: 'strategy', name: '恢复验收策略', versions: [version] };
 const provider: ProviderManifest = { providerId: 'tushare', displayName: 'Tushare', version: 1, configVersion: 1, configured: true, enabled: true, credentialConfigured: true, credentialSource: 'control', credentialMethod: 'token', credentialFieldsConfigured: { token: true }, requiresCredential: true, capabilities: {}, credentialSchema: { methods: [{ method: 'token', fields: [{ name: 'token', secret: true, required: true }] }] } };
 const experiment = fixture.experiment as unknown as OptimizationExperimentSummary;
@@ -67,6 +71,26 @@ async function click(text: string) { await act(async () => button(text).click())
 async function input(value: string) { const field = document.querySelector('input')!; await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, value); field.dispatchEvent(new Event('input', { bubbles: true })); }); }
 
 describe('市场配置与策略实验恢复', () => {
+  it('旧策略先确认新研究版本，采用后持续锁定新 ID 并用于实验创建', async () => {
+    const legacy = { ...version, schemaVersion: 2, schema: { ...version.schema, schemaVersion: '2' as const,
+      signalSources: version.schema.signalSources.map(source => { const next = { ...source }; delete next.priceCoordinate; return next; }),
+    } };
+    const projected = projectPriceResearchStrategy(legacy.schema);
+    const saved = { ...version, id: '55555555-5555-4555-8555-555555555555', version: 2, schemaVersion: 3, schema: projected };
+    versionApi.save.mockResolvedValue(saved);
+    await mount(<StrategyExperimentCreatePage strategies={[{ ...strategy, versions: [legacy] }]} />, '/strategy/experiments/new?strategyVersionId=' + legacy.id);
+    await wait(() => expect(document.body.textContent).toContain('仓位'));
+    await click('下一步');
+    expect(document.body.textContent).toContain('请先确认研究口径');
+    await click('采用研究口径并保存新版本');
+    await wait(() => expect(document.body.textContent).toContain('恢复验收策略 · v2'));
+    expect(versionApi.save).toHaveBeenCalledWith({ strategyId: strategy.id, schema: projected });
+    expect(legacy.schema.schemaVersion).toBe('2');
+    await click('下一步'); await click('下一步'); await click('受控准备完成');
+    api.create.mockRejectedValueOnce(new Error('受控创建失败'));
+    await click('创建实验'); await wait(() => expect(api.create).toHaveBeenCalledOnce());
+    expect(api.create.mock.calls[0]?.[0]).toMatchObject({ strategyVersionId: saved.id, runConfig: { priceResearch: expect.anything() } });
+  });
   it('缺少 randomUUID 时风险页可预览且失败重试保持同一幂等键', async () => {
     const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
     vi.stubGlobal('crypto', { getRandomValues });
@@ -123,6 +147,7 @@ describe('市场配置与策略实验恢复', () => {
     let complete!: () => void;
     api.riskSave.mockImplementationOnce(() => new Promise((resolve) => { complete = () => resolve(saved); }));
     await mount(<StrategyRiskApplicationPage strategies={[strategy]} presentation="drawer" />, `/strategy/library/strategy/versions/${version.id}/risk-application`);
+    await click('通知设置');
     await wait(() => expect(button('预览风险规则').disabled).toBe(false)); await click('预览风险规则');
     await wait(() => expect(button('保存为停用').disabled).toBe(false)); await click('保存为停用');
     await wait(() => expect(document.querySelector<HTMLInputElement>('input[max="10080"]')!.disabled).toBe(true));

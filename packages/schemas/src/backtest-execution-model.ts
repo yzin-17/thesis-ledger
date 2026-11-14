@@ -232,6 +232,18 @@ export const executionModelDisclosureSchemaV3 = z.strictObject({
 export type ExecutionModelDisclosureV3 = z.infer<typeof executionModelDisclosureSchemaV3>;
 export type ExecutionModelFees = z.infer<typeof executionModelFeesSchema>;
 
+function validateNormalizedSegmentFees(
+  segment: BacktestExecutionModelV3['segments'][number],
+  index: number,
+  accountingBasis: 'raw-events' | 'normalized-series',
+  add: (path: (string | number)[], message: string) => void,
+): void {
+  if (accountingBasis === 'normalized-series' && segment.fees?.tradingActivityFee)
+    add(['executionModel', 'segments', index, 'fees', 'tradingActivityFee'], '按股数收费要求实际股数，归一化数量不能作为TAF基数');
+  if (accountingBasis === 'normalized-series' && segment.fees?.brokerCommission?.basis.kind === 'actualShares')
+    add(['executionModel', 'segments', index, 'fees', 'brokerCommission', 'basis'], '归一化美股佣金必须显式选用参考股价换算，不能按真实股数计费');
+}
+
 /** Checks the V3 RunConfig accounting declaration against the frozen model. */
 export const executionModelAccountingIssuesV3 = (
   model: BacktestExecutionModelV3 | undefined,
@@ -257,10 +269,7 @@ export const executionModelAccountingIssuesV3 = (
     add(['executionModel', 'scope', 'instrumentType'], '净值基金不能使用归一化日线执行模型');
   }
   for (const { segment, index } of overlapping) {
-    if (accountingBasis === 'normalized-series' && segment.fees?.tradingActivityFee)
-      add(['executionModel', 'segments', index, 'fees', 'tradingActivityFee'], '按股数收费要求实际股数，归一化数量不能作为TAF基数');
-    if (accountingBasis === 'normalized-series' && segment.fees?.brokerCommission?.basis.kind === 'actualShares')
-      add(['executionModel', 'segments', index, 'fees', 'brokerCommission', 'basis'], '归一化美股佣金必须显式选用参考股价换算，不能按真实股数计费');
+    validateNormalizedSegmentFees(segment, index, accountingBasis, add);
     const assumptions =
       segment.execution.mode === 'exchange' ? segment.execution.normalizedExecution : undefined;
     if (accountingBasis === 'normalized-series') {

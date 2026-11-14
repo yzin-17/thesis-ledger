@@ -165,6 +165,9 @@ describe('backtest corporate actions', () => {
     expect(target.snapshot().position).toMatchObject({ quantity: '10', averageCost: '10' });
   });
 
+});
+
+describe("公司行动复权、归一化与身份限制", () => {
   it('matches adjusted series semantics without applying a second ledger mutation', () => {
     const action = fact({
       type: 'SPLIT',

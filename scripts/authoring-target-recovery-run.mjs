@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { main as recover } from '../../thesis-ledger-infra/scripts/authoring-target-recovery.mjs';
+import { main as recover } from '../../thesis-ledger/scripts/local-runtime/authoring-target-recovery.mjs';
 import {
   withMissingAuthoringDelivery,
   assertDeliveryTerminal,
-} from '../../thesis-ledger-infra/scripts/authoring-target-delivery.mjs';
-import { withUnavailableAuthoringQueue } from '../../thesis-ledger-infra/scripts/authoring-target-queue-outage.mjs';
+} from '../../thesis-ledger/scripts/local-runtime/authoring-target-delivery.mjs';
+import { withUnavailableAuthoringQueue } from '../../thesis-ledger/scripts/local-runtime/authoring-target-queue-outage.mjs';
 
 const args = process.argv.slice(2);
 assert.equal(args[0], '--confirm=thesis-ledger-dev/thesis_ledger');

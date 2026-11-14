@@ -1,5 +1,8 @@
 import type { BacktestJob, BacktestJobResult } from './strategy.types.js';
 import { backtestBaseCurrency, backtestNumber } from './strategy-backtest-detail.model.js';
+import { projectBacktestTradeMarkers, type BacktestTradeMarker } from './backtest-trade-markers.model.js';
+import type { BacktestInstrumentSeries } from '@thesis-ledger/schemas';
+import { projectBacktestInstrumentChart, type BacktestInstrumentChart } from './backtest-instrument-chart.model.js';
 
 export type BacktestEquityChartPoint = {
   time: number;
@@ -16,6 +19,8 @@ export type BacktestDrawdownChartPoint = {
 };
 
 export type BacktestChartModel = {
+  instrument?: BacktestInstrumentChart | undefined;
+  priceResearch?: boolean;
   equity: BacktestEquityChartPoint[];
   drawdown: BacktestDrawdownChartPoint[];
   drawdownSource: 'authoritative' | 'display-derived' | 'unavailable';
@@ -23,6 +28,8 @@ export type BacktestChartModel = {
   timezone: string;
   completeness: 'complete' | 'limited' | 'unknown';
   limitation: string | null;
+  tradeMarkers: BacktestTradeMarker[];
+  unmappedFillCount: number;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -117,8 +124,19 @@ const resultCompleteness = (result: BacktestJobResult) => {
 export const buildBacktestChartModel = (
   job: BacktestJob,
   result: BacktestJobResult,
+  instrumentSeries?: BacktestInstrumentSeries,
 ): BacktestChartModel => {
   const equity = parseBacktestEquityPoints(result);
+  const timezone = backtestChartTimezone(job);
+  const instrument = projectBacktestInstrumentChart(job.id, job.snapshotId ?? result.snapshotId, instrumentSeries, equity);
+  let markerPoints: { time: number }[] = [];
+  let markerTimezone = timezone;
+  let markerAlignment: 'at-or-after' | 'same-date' = 'at-or-after';
+  if (instrument?.status === 'available') {
+    markerPoints = instrument.points.filter((point) => point.value !== null);
+    markerTimezone = instrument.source.timezone;
+    if (instrument.source.timeframe === '1d') markerAlignment = 'same-date';
+  }
   const authoritative = parseBacktestDrawdownPoints(result);
   let drawdown = authoritative;
   let drawdownSource: BacktestChartModel['drawdownSource'] = 'authoritative';
@@ -137,11 +155,14 @@ export const buildBacktestChartModel = (
     limitation = '结果未提供完整性证据；图中仅展示已返回时点。';
   }
   return {
+    instrument,
     equity,
+    priceResearch: asRecord(result.priceResearch)?.protocolVersion === 'price-research-v1',
     drawdown,
     drawdownSource,
     currency: backtestBaseCurrency(job, result),
-    timezone: backtestChartTimezone(job),
+    timezone,
+    ...projectBacktestTradeMarkers(result.simulationFills, markerPoints, markerTimezone, markerAlignment),
     completeness,
     limitation,
   };
@@ -205,9 +226,9 @@ export const backtestEquityCsv = (
   const rows = [
     [
       `时间（${model.timezone}）`,
-      `组合权益（${model.currency ?? '币种未记录'}）`,
-      '现金',
-      '持仓市值',
+      `${model.priceResearch ? '研究权益' : '组合权益'}（${model.currency ?? '币种未记录'}）`,
+      model.priceResearch ? '研究资金余额' : '现金',
+      model.priceResearch ? '持仓研究价值' : '持仓市值',
     ],
     ...points.map((point) => [point.timestamp, point.value, point.cash, point.positionsValue]),
   ];

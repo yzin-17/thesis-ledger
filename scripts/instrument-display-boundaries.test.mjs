@@ -4,11 +4,26 @@ import { instrumentDisplayBoundaryViolation as check } from './instrument-displa
 
 const risk = 'apps/server/src/risk/risk-rule.service.ts';
 const ready = 'InstrumentDisplayService; this.display.resolve(symbols);';
+test('策略名称投影必须消费公共目录读取边界', () => {
+  const file = 'apps/server/src/backtest/strategy-instrument-display.ts';
+  assert.match(check(file, 'directory.resolveSymbols(symbols)'), /公共名称服务/u);
+  assert.equal(check(file, 'InstrumentDisplayService; display.resolveDirectory(symbols);'), null);
+  assert.match(check('apps/server/src/backtest/backtest.service.ts', 'return strategy.versions'), /目录名称投影/u);
+  assert.equal(check('apps/server/src/backtest/backtest.service.ts', 'nameStrategyVersions(versions, display)'), null);
+});
 test('当前业务名称需要公共读取服务，拒绝旧 Asset 查询和传入旧名遮蔽', () => {
   assert.match(check(risk, 'prisma.asset.findMany({ select: { name: true } })'), /公共名称服务/u);
   assert.match(check(risk, `${ready} prisma.asset.findMany({});`), /Asset/u);
   assert.match(check(risk, `${ready} context.assetName || name`), /遮蔽/u);
   assert.equal(check(risk, ready), null);
+});
+test('实验名称投影使用统一目录，列表和详情不可直接省略投影', () => {
+  const helper = 'apps/server/src/strategy-optimization/strategy-optimization-instrument-display.ts';
+  assert.match(check(helper, 'prisma.instrument.findMany({})'), /公共名称服务/u);
+  assert.equal(check(helper, 'InstrumentDisplayService; display.resolveDirectory(symbols);'), null);
+  const reader = 'apps/server/src/strategy-optimization/strategy-optimization-read.service.ts';
+  assert.match(check(reader, 'return rows.map(enrichOptimizationExperiment);'), /目录名称投影/u);
+  assert.equal(check(reader, 'projectNamedOptimizationExperiments(rows, display);'), null);
 });
 test('名称服务保持 Market 所有权与单向依赖', () => {
   assert.match(

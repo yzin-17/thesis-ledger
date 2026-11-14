@@ -389,6 +389,9 @@ describe('冻结 execution-model-v1 的 Runner 消费', () => {
     expect(sell).toMatchObject({ status: 'filled', settlement: { cashAvailableOn: '2026-09-09' } });
   });
 
+});
+
+describe("NAV 生命周期消费冻结执行模型", () => {
   it('按冻结 NAV 生命周期执行申购和赎回，模型费用不采纳请求旧费用', () => {
     const simulation = new CnNavSimulation(navConfig());
     const requestAt = '2026-09-08T05:00:00.000Z';

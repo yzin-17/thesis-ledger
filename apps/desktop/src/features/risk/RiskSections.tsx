@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FilterReset } from '@/components/ui/filter-bar';
 import { BellOff, CircleAlert } from 'lucide-react';
 import {
   Dialog,
@@ -82,10 +83,11 @@ export function NotificationProviderNotice({
   );
 }
 
-const riskReadEmptyLabel = (state: LoadState, subject: string) => {
+const riskReadEmptyLabel = (state: LoadState, subject: string, filtered = false) => {
   if (state === 'loading') return `正在读取${subject}…`;
   if (state === 'error') return `${subject}读取失败，请重新读取。`;
   if (state === 'stale') return `${subject}更新失败，当前没有可显示记录。`;
+  if (filtered) return `当前筛选下没有${subject}。`;
   return `暂无${subject}。`;
 };
 
@@ -145,7 +147,7 @@ export function RiskEventTable({
           </TableHeader>
           <tbody>
             {empty ? (
-              <EmptyTableRow colSpan={5} loading={loadState === 'loading'} label={riskReadEmptyLabel(loadState, '风险事件')} />
+              <EmptyTableRow colSpan={5} loading={loadState === 'loading'} label={riskReadEmptyLabel(loadState, '风险事件', Boolean(severityFilter))} />
             ) : (
               <RiskEventRows events={visibleEvents} limit={limit} />
             )}
@@ -200,6 +202,7 @@ export function RiskNotificationTable({
   deliveries,
   statusFilter,
   headerControls,
+  onClearStatusFilter,
   onRetry,
 }: {
   refreshing?: boolean;
@@ -207,6 +210,7 @@ export function RiskNotificationTable({
   deliveries: NotificationRecord[];
   statusFilter?: string | null;
   headerControls?: ReactNode;
+  onClearStatusFilter?: () => void;
   onRetry?: (() => void) | undefined;
 }) {
   const visibleDeliveries = statusFilter
@@ -217,7 +221,14 @@ export function RiskNotificationTable({
   return (
     <section className="panel mt-0 border-t-0">
       {headerControls}
-      {statusFilter && <p className="mb-group text-sm text-muted-foreground">当前筛选：{riskStatusLabel(statusFilter)}。</p>}
+      {statusFilter && (
+        <div className="mb-group flex flex-wrap items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            当前筛选：{riskStatusLabel(statusFilter)}。
+          </p>
+          {onClearStatusFilter && <FilterReset size="xs" onReset={onClearStatusFilter} />}
+        </div>
+      )}
       {(loadState === 'error' || loadState === 'stale') && (
         <DataStateBanner state={loadState} {...(onRetry ? { onRetry } : {})} />
       )}
@@ -234,7 +245,7 @@ export function RiskNotificationTable({
           </TableHeader>
           <tbody>
             {empty ? (
-              <EmptyTableRow colSpan={5} loading={loadState === 'loading'} label={riskReadEmptyLabel(loadState, '通知记录')} />
+              <EmptyTableRow colSpan={5} loading={loadState === 'loading'} label={riskReadEmptyLabel(loadState, '通知记录', Boolean(statusFilter))} />
             ) : (
               visibleDeliveries.map((delivery) => (
                 <tr key={delivery.id}>

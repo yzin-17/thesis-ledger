@@ -6,13 +6,14 @@ import {
   type RuleMonitorCheck,
   type RuleMonitorConfigure,
   type RuleMonitorStatus,
+  type RuleMonitorTask,
 } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 export const ruleMonitorKey = ['desktop', 'market-data', 'rule-monitor'] as const;
 const api = () => getDesktopApiClient().market;
 type Draft = { enabled: boolean; sourceIds: string[]; revision: number };
 
-export function useRuleSourceMonitor() {
+export function useRuleSourceMonitor(options: { onTaskSaved?: () => void } = {}) {
   const client = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
   const request = useRef<RuleMonitorCheck | null>(null);
@@ -40,6 +41,21 @@ export function useRuleSourceMonitor() {
       void client.invalidateQueries({ queryKey: ruleMonitorKey });
     },
   });
+  const create = useMutation({
+    mutationFn: (input: RuleMonitorTask) => api().createRuleMonitorTask(input),
+    onMutate: () => client.cancelQueries({ queryKey: ruleMonitorKey }),
+    onSuccess: (result) => {
+      client.setQueryData<RuleMonitorStatus>(ruleMonitorKey, (current) =>
+        current ? { ...current, config: result.config } : current,
+      );
+      setDraft(null);
+      options.onTaskSaved?.();
+      void client.invalidateQueries({ queryKey: ruleMonitorKey });
+    },
+    onError: () => {
+      void client.invalidateQueries({ queryKey: ruleMonitorKey });
+    },
+  });
   const check = useMutation({
     mutationFn: (input: RuleMonitorCheck) => api().checkRuleSources(input),
     onMutate: () => client.cancelQueries({ queryKey: ruleMonitorKey }),
@@ -55,30 +71,34 @@ export function useRuleSourceMonitor() {
   const update = (change: Partial<Draft>) => {
     if (selection) setDraft({ ...selection, ...change });
   };
-  const run = () => {
-    if (!selection?.sourceIds.length) return;
-    if (
-      !request.current ||
-      JSON.stringify(request.current.sourceIds) !== JSON.stringify(selection.sourceIds)
-    )
+  const checkInput = (sourceIds: string[]) => {
+    if (!request.current || JSON.stringify(request.current.sourceIds) !== JSON.stringify(sourceIds))
       request.current = {
         version: ruleSourceMonitorVersion,
         requestId: createClientRequestId(),
-        sourceIds: [...selection.sourceIds],
+        sourceIds: [...sourceIds],
       };
-    check.mutate(request.current);
+    return request.current;
   };
-  const saveConfig = () => {
+  const runSources = (sourceIds: string[]) => check.mutateAsync(checkInput(sourceIds));
+  const createTask = () => {
     if (selection)
-      save.mutate({
+      create.mutate({
         version: ruleSourceMonitorVersion,
         expectedRevision: selection.revision,
-        enabled: selection.enabled,
         sourceIds: selection.sourceIds,
       });
   };
+  const reloadTask = async () => {
+    const result = await status.refetch();
+    if (result.error || !result.data) return;
+    const revision = result.data.config.revision;
+    setDraft((current) => (current ? { ...current, revision } : null));
+    create.reset();
+  };
   const busy =
     save.isPending ||
+    create.isPending ||
     check.isPending ||
     ['queued', 'running'].includes(status.data?.latestRun?.status ?? '');
   return {
@@ -88,13 +108,10 @@ export function useRuleSourceMonitor() {
     update,
     save,
     check,
-    run,
-    saveConfig,
+    runSources,
+    create,
+    createTask,
+    reloadTask,
     busy,
-    reload: () => {
-      setDraft(null);
-      save.reset();
-      void status.refetch();
-    },
   };
 }

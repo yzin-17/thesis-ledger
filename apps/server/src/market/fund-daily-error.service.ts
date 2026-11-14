@@ -26,7 +26,9 @@ export class FundDailyErrorService {
     @Inject(RedisService) private readonly redis: RedisService,
     @Inject(DsaClient) private readonly dsa: DsaClient,
     @Optional() sessions?: MarketSessionReader,
-  ) { this.sessions = sessions ?? new MarketSessionReader(new MarketPeriodCalendarReader(dsa)); }
+  ) {
+    this.sessions = sessions ?? new MarketSessionReader(new MarketPeriodCalendarReader(dsa));
+  }
   onModuleInit() {
     if (process.env.NODE_ENV === 'test') return;
     const tick = () => void this.run().catch(() => this.log.warn('基金收盘估值检查失败'));
@@ -44,8 +46,11 @@ export class FundDailyErrorService {
     try {
       const today = fundValuationDay(now);
       const current = await this.sessions.read('CN', now);
-      const closingAt = current.sessions.filter((window) => window.tradingDate === today).at(-1)?.endAt;
-      const closed = current.state !== 'unknown' && (!closingAt || now.getTime() >= Date.parse(closingAt));
+      const closingAt = current.sessions
+        .filter((window) => window.tradingDate === today)
+        .at(-1)?.endAt;
+      const closed =
+        current.state !== 'unknown' && (!closingAt || now.getTime() >= Date.parse(closingAt));
       const limit = new Date(Date.parse(today + 'T00:00:00+08:00') + (closed ? 86400000 : 0));
       const points = await this.db.$queryRaw<FundValuationPoint[]>(Prisma.sql`
         SELECT DISTINCT ON (p."symbol",p."method",(p."minute"+interval '8 hours')::date) p.*
@@ -91,21 +96,18 @@ export class FundDailyErrorService {
     await this.db.fundDailyEstimateError.updateMany({ where, data: { checkedAt: now } });
     const control = new MarketCacheControl(this.dsa);
     const scope = await control.read({ capability: 'FUND_NAV', symbol: row.symbol });
-    const policy = (await this.dsa.effectiveControlPolicyV3()).projection?.effective;
-    const key = marketRouteKeyIdV3(scope.context.routeKey);
-    const primary = policy?.routes.find((r) => marketRouteKeyIdV3(r.key) === key)?.targets[0];
-    if (
-      !policy?.enabled ||
-      policy.revision !== scope.context.policyRevision ||
-      !primary?.eligible ||
-      primary.providerId !== 'akshare' ||
-      primary.upstreamSource !== 'eastmoney'
-    )
-      return;
+    const admitted = publicComparisonRoute(
+      (await this.dsa.effectiveControlPolicyV3()).projection,
+      scope,
+    );
+    if (!admitted) return;
+    const { primary, policy } = admitted;
     const estimate = fundValuationSchema.parse(row.estimate).estimatedNav;
     if (estimate === null) return;
     const session = await this.sessions.read('CN', new Date(row.day + 'T12:00:00+08:00'));
-    const closingAt = session.sessions.filter((window) => window.tradingDate === row.day).at(-1)?.endAt;
+    const closingAt = session.sessions
+      .filter((window) => window.tradingDate === row.day)
+      .at(-1)?.endAt;
     if (session.state === 'unknown' || !closingAt) return;
     const prefix = 'fund-nav:4:' + row.symbol + ':' + scope.context.generation;
     const candidates = await this.redis.client.mget(
@@ -114,7 +116,14 @@ export class FundDailyErrorService {
     );
     const settle = async (raw: unknown, fromCache: boolean) => {
       const nav = parseCurrentFundNav(raw, row.symbol);
-      const errors = fundErrorFor(row.day, row.symbol, estimate, nav, fromCache ? now : new Date(), closingAt);
+      const errors = fundErrorFor(
+        row.day,
+        row.symbol,
+        estimate,
+        nav,
+        fromCache ? now : new Date(),
+        closingAt,
+      );
       if (!errors) return false;
       await control.assertCurrent(scope);
       await this.db.fundDailyEstimateError.updateMany({
@@ -169,4 +178,23 @@ export class FundDailyErrorService {
       errors: row.errors,
     };
   }
+}
+
+function publicComparisonRoute(
+  projection: Awaited<ReturnType<DsaClient['effectiveControlPolicyV3']>>['projection'],
+  scope: Awaited<ReturnType<MarketCacheControl['read']>>,
+) {
+  const policy = projection?.effective;
+  const key = marketRouteKeyIdV3(scope.context.routeKey);
+  const primary = policy?.routes.find((r) => marketRouteKeyIdV3(r.key) === key)?.targets[0];
+  if (
+    !policy?.enabled ||
+    policy.revision !== scope.context.policyRevision ||
+    !primary?.eligible ||
+    primary.providerId !== 'akshare' ||
+    primary.upstreamSource !== 'eastmoney'
+  )
+    return null;
+
+  return { primary, policy };
 }

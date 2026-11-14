@@ -24,160 +24,20 @@ it.skipIf(!url)('两模型共用封存材料，各自独立调仓或观望，重
   const db = new PrismaService({ datasourceUrl: url! });
   const owner = randomUUID();
   try {
-    const store = new ModelArenaRepository(db),
-      instrumentId = randomUUID(),
-      symbol = '006987.SZ';
-    await db.instrument.create({
-      data: {
-        id: instrumentId,
-        market: 'SZ',
-        canonicalCode: '006987',
-        instrumentType: 'STOCK',
-        displayName: '研究样本',
-        generation: 1,
-      },
-    });
-    const day = new Date().toISOString().slice(0, 10);
-    const budget = { requests: 2, tokens: 50000, costMicros: 100 };
-    const match = await store.create(owner, {
-      version: 1,
-      title: '决策样本',
-      market: 'CN',
-      currency: 'CNY',
-      timeZone: 'Asia/Shanghai',
-      calendarId: 'CN',
-      calendarVersion: 'fixture',
-      startsOn: day,
-      endsOn: day,
-      instruments: [{ instrumentId, symbol, assetType: 'STOCK' }],
-      entrants: ['first', 'second'].map((model) => ({
-        providerId: 'fixture',
-        model,
-        budget,
-        maxInputTokens: 20000,
-        maxOutputTokens: 500,
-      })),
-      initialCash: '1000',
-      fees: { version: 'fixture', buyBps: 0, sellBps: 0, minimum: '0', slippageBps: 0 },
-      maxPositionBps: 6000,
-      benchmarks: ['cash', 'equal_weight_buy_hold'],
-      decisionDeadlineMinutes: 60,
-      maxInfrastructureAttempts: 2,
-      budgetCurrency: 'USD',
-      budget,
-    });
-    await store.transition(owner, match.id, 'running');
-    const now = Date.now();
-    await db.arenaOccurrence.create({
-      data: {
-        arenaId: match.id,
-        tradingDate: day,
-        dueAt: new Date(now - 5000),
-        deadlineAt: new Date(now + 60000),
-        nextOpenAt: new Date(now + 86400000),
-        calendarRevision: 'fixture',
-        maxAttempts: 2,
-        state: 'complete',
-      },
-    });
-    const entrants = (await store.read(owner, match.id)).entrants;
-    const round = await new ArenaRoundAdmission(db).open(
-      owner,
-      match.id,
-      day,
-      new Map(entrants.map((e) => [e.id, { maxCostMicros: 10, currency: 'USD' }])),
-    );
-    const fact = {
+    const {
+      store,
+      match,
+      round,
+      now,
       symbol,
-      kind: 'daily_bar',
-      date: day,
-      availableAt: new Date(now - 2000).toISOString(),
-      observedAt: new Date(now - 2000).toISOString(),
-      open: '10',
-      close: '10',
-      ref: 'source:close',
-    };
-    const evidence = vi
-      .fn()
-      .mockResolvedValue([
-        fact,
-        { ...fact, availableAt: new Date(now + 86400000).toISOString(), ref: 'future-ref' },
-      ]);
-    const packets = new ArenaResearchPackets(db, {
-      read: evidence,
-      recentNews: async () => [
-        {
-          kind: 'news',
-          symbol,
-          date: day,
-          ref: 'news:qualified',
-          availableAt: new Date(now - 1000).toISOString(),
-          publishedAt: new Date(now - 2000).toISOString(),
-          title: '已发布资讯',
-          publisher: null,
-          url: 'https://example.org/fixture',
-          excerpt: null,
-        },
-        {
-          kind: 'news',
-          symbol,
-          date: day,
-          ref: 'news:late',
-          availableAt: new Date(now + 86400000).toISOString(),
-          publishedAt: new Date(now - 2000).toISOString(),
-          title: '迟到资讯',
-          publisher: null,
-          url: 'https://example.org/fixture',
-          excerpt: null,
-        },
-      ],
-    } as unknown as MarketInstrumentEvidence);
-    const sdk = vi.fn(async (request: { model: string; messages: { content: string }[] }) => {
-      const context = JSON.parse(request.messages[1]!.content);
-      expect(context.facts.map((f: { ref: string }) => f.ref)).toEqual([
-        'news:qualified',
-        'source:close',
-      ]);
-      expect(context.ownBook).toMatchObject({ cash: '1000', positions: [] });
-      const rationale = {
-        symbol,
-        references: ['source:close'],
-        reason: '受控判断',
-        invalidatedBy: '条件改变',
-      };
-      return {
-        output: {
-          actions: [
-            request.model === 'first'
-              ? { ...rationale, action: 'target', weightBps: 5000 }
-              : { ...rationale, action: 'observe' },
-          ],
-        },
-        actualModel: request.model,
-        usage: { status: 'reported', inputTokens: 120, outputTokens: 80, totalTokens: 200 },
-        providerCost: '0',
-        providerCostCurrency: 'USD',
-      };
-    });
-    const routes = {
-      strictReadyContract: ({ model }: { model: string }) => ({
-        provider: {
-          metadata: {
-            modelPricing: {
-              [model]: { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' },
-            },
-          },
-          sdkRuntime: () => ({ baseURL: 'http://127.0.0.1:1', apiKey: '', authMode: 'none' }),
-        },
-        execution: { mode: 'json_validated', adapter: 'openai-compatible' },
-      }),
-    };
-    const decisions = new ArenaModelDecisions(
-      db,
-      routes as unknown as AiProviderRegistry,
-      { generate: sdk } as unknown as AiSdkGenerationAdapter,
-    );
-    const runner = new ArenaDecisionRunner(db, packets, decisions);
+      day,
+      evidence,
+      sdk,
+      routes,
+      packets,
+      decisions,
+      runner,
+    } = await prepareArenaDecisionRound(db, owner);
     await packets.freeze(round.id);
     const record = await db.arenaReservation.findFirstOrThrow({ where: { roundId: round.id } });
     await Promise.all([decisions.execute(record.id), decisions.execute(record.id)]);
@@ -335,3 +195,174 @@ it.skipIf(!url)('两模型共用封存材料，各自独立调仓或观望，重
     await db.$disconnect();
   }
 });
+
+async function prepareArenaDecisionRound(db: PrismaService, owner: string) {
+  const store = new ModelArenaRepository(db),
+    instrumentId = randomUUID(),
+    symbol = '006987.SZ';
+  await db.instrument.create({
+    data: {
+      id: instrumentId,
+      market: 'SZ',
+      canonicalCode: '006987',
+      instrumentType: 'STOCK',
+      displayName: '研究样本',
+      generation: 1,
+    },
+  });
+  const day = new Date().toISOString().slice(0, 10);
+  const budget = { requests: 2, tokens: 50000, costMicros: 100 };
+  const match = await store.create(owner, {
+    version: 1,
+    title: '决策样本',
+    market: 'CN',
+    currency: 'CNY',
+    timeZone: 'Asia/Shanghai',
+    calendarId: 'CN',
+    calendarVersion: 'fixture',
+    startsOn: day,
+    endsOn: day,
+    instruments: [{ instrumentId, symbol, assetType: 'STOCK' }],
+    entrants: ['first', 'second'].map((model) => ({
+      providerId: 'fixture',
+      model,
+      budget,
+      maxInputTokens: 20000,
+      maxOutputTokens: 500,
+    })),
+    initialCash: '1000',
+    fees: { version: 'fixture', buyBps: 0, sellBps: 0, minimum: '0', slippageBps: 0 },
+    maxPositionBps: 6000,
+    benchmarks: ['cash', 'equal_weight_buy_hold'],
+    decisionDeadlineMinutes: 60,
+    maxInfrastructureAttempts: 2,
+    budgetCurrency: 'USD',
+    budget,
+  });
+  await store.transition(owner, match.id, 'running');
+  const now = Date.now();
+  await db.arenaOccurrence.create({
+    data: {
+      arenaId: match.id,
+      tradingDate: day,
+      dueAt: new Date(now - 5000),
+      deadlineAt: new Date(now + 60000),
+      nextOpenAt: new Date(now + 86400000),
+      calendarRevision: 'fixture',
+      maxAttempts: 2,
+      state: 'complete',
+    },
+  });
+  const entrants = (await store.read(owner, match.id)).entrants;
+  const round = await new ArenaRoundAdmission(db).open(
+    owner,
+    match.id,
+    day,
+    new Map(entrants.map((e) => [e.id, { maxCostMicros: 10, currency: 'USD' }])),
+  );
+  const fact = {
+    symbol,
+    kind: 'daily_bar',
+    date: day,
+    availableAt: new Date(now - 2000).toISOString(),
+    observedAt: new Date(now - 2000).toISOString(),
+    open: '10',
+    close: '10',
+    ref: 'source:close',
+  };
+  const evidence = vi
+    .fn()
+    .mockResolvedValue([
+      fact,
+      { ...fact, availableAt: new Date(now + 86400000).toISOString(), ref: 'future-ref' },
+    ]);
+  const packets = new ArenaResearchPackets(db, {
+    read: evidence,
+    recentNews: async () => [
+      {
+        kind: 'news',
+        symbol,
+        date: day,
+        ref: 'news:qualified',
+        availableAt: new Date(now - 1000).toISOString(),
+        publishedAt: new Date(now - 2000).toISOString(),
+        title: '已发布资讯',
+        publisher: null,
+        url: 'https://example.org/fixture',
+        excerpt: null,
+      },
+      {
+        kind: 'news',
+        symbol,
+        date: day,
+        ref: 'news:late',
+        availableAt: new Date(now + 86400000).toISOString(),
+        publishedAt: new Date(now - 2000).toISOString(),
+        title: '迟到资讯',
+        publisher: null,
+        url: 'https://example.org/fixture',
+        excerpt: null,
+      },
+    ],
+  } as unknown as MarketInstrumentEvidence);
+  const sdk = vi.fn(async (request: { model: string; messages: { content: string }[] }) => {
+    const context = JSON.parse(request.messages[1]!.content);
+    expect(context.facts.map((f: { ref: string }) => f.ref)).toEqual([
+      'news:qualified',
+      'source:close',
+    ]);
+    expect(context.ownBook).toMatchObject({ cash: '1000', positions: [] });
+    const rationale = {
+      symbol,
+      references: ['source:close'],
+      reason: '受控判断',
+      invalidatedBy: '条件改变',
+    };
+    return {
+      output: {
+        actions: [
+          request.model === 'first'
+            ? { ...rationale, action: 'target', weightBps: 5000 }
+            : { ...rationale, action: 'observe' },
+        ],
+      },
+      actualModel: request.model,
+      usage: { status: 'reported', inputTokens: 120, outputTokens: 80, totalTokens: 200 },
+      providerCost: '0',
+      providerCostCurrency: 'USD',
+    };
+  });
+  const routes = {
+    strictReadyContract: ({ model }: { model: string }) => ({
+      provider: {
+        metadata: {
+          modelPricing: {
+            [model]: { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' },
+          },
+        },
+        sdkRuntime: () => ({ baseURL: 'http://127.0.0.1:1', apiKey: '', authMode: 'none' }),
+      },
+      execution: { mode: 'json_validated', adapter: 'openai-compatible' },
+    }),
+  };
+  const decisions = new ArenaModelDecisions(
+    db,
+    routes as unknown as AiProviderRegistry,
+    { generate: sdk } as unknown as AiSdkGenerationAdapter,
+  );
+  const runner = new ArenaDecisionRunner(db, packets, decisions);
+  return {
+    store,
+    match,
+    round,
+    now,
+    symbol,
+    day,
+    evidence,
+    sdk,
+    routes,
+    packets,
+    decisions,
+    runner,
+  };
+}

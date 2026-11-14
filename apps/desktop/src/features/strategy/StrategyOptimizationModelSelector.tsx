@@ -1,4 +1,5 @@
 import type { OptimizationReasoningEffort } from '@thesis-ledger/schemas';
+import { useState } from 'react';
 import {
   Combobox,
   ComboboxChip,
@@ -62,6 +63,7 @@ export function StrategyOptimizationModelSelector({
   ) => void;
 }) {
   const modelAnchor = useComboboxAnchor();
+  const [modelSearch, setModelSearch] = useState('');
   const selectedRoutes = routes.filter((route) =>
     selectedModels.includes(routeKey(route.provider, route.model)),
   );
@@ -81,13 +83,19 @@ export function StrategyOptimizationModelSelector({
         模型（最多 3 个）
       </div>
       <Combobox
-        items={routes.map((route) => routeKey(route.provider, route.model))}
+        items={routes.filter((route) => `${route.provider}:${route.model}`.toLocaleLowerCase().includes(modelSearch.trim().toLocaleLowerCase()))
+          .map((route) => routeKey(route.provider, route.model))}
+        filter={null} inputValue={modelSearch}
+        onInputValueChange={(value, details) => {
+          if (details.reason === 'input-change' || details.reason === 'clear-press') setModelSearch(value);
+        }}
         multiple
         autoHighlight
         value={selectedModels}
-        onValueChange={(value) => onSelectedModelsChange(limitSelectedModels(value))}
+        onValueChange={(value) => { onSelectedModelsChange(limitSelectedModels(value)); setModelSearch(''); }}
         onOpenChange={(open, eventDetails) => {
           if (!open && eventDetails.reason === 'item-press') eventDetails.cancel();
+          else if (!open) setModelSearch('');
         }}
       >
         <ComboboxChips ref={modelAnchor}>
@@ -97,7 +105,7 @@ export function StrategyOptimizationModelSelector({
                 {(values as string[]).map((key) => {
                   const route = routes.find((item) => routeKey(item.provider, item.model) === key);
                   return (
-                    <ComboboxChip key={key} className="font-mono">
+                    <ComboboxChip key={key} className="font-mono" removeLabel={`移除 ${route ? `${route.provider}:${route.model}` : key}`}>
                       <span className="max-w-72 truncate">
                         {route ? `${route.provider}:${route.model}` : key}
                       </span>
@@ -137,7 +145,7 @@ export function StrategyOptimizationModelSelector({
         <p className="mt-2">可选模型来自数据与自动化中的已启用配置。每项同时指定提供方和模型；没有可选推理强度时使用模型默认设置。</p>
       </details>
       {selectedRoutes.length > 0 ? (
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-group md:grid-cols-2 xl:grid-cols-3">
           {selectedRoutes.map((route) => {
             const key = routeKey(route.provider, route.model);
             const options = reasoningOptions(route);
@@ -147,7 +155,7 @@ export function StrategyOptimizationModelSelector({
             const hasDeclaredCapabilities = route.reasoning?.supportedEfforts !== undefined;
             const defaultEffort = route.reasoning?.defaultEffort;
             return (
-              <Field key={key} className="rounded-md border p-2 text-sm">
+              <Field key={key} className="text-sm">
                 <FieldLabel>
                   {route.provider}:{route.model} 的推理强度
                 </FieldLabel>

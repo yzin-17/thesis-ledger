@@ -1,5 +1,6 @@
 import {useContinuousSubmission} from '../strategy-library/StrategySubmissions';
 import { useState } from 'react';
+import { strategyInstrumentLabel } from '../strategy-library/strategy-instrument-display';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
 import { useQuery } from '@tanstack/react-query';
@@ -10,7 +11,10 @@ import type {
   BacktestNavPreparationResultV3,
   BacktestRunPreparationRequestV3,
   BacktestRunPreparationResultV3,
+  StrategyVersionRead,
+  BacktestStrategy,
 } from '@thesis-ledger/schemas';
+import { strategySchema, projectPriceResearchStrategy, priceResearchStrategySummary } from '@thesis-ledger/schemas';
 import { confirmAction, useDirtyForm, useMobileRuntime } from '../../app/MobileRuntime';
 import { useMobileCommand } from '../../app/query/mobile-queries';
 import type { StrategyStackParams } from '../../app/strategy-navigation';
@@ -42,16 +46,28 @@ type Intent =
   | { kind: 'ordinary'; body: BacktestRunPreparationRequestV3; signature: string }
   | { kind: 'nav'; body: BacktestNavPreparationRequestV3; signature: string };
 type Prepared = BacktestRunPreparationResultV3 | BacktestNavPreparationResultV3;
+function backtestVersionResearch(version: StrategyVersionRead | undefined, kind: 'ordinary' | 'nav', fallbackId: string) {
+  const versionId = version?.id ?? fallbackId;
+  const researchReady = kind === 'nav' || version?.schema?.schemaVersion === '3';
+  const parsed = strategySchema.safeParse(version?.schema);
+  const projection = parsed.success ? projectPriceResearchStrategy(parsed.data as BacktestStrategy) : null;
+  const projectionSummary = projection ? priceResearchStrategySummary(projection) : null;
+  const instrument = version?.schema?.executionInstrument as { symbol?: string } | undefined;
+  return { versionId, researchReady, projection, projectionSummary, instrument };
+}
+
 function useBacktestSetupController() {
   const { params } = useRoute<RouteProp<StrategyStackParams, 'BacktestSetup'>>();
   const { api, scope, baseUrl } = useMobileRuntime();
   const library = useStrategyLibrary();
   const navigation = useNavigation<NativeStackNavigationProp<StrategyStackParams>>();
-  const version = library.data
+  const originalVersion = library.data
     ?.find((v) => v.id === params.strategyId)
     ?.versions.find((v) => v.id === params.versionId);
-  const instrument = version?.schema?.executionInstrument as { symbol?: string } | undefined;
-  const key = JSON.stringify(['mobile-backtest-submit-v1', baseUrl, params.kind, params.versionId]);
+  const [adoptedVersion, setAdoptedVersion] = useState<StrategyVersionRead | null>(null);
+  const version = adoptedVersion ?? originalVersion;
+  const { versionId, researchReady, projection, projectionSummary, instrument } = backtestVersionResearch(version, params.kind, params.versionId);
+  const key = JSON.stringify(['mobile-backtest-submit-v1', baseUrl, params.kind, versionId]);
   const pendingQuery = useQuery({
     queryKey: [...scope, 'backtest-pending', key],
     queryFn: async (): Promise<PendingBacktest | null> => {
@@ -65,13 +81,29 @@ function useBacktestSetupController() {
   const [submitted, setSubmitted] = useState<Intent | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<string | null>(null);
+  const modelResolution = useQuery({
+    queryKey: [...scope, 'price-research-model', versionId, form.start, form.end, form.currency],
+    enabled: params.kind === 'ordinary' && researchReady && !!version,
+    queryFn: ({ signal }) => api.backtests.resolveExecutionModel({ strategyVersionId: versionId,
+      startDate: form.start, endDate: form.end, currency: form.currency, adjustment: 'hfq',
+      policy: 'research-defaults' }, signal),
+    retry: false,
+  });
+  const adopt = useMobileCommand(async () => {
+    if (!projection) throw Error('当前策略定义不可用');
+    const saved = await api.strategy.definitions.createVersion(params.strategyId, projection);
+    setAdoptedVersion(saved);
+    setSubmitted(null);
+    setEdited(true);
+    await library.refetch();
+  }, { refresh: false });
   const signature = JSON.stringify(form);
   useDirtyForm(edited, () => {
     setEdited(false);
     setSubmitted(null);
   });
   const preparation = useQuery<Prepared>({
-    queryKey: [...scope, 'backtest-preparation', params.kind, params.versionId, submitted],
+    queryKey: [...scope, 'backtest-preparation', params.kind, versionId, submitted],
     enabled: !!submitted && submitted.signature === signature,
     queryFn: ({ signal }) => {
       if (!submitted) throw Error('尚未提交准备。');
@@ -99,12 +131,12 @@ function useBacktestSetupController() {
         pending =
           params.kind === 'ordinary'
             ? freezeOrdinarySubmission(
-                params.versionId,
+                versionId,
                 current as BacktestRunPreparationResultV3,
                 randomUUID(),
               )
             : freezeNavSubmission(
-                params.versionId,
+                versionId,
                 current as BacktestNavPreparationResultV3,
                 randomUUID(),
               );
@@ -129,16 +161,24 @@ function useBacktestSetupController() {
   const prepare = async (automatic=false) => {
     try {
       if (!version) throw Error('当前版本不可读，请重新选择。');
-      const input = { ...form, symbol: instrument?.symbol ?? form.symbol };
+      if (!researchReady) throw Error('请先核对并保存价格研究版本');
+      let model = form.model;
+      if (params.kind === 'ordinary') {
+        if (modelResolution.data?.status !== 'available') throw Error('研究执行设置尚未就绪，请核对日期和币种');
+        model = JSON.stringify(modelResolution.data.model);
+      }
+      const input = { ...form, model, priceResearch: params.kind === 'ordinary',
+        adjustment: 'hfq' as const, history: 'fixed-provider-snapshot' as const,
+        symbol: instrument?.symbol ?? form.symbol };
       const body =
         params.kind === 'ordinary'
           ? ordinaryPreparationIntent(
               input,
-              params.versionId,
+              versionId,
               randomUUID(),
               new Date().toISOString(),
             )
-          : navPreparationIntent(input, params.versionId, randomUUID(), new Date().toISOString());
+          : navPreparationIntent(input, versionId, randomUUID(), new Date().toISOString());
       const choice={ kind: params.kind, body, signature } as Intent;
       if(automatic){
         const input=choice.kind==='ordinary'?{kind:choice.kind,preparation:choice.body}:{kind:choice.kind,preparation:choice.body};
@@ -150,7 +190,7 @@ function useBacktestSetupController() {
       setMessage(failureMessage(e));
     }
   };
-  const locked = continuous.isPending || command.isPending || !!pendingQuery.data || !!receipt;
+  const locked = continuous.isPending || command.isPending || adopt.isPending || !!pendingQuery.data || !!receipt;
   return {
     params,
     library,
@@ -171,8 +211,48 @@ function useBacktestSetupController() {
     setMessage,
     message,
     navigation,
+    versionId, researchReady, projectionSummary, adopt, modelResolution,
   };
 }
+function BacktestResearchDisclosure({ state }: { state: Pick<ReturnType<typeof useBacktestSetupController>, 'params' | 'projectionSummary' | 'researchReady' | 'locked' | 'adopt' | 'modelResolution' | 'setMessage'> }) {
+  const { params, projectionSummary, researchReady, locked, adopt, modelResolution, setMessage } = state;
+  return (
+    <>
+      {params.kind === 'ordinary' && projectionSummary && <Section title="策略收益研究口径">
+        <Copy>入场：{projectionSummary.entry}</Copy><Copy>退出：{projectionSummary.exit}</Copy>
+        <Copy>投入：{projectionSummary.sizing}，持仓以研究单位计算。</Copy>
+        {!researchReady && <Action label="采用研究口径并保存新版本" primary disabled={locked}
+          onPress={() => void adopt.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))} />}
+      </Section>}
+      {params.kind === 'ordinary' && researchReady && <>
+        <QueryStatus query={modelResolution} retry={() => void modelResolution.refetch()} />
+        {modelResolution.data?.status === 'blocked' && <Copy>{modelResolution.data.message}</Copy>}
+        {modelResolution.data?.status === 'available' && modelResolution.data.notes?.map((note, index) => <Copy key={index} muted>{note}</Copy>)}
+      </>}
+    </>
+  );
+}
+
+function BacktestCreateAction({ state }: { state: Pick<ReturnType<typeof useBacktestSetupController>, 'command' | 'pendingQuery' | 'receipt' | 'current' | 'preparation' | 'setMessage'> }) {
+  const { command, pendingQuery, receipt, current, preparation, setMessage } = state;
+  return (
+    <Action
+      label={pendingQuery.data ? '找回原 Run 提交' : '确认冻结并创建回测'}
+      primary
+      disabled={
+        command.isPending ||
+        !pendingQuery.isSuccess ||
+        !!receipt ||
+        (!pendingQuery.data &&
+          (current?.status !== 'prepared' || preparation.isError || preparation.isFetching))
+      }
+      onPress={() =>
+        void command.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))
+      }
+    />
+  );
+}
+
 export function BacktestSetupScreen() {
   const state = useBacktestSetupController();
   const {
@@ -192,16 +272,19 @@ export function BacktestSetupScreen() {
     current,
     command,
     receipt,
-    setMessage,
     message,
     navigation,
+    versionId, researchReady,
   } = state;
   return (
     <Page title={params.kind === 'ordinary' ? '准备普通回测' : '准备净值回测'}>
-      <Copy>策略版本 {params.versionId}</Copy>
+      <Copy>策略版本 {versionId}</Copy>
       <QueryStatus query={library} retry={() => void library.refetch()} />
       <QueryStatus query={pendingQuery} retry={() => void pendingQuery.refetch()} />
+      <BacktestResearchDisclosure state={state} />
       <BacktestInputFields
+        priceResearch={params.kind === 'ordinary'}
+        instrumentLabel={strategyInstrumentLabel(version)}
         kind={params.kind}
         value={{ ...form, symbol: instrument?.symbol ?? form.symbol }}
         disabled={locked}
@@ -211,10 +294,10 @@ export function BacktestSetupScreen() {
           setSubmitted(null);
         }}
       />
-      <Action label="后台准备并提交回测" primary disabled={locked || !version || !pendingQuery.isSuccess} onPress={()=>void prepare(true)}/>
+      <Action label="后台准备并提交回测" primary disabled={locked || !version || !researchReady || !pendingQuery.isSuccess} onPress={()=>void prepare(true)}/>
       <Action
         label="准备并预检回测配置"
-        disabled={locked || !version || !pendingQuery.isSuccess || preparation.isFetching}
+        disabled={locked || !version || !researchReady || !pendingQuery.isSuccess || preparation.isFetching}
         onPress={()=>void prepare()}
       />
       {submitted ? (
@@ -237,20 +320,7 @@ export function BacktestSetupScreen() {
           <Copy>原冻结输入已留在本机。显式找回会复用相同输入和标识。</Copy>
         </Section>
       ) : null}
-      <Action
-        label={pendingQuery.data ? '找回原 Run 提交' : '确认冻结并创建回测'}
-        primary
-        disabled={
-          command.isPending ||
-          !pendingQuery.isSuccess ||
-          !!receipt ||
-          (!pendingQuery.data &&
-            (current?.status !== 'prepared' || preparation.isError || preparation.isFetching))
-        }
-        onPress={() =>
-          void command.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))
-        }
-      />
+      <BacktestCreateAction state={state} />
       <Feedback busy={command.isPending} message={message} error={command.isError} />
       {receipt ? (
         <Action

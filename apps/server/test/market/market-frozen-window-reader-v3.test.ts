@@ -211,6 +211,40 @@ describe('固定Market窗口与子窗读取', () => {
     });
     expect(f.dsa.marketBarsV3).not.toHaveBeenCalled();
   });
+  it('只有全局 Catalog 更新时重新记录当前准入，父事实不变且不重取行情', async () => {
+    const f = await fixture();
+    const parent = await f.repository.findFrozen(f.reference.identityFingerprint);
+    f.revisions.readCurrent.mockResolvedValue({ ...(await f.revisions.readCurrent()), catalogRevision: 10 });
+    const read = await f.reader.read(f.input);
+    expect(read.status).toBe('selected');
+    if (read.status !== 'selected') throw new Error('fixture');
+    expect(read.selection.catalogRevision).toBe(10);
+    expect(read.evidence.catalogRevision).toBe(10);
+    expect(read.frozenWindowRef).toEqual(f.reference);
+    expect(read.selection.response.bars).toEqual(f.response.bars);
+    expect(read.selection.response.sourcePriceBasis).toEqual(f.response.sourcePriceBasis);
+    expect(await f.repository.findFrozen(f.reference.identityFingerprint)).toEqual(parent);
+    expect(f.rows.size).toBe(2);
+    expect(f.dsa.marketBarsV3).not.toHaveBeenCalled();
+    expect(() => createBacktestSnapshotV3Source({ purpose: 'execution', symbol: f.input.symbol,
+      routeKey: f.input.routeKey, window: f.input.window }, read)).not.toThrow();
+    expect((await f.reader.read(f.input)).status).toBe('selected');
+    expect(f.rows.size).toBe(2);
+  });
+  it.each(['effective','target','eligibility','readiness'])(
+    'Catalog 改变也不能绕过实际来源或准入变化：%s', async kind => {
+      const f = await fixture();
+      const context = { ...(await f.revisions.readCurrent()), catalogRevision: 10 };
+      if (kind === 'effective') context.effectiveRevision += 1;
+      else if (kind === 'target') context.targetSources = [{ ...context.targetSources[0], upstreamSource: 'other' }];
+      else if (kind === 'eligibility') context.availability = [{ eligible: false, catalogReady: true }];
+      else context.availability = [{ eligible: true, catalogReady: false }];
+      f.revisions.readCurrent.mockResolvedValue(context);
+      expect(await f.reader.read(f.input)).toMatchObject({ status: 'unavailable', selection: { reason: 'policy_mismatch' } });
+      expect(f.rows.size).toBe(1);
+      expect(f.dsa.marketBarsV3).not.toHaveBeenCalled();
+    },
+  );
   it('request-window基准只可读取原完整窗口', async () => {
     const f = await fixture(true);
     expect((await f.reader.read(f.input)).status).toBe('selected');

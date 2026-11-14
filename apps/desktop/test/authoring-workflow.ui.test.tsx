@@ -182,27 +182,12 @@ describe('自然语言策略编写阶段', () => {
     expect(model.save).not.toHaveBeenCalled();
   });
 
-  it('草稿恢复和丢弃经菜单进入，取消确认不改写内容', async () => {
-    const reload = vi.fn();
-    const discard = vi.fn();
-    await render(
-      <AuthoringDraftRecovery
-        content={{ description: '本地输入' }}
-        disabled={false}
-        onReadLatest={reload}
-        onDiscard={discard}
-      />,
-    );
+  it('草稿操作提供本地内容复制', async () => {
+    await render(<AuthoringDraftRecovery content={{ description: '本地输入' }} disabled={false} />);
     await act(async () => button('草稿操作').click());
-    await act(async () => button('读取服务器最新草稿').click());
-    expect(reload).not.toHaveBeenCalled();
-    await act(async () => button('继续编辑').click());
-    expect(reload).not.toHaveBeenCalled();
-    expect(discard).not.toHaveBeenCalled();
-    await act(async () => button('草稿操作').click());
-    await act(async () => button('丢弃这个草稿').click());
-    expect(discard).not.toHaveBeenCalled();
-    await act(async () => button('确认').click());
-    expect(discard).toHaveBeenCalledOnce();
+    expect(button('复制本地草稿')).toBeDefined();
+    expect(
+      [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent),
+    ).toEqual(['复制本地草稿']);
   });
 });

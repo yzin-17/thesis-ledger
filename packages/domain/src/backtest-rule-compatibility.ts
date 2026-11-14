@@ -391,6 +391,7 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
 
   private checkActualQuantity(sourceId: string, path: readonly (string | number)[]) {
     if (!this.normalized) return;
+    if (this.context.executionUnits.researchQuantity === 'reference-notional-v1') return;
     const conversion = this.context.executionUnits.actualQuantityConversion;
     if (!hasVerifiedExecutionModelConversion(conversion)) {
       this.addIssue(
@@ -641,6 +642,16 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
     this.markScale(left.scaleInvariant && right.scaleInvariant, path);
   }
 
+  private isReferenceNotionalZeroComparison(value: UnknownRecord, left: NumericUnit, right: NumericUnit): boolean {
+    if (this.context.executionUnits.researchQuantity !== 'reference-notional-v1') return false;
+    const leftNode = isRecord(value.left) ? value.left : {};
+    const rightNode = isRecord(value.right) ? value.right : {};
+    const zero = (node: UnknownRecord) => node.type === 'constant' &&
+      typeof node.value === 'string' && /^-?0(?:\.0+)?$/.test(node.value);
+    return (left.kind === 'price' && leftNode.type === 'indicator' && zero(rightNode)) ||
+      (right.kind === 'price' && rightNode.type === 'indicator' && zero(leftNode));
+  }
+
   private readBooleanRule(value: unknown, path: readonly (string | number)[]) {
     if (!isRecord(value) || typeof value.type !== 'string') {
       this.addIssue('UNSUPPORTED_RULE_NODE', path, '无法识别的布尔 AST 节点');
@@ -668,6 +679,10 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
     if (value.type === 'compare' || value.type === 'cross') {
       const left = this.readNumericUnit(value.left, [...path, 'left']);
       const right = this.readNumericUnit(value.right, [...path, 'right']);
+      if (this.isReferenceNotionalZeroComparison(value, left, right)) {
+        this.markScale(true, path);
+        return;
+      }
       this.compareNumericUnits(left, right, path);
       return;
     }

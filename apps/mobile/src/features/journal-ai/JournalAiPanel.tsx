@@ -14,6 +14,7 @@ import {
   Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
+import { ResearchBody } from '../research-read/ResearchBody';
 import { journalTaskKey, rememberJournalTask } from './journal-tasks';
 type Run = JournalAiExplanation | JournalPeriodAiExplanation;
 export const runStatusLabels: Record<string, string> = {
@@ -112,44 +113,65 @@ export function JournalAiPanel({
           </Copy>
           <Feedback message={query.data.errorSummary} error />
           {query.data.result ? (
-            <>
-              <Copy>{query.data.result.conclusion}</Copy>
-              {query.data.result.evidence.map((entry, i) => (
-                <Section key={i} title={entry.claim}>
-                  {entry.citations.map((c, j) => (
-                    <Section key={j}>
-                      <Copy>
-                        来源 {c.provider} · {c.sourceId} · {c.observedAt} · 工具 {c.tool}
-                      </Copy>
-                      {c.toolCallId ? (
-                        <Action
-                          label={`定位解读引用 ${c.toolCallId}`}
-                          onPress={() =>
-                            navigation.navigate('JournalEvidence', {
-                              accountId,
-                              mode,
-                              kind,
-                              runId,
-                              toolCallId: c.toolCallId!,
-                            })
-                          }
-                        />
-                      ) : null}
-                    </Section>
-                  ))}
-                </Section>
-              ))}
-              {query.data.result.risks.map((v, i) => (
-                <Copy key={i}>风险：{v}</Copy>
-              ))}
-              {query.data.result.unknowns.map((v, i) => (
-                <Copy key={i}>未知项：{v}</Copy>
-              ))}
-              <Copy muted>{query.data.result.disclaimer}</Copy>
-            </>
+            <JournalRunResult
+              result={query.data.result}
+              onEvidence={(toolCallId) =>
+                navigation.navigate('JournalEvidence', { accountId, mode, kind, runId, toolCallId })
+              }
+            />
           ) : null}
         </>
       ) : null}
     </Section>
+  );
+}
+
+function JournalRunResult({
+  result,
+  onEvidence,
+}: {
+  result: NonNullable<Run['result']>;
+  onEvidence: (toolCallId: string) => void;
+}) {
+  if (result.version === 2)
+    return (
+      <ResearchBody
+        report={{ result, errorCode: null, errorSummary: null }}
+        evidence={(evidenceId) => {
+          const binding = result.evidenceBindings.find(
+            (item) => item.audit.evidenceId === evidenceId,
+          );
+          if (binding) onEvidence(binding.toolCallId);
+        }}
+      />
+    );
+  return (
+    <>
+      <Copy>{result.conclusion}</Copy>
+      {result.evidence.map((entry, i) => (
+        <Section key={i} title={entry.claim}>
+          {entry.citations.map((c, j) => (
+            <Section key={j}>
+              <Copy>
+                来源 {c.provider} · {c.sourceId} · {c.observedAt} · 工具 {c.tool}
+              </Copy>
+              {c.toolCallId ? (
+                <Action
+                  label={'定位解读引用 ' + c.toolCallId}
+                  onPress={() => onEvidence(c.toolCallId!)}
+                />
+              ) : null}
+            </Section>
+          ))}
+        </Section>
+      ))}
+      {result.risks.map((v, i) => (
+        <Copy key={i}>风险：{v}</Copy>
+      ))}
+      {result.unknowns.map((v, i) => (
+        <Copy key={i}>未知项：{v}</Copy>
+      ))}
+      <Copy muted>{result.disclaimer}</Copy>
+    </>
   );
 }

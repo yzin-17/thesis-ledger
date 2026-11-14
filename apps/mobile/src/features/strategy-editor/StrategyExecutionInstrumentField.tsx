@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { InstrumentDirectory, InstrumentSearchResult } from '@thesis-ledger/schemas';
 import {
   strategyInstrumentFromDirectory,
   strategyInstrumentSearchScopes,
@@ -8,15 +9,16 @@ import {
 import { Copy } from '../../components/MobilePrimitives';
 import { InstrumentPicker } from '../market/InstrumentPicker';
 
-const marketLabels: Record<string, string> = { CN: '中国内地', HK: '香港', US: '美国' };
-const assetLabels: Record<string, string> = { stock: '股票', etf: 'ETF', fund: '基金' };
-
 export function StrategyExecutionInstrumentField({
   definition,
+  instrumentDirectory,
+  onSelect,
   locked,
   onChange,
 }: {
   definition: Record<string, unknown>;
+  instrumentDirectory?: InstrumentDirectory | undefined;
+  onSelect?: (item: InstrumentSearchResult) => void;
   locked: boolean;
   onChange: (next: Record<string, unknown>) => void;
 }) {
@@ -32,6 +34,7 @@ export function StrategyExecutionInstrumentField({
         purpose="browse"
         label="执行标的"
         value={search ?? symbol}
+        displayName={instrumentDirectory?.items.find((item) => item.symbol === symbol)?.displayName}
         editable={!locked}
         markets={scope.markets}
         instrumentTypes={scope.instrumentTypes}
@@ -45,14 +48,11 @@ export function StrategyExecutionInstrumentField({
           const selected = strategyInstrumentFromDirectory(item, mode);
           if (!selected) return;
           setSearch(null);
+          onSelect?.(item);
           onChange(withStrategyExecutionInstrument(definition, selected));
         }}
       />
-      <Copy>
-        {symbol
-          ? `${marketLabels[String(instrument?.market)] ?? '未知市场'} · ${assetLabels[String(instrument?.assetType)] ?? '未知类型'}`
-          : '选择搜索结果后自动识别市场和资产类型。'}
-      </Copy>
+      {!symbol && <Copy>选择搜索结果后自动识别市场和资产类型。</Copy>}
     </>
   );
 }

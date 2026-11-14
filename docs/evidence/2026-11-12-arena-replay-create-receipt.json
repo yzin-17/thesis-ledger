@@ -1,0 +1,21 @@
+{
+  "sourceId": "a36c2d69-1731-41fe-8750-86f89a236762",
+  "replayId": "6f41c462-176a-4d6f-957e-331015e2af0f",
+  "title": "test · 历史回放",
+  "startsOn": "2026-11-02",
+  "state": "running",
+  "timeline": {
+    "phase": "replay",
+    "status": "blocked",
+    "originAt": "2026-11-01T16:00:00.000Z",
+    "cursorAt": "2026-11-01T16:00:00.000Z",
+    "pendingAt": null,
+    "reason": "replay_universe_unavailable"
+  },
+  "frames": 1,
+  "researchCycles": 0,
+  "originalRecordsPreserved": true,
+  "reads": 5,
+  "writes": 2,
+  "observedAt": "2026-11-12T15:36:43.388Z"
+}

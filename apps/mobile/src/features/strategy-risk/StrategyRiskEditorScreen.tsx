@@ -28,6 +28,7 @@ import { useStrategyLibrary } from '../strategy-library/useStrategyLibrary';
 import { StrategyVersionPicker } from '../strategy-library/StrategyVersionPicker';
 import { RiskNotificationFields } from './RiskNotificationFields';
 import { riskNotificationBody, type RiskNotificationForm } from './risk-notification-model';
+import { RiskRuleNotificationFields } from './RiskRuleNotificationFields';
 import {
   parseStrategyRiskAction,
   strategyRiskStatusLabel,
@@ -40,6 +41,10 @@ const config = (row: StrategyRiskApplicationRead): RiskNotificationForm => ({
   cooldown: String(row.notification.cooldownMinutes),
   severity: row.notification.severity,
   feishu: row.notification.channels.includes('feishu'),
+  providers: row.notification.providers,
+  ruleOverrides: Object.fromEntries(Object.entries(row.notification.ruleOverrides ?? {}).map(([key, rule]) => [key, {
+    severity: rule.severity, cooldown: rule.cooldownMinutes === undefined ? '' : String(rule.cooldownMinutes),
+  }])),
 });
 export function StrategyRiskEditorScreen() {
   const { params } = useRoute<RouteProp<StrategyStackParams, 'StrategyRiskEditor'>>();
@@ -297,6 +302,7 @@ function StrategyRiskEditorForm({
         ]}
       />
       <RiskNotificationFields value={notification} onChange={setNotification} disabled={locked} />
+      <RiskRuleNotificationFields rules={current.plan.rules} value={notification} onChange={setNotification} disabled={locked} />
       <Action
         label="确认修改风险应用"
         disabled={locked || !pending.isSuccess}

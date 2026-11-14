@@ -31,14 +31,32 @@ export const unavailableChartOptions = (
 
 /** Readiness is an exact route declaration, not a promise of a requested window's coverage. */
 export const resolveChartOptionsV3 = (
-  identity: { symbol: string; assetType: 'STOCK' | 'ETF'; timeframe?: '1m' | '5m' | '15m' | '30m' | '60m' | '1d' },
+  identity: {
+    symbol: string;
+    assetType: 'STOCK' | 'ETF';
+    timeframe?: '1m' | '5m' | '15m' | '30m' | '60m' | '1d';
+  },
   desired: unknown,
   effective: unknown,
   catalog: unknown,
 ): MarketChartOptionsV3 => {
   const parsed = desiredProviderPolicyV3Schema.safeParse(desired);
-  if (!parsed.success) return unavailableChartOptions(identity.symbol, 'v3', 'policy_not_applied', undefined, identity.timeframe);
-  if (!parsed.data.enabled) return unavailableChartOptions(identity.symbol, 'v3', 'disabled', undefined, identity.timeframe);
+  if (!parsed.success)
+    return unavailableChartOptions(
+      identity.symbol,
+      'v3',
+      'policy_not_applied',
+      undefined,
+      identity.timeframe,
+    );
+  if (!parsed.data.enabled)
+    return unavailableChartOptions(
+      identity.symbol,
+      'v3',
+      'disabled',
+      undefined,
+      identity.timeframe,
+    );
   const options = (['none', 'qfq', 'hfq'] as const).map((adjustment) => {
     if (identity.timeframe && identity.timeframe !== '1d' && adjustment !== 'none')
       return { adjustment, available: false, reason: 'unsupported_adjustment' as const };
@@ -57,29 +75,28 @@ export const resolveChartOptionsV3 = (
       reason = context.reason === 'policy_mismatch' ? 'policy_not_applied' : context.reason;
     } else {
       const [primary, backup] = context.context.targets;
-      if (!primary) reason = 'route_not_configured';
-      else if (!primary.eligible) {
-        const effectiveRoute = context.context.effective.routes.find(
-          (route) => marketRouteKeyIdV3(route.key) === marketRouteKeyIdV3(routeKey),
-        );
-        reason = effectiveRoute?.targets[0]?.reason ?? 'not_admitted';
-      } else if (!primary.catalogReady) {
-        const entry = context.context.catalog.entries.find(
-          (entry) =>
-            marketRouteKeyIdV3(entry.key) === marketRouteKeyIdV3(routeKey) &&
-            entry.target.providerId === primary.target.providerId &&
-            entry.target.upstreamSource === primary.target.upstreamSource,
-        );
-        reason =
-          entry?.state === 'ready' ? 'not_admitted' : (entry?.state ?? 'catalog_unavailable');
-      }
-      if (reason && primary && backup?.eligible && backup.catalogReady &&
-        supportsBasicPriceFallback(routeKey, [primary.target, backup.target], context.context.catalog)) {
+      reason = primaryChartRouteReason(context.context, routeKey);
+      if (
+        reason &&
+        primary &&
+        backup?.eligible &&
+        backup.catalogReady &&
+        supportsBasicPriceFallback(
+          routeKey,
+          [primary.target, backup.target],
+          context.context.catalog,
+        )
+      ) {
         reason = null;
         availableVia = 'backup';
       }
     }
-    return { adjustment, available: reason === null, reason, ...(availableVia ? { availableVia } : {}) };
+    return {
+      adjustment,
+      available: reason === null,
+      reason,
+      ...(availableVia ? { availableVia } : {}),
+    };
   });
   return marketChartOptionsV3Schema.parse({
     contractVersion: 3,
@@ -89,3 +106,27 @@ export const resolveChartOptionsV3 = (
     options,
   });
 };
+
+function primaryChartRouteReason(
+  context: Extract<ReturnType<typeof marketRouteContextV3>, { ok: true }>['context'],
+  routeKey: MarketDataBarRouteKeyV3,
+): MarketChartOptionsV3['options'][number]['reason'] {
+  const [primary] = context.targets;
+  let reason: MarketChartOptionsV3['options'][number]['reason'] = null;
+  if (!primary) reason = 'route_not_configured';
+  else if (!primary.eligible) {
+    const effectiveRoute = context.effective.routes.find(
+      (route) => marketRouteKeyIdV3(route.key) === marketRouteKeyIdV3(routeKey),
+    );
+    reason = effectiveRoute?.targets[0]?.reason ?? 'not_admitted';
+  } else if (!primary.catalogReady) {
+    const entry = context.catalog.entries.find(
+      (entry) =>
+        marketRouteKeyIdV3(entry.key) === marketRouteKeyIdV3(routeKey) &&
+        entry.target.providerId === primary.target.providerId &&
+        entry.target.upstreamSource === primary.target.upstreamSource,
+    );
+    reason = entry?.state === 'ready' ? 'not_admitted' : (entry?.state ?? 'catalog_unavailable');
+  }
+  return reason;
+}

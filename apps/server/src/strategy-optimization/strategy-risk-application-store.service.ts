@@ -5,7 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { Severity, StrategyMonitoringPlan } from '@thesis-ledger/domain';
+import type { StrategyMonitoringPlan } from '@thesis-ledger/domain';
+import type { StrategyRiskNotificationInput } from '@thesis-ledger/schemas';
+import { strategyRiskNotification, strategyRiskRuleParameters } from '../risk/strategy-risk-notification.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
   strategyRiskApplicationManagementEntry,
@@ -177,7 +179,7 @@ export class StrategyRiskApplicationStoreService {
       symbol: string;
       revision: number;
       enabled: boolean;
-      severity: Severity;
+      notification: StrategyRiskNotificationInput;
       plan: StrategyMonitoringPlan;
     },
   ) {
@@ -186,7 +188,7 @@ export class StrategyRiskApplicationStoreService {
         data: {
           kind: rule.kind,
           scope: 'security',
-          severity: input.severity,
+          severity: strategyRiskNotification(input.notification, rule.sourceKey).severity,
           threshold: rule.threshold,
           enabled: input.enabled,
           symbol: input.symbol,
@@ -198,7 +200,7 @@ export class StrategyRiskApplicationStoreService {
             metric: rule.metric,
             operator: rule.operator,
           }),
-          parameters: asJson({ applicationRevision: input.revision }),
+          parameters: asJson(strategyRiskRuleParameters(input.notification, input.revision, rule.sourceKey)),
           config: asJson(rule),
         },
       });
@@ -287,20 +289,30 @@ export class StrategyRiskApplicationStoreService {
     return archived;
   }
 
-  syncFrozenRuleState(
+  async syncFrozenRuleState(
     transaction: Prisma.TransactionClient,
     applicationId: string,
-    input: { enabled: boolean; severity: Severity; revision: number; enabledChanged: boolean },
+    input: { enabled: boolean; notification: StrategyRiskNotificationInput; plan: StrategyMonitoringPlan; revision: number; enabledChanged: boolean },
   ) {
-    return transaction.riskRule.updateMany({
+    const result = await transaction.riskRule.updateMany({
       where: { sourcePlanId: applicationId, archivedAt: null },
       data: {
         enabled: input.enabled,
-        severity: input.severity,
+        severity: input.notification.severity,
         ...(input.enabledChanged ? { version: { increment: 1 } } : {}),
-        parameters: asJson({ applicationRevision: input.revision }),
+        parameters: asJson(strategyRiskRuleParameters(input.notification, input.revision)),
       },
     });
+    for (const rule of input.plan.rules) {
+      const notification = strategyRiskNotification(input.notification, rule.sourceKey);
+      const severity = notification.severity;
+      if (severity === input.notification.severity && notification.cooldownMinutes === input.notification.cooldownMinutes) continue;
+      await transaction.riskRule.updateMany({
+        where: { sourcePlanId: applicationId, archivedAt: null, config: { path: ['sourceKey'], equals: rule.sourceKey } },
+        data: { severity, parameters: asJson(strategyRiskRuleParameters(input.notification, input.revision, rule.sourceKey)) },
+      });
+    }
+    return result;
   }
 
   archiveFrozenRules(transaction: Prisma.TransactionClient, applicationId: string) {
@@ -317,6 +329,7 @@ export class StrategyRiskApplicationStoreService {
       expectedRevision: number;
       strategyVersionId: string;
       plan: StrategyMonitoringPlan;
+      notification: StrategyRiskNotificationInput;
     },
   ) {
     const rows = await transaction.$queryRaw<StrategyRiskApplicationRow[]>(Prisma.sql`
@@ -324,6 +337,7 @@ export class StrategyRiskApplicationStoreService {
       SET "strategyVersionId"=${input.strategyVersionId}::uuid,
           "planHash"=${input.plan.planHash}, "plan"=${JSON.stringify(input.plan)}::jsonb,
           "coverage"=${JSON.stringify(input.plan.coverage)}::jsonb,
+          "notification"=${JSON.stringify(input.notification)}::jsonb,
           "revision"="revision"+1, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${input.id}::uuid AND "revision"=${input.expectedRevision}
       RETURNING *

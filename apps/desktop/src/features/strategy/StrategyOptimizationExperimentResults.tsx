@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { OptimizationResearchDisclosure } from './OptimizationResearchDisclosure.js';
+import { ExperimentFailureNotice } from './ExperimentFailureNotice.js';
+import { ExperimentEvaluationNote } from './ExperimentEvaluationNote.js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type {
@@ -15,13 +17,14 @@ import type {
 } from './strategy-optimization.api.js';
 import {
   adoptOptimizationCandidate,
-  finalizeOptimizationExperiment,
+  completeOptimizationExperiment,
 } from './strategy-optimization.api.js';
 import {
   experimentCostText,
   experimentUsageText,
   optimizationAttemptExecutionText,
   tradingCostText,
+  candidateAdoptionEligibility,
 } from './strategy-experiment-detail.model.js';
 const metricText = (value: unknown) => {
   if (!value || typeof value !== 'object') return '指标不可用';
@@ -59,14 +62,12 @@ const riskRuleText = (value: unknown) => {
   const timeframe = timeframeValue ? `周期 ${timeframeValue}` : null;
   return [identity, comparison, timeframe].filter(Boolean).join(' · ');
 };
-const riskChangeText = (change: string) =>
-  change === 'added'
-    ? '新增'
-    : change === 'removed'
-      ? '移除'
-      : change === 'changed'
-        ? '修改'
-        : '无变化';
+const riskChangeText = (change: string) => {
+  if (change === 'added') return '新增';
+  if (change === 'removed') return '移除';
+  if (change === 'changed') return '修改';
+  return '无变化';
+};
 
 type Props = {
   experimentsRefreshing?: boolean;
@@ -99,8 +100,6 @@ export function StrategyOptimizationExperimentResults({
   clonePending,
   onCancelExperiment,
 }: Props) {
-  const [lockedCandidateIds, setLockedCandidateIds] = useState<string[]>([]);
-  const [preselectedCandidateId, setPreselectedCandidateId] = useState<string | null>(null);
   const [adoptionDiffs, setAdoptionDiffs] = useState<AdoptionRiskApplicationDiff[]>([]);
   const [adoptionIntentKeys, setAdoptionIntentKeys] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -109,13 +108,8 @@ export function StrategyOptimizationExperimentResults({
   }, [selectedExperimentId]);
   const finalizeMutation = useMutation({
     mutationFn: () => {
-      if (!selectedExperimentId || !preselectedCandidateId || lockedCandidateIds.length === 0)
-        throw new Error('请选择进入封存测试的候选，并预选最终候选');
-      return finalizeOptimizationExperiment(selectedExperimentId, {
-        candidateIds: lockedCandidateIds,
-        selectedCandidateId: preselectedCandidateId,
-        expectedStage: 'awaiting_finalization',
-      });
+      if (!selectedExperimentId) throw new Error('实验不存在');
+      return completeOptimizationExperiment(selectedExperimentId);
     },
     onSuccess: async () => {
       onFeedback('封存测试已完成；测试集结果已经揭示。');
@@ -149,86 +143,28 @@ export function StrategyOptimizationExperimentResults({
         delete next[candidate.id];
         return next;
       });
-      setAdoptionDiffs(result.riskApplicationDiffs ?? []);
+      setAdoptionDiffs(result.detailsStatus === 'ready' ? result.riskApplicationDiffs : []);
       onFeedback(
-        `已采纳为正式策略 v${result.strategyVersion.version}；${result.riskApplicationDiffs.length} 个现有风险应用可查看升级差异，仍需人工确认。`,
+        result.detailsStatus === 'ready'
+          ? `已采纳为正式策略 v${result.strategyVersion.version}；${result.riskApplicationDiffs.length} 个现有风险应用可查看升级差异，仍需人工确认。`
+          : `正式策略 v${result.strategyVersion.version} 已保存；风险规则预览暂不可用，请稍后查看。`,
       );
       await onInvalidate();
     },
     onError: (error) => onFeedback(error instanceof Error ? error.message : '采纳候选失败'),
   });
-  const toggleLockedCandidate = (id: string) =>
-    setLockedCandidateIds((current) => {
-      if (current.includes(id)) return current.filter((item) => item !== id);
-      if (current.length < 3) return [...current, id];
-      return current;
-    });
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>实验记录</CardTitle>
-          <CardDescription>实验可恢复、可取消；测试集在用户锁定候选前不会运行。</CardDescription>
-        </CardHeader>
-        <CardContent className="divide-y divide-border">
-          <ListRefreshRegion refreshing={experimentsRefreshing} label="正在刷新实验列表">
-            <div className="divide-y divide-border">
-              {experiments.map((experiment) => (
-                <div
-                  key={experiment.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0"
-                >
-                  <div>
-                    <div className="font-medium">{experiment.stage}</div>
-                    <div className="text-xs text-muted-foreground">
-                      AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · Token{' '}
-                      {experimentUsageText(
-                        experiment,
-                        compare?.experiment.id === experiment.id ? compare.attempts : [],
-                      )}{' '}
-                      · AI 费用 {experimentCostText(experiment.costSummary)}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>
-                      {experiment.status}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onSelectExperiment(experiment.id)}
-                    >
-                      查看
-                    </Button>
-                    <Button
-                      aria-busy={clonePending}
-                      size="sm"
-                      variant="outline"
-                      disabled={clonePending}
-                      onClick={() => onCloneExperiment(experiment.id)}
-                    >
-                      {clonePending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-                      克隆
-                    </Button>
-                    {!settledStatuses.has(experiment.status) ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onCancelExperiment(experiment.id)}
-                      >
-                        取消
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ListRefreshRegion>
-          {experiments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无优化实验。</p>
-          ) : null}
-        </CardContent>
-      </Card>
+      <OptimizationExperimentRecords
+        experimentsRefreshing={experimentsRefreshing}
+        experiments={experiments}
+        compare={compare}
+        settledStatuses={settledStatuses}
+        onSelectExperiment={onSelectExperiment}
+        onCloneExperiment={onCloneExperiment}
+        clonePending={clonePending}
+        onCancelExperiment={onCancelExperiment}
+      />
 
       {compare ? (
         <Card>
@@ -242,6 +178,13 @@ export function StrategyOptimizationExperimentResults({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
+            {compare.experiment.status === 'failed' ? (
+              <ExperimentFailureNotice
+                experiment={compare.experiment}
+                disabled={candidatesRefreshing}
+                onRetried={onInvalidate}
+              />
+            ) : null}
             <OptimizationResearchDisclosure runConfig={compare.experiment.runConfig} />
             <div className="rounded-md border p-3 text-xs text-muted-foreground">
               <div className="font-medium text-foreground">回测交易成本假设（与 AI 费用分开）</div>
@@ -270,56 +213,12 @@ export function StrategyOptimizationExperimentResults({
                 </div>
               ) : null}
             </div>
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {compare.experiment.modelConfig.map((route) => {
-                const key = `${route.provider}:${route.model}`;
-                const attempts = compare.attempts.filter((attempt) => attempt.modelKey === key);
-                const latest = attempts.at(-1);
-                const aiCalls = attempts.filter((attempt) => Boolean(attempt.aiRunId)).length;
-                const executionDisplays = attempts.map(optimizationAttemptExecutionText);
-                const tokenText =
-                  executionDisplays.length > 0
-                    ? executionDisplays.map((display) => display.tokenText).join('；')
-                    : '尚未开始';
-                const costText =
-                  executionDisplays.length > 0
-                    ? [...new Set(executionDisplays.flatMap((display) => display.costLines))].join(
-                        '；',
-                      )
-                    : '尚未开始';
-                const knownDurations = attempts.flatMap((attempt) =>
-                  attempt.durationMs == null ? [] : [attempt.durationMs],
-                );
-                const durationMs = knownDurations.reduce((sum, value) => sum + value, 0);
-                const durationSummary =
-                  knownDurations.length === attempts.length
-                    ? durationText(durationMs)
-                    : `${durationText(durationMs)}（部分耗时未知）`;
-                return (
-                  <div key={key} className="rounded-md border p-3">
-                    <div className="font-medium">{key}</div>
-                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      <span>AI calls</span>
-                      <span>{aiCalls}</span>
-                      <span>Input / Output</span>
-                      <span>{tokenText}</span>
-                      <span>Duration</span>
-                      <span>{durationSummary}</span>
-                      <span>AI 费用</span>
-                      <span>{costText}</span>
-                      <span>Latest status</span>
-                      <span>{String(latest?.status ?? '尚未开始')}</span>
-                    </div>
-                    {latest?.error ? (
-                      <div className="mt-2 text-xs text-destructive">
-                        Failure: {String(latest.error)}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-            <ListRefreshRegion refreshing={candidatesRefreshing} label="正在刷新实验候选" className="flex flex-col gap-3">
+            <ExperimentModelSummaries compare={compare} />
+            <ListRefreshRegion
+              refreshing={candidatesRefreshing}
+              label="正在刷新实验候选"
+              className="flex flex-col gap-3"
+            >
               {compare.candidates.map((candidate) => (
                 <div key={candidate.id} className="rounded-md border p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -338,55 +237,32 @@ export function StrategyOptimizationExperimentResults({
                       ) : null}
                     </div>
                     <Badge
-                      variant={candidate.validationStatus.includes('valid') ? 'default' : 'outline'}
+                      variant={
+                        candidateAdoptionEligibility(compare.experiment, candidate)
+                          ? 'outline'
+                          : 'default'
+                      }
                     >
-                      {candidate.validationStatus}
+                      {candidateAdoptionEligibility(compare.experiment, candidate) ?? '可采纳'}
                     </Badge>
                   </div>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    {candidate.diff.length > 0
-                      ? candidate.diff
-                          .map((item) =>
-                            item.kind === 'full-strategy'
-                              ? '完整 BacktestStrategy 候选'
-                              : `${String(item.label ?? item.parameterId)}: ${String(item.before)} → ${String(item.after)}`,
-                          )
-                          .join('；')
-                      : '无参数变化'}
+                  <ExperimentEvaluationNote
+                    metrics={(candidate.metrics.test ?? {}) as Record<string, unknown>}
+                  />
+                  <div className="mt-2">
+                    <ExperimentCandidateDiff candidate={candidate} />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {compare.experiment.stage === 'awaiting_finalization' &&
-                    candidate.validationStatus === 'valid' ? (
-                      <>
-                        <Button
-                          size="sm"
-                          variant={lockedCandidateIds.includes(candidate.id) ? 'default' : 'outline'}
-                          onClick={() => toggleLockedCandidate(candidate.id)}
-                        >
-                          进入封存测试
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={preselectedCandidateId === candidate.id ? 'default' : 'outline'}
-                          onClick={() => {
-                            setPreselectedCandidateId(candidate.id);
-                            if (!lockedCandidateIds.includes(candidate.id))
-                              toggleLockedCandidate(candidate.id);
-                          }}
-                        >
-                          预选最终候选
-                        </Button>
-                      </>
-                    ) : null}
-                    {compare.experiment.status === 'succeeded' &&
-                    candidate.validationStatus === 'test_valid' ? (
+                    {!candidateAdoptionEligibility(compare.experiment, candidate) ? (
                       <Button
                         aria-busy={adoptMutation.isPending}
                         size="sm"
                         disabled={adoptMutation.isPending}
                         onClick={() => adoptMutation.mutate(candidate)}
                       >
-                        {adoptMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
+                        {adoptMutation.isPending && (
+                          <Spinner data-icon="inline-start" aria-hidden="true" />
+                        )}
                         采纳为正式版本
                       </Button>
                     ) : null}
@@ -394,59 +270,204 @@ export function StrategyOptimizationExperimentResults({
                 </div>
               ))}
             </ListRefreshRegion>
-            {compare.experiment.stage === 'awaiting_finalization' ? (
+            {compare.experiment.stopReason?.startsWith('final_test_retry_required:') ? (
               <Button
                 aria-busy={finalizeMutation.isPending}
-                disabled={
-                  finalizeMutation.isPending ||
-                  !preselectedCandidateId ||
-                  lockedCandidateIds.length === 0
-                }
+                disabled={finalizeMutation.isPending}
                 onClick={() => finalizeMutation.mutate()}
               >
-                {finalizeMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-                {finalizeMutation.isPending ? '测试中…' : '锁定候选并运行测试集'}
+                {finalizeMutation.isPending && (
+                  <Spinner data-icon="inline-start" aria-hidden="true" />
+                )}
+                {finalizeMutation.isPending ? '测试中…' : '重试未完成测试'}
               </Button>
             ) : null}
-            {adoptionDiffs.length > 0 ? (
-              <div className="flex flex-col gap-2 rounded-md border p-3">
-                <div className="font-medium">现有风险应用升级差异</div>
-                {adoptionDiffs.map((application) => {
-                  const changed = application.diff.filter((item) => item.change !== 'unchanged');
-                  return (
-                    <details
-                      key={application.applicationId}
-                      className="rounded-md border p-2 text-xs text-muted-foreground"
-                    >
-                      <summary className="cursor-pointer select-none font-medium text-foreground">
-                        {application.symbol} · r{application.currentRevision} ·{' '}
-                        {application.enabled ? '监控中' : '已停用'} ·{' '}
-                        {changed.length === 0 ? '规则无变化' : `${changed.length} 项规则变化`}
-                      </summary>
-                      {changed.length > 0 ? (
-                        <div className="mt-2 flex flex-col gap-2">
-                          {changed.map((item) => (
-                            <div key={item.sourceKey} className="rounded border p-2">
-                              <div className="font-medium text-foreground">
-                                {riskChangeText(item.change)} · {item.sourceKey}
-                              </div>
-                              <div className="mt-1">Before: {riskRuleText(item.before)}</div>
-                              <div>After: {riskRuleText(item.after)}</div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </details>
-                  );
-                })}
-                <p className="text-xs text-muted-foreground">
-                  这些差异不会自动覆盖或启用风险应用；请到“策略风险规则”中逐个确认升级。
-                </p>
-              </div>
-            ) : null}
+            <AdoptionRiskUpgradeDiffs adoptionDiffs={adoptionDiffs} />
           </CardContent>
         </Card>
       ) : null}
     </>
+  );
+}
+import { ExperimentCandidateDiff } from './StrategyExperimentCandidateDiff.js';
+
+function OptimizationExperimentRecords({
+  experimentsRefreshing = false,
+  experiments,
+  compare,
+  settledStatuses,
+  onSelectExperiment,
+  onCloneExperiment,
+  clonePending,
+  onCancelExperiment,
+}: Pick<
+  Props,
+  | 'experimentsRefreshing'
+  | 'experiments'
+  | 'compare'
+  | 'settledStatuses'
+  | 'onSelectExperiment'
+  | 'onCloneExperiment'
+  | 'clonePending'
+  | 'onCancelExperiment'
+>) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>实验记录</CardTitle>
+        <CardDescription>实验可恢复、可取消；测试集在用户锁定候选前不会运行。</CardDescription>
+      </CardHeader>
+      <CardContent className="divide-y divide-border">
+        <ListRefreshRegion refreshing={experimentsRefreshing} label="正在刷新实验列表">
+          <div className="divide-y divide-border">
+            {experiments.map((experiment) => (
+              <div
+                key={experiment.id}
+                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0"
+              >
+                <div>
+                  <div className="font-medium">{experiment.stage}</div>
+                  <div className="text-xs text-muted-foreground">
+                    AI {experiment.aiCallsUsed} 次 · 回测 {experiment.backtestRunsUsed} 次 · Token{' '}
+                    {experimentUsageText(
+                      experiment,
+                      compare?.experiment.id === experiment.id ? compare.attempts : [],
+                    )}{' '}
+                    · AI 费用 {experimentCostText(experiment.costSummary)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={experiment.status === 'succeeded' ? 'default' : 'outline'}>
+                    {experiment.status}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onSelectExperiment(experiment.id)}
+                  >
+                    查看
+                  </Button>
+                  <Button
+                    aria-busy={clonePending}
+                    size="sm"
+                    variant="outline"
+                    disabled={clonePending}
+                    onClick={() => onCloneExperiment(experiment.id)}
+                  >
+                    {clonePending && <Spinner data-icon="inline-start" aria-hidden="true" />}
+                    克隆
+                  </Button>
+                  {!settledStatuses.has(experiment.status) ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onCancelExperiment(experiment.id)}
+                    >
+                      取消
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </ListRefreshRegion>
+        {experiments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">暂无优化实验。</p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AdoptionRiskUpgradeDiffs({
+  adoptionDiffs,
+}: {
+  adoptionDiffs: AdoptionRiskApplicationDiff[];
+}) {
+  return adoptionDiffs.length > 0 ? (
+    <div className="flex flex-col gap-2 rounded-md border p-3">
+      <div className="font-medium">现有风险应用升级差异</div>
+      {adoptionDiffs.map((application) => {
+        const changed = application.diff.filter((item) => item.change !== 'unchanged');
+        return (
+          <details
+            key={application.applicationId}
+            className="rounded-md border p-2 text-xs text-muted-foreground"
+          >
+            <summary className="cursor-pointer select-none font-medium text-foreground">
+              {application.symbol} · r{application.currentRevision} ·{' '}
+              {application.enabled ? '监控中' : '已停用'} ·{' '}
+              {changed.length === 0 ? '规则无变化' : `${changed.length} 项规则变化`}
+            </summary>
+            {changed.length > 0 ? (
+              <div className="mt-2 flex flex-col gap-2">
+                {changed.map((item) => (
+                  <div key={item.sourceKey} className="rounded border p-2">
+                    <div className="font-medium text-foreground">
+                      {riskChangeText(item.change)} · {item.sourceKey}
+                    </div>
+                    <div className="mt-1">Before: {riskRuleText(item.before)}</div>
+                    <div>After: {riskRuleText(item.after)}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </details>
+        );
+      })}
+      <p className="text-xs text-muted-foreground">
+        这些差异不会自动覆盖或启用风险应用；请到“策略风险规则”中逐个确认升级。
+      </p>
+    </div>
+  ) : null;
+}
+
+function ExperimentModelSummaries({ compare }: { compare: OptimizationCompare }) {
+  return (
+    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      {compare.experiment.modelConfig.map((route) => {
+        const key = `${route.provider}:${route.model}`;
+        const attempts = compare.attempts.filter((attempt) => attempt.modelKey === key);
+        const latest = attempts.at(-1);
+        const aiCalls = attempts.filter((attempt) => Boolean(attempt.aiRunId)).length;
+        const executionDisplays = attempts.map(optimizationAttemptExecutionText);
+        const tokenText =
+          executionDisplays.length > 0
+            ? executionDisplays.map((display) => display.tokenText).join('；')
+            : '尚未开始';
+        const costText =
+          executionDisplays.length > 0
+            ? [...new Set(executionDisplays.flatMap((display) => display.costLines))].join('；')
+            : '尚未开始';
+        const knownDurations = attempts.flatMap((attempt) =>
+          attempt.durationMs == null ? [] : [attempt.durationMs],
+        );
+        const durationMs = knownDurations.reduce((sum, value) => sum + value, 0);
+        const durationSummary =
+          knownDurations.length === attempts.length
+            ? durationText(durationMs)
+            : `${durationText(durationMs)}（部分耗时未知）`;
+        return (
+          <div key={key} className="rounded-md border p-3">
+            <div className="font-medium">{key}</div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>AI calls</span>
+              <span>{aiCalls}</span>
+              <span>Input / Output</span>
+              <span>{tokenText}</span>
+              <span>Duration</span>
+              <span>{durationSummary}</span>
+              <span>AI 费用</span>
+              <span>{costText}</span>
+              <span>Latest status</span>
+              <span>{String(latest?.status ?? '尚未开始')}</span>
+            </div>
+            {latest?.error ? (
+              <div className="mt-2 text-xs text-destructive">Failure: {String(latest.error)}</div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }

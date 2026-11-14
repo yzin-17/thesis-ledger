@@ -38,7 +38,7 @@ const event = z.strictObject({
   currency: z.literal('CNY'),
   sourceDocumentId: text,
 });
-export const marketNoticeDividendPackV3Schema = z
+const noticeDividendPackFields = z
   .strictObject({
     schemaVersion: z.literal(1),
     datasetId: text,
@@ -57,7 +57,33 @@ export const marketNoticeDividendPackV3Schema = z
     }),
     sourceDocuments: z.array(document).min(2),
     events: z.array(event),
-  })
+  });
+
+function validateNoticeCashEvents(
+  pack: z.infer<typeof noticeDividendPackFields>,
+  documents: Map<string, z.infer<typeof document>>,
+  fail: (message: string) => void,
+): Set<string> {
+  const dates = new Set<string>();
+  for (const item of pack.events) {
+    if (dates.has(item.effectiveDate)) fail('现金事件重复');
+    dates.add(item.effectiveDate);
+    const notice = documents.get(item.sourceDocumentId);
+    if (notice?.kind !== 'issuerDisclosure' || notice.publishedDate !== item.announcementDate)
+      fail('事件缺对应公告');
+    if (!(
+      item.announcementDate <= item.recordDate &&
+      item.recordDate < item.effectiveDate &&
+      item.effectiveDate <= item.paymentDate &&
+      pack.coverage.start <= item.effectiveDate &&
+      item.effectiveDate <= pack.coverage.end
+    ))
+      fail('现金事件日期次序或范围无效');
+  }
+  return dates;
+}
+
+export const marketNoticeDividendPackV3Schema = noticeDividendPackFields
   .superRefine((pack, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: 'custom', message });
     const coverage = pack.coverage;
@@ -76,22 +102,7 @@ export const marketNoticeDividendPackV3Schema = z
     const report = documents.get(coverage.sourceDocumentId);
     if (report?.kind !== 'issuerAnnualReport' || report.publishedDate <= coverage.reportEnd)
       fail('缺期后年报现金覆盖依据');
-    const dates = new Set<string>();
-    for (const item of pack.events) {
-      if (dates.has(item.effectiveDate)) fail('现金事件重复');
-      dates.add(item.effectiveDate);
-      const notice = documents.get(item.sourceDocumentId);
-      if (notice?.kind !== 'issuerDisclosure' || notice.publishedDate !== item.announcementDate)
-        fail('事件缺对应公告');
-      if (!(
-        item.announcementDate <= item.recordDate &&
-        item.recordDate < item.effectiveDate &&
-        item.effectiveDate <= item.paymentDate &&
-        coverage.start <= item.effectiveDate &&
-        item.effectiveDate <= coverage.end
-      ))
-        fail('现金事件日期次序或范围无效');
-    }
+    const dates = validateNoticeCashEvents(pack, documents, fail);
     if (
       new Set(coverage.eventDates).size !== coverage.eventDates.length ||
       dates.size !== coverage.eventDates.length ||

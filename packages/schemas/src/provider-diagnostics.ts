@@ -1,33 +1,22 @@
 import { z } from 'zod';
 import { omitUndefinedDeep } from './exact-optional.js';
-import {
-  aiCostFactsSchema,
-  aiUsageFactsSchema,
-  aiGenerationModeSchema,
-  aiGenerationContractRefSchema,
-} from './ai-execution.js';
-const testDetails = z.object({
-  kind: z.literal('ai_provider_test').optional(),
-  testKind: z.enum(['connection', 'generation']).optional(),
-  model: z.string().optional(),
-  mode: aiGenerationModeSchema.optional(),
-  contract: aiGenerationContractRefSchema.optional(),
-  configurationFingerprint: z.string().optional(),
-  usage: aiUsageFactsSchema.optional(),
-  cost: aiCostFactsSchema.optional(),
-  errorCode: z.string().optional(),
-  status: z.enum(['healthy', 'degraded', 'down', 'cancelled']).optional(),
-});
+import { providerHealthDetailsSchema } from './provider-health-details.js';
+export {
+  providerHealthDetailsSchema,
+  providerProbeDetailsSchema,
+} from './provider-health-details.js';
 export const providerHealthRecordSchema = z
   .object({
     provider: z.string(),
     state: z.string(),
+    errorCode: z.string().nullish(),
     latencyMs: z.number().nullable(),
     checkedAt: z.string(),
     source: z.string().optional(),
-    details: testDetails.nullish().transform((value) => value ?? undefined),
+    details: providerHealthDetailsSchema.nullish().transform((value) => value ?? undefined),
   })
   .transform(omitUndefinedDeep);
+export type ProviderHealthRecord = z.infer<typeof providerHealthRecordSchema>;
 export const providerHealthPageSchema = z.object({
   items: z.array(providerHealthRecordSchema),
   page: z.number().int().positive(),
@@ -44,6 +33,7 @@ export const providerIssueRecordSchema = z
     code: z.string(),
     status: z.string(),
     capability: z.string().optional(),
+    detectedAt: z.string().optional(),
     details: z.record(z.string(), z.unknown()).nullable(),
   })
   .transform(omitUndefinedDeep);

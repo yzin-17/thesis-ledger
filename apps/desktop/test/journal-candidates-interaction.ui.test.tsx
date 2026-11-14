@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
+import { notifyManager } from '@tanstack/react-query';
+import type * as ToastModule from '../src/components/ui/toast.js';
 import { JournalCandidateBrowser } from '../src/features/journal/review/JournalCandidateBrowser.js';
 import { JournalFactSummary } from '../src/features/journal/review/JournalFactSummary.js';
 import { JournalReviewWorkspace } from '../src/features/journal/review/JournalReviewWorkspace.js';
@@ -19,17 +22,27 @@ import {
   mountJournal,
 } from './journal-mounted-harness.js';
 
-const api = vi.hoisted(() => ({ candidates: vi.fn(), history: vi.fn(), object: vi.fn() }));
+const api = vi.hoisted(() => ({
+  candidates: vi.fn(),
+  history: vi.fn(),
+  periodHistory: vi.fn(),
+  object: vi.fn(),
+  explanation: vi.fn(),
+}));
 vi.mock('../src/shared/api/client', () => ({
   getDesktopApiClient: () => ({ journalReviews: api }),
+}));
+vi.mock('@/components/ui/toast', async (importOriginal) => ({
+  ...(await importOriginal<typeof ToastModule>()),
+  useToastManager: () => ({ add: vi.fn() }),
 }));
 const accountId = '00000000-0000-4000-8000-000000000001';
 const props = {
   accountId,
   mode: 'actual' as const,
   symbol: '',
+  window: { start: '', end: '' },
   onSelect: vi.fn(),
-  onWindowApplied: vi.fn(),
 };
 const page = () => ({
   items: [journalMountedCandidate()],
@@ -37,54 +50,155 @@ const page = () => ({
   nextCursor: null as string | null,
 });
 
-describe('候选、局部状态与工作台隔离', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    sessionStorage.clear();
-    journalBrowserStateFixture.state = 'ready';
-    api.candidates.mockResolvedValue(page());
-    api.history.mockResolvedValue({ items: [], nextCursor: null });
+beforeEach(() => {
+  vi.clearAllMocks();
+  notifyManager.setNotifyFunction((callback) => {
+    act(callback);
   });
-  it('选择提示只在成功有候选时显示，空集和失败各自只有当前状态', async () => {
+  sessionStorage.clear();
+  journalBrowserStateFixture.state = 'ready';
+  api.candidates.mockResolvedValue(page());
+  api.history.mockResolvedValue({
+    items: [],
+    nextCursor: null,
+    instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
+  });
+  api.periodHistory.mockResolvedValue({ items: [], nextCursor: null });
+});
+afterEach(() => {
+  notifyManager.setNotifyFunction((callback) => callback());
+});
+describe('复盘候选状态与当前导航', () => {
+  it('候选列表不显示额外选择提示，空集和失败只展示当前状态', async () => {
     api.candidates.mockResolvedValueOnce({ ...page(), items: [] });
-    const view = await mountJournal(<JournalCandidateBrowser {...props} selectionPrompt={<p>选择一个复盘对象</p>} />);
+    const view = await mountJournal(<JournalCandidateBrowser {...props} />);
     await journalWait(() => expect(view.host.textContent).toContain('没有可复盘对象'));
     expect(view.host.textContent).not.toContain('选择一个复盘对象');
     api.candidates.mockRejectedValueOnce(new Error('503'));
-    await view.client.refetchQueries({ queryKey: ['journal-review-candidates'] });
+    await act(async () => {
+      await view.client.refetchQueries({ queryKey: ['journal-review-candidates'] });
+    });
     await journalWait(() => expect(view.host.textContent).toContain('候选读取失败'));
     expect(view.host.textContent).not.toContain('选择一个复盘对象');
     await journalClick('重新读取');
-    await journalWait(() => expect(view.host.textContent).toContain('选择一个复盘对象'));
+    await journalWait(() => expect(view.host.textContent).toContain('查看复盘'));
+    expect(view.host.textContent).not.toContain('选择一个复盘对象');
     expect(view.host.textContent).not.toContain('没有可复盘对象');
   });
-  it('选择对象后反馈选中状态并定位复盘区，返回列表保留当前对象', async () => {
+  it('查看复盘打开右侧抽屉，关闭后回到列表，也可前往历史快照', async () => {
     api.object.mockResolvedValue(journalMountedCandidate());
-    const view = await mountJournal(<JournalReviewWorkspace accounts={[{
-      id: accountId, name: '实际账户', type: 'securities', mode: 'actual', currency: 'USD',
-    }]} />);
-    await journalWait(() => expect(view.host.textContent).toContain('选择对象'));
-    await journalClick('选择对象');
-    await journalWait(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('当前复盘对象'));
-    expect(journalButton('已选择').getAttribute('aria-pressed')).toBe('true');
-    expect(journalButton('已选择').closest('tr')?.getAttribute('data-state')).toBe('selected');
-    expect(journalButton('已选择').disabled).toBe(false);
-    await journalClick('返回对象列表');
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('复盘对象列表');
-    expect(view.host.querySelector('[aria-label="当前复盘对象"]')).not.toBeNull();
-    await journalClick('已选择');
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('当前复盘对象');
-    expect(api.object).toHaveBeenCalledTimes(1);
+    const view = await mountJournal(
+      <JournalReviewWorkspace
+        accounts={[
+          {
+            id: accountId,
+            name: '实际账户',
+            type: 'securities',
+            mode: 'actual',
+            currency: 'USD',
+          },
+        ]}
+      />,
+    );
+    await journalWait(() => expect(view.host.textContent).toContain('查看复盘'));
+    expect(view.host.textContent).not.toContain('选择一个复盘对象');
+    await act(async () => {
+      journalButton('查看复盘').click();
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+    await journalWait(() => {
+      const sheet = document.querySelector('[data-slot="sheet-content"][data-side="right"]');
+      expect(sheet?.querySelector('[aria-label="当前复盘对象"]')).not.toBeNull();
+    });
+    expect(view.host.querySelector('[aria-label="当前复盘对象"]')).toBeNull();
+    expect(journalButton('查看中').getAttribute('aria-pressed')).toBe('true');
+    expect(journalButton('查看中').closest('tr')?.getAttribute('data-state')).toBe('selected');
+    expect(document.querySelector('[data-slot="sheet-content"] [data-slot="card"]')).toBeNull();
+    await act(async () => {
+      journalButton('关闭').click();
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+    await journalWait(() =>
+      expect(document.querySelector('[data-slot="sheet-content"]')).toBeNull(),
+    );
+    expect(journalButton('查看复盘').disabled).toBe(false);
+    await act(async () => {
+      journalButton('查看复盘').click();
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+    await journalWait(() =>
+      expect(
+        document.querySelector('[data-slot="sheet-content"][data-side="right"]'),
+      ).not.toBeNull(),
+    );
+    await act(async () => {
+      journalButton('查看历史快照').click();
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+    await journalWait(() =>
+      expect(document.querySelector('[data-slot="sheet-content"]')).toBeNull(),
+    );
+    expect(view.host.textContent).toContain('历史快照');
+  });
+  it('打开单笔复盘不自动恢复旧的单笔或周期 AI 任务', async () => {
+    const objectRunId = '00000000-0000-4000-8000-000000000097';
+    const periodRunId = '00000000-0000-4000-8000-000000000098';
+    api.object.mockResolvedValue(journalMountedCandidate());
+    api.explanation.mockResolvedValue({
+      id: objectRunId,
+      accountId,
+      mode: 'actual',
+      reviewObjectId: journalMountedCandidate().input.reference.reviewObjectId,
+      evidenceFingerprint: journalMountedCandidate().input.projection.evidenceFingerprint,
+      provider: '本机模型',
+      model: '单笔测试模型',
+      promptVersion: 'test-v1',
+      algorithmVersion: 'journal-test',
+      status: 'failed',
+      errorSummary: '单笔历史解读已失败',
+      result: null,
+    });
+    const view = await mountJournal(
+      <JournalReviewWorkspace
+        accounts={[
+          {
+            id: accountId,
+            name: '实际账户',
+            type: 'securities',
+            mode: 'actual',
+            currency: 'USD',
+          },
+        ]}
+      />,
+    );
+    await journalWait(() => expect(view.host.textContent).toContain('查看复盘'));
+    expect(view.host.textContent).not.toContain('已提交的 AI 解读');
+    await journalClick('查看复盘');
+    await journalWait(() =>
+      expect(document.querySelector('[data-slot="sheet-content"]')?.textContent).toContain(
+        '真实开仓时间',
+      ),
+    );
+    const sheet = document.querySelector('[data-slot="sheet-content"]')!;
+    expect(sheet.textContent).not.toContain('单笔历史解读已失败');
+    expect(sheet.textContent).not.toContain(objectRunId);
+    expect(sheet.textContent).not.toContain(periodRunId);
+    expect(view.host.textContent).not.toContain('已提交的 AI 解读');
+    expect(api.explanation).not.toHaveBeenCalled();
   });
   it('事实摘要与成交表使用可读日期，原始追溯 JSON 保留来源时间', async () => {
     const candidate = journalMountedCandidate();
     const view = await mountJournal(<JournalFactSummary candidate={candidate} />);
     expect(view.host.querySelector('dd')?.textContent).not.toContain('T');
     expect(view.host.querySelector('dd')?.textContent).toMatch(/2026/);
+    expect(view.host.querySelector('[data-slot="card"]')).toBeNull();
+    expect(view.host.querySelectorAll('dl > div')).toHaveLength(4);
     for (const cell of view.host.querySelectorAll('td'))
       expect(cell.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
     expect(view.host.querySelector('pre')?.textContent).toContain(candidate.input.trade.openedAt);
   });
+});
+describe('复盘名称与分页', () => {
   it('当前候选和旧引用使用同一主响应的目录名称，不额外查询目录', async () => {
     const candidate = journalMountedCandidate();
     const legacy = browserJournalLegacy(accountId, 'actual');
@@ -102,7 +216,11 @@ describe('候选、局部状态与工作台隔离', () => {
     await journalWait(() =>
       expect(view.host.querySelector('tbody')?.textContent).toContain('目录证券名称'),
     );
-    expect([...view.host.querySelectorAll('details')].find(row => row.textContent?.includes('旧 Journal'))?.textContent).toContain('目录证券名称');
+    expect(
+      [...view.host.querySelectorAll('details')].find((row) =>
+        row.textContent?.includes('旧 Journal'),
+      )?.textContent,
+    ).toContain('目录证券名称');
     expect(view.host.querySelector('tbody')?.textContent).toContain(candidate.input.trade.symbol);
     expect(api.candidates).toHaveBeenCalledTimes(1);
   });
@@ -116,7 +234,7 @@ describe('候选、局部状态与工作台隔离', () => {
       expect(view.host.querySelector('tbody')?.textContent).toContain('AAPL.US'),
     );
     expect(view.host.querySelectorAll('tbody tr')).toHaveLength(1);
-    expect(journalButton('选择对象').disabled).toBe(false);
+    expect(journalButton('查看复盘').disabled).toBe(false);
     expect(api.candidates).toHaveBeenCalledTimes(1);
   });
   it('追加空的下一页不丢失前页目录名称或候选', async () => {
@@ -143,6 +261,8 @@ describe('候选、局部状态与工作台隔离', () => {
     expect(view.host.querySelectorAll('tbody tr')).toHaveLength(1);
     expect(api.candidates.mock.calls[1]![0].cursor).toBe('next-page');
   });
+});
+describe('冻结事实与统计资格', () => {
   it.each(['active', 'baseline', 'unknown-time', 'close-slice'] as const)(
     '消费服务端 %s 状态并保留未知事实',
     async (state) => {
@@ -170,6 +290,8 @@ describe('候选、局部状态与工作台隔离', () => {
     expect(view.host.textContent).toContain('不进入本粒度默认统计');
     expect(view.host.textContent).not.toContain('符合本粒度统计资格');
   });
+});
+describe('候选失败与条件恢复', () => {
   it('加载、空态与失败区分；重试不保留错误，旧记录不成为正式候选', async () => {
     const pending = journalDeferred<ReturnType<typeof page>>();
     api.candidates.mockReturnValueOnce(pending.promise);
@@ -199,19 +321,27 @@ describe('候选、局部状态与工作台隔离', () => {
     await journalWait(() => expect(view.host.textContent).not.toContain('候选读取失败'));
     expect(api.candidates.mock.calls[2]![0]).not.toHaveProperty('cursor');
   });
-  it('非法窗口不提交，合法窗口变更清除单笔选择且不携带旧游标', async () => {
-    await mountJournal(<JournalCandidateBrowser {...props} />);
+  it('条件改动不查询，点搜索或清空筛选才提交，且不沿用旧游标', async () => {
+    await mountJournal(
+      <JournalReviewWorkspace
+        accounts={[
+          { id: accountId, name: '实际账户', type: 'securities', mode: 'actual', currency: 'USD' },
+        ]}
+      />,
+    );
     await journalWait(() => expect(api.candidates).toHaveBeenCalledTimes(1));
+    expect(document.querySelector('input[aria-label="复盘标的筛选"]')).not.toBeNull();
     expect(document.querySelector('input[aria-label="候选开始时间"]')).not.toBeNull();
     await journalFill('候选开始时间', '2026-01-04T00:00:00Z');
+    await journalFill('候选结束时间', '2026-01-05T00:00:00Z');
+    expect(api.candidates).toHaveBeenCalledTimes(1);
     await journalFill('候选结束时间', '2026-01-03T00:00:00Z');
-    await journalClick('应用候选窗口');
-    expect(document.body.textContent).toContain('候选窗口无效');
+    await journalClick('搜索');
+    expect(document.body.textContent).toContain('筛选条件无效');
     expect(api.candidates).toHaveBeenCalledTimes(1);
     await journalFill('候选结束时间', '2026-01-05T00:00:00Z');
-    await journalClick('应用候选窗口');
+    await journalClick('搜索');
     await journalWait(() => expect(api.candidates).toHaveBeenCalledTimes(2));
-    expect(props.onWindowApplied).toHaveBeenCalledTimes(1);
     expect(api.candidates.mock.calls[1]![0]).toMatchObject({
       accountId,
       mode: 'actual',
@@ -219,19 +349,24 @@ describe('候选、局部状态与工作台隔离', () => {
       end: '2026-01-05T00:00:00.000Z',
     });
     expect(api.candidates.mock.calls[1]![0]).not.toHaveProperty('cursor');
-    expect(document.querySelector<HTMLInputElement>('input[aria-label="候选结束时间"]')?.value).toContain('2026-01-05');
     await journalFill('候选结束时间', '2026-01-06T00:00:00Z');
-    expect(document.querySelector<HTMLInputElement>('input[aria-label="候选结束时间"]')?.value).toContain('2026-01-06');
+    expect(
+      document.querySelector<HTMLInputElement>('input[aria-label="候选结束时间"]')?.value,
+    ).toContain('2026-01-06');
     expect(api.candidates).toHaveBeenCalledTimes(2);
-    await journalClick('清空时间');
-    expect(document.querySelector<HTMLInputElement>('input[aria-label="候选开始时间"]')?.value).toBe('');
-    expect(document.querySelector<HTMLInputElement>('input[aria-label="候选结束时间"]')?.value).toBe('');
-    expect(api.candidates).toHaveBeenCalledTimes(2);
-    await journalClick('应用候选窗口');
+    await journalClick('清空筛选');
     await journalWait(() => expect(api.candidates).toHaveBeenCalledTimes(3));
+    expect(
+      document.querySelector<HTMLInputElement>('input[aria-label="候选开始时间"]')?.value,
+    ).toBe('');
+    expect(
+      document.querySelector<HTMLInputElement>('input[aria-label="候选结束时间"]')?.value,
+    ).toBe('');
     expect(api.candidates.mock.calls[2]![0]).not.toHaveProperty('start');
     expect(api.candidates.mock.calls[2]![0]).not.toHaveProperty('end');
   });
+});
+describe('账户范围晚到响应隔离', () => {
   it('账户模式切换后的晚候选响应不能污染新工作台', async () => {
     const late = journalDeferred<ReturnType<typeof page>>();
     api.candidates.mockReturnValueOnce(late.promise);

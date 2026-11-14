@@ -42,7 +42,9 @@ const compareParts = (left: DecimalParts, right: DecimalParts) => {
   const scale = Math.max(left.scale, right.scale);
   const leftCoefficient = left.coefficient * powerOfTen(scale - left.scale);
   const rightCoefficient = right.coefficient * powerOfTen(scale - right.scale);
-  return leftCoefficient < rightCoefficient ? -1 : leftCoefficient > rightCoefficient ? 1 : 0;
+  if (leftCoefficient < rightCoefficient) return -1;
+  if (leftCoefficient > rightCoefficient) return 1;
+  return 0;
 };
 
 const roundedQuotient = (numerator: bigint, denominator: bigint) => {

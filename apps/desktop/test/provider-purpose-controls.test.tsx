@@ -7,7 +7,7 @@ import { newAiProviderDraft } from '../src/features/providers/providers.types.js
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-it('每个模型用途有独立可访问名称，分组标题不覆盖七个选项', async () => {
+it('每个模型用途有独立可访问名称，分组标题不覆盖八个选项', async () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -21,7 +21,7 @@ it('每个模型用途有独立可访问名称，分组标题不覆盖七个选�
       ),
     );
     const controls = [...host.querySelectorAll('[role="checkbox"]')];
-    expect(controls).toHaveLength(7);
+    expect(controls).toHaveLength(8);
     const names = controls.map((control) => {
       const references = control.getAttribute('aria-labelledby')?.trim();
       if (references)
@@ -31,10 +31,11 @@ it('每个模型用途有独立可访问名称，分组标题不覆盖七个选�
           .join(' ');
       return control.getAttribute('aria-label');
     });
-    expect(new Set(names).size).toBe(7);
+    expect(new Set(names).size).toBe(8);
     expect(names).toContain('验收模型 研究报告用途');
     expect(names).toContain('验收模型 参数优化用途');
     expect(names).toContain('验收模型 模拟交易决策用途');
+    expect(names).toContain('验收模型 策略发现用途');
     const inputIds = [...host.querySelectorAll('input[id]')].map((input) => input.id);
     expect(new Set(inputIds).size).toBe(inputIds.length);
   } finally {

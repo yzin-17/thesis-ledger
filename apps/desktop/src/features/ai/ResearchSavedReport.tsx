@@ -4,6 +4,7 @@ import type { ResearchReportDetail } from '@thesis-ledger/schemas';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import { useOptionalPortfolioMode } from '../portfolio/portfolio-mode-context.js';
 import { useNavigationGuard } from '../shared/navigation-guard.js';
@@ -22,7 +23,6 @@ import { ResearchObservations } from './ResearchObservations.js';
 import { ResearchNextActions } from './ResearchNextActions.js';
 import { researchStateMeta } from './research-state-display.js';
 import { questionSummary } from './ai.display.js';
-import { ResearchQuestionSection } from './ResearchQuestionSection.js';
 export { researchQualityReason } from './research-report-display.js';
 
 function ResearchRunStatus({
@@ -149,6 +149,7 @@ function ResearchLegacyReport({
             label={'核对历史引用 ' + (index + 1)}
           />
         ))}
+      <ResearchSavedFields report={report} />
     </div>
   );
 }
@@ -177,7 +178,7 @@ export function ResearchSavedReport({
     );
   const partial = report.quality?.status === 'partial';
   return (
-    <article className="flex flex-col gap-5">
+    <article className="flex min-w-0 flex-col gap-5 break-words">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{mode === 'shadow' ? '模拟范围' : '实际范围'}</Badge>
         <Badge variant={partial ? 'secondary' : 'outline'}>
@@ -185,13 +186,8 @@ export function ResearchSavedReport({
         </Badge>
       </div>
       <ResearchRunStatus report={report} onRetry={onRetry} />
-      <ResearchQuestionSection question={questionSummary(reportToAiRun(report))} />
-      <ResearchNextActions report={report} onPrepare={onRetry} />
-      {partial && (
-        <ResearchTextSection
-          title="资料质量与限制"
-          items={[...new Set((report.quality?.reasons ?? []).map(researchQualityReason))]}
-        />
+      {!(report.result?.version === 2 && report.availability === 'available') && (
+        <ResearchReportQuality report={report} />
       )}
       {report.status === 'succeeded' && report.availability !== 'available' && (
         <Alert variant="destructive">
@@ -199,23 +195,73 @@ export function ResearchSavedReport({
           <AlertDescription>正文或引用关联不完整，请保留任务标识以便排查。</AlertDescription>
         </Alert>
       )}
+      <ResearchVerifiedInference report={report} snapshot={report.historicalScope.snapshot} />
+      <details>
+        <summary className="cursor-pointer py-2 text-sm font-medium">研究背景</summary>
+        <p className="py-3 break-words whitespace-pre-wrap text-sm leading-6">
+          {questionSummary(reportToAiRun(report))}
+        </p>
+      </details>
       {report.status === 'succeeded' && report.availability === 'available' && (
         <>
+          <Separator />
           <ResearchComparison
             report={report}
             choices={comparisonChoices}
             contextKey={comparisonContextKey}
           />
-          <ResearchObservations report={report} contextKey={comparisonContextKey} />
+          {report.result?.version === 2 && (
+            <ResearchObservations report={report} contextKey={comparisonContextKey} />
+          )}
         </>
       )}
-      {report.result?.version === 2 && (
-        <ResearchInferenceSections
-          result={report.result}
-          runId={report.id}
-          locator={reportEvidenceLocator(report.historicalScope.snapshot)}
+      <ResearchNextActions report={report} onPrepare={onRetry} />
+      <ResearchSavedFields report={report} />
+    </article>
+  );
+}
+
+function ResearchSavedFields({ report }: { report: ResearchReportDetail }) {
+  return (
+    <details>
+      <summary className="cursor-pointer py-2 text-sm font-medium">完整报告与保存字段</summary>
+      <p className="py-2 break-all text-xs text-muted-foreground">任务：{report.id}</p>
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">
+        {JSON.stringify(report, null, 2)}
+      </pre>
+    </details>
+  );
+}
+
+function ResearchVerifiedInference({
+  report,
+  snapshot,
+}: {
+  report: ResearchReportDetail;
+  snapshot: Parameters<typeof reportEvidenceLocator>[0];
+}) {
+  const result = report.result;
+  if (result?.version !== 2 || report.availability !== 'available') return null;
+  return (
+    <ResearchInferenceSections
+      result={result}
+      runId={report.id}
+      locator={reportEvidenceLocator(snapshot)}
+    />
+  );
+}
+
+function ResearchReportQuality({ report }: { report: ResearchReportDetail }) {
+  const partial = report.quality?.status === 'partial';
+  return (
+    <>
+      {' '}
+      {partial && (
+        <ResearchTextSection
+          title="资料质量与限制"
+          items={[...new Set((report.quality?.reasons ?? []).map(researchQualityReason))]}
         />
       )}
-    </article>
+    </>
   );
 }

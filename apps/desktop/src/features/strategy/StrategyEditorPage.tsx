@@ -239,7 +239,7 @@ export function StrategyEditorPage({
         setSearchParams(next, { replace: true });
       }}
     >
-      <header className="flex w-full max-w-3xl flex-col items-start gap-2">
+      <header className="flex w-full flex-col items-start gap-2">
         <Link
           to={strategyCenterPath.library}
           className="inline-flex min-h-8 items-center gap-2 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-ring"
@@ -255,7 +255,7 @@ export function StrategyEditorPage({
           </TabsList>
         </div>
       </header>
-      <TabsContent value="manual" className="w-full max-w-3xl" keepMounted>
+      <TabsContent value="manual" className="w-full" keepMounted>
         {editor}
       </TabsContent>
       <TabsContent value="authoring" keepMounted>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import type { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
+import { instrumentConfirmationPresentation } from '@thesis-ledger/api-client';
+import type { InstrumentSearchResult } from '@thesis-ledger/schemas';
 import { useMobileRuntime, confirmAction } from '../../app/MobileRuntime';
 import {
   Action,
@@ -97,8 +99,14 @@ export function MarketCatalogScreen() {
   const confirm = async (id: string, label: string) => {
     if (!(await confirmAction('确认标的？', label))) return;
     try {
-      await command.submit(() => api.market.confirmInstrument(id));
-      setMessage('标的已确认，已重新读取搜索结果。');
+      await command.submit(async () => {
+        await api.market.confirmInstrument(id);
+        const queryKey = [...scope, 'configuration', 'catalog-search'];
+        await client.cancelQueries({ queryKey });
+        client.setQueriesData<InstrumentSearchResult[]>({ queryKey }, (items) => items?.map((item) =>
+          item.id === id ? { ...item, confirmed: true } : item));
+      });
+      setMessage('标的已确认，可用于持仓关联。');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '操作未完成。');
     }
@@ -145,19 +153,20 @@ export function MarketCatalogScreen() {
             label="正在刷新标的列表"
             gap={12}
           >
-            {instruments.data?.map((item) => (
-              <Section key={item.id} title={item.displayName}>
+            {instruments.data?.map((item) => {
+              const confirmation = instrumentConfirmationPresentation(item);
+              return <Section key={item.id} title={item.displayName}>
                 <Copy>
-                  {item.symbol} · {item.market} · {item.confirmable ? '可确认' : '不可确认'}
+                  {item.symbol} · {item.market}
                 </Copy>
-                <Copy>{item.disabledReason ?? '目录身份有效，可提交确认。'}</Copy>
+                <Copy>{confirmation.description}</Copy>
                 <Action
-                  label={`确认标的 ${item.symbol}`}
-                  disabled={command.pending || instruments.isError || !item.confirmable}
+                  label={`${confirmation.label} ${item.symbol}`}
+                  disabled={command.pending || instruments.isError || confirmation.status !== 'unconfirmed'}
                   onPress={() => void confirm(item.id, `${item.displayName} / ${item.symbol}`)}
                 />
-              </Section>
-            ))}
+              </Section>;
+            })}
           </QueryList>
         )}
       </Section>

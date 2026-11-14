@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   type BaselineObservationInput,
@@ -133,39 +134,7 @@ export const findOrphanSellRowIds = async (
   defaultObservedAt?: string,
 ) => {
   const tips = await readEffectiveEventTips(context);
-  const operations: Array<{
-    occurredAt: number;
-    order: string;
-    symbol: string;
-    kind: 'SET' | 'ADD' | 'SUBTRACT' | 'RATIO';
-    quantity?: Prisma.Decimal;
-    fromUnits?: Prisma.Decimal;
-    toUnits?: Prisma.Decimal;
-    rowId?: string;
-  }> = [];
-  for (const event of tips.values()) {
-    const operation = ledgerEventPositionOperation(event);
-    if (!operation) continue;
-    const base = {
-      occurredAt:
-        event.occurredAt === null ? Number.NEGATIVE_INFINITY : new Date(event.occurredAt).getTime(),
-      order: `0:${event.economicOrderKey}`,
-      symbol: operation.symbol,
-    };
-    if (operation.kind === 'RATIO')
-      operations.push({
-        ...base,
-        kind: 'RATIO',
-        fromUnits: new Prisma.Decimal(operation.fromUnits),
-        toUnits: new Prisma.Decimal(operation.toUnits),
-      });
-    else
-      operations.push({
-        ...base,
-        kind: operation.kind,
-        quantity: new Prisma.Decimal(operation.quantity),
-      });
-  }
+  const operations = draftBalanceOperations(tips);
   for (const [index, row] of rows.entries()) {
     if (row.kind === 'UNRESOLVED') continue;
     const occurredAt =
@@ -276,3 +245,47 @@ export const appendDraftRow = (
     },
   });
 };
+
+export const importDraftConflict = (
+  errorCode: string,
+  message: string,
+  details?: Record<string, unknown>,
+) => new ConflictException({ errorCode, message, ...(details ? { details } : {}) });
+
+function draftBalanceOperations(tips: Awaited<ReturnType<typeof readEffectiveEventTips>>) {
+  const operations: Array<{
+    occurredAt: number;
+    order: string;
+    symbol: string;
+    kind: 'SET' | 'ADD' | 'SUBTRACT' | 'RATIO';
+    quantity?: Prisma.Decimal;
+    fromUnits?: Prisma.Decimal;
+    toUnits?: Prisma.Decimal;
+    rowId?: string;
+  }> = [];
+  for (const event of tips.values()) {
+    const operation = ledgerEventPositionOperation(event);
+    if (!operation) continue;
+    const base = {
+      occurredAt:
+        event.occurredAt === null ? Number.NEGATIVE_INFINITY : new Date(event.occurredAt).getTime(),
+      order: `0:${event.economicOrderKey}`,
+      symbol: operation.symbol,
+    };
+    if (operation.kind === 'RATIO')
+      operations.push({
+        ...base,
+        kind: 'RATIO',
+        fromUnits: new Prisma.Decimal(operation.fromUnits),
+        toUnits: new Prisma.Decimal(operation.toUnits),
+      });
+    else
+      operations.push({
+        ...base,
+        kind: operation.kind,
+        quantity: new Prisma.Decimal(operation.quantity),
+      });
+  }
+
+  return operations;
+}

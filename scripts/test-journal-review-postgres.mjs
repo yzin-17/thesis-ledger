@@ -9,7 +9,8 @@ const authoringRedis = process.env.AUTHORING_WITH_REDIS === '1';
 const arenaRedis = process.env.ARENA_WITH_REDIS === '1';
 const arenaJourney = process.argv.includes('test/model-arena/watchlist-journey.integration.test.mjs');
 const arenaSchedule = process.argv.includes('test/model-arena/schedule-queue.integration.test.ts');
-if (arenaRedis && ((!arenaSchedule && !arenaJourney) || authoringRedis))
+const arenaLive = process.argv.includes('test/model-arena/live-runtime.integration.test.ts');
+if (arenaRedis && ((!arenaSchedule && !arenaJourney && !arenaLive) || authoringRedis))
   throw new Error('竞技场隔离队列仅用于独立调度验收');
 const withRedis = authoringRedis || arenaRedis;
 if (

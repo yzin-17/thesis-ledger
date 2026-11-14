@@ -38,7 +38,11 @@ export const collectSnapshotTradingStatusV3 = async (
   if (runConfig.lifecyclePreparation) {
     const response = runConfig.lifecyclePreparation.response;
     const { freezeVersion, structuredResearch } = freezeStructuredStatusV3(runConfig, response);
-    return backtestTradingStatusSnapshotV3Schema.parse({ ...base, freezeVersion, disclosure: { status: 'source', response, structuredResearch } });
+    return backtestTradingStatusSnapshotV3Schema.parse({
+      ...base,
+      freezeVersion,
+      disclosure: { status: 'source', response, structuredResearch },
+    });
   }
   const fallback = (reason: string): BacktestTradingStatusSnapshotV3 => ({
     ...base,
@@ -133,21 +137,33 @@ export const readSnapshotTradingStatusV3 = (
   if (status.runConfigChecksum !== hashCanonicalManifest(runConfig))
     throw new Error('停复牌冻结产物与原运行配置身份不一致');
   if (status.disclosure.status === 'source') {
-    const response = status.disclosure.response;
-    const model = runConfig.executionModel;
-    if (
-      !model ||
-      response.routeKey.market !== model.scope.market ||
-      model.scope.instrumentType !== 'STOCK' ||
-      response.symbol !== model.scope.symbol ||
-      response.range.start !== (runConfig.lifecyclePreparation?.response.range.start ?? runConfig.startDate) ||
-      response.range.end !== runConfig.endDate ||
-      runConfig.executionPriceProtocol.history.basis !== 'fixed-provider-snapshot'
-    )
-      throw new Error('停复牌冻结产物与执行标的或窗口不一致');
-    if (runConfig.lifecyclePreparation && canonicalizeManifest(response) !== canonicalizeManifest(runConfig.lifecyclePreparation.response)) throw new Error('冻结生命周期响应不是准备取得的版本');
-    statusPriceExecutionModelV3(runConfig, response);
-    validateFrozenStructuredStatusV3(runConfig, status.disclosure);
+    validateTradingStatusSourceV3(runConfig, status.disclosure);
   }
   return status;
+};
+
+const validateTradingStatusSourceV3 = (
+  runConfig: RunConfigV3,
+  disclosure: Extract<BacktestTradingStatusSnapshotV3['disclosure'], { status: 'source' }>,
+) => {
+  const response = disclosure.response;
+  const model = runConfig.executionModel;
+  if (
+    !model ||
+    response.routeKey.market !== model.scope.market ||
+    model.scope.instrumentType !== 'STOCK' ||
+    response.symbol !== model.scope.symbol ||
+    response.range.start !==
+      (runConfig.lifecyclePreparation?.response.range.start ?? runConfig.startDate) ||
+    response.range.end !== runConfig.endDate ||
+    runConfig.executionPriceProtocol.history.basis !== 'fixed-provider-snapshot'
+  )
+    throw new Error('停复牌冻结产物与执行标的或窗口不一致');
+  if (
+    runConfig.lifecyclePreparation &&
+    canonicalizeManifest(response) !== canonicalizeManifest(runConfig.lifecyclePreparation.response)
+  )
+    throw new Error('冻结生命周期响应不是准备取得的版本');
+  statusPriceExecutionModelV3(runConfig, response);
+  validateFrozenStructuredStatusV3(runConfig, disclosure);
 };

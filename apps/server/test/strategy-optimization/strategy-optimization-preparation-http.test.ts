@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import { makeReaderResult } from '../backtest/v3-snapshot-fixtures.js';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,41 +6,25 @@ import { OptimizationPreparation } from '../../src/strategy-optimization/optimiz
 import { BacktestRunPreparationService } from '../../src/backtest/backtest-run-preparation.service.js';
 import { StrategyOptimizationPreparationController } from '../../src/strategy-optimization/strategy-optimization-preparation.controller.js';
 import { ApiExceptionFilter } from '../../src/platform/api-exception.filter.js';
-import { completeSnapshotFixture } from '../backtest/v3-complete-snapshot-fixtures.js';
+import { priceResearchFixture } from '../backtest/price-research.fixtures.js';
+import { OptimizationModelResolution } from '../../src/strategy-optimization/optimization-model-resolution.js';
+import { StrategyAccessService } from '../../src/backtest/strategy-access.service.js';
+import { StrategyIdentityGuard } from '../../src/backtest/strategy-identity.guard.js';
+import { IdentityService } from '../../src/identity/identity.service.js';
+import { optimizationRunPreparationResultSchema } from '@thesis-ledger/schemas';
 
 describe('实验配置准备HTTP', () => {
   it('已有版本与内存探索种子共用准备能力；不写入任务或返回创建戳', async () => {
-    const f = await completeSnapshotFixture();
-    f.reader.readV3.mockImplementation(async (input) => {
-      const result = await makeReaderResult(input);
-      return input.frozenWindowRef && result.status === 'selected'
-        ? { ...result, frozenWindowRef: input.frozenWindowRef }
-        : result;
-    });
+    const f = await priceResearchFixture({ researchSource: { providerId: 'futu', upstreamSource: 'futu' },
+      actualSource: { providerId: 'tushare', upstreamSource: 'tushare', routeIndex: 1 } });
     const config = f.input.runConfig;
     const prisma = {
       strategyVersion: {
-        findUnique: vi.fn().mockResolvedValue({ schemaVersion: 2, schema: f.input.strategy }),
+        findUnique: vi.fn().mockResolvedValue({ schemaVersion: 3, schema: f.input.strategy }),
       },
       backtestJob: { create: vi.fn() },
     };
-    const control = {
-      getPolicy: vi.fn().mockResolvedValue({
-        contractVersion: 3,
-        consumer: 'thesis-ledger',
-        requestId: 'policy',
-        revision: 7,
-        enabled: true,
-        syncState: 'applied',
-        effectiveStale: false,
-        routes: [
-          {
-            key: f.input.executionRouteKey,
-            targets: [{ providerId: 'hithink', upstreamSource: 'hithink-financial-api' }],
-          },
-        ],
-      }),
-    };
+    const control = f.control;
     const preparation = new BacktestRunPreparationService(
       prisma as never,
       f.reader as never,
@@ -49,17 +32,22 @@ describe('实验配置准备HTTP', () => {
     );
     @Module({
       controllers: [StrategyOptimizationPreparationController],
-      providers: [OptimizationPreparation, { provide: BacktestRunPreparationService, useValue: preparation }],
+      providers: [OptimizationPreparation, { provide: BacktestRunPreparationService, useValue: preparation },
+        { provide: OptimizationModelResolution, useValue: {} }, { provide: StrategyAccessService, useValue: {} },
+        { provide: IdentityService, useValue: {} },
+        { provide: StrategyIdentityGuard, useValue: { canActivate: () => true } }],
     })
     class TestModule {}
-    const app = await NestFactory.create(TestModule, { logger: false });
+    const app = await NestFactory.create(TestModule, { logger: false, abortOnError: false });
     app.useGlobalFilters(new ApiExceptionFilter());
     await app.listen(0, '127.0.0.1');
     const intent = {
       contractVersion: 3,
       requestId: 'prepare-experiment',
       warmupBudgetSessions: 60,
-      adjustment: 'qfq',
+      adjustment: 'hfq',
+      priceResearch: 'price-research-v1',
+      priceResearchReference: 'freeze',
       accountingBasis: 'normalized-series',
       history: { basis: 'fixed-provider-snapshot' },
       runConfig: {
@@ -95,12 +83,21 @@ describe('实验配置准备HTTP', () => {
           status: 'prepared',
           scope: 'baseline-window',
           requestId: intent.requestId,
+          actualSource: { provenance: { providerId: 'futu', routeIndex: 0 } },
+          actualPriceSource: { routeKey: { adjustment: 'none' }, provenance: { providerId: 'tushare', upstreamSource: 'tushare', routeIndex: 1 } },
           runConfig: {
             frozenWarmupBudgetSessions: 60,
             frozenExecutionWindow: { version: 'market-frozen-window-v1' },
+            priceResearch: { protocolVersion: 'price-research-v1', actualPriceWindow: { version: 'market-frozen-window-v1' } },
           },
         });
         expect(result).not.toHaveProperty('executionPreflight');
+        const legacy = { ...result };
+        delete legacy.actualPriceSource;
+        expect(optimizationRunPreparationResultSchema.safeParse(legacy).success).toBe(true);
+        expect(optimizationRunPreparationResultSchema.safeParse({ ...result, actualPriceSource: {
+          ...result.actualPriceSource, routeKey: { ...result.actualPriceSource.routeKey, adjustment: 'hfq' },
+        } }).success).toBe(false);
         expect(result).not.toHaveProperty('preparationStamp');
         expect(result.strategyContentHash).toMatch(/^[a-f0-9]{64}$/);
       }

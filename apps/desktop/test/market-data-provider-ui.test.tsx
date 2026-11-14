@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MarketPolicyPanel } from '../src/features/market-data/MarketPolicyPanel.js';
 import { MarketProviderPanel } from '../src/features/market-data/MarketProviderPanel.js';
 import { MarketDataSectionTabs } from '../src/features/market-data/MarketDataSectionTabs.js';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../src/components/ui/tabs.js';
 import { InstrumentCatalogPanel } from '../src/features/market-data/InstrumentCatalogPanel.js';
 import { parseMarketPolicyResponse } from '../src/features/market-data/market-data.api.js';
 import {
@@ -192,6 +193,14 @@ const v3AppliedPolicy: MarketPolicyV3 = {
 };
 
 describe('市场数据 Provider 与主备路由', () => {
+  it('分类页签将竖向语义传给底层控件', () => {
+    const html = renderToStaticMarkup(<Tabs orientation="vertical" defaultValue="market">
+      <TabsList aria-label="分类"><TabsTrigger value="market">行情</TabsTrigger></TabsList>
+      <TabsContent value="market">配置内容</TabsContent>
+    </Tabs>);
+    expect(html).toContain('aria-orientation="vertical"');
+    expect(html).toContain('配置内容');
+  });
   it('拒绝旧合同策略响应，保留 V3 的精确路由', () => {
     expect(parseMarketPolicyResponse(v3AppliedPolicy).routes).toEqual(v3Draft.routes);
     expect(() => parseMarketPolicyResponse({ ...v3AppliedPolicy, contractVersion: 2 })).toThrow(
@@ -199,26 +208,28 @@ describe('市场数据 Provider 与主备路由', () => {
     );
   });
 
-  it('用四个一级页签分隔任务并默认打开路由策略', () => {
+  it('用三个一级页签分隔任务并默认打开路由策略', () => {
     const html = renderToStaticMarkup(
       <MarketDataSectionTabs
         providerPanel={<div>provider-panel</div>}
         policyPanel={<div>policy-panel</div>}
-        catalogPanel={<div>catalog-panel</div>}
       />,
     );
 
     expect(html).toContain('aria-label="市场数据功能"');
-    expect(html.match(/role="tab"/g)).toHaveLength(4);
+    expect(html.match(/role="tab"/g)).toHaveLength(3);
     expect(html).toContain('>规则监测<');
     expect(html).toContain('>数据源<');
     expect(html).toContain('>路由策略<');
-    expect(html).toContain('>标的目录<');
+    expect(html).not.toContain('>标的目录<');
     expect(html.indexOf('>路由策略<')).toBeLessThan(html.indexOf('>数据源<'));
     expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>路由策略</);
     expect(html).toContain('policy-panel');
   });
 
+});
+
+describe('精确路由候选及价格口径', () => {
   it('按能力与标的类型提供全部兼容数据源', () => {
     expect(
       compatibleProviders(providers, 'DAILY_BAR', 'ETF').map((item) => item.providerId),
@@ -297,6 +308,9 @@ describe('市场数据 Provider 与主备路由', () => {
     ).toEqual([akshareEastmoney]);
   });
 
+});
+
+describe('来源清单与路由状态', () => {
   it('Provider 清单为全部 DSA 数据源提供路由配置操作', () => {
     const html = renderToStaticMarkup(
       <MarketProviderPanel
@@ -349,17 +363,16 @@ describe('市场数据 Provider 与主备路由', () => {
 
     expect(html).toContain('主数据源');
     expect(html).toContain('备用数据源');
-    expect(html).toContain('中国内地股票 · 日线行情（日线／不复权） 主数据源');
-    expect(html).toContain('AKShare · 东方财富');
-    expect(html).toContain('腾讯财经');
+    expect(html).toContain('展开日线行情配置');
+    expect(html).toContain('已配置 3 项');
     expect(html).not.toContain('旧版主备设置已保留');
-    expect(html).toContain('保存后为 15');
-    expect(html).toContain('保存路由策略');
+    expect(html).toContain('有未保存修改');
+    expect(html).toContain('保存全部修改');
     expect(html).not.toContain('第 14 版');
     expect(html).not.toContain('上移');
   });
 
-  it('V3 面板区分期望修订和生效修订，并呈现已生效状态', () => {
+  it('V3 面板呈现同步状态与分类摘要', () => {
     const html = renderToStaticMarkup(
       <MarketPolicyPanel
         policy={v3Draft}
@@ -378,11 +391,14 @@ describe('市场数据 Provider 与主备路由', () => {
       />,
     );
 
-    expect(html).toContain('期望修订：14');
-    expect(html).toContain('生效修订：9（对应期望 14）');
-    expect(html).toContain('已生效');
+    expect(html).toContain('已应用');
+    expect(html).toContain('行情与净值');
+    expect(html).toContain('已配置 3 项');
   });
 
+});
+
+describe('不完整目录与标的数量', () => {
   it('partial 目录下显示保存的路由但禁用选择和保存', () => {
     const html = renderToStaticMarkup(
       <MarketPolicyPanel
@@ -403,11 +419,11 @@ describe('市场数据 Provider 与主备路由', () => {
     );
 
     expect(html).toContain('路由能力目录尚未完整');
-    expect(html).toContain('AKShare · 东方财富');
+    expect(html).toContain('已配置 3 项');
     const selectors = html.match(/<button\b[^>]*role="combobox"[^>]*>/g) ?? [];
-    expect(selectors).toHaveLength(6);
-    expect(selectors.every((selector) => selector.includes('disabled=""'))).toBe(true);
-    const saveButton = html.match(/<button\b[^>]*>保存路由策略<\/button>/)?.[0];
+    expect(selectors).toHaveLength(3);
+    expect(html).toContain('暂不能修改路由');
+    const saveButton = html.match(/<button\b[^>]*>保存全部修改[^<]*<\/button>/)?.[0];
     expect(saveButton).toContain('disabled=""');
   });
 

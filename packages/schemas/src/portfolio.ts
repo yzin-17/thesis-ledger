@@ -34,10 +34,14 @@ export type AccountPermanentDeletionErrorCode = z.infer<
   typeof accountPermanentDeletionErrorCodeSchema
 >;
 
+export const positionSymbolPattern = String.raw`(?:[0-9]{6}\.(?:SH|SZ|BJ|OF)|[0-9]{5}\.HK|[A-Z][A-Z0-9.\-]{0,31}\.US)`;
+const positionSymbolSchema = z.string().regex(new RegExp(`^${positionSymbolPattern}$`))
+  .refine((symbol) => symbol !== '00000.HK', '港股证券代码不能为零');
+
 export const positionInputSchema = z.object({
   accountId: z.uuid(),
   instrumentId: z.uuid().optional(),
-  symbol: z.string().regex(/^\d{6}\.(SH|SZ|BJ|OF)$/),
+  symbol: positionSymbolSchema,
   quantity: nonNegativeDecimalStringSchema,
   costPrice: nonNegativeDecimalStringSchema,
   source: z.enum(['manual', 'screenshot', 'migration']),

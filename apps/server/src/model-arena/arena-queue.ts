@@ -11,7 +11,7 @@ export class ArenaQueue {
     redis: RedisService,
     consume: (item: ArenaDelivery) => Promise<void>,
     error: () => void,
-    name: 'rounds' | 'weeklies' = 'rounds',
+    name: 'rounds' | 'weeklies' | 'live' = 'rounds',
   ) {
     const testScope = process.env.ARENA_QUEUE_TEST_SCOPE;
     if (

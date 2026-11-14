@@ -73,7 +73,7 @@ describe('优化评价的当前结果边界', () => {
       failureCategory: 'data-unavailable',
     });
     expect(summary).not.toHaveProperty('score');
-    expect(summary).not.toHaveProperty('totalReturn');
+    expect(summary).toHaveProperty('totalReturn', '-0.12');
   });
   it('缺少关键指标不会冒充零收益', () => {
     const summary = evaluate({ ...resultV3(), metrics: {} });

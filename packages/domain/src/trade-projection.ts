@@ -726,11 +726,10 @@ const finalizeTrade = (trade: MutableTrade): TradeProjection => {
   const hasBaselineContribution = baselineComponents.some(
     (component) => component.quantity !== '0',
   );
-  const completeness: TradeEvidenceCompleteness = trade.issues.has('QUANTITY_CONFLICT')
-    ? 'CONFLICTED'
-    : trade.issues.size > 0 || hasBaselineContribution || trade.openedAt === null
-      ? 'PARTIAL'
-      : 'COMPLETE';
+  let completeness: TradeEvidenceCompleteness = 'COMPLETE';
+  if (trade.issues.has('QUANTITY_CONFLICT')) completeness = 'CONFLICTED';
+  else if (trade.issues.size > 0 || hasBaselineContribution || trade.openedAt === null)
+    completeness = 'PARTIAL';
   return {
     id: trade.id,
     accountId: trade.accountId,

@@ -58,3 +58,7 @@ export const arenaPointSchema = z.strictObject({
   quantity: z.string(),
 });
 export type ArenaPoint = z.infer<typeof arenaPointSchema>;
+export const arenaLivePointSchema = arenaPointSchema.omit({ roundId: true }).extend({
+  protocolVersion: z.literal(2), roundId: z.null(),
+});
+export type ArenaPricePoint = ArenaPoint | z.infer<typeof arenaLivePointSchema>;

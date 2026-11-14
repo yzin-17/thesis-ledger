@@ -20,6 +20,49 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
+function matchesJobStatus(expected: unknown, actual: string) {
+  if (typeof expected === 'string' && expected !== actual) return false;
+  const status = expected;
+  if (
+    status &&
+    typeof status === 'object' &&
+    'in' in status &&
+    Array.isArray(status.in) &&
+    !status.in.includes(actual)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+function matchesJobAttempt(attempt: unknown, actual: number) {
+  if (typeof attempt === 'number' && attempt !== actual) return false;
+  if (
+    attempt &&
+    typeof attempt === 'object' &&
+    'lt' in attempt &&
+    typeof attempt.lt === 'number' &&
+    actual >= attempt.lt
+  ) {
+    return false;
+  }
+
+  return true;
+}
+function matchesJobCancellation(cancelRequestedAt: unknown, actual: Date | null) {
+  if (cancelRequestedAt === null && actual !== null) return false;
+  if (
+    cancelRequestedAt &&
+    typeof cancelRequestedAt === 'object' &&
+    'not' in cancelRequestedAt &&
+    cancelRequestedAt.not === null &&
+    actual === null
+  ) {
+    return false;
+  }
+  return true;
+}
+
 const createState = (initial: TestJob, beforeFirstFindUnique?: () => Promise<void>) => {
   let job = { ...initial };
   let firstFindUnique = true;
@@ -27,41 +70,9 @@ const createState = (initial: TestJob, beforeFirstFindUnique?: () => Promise<voi
   const matches = (where: Record<string, unknown>) => {
     if (where.id !== undefined && where.id !== job.id) return false;
     if (where.mode !== undefined && where.mode !== job.mode) return false;
-    if (typeof where.status === 'string' && where.status !== job.status) return false;
-    const status = where.status;
-    if (
-      status &&
-      typeof status === 'object' &&
-      'in' in status &&
-      Array.isArray(status.in) &&
-      !status.in.includes(job.status)
-    ) {
-      return false;
-    }
-
-    const attempt = where.executionAttempt;
-    if (typeof attempt === 'number' && attempt !== job.executionAttempt) return false;
-    if (
-      attempt &&
-      typeof attempt === 'object' &&
-      'lt' in attempt &&
-      typeof attempt.lt === 'number' &&
-      job.executionAttempt >= attempt.lt
-    ) {
-      return false;
-    }
-
-    const cancelRequestedAt = where.cancelRequestedAt;
-    if (cancelRequestedAt === null && job.cancelRequestedAt !== null) return false;
-    if (
-      cancelRequestedAt &&
-      typeof cancelRequestedAt === 'object' &&
-      'not' in cancelRequestedAt &&
-      cancelRequestedAt.not === null &&
-      job.cancelRequestedAt === null
-    ) {
-      return false;
-    }
+    if (!matchesJobStatus(where.status, job.status)) return false;
+    if (!matchesJobAttempt(where.executionAttempt, job.executionAttempt)) return false;
+    if (!matchesJobCancellation(where.cancelRequestedAt, job.cancelRequestedAt)) return false;
     return true;
   };
 

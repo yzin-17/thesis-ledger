@@ -39,6 +39,22 @@ const PerformanceKpiCard = ({
   </Card>
 );
 
+type PerformanceMetricsProps = {
+  latest: SnapshotRecord | undefined;
+  summary: PerformanceSummary | null;
+  snapshotCount: number;
+  summaryError?: string | undefined;
+  latestPartial?: boolean | undefined;
+  currentValue?: number | undefined;
+  currentValuePartial?: boolean | undefined;
+  currentPnl?: number | null | undefined;
+  currentPnlRate?: number | null | undefined;
+  currentCurrency?: Currency | undefined;
+  currencyTotals?: PerformancePortfolioTotal[];
+  fx?: PerformanceFxMeta | undefined;
+  includeAssets?: boolean;
+};
+
 export function PerformanceMetrics({
   latest,
   summary,
@@ -53,21 +69,7 @@ export function PerformanceMetrics({
   currencyTotals = [],
   fx,
   includeAssets = true,
-}: {
-  latest: SnapshotRecord | undefined;
-  summary: PerformanceSummary | null;
-  snapshotCount: number;
-  summaryError?: string | undefined;
-  latestPartial?: boolean | undefined;
-  currentValue?: number | undefined;
-  currentValuePartial?: boolean | undefined;
-  currentPnl?: number | null | undefined;
-  currentPnlRate?: number | null | undefined;
-  currentCurrency?: Currency | undefined;
-  currencyTotals?: PerformancePortfolioTotal[];
-  fx?: PerformanceFxMeta | undefined;
-  includeAssets?: boolean;
-}) {
+}: PerformanceMetricsProps) {
   const resolvedFx = fx ?? summary?.fx;
   const hasCurrentValue = currentValue !== undefined && Number.isFinite(currentValue);
   const hasSnapshotValue = latest !== undefined && !latest.partial;
@@ -76,27 +78,13 @@ export function PerformanceMetrics({
   if (hasCurrentValue) assetValue = formatMoney(currentValue, currentCurrency);
   else if (hasSnapshotValue) assetValue = formatMoney(snapshotValue(latest), latest.currency);
 
-  let assetDetail = '暂无即时估值';
-  if (currentValuePartial) assetDetail = '当前估值，行情不完整';
-  else if (hasCurrentValue) {
-    if (
-      currentPnl !== null &&
-      currentPnl !== undefined &&
-      currentPnlRate !== null &&
-      currentPnlRate !== undefined
-    ) {
-      assetDetail = `较持仓成本 ${signedMoney(currentPnl, currentCurrency)} · ${signedPercent(currentPnlRate)}`;
-    } else {
-      assetDetail = '当前估值';
-    }
-  } else if (hasSnapshotValue) {
-    if (snapshotPartial) {
-      assetDetail = `最近完整快照 ${formatDate(latest.capturedAt)} · 最新快照缺行情`;
-    } else {
-      assetDetail = `最近完整快照 ${formatDate(latest.capturedAt)}`;
-    }
-  } else if (currencyTotals.length > 1) assetDetail = '分币种估值 · 开启汇率合并查看合计';
-  else if (snapshotPartial) assetDetail = '行情不完整，尚无完整估值';
+  const assetDetail = performanceAssetDetail(
+    { currentValuePartial, currentPnl, currentPnlRate, currentCurrency, latest },
+    hasCurrentValue,
+    hasSnapshotValue,
+    snapshotPartial,
+    currencyTotals.length,
+  );
   let assetTone: 'up' | 'down' | undefined;
   if (currentPnlRate !== null && currentPnlRate !== undefined) {
     if (currentPnlRate > 0) assetTone = 'up';
@@ -157,4 +145,44 @@ export function PerformanceMetrics({
       ) : null}
     </>
   );
+}
+
+function performanceAssetDetail(
+  {
+    currentValuePartial,
+    currentPnl,
+    currentPnlRate,
+    currentCurrency,
+    latest,
+  }: Pick<
+    PerformanceMetricsProps,
+    'currentValuePartial' | 'currentPnl' | 'currentPnlRate' | 'currentCurrency' | 'latest'
+  >,
+  hasCurrentValue: boolean,
+  hasSnapshotValue: boolean,
+  snapshotPartial: boolean,
+  currencyCount: number,
+) {
+  let assetDetail = '暂无即时估值';
+  if (currentValuePartial) assetDetail = '当前估值，行情不完整';
+  else if (hasCurrentValue) {
+    if (
+      currentPnl !== null &&
+      currentPnl !== undefined &&
+      currentPnlRate !== null &&
+      currentPnlRate !== undefined
+    ) {
+      assetDetail = `较持仓成本 ${signedMoney(currentPnl, currentCurrency)} · ${signedPercent(currentPnlRate)}`;
+    } else {
+      assetDetail = '当前估值';
+    }
+  } else if (hasSnapshotValue) {
+    if (snapshotPartial) {
+      assetDetail = `最近完整快照 ${formatDate(latest!.capturedAt)} · 最新快照缺行情`;
+    } else {
+      assetDetail = `最近完整快照 ${formatDate(latest!.capturedAt)}`;
+    }
+  } else if (currencyCount > 1) assetDetail = '分币种估值 · 开启汇率合并查看合计';
+  else if (snapshotPartial) assetDetail = '行情不完整，尚无完整估值';
+  return assetDetail;
 }

@@ -1,0 +1,35 @@
+{
+  "fixtureKind": "受控两版本正文，无外部请求",
+  "request": {
+    "kind": "document",
+    "identity": "https://www.sse.com.cn/rule",
+    "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "baseHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "detail": {
+    "version": "rule-source-monitor-v1",
+    "kind": "document",
+    "identity": "https://www.sse.com.cn/rule",
+    "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "snapshot": {
+      "status": "available",
+      "format": "html",
+      "text": "收费比例0.2%\n新附件",
+      "capturedAt": "2026-11-10T00:00:00Z",
+      "reason": null
+    },
+    "comparison": {
+      "baseHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "status": "available",
+      "reason": null,
+      "added": 2,
+      "removed": 2,
+      "lines": [
+        { "type": "removed", "text": "收费比例0.1%" },
+        { "type": "removed", "text": "旧附件" },
+        { "type": "added", "text": "收费比例0.2%" },
+        { "type": "added", "text": "新附件" }
+      ]
+    }
+  }
+}

@@ -199,6 +199,9 @@ describe('实际 Exchange Runner 权益序列', () => {
     expect(result.analytics.equityCurve.at(-1)?.value.amount).toBe('10000');
   });
 
+});
+
+describe("按实际估值间隔年化", () => {
   it('按冻结 Calendar 产生的实际估值间隔推导年化频率', () => {
     const ticks = buildDailyValuationTicks({
       startDate: '2026-09-04',
@@ -234,6 +237,9 @@ describe('实际 Exchange Runner 权益序列', () => {
     expect(annualizationFactorFromValuations(points)).toBeCloseTo(365.2425 / 2, 8);
   });
 
+});
+
+describe("缺失价格与汇率的权益完整性", () => {
   it('价格或 FX 缺失时不以现金冒充完整权益', () => {
     const ledgerState: SimulationLedgerState = {
       baseCurrency: 'CNY',

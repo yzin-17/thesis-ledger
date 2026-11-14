@@ -26,6 +26,12 @@ const databaseUrl = process.env.LEDGER_CURRENT_TEST_DATABASE_URL;
 const isolated = databaseUrl ? describe : describe.skip;
 
 isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
+  const suiteScope = ledgerHttpContext();
+  registerLedgerHttpEnvelopeCases(suiteScope);
+  registerLedgerHttpVerificationCases(suiteScope);
+});
+
+function ledgerHttpContext() {
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl ?? '' });
   const repository = new LedgerV2Repository(prisma as never);
   const queries = new LedgerQueryService(
@@ -78,12 +84,45 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
     await app?.close();
     await prisma.$disconnect();
   });
-
+  const snapshot = async (accountId: string) => ({
+    events: await prisma.ledgerEvent.findMany({ where: { accountId }, orderBy: { id: 'asc' } }),
+    state: await prisma.accountLedgerState.findUnique({ where: { accountId } }),
+    positions: await prisma.position.findMany({ where: { accountId } }),
+    balances: await prisma.cashBalance.findMany({ where: { accountId } }),
+  });
+  return {
+    get prisma() {
+      return prisma;
+    },
+    get repository() {
+      return repository;
+    },
+    get queries() {
+      return queries;
+    },
+    get app() {
+      return app;
+    },
+    set app(value: typeof app) {
+      app = value;
+    },
+    get origin() {
+      return origin;
+    },
+    set origin(value: typeof origin) {
+      origin = value;
+    },
+    get snapshot() {
+      return snapshot;
+    },
+  };
+}
+function registerLedgerHttpEnvelopeCases(suiteScope: ReturnType<typeof ledgerHttpContext>) {
   it('当前 HTTP 创建、幂等、修订、撤销、恢复、审计与历史重放保持经济投影', async () => {
-    const account = await prisma.account.create({
+    const account = await suiteScope.prisma.account.create({
       data: { name: 'E03-d HTTP 夹具', type: 'securities' },
     });
-    await prisma.asset.upsert({
+    await suiteScope.prisma.asset.upsert({
       where: { symbol: '600519.SH' },
       update: {},
       create: {
@@ -95,26 +134,33 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
         identityStatus: 'confirmed',
       },
     });
-    const result = await runCurrentLedgerHttpProbe(ledgerHttp(origin), account.id, '600519.SH');
+    const result = await runCurrentLedgerHttpProbe(
+      ledgerHttp(suiteScope.origin),
+      account.id,
+      '600519.SH',
+    );
     expect(result.audit.events).toHaveLength(5);
-    const rows = await prisma.ledgerEvent.findMany({ where: { accountId: account.id } });
+    const rows = await suiteScope.prisma.ledgerEvent.findMany({ where: { accountId: account.id } });
     expect(rows.every((row) => row.envelopeVersion === 3 && row.payloadVersion === 1)).toBe(true);
-    const position = await prisma.position.findFirstOrThrow({ where: { accountId: account.id } });
+    const position = await suiteScope.prisma.position.findFirstOrThrow({
+      where: { accountId: account.id },
+    });
     expect(position.quantity.toString()).toBe('10');
-    const balance = await prisma.cashBalance.findFirstOrThrow({ where: { accountId: account.id } });
+    const balance = await suiteScope.prisma.cashBalance.findFirstOrThrow({
+      where: { accountId: account.id },
+    });
     expect(balance.settledAmount.toString()).toBe('898');
     expect(balance.pendingPayable.toString()).toBe('0');
-    const state = await prisma.accountLedgerState.findUniqueOrThrow({
+    const state = await suiteScope.prisma.accountLedgerState.findUniqueOrThrow({
       where: { accountId: account.id },
     });
     expect(state).toMatchObject({ ledgerRevision: 5n, projectionGeneration: 5n });
   });
-
   it('旧空版本通过生产 HTTP 明确拒绝读取与写入，原状态不变', async () => {
-    const account = await prisma.account.create({
+    const account = await suiteScope.prisma.account.create({
       data: { name: 'E03-d 旧记录 HTTP 夹具', type: 'securities' },
     });
-    const row = await prisma.ledgerEvent.create({
+    const row = await suiteScope.prisma.ledgerEvent.create({
       data: {
         accountId: account.id,
         type: 'CASH_FLOW',
@@ -124,51 +170,48 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
         occurredAt: new Date('2026-09-29T02:00:00.000Z'),
       },
     });
-    const before = await prisma.ledgerEvent.findMany({ where: { accountId: account.id } });
+    const before = await suiteScope.prisma.ledgerEvent.findMany({
+      where: { accountId: account.id },
+    });
     const rejected = await runOldLedgerHttpProbe(
-      ledgerHttp(origin),
+      ledgerHttp(suiteScope.origin),
       account.id,
       row.id,
       '600519.SH',
     );
     expect(rejected.results).toHaveLength(5);
-    expect(await prisma.ledgerEvent.findMany({ where: { accountId: account.id } })).toEqual(before);
     expect(
-      await prisma.accountLedgerState.findUnique({ where: { accountId: account.id } }),
+      await suiteScope.prisma.ledgerEvent.findMany({ where: { accountId: account.id } }),
+    ).toEqual(before);
+    expect(
+      await suiteScope.prisma.accountLedgerState.findUnique({ where: { accountId: account.id } }),
     ).toBeNull();
-    expect(await prisma.position.count({ where: { accountId: account.id } })).toBe(0);
-    expect(await prisma.cashBalance.count({ where: { accountId: account.id } })).toBe(0);
+    expect(await suiteScope.prisma.position.count({ where: { accountId: account.id } })).toBe(0);
+    expect(await suiteScope.prisma.cashBalance.count({ where: { accountId: account.id } })).toBe(0);
   });
-
-  const snapshot = async (accountId: string) => ({
-    events: await prisma.ledgerEvent.findMany({ where: { accountId }, orderBy: { id: 'asc' } }),
-    state: await prisma.accountLedgerState.findUnique({ where: { accountId } }),
-    positions: await prisma.position.findMany({ where: { accountId } }),
-    balances: await prisma.cashBalance.findMany({ where: { accountId } }),
-  });
-
+}
+function registerLedgerHttpVerificationCases(suiteScope: ReturnType<typeof ledgerHttpContext>) {
   it('客户端伪报 VERIFIED 经生产 HTTP 拒绝，事务不留下事件或版本', async () => {
-    const account = await prisma.account.create({
+    const account = await suiteScope.prisma.account.create({
       data: { name: 'T18 未验证创建 HTTP 夹具', type: 'securities' },
     });
-    const before = await snapshot(account.id);
+    const before = await suiteScope.snapshot(account.id);
     const command = probeExecution(account.id, '600519.SH', `t18-create-${account.id}`);
-    const rejected = await ledgerHttp(origin)('/executions', {
+    const rejected = await ledgerHttp(suiteScope.origin)('/executions', {
       ...command,
       payload: { ...command.payload, capabilityVerification: 'VERIFIED' },
     });
     expect(rejected).toMatchObject({ status: 409, payload: { error: 'LEDGER_VALIDATION_FAILED' } });
-    expect(await snapshot(account.id)).toEqual(before);
+    expect(await suiteScope.snapshot(account.id)).toEqual(before);
   });
-
   it('历史 VERIFIED 可读与幂等重放，新更正、跨账户及恢复均不能伪报', async () => {
-    const account = await prisma.account.create({
+    const account = await suiteScope.prisma.account.create({
       data: { name: 'T18 历史验证 HTTP 夹具', type: 'securities' },
     });
-    const target = await prisma.account.create({
+    const target = await suiteScope.prisma.account.create({
       data: { name: 'T18 跨账户 HTTP 夹具', type: 'securities' },
     });
-    const request = ledgerHttp(origin);
+    const request = ledgerHttp(suiteScope.origin);
     const command = probeExecution(account.id, '600519.SH', `t18-history-${account.id}`);
     const payload = { ...command.payload, capabilityVerification: 'VERIFIED' };
     const eventId = randomUUID();
@@ -182,8 +225,8 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
       source: command.source,
       actorId: command.actorId,
     };
-    await repository.withAccountWrite(account.id, async (context) => {
-      await repository.appendRevision(
+    await suiteScope.repository.withAccountWrite(account.id, async (context) => {
+      await suiteScope.repository.appendRevision(
         context,
         ledgerEventEnvelopeSchema.parse({
           ...eventFields,
@@ -201,8 +244,8 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
       );
       return { value: null, advanceRevision: true };
     });
-    const before = await snapshot(account.id);
-    const targetBefore = await snapshot(target.id);
+    const before = await suiteScope.snapshot(account.id);
+    const targetBefore = await suiteScope.snapshot(target.id);
     const current = await request(`/${account.id}/events`);
     expect(current.status).toBe(200);
     expect(current.payload).toMatchObject({
@@ -212,7 +255,7 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
       status: 201,
       payload: { eventIds: result.eventIds, idempotentReplay: true },
     });
-    expect(await snapshot(account.id)).toEqual(before);
+    expect(await suiteScope.snapshot(account.id)).toEqual(before);
     const correction = {
       ...command,
       payload,
@@ -242,8 +285,8 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
         source: { ...command.source, externalId: `t18-move-${account.id}` },
       }),
     ).toMatchObject({ status: 409, payload: { error: 'LEDGER_VALIDATION_FAILED' } });
-    expect(await snapshot(account.id)).toEqual(before);
-    expect(await snapshot(target.id)).toEqual(targetBefore);
+    expect(await suiteScope.snapshot(account.id)).toEqual(before);
+    expect(await suiteScope.snapshot(target.id)).toEqual(targetBefore);
     const voided = await request('/executions/void', {
       command: 'VOID_EXECUTION',
       accountId: account.id,
@@ -254,7 +297,7 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
       source: { ...command.source, externalId: `t18-void-${account.id}` },
     });
     expect(voided.status).toBe(201);
-    const afterVoid = await snapshot(account.id);
+    const afterVoid = await suiteScope.snapshot(account.id);
     expect(
       await request('/executions/restore', {
         ...correction,
@@ -264,6 +307,6 @@ isolated('隔离 PostgreSQL 与生产 Ledger HTTP 闭环', () => {
         source: { ...command.source, externalId: `t18-restore-${account.id}` },
       }),
     ).toMatchObject({ status: 409, payload: { error: 'LEDGER_VALIDATION_FAILED' } });
-    expect(await snapshot(account.id)).toEqual(afterVoid);
+    expect(await suiteScope.snapshot(account.id)).toEqual(afterVoid);
   });
-});
+}

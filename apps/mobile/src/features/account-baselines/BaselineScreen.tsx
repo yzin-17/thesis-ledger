@@ -26,7 +26,7 @@ import {
 } from '../../components/MobilePrimitives';
 import { BaselinePositions } from './BaselinePositions';
 import { InstrumentPicker } from '../market/InstrumentPicker';
-import { baselineFingerprint, buildBaselineCommand, type BaselineForm } from './baseline-command';
+import { baselineCurrency, baselineFingerprint, buildBaselineCommand, type BaselineForm } from './baseline-command';
 
 export function BaselineScreen() {
   const { params } = useRoute<RouteProp<AccountStackParams, 'Baseline'>>();
@@ -97,7 +97,7 @@ export function BaselineScreen() {
         cost,
         observedAt,
         costIncludesFees,
-        currency: account.currency,
+        currency: baselineCurrency(instrument, account.currency),
       };
       const result = await write.mutateAsync(form);
       reset();
@@ -145,7 +145,7 @@ export function BaselineScreen() {
         editable={!blocked}
       />
       <Field
-        label={`成本均价（${account?.currency ?? '账户币种'}，未知留空）`}
+        label={`成本均价（${baselineCurrency(instrument, account?.currency ?? '账户币种')}，未知留空）`}
         value={cost}
         onChange={setCost}
         keyboardType="decimal-pad"

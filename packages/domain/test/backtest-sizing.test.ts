@@ -157,6 +157,9 @@ describe('computeSizing', () => {
     });
   });
 
+});
+
+describe("定仓输入时钟与汇率", () => {
   it('converts direct and inverse FX using only consumed facts', () => {
     const direct = computeSizing(
       input(
@@ -276,6 +279,9 @@ describe('computeSizing', () => {
     expect(mismatch).toMatchObject({ status: 'rejected', reasonCode: 'CURRENCY_MISMATCH' });
   });
 
+});
+
+describe("归一化数量和模型门禁", () => {
   it('sizes continuous normalized units without applying the supplied real lot size', () => {
     const buy = computeSizing(
       input(

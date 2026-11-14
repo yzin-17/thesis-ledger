@@ -167,6 +167,30 @@ function notAfter(left: string, right: string): boolean {
   return order !== undefined && order <= 0;
 }
 
+function validateHithinkIdentityAdmission(
+  response: IdentityResponse,
+  evidence: z.infer<typeof marketHithinkIdentityEvidenceV3Schema>,
+  admission: z.infer<typeof marketHithinkEventAdmissionV3Schema>,
+): void {
+  if (
+    evidence.ref !== `sha256:${evidence.sha256}` ||
+    evidence.ref !== admission.evidenceRef ||
+    evidence.sha256 !== admission.evidenceSha256 ||
+    !admission.scopeSymbols.includes(response.symbol) ||
+    admission.scopeDateFrom > response.start ||
+    admission.scopeDateTo < response.end ||
+    response.start > response.end
+  )
+    throw new Error('HiThink 身份原文摘要或请求范围不匹配');
+  if (
+    !notAfter(admission.validFrom, response.fetchedAt) ||
+    compareMarketPitEvidenceInstantStringsV1(response.fetchedAt, admission.validUntil) !== -1 ||
+    !notAfter(admission.recordedAt, response.fetchedAt) ||
+    !notAfter(admission.recordedAt, response.dataAsOf)
+  )
+    throw new Error('HiThink 准入超出观察或冻结截点');
+}
+
 /** Schema 核对声明的证据关联；在线与离线消费者另按原字节重新散列。 */
 export function validateMarketHithinkIdentityResponseV3(response: IdentityResponse): void {
   const evidence = response.hithinkIdentityEvidence;
@@ -186,23 +210,7 @@ export function validateMarketHithinkIdentityResponseV3(response: IdentityRespon
   symbol.parse(response.symbol);
   date.parse(response.start);
   date.parse(response.end);
-  if (
-    evidence.ref !== `sha256:${evidence.sha256}` ||
-    evidence.ref !== admission.evidenceRef ||
-    evidence.sha256 !== admission.evidenceSha256 ||
-    !admission.scopeSymbols.includes(response.symbol) ||
-    admission.scopeDateFrom > response.start ||
-    admission.scopeDateTo < response.end ||
-    response.start > response.end
-  )
-    throw new Error('HiThink 身份原文摘要或请求范围不匹配');
-  if (
-    !notAfter(admission.validFrom, response.fetchedAt) ||
-    compareMarketPitEvidenceInstantStringsV1(response.fetchedAt, admission.validUntil) !== -1 ||
-    !notAfter(admission.recordedAt, response.fetchedAt) ||
-    !notAfter(admission.recordedAt, response.dataAsOf)
-  )
-    throw new Error('HiThink 准入超出观察或冻结截点');
+  validateHithinkIdentityAdmission(response, evidence, admission);
   const bundle = parseMarketHithinkFundIdentityV3(evidence.content);
   for (const item of bundle.mappings) {
     if (

@@ -1,4 +1,9 @@
-import { researchPrivateMaterialV2Schema, type AiFrozenResearchV2 } from '@thesis-ledger/schemas';
+import {
+  researchPrivateMaterialV2Schema,
+  journalAiFrozenEvidenceSchema,
+  journalPeriodAiFrozenEvidenceSchema,
+  type AiFrozenResearchV2,
+} from '@thesis-ledger/schemas';
 
 const materialRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -36,18 +41,28 @@ export function qualifyFrozenResearchEvidenceV2(
   if (['unknown', 'unavailable'].includes(String(materialRecord(value.quality).status)))
     return 'unknown';
   if (Object.keys(value).length === 0) return 'unknown';
+  if (entry.audit.kind === 'journal')
+    return journalAiFrozenEvidenceSchema.safeParse(data).success ||
+      journalPeriodAiFrozenEvidenceSchema.safeParse(data).success
+      ? 'usable'
+      : 'unknown';
   if (entry.audit.kind === 'quote') return quoteMaterial(value);
   if (entry.audit.kind === 'news') return newsMaterial(value);
   if (entry.audit.kind === 'portfolio' || entry.audit.kind === 'strategy') {
-    const parsed = researchPrivateMaterialV2Schema.safeParse(data);
-    if (!parsed.success) return 'unknown';
-    if (
-      entry.audit.kind === 'portfolio' &&
-      parsed.data.version === 'research-portfolio-material-v2'
-    )
-      return parsed.data.accounts.length ? 'usable' : 'empty';
-    if (entry.audit.kind === 'strategy' && parsed.data.version === 'research-strategy-material-v2')
-      return 'usable';
+    return qualifyPrivateResearchMaterial(data, entry.audit.kind);
   }
+  return 'unknown';
+}
+
+function qualifyPrivateResearchMaterial(
+  data: unknown,
+  kind: 'portfolio' | 'strategy',
+): Availability {
+  const parsed = researchPrivateMaterialV2Schema.safeParse(data);
+  if (!parsed.success) return 'unknown';
+  if (kind === 'portfolio' && parsed.data.version === 'research-portfolio-material-v2')
+    return parsed.data.accounts.length ? 'usable' : 'empty';
+  if (kind === 'strategy' && parsed.data.version === 'research-strategy-material-v2')
+    return 'usable';
   return 'unknown';
 }

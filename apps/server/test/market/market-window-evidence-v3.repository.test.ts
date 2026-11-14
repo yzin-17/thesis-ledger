@@ -141,7 +141,12 @@ const createRepository = (options?: {
   };
 };
 
-describe('MarketWindowEvidenceV3Repository', () => {
+beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+describe("冻结窗口写入与载荷读回", () => {
+
   it('多窗口完整写入并离线读回，改写子观测后拒绝', async () => {
     const golden = readFixture<{
       response: MarketDataMultiWindowResponseV3;
@@ -166,9 +171,6 @@ describe('MarketWindowEvidenceV3Repository', () => {
     changed.windowObservations[0]!.completedAt = '2026-05-20T07:03:00Z';
     row.completeResponse = JSON.parse(JSON.stringify(changed));
     await expect(f.repository.findFrozen(stored.identityFingerprint)).rejects.toThrow();
-  });
-  beforeEach(() => {
-    vi.clearAllMocks();
   });
 
   it('记录严格关联的 pinned V3 响应及精确窗口证据', async () => {
@@ -235,6 +237,9 @@ describe('MarketWindowEvidenceV3Repository', () => {
     expect(await f.repository.findFrozen('0'.repeat(64))).toBeNull();
     expect(f.updateMany).not.toHaveBeenCalled();
   });
+});
+
+describe("冻结窗口身份竞争与损坏", () => {
 
   it('请求关联ID不改变市场载荷身份，但新请求也不能覆盖旧载荷', async () => {
     const f = createRepository();
@@ -329,6 +334,9 @@ describe('MarketWindowEvidenceV3Repository', () => {
       await expect(f.repository.findFrozen(stored.identityFingerprint)).rejects.toThrow();
     },
   );
+});
+
+describe("冻结窗口幂等及准入范围", () => {
 
   it('相同身份与相同证明重复记录时幂等，不更新已有行', async () => {
     const input = makeInput();

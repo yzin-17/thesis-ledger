@@ -303,29 +303,9 @@ export function AiRunDetail({
   }
   const current = detail ?? run;
   const status = current.status;
-  const context = current.context;
   return (
     <article className="flex min-h-0 flex-col gap-4" aria-live="polite">
-      <header className="rounded-md border bg-card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="mb-2 text-xs text-muted-foreground">
-              {context ? scopeLabel(context.scope) : '上下文未记录'} · {contextSummary(context)}
-            </p>
-            <h2 className="text-xl font-semibold leading-8">{questionSummary(current)}</h2>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {(current.provider === 'mock' || current.provider === 'fixture') && (
-              <Badge variant="secondary">演示模式</Badge>
-            )}
-            <Badge variant={statusVariant(status)}>{statusLabel(status)}</Badge>
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          创建于 {formatFullDateTime(current.createdAt)}
-          {current.updatedAt ? ` · 更新于 ${formatFullDateTime(current.updatedAt)}` : ''}
-        </p>
-      </header>
+      <AiRunHeader current={current} />
       {detailError && (
         <Alert variant="destructive">
           <AlertTriangle />
@@ -400,5 +380,32 @@ export function AiRunDetail({
         )}
       <RunMetadata run={current} />
     </article>
+  );
+}
+
+function AiRunHeader({ current }: { current: AiRunRecord | AiRunDetailRecord }) {
+  const context = current.context;
+  const status = current.status;
+  return (
+    <header className="rounded-md border bg-card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="mb-2 text-xs text-muted-foreground">
+            {context ? scopeLabel(context.scope) : '上下文未记录'} · {contextSummary(context)}
+          </p>
+          <h2 className="text-xl font-semibold leading-8">{questionSummary(current)}</h2>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {(current.provider === 'mock' || current.provider === 'fixture') && (
+            <Badge variant="secondary">演示模式</Badge>
+          )}
+          <Badge variant={statusVariant(status)}>{statusLabel(status)}</Badge>
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        创建于 {formatFullDateTime(current.createdAt)}
+        {current.updatedAt ? ` · 更新于 ${formatFullDateTime(current.updatedAt)}` : ''}
+      </p>
+    </header>
   );
 }

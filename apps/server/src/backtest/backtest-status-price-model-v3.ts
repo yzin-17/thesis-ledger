@@ -17,6 +17,22 @@ export function statusPriceExecutionModelV3(
   validateIntradayStatusV3(config, response);
   validateListingStatusV3(config, response);
   if (!response.days.some((day) => day.dailyPriceLimit || day.noDailyPriceLimit)) return model;
+  assertStatusPriceScope(config, response, model);
+  validateStatusPriceSources(config, response);
+  const segments = statusPriceSegments(response, model);
+  return backtestExecutionModelSchemaV3.parse({
+    ...model,
+    scope: { ...model.scope, range: response.range },
+    version: `${model.version}:${response.days.some((day) => day.noDailyPriceLimit) ? 'frozen-listing-price-limits-v1' : 'frozen-risk-price-limits-v1'}:${response.provenance.providerRevision}`,
+    segments,
+  });
+}
+
+function assertStatusPriceScope(
+  config: RunConfigV3,
+  response: MarketTradingStatusResponseV3,
+  model: BacktestExecutionModelV3 | undefined,
+): asserts model is BacktestExecutionModelV3 {
   if (
     !model ||
     !config.executionPriceProtocol.marketRuleResearch ||
@@ -30,6 +46,9 @@ export function statusPriceExecutionModelV3(
   ) {
     throw new Error('来源日涨跌幅需要同一标的/窗口的显式原价规则研究');
   }
+}
+
+function validateStatusPriceSources(config: RunConfigV3, response: MarketTradingStatusResponseV3) {
   for (const document of response.sourceDocuments) {
     if (!document.observedAt) continue;
     const order = compareMarketPitEvidenceInstantStringsV1(document.observedAt, config.dataAsOf);
@@ -43,6 +62,12 @@ export function statusPriceExecutionModelV3(
         throw new Error('价格限制缺少原件摘要或实际核验时钟');
     }
   }
+}
+
+function statusPriceSegments(
+  response: MarketTradingStatusResponseV3,
+  model: BacktestExecutionModelV3,
+) {
   const segments: unknown[] = [];
   for (const original of model.segments) {
     if (original.execution.mode !== 'exchange') throw new Error('价格限制只适用于交易所执行');
@@ -51,7 +76,10 @@ export function statusPriceExecutionModelV3(
       const limit = day.dailyPriceLimit;
       let execution = original.execution;
       if (day.noDailyPriceLimit)
-        execution = { ...execution, price: { kind: 'noDailyLimit', reason: day.noDailyPriceLimit.reason } };
+        execution = {
+          ...execution,
+          price: { kind: 'noDailyLimit', reason: day.noDailyPriceLimit.reason },
+        };
       else if (limit)
         execution = {
           ...execution,
@@ -89,10 +117,5 @@ export function statusPriceExecutionModelV3(
       });
     }
   }
-  return backtestExecutionModelSchemaV3.parse({
-    ...model,
-    scope: { ...model.scope, range: response.range },
-    version: `${model.version}:${response.days.some((day) => day.noDailyPriceLimit) ? 'frozen-listing-price-limits-v1' : 'frozen-risk-price-limits-v1'}:${response.provenance.providerRevision}`,
-    segments,
-  });
+  return segments;
 }

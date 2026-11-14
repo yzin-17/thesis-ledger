@@ -62,15 +62,33 @@ describe('策略版本关联记录', () => {
   });
 
   it('实验精确关联且创建入口锁定版本，禁用创建时仍显示历史记录', async () => {
-    api.experiments.mockResolvedValue({ items: [experiment(), experiment(second)], pageInfo: { nextCursor: null } });
+    api.experiments.mockResolvedValue({ items: [experiment(), { ...experiment(second), id: 'origin', name: '生成版本的探索实验', sourceMode: 'discovery' }], pageInfo: { nextCursor: null } });
     await render(<StrategyVersionExperiments strategyVersionId={first} canCreate />);
-    expect(api.experiments).toHaveBeenCalledWith({ strategyVersionId: first, sourceMode: 'existing', limit: 20 }, undefined, expect.any(AbortSignal));
+    expect(api.experiments).toHaveBeenCalledWith({ strategyVersionId: first, limit: 20 }, undefined, expect.any(AbortSignal));
     expect(document.body.textContent).toContain(`实验 ${first}`);
-    expect(document.body.textContent).not.toContain(`实验 ${second}`);
+    expect(document.body.textContent).toContain('生成版本的探索实验');
+    expect(document.body.textContent).toContain('基于此版本');
+    expect(document.body.textContent).toContain('生成此版本');
+    expect(document.querySelector('a[href="/strategy/experiments/origin"]')).not.toBeNull();
     expect(document.querySelector(`a[href="/strategy/experiments/new?strategyVersionId=${first}"]`)).not.toBeNull();
     await render(<StrategyVersionExperiments strategyVersionId={first} canCreate={false} />);
     expect(document.body.textContent).toContain(`实验 ${first}`);
     expect(document.body.textContent).not.toContain('新建 AI 实验');
+  });
+
+  it('实验分页切换版本后不混入前一版本的生成实验', async () => {
+    let finish!: (data: unknown) => void;
+    api.experiments.mockResolvedValueOnce({ items: [experiment()], pageInfo: { nextCursor: 'next-page' } })
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValue({ items: [experiment(second)], pageInfo: { nextCursor: null } });
+    await render(<StrategyVersionExperiments key={first} strategyVersionId={first} canCreate={false} />);
+    await act(async () => button('下一页').click()); await flush();
+    await render(<StrategyVersionExperiments key={second} strategyVersionId={second} canCreate={false} />);
+    expect(api.experiments).toHaveBeenLastCalledWith({ strategyVersionId: second, limit: 20 }, undefined, expect.any(AbortSignal));
+    await act(async () => finish({ items: [experiment()], pageInfo: { nextCursor: null } })); await flush();
+    expect(document.body.textContent).toContain(`实验 ${second}`);
+    expect(document.body.textContent).not.toContain(`实验 ${first}`);
+    expect(button('上一页').disabled).toBe(true);
   });
 
   it('同范围刷新保留记录并显示单个加载圈，失败保留记录和重试入口', async () => {

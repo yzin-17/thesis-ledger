@@ -4,8 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { desiredProviderPolicyV3Schema } from '@thesis-ledger/schemas';
 import { MarketPolicyRoutes } from '../src/features/market-data/MarketPolicyRoutes.js';
-import { marketPolicyRouteRowsV3, selectableRouteTargetsV3, updatePolicyRouteTargetV3,
-  updatePolicyRouteEnabledV3 } from '../src/features/market-data/market-data-routes-v3.js';
+import { marketPolicyRouteRowsV3, selectableRouteTargetsV3, updatePolicyRouteTargetV3 } from '../src/features/market-data/market-data-routes-v3.js';
 import type { MarketPolicyDraftV3, MarketRouteCatalogReadV3, ProviderManifest } from '../src/features/market-data/market-data.types.js';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -37,37 +36,39 @@ let root: Root | undefined;
 let host: HTMLDivElement | undefined;
 afterEach(async () => { if (root) await act(async () => root!.unmount()); host?.remove(); root = undefined; });
 
-it('点击说明不切换；关闭只编辑该功能，保留主备且不保存真实政策', async () => {
+it('配置行通过清空来源停止读取，保留精确能力隔离', async () => {
   let current = structuredClone(policy);
   const changed = vi.fn();
   function Fixture() {
     const [draft, setDraft] = useState(current);
     return <MarketPolicyRoutes policy={draft} serverPolicy={null} catalog={catalog} providers={providers}
-      disabled={false} dirty={true} onChange={(next) => { current = next; changed(next); setDraft(next); }} />;
+      disabled={false} changedIds={new Set()} actions={null} onChange={(next) => { current = next; changed(next); setDraft(next); }} />;
   }
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   await act(async () => root!.render(<Fixture />));
-  const toggle = host.querySelector('[role="switch"][aria-label="中国内地股票 · 日级交易状态 启用功能"]') as HTMLElement;
-  expect(toggle).not.toBeNull();
-  const label = toggle.closest('[data-slot="field"]')!.querySelector('label')!;
-  await act(async () => label.click()); expect(changed).not.toHaveBeenCalled();
-  await act(async () => toggle.click());
-  expect(changed).toHaveBeenCalledOnce();
-  expect(current.routes[0]).toEqual({ ...policy.routes[0], enabled: false });
-  expect(current.routes[1]).toEqual(policy.routes[1]);
+  const tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find((item) => item.textContent?.startsWith('交易规则'))!;
+  await act(async () => tab.click());
+  expect(host.querySelector('[role="switch"]')).toBeNull();
   expect(host.textContent).toContain('日级状态，单次最多 3650 天');
-  expect(host.textContent).toContain('交易状态与风险规则');
+  const select = host.querySelector('[aria-label="中国内地股票 · 日级交易状态 主数据源"]') as HTMLElement;
+  await act(async () => select.click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) => item.textContent === '未配置')!;
+  await act(async () => {
+    const down = new MouseEvent('pointerdown', { bubbles: true, button: 0 });
+    Object.defineProperty(down, 'pointerType', { value: 'mouse' });
+    option.dispatchEvent(down);
+    option.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0, detail: 1 }));
+  });
+  expect(changed).toHaveBeenCalledOnce();
+  expect(current.routes).toEqual([]);
   expect(host.textContent).not.toContain('DAILY_TRADING_STATUS');
 });
 
-it('关闭后编辑来源保持关闭；首次选择显式启用并通过原政策Schema', () => {
-  const closed = updatePolicyRouteEnabledV3(policy, statusKey, false);
+it('重新选择只应用当前能力，并通过原政策Schema', () => {
+  const closed = { ...policy, routes: policy.routes.map((route) => ({ ...route, enabled: false })) };
   const edited = updatePolicyRouteTargetV3(closed, statusKey, 'primary', notice);
-  expect(edited.routes.find((route) => route.key.capability === statusKey.capability)?.enabled).toBe(false);
-  const initial = updatePolicyRouteTargetV3({ ...policy, routes: [] }, statusKey, 'primary', stateSource);
-  expect(initial.routes[0]?.enabled).toBe(true);
-  expect(desiredProviderPolicyV3Schema.safeParse({ ...initial, consumer: 'thesis-ledger', requestId: 'selection' }).success).toBe(true);
-  expect(updatePolicyRouteEnabledV3({ ...policy, routes: [] }, statusKey, true).routes).toEqual([]);
+  expect(edited.routes).toEqual([{ key: statusKey, targets: [notice], enabled: true }]);
+  expect(desiredProviderPolicyV3Schema.safeParse({ ...edited, consumer: 'thesis-ledger', requestId: 'selection' }).success).toBe(true);
 });
 
 it('状态来源不依赖风险能力，精确参数范围复用在选项与回显', () => {

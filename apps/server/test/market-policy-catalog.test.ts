@@ -113,7 +113,8 @@ const policyStore = () => {
   };
 };
 
-describe('market-policy-catalog', () => {
+describe("策略路由目录完整性", () => {
+
   it('拒绝 partial 目录并保留目标级路径、原因和目录审计', async () => {
     const store = policyStore();
     const dsa = {
@@ -247,6 +248,9 @@ describe('market-policy-catalog', () => {
     });
     expect(dsa.applyControlPolicyV3).not.toHaveBeenCalled();
   });
+});
+
+describe("策略路由 Apply 与失败", () => {
 
   it('complete ready 目录允许 Apply，并记录匹配的 Effective projection', async () => {
     const store = policyStore();
@@ -354,6 +358,9 @@ describe('market-policy-catalog', () => {
       effectiveStale: true,
     });
   });
+});
+
+describe("策略路由修订竞争", () => {
 
   for (const sameRequestId of [false, true]) {
     for (const lateFailure of [false, true]) {

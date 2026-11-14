@@ -1,6 +1,7 @@
 import { InstrumentSearchCombobox } from '../market-data/InstrumentSearchCombobox.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { positionSymbolPattern } from '@thesis-ledger/schemas';
 
 import type { Position, InstrumentLookup, InstrumentSearchState } from './portfolio.types.js';
 import { instrumentTypeLabel, instrumentMarketLabel, assetTypeLabel } from './portfolio.types.js';
@@ -114,9 +115,9 @@ export function InstrumentCombobox({
         <Input
           name="symbol"
           required
-          pattern="\\d{6}\\.(SH|SZ|BJ|OF)"
+          pattern={positionSymbolPattern}
           value={query}
-          placeholder="例如：600519.SH"
+          placeholder="例如：600519.SH、00700.HK、AAPL.US"
           onChange={(event) => onQueryChange(event.target.value)}
         />
       </div>

@@ -211,6 +211,9 @@ describe('AI 研究执行器', () => {
     expect(sdk.execute).not.toHaveBeenCalled();
     expect(prisma.account.findMany).not.toHaveBeenCalled();
   });
+});
+
+describe("研究领取、只读工具与冻结版本", () => {
   it('发布停用开关关闭时不领取或恢复研究任务', async () => {
     vi.stubEnv('AI_RESEARCH_EXECUTION_ENABLED', 'false');
     const { runs, executions } = runRecorder();
@@ -330,6 +333,9 @@ describe('AI 研究执行器', () => {
     expect(prisma.journalEntry.findMany).not.toHaveBeenCalled();
   });
 
+});
+
+describe("研究故障与能力预检", () => {
   it('没有 Provider 时把任务标记为明确的 provider_unavailable', async () => {
     const failOwned = vi.fn(async (ownership: unknown, input: { errorCode: string }) => {
       void ownership;

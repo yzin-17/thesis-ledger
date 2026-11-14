@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MemoryRouter } from 'react-router';
 import { createRoot } from 'react-dom/client';
 import { useMutation, useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { JournalReviewWorkspace } from '../src/features/journal/review/JournalReviewWorkspace.js';
@@ -105,7 +106,9 @@ function ExistingReportWorkspace() {
 }
 createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={controlsClient}>
-    <ExistingReportControls />
-    <ExistingReportWorkspace />
+    <MemoryRouter>
+      <ExistingReportControls />
+      <ExistingReportWorkspace />
+    </MemoryRouter>
   </QueryClientProvider>,
 );

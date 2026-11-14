@@ -1,4 +1,8 @@
 import {
+  optimizationModelResolutionRequestSchema,
+  backtestModelResolutionResultSchema,
+  executionModelAccountingIssuesV3,
+  type OptimizationModelResolutionRequest,
   optimizationRunPreparationRequestSchema,
   optimizationRunPreparationResultSchema,
   type OptimizationRunPreparationRequest,
@@ -12,6 +16,8 @@ import {
   optimizationExperimentReadSchema,
   optimizationExperimentRenameSchema,
   optimizationFinalizeSchema,
+  optimizationRetryRequestSchema,
+  type OptimizationRetryRequest,
   optimizationListInputSchema,
   optimizationPageReadSchema,
   strategyBacktestGroupPageSchema,
@@ -22,8 +28,10 @@ import {
   type OptimizationExperimentCreate,
   type OptimizationExperimentRead,
   type OptimizationListInput,
+  type OptimizationAdoptionRead,
 } from '@thesis-ledger/schemas';
 import type { ParsedRequest, ParsedResponseSchema } from './parsed-request.js';
+import { ThesisLedgerApiError } from './api-error.js';
 
 const prefix = '/strategy-optimization';
 const path = (id: string) =>
@@ -36,6 +44,31 @@ export function strategyOptimizationClient(request: ParsedRequest) {
       body: JSON.stringify(body),
     });
   const summary = (id: string) => optimizationExperimentReadSchema.refine((v) => v.id === id);
+  const adoptionSource = (result: OptimizationAdoptionRead) => {
+    if (result.detailsStatus === 'unavailable') return result.source;
+    if (result.source) return result.source;
+    return {
+      experimentId: result.adoptionContext.experimentId,
+      candidateId: result.adoptionContext.candidateId,
+      candidateHash: result.adoptionContext.candidate.executionHash,
+    };
+  };
+  const adoptionMatches = (result: OptimizationAdoptionRead, id: string, candidateId: string, hash?: string) => {
+    const source = adoptionSource(result);
+    if (source.experimentId !== id || source.candidateId !== candidateId || (hash && source.candidateHash !== hash)) return false;
+    if (result.detailsStatus === 'unavailable') return true;
+    return result.adoptionContext.experimentId === id && result.adoptionContext.candidateId === candidateId &&
+      result.adoptionContext.candidate.executionHash === source.candidateHash &&
+      (!result.monitoringPlan.strategyVersionId || result.monitoringPlan.strategyVersionId === result.strategyVersion.id);
+  };
+  const adoptionStatus = (id: string, candidateId: string, signal?: AbortSignal) => request(
+    `${path(id)}/candidates/${encodeURIComponent(strategyManagementIdSchema.parse(candidateId))}/adoption`,
+    optimizationAdoptionReadSchema.nullable().refine((value) => {
+      if (!value) return true;
+      return adoptionMatches(value, id, candidateId);
+    }),
+    { cache: 'no-store', signal: signal ?? null },
+  );
   const query = (options: OptimizationListInput) => {
     optimizationListInputSchema.parse(options);
     const params = new URLSearchParams({ limit: String(options.limit ?? 50) });
@@ -45,6 +78,22 @@ export function strategyOptimizationClient(request: ParsedRequest) {
     return params.toString();
   };
   return {
+    resolveExecutionModel: async (input: OptimizationModelResolutionRequest, signal?: AbortSignal) => {
+      const body = optimizationModelResolutionRequestSchema.parse(input);
+      const result = await request(`${prefix}/run-config/execution-model`, backtestModelResolutionResultSchema, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body), signal: signal ?? null,
+      });
+      const instrument = body.target.sourceMode === 'discovery' ? body.target.discoveryScope.executionInstrument : null;
+      if (result.status === 'available' && (
+        result.model.scope.currency !== body.currency ||
+        result.model.scope.range.start > body.startDate || result.model.scope.range.end < body.endDate ||
+        (instrument && (result.model.scope.symbol !== instrument.symbol || result.model.scope.market !== instrument.market ||
+          result.model.scope.instrumentType !== (instrument.assetType === 'stock' ? 'STOCK' : 'ETF'))) ||
+        executionModelAccountingIssuesV3(result.model, body, 'normalized-series').length > 0
+      )) throw new Error('实验执行设置与当前标的、日期、币种或价格口径不一致，请重新读取。');
+      return result;
+    },
     prepare: async (input: OptimizationRunPreparationRequest, signal?: AbortSignal) => {
       const body=optimizationRunPreparationRequestSchema.parse(input);
       const response=await request(`${prefix}/run-config/prepare`,optimizationRunPreparationResultSchema,{
@@ -108,11 +157,13 @@ export function strategyOptimizationClient(request: ParsedRequest) {
     rename: (id: string, name: string) =>
       write(path(id), optimizationExperimentRenameSchema.parse({ name }), summary(id), 'PATCH'),
     cancel: (id: string) => write(`${path(id)}/cancel`, {}, summary(id)),
+    retry: (id: string, input: OptimizationRetryRequest) =>
+      write(`${path(id)}/retry`, optimizationRetryRequestSchema.parse(input), summary(id)),
     finalize: (
       id: string,
       input: {
         candidateIds: string[];
-        selectedCandidateId: string;
+        selectedCandidateId?: string | null;
         expectedStage: 'awaiting_finalization';
       },
     ) =>
@@ -121,6 +172,8 @@ export function strategyOptimizationClient(request: ParsedRequest) {
         optimizationFinalizeSchema.parse(input),
         optimizationCompareReadSchema.refine((v) => v.experiment.id === id),
       ),
+    complete: (id: string) =>
+      write(`${path(id)}/complete`, {}, optimizationCompareReadSchema.refine((v) => v.experiment.id === id)),
     adoptionContext: (id: string, candidateId: string, signal?: AbortSignal) =>
       request(
         `${path(id)}/adopt-context?candidateId=${encodeURIComponent(strategyManagementIdSchema.parse(candidateId))}`,
@@ -129,7 +182,8 @@ export function strategyOptimizationClient(request: ParsedRequest) {
         ),
         { signal: signal ?? null },
       ),
-    adopt: (
+    adoptionStatus,
+    adopt: async (
       id: string,
       input: {
         candidateId: string;
@@ -140,16 +194,29 @@ export function strategyOptimizationClient(request: ParsedRequest) {
       },
     ) => {
       const body = optimizationAdoptSchema.parse(input);
-      return write(
-        `${path(id)}/adopt`,
-        body,
-        optimizationAdoptionReadSchema.refine(
-          (v) =>
-            v.adoptionContext.experimentId === id &&
-            v.adoptionContext.candidateId === body.candidateId &&
-            v.adoptionContext.candidate.executionHash === body.candidateHash,
-        ),
-      );
+      try {
+        return await write(
+          `${path(id)}/adopt`, body,
+          optimizationAdoptionReadSchema.refine((value) => adoptionMatches(value, id, body.candidateId, body.candidateHash)),
+        );
+      } catch (error) {
+        try {
+          const committed = await adoptionStatus(id, body.candidateId);
+          if (committed && adoptionSource(committed).candidateHash === body.candidateHash) return committed;
+        } catch { /* 读取失败不等于未提交，原意图由调用方保留。 */ }
+        if (error instanceof ThesisLedgerApiError) {
+          const code = error.payload?.errorCode ?? error.payload?.code ?? error.payload?.error;
+          if (typeof code === 'string' && [
+            'ADOPTION_NOT_REVEALED', 'ADOPTION_NOT_ELIGIBLE', 'ADOPTION_CANDIDATE_HASH_MISMATCH',
+            'ADOPTION_SOURCE_MISMATCH', 'ADOPTION_STALE_BASELINE', 'ADOPTION_IDEMPOTENCY_CONFLICT',
+            'ADOPTION_ALREADY_COMMITTED',
+          ].includes(code)) throw error;
+        }
+        throw new ThesisLedgerApiError(0, {
+          error: 'ADOPTION_OUTCOME_UNCONFIRMED',
+          message: '采纳结果暂未确认，原提交信息已保留，请稍后重查。',
+        });
+      }
     },
   };
 }

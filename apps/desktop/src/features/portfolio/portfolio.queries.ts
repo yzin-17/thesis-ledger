@@ -9,7 +9,7 @@ import {
   searchPortfolioInstruments,
 } from './portfolio.api.js';
 import type { DesktopRequestClient } from '../shared/request.js';
-import type { LoadState, PortfolioMode } from './portfolio.types.js';
+import type { Account, Portfolio, LoadState, PortfolioMode } from './portfolio.types.js';
 import { portfolioTradeKeys } from './portfolio-trade.queries.js';
 
 export const portfolioKeys = {
@@ -73,17 +73,14 @@ export const usePortfolioShellQueries = (
     portfolioValuationQueryOptions(mode, enableValuation && scopeReady, undefined, accountId),
   );
   const portfolio = portfolioQuery.data ?? null;
-  let state: LoadState = enableValuation ? 'loading' : 'ready';
-  if (accountsQuery.isError || (enableValuation && portfolioQuery.isError)) state = 'error';
-  else if (enableValuation && portfolioQuery.isSuccess && accountsQuery.isSuccess && portfolio) {
-    if (
-      portfolio.positions.length === 0 &&
-      !accounts.some((account) => account.mode === mode && account.active !== false)
-    )
-      state = 'empty';
-    else if (portfolioValuationNotice(portfolio)) state = 'stale';
-    else state = 'ready';
-  }
+  const state = portfolioShellLoadState(
+    enableValuation,
+    accountsQuery,
+    portfolioQuery,
+    portfolio,
+    accounts,
+    mode,
+  );
 
   const refresh = async () => {
     setRefreshPending(true);
@@ -162,3 +159,26 @@ export const usePortfolioInstrumentSearchQuery = (
   query: string,
   enabled: boolean,
 ) => useQuery(portfolioInstrumentSearchQueryOptions(accountType, query, enabled));
+
+function portfolioShellLoadState(
+  enableValuation: boolean,
+  accountsQuery: { isError: boolean; isSuccess: boolean },
+  portfolioQuery: { isError: boolean; isSuccess: boolean },
+  portfolio: Portfolio | null,
+  accounts: Account[],
+  mode: PortfolioMode,
+): LoadState {
+  let state: LoadState = enableValuation ? 'loading' : 'ready';
+  if (accountsQuery.isError || (enableValuation && portfolioQuery.isError)) state = 'error';
+  else if (enableValuation && portfolioQuery.isSuccess && accountsQuery.isSuccess && portfolio) {
+    if (
+      portfolio.positions.length === 0 &&
+      !accounts.some((account) => account.mode === mode && account.active !== false)
+    )
+      state = 'empty';
+    else if (portfolioValuationNotice(portfolio)) state = 'stale';
+    else state = 'ready';
+  }
+
+  return state;
+}

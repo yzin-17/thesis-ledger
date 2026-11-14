@@ -1,12 +1,18 @@
 import { z } from 'zod';
 import { marketRouteKeyV3Schema } from './market-route-v3.js';
+import {
+  correlateMarketBarCacheContextV3,
+  marketBarCacheContextRequestV3Schema,
+  marketBarCacheContextResponseV3Schema,
+} from './market-bar-cache-context-v3.js';
+export * from './market-bar-cache-context-v3.js';
 
 const identity = {
   contractVersion: z.literal(3), consumer: z.literal('thesis-ledger'),
   requestId: z.string().min(1).refine((value) => value.trim() === value),
   symbol: z.string().min(1).max(64).refine((value) => value.trim() === value && value.toUpperCase() === value),
 };
-export const marketCacheContextRequestV3Schema = z.discriminatedUnion('capability', [
+const currentDataCacheContextRequestV3Schema = z.discriminatedUnion('capability', [
   z.strictObject({ ...identity, capability: z.literal('REALTIME_QUOTE'),
     assetType: z.enum(['STOCK', 'ETF', 'INDEX']).optional() }),
   z.strictObject({ ...identity, capability: z.literal('FUND_NAV') }),
@@ -14,7 +20,7 @@ export const marketCacheContextRequestV3Schema = z.discriminatedUnion('capabilit
   z.strictObject({ ...identity, capability: z.literal('FUND_HOLDINGS') }),
   z.strictObject({ ...identity, capability: z.literal('CHIP_SUMMARY') }),
 ]);
-export const marketCacheContextResponseV3Schema = z.strictObject({
+const currentDataCacheContextResponseV3Schema = z.strictObject({
   ...identity,
   capability: z.enum(['REALTIME_QUOTE', 'FUND_NAV', 'FUND_NAV_HISTORY', 'FUND_HOLDINGS', 'CHIP_SUMMARY']),
   routeKey: marketRouteKeyV3Schema.options[1],
@@ -32,10 +38,18 @@ export const marketCacheContextResponseV3Schema = z.strictObject({
   if (value.capability === 'CHIP_SUMMARY' && value.routeKey.assetType !== 'STOCK')
     context.addIssue({ code: 'custom', message: '筹码缓存上下文资产类型无效' });
 });
+export const marketCacheContextRequestV3Schema = z.union([
+  currentDataCacheContextRequestV3Schema, marketBarCacheContextRequestV3Schema,
+]);
+export const marketCacheContextResponseV3Schema = z.union([
+  currentDataCacheContextResponseV3Schema, marketBarCacheContextResponseV3Schema,
+]);
 export type MarketCacheContextRequestV3 = z.infer<typeof marketCacheContextRequestV3Schema>;
 export type MarketCacheContextResponseV3 = z.infer<typeof marketCacheContextResponseV3Schema>;
 
 export function correlateMarketCacheContextV3(request: MarketCacheContextRequestV3, raw: unknown) {
+  if (request.capability === 'DAILY_BAR' || request.capability === 'MINUTE_BAR')
+    return correlateMarketBarCacheContextV3(request, raw);
   const response = marketCacheContextResponseV3Schema.parse(raw);
   for (const name of ['requestId', 'symbol', 'capability'] as const)
     if (response[name] !== request[name]) throw new Error('缓存上下文响应未绑定请求');

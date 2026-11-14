@@ -5,8 +5,14 @@ import {
   chipDistributionSchema,
 } from '@thesis-ledger/schemas';
 
+export class MarketDataIdentityError extends Error {
+  constructor(message = '行情响应代码与请求不一致') {
+    super(message);
+  }
+}
+
 const requireSymbol = (actual: string, expected: string) => {
-  if (actual !== expected) throw new Error('行情响应代码与请求不一致');
+  if (actual !== expected) throw new MarketDataIdentityError();
 };
 
 export const parseCurrentQuote = (value: unknown, symbol: string) => {

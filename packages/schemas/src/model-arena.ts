@@ -38,7 +38,7 @@ export const arenaProtocolSchema = z
     startsOn: z.iso.date(),
     endsOn: z.iso.date(),
     instruments: z.array(instrument).min(1).max(50),
-    entrants: z.array(entrant).min(2).max(12),
+    entrants: z.array(entrant).min(1).max(12),
     initialCash: positiveMoney,
     maxPositionBps: bps.positive(),
     fees: z.strictObject({

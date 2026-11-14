@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { MarketPolicyRoutes } from '../src/features/market-data/MarketPolicyRoutes.js';
+import { MarketPolicyRouteTable as MarketPolicyRoutes } from '../src/features/market-data/MarketPolicyRouteTable.js';
 import { marketPolicyRouteRowsV3 } from '../src/features/market-data/market-data-routes-v3.js';
 import type {
   MarketPolicyDraftV3,
@@ -58,16 +58,17 @@ const renderRoutes = (input: MarketRouteCatalogReadV3, draft = policy) =>
       catalog={input}
       providers={[provider]}
       disabled={false}
-      dirty={false}
+      rows={marketPolicyRouteRowsV3(input, draft)}
+      changedIds={new Set()}
       onChange={vi.fn()}
     />,
   );
 
-describe('公共收费配置消费', () => {
-  it('真实目录能力进入历史分组，主源回显和选择器均显示中文来源', () => {
+describe('公共收费来源配置', () => {
+  it('主源回显和选择器均显示中文收费来源', () => {
     const html = renderRoutes(catalog);
-    expect(html).toContain('<legend');
-    expect(html).toContain('分红拆分与公共收费');
+
+
     expect(html).toContain('中国内地股票 · 历史公共收费 主数据源');
     expect(html).toContain('上交所 A 股费率（2023-08-25～29）');
     expect(html.match(/role="combobox"/g)).toHaveLength(2);

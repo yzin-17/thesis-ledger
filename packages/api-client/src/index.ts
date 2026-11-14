@@ -1,4 +1,5 @@
 import { modelArenaClient } from './model-arena-client.js';
+import { arenaLiveClient } from './arena-live-client.js';
 import { watchlistClient } from './watchlist-client.js';
 import { cashManagementClient } from './cash-management-client.js';
 import { aiProviderClient } from './ai-provider-client.js';
@@ -33,6 +34,7 @@ import { marketDisplayClient } from './market-display-client.js';
 import { backtestClients } from './backtest-clients.js';
 import { strategyClients } from './strategy-clients.js';
 import { marketControlClient } from './market-control-client.js';
+export { ruleSourceMonitorClient } from './rule-source-monitor-client.js';
 import { journalReviewClient } from './journal-review-client.js';
 import { researchClient } from './research-client.js';
 import { researchRunClient } from './research-run-client.js';
@@ -341,6 +343,7 @@ export class ThesisLedgerApiClient {
   readonly cashDeposits = this.cashManagement.cashDeposits;
   readonly fundInvestments = this.cashManagement.fundInvestments;
   readonly modelArenas = modelArenaClient(this.requestParsed.bind(this));
+  readonly arenaMatches = arenaLiveClient(this.requestParsed.bind(this));
   readonly watchlist = watchlistClient(this.requestParsed.bind(this));
   readonly risk = riskManagementClient(this.requestParsed.bind(this));
 
@@ -536,4 +539,7 @@ export class ThesisLedgerApiClient {
   }
 }
 export * from './arena-setup.js';
+export * from './arena-live-setup.js';
+export * from './arena-setup-validation.js';
 export * from './market-reference-contracts.js';
+export { instrumentConfirmationPresentation } from './instrument-confirmation.js';

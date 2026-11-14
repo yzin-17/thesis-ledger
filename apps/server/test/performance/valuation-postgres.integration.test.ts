@@ -92,6 +92,13 @@ async function createValuationFixture() {
 }
 
 describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
+  const context = valuationRuntimeContext();
+  registerValuationScheduling(context);
+  registerValuationRevisionAndCoverage(context);
+  registerValuationHistoricalAndPortfolioScope(context);
+});
+
+function valuationRuntimeContext() {
   let prisma: PrismaClient;
   let automations: AutomationService;
   let snapshots: PerformanceSnapshotService;
@@ -107,8 +114,38 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
   afterAll(async () => {
     await prisma?.$disconnect();
   });
+  return {
+    get prisma() {
+      return prisma;
+    },
+    get automations() {
+      return automations;
+    },
+    get snapshots() {
+      return snapshots;
+    },
+    get series() {
+      return series;
+    },
+    get handlers() {
+      return handlers;
+    },
+    get scheduler() {
+      return scheduler;
+    },
+    get cnAccount() {
+      return cnAccount;
+    },
+    get cashAccount() {
+      return cashAccount;
+    },
+  };
+}
 
+function registerValuationScheduling(context: ReturnType<typeof valuationRuntimeContext>) {
   it('并发 provision 不复制三个 systemKey，保留用户启停和计划', async () => {
+    const { prisma, automations } = context;
+
     await Promise.all(Array.from({ length: 4 }, () => automations.ensureManagedValuationJobs()));
     const jobs = await prisma.automationJob.findMany({
       where: {
@@ -126,8 +163,9 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
     await expect(automations.delete(intradayId)).rejects.toThrow('不能删除');
     await prisma.automationJob.updateMany({ data: { enabled: false } });
   });
-
   it('真实 Scheduler 在开放美股但仅有中国持仓时不创建历史和点位', async () => {
+    const { prisma, scheduler } = context;
+
     const due = new Date('2026-09-08T17:04:00Z');
     await prisma.automationJob.update({
       where: { id: intradayId },
@@ -147,8 +185,9 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
       ).nextRunAt?.getTime(),
     ).toBeGreaterThan(due.getTime());
   });
-
   it('真实 Scheduler 为开放中国持仓写点，重复轮询不重复执行', async () => {
+    const { prisma, scheduler, cnAccount } = context;
+
     const due = new Date('2026-09-09T02:00:00Z');
     await prisma.automationJob.update({ where: { id: intradayId }, data: { nextRunAt: due } });
     const result = await scheduler.runDue(new Date('2026-09-09T02:00:06Z'));
@@ -160,8 +199,9 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
     ]);
     expect(Number((await prisma.accountValuationPoint.findFirstOrThrow()).totalValue)).toBe(120);
   });
-
   it('停用任务立即运行绕过周末门禁，分钟 upsert 和现金账户隔离成立', async () => {
+    const { prisma, automations, series, handlers, cnAccount, cashAccount } = context;
+
     await automations.update(intradayId, { enabled: false });
     const at = new Date('2026-10-04T02:00:17Z');
     const output = await automations.execute(
@@ -178,8 +218,12 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
     ).toBe(1);
     expect(await prisma.accountValuationPoint.count({ where: { accountId: cashAccount } })).toBe(0);
   });
+}
 
+function registerValuationRevisionAndCoverage(context: ReturnType<typeof valuationRuntimeContext>) {
   it('同一估值幂等键并发创建只产生一条快照', async () => {
+    const { prisma, snapshots, cnAccount } = context;
+
     const at = new Date();
     const results = await Promise.all(
       Array.from({ length: 8 }, () => snapshots.capture(cnAccount, at)),
@@ -187,8 +231,9 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
     expect(new Set(results.map((row) => row.id)).size).toBe(1);
     expect(await prisma.portfolioSnapshot.count({ where: { accountId: cnAccount } })).toBe(1);
   });
-
   it('正式修订并发恰好一次，晚到估算不能覆盖，详情保留修订链', async () => {
+    const { prisma, snapshots, series } = context;
+
     const at = new Date();
     // 无持仓的新账户可在没有外部行情的情况下证明修订存储语义。
     const account = await prisma.account.create({
@@ -230,8 +275,9 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
       valuationBasis: 'OFFICIAL',
     });
   });
-
   it('缺行情保留已知金额和覆盖率，正式校准失败保留待补齐估算', async () => {
+    const { prisma, series } = context;
+
     const data = new PerformanceDataService(prisma as never, {} as never);
     const unavailable = new PerformanceSnapshotService(prisma as never, {} as never, data);
     const account = await prisma.account.create({
@@ -265,52 +311,99 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
     ).rejects.toThrow('尚未齐备');
     expect((await unavailable.detail(estimate.id))?.revisions).toHaveLength(1);
   });
+}
 
+function registerValuationHistoricalAndPortfolioScope(
+  context: ReturnType<typeof valuationRuntimeContext>,
+) {
   it('后续买卖不污染旧日校准，正式证据并发幂等并允许更正', async () => {
+    const { prisma } = context;
+
     const at = new Date('2026-09-28T08:00:00Z');
     const account = await prisma.account.create({
       data: { name: '隔离冻结经济输入', type: 'securities', mode: 'actual' },
     });
-    await prisma.position.create({ data: { accountId: account.id, symbol: '600519.SH',
-      quantity: 2, costPrice: 80, source: 'isolated-fixture' } });
-    const market = { getQuote: async () => ({ price: 100, provider: 'isolated-fixture', stale: false }) };
+    await prisma.position.create({
+      data: {
+        accountId: account.id,
+        symbol: '600519.SH',
+        quantity: 2,
+        costPrice: 80,
+        source: 'isolated-fixture',
+      },
+    });
+    const market = {
+      getQuote: async () => ({ price: 100, provider: 'isolated-fixture', stale: false }),
+    };
     let officialPrice = 101;
-    const bars = { readV3: async () => ({ status: 'selected', selection: { response: {
-      bars: [{ timestamp: '2026-09-28T07:00:00Z', close: officialPrice, completionStatus: 'complete' }],
-      provenance: { providerId: 'isolated-fixture', upstreamSource: 'fixture-explicit' },
-    } } }) };
+    const bars = {
+      readV3: async () => ({
+        status: 'selected',
+        selection: {
+          response: {
+            bars: [
+              {
+                timestamp: '2026-09-28T07:00:00Z',
+                close: officialPrice,
+                completionStatus: 'complete',
+              },
+            ],
+            provenance: { providerId: 'isolated-fixture', upstreamSource: 'fixture-explicit' },
+          },
+        },
+      }),
+    };
     const data = new PerformanceDataService(prisma as never, market as never);
-    const service = new PerformanceSnapshotService(prisma as never, market as never, data, bars as never);
+    const service = new PerformanceSnapshotService(
+      prisma as never,
+      market as never,
+      data,
+      bars as never,
+    );
     const estimate = await service.capture(account.id, at);
     const original = JSON.stringify(estimate);
-    await prisma.position.update({ where: { accountId_symbol: { accountId: account.id, symbol: '600519.SH' } },
-      data: { quantity: 20, costPrice: 95 } });
+    await prisma.position.update({
+      where: { accountId_symbol: { accountId: account.id, symbol: '600519.SH' } },
+      data: { quantity: 20, costPrice: 95 },
+    });
     await prisma.account.update({ where: { id: account.id }, data: { active: false } });
     const first = await service.reconcileOfficial(100, account.id);
     expect(first.scanned).toBe(1);
-    expect(first.pending.find(row => row.snapshotId === estimate.id)).toBeUndefined();
+    expect(first.pending.find((row) => row.snapshotId === estimate.id)).toBeUndefined();
     const detail = await service.detail(estimate.id);
     expect(detail?.revisions).toHaveLength(2);
     const initialOfficial = detail!.revisions[1]!;
     expect(Number(initialOfficial.marketValue)).toBe(202);
     expect(Number(initialOfficial.costValue)).toBe(160);
-    expect(JSON.stringify(await prisma.portfolioSnapshot.findUnique({ where: { id: estimate.id } }))).toBe(original);
+    expect(
+      JSON.stringify(await prisma.portfolioSnapshot.findUnique({ where: { id: estimate.id } })),
+    ).toBe(original);
     const frozen = frozenSnapshotInputs(estimate);
-    const capture = () => service.capture(account.id, at, 'actual', {}, {
-      valuationBasis: 'OFFICIAL', valuationDate: estimate.valuationDate,
-    }, frozen);
+    const capture = () =>
+      service.capture(
+        account.id,
+        at,
+        'actual',
+        {},
+        {
+          valuationBasis: 'OFFICIAL',
+          valuationDate: estimate.valuationDate,
+        },
+        frozen,
+      );
     const repeated = await Promise.all(Array.from({ length: 8 }, capture));
-    expect(new Set(repeated.map(row => row.id))).toEqual(new Set([initialOfficial.id]));
+    expect(new Set(repeated.map((row) => row.id))).toEqual(new Set([initialOfficial.id]));
     officialPrice = 103;
     const corrected = await Promise.all(Array.from({ length: 8 }, capture));
-    expect(new Set(corrected.map(row => row.id)).size).toBe(1);
+    expect(new Set(corrected.map((row) => row.id)).size).toBe(1);
     expect(corrected[0]).toMatchObject({ revision: 3, supersedesSnapshotId: initialOfficial.id });
     expect(Number(corrected[0]!.marketValue)).toBe(206);
     expect((await service.detail(estimate.id))?.revisions).toHaveLength(3);
     expect(await service.list({ accountId: account.id })).toMatchObject([{ id: corrected[0]!.id }]);
   });
-
   it('组合分钟点保留低覆盖质量，不混入现金、模拟或异币种点', async () => {
+    const { prisma, series, cnAccount, cashAccount } = context;
+
     const at = new Date();
     at.setUTCSeconds(0, 0);
     const other = await prisma.account.create({
@@ -358,4 +451,4 @@ describe.skipIf(!databaseUrl)('组合估值真实 PostgreSQL', () => {
     });
     expect(result.dataQuality).toBe('LOW_COVERAGE');
   });
-});
+}

@@ -1,4 +1,5 @@
 import { notificationRiskFingerprint } from '../notifications/notification.service.js';
+import { DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES, riskRuleNotificationFromParameters } from '@thesis-ledger/schemas';
 import type {
   NotificationMessage,
   NotificationService,
@@ -6,7 +7,7 @@ import type {
 } from '../notifications/notification.service.js';
 
 const notificationPolicy = {
-  cooldownMinutes: 30,
+  cooldownMinutes: DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES,
   maxAttempts: 3,
   criticalBypassCooldown: true,
 };
@@ -29,6 +30,7 @@ export type RiskNotificationInput = {
     enabled?: boolean;
     cooldownMinutes?: number;
     channels?: string[];
+    providers?: string[] | undefined;
   };
 };
 
@@ -61,9 +63,11 @@ export const enqueueRiskNotificationIfNeeded = async (
   notifications: NotificationService,
   input: RiskNotificationInput & { mode: 'actual' | 'shadow'; created: boolean },
 ) => {
-  if (input.mode === 'shadow' || input.policy?.enabled === false) return;
+  const policy = input.policy ?? riskRuleNotificationFromParameters(input.rule.parameters);
+  if (input.mode === 'shadow' || policy.enabled === false) return;
   // 当前 NotificationService 唯一可投递渠道为 feishu；策略应用显式移除该渠道时不入队。
-  if (input.policy?.channels && !input.policy.channels.includes('feishu')) return;
+  if ('channels' in policy && policy.channels && !policy.channels.includes('feishu')) return;
+  if (policy.providers?.length === 0) return;
   if (
     !input.created &&
     !(await notifications.subjectDeliveryStatus({ type: 'risk-event', id: input.eventId }))
@@ -73,8 +77,9 @@ export const enqueueRiskNotificationIfNeeded = async (
   const notification = buildRiskNotification(input);
   await notifications.enqueue(notification.subject, notification.message, {
     ...notificationPolicy,
-    ...(input.policy?.cooldownMinutes === undefined
+    ...(policy.providers === undefined ? {} : { providers: policy.providers }),
+    ...(policy.cooldownMinutes === undefined
       ? {}
-      : { cooldownMinutes: Math.max(0, Math.floor(input.policy.cooldownMinutes)) }),
+      : { cooldownMinutes: Math.max(0, Math.floor(policy.cooldownMinutes)) }),
   });
 };

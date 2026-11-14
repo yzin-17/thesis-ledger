@@ -346,6 +346,46 @@ interface BacktestBenchmarkAnalysis {
   };
 }
 
+function collectAlignedBenchmarkValues(
+  input: BacktestAnalyticsInput,
+  benchmark: BacktestBenchmarkInput,
+  equity: readonly BacktestEquityPoint[],
+  warnings: string[],
+) {
+  const values: DecimalValue[] = [];
+  const matched = new Set<string>();
+  let alignmentIncomplete = false;
+  let fxUnavailable = false;
+  for (const equityPoint of equity) {
+    const source = pointAt(benchmark.points, equityPoint.occurredAt);
+    if (source === undefined) {
+      alignmentIncomplete = true;
+      continue;
+    }
+    matched.add(`${source.occurredAt}:${source.availableAt ?? source.occurredAt}`);
+    let value: DecimalValue;
+    try {
+      value = decimal(source.value, 'Benchmark 值');
+      if (benchmark.currency !== input.baseCurrency) {
+        const fx = fxAt(benchmark.fxToBase, equityPoint.occurredAt);
+        if (fx === undefined) {
+          fxUnavailable = true;
+          warnings.push(`FX_UNAVAILABLE:${benchmark.symbol}:${equityPoint.occurredAt}`);
+          continue;
+        }
+        const rate = decimal(fx.rate, 'FX');
+        if (!rate.isPositive()) throw new Error('FX 必须为正数');
+        value = value.times(rate);
+      }
+    } catch (error) {
+      warnings.push(`${benchmark.symbol}:${error instanceof Error ? error.message : 'Benchmark 不可用'}`);
+      continue;
+    }
+    values.push(value);
+  }
+  return { values, matched, alignmentIncomplete, fxUnavailable };
+}
+
 const benchmarkMetrics = (
   input: BacktestAnalyticsInput,
   equity: readonly BacktestEquityPoint[],
@@ -394,39 +434,7 @@ const benchmarkMetrics = (
   }
   const benchmark = resolution.benchmark;
   if (benchmark === undefined) return undefined;
-  const values: DecimalValue[] = [];
-  const matched = new Set<string>();
-  let alignmentIncomplete = false;
-  let fxUnavailable = false;
-  for (const equityPoint of equity) {
-    const source = pointAt(benchmark.points, equityPoint.occurredAt);
-    if (source === undefined) {
-      alignmentIncomplete = true;
-      continue;
-    }
-    matched.add(`${source.occurredAt}:${source.availableAt ?? source.occurredAt}`);
-    let value: DecimalValue;
-    try {
-      value = decimal(source.value, 'Benchmark 值');
-      if (benchmark.currency !== input.baseCurrency) {
-        const fx = fxAt(benchmark.fxToBase, equityPoint.occurredAt);
-        if (fx === undefined) {
-          fxUnavailable = true;
-          warnings.push(`FX_UNAVAILABLE:${benchmark.symbol}:${equityPoint.occurredAt}`);
-          continue;
-        }
-        const rate = decimal(fx.rate, 'FX');
-        if (!rate.isPositive()) throw new Error('FX 必须为正数');
-        value = value.times(rate);
-      }
-    } catch (error) {
-      warnings.push(
-        `${benchmark.symbol}:${error instanceof Error ? error.message : 'Benchmark 不可用'}`,
-      );
-      continue;
-    }
-    values.push(value);
-  }
+  const { values, matched, alignmentIncomplete, fxUnavailable } = collectAlignedBenchmarkValues(input, benchmark, equity, warnings);
   if (alignmentIncomplete) warnings.push(`BENCHMARK_ALIGNMENT_INCOMPLETE:${benchmark.symbol}`);
   if (fxUnavailable) return finish(unavailable('FX_UNAVAILABLE'));
   if (alignmentIncomplete || matched.size < 2 || values.length < 2) {
@@ -523,7 +531,7 @@ export const buildBacktestAnalytics = (input: BacktestAnalyticsInput): BacktestA
   } else if (
     warnings.length > 0 ||
     Object.values(metrics).some(
-      (metric) => metric.status === 'unavailable' && metric.reason !== 'NO_LOSING_TRADES',
+      (metric) => metric.status === 'unavailable' && !['NO_LOSING_TRADES', 'NO_CLOSED_TRADES'].includes(metric.reason ?? ''),
     )
   ) {
     completeness = 'partial';

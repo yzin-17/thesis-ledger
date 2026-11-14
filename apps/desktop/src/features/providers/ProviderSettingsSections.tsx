@@ -1,5 +1,5 @@
 import { Spinner } from '@/components/ui/spinner';
-import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
+import { TableCell, TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,15 @@ import type { LoadState } from '../shared/types.js';
 import { ProviderModelSummary } from './ProviderModelSummary.js';
 import { ProviderPriorityHeader } from './ProviderPriorityHeader.js';
 import { AiProviderReadinessStatus } from './AiProviderReadinessStatus.js';
+import { AutomationReadWarning } from './AutomationReadWarning.js';
+import { AutomationHistoryFilter } from './AutomationHistoryFilter.js';
+import {
+  automationNextRunLabel,
+  automationEnabledLabel,
+  automationRunTimeLabel,
+} from './automation-read-display.js';
+import { SimpleProviderTable, providerReadEmptyLabel } from './ProviderReadTable.js';
+import { dataQualityLastSeenLabel } from './data-quality-issue-display.js';
 import {
   automationJobTypeLabel,
   automationOutputSummary,
@@ -291,7 +300,7 @@ export function AutomationTable({
       <div className="panel-heading flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2>自动化任务</h2>
-          <p>启停、编辑与运行历史通过同一 API 管理。</p>
+          <p>集中查看任务状态和运行历史，按需调整执行设置。</p>
         </div>
         <Button size="sm" type="button" variant="default" onClick={onCreate}>
           新建任务
@@ -302,14 +311,23 @@ export function AutomationTable({
           <AlertTitle>任务列表暂未更新</AlertTitle>
           <AlertDescription>
             已成功保存的任务无需再次创建或保存。重新读取列表不会执行任务。
-            <Button aria-busy={reloading} type="button" variant="outline" disabled={reloading} onClick={onRetry}>
+            <Button
+              aria-busy={reloading}
+              type="button"
+              variant="outline"
+              disabled={reloading}
+              onClick={onRetry}
+            >
               {reloading && <Spinner data-icon="inline-start" aria-hidden="true" />}
               重新读取任务
             </Button>
           </AlertDescription>
         </Alert>
       )}
-      <TableContainer refreshing={!!reloading && loadState !== 'loading'} refreshLabel="正在刷新自动化任务">
+      <TableContainer
+        refreshing={!!reloading && loadState !== 'loading'}
+        refreshLabel="正在刷新自动化任务"
+      >
         <table>
           <TableHeader>
             <tr>
@@ -326,25 +344,31 @@ export function AutomationTable({
             ) : (
               jobs.map((job) => (
                 <tr key={job.id}>
-                  <td>
+                  <TableCell>
                     {job.name}
                     {job.managed ? (
                       <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                         系统任务
                       </span>
                     ) : null}
-                  </td>
-                  <td>{automationJobTypeLabel(job.type)}</td>
-                  <td>
-                    {job.nextRunAt ? new Date(job.nextRunAt).toLocaleString('zh-CN') : '未安排'}
-                  </td>
-                  <td>{job.enabled ? '启用' : '停用'}</td>
+                  </TableCell>
+                  <TableCell>
+                    {automationJobTypeLabel(job.type)}
+                    {job.scheduleLabel ? <span>{job.scheduleLabel}</span> : null}
+                  </TableCell>
+                  <TableCell>{automationNextRunLabel(job)}</TableCell>
+                  <TableCell>{automationEnabledLabel(job)}</TableCell>
                   <StickyTableActionCell>
                     <Button
                       className="text-button"
                       size="sm"
                       variant="link"
-                      disabled={readError || togglingJobId !== null}
+                      disabled={
+                        readError ||
+                        job.enabled === null ||
+                        !!job.readError ||
+                        togglingJobId !== null
+                      }
                       aria-busy={togglingJobId === job.id}
                       onClick={() => onToggle(job)}
                     >
@@ -355,7 +379,7 @@ export function AutomationTable({
                           aria-hidden="true"
                         />
                       )}
-                      {toggleLabel(togglingJobId === job.id, job.enabled)}
+                      {toggleLabel(togglingJobId === job.id, job.enabled ?? false)}
                     </Button>
                     <Button
                       className="text-button"
@@ -370,7 +394,7 @@ export function AutomationTable({
                       className="text-button"
                       size="sm"
                       variant="link"
-                      disabled={readError || runningJobId !== null}
+                      disabled={readError || !!job.readError || runningJobId !== null}
                       aria-busy={runningJobId === job.id}
                       onClick={() => onRun(job)}
                     >
@@ -405,13 +429,6 @@ export function AutomationTable({
     </section>
   );
 }
-
-const providerReadEmptyLabel = (state: LoadState | undefined, subject: string) => {
-  if (state === 'loading') return `正在读取${subject}…`;
-  if (state === 'error') return `${subject}读取失败，请重新读取。`;
-  if (state === 'stale') return `${subject}更新失败，当前没有可显示记录。`;
-  return `暂无${subject}。`;
-};
 
 export function HealthHistoryTable({
   loadState,
@@ -499,82 +516,22 @@ export function HealthHistoryTable({
   );
 }
 
-function SimpleProviderTable({
-  refreshing = false,
-  title,
-  description,
-  columns,
-  rows,
-  emptyColSpan,
-  emptyState,
-  footer,
-  loadState,
-  onRetry,
-}: {
-  refreshing?: boolean;
-  title: string;
-  description: string;
-  columns: string[];
-  rows: Array<{ id: string; cells: string[] }>;
-  emptyColSpan: number;
-  emptyState?: ReactNode;
-  footer?: ReactNode;
-  loadState?: LoadState;
-  onRetry?: (() => void) | undefined;
-}) {
-  return (
-    <section className="panel">
-      <div className="panel-heading">
-        <h2>{title}</h2>
-        <p>{description}</p>
-      </div>
-      {(loadState === 'error' || loadState === 'stale') && (
-        <DataStateBanner state={loadState} {...(onRetry ? { onRetry } : {})} />
-      )}
-      <TableContainer refreshing={refreshing} refreshLabel={`正在刷新${title}`}>
-        <table>
-          <TableHeader>
-            <tr>
-              {columns.map((column) => (
-                <TableHead key={column}>{column}</TableHead>
-              ))}
-            </tr>
-          </TableHeader>
-          <tbody>
-            {rows.length === 0
-              ? (emptyState ?? (
-                  <EmptyTableRow
-                    colSpan={emptyColSpan}
-                    loading={loadState === 'loading'} label={providerReadEmptyLabel(loadState, title)}
-                  />
-                ))
-              : rows.map((row) => (
-                  <tr key={row.id}>
-                    {row.cells.map((cell, index) => (
-                      <td key={`${row.id}-${index}`}>{cell}</td>
-                    ))}
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-      </TableContainer>
-      {footer}
-    </section>
-  );
-}
-
 export function AutomationRunHistoryTable({
   loadState,
   jobs,
   history,
   loading,
   onPage,
+  jobId,
+  onJobChange,
 }: {
   loadState: LoadState;
   jobs: AutomationJob[];
   history: AutomationHistoryPage;
   loading: boolean;
   onPage: (page: number) => void;
+  jobId?: string | undefined;
+  onJobChange?: (jobId: string | undefined) => void;
 }) {
   const jobNames = new Map(jobs.map((job) => [job.id, job.name]));
   const automationJobName = (jobId: string) => jobNames.get(jobId) ?? jobId.slice(0, 8);
@@ -591,6 +548,13 @@ export function AutomationRunHistoryTable({
       refreshing={loading && loadState !== 'loading'}
       title="自动化运行历史"
       description="失败任务和错误摘要可从这里定位，无需直接查数据库。"
+      notice={<AutomationReadWarning warnings={history.sourceWarnings} />}
+      controls={
+        onJobChange ? (
+          <AutomationHistoryFilter jobs={jobs} jobId={jobId} onChange={onJobChange} />
+        ) : null
+      }
+      wrapColumns={[2, 3, 4]}
       columns={['任务', '状态', '开始时间', '运行结果', '错误']}
       emptyColSpan={5}
       emptyState={emptyState}
@@ -629,10 +593,10 @@ export function AutomationRunHistoryTable({
       rows={history.items.map((item) => ({
         id: item.id,
         cells: [
-          automationJobName(item.jobId),
+          item.jobName ?? automationJobName(item.jobId),
           automationRunStatusLabel(item.status),
-          new Date(item.startedAt).toLocaleString('zh-CN'),
-          automationOutputSummary(item.output),
+          automationRunTimeLabel(item),
+          item.summary ?? automationOutputSummary(item.output),
           item.error ?? '—',
         ],
       }))}
@@ -656,7 +620,7 @@ export function NotificationFailuresTable({
     <SimpleProviderTable
       refreshing={refreshing}
       title="通知失败"
-      description="只读展示投递失败状态，重试仍通过 Notification API 处理。"
+      description="显示投递失败和等待重试的通知。"
       columns={['提供方', '状态', '错误']}
       emptyColSpan={3}
       loadState={loadState}
@@ -692,10 +656,10 @@ export function DataQualityIssuesTable({
   return (
     <SimpleProviderTable
       refreshing={refreshing}
-      title="开放数据质量问题"
-      description="异常不会静默当作完整数据。"
-      columns={['提供方', '标的', '级别', '问题']}
-      emptyColSpan={4}
+      title="未关闭的数据质量问题"
+      description="显示已接入校验的异常，重复发生合并计数；没有记录不代表所有数据均正常。"
+      columns={['提供方', '标的', '级别', '最近发生', '次数', '问题']}
+      emptyColSpan={6}
       loadState={loadState}
       onRetry={onRetry}
       rows={
@@ -708,6 +672,8 @@ export function DataQualityIssuesTable({
                   issue.provider,
                   issue.symbol ?? '全局',
                   dataQualitySeverityLabel(issue.severity),
+                  dataQualityLastSeenLabel(issue),
+                  typeof issue.details?.occurrences === 'number' ? String(issue.details.occurrences) : '1',
                   `${dataQualityCodeLabel(issue.code)}${reason ? `：${reason}` : ''}`,
                 ],
               };

@@ -35,7 +35,12 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
 ): Promise<TJob | null> {
   const { job, execution, prisma, activeControllers } = input;
   const runId = job.id;
-  const eligibility = await prepareBacktestAttempt(prisma, job, input.runnerId, execution !== undefined);
+  const eligibility = await prepareBacktestAttempt(
+    prisma,
+    job,
+    input.runnerId,
+    execution !== undefined,
+  );
   if (!eligibility.allowed) return eligibility.job;
 
   const attempt = execution?.attempt ?? job.executionAttempt + 1;
@@ -102,6 +107,12 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
     if (committed.count === 1) return findCurrent();
     return latestOrAcknowledgeCancellation(attempt);
   } catch (error) {
+    return await handleFailure(error, attempt);
+  } finally {
+    if (activeControllers.get(runId) === controller) activeControllers.delete(runId);
+  }
+
+  async function handleFailure(error: unknown, attempt: number): Promise<TJob | null> {
     const current = await findCurrent();
     if (!current || finishedStatuses.has(current.status)) return current;
     if (current.status !== 'running' || current.executionAttempt !== attempt) return current;
@@ -155,8 +166,6 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
     if (failed.count === 0) return latestOrAcknowledgeCancellation(attempt);
     if (execution) throw error;
     return findCurrent();
-  } finally {
-    if (activeControllers.get(runId) === controller) activeControllers.delete(runId);
   }
 
   async function acknowledgeCancellation(currentAttempt: number): Promise<TJob | null> {

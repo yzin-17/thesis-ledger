@@ -7,6 +7,8 @@ import {
   experimentUsageText,
   experimentStopReasonText,
   tradingCostText,
+  metricValue,
+  latestExperimentAdoption,
 } from '../src/features/strategy/strategy-experiment-detail.model.js';
 import type {
   OptimizationCandidate,
@@ -18,6 +20,25 @@ import {
 } from '../src/features/strategy/strategy-optimization.api.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
 import { createDefaultStrategySchema, setStrategyExecutionSymbol } from '../src/features/strategy/strategy.schema.js';
+import type { StrategyRecord } from '../src/features/strategy/strategy.types.js';
+
+describe('实验已采纳版本投影', () => {
+  const strategies = [{ id: 'strategy', versions: [
+    { id: 'formal-1', version: 1 }, { id: 'formal-2', version: 2 },
+    { id: 'formal-3', version: 3 }, { id: 'manual-9', version: 9 },
+  ] }] as unknown as StrategyRecord[];
+  const first = { adoptedStrategyVersionId: 'formal-1' };
+  const second = { adoptedStrategyVersionId: 'formal-2' };
+  it.each([[first, second], [second, first]])('刷新与候选顺序均选择本实验最高版本', (...candidates) => {
+    expect(latestExperimentAdoption(candidates, strategies)).toEqual({ id: 'formal-2', strategyId: 'strategy', version: 2 });
+  });
+  it('兼容尚未读回的本地回执，并接受更新后的较高采纳版本', () => {
+    const receipt = { id: 'formal-2', strategyId: 'strategy', version: 2 };
+    expect(latestExperimentAdoption([first], strategies, receipt)).toEqual(receipt);
+    expect(latestExperimentAdoption([{ adoptedStrategyVersionId: 'formal-3' }], strategies, receipt)?.version).toBe(3);
+    expect(latestExperimentAdoption([{ adoptedStrategyVersionId: 'missing' }], strategies)).toBeNull();
+  });
+});
 
 const experiment = (overrides: Partial<OptimizationExperimentSummary> = {}) =>
   ({
@@ -85,6 +106,28 @@ const candidate = (overrides: Partial<OptimizationCandidate> = {}) =>
   }) satisfies OptimizationCandidate;
 
 describe('策略实验详情', () => {
+  it('收益和回撤按比例显示两位百分比，交易数量及原始值保持不变', () => {
+    const metrics = {
+      totalReturn: '0.00195553178350810746',
+      maxDrawdown: '-0.024960676825349179915',
+      closedTradeCount: 11,
+    };
+    const original = structuredClone(metrics);
+    expect(metricValue(metrics, ['totalReturn', 'return'], 'percent')).toBe('0.20%');
+    expect(metricValue(metrics, ['maxDrawdown'], 'percent')).toBe('-2.50%');
+    expect(metricValue({ return: '-0.10343877948424885324' }, ['totalReturn', 'return'], 'percent')).toBe('-10.34%');
+    expect(metricValue({ totalReturn: 0 }, ['totalReturn'], 'percent')).toBe('0.00%');
+    expect(metricValue(metrics, ['closedTradeCount', 'tradeCount'])).toBe('11');
+    expect(metrics).toEqual(original);
+  });
+
+  it('缺失和不可用指标不伪装为零，已声明可用的指标复用百分比投影', () => {
+    for (const value of [null, undefined, '', 'invalid', Infinity, { status: 'unavailable', value: '0.1' }]) {
+      expect(metricValue({ totalReturn: value }, ['totalReturn'], 'percent')).toBe('不可用');
+    }
+    expect(metricValue({ totalReturn: { status: 'available', value: '0.123456' } }, ['totalReturn'], 'percent')).toBe('12.35%');
+  });
+
   it('仅在实验与候选都明确可读时揭示封存指标', () => {
     expect(canRevealTestMetrics(experiment(), candidate())).toBe(true);
     expect(canRevealTestMetrics(experiment({ readEligibility: undefined }), candidate())).toBe(
@@ -95,7 +138,7 @@ describe('策略实验详情', () => {
     );
   });
 
-  it('采纳动作同时依赖揭示、完成状态和候选资格', () => {
+  it('采纳动作依赖揭示与完成状态，不要求评价合格', () => {
     expect(candidateAdoptionEligibility(experiment(), candidate())).toBeNull();
     expect(
       candidateAdoptionEligibility(
@@ -105,13 +148,13 @@ describe('策略实验详情', () => {
     ).toBe('实验尚未完成封存测试');
     expect(
       candidateAdoptionEligibility(experiment(), candidate({ validationStatus: 'test_invalid' })),
-    ).toBe('未进入封存测试');
+    ).toBeNull();
     expect(
       candidateAdoptionEligibility(
         experiment({ lockedCandidateIds: ['candidate-1'] }),
         candidate({ validationStatus: 'test_invalid' }),
       ),
-    ).toBe('候选未通过封存测试');
+    ).toBeNull();
   });
 
   it('费用未知、部分已知和多币种均不伪装为精确总额', () => {

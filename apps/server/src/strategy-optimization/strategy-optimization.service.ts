@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { OptimizationBacktestFailure } from './strategy-optimization-failure.js';
 import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   optimizationAdoptSchema,
+  isCompletedOptimizationCandidate,
   optimizationExperimentCloneSchema,
-  optimizationExperimentCreateSchema,
   optimizationExperimentRenameSchema,
-  optimizationFinalizeSchema,
   type OptimizationAdoptionContext,
   strategySchema,
   type BacktestStrategy,
@@ -16,6 +16,7 @@ import { PrismaService } from '../platform/prisma.service.js';
 import {
   adoptionConflict,
   adoptionIdempotencyMatches,
+  candidateOptimizationAdoption,
   adoptionRejected,
   formalizeOptimizationCandidate,
   previousOptimizationAdoption,
@@ -36,7 +37,6 @@ import {
 import { describeStrategyParameters } from './strategy-optimization-parameters.js';
 import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
 import {
-  buildOptimizationModelConfig,
   type OptimizationModelRoute,
 } from './strategy-optimization-model-routing.js';
 import {
@@ -48,15 +48,18 @@ import { StrategyOptimizationRunService } from './strategy-optimization-run.serv
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
 import {
   cloneDiscoveryExperiment,
-  createDiscoveryExperiment,
 } from './strategy-optimization-discovery-store.js';
-import { insertOptimizationExperiment } from './strategy-optimization-experiment.store.js';
-import { assertOptimizationCreateIdentity } from './strategy-optimization-create-identity.js';
+import { createOptimizationExperiment } from './strategy-optimization-create.js';
 import { concludeOptimizationProposalStage } from './strategy-optimization-proposal-stage.js';
+import { OptimizationFinalization } from './strategy-optimization-finalization.js';
+import { requestOptimizationRetry } from './strategy-optimization-retry.js';
+import { optimizationRetryStateSchema } from '@thesis-ledger/schemas';
+import { committedOptimizationAdoptionResponse } from './strategy-optimization-adoption-response.js';
 
 @Injectable()
 export class StrategyOptimizationService implements OnModuleInit {
   private readonly active = new Set<string>();
+  private readonly finalization: OptimizationFinalization;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -65,7 +68,9 @@ export class StrategyOptimizationService implements OnModuleInit {
     private readonly reads: StrategyOptimizationReadService,
     private readonly runs: StrategyOptimizationRunService,
     private readonly riskApplications: StrategyRiskApplicationService,
-  ) {}
+  ) {
+    this.finalization = new OptimizationFinalization(prisma, runs, reads, this.active);
+  }
 
   onModuleInit() {
     if (optimizationFeatureEnabled()) void this.reconcilePending().catch(() => undefined);
@@ -91,39 +96,8 @@ export class StrategyOptimizationService implements OnModuleInit {
 
   async create(input: unknown) {
     this.assertEnabled();
-    const parsed = optimizationExperimentCreateSchema.parse(input);
-    const modelConfig = buildOptimizationModelConfig(parsed.models, this.providers, parsed.sourceMode === 'discovery' ? 'strategy_discovery' : 'parameter_optimization');
-    assertOptimizationModelConfigCost(modelConfig);
-    const previous = await this.prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
-      SELECT * FROM "OptimizationExperiment" WHERE "idempotencyKey"=${parsed.idempotencyKey} LIMIT 1
-    `);
-    if (previous[0]) {
-      assertOptimizationCreateIdentity(previous[0], parsed, modelConfig);
-      return this.reads.experiment(previous[0].id);
-    }
-    const hasUnknownCost = modelConfig.some((route) => route.costStatus === 'unknown');
-    if (hasUnknownCost && parsed.budget.maxCost !== undefined)
-      throw optimizationCostError(
-        'OPTIMIZATION_COST_TOTAL_LIMIT_UNAVAILABLE',
-        '费用或计费币种未知时不能提交实验总金额上限',
-      );
-    if (hasUnknownCost && !parsed.acknowledgeUnknownCost)
-      throw optimizationCostError(
-        'OPTIMIZATION_COST_UNKNOWN_CONFIRMATION_REQUIRED',
-        '所选模型存在未知费用；请明确确认后继续，实验总金额上限不可用',
-      );
-    if (parsed.sourceMode === 'discovery') {
-      const created = await createDiscoveryExperiment(this.prisma, parsed, modelConfig);
-      void this.process(created.id).catch(() => undefined);
-      return this.reads.experiment(created.id);
-    }
-    const baseline: StrategyVersionRecord & { strategy: BacktestStrategy } =
-      await this.reads.formalStrategyVersion(parsed.strategyVersionId!);
-    const descriptors = describeStrategyParameters(baseline.strategy);
-    this.candidateService.validateAuthorizedParameters(descriptors, parsed.allowedParameterIds!);
-    const created = await insertOptimizationExperiment(this.prisma, parsed, baseline, modelConfig);
-    void this.process(created.id).catch(() => undefined);
-    return this.reads.experiment(created.id);
+    return createOptimizationExperiment(input, { prisma: this.prisma, providers: this.providers,
+      reads: this.reads, candidates: this.candidateService, process: id => this.process(id) });
   }
 
   async clone(id: string, input: unknown) {
@@ -245,10 +219,13 @@ export class StrategyOptimizationService implements OnModuleInit {
     return current;
   }
 
-  private async setStage(id: string, stage: string) {
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationExperiment" SET "stage"=${stage}, "updatedAt"=CURRENT_TIMESTAMP WHERE "id"=${id}::uuid
+  private async setStage(experiment: ExperimentRow, stage: string) {
+    const updated = await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE "OptimizationExperiment" SET "stage"=${stage}, "updatedAt"=CURRENT_TIMESTAMP
+      WHERE "id"=${experiment.id}::uuid AND "status"='running'
+        AND "executionAttempt"=${experiment.executionAttempt} AND "cancelRequestedAt" IS NULL
     `);
+    if (updated !== 1) throw new Error('实验已被新的执行尝试接管');
   }
 
   private async processRound(
@@ -269,22 +246,14 @@ export class StrategyOptimizationService implements OnModuleInit {
         round,
       );
       if (generated.continuationBlockedReason) return generated.continuationBlockedReason;
-      await this.setStage(experiment.id, 'evaluating');
-      const outcome = await this.candidateService.createAndEvaluateCandidate(
+      await this.setStage(experiment, 'evaluating');
+      await this.candidateService.createAndEvaluateCandidate(
         experiment,
         baseline,
         descriptors,
         modelKey,
         generated.proposal,
       );
-      await this.candidateService.recordAttempt({
-        experimentId: experiment.id,
-        modelKey,
-        aiRunId: generated.aiRunId,
-        attempt: round,
-        status: outcome.duplicate ? 'duplicate' : outcome.candidate.validationStatus,
-        proposal: generated.proposal,
-      });
       return null;
     } catch (error) {
       await this.candidateService.recordAttempt({
@@ -294,7 +263,7 @@ export class StrategyOptimizationService implements OnModuleInit {
         status: optimizationAttemptFailureStatus(error),
         error: redactOptimizationError(error),
       });
-      return null;
+      return error instanceof OptimizationBacktestFailure ? redactOptimizationError(error) : null;
     }
   }
 
@@ -321,7 +290,8 @@ export class StrategyOptimizationService implements OnModuleInit {
         { bestScore: Number.NEGATIVE_INFINITY, stopped: false },
       ]),
     );
-    for (let round = 1; round <= experiment.maxRounds; round += 1) {
+    const { roundOffset } = optimizationRetryStateSchema.parse(experiment.retryState ?? {});
+    for (let round = roundOffset + 1; round <= roundOffset + experiment.maxRounds; round += 1) {
       for (const route of routes) {
         const modelKey = `${route.provider}:${route.model}`;
         const state = states.get(modelKey);
@@ -329,22 +299,27 @@ export class StrategyOptimizationService implements OnModuleInit {
         const blocked = await this.processRound(experiment, baseline, descriptors, route, round);
         if (blocked || (await this.cancelled(experiment.id))) return blocked;
         const currentBest = await this.bestValidationScore(experiment.id, modelKey);
-        if (round > 1 && currentBest <= state.bestScore) state.stopped = true;
+        if (round > roundOffset + 1 && currentBest <= state.bestScore) state.stopped = true;
         state.bestScore = Math.max(state.bestScore, currentBest);
       }
     }
   }
-  private async finishProposalStage(id: string) {
+  private async finishProposalStage(id: string, executionAttempt: number) {
     const reason = await concludeOptimizationProposalStage(
       this.prisma,
       id,
       await this.candidates(id),
+      executionAttempt,
     );
-    if (reason) await this.fail(id, reason);
+    if (reason) return;
+    await this.finalization.complete(id).catch(() => undefined);
   }
 
-  private async processClaimed(id: string) {
+  private async processClaimed(id: string, expectedExecutionAttempt?: number) {
     let experiment = await this.experiment(id);
+    if (expectedExecutionAttempt !== undefined && experiment.executionAttempt !== expectedExecutionAttempt)
+      throw new Error('实验已被新的执行尝试接管');
+    const executionAttempt = experiment.executionAttempt;
     const baselineVersion = await this.prisma.strategyVersion.findUnique({
       where: { id: experiment.baselineStrategyVersionId },
       include: { strategy: true },
@@ -352,32 +327,38 @@ export class StrategyOptimizationService implements OnModuleInit {
     if (!baselineVersion) throw new NotFoundException('实验基线策略版本不存在');
     const parsedBaseline = strategySchema.parse(baselineVersion.schema) as BacktestStrategy;
     const baseline = { ...baselineVersion, strategy: parsedBaseline };
+    await this.runs.assertFrozenResearchBudget(experiment);
     experiment = await this.ensureBaselines(experiment);
-    await this.setStage(id, 'proposing');
+    await this.setStage(experiment, 'proposing');
     const continuationBlockedReason = await this.processModelRounds(experiment, baseline);
-    if (continuationBlockedReason) return this.fail(id, continuationBlockedReason);
-    if (!(await this.cancelled(id))) await this.finishProposalStage(id);
+    if (continuationBlockedReason) return this.fail(id, continuationBlockedReason, executionAttempt);
+    if (!(await this.cancelled(id))) await this.finishProposalStage(id, executionAttempt);
   }
 
   private async process(id: string) {
     if (this.active.has(id)) return;
     this.active.add(id);
+    let executionAttempt: number | undefined;
     try {
-      if ((await this.claim(id)) === 1) await this.processClaimed(id);
+      if ((await this.claim(id)) === 1) {
+        executionAttempt = (await this.experiment(id)).executionAttempt;
+        await this.processClaimed(id, executionAttempt);
+      }
     } catch (error) {
-      await this.fail(id, redactOptimizationError(error));
+      if (executionAttempt !== undefined) await this.fail(id, redactOptimizationError(error), executionAttempt);
     } finally {
       this.active.delete(id);
     }
   }
 
-  private async fail(id: string, reason: string) {
+  private async fail(id: string, reason: string, executionAttempt: number) {
     await this.prisma
       .$executeRaw(
         Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "status"='failed', "stage"='failed', "leaseUntil"=NULL, "stopReason"=${reason}, "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${id}::uuid AND "status" <> 'cancelled'
+      WHERE "id"=${id}::uuid AND "status"='running' AND "executionAttempt"=${executionAttempt}
+        AND "cancelRequestedAt" IS NULL
     `,
       )
       .catch(() => undefined);
@@ -387,372 +368,43 @@ export class StrategyOptimizationService implements OnModuleInit {
     const bounded = Math.max(1, Math.min(limit, 500));
     const rows = await this.prisma.$queryRaw<Array<{ id: string; stage: string }>>(Prisma.sql`
       SELECT "id", "stage" FROM "OptimizationExperiment"
-      WHERE "status" IN ('queued','running','testing') AND "cancelRequestedAt" IS NULL
+      WHERE ("status" IN ('queued','running','testing') OR
+        ("status"='awaiting_finalization' AND "stopReason" IS NULL AND
+          COALESCE("lockedCandidateIds", '[]'::jsonb)='[]'::jsonb)) AND "cancelRequestedAt" IS NULL
         AND ("status"='queued' OR "leaseUntil" IS NULL OR "leaseUntil" < CURRENT_TIMESTAMP)
       ORDER BY "createdAt" ASC LIMIT ${bounded}
     `);
     rows.forEach((row) => {
-      if (row.stage === 'testing') void this.resumeTesting(row.id).catch(() => undefined);
+      if (row.stage === 'testing') void this.finalization.resumeTesting(row.id).catch(() => undefined);
+      else if (row.stage === 'awaiting_finalization') void this.finalization.resumeAutomatic(row.id).catch(() => undefined);
       else void this.process(row.id).catch(() => undefined);
     });
     return { scheduled: rows.length };
   }
 
-  private async eligibleFinalCandidates(id: string, candidateIds: string[]) {
-    const all = await this.candidates(id);
-    const selected = all.filter((candidate) => candidateIds.includes(candidate.id));
-    if (selected.length !== candidateIds.length)
-      throw new BadRequestException('锁定候选不属于当前实验');
-    if (
-      selected.some(
-        (candidate) =>
-          !['valid', 'test_failed', 'test_running', 'test_valid', 'test_invalid'].includes(
-            candidate.validationStatus,
-          ),
-      )
-    )
-      throw new BadRequestException('只有开发/验证均通过的候选可以进入封存测试');
-    return selected;
+  async complete(id: string) {
+    this.assertEnabled();
+    return this.finalization.complete(id);
   }
 
-  private assertSameFinalizationLock(
-    experiment: ExperimentRow,
-    candidateIds: string[],
-    selectedCandidateId: string,
-  ) {
-    const existing = Array.isArray(experiment.lockedCandidateIds)
-      ? experiment.lockedCandidateIds.filter((item): item is string => typeof item === 'string')
-      : [];
-    if (existing.length === 0) return;
-    const requested = [...candidateIds].sort();
-    const locked = [...existing].sort();
-    if (
-      JSON.stringify(requested) !== JSON.stringify(locked) ||
-      experiment.selectedCandidateId !== selectedCandidateId
-    )
-      throw new BadRequestException('测试集已开始访问，只允许对原锁定候选进行技术重试');
-  }
-
-  private async lockFinalization(
-    experiment: ExperimentRow,
-    candidateIds: string[],
-    selectedCandidateId: string,
-  ) {
-    this.assertSameFinalizationLock(experiment, candidateIds, selectedCandidateId);
-    const updated = await this.prisma.$queryRaw<Array<{ executionAttempt: number }>>(Prisma.sql`
-      UPDATE "OptimizationExperiment"
-      SET "status"='testing', "stage"='testing', "lockedCandidateIds"=${JSON.stringify(candidateIds)}::jsonb,
-          "selectedCandidateId"=${selectedCandidateId}::uuid, "leaseUntil"=${new Date(Date.now() + 3_600_000)},
-          "executionAttempt"="executionAttempt"+1,
-          "pausedDurationMs"="pausedDurationMs" + GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "updatedAt")) * 1000))::int,
-          "testExposedAt"=COALESCE("testExposedAt", CURRENT_TIMESTAMP),
-          "exposure"=(CASE WHEN jsonb_typeof("exposure")='object' THEN "exposure" ELSE '{}'::jsonb END
-            || ${JSON.stringify({ testAccessStarted: true, lockedCandidateIds: candidateIds, preselectedCandidateId: selectedCandidateId })}::jsonb)
-            || CASE WHEN CASE WHEN jsonb_typeof("exposure")='object' THEN "exposure" ELSE '{}'::jsonb END ? 'testRevealed'
-              THEN '{}'::jsonb ELSE '{"testRevealed": false}'::jsonb END,
-          "stopReason"=NULL, "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${experiment.id}::uuid AND "stage"='awaiting_finalization' AND "status"='awaiting_finalization'
-        AND "cancelRequestedAt" IS NULL
-      RETURNING "executionAttempt"
-    `);
-    if (updated.length !== 1) throw new BadRequestException('实验封存状态发生并发变化');
-    return updated[0]!.executionAttempt;
-  }
-
-  private lockedCandidateIds(experiment: ExperimentRow) {
-    return Array.isArray(experiment.lockedCandidateIds)
-      ? experiment.lockedCandidateIds.filter((item): item is string => typeof item === 'string')
-      : [];
-  }
-
-  private async finalBaseline(experiment: ExperimentRow, executionAttempt: number) {
-    const existingFingerprint = toRecord(experiment.frozenDataFingerprints).test;
-    const existingRunId = toRecord(experiment.baselineRunRefs).test;
-    const existingMetrics = toRecord(experiment.baselineMetrics).test;
-    const hasFrozenBaselineFact = [
-      experiment.frozenDataFingerprints,
-      experiment.baselineRunRefs,
-      experiment.baselineMetrics,
-    ].some((value) => Object.prototype.hasOwnProperty.call(toRecord(value), 'test'));
-    if (hasFrozenBaselineFact) {
-      if (
-        typeof existingFingerprint !== 'string' ||
-        existingFingerprint.length === 0 ||
-        typeof existingRunId !== 'string' ||
-        existingRunId.length === 0 ||
-        !existingMetrics ||
-        typeof existingMetrics !== 'object' ||
-        Array.isArray(existingMetrics) ||
-        toRecord(existingMetrics).runId !== existingRunId
-      )
-        throw new Error('封存测试基线冻结事实不完整');
-      await this.runs.requireCompletedRun(existingRunId, '封存测试基线');
-      return existingFingerprint;
-    }
-    const run = await this.runs.executeRun(
-      experiment,
-      experiment.baselineStrategyVersionId,
-      'test',
-      'baseline-final',
-    );
-    const summary = this.runs.evaluateResult(run, experiment.objective);
-    const split = toRecord(experiment.split).test as { start?: string; end?: string } | undefined;
-    if (!split?.start || !split.end) throw new Error('实验缺少 test 数据切分');
-    const fingerprint = await this.runs.dataArtifactFingerprint(run, {
-      start: split.start,
-      end: split.end,
-    });
-    const updated = await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationExperiment"
-      SET "baselineRunRefs"=COALESCE("baselineRunRefs", '{}'::jsonb) || ${JSON.stringify({ test: run.id })}::jsonb,
-          "baselineMetrics"=COALESCE("baselineMetrics", '{}'::jsonb) || ${JSON.stringify({ test: summary })}::jsonb,
-          "frozenDataFingerprints"=COALESCE("frozenDataFingerprints", '{}'::jsonb) || ${JSON.stringify({ test: fingerprint })}::jsonb
-      WHERE "id"=${experiment.id}::uuid AND "status"='testing' AND "stage"='testing'
-        AND "executionAttempt"=${executionAttempt} AND "cancelRequestedAt" IS NULL
-    `);
-    if (updated !== 1) throw new Error('封存测试已被更新的执行尝试接管');
-    return fingerprint;
-  }
-
-  private async candidate(id: string) {
-    const rows = await this.prisma.$queryRaw<CandidateRow[]>(Prisma.sql`
-      SELECT * FROM "OptimizationCandidate" WHERE "id"=${id}::uuid LIMIT 1
-    `);
-    return rows[0] ?? null;
-  }
-
-  private async claimFinalCandidate(experiment: ExperimentRow, candidateId: string) {
-    const updated = await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationCandidate" AS c
-      SET "validationStatus"='test_running'
-      WHERE c."id"=${candidateId}::uuid AND c."experimentId"=${experiment.id}::uuid
-        AND c."validationStatus" IN ('valid', 'test_failed', 'test_running')
-        AND EXISTS (
-          SELECT 1 FROM "OptimizationExperiment" AS e
-          WHERE e."id"=c."experimentId" AND e."status"='testing' AND e."stage"='testing'
-            AND e."executionAttempt"=${experiment.executionAttempt}
-            AND e."cancelRequestedAt" IS NULL
-        )
-    `);
-    return updated === 1;
-  }
-
-  private async markFinalCandidateFailure(
-    experiment: ExperimentRow,
-    candidateId: string,
-    error: unknown,
-  ) {
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationCandidate" AS c
-      SET "validationStatus"='test_failed'
-      WHERE c."id"=${candidateId}::uuid AND c."experimentId"=${experiment.id}::uuid
-        AND c."validationStatus"='test_running'
-        AND EXISTS (
-          SELECT 1 FROM "OptimizationExperiment" AS e
-          WHERE e."id"=c."experimentId" AND e."status"='testing' AND e."stage"='testing'
-            AND e."executionAttempt"=${experiment.executionAttempt}
-            AND e."cancelRequestedAt" IS NULL
-        )
-    `);
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationExperiment"
-      SET "stopReason"=${`final_test_retry_required:${redactOptimizationError(error)}`},
-          "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${experiment.id}::uuid AND "status"='testing' AND "stage"='testing'
-        AND "executionAttempt"=${experiment.executionAttempt} AND "cancelRequestedAt" IS NULL
-    `);
-  }
-
-  private async finalCandidate(
-    experiment: ExperimentRow,
-    candidate: CandidateRow,
-    fingerprint: string,
-  ) {
-    const current = (await this.candidate(candidate.id)) ?? candidate;
-    if (['test_valid', 'test_invalid'].includes(current.validationStatus)) {
-      const existingRunId = toRecord(current.runRefs).test;
-      const existingMetrics = toRecord(current.metrics).test;
-      if (
-        typeof existingRunId === 'string' &&
-        existingRunId.length > 0 &&
-        existingMetrics &&
-        typeof existingMetrics === 'object' &&
-        !Array.isArray(existingMetrics) &&
-        toRecord(existingMetrics).runId === existingRunId
-      ) {
-        await this.runs.requireCompletedRun(existingRunId, '封存测试候选');
-        return;
-      }
-      throw new Error('封存测试候选已标记完成但缺少冻结 Run 引用');
-    }
-    if (!(await this.claimFinalCandidate(experiment, candidate.id))) return;
-    try {
-      const run = await this.runs.executeRun(
-        experiment,
-        current.candidateStrategyVersionId,
-        'test',
-        `candidate-final:${current.id}`,
-      );
-      const split = toRecord(experiment.split).test as { start?: string; end?: string } | undefined;
-      if (!split?.start || !split.end) throw new Error('实验缺少 test 数据切分');
-      const sameData =
-        (await this.runs.dataArtifactFingerprint(run, {
-          start: split.start,
-          end: split.end,
-        })) === fingerprint;
-      const summary = sameData
-        ? this.runs.evaluateResult(run, experiment.objective)
-        : {
-            runId: run.id,
-            status: 'invalid' as const,
-            completeness: 'unavailable',
-            tradeCount: 0,
-            reason: '封存测试候选与基准数据 Artifact 指纹不一致',
-          };
-      const runRefs = { ...toRecord(current.runRefs), test: run.id };
-      const metrics = { ...toRecord(current.metrics), test: summary };
-      const updated = await this.prisma.$executeRaw(Prisma.sql`
-        UPDATE "OptimizationCandidate" AS c
-        SET "runRefs"=${JSON.stringify(runRefs)}::jsonb,
-            "metrics"=${JSON.stringify(metrics)}::jsonb,
-            "validationStatus"=${summary.status === 'valid' ? 'test_valid' : 'test_invalid'}
-        WHERE c."id"=${current.id}::uuid AND c."experimentId"=${experiment.id}::uuid
-          AND c."validationStatus"='test_running'
-          AND EXISTS (
-            SELECT 1 FROM "OptimizationExperiment" AS e
-            WHERE e."id"=c."experimentId" AND e."status"='testing' AND e."stage"='testing'
-              AND e."executionAttempt"=${experiment.executionAttempt}
-              AND e."cancelRequestedAt" IS NULL
-          )
-      `);
-      if (updated !== 1) throw new Error('封存测试结果已由更新的执行尝试接管');
-    } catch (error) {
-      await this.markFinalCandidateFailure(experiment, current.id, error);
-      throw error;
-    }
-  }
-
-  private async completeFinalization(
-    id: string,
-    candidateIds: string[],
-    selectedCandidateId: string,
-    executionAttempt: number,
-  ) {
-    const updated = await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationExperiment"
-      SET "status"='succeeded', "stage"='completed', "testExposedAt"=COALESCE("testExposedAt", CURRENT_TIMESTAMP),
-          "exposure"=(CASE WHEN jsonb_typeof("exposure")='object' THEN "exposure" ELSE '{}'::jsonb END)
-            || ${JSON.stringify({ testRevealed: true, testRevealedAt: new Date().toISOString(), lockedCandidateIds: candidateIds, preselectedCandidateId: selectedCandidateId })}::jsonb,
-          "leaseUntil"=NULL, "stopReason"=NULL, "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${id}::uuid AND "status"='testing' AND "stage"='testing'
-        AND "executionAttempt"=${executionAttempt} AND "cancelRequestedAt" IS NULL
-        AND jsonb_typeof("baselineRunRefs"->'test')='string'
-        AND NULLIF("baselineRunRefs"->>'test', '') IS NOT NULL
-        AND jsonb_typeof("baselineMetrics"->'test')='object'
-        AND ("baselineMetrics"->'test'->>'runId')=("baselineRunRefs"->>'test')
-        AND jsonb_typeof("frozenDataFingerprints"->'test')='string'
-        AND NULLIF("frozenDataFingerprints"->>'test', '') IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1
-          FROM jsonb_array_elements_text(COALESCE("lockedCandidateIds", '[]'::jsonb)) AS locked("id")
-          LEFT JOIN "OptimizationCandidate" AS c ON c."id"=locked."id"::uuid
-          WHERE c."id" IS NULL
-             OR c."experimentId"<>"OptimizationExperiment"."id"
-             OR c."validationStatus" NOT IN ('test_valid', 'test_invalid')
-             OR jsonb_typeof(c."runRefs"->'test') IS DISTINCT FROM 'string'
-             OR NULLIF(c."runRefs"->>'test', '') IS NULL
-             OR jsonb_typeof(c."metrics"->'test') IS DISTINCT FROM 'object'
-             OR (c."metrics"->'test'->>'runId') IS DISTINCT FROM (c."runRefs"->>'test')
-        )
-    `);
-    return updated === 1;
-  }
-
-  private async releaseFinalizationForRetry(id: string, executionAttempt: number, error: unknown) {
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationExperiment"
-      SET "status"='awaiting_finalization', "stage"='awaiting_finalization', "leaseUntil"=NULL,
-          "stopReason"=${`final_test_retry_required:${redactOptimizationError(error)}`},
-          "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${id}::uuid AND "status"='testing' AND "stage"='testing'
-        AND "executionAttempt"=${executionAttempt} AND "cancelRequestedAt" IS NULL
-    `);
-  }
-
-  private async runFinalization(id: string, executionAttempt: number) {
-    const testingExperiment = await this.experiment(id);
-    const lockedIds = this.lockedCandidateIds(testingExperiment);
-    if (!testingExperiment.selectedCandidateId || lockedIds.length === 0)
-      throw new Error('封存测试缺少原子锁定的候选集合');
-    const candidates = await this.eligibleFinalCandidates(id, lockedIds);
-    const fingerprint = await this.finalBaseline(testingExperiment, executionAttempt);
-    for (const candidate of candidates)
-      await this.finalCandidate(testingExperiment, candidate, fingerprint);
-    const completed = await this.completeFinalization(
-      id,
-      lockedIds,
-      testingExperiment.selectedCandidateId,
-      executionAttempt,
-    );
-    if (!completed) throw new Error('封存测试尚未完成，结果保持隐藏');
-    return this.reads.compare(id);
-  }
-
-  private async claimTesting(id: string) {
-    const rows = await this.prisma.$queryRaw<Array<{ executionAttempt: number }>>(Prisma.sql`
-      UPDATE "OptimizationExperiment"
-      SET "leaseUntil"=${new Date(Date.now() + 3_600_000)},
-          "executionAttempt"="executionAttempt"+1, "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${id}::uuid AND "status"='testing' AND "stage"='testing'
-        AND "cancelRequestedAt" IS NULL
-        AND ("leaseUntil" IS NULL OR "leaseUntil" < CURRENT_TIMESTAMP)
-      RETURNING "executionAttempt"
-    `);
-    return rows[0]?.executionAttempt ?? null;
-  }
-
-  private async resumeTesting(id: string) {
-    if (this.active.has(id)) return;
-    this.active.add(id);
-    try {
-      const executionAttempt = await this.claimTesting(id);
-      if (executionAttempt === null) return;
-      try {
-        await this.runFinalization(id, executionAttempt);
-      } catch (error) {
-        await this.releaseFinalizationForRetry(id, executionAttempt, error);
-      }
-    } finally {
-      this.active.delete(id);
-    }
+  async retry(id: string, input: unknown) {
+    this.assertEnabled();
+    const { accepted } = await requestOptimizationRetry(this.prisma, id, input);
+    if (accepted) void this.process(id).catch(() => undefined);
+    return this.reads.experiment(id);
   }
 
   async finalize(id: string, input: unknown) {
     this.assertEnabled();
-    const parsed = optimizationFinalizeSchema.parse(input);
-    const experiment = await this.experiment(id);
-    if (experiment.stage !== parsed.expectedStage || experiment.status !== 'awaiting_finalization')
-      throw new BadRequestException('实验当前不能进入最终测试');
-    await this.eligibleFinalCandidates(id, parsed.candidateIds);
-    const executionAttempt = await this.lockFinalization(
-      experiment,
-      parsed.candidateIds,
-      parsed.selectedCandidateId,
-    );
-    try {
-      return await this.runFinalization(id, executionAttempt);
-    } catch (error) {
-      await this.releaseFinalizationForRetry(id, executionAttempt, error);
-      throw error;
-    }
+    return this.finalization.finalize(id, input);
   }
 
   private async adoptionVersionSnapshot(id: string) {
     const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
     if (!version) throw adoptionRejected('ADOPTION_SOURCE_MISMATCH', '采纳来源版本不存在');
     const parsed = strategySchema.safeParse(version.schema);
-    if (!parsed.success || version.schemaVersion !== 2)
-      throw adoptionRejected('ADOPTION_SOURCE_MISMATCH', '采纳来源不是可审阅的正式 V2 策略定义');
+    if (!parsed.success || ![2, 3].includes(version.schemaVersion))
+      throw adoptionRejected('ADOPTION_SOURCE_MISMATCH', '采纳来源不是可审阅的策略定义');
     return {
       id: version.id,
       strategyId: version.strategyId,
@@ -819,14 +471,8 @@ export class StrategyOptimizationService implements OnModuleInit {
       throw adoptionRejected('ADOPTION_NOT_REVEALED', '封存测试结果尚未明确揭示，不能确认采纳');
     const candidate = detail.candidates.find((item) => item.id === candidateId);
     if (!candidate) throw new NotFoundException('候选不存在');
-    const current =
-      detail.experiment.sourceMode === 'existing'
-        ? await this.currentFormalVersion(
-            detail.experiment.source.kind === 'existing'
-              ? detail.experiment.source.strategyId
-              : candidate.candidateStrategyVersionId,
-          )
-        : null;
+    const baseline = await this.adoptionVersionSnapshot(detail.experiment.baselineStrategyVersionId);
+    const current = await this.currentFormalVersion(baseline.strategyId);
     return this.buildAdoptionContext(
       id,
       candidateId,
@@ -836,33 +482,25 @@ export class StrategyOptimizationService implements OnModuleInit {
   }
 
   private async adoptionResponse(adoption: OptimizationAdoptionRow) {
-    const experiment = await this.experiment(adoption.experimentId);
-    const context = await this.buildAdoptionContext(
-      adoption.experimentId,
-      adoption.candidateId,
-      adoption.baselineStrategyVersionId ?? experiment.baselineStrategyVersionId,
-      adoption.confirmedCurrentStrategyVersionId,
-    );
-    const strategyVersion = await this.prisma.strategyVersion.findUnique({
-      where: { id: adoption.formalStrategyVersionId },
+    return committedOptimizationAdoptionResponse(adoption, async () => {
+      const experiment = await this.experiment(adoption.experimentId);
+      const context = await this.buildAdoptionContext(
+        adoption.experimentId, adoption.candidateId,
+        adoption.baselineStrategyVersionId ?? experiment.baselineStrategyVersionId,
+        adoption.confirmedCurrentStrategyVersionId,
+      );
+      const monitoringPlan = await this.riskApplications.monitoringPlan(adoption.formalStrategyVersionId);
+      const before = context.current ? await this.riskApplications.monitoringPlan(context.current.id) : null;
+      const riskApplicationDiffs = await this.riskApplications.planDiffsForTargetVersion(adoption.formalStrategyVersionId);
+      return { adoptionContext: context, monitoringPlan, monitoringDiff: { before, after: monitoringPlan }, riskApplicationDiffs };
     });
-    if (!strategyVersion) throw new NotFoundException('采纳后的正式版本不存在');
-    const monitoringPlan = await this.riskApplications.monitoringPlan(strategyVersion.id);
-    const before = context.current
-      ? await this.riskApplications.monitoringPlan(context.current.id)
-      : null;
-    return {
-      strategyVersion,
-      source: {
-        experimentId: adoption.experimentId,
-        candidateId: adoption.candidateId,
-        candidateHash: adoption.candidateHash,
-      },
-      adoptionContext: context,
-      monitoringPlan,
-      monitoringDiff: { before, after: monitoringPlan },
-      riskApplicationEnabled: false,
-    };
+  }
+
+  async adoptionStatus(id: string, candidateId: string) {
+    await this.experiment(id);
+    const adoption = await candidateOptimizationAdoption(this.prisma, candidateId);
+    if (!adoption || adoption.experimentId !== id) return null;
+    return this.adoptionResponse(adoption);
   }
 
   async adopt(id: string, input: unknown) {
@@ -898,8 +536,8 @@ export class StrategyOptimizationService implements OnModuleInit {
       );
     const candidate = detail.candidates.find((item) => item.id === parsed.candidateId);
     if (!candidate) throw new NotFoundException('候选不存在');
-    if (candidate.validationStatus !== 'test_valid')
-      throw adoptionRejected('ADOPTION_NOT_ELIGIBLE', '只有封存测试通过的候选可以采纳');
+    if (!isCompletedOptimizationCandidate(candidate.validationStatus))
+      throw adoptionRejected('ADOPTION_NOT_ELIGIBLE', '候选评估尚未完成');
     if (candidate.executionHash !== parsed.candidateHash)
       throw adoptionRejected(
         'ADOPTION_CANDIDATE_HASH_MISMATCH',

@@ -53,11 +53,10 @@ describe('DsaClient trace headers', () => {
   });
 });
 
-describe('DsaClient DSA V3 transport', () => {
+describe("图表指标协议", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-
   it('图表指标只向 V3 路由发送当前合同', async () => {
     const timestamp = '2026-09-28T07:00:00.000Z';
     const fetchMock = vi.fn(async () => response({
@@ -86,7 +85,12 @@ describe('DsaClient DSA V3 transport', () => {
     expect(JSON.parse(String(init.body))).toMatchObject({ contractVersion: 3, inputFingerprint: 'fingerprint-1' });
     expect(result.engineVersion).toBe('dsa-indicator-v3');
   });
+});
 
+describe("Control 握手及路由目录", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
   it('独立解析 Control V3 handshake，并使用 Control Token', async () => {
     const request = fixture('market-control-v3.handshake.request.json') as {
       requestId: string;
@@ -203,7 +207,12 @@ describe('DsaClient DSA V3 transport', () => {
       });
     }
   });
+});
 
+describe("Control Policy 版本及顺序", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
   it('严格应用 V3 Policy，并按明确版本查询 Effective projection', async () => {
     const desired = fixture('market-route-v3.etf-qfq.json');
     const effective = fixture('market-control-v3.effective.etf-qfq.json');
@@ -317,7 +326,12 @@ describe('DsaClient DSA V3 transport', () => {
       });
     }
   });
+});
 
+describe("Data 行情证据及错误协议", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
   it('通过 Data Token 单独读取 V3 能力与严格匹配的 BarSeries', async () => {
     const capabilities = fixture('market-data-v3.capabilities.json');
     const request = fixture('market-data-v3.request.etf-qfq.json') as {
@@ -448,5 +462,4 @@ describe('DsaClient DSA V3 transport', () => {
       status: 422,
     });
   });
-
 });

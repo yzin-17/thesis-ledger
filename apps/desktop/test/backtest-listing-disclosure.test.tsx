@@ -26,7 +26,7 @@ describe('上市日期未知的已有数据说明', () => {
     const result = { ...unknown, completeness };
     const before = structuredClone(result);
     const html = renderToStaticMarkup(<BacktestRunDisclosure job={job(result)} />);
-    expect(html).toContain('本次运行的价格与记账协议');
+    expect(html).toContain('价格与数据');
     expect(html).toContain(backtestUnknownListingWarningV3);
     expect(html).toContain(completeness === 'complete' ? '完整' : '部分完整');
     expect(html).not.toContain('role="dialog"');

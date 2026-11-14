@@ -490,19 +490,7 @@ export const projectCashMaterialization = (
   targetAt = new Date(),
 ): CashProjectionMaterialization => {
   const operations = v2Operations(stored).sort(compareCashOperation);
-  const snapshots = new Map<string, CashOperation>();
-  for (const operation of operations) {
-    if (
-      operation.set === undefined ||
-      operation.effectiveAt === null ||
-      !isAtOrBefore(operation.effectiveAt, targetAt)
-    )
-      continue;
-    const key = balanceKey(operation.accountId, operation.currency);
-    const current = snapshots.get(key);
-    if (current === undefined || compareCashOperation(current, operation) < 0)
-      snapshots.set(key, operation);
-  }
+  const snapshots = cashSnapshotsAt(operations, targetAt);
 
   const balances = new Map<string, ReturnType<typeof createMaterializedBalance>>();
   for (const snapshot of snapshots.values()) {
@@ -529,14 +517,7 @@ export const projectCashMaterialization = (
         ? ('SETTLED' as const)
         : ('PENDING' as const);
 
-    if (!absorbedBySnapshot && operation.delta !== undefined) {
-      if (status === 'PENDING') {
-        if (cashSettlement?.direction === 'RECEIVABLE')
-          current.pendingReceivable = current.pendingReceivable.plus(cashSettlement.amount);
-        else if (cashSettlement?.direction === 'PAYABLE')
-          current.pendingPayable = current.pendingPayable.plus(cashSettlement.amount);
-      } else current.settledAmount = current.settledAmount.plus(operation.delta);
-    }
+    applyCashDelta(current, operation, cashSettlement, status, absorbedBySnapshot);
 
     if (cashSettlement && operation.eventId && operation.factId && operation.sourceType)
       settlements.push({
@@ -582,3 +563,38 @@ export const projectCashBalances = (stored: StoredCashEvent[], targetAt = new Da
   }
   return balances;
 };
+
+function cashSnapshotsAt(operations: CashOperation[], targetAt: Date) {
+  const snapshots = new Map<string, CashOperation>();
+  for (const operation of operations) {
+    if (
+      operation.set === undefined ||
+      operation.effectiveAt === null ||
+      !isAtOrBefore(operation.effectiveAt, targetAt)
+    )
+      continue;
+    const key = balanceKey(operation.accountId, operation.currency);
+    const current = snapshots.get(key);
+    if (current === undefined || compareCashOperation(current, operation) < 0)
+      snapshots.set(key, operation);
+  }
+
+  return snapshots;
+}
+
+function applyCashDelta(
+  current: MutableCashMaterializedBalance,
+  operation: CashOperation,
+  cashSettlement: CashOperation['settlement'],
+  status: CashMaterializedSettlement['status'],
+  absorbedBySnapshot: boolean,
+) {
+  if (!absorbedBySnapshot && operation.delta !== undefined) {
+    if (status === 'PENDING') {
+      if (cashSettlement?.direction === 'RECEIVABLE')
+        current.pendingReceivable = current.pendingReceivable.plus(cashSettlement.amount);
+      else if (cashSettlement?.direction === 'PAYABLE')
+        current.pendingPayable = current.pendingPayable.plus(cashSettlement.amount);
+    } else current.settledAmount = current.settledAmount.plus(operation.delta);
+  }
+}

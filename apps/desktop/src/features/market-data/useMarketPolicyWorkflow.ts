@@ -7,7 +7,7 @@ import {
   useSaveMarketPolicyMutation,
 } from './market-data.mutations.js';
 import { routeAvailabilityLabelV3 } from './market-data-routes-v3.js';
-import { withDefaultHithinkRoutes } from './market-policy-defaults-v3.js';
+import { configuredPolicyDraftV3, changedPolicyRouteIdsV3 } from './market-policy-draft-v3.js';
 import type {
   MarketPolicyDraftV3,
   MarketPolicyResponse,
@@ -16,12 +16,7 @@ import type {
 } from './market-data.types.js';
 
 const toPolicyDraftV3 = (policy: MarketPolicyResponse): MarketPolicyDraftV3 => {
-  return {
-    contractVersion: 3,
-    revision: policy.revision,
-    enabled: policy.enabled,
-    routes: policy.routes,
-  };
+  return configuredPolicyDraftV3(policy);
 };
 
 const retryMessage = (policy: MarketPolicyResponse) => {
@@ -33,21 +28,18 @@ const retryMessage = (policy: MarketPolicyResponse) => {
 export function useMarketPolicyWorkflow({
   policy,
   catalogComplete,
-  catalog,
-  providers,
   setBusyAction,
   setMessage,
 }: {
   policy: MarketPolicyResponse | undefined;
   catalogComplete: boolean;
-  catalog: MarketRouteCatalogReadV3 | undefined;
-  providers: readonly ProviderManifest[] | undefined;
+  catalog?: MarketRouteCatalogReadV3 | undefined;
+  providers?: readonly ProviderManifest[] | undefined;
   setBusyAction: Dispatch<SetStateAction<string | null>>;
   setMessage: (next: { type: 'success' | 'error'; text: string } | null) => void;
 }) {
   const [draft, setDraft] = useState<MarketPolicyDraftV3 | null>(null);
   const [dirty, setDirty] = useState(false);
-  const defaultsInitialized = useRef(false);
   const hydratedPolicy = useRef<MarketPolicyResponse | undefined>(undefined);
   const saveMutation = useSaveMarketPolicyMutation();
   const retryMutation = useRetryMarketPolicyMutation();
@@ -59,25 +51,10 @@ export function useMarketPolicyWorkflow({
     setDraft(toPolicyDraftV3(policy));
   }, [policy, dirty]);
 
-  useEffect(() => {
-    if (!policy || !providers || catalog?.status !== 'complete' || defaultsInitialized.current)
-      return;
-    if (dirty) {
-      defaultsInitialized.current = true;
-      return;
-    }
-    const initial = toPolicyDraftV3(policy);
-    const next = withDefaultHithinkRoutes(initial, catalog, providers);
-    if (next === initial) return;
-    defaultsInitialized.current = true;
-    setDraft(next);
-    setDirty(true);
-  }, [policy, catalog, providers, dirty]);
-
   const changeDraft = useCallback((next: MarketPolicyDraftV3) => {
     setDraft(next);
-    setDirty(true);
-  }, []);
+    setDirty(changedPolicyRouteIdsV3(next, policy ?? null).size > 0);
+  }, [policy]);
 
   const acceptPolicy = useCallback((next: MarketPolicyResponse) => {
     setDraft(toPolicyDraftV3(next));
@@ -89,7 +66,6 @@ export function useMarketPolicyWorkflow({
     dirty,
     busy: saveMutation.isPending || retryMutation.isPending,
     discard: () => {
-      defaultsInitialized.current = true;
       setDraft(policy ? toPolicyDraftV3(policy) : null);
       setDirty(false);
     },
@@ -100,7 +76,7 @@ export function useMarketPolicyWorkflow({
     setBusyAction('policy-save');
     setMessage(null);
     try {
-      const savedPolicy = await saveMutation.mutateAsync(draft);
+      const savedPolicy = await saveMutation.mutateAsync(configuredPolicyDraftV3(draft));
       acceptPolicy(savedPolicy);
       setMessage({
         type: savedPolicy.syncState === 'applied' ? 'success' : 'error',

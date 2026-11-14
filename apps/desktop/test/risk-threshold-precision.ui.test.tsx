@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog';
+vi.mock('../src/features/risk/risk.queries', () => ({ useRiskNotificationRoutingQuery: () => ({ data: { availableRoutes: [], selectedProviders: [] }, isPending: false, isError: false }) }));
 import { RiskRuleEditorSheet } from '../src/features/risk/RiskRuleEditorSheet';
 import { precisionRiskRule, riskAccount, riskPosition } from './risk-threshold.fixture';
 import type { RiskRuleRecord } from '../src/features/risk/risk.types';
@@ -84,7 +85,7 @@ describe('风险阈值原值与提交', () => {
   );
   it('只切换严重级别仍提交完整阈值', async () => {
     await mount();
-    await click('严重');
+    await click('关键');
     await click('保存修改');
     expect(save).toHaveBeenCalledOnce();
     expect(save.mock.calls[0]![0]).toMatchObject({ threshold: 1 / 3, severity: 'critical' });

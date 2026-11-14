@@ -20,7 +20,7 @@ export function AiProviderRequestOptionsFields({
     error = failure instanceof Error ? failure.message : '请求参数无效';
   }
   return (
-    <details className="rounded-md border p-3">
+    <details>
       <summary className="cursor-pointer text-sm">模型请求参数</summary>
       <Field className="mt-3" data-invalid={error ? true : undefined}>
         <FieldLabel>请求参数 JSON</FieldLabel>

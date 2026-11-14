@@ -282,6 +282,9 @@ describe('V3 同执行序列 Benchmark', () => {
     });
   });
 
+});
+
+describe("基准执行模型及来源绑定", () => {
   it('新版本零费用仍使用完整执行模型身份，不继承旧 V2 零成本版本', async () => {
     const { input } = await setup('zero');
     const projection = buildBacktestV3Benchmark(input);
@@ -322,6 +325,9 @@ describe('V3 同执行序列 Benchmark', () => {
     expect(benchmarkMetric(projection, 'totalReturn').status).toBe('available');
   });
 
+});
+
+describe("可比收益的身份与可见性门禁", () => {
   it('缺少显式绑定或行情行时报告未核验，且不产生超额收益', async () => {
     const { input } = await setup('proportional');
     const withoutBinding = structuredClone(input.runConfig);

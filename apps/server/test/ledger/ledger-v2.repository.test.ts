@@ -127,6 +127,9 @@ describe('Ledger V2 不可变持久化', () => {
     expect(transaction.accountLedgerState.update).not.toHaveBeenCalled();
   });
 
+});
+
+describe("锁定修订与有效事实读取", () => {
   it('旧账本行存在时，在执行写入操作前拒绝', async () => {
     const transaction = createTransaction([{ ledgerRevision: 1n, projectionGeneration: 1n }]);
     transaction.ledgerEvent.findFirst.mockResolvedValueOnce({ id: createEvent('1').eventId });
@@ -266,6 +269,9 @@ describe('Ledger V2 不可变持久化', () => {
     );
   });
 
+});
+
+describe("旧 envelope 拒绝与不可变账本", () => {
   it('拒绝读取缺少当前 envelopeVersion 的旧事件', async () => {
     const transaction = createTransaction([]);
     const oldEvent = {

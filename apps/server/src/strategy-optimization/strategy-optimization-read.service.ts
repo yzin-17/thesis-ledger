@@ -1,4 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  candidateSourceForBacktestAssociation,
+  sourceForUserBacktest,
+  type BacktestAssociationRow,
+  type BacktestStrategyVersionSource,
+} from './strategy-optimization-backtest-group-source.js';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
+import { projectNamedOptimizationExperiments } from './strategy-optimization-instrument-display.js';
 import { Prisma } from '@prisma/client';
 import {
   optimizationDiscoveryScopeSchema,
@@ -23,9 +31,10 @@ import {
   type ExperimentReadRow,
 } from './strategy-optimization-common.js';
 import { describeStrategyParameters } from './strategy-optimization-parameters.js';
+import { projectCandidateDefinitionDiff } from './strategy-optimization-candidate-diff.js';
 import { optimizationCostFacts, optimizationCostSummary } from './strategy-optimization-cost.js';
+import { projectOptimizationResultFacts } from './strategy-optimization-result-facts.js';
 import {
-  enrichOptimizationExperiment,
   optimizationAttemptReadModel,
   optimizationUsageNote,
 } from './strategy-optimization-read-model.js';
@@ -44,33 +53,6 @@ export type ExperimentPage = {
   items: EnrichedExperiment[];
   totalCount: number;
   pageInfo: { nextCursor: string | null; hasNextPage: boolean };
-};
-
-type BacktestAssociationRow = {
-  runId: string;
-  experimentId: string;
-  baselineStrategyVersionId: string;
-  experimentName: string | null;
-  sourceMode: 'existing' | 'discovery';
-  discoveryScope: unknown;
-  strategySpaceVersion: string | null;
-  experimentStage: string;
-  relation: 'baseline' | 'candidate';
-  split: string;
-  candidateId: string | null;
-  candidateNumber: number | null;
-  candidateStrategyVersionId: string | null;
-  strategyId: string | null;
-  strategyName: string | null;
-  strategyVersion: number | null;
-  strategySchemaVersion: number | null;
-};
-
-type BacktestStrategyVersionSource = {
-  id: string;
-  version: number;
-  schemaVersion: number;
-  strategy: { id: string; name: string };
 };
 
 export type BacktestGroupItem = {
@@ -161,6 +143,8 @@ export class StrategyOptimizationReadService {
     private readonly prisma: PrismaService,
     private readonly providers: AiProviderRegistry,
     private readonly resultReadPolicy: ResultReadPolicyService,
+    @Optional()
+    private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {
     if (!resultReadPolicy) throw new Error('ResultReadPolicyService is required');
   }
@@ -168,8 +152,8 @@ export class StrategyOptimizationReadService {
   async formalStrategyVersion(id: string) {
     const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (version.schemaVersion !== 2 || version.version <= 0)
-      throw new BadRequestException('AI 优化只能从正式 V2 策略版本开始');
+    if (![2, 3].includes(version.schemaVersion) || version.version <= 0)
+      throw new BadRequestException('AI 优化需要有效的正式策略版本');
     return { ...version, strategy: strategySchema.parse(version.schema) as BacktestStrategy };
   }
 
@@ -209,8 +193,8 @@ export class StrategyOptimizationReadService {
       where: { id: strategyVersionId },
     });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (version.schemaVersion !== 2 || version.version <= 0)
-      throw new BadRequestException('只有正式 V2 策略版本可以配置优化参数');
+    if (![2, 3].includes(version.schemaVersion) || version.version <= 0)
+      throw new BadRequestException('只有正式策略版本可以配置优化参数');
     return describeStrategyParameters(strategySchema.parse(version.schema) as BacktestStrategy);
   }
 
@@ -222,8 +206,8 @@ export class StrategyOptimizationReadService {
     );
     const row = rows[0];
     if (!row) throw new NotFoundException('优化实验不存在');
-    const enriched = enrichOptimizationExperiment(row);
-    return this.resultReadPolicy.protectExperiment(enriched);
+    const [enriched] = await projectNamedOptimizationExperiments([row], this.display);
+    return this.resultReadPolicy.protectExperiment(enriched!);
   }
 
   async candidates(id: string): Promise<EnrichedCandidate[]> {
@@ -232,23 +216,40 @@ export class StrategyOptimizationReadService {
         experimentStage: string;
         experimentExposure: unknown;
         experimentTestExposedAt: Date | null;
+        baselineDefinition: unknown;
+        candidateDefinition: unknown;
       })[]
     >(Prisma.sql`
       SELECT c.*, e."stage" AS "experimentStage", e."exposure" AS "experimentExposure",
-             e."testExposedAt" AS "experimentTestExposedAt"
+             e."testExposedAt" AS "experimentTestExposedAt",
+             baseline."schema" AS "baselineDefinition", frozenCandidate."schema" AS "candidateDefinition"
       FROM "OptimizationCandidate" AS c
       JOIN "OptimizationExperiment" AS e ON e."id"=c."experimentId"
+      LEFT JOIN "StrategyVersion" AS baseline ON baseline."id"=e."baselineStrategyVersionId"
+      LEFT JOIN "StrategyVersion" AS frozenCandidate ON frozenCandidate."id"=c."candidateStrategyVersionId"
       WHERE c."experimentId"=${id}::uuid AND e."ownerKey"='local-user'
       ORDER BY c."candidateNumber" ASC, c."id" ASC
     `);
     return rows.map(
-      ({ experimentStage, experimentExposure, experimentTestExposedAt, ...candidate }) => {
+      ({
+        experimentStage,
+        experimentExposure,
+        experimentTestExposedAt,
+        baselineDefinition,
+        candidateDefinition,
+        ...candidate
+      }) => {
         const readEligibility = resultReadEligibilityForExperiment({
           exposure: experimentExposure,
           testExposedAt: experimentTestExposedAt,
         });
         const enriched = {
           ...candidate,
+          diff: projectCandidateDefinitionDiff(
+            candidate.diff,
+            baselineDefinition,
+            candidateDefinition,
+          ),
           source: {
             kind: 'candidate' as const,
             experimentId: candidate.experimentId,
@@ -290,7 +291,7 @@ export class StrategyOptimizationReadService {
         costUsed: costSummary.status === 'complete' ? experiment.costUsed : null,
         costSummary,
       },
-      candidates,
+      candidates: await projectOptimizationResultFacts(this.prisma, candidates),
       attempts: safeAttempts,
     };
   }
@@ -313,7 +314,14 @@ export class StrategyOptimizationReadService {
     if (parsed.sourceMode) filters.push(Prisma.sql`e."sourceMode"=${parsed.sourceMode}`);
     if (parsed.status) filters.push(Prisma.sql`e."status"=${parsed.status}`);
     if (parsed.strategyVersionId)
-      filters.push(Prisma.sql`e."baselineStrategyVersionId"=${parsed.strategyVersionId}::uuid`);
+      filters.push(Prisma.sql`(
+        e."baselineStrategyVersionId"=${parsed.strategyVersionId}::uuid
+        OR EXISTS (
+          SELECT 1 FROM "OptimizationAdoption" AS adoption
+          WHERE adoption."experimentId"=e."id"
+            AND adoption."formalStrategyVersionId"=${parsed.strategyVersionId}::uuid
+        )
+      )`);
     if (cursor)
       filters.push(
         Prisma.sql`(e."createdAt", e."id") < (${cursor.createdAt}::timestamp, ${cursor.id}::uuid)`,
@@ -339,10 +347,11 @@ export class StrategyOptimizationReadService {
       `),
     ]);
     const hasNextPage = rows.length > bounded;
-    const items = (hasNextPage ? rows.slice(0, bounded) : rows).map((row) => {
-      const enriched = enrichOptimizationExperiment(row);
-      return this.resultReadPolicy.protectExperiment(enriched);
-    });
+    const named = await projectNamedOptimizationExperiments(
+      hasNextPage ? rows.slice(0, bounded) : rows,
+      this.display,
+    );
+    const items = named.map((row) => this.resultReadPolicy.protectExperiment(row));
     const tail = items.at(-1);
     return {
       items,
@@ -417,29 +426,14 @@ export class StrategyOptimizationReadService {
       const association = associationByRunId.get(job.id);
       if (!association) {
         const strategyVersion = strategyVersionById.get(job.strategyVersionId);
-        let source: OptimizationExperimentSource | null = null;
-        if (strategyVersion) {
-          source = { kind: 'unknown', reason: 'missing_source', referenceId: strategyVersion.id };
-          if (
-            Number.isInteger(strategyVersion.version) && strategyVersion.version > 0 &&
-            Number.isInteger(strategyVersion.schemaVersion) && strategyVersion.schemaVersion > 0
-          ) {
-            source = {
-              kind: 'existing',
-              strategyId: strategyVersion.strategy.id,
-              strategyVersionId: strategyVersion.id,
-              strategyName: strategyVersion.strategy.name,
-              version: strategyVersion.version,
-              schemaVersion: strategyVersion.schemaVersion,
-            };
-          }
-        }
+        const source = sourceForUserBacktest(strategyVersion);
         groups.set(job.id, {
           id: job.id,
           kind: 'user',
-          name: source?.kind === 'existing'
-            ? `${source.strategyName} · v${source.version}`
-            : strategyVersion?.strategy.name || `来源信息未记录 ${job.id.slice(0, 8)}`,
+          name:
+            source?.kind === 'existing'
+              ? `${source.strategyName} · v${source.version}`
+              : strategyVersion?.strategy.name || `来源信息未记录 ${job.id.slice(0, 8)}`,
           experimentId: null,
           experimentStage: null,
           source,
@@ -455,20 +449,7 @@ export class StrategyOptimizationReadService {
           jobId: job.id,
           relation: association.relation,
           split: association.split,
-          candidateSource:
-            association.relation === 'candidate' &&
-            association.candidateId &&
-            association.candidateNumber &&
-            association.candidateStrategyVersionId
-              ? {
-                  kind: 'candidate',
-                  experimentId: association.experimentId,
-                  candidateId: association.candidateId,
-                  candidateStrategyVersionId: association.candidateStrategyVersionId,
-                  candidateNumber: association.candidateNumber,
-                  stage: association.experimentStage,
-                }
-              : null,
+          candidateSource: candidateSourceForBacktestAssociation(association),
         });
         continue;
       }
@@ -493,20 +474,7 @@ export class StrategyOptimizationReadService {
             jobId: job.id,
             relation: association.relation,
             split: association.split,
-            candidateSource:
-              association.relation === 'candidate' &&
-              association.candidateId &&
-              association.candidateNumber &&
-              association.candidateStrategyVersionId
-                ? {
-                    kind: 'candidate',
-                    experimentId: association.experimentId,
-                    candidateId: association.candidateId,
-                    candidateStrategyVersionId: association.candidateStrategyVersionId,
-                    candidateNumber: association.candidateNumber,
-                    stage: association.experimentStage,
-                  }
-                : null,
+            candidateSource: candidateSourceForBacktestAssociation(association),
           },
         ],
       });
@@ -534,16 +502,10 @@ export class StrategyOptimizationReadService {
       : allGroups;
     const items = visible.slice(0, bounded);
     const hasNextPage = visible.length > bounded;
-    const tail = items.at(-1);
-    const tailJob = tail?.jobs[0];
     return {
       items,
       totalCount: allGroups.length,
-      pageInfo: {
-        hasNextPage,
-        nextCursor:
-          hasNextPage && tail && tailJob ? encodeCursor(tailJob.createdAt, tail.id) : null,
-      },
+      pageInfo: backtestGroupPageInfo(items, hasNextPage),
     };
   }
 
@@ -575,4 +537,14 @@ export class StrategyOptimizationReadService {
       note: `${rankingNote}${optimizationUsageNote(experiment, attempts)}`,
     };
   }
+}
+
+function backtestGroupPageInfo(items: BacktestGroupItem[], hasNextPage: boolean) {
+  const tail = items.at(-1);
+  const tailJob = tail?.jobs[0];
+
+  return {
+    hasNextPage,
+    nextCursor: hasNextPage && tail && tailJob ? encodeCursor(tailJob.createdAt, tail.id) : null,
+  };
 }

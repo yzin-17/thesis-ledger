@@ -8,7 +8,10 @@ import { browserRequestIdBoundaryViolation } from './browser-request-id-boundari
 import { dateInputBoundaryViolation } from './date-input-boundaries.mjs';
 import { marketSessionBoundaryViolation } from './market-session-boundaries.mjs';
 import { marketWindowConsumerBoundaryViolation } from './market-window-consumer-boundaries.mjs';
-import { draftCloseSnapshotBoundaryViolation, navigationDraftSnapshotBoundaryViolation } from './draft-close-boundaries.mjs';
+import {
+  draftCloseSnapshotBoundaryViolation,
+  navigationDraftSnapshotBoundaryViolation,
+} from './draft-close-boundaries.mjs';
 const root = new URL('..', import.meta.url).pathname;
 const violations = [];
 const serverLedgerPrefix = 'apps/server/src/ledger/';
@@ -17,56 +20,246 @@ const serverProvidersPrefix = 'apps/server/src/providers/';
 const serverBacktestPrefix = 'apps/server/src/backtest/';
 const serverBacktestTestPrefix = 'apps/server/test/backtest/';
 const forbiddenFeatureDependencies = [
-  ['apps/server/src/market/', 'apps/server/src/watchlist/', '交易时段与报价时效属于 Market，自选只能单向消费'],
-  ['apps/desktop/src/components/ui/info-tip.tsx', 'apps/desktop/src/features/', '通用图标说明属于 UI 层，不得依赖业务 feature'],
-  ['apps/server/src/platform/api-rate-limit', 'apps/server/src/identity/', '平台限流只接收已验证主体投影，不得反向依赖身份业务；组合由根启动入口负责'],
-  ['apps/server/src/watchlist/', 'apps/server/src/integration/', '自选报价与日历只消费 Market 领域边界，不得直连 DSA 绕过控制和缓存'],
-  ['apps/server/src/market/', 'apps/server/src/risk/', 'Market拥有行情观察事实，必须由Risk单向消费，禁止行情反向编排风险'],
-  ['apps/server/src/risk/risk-monitoring.service.ts', 'apps/server/src/integration/', '自动监控只消费已取得的数据，不得隐式扩展远程行情调用'],
-  ['apps/server/src/risk/risk-market-demand.service.ts', 'apps/server/src/integration/', '风险只登记行情需求，来源能力和后台执行属于 Market/DSA'],
+  ['apps/desktop/src/features/risk/RiskCenter.tsx', 'apps/desktop/src/features/risk/RiskNotificationProviderPicker', '通知提供方选择归单条规则创建和编辑，通知记录页不得恢复全局配置入口'],
+  [
+    'apps/server/src/backtest/strategy-version-publication.ts',
+    'apps/server/src/strategy-optimization/',
+    '正式版本分配属于 Backtest，采纳只能单向消费发布锁',
+  ],
+  ['apps/desktop/src/components/ui/multi-select.tsx', 'apps/desktop/src/features/', '通用多选组件只接收选项和值，不得依赖业务查询与保存'],
+  ['apps/mobile/src/components/MultiSelect.tsx', 'apps/mobile/src/features/', '原生通用多选组件不得反向依赖领域消费者'],
+  [
+    'packages/schemas/src/optimization-budget',
+    'apps/',
+    '实验预算边界属于公共合同，不得反向依赖界面实现',
+  ],
+  [
+    'apps/server/src/backtest/backtest-instrument-series.service.ts',
+    'apps/server/src/market/',
+    '回测标的走势必须只读本次冻结产物，不得重新读取 Market 行情',
+  ],
+  [
+    'apps/server/src/backtest/backtest-instrument-series.service.ts',
+    'apps/server/src/integration/',
+    '回测标的走势不得调用远程 Provider 适配器',
+  ],
+  ['packages/schemas/src/rule-source-monitor', 'apps/', '资料快照与差异合同不得依赖应用实现'],
+  [
+    'apps/desktop/src/features/market-data/RuleSourceVersion',
+    'apps/server/',
+    '资料版本界面只消费公共合同，不得引用服务端抓取或存储实现',
+  ],
+  [
+    'packages/schemas/src/market-routing',
+    'apps/',
+    '分级路由公共契约不得依赖应用实现，编译与持久化由 Server Market 持有',
+  ],
+  [
+    'apps/desktop/src/features/market-data/routing-',
+    'apps/server/',
+    '路由客户端只消费公共契约和预览接口，不得引用服务端编译实现',
+  ],
+  ...['market', 'integration', 'providers'].map((feature) => [
+    'apps/server/src/quality/',
+    `apps/server/src/${feature}/`,
+    'Quality只拥有通用质量问题记录，不得反向依赖来源协议或行情执行',
+  ]),
+  [
+    'apps/server/src/market/',
+    'apps/server/src/automation/',
+    'Market拥有监测事实，自动化只能单向读取，禁止反向依赖',
+  ],
+  [
+    'apps/server/src/automation/automation-read',
+    'apps/server/src/integration/',
+    '自动化读取监测记录必须消费Market边界，不得直连DSA',
+  ],
+  [
+    'apps/server/src/market/',
+    'apps/server/src/watchlist/',
+    '交易时段与报价时效属于 Market，自选只能单向消费',
+  ],
+  [
+    'apps/desktop/src/components/ui/info-tip.tsx',
+    'apps/desktop/src/features/',
+    '通用图标说明属于 UI 层，不得依赖业务 feature',
+  ],
+  [
+    'apps/server/src/platform/api-rate-limit',
+    'apps/server/src/identity/',
+    '平台限流只接收已验证主体投影，不得反向依赖身份业务；组合由根启动入口负责',
+  ],
+  [
+    'apps/server/src/watchlist/',
+    'apps/server/src/integration/',
+    '自选报价与日历只消费 Market 领域边界，不得直连 DSA 绕过控制和缓存',
+  ],
+  [
+    'apps/server/src/market/',
+    'apps/server/src/risk/',
+    'Market拥有行情观察事实，必须由Risk单向消费，禁止行情反向编排风险',
+  ],
+  [
+    'apps/server/src/risk/risk-monitoring.service.ts',
+    'apps/server/src/integration/',
+    '自动监控只消费已取得的数据，不得隐式扩展远程行情调用',
+  ],
+  [
+    'apps/server/src/risk/risk-market-demand.service.ts',
+    'apps/server/src/integration/',
+    '风险只登记行情需求，来源能力和后台执行属于 Market/DSA',
+  ],
+  [
+    'apps/server/src/risk/strategy-risk-monitoring.service.ts',
+    'apps/server/src/market/',
+    '策略自动监控通过 Risk 应用执行器取数，后台窗口缓存与来源执行由 Market 维护',
+  ],
+  [
+    'apps/server/src/risk/strategy-risk-monitoring.service.ts',
+    'apps/server/src/integration/',
+    '策略自动监控不得直连外部适配器绕过行情来源控制',
+  ],
 
-  ...['InstrumentSymbolField.tsx', 'InstrumentSearchCombobox.tsx', 'InstrumentOptionField.tsx', 'instrument-picker.queries.ts', 'MarketReferenceCodeField.tsx', 'MarketReferenceContractField.tsx'].flatMap(file =>
-    ['portfolio', 'ai', 'risk', 'account-data', 'strategy', 'watchlist'].map(feature => [
-      `apps/desktop/src/features/market-data/${file}`, `apps/desktop/src/features/${feature}/`,
+  ...[
+    'InstrumentSymbolField.tsx',
+    'InstrumentMultiSelect.tsx',
+    'InstrumentSearchCombobox.tsx',
+    'InstrumentOptionField.tsx',
+    'instrument-picker.queries.ts',
+    'MarketReferenceCodeField.tsx',
+    'MarketReferenceContractField.tsx',
+  ].flatMap((file) =>
+    ['portfolio', 'ai', 'risk', 'account-data', 'strategy', 'watchlist'].map((feature) => [
+      `apps/desktop/src/features/market-data/${file}`,
+      `apps/desktop/src/features/${feature}/`,
       '公共标的选择属于 Market 目录契约，不得反向依赖业务确认与保存编排',
     ]),
   ),
-  ['packages/api-client/src/market-reference-contracts.ts', 'apps/', '来源合约投影只消费已关联的资料页，不得依赖运行时业务编排'],
-  ...['InstrumentPicker.tsx', 'InstrumentSymbolField.tsx', 'InstrumentOptionField.tsx'].flatMap(file =>
-    ['account-baselines', 'executions', 'recurring-plans', 'research-submit', 'watchlist'].map(feature => [
-      `apps/mobile/src/features/market/${file}`, `apps/mobile/src/features/${feature}/`,
-      '移动端公共标的选择不得反向依赖业务消费者',
-    ]),
+  [
+    'packages/api-client/src/market-reference-contracts.ts',
+    'apps/',
+    '来源合约投影只消费已关联的资料页，不得依赖运行时业务编排',
+  ],
+  ...['InstrumentPicker.tsx', 'InstrumentSymbolField.tsx', 'InstrumentOptionField.tsx'].flatMap(
+    (file) =>
+      ['account-baselines', 'executions', 'recurring-plans', 'research-submit', 'watchlist', 'model-arena'].map(
+        (feature) => [
+          `apps/mobile/src/features/market/${file}`,
+          `apps/mobile/src/features/${feature}/`,
+          '移动端公共标的选择不得反向依赖业务消费者',
+        ],
+      ),
   ),
-  ...['ledger','portfolio','imports'].map(feature => [
-    'apps/server/src/model-arena/', `apps/server/src/${feature}/`, '比赛专用模拟账不可依赖账户写入模块',
+  ...['ledger', 'portfolio', 'imports'].map((feature) => [
+    'apps/server/src/model-arena/',
+    `apps/server/src/${feature}/`,
+    '比赛专用模拟账不可依赖账户写入模块',
   ]),
-  ['apps/desktop/src/features/portfolio/', 'apps/desktop/src/features/performance/', '组合事实与展示不得反向依赖收益分析消费；联合刷新由应用编排拥有'],
-  ['apps/desktop/src/features/portfolio/', 'apps/desktop/src/app/', '组合特性不得反向依赖统一收益工作区编排'],
-  ['apps/desktop/src/features/performance/', 'apps/desktop/src/app/', '收益特性不得反向依赖统一收益工作区编排'],
-  ...['market', 'ledger', 'research'].map(feature => [
-    `apps/server/src/${feature}/`, 'apps/server/src/watchlist/', '上游领域不得反向依赖自选关注关系',
+  [
+    'apps/server/src/market/',
+    'apps/server/src/model-arena/',
+    'Market 历史观察契约由 Market 拥有，不得反向依赖竞技场执行编排',
+  ],
+  [
+    'apps/desktop/src/features/portfolio/',
+    'apps/desktop/src/features/performance/',
+    '组合事实与展示不得反向依赖收益分析消费；联合刷新由应用编排拥有',
+  ],
+  [
+    'apps/desktop/src/features/portfolio/',
+    'apps/desktop/src/app/',
+    '组合特性不得反向依赖统一收益工作区编排',
+  ],
+  [
+    'apps/desktop/src/features/performance/',
+    'apps/desktop/src/app/',
+    '收益特性不得反向依赖统一收益工作区编排',
+  ],
+  ...['market', 'ledger', 'research'].map((feature) => [
+    `apps/server/src/${feature}/`,
+    'apps/server/src/watchlist/',
+    '上游领域不得反向依赖自选关注关系',
   ]),
-  ['apps/server/src/market/', 'apps/server/src/ledger/trade-', '行情来源不得反向读取账本成交投影；交易叠加由Ledger提供并由Portfolio消费'],
-  ['apps/server/src/ledger/trade-chart-query.service.ts', 'apps/server/src/market/', '成交图表只读投影不得依赖行情来源或价格读取'],
-  ['apps/server/src/market/market-rule-monitor.controller.ts', 'apps/server/src/backtest/', '收费资料监测仅观察版本，不得编排回测或改写执行冻结'],
-  ['apps/server/src/market/market-rule-monitor.controller.ts', 'apps/server/src/providers/', '收费资料监测不得改变Provider配置或准入'],
-  ['apps/desktop/src/features/shared/usePageRefresh.ts', 'apps/desktop/src/features/', '页面刷新只调度查询缓存，不得依赖具体功能编排'],
-  ['apps/desktop/src/features/shared/usePageRefresh.ts', 'apps/desktop/src/shared/api/', '页面刷新不得绕过查询缓存直接重放 API 请求'],
-  ['apps/desktop/src/app/DeferredPage.tsx', 'apps/desktop/src/features/', '页面代码加载只承接加载器，不依赖功能编排'],
-  ['apps/desktop/src/app/DeferredPage.tsx', 'apps/desktop/src/shared/api/', '页面代码加载不得发起业务请求'],
-  ['apps/desktop/src/app/performance-workspace-tabs.ts', 'apps/desktop/src/features/', '收益 URL 投影保持轻量，不加载功能页面'],
-  ['apps/desktop/src/app/performance-workspace-tabs.ts', 'apps/desktop/src/app/PerformanceWorkspace', 'URL 投影不得反向加载收益页面实现'],
-  ['apps/desktop/src/features/', 'apps/desktop/src/app/deferred-pages', '功能模块不得反向依赖应用路由加载注册'],
+  [
+    'apps/server/src/market/',
+    'apps/server/src/ledger/trade-',
+    '行情来源不得反向读取账本成交投影；交易叠加由Ledger提供并由Portfolio消费',
+  ],
+  [
+    'apps/server/src/ledger/trade-chart-query.service.ts',
+    'apps/server/src/market/',
+    '成交图表只读投影不得依赖行情来源或价格读取',
+  ],
+  [
+    'apps/server/src/market/market-rule-monitor.controller.ts',
+    'apps/server/src/backtest/',
+    '收费资料监测仅观察版本，不得编排回测或改写执行冻结',
+  ],
+  [
+    'apps/server/src/market/market-rule-monitor.controller.ts',
+    'apps/server/src/providers/',
+    '收费资料监测不得改变Provider配置或准入',
+  ],
+  [
+    'apps/desktop/src/features/shared/usePageRefresh.ts',
+    'apps/desktop/src/features/',
+    '页面刷新只调度查询缓存，不得依赖具体功能编排',
+  ],
+  [
+    'apps/desktop/src/features/shared/usePageRefresh.ts',
+    'apps/desktop/src/shared/api/',
+    '页面刷新不得绕过查询缓存直接重放 API 请求',
+  ],
+  [
+    'apps/desktop/src/app/DeferredPage.tsx',
+    'apps/desktop/src/features/',
+    '页面代码加载只承接加载器，不依赖功能编排',
+  ],
+  [
+    'apps/desktop/src/app/DeferredPage.tsx',
+    'apps/desktop/src/shared/api/',
+    '页面代码加载不得发起业务请求',
+  ],
+  [
+    'apps/desktop/src/app/performance-workspace-tabs.ts',
+    'apps/desktop/src/features/',
+    '收益 URL 投影保持轻量，不加载功能页面',
+  ],
+  [
+    'apps/desktop/src/app/performance-workspace-tabs.ts',
+    'apps/desktop/src/app/PerformanceWorkspace',
+    'URL 投影不得反向加载收益页面实现',
+  ],
+  [
+    'apps/desktop/src/features/',
+    'apps/desktop/src/app/deferred-pages',
+    '功能模块不得反向依赖应用路由加载注册',
+  ],
   ['apps/desktop/src/features/', 'apps/desktop/src/app/DeferredPage', '页面加载组合由应用层拥有'],
   ['packages/domain/src/ratio-percent.ts', 'apps/', '比例单位合同不得依赖应用业务编排'],
-  ['packages/domain/src/ratio-percent.ts', 'packages/api-client/', '比例单位合同不得依赖请求适配层'],
-  ...['decimal.ts', 'decimal-number-display.ts', 'risk/threshold-format.ts'].flatMap(file => [
+  [
+    'packages/domain/src/ratio-percent.ts',
+    'packages/api-client/',
+    '比例单位合同不得依赖请求适配层',
+  ],
+  ...['decimal.ts', 'decimal-number-display.ts', 'risk/threshold-format.ts'].flatMap((file) => [
     [`packages/domain/src/${file}`, 'apps/', '十进制表示与风险阈值展示不得依赖应用编排'],
-    [`packages/domain/src/${file}`, 'packages/api-client/', '十进制表示与风险阈值展示不得依赖请求适配层'],
+    [
+      `packages/domain/src/${file}`,
+      'packages/api-client/',
+      '十进制表示与风险阈值展示不得依赖请求适配层',
+    ],
   ]),
-  ['packages/domain/src/valuation-display.ts', 'apps/', '估值展示投影不得依赖应用编排、来源或持久化'],
-  ['packages/domain/src/valuation-display.ts', 'packages/api-client/', '估值展示投影只消费结果，不得主动发起请求'],
+  [
+    'packages/domain/src/valuation-display.ts',
+    'apps/',
+    '估值展示投影不得依赖应用编排、来源或持久化',
+  ],
+  [
+    'packages/domain/src/valuation-display.ts',
+    'packages/api-client/',
+    '估值展示投影只消费结果，不得主动发起请求',
+  ],
   ...['research', 'providers', 'ledger', 'backtest'].map((feature) => [
     'apps/server/src/ai/adaptive/',
     `apps/server/src/${feature}/`,
@@ -157,6 +350,11 @@ const forbiddenFeatureDependencies = [
     'packages/schemas/src/backtest-',
     '标准功能组合不得依赖研究冻结合同',
   ],
+  ...['market', 'backtest', 'strategy-optimization'].map((feature) => [
+    'apps/server/src/integration/dsa/dsa-client-errors.ts',
+    `apps/server/src/${feature}/`,
+    'DSA 来源错误分类只属于协议适配层，不得反向依赖消费领域',
+  ]),
   ...['strategy-authoring', 'ai', 'backtest', 'market', 'journal', 'strategy-optimization'].map(
     (feature) => [
       'apps/server/src/identity/',
@@ -184,6 +382,11 @@ const forbiddenFeatureDependencies = [
     'packages/schemas/src/backtest-strategy.ts',
     'packages/schemas/src/strategy-authoring',
     '策略定义不得依赖编写合同',
+  ],
+  [
+    'packages/schemas/src/backtest-price-research',
+    'packages/schemas/src/strategy-authoring',
+    '价格研究合同与投影由回测领域拥有，不得反向依赖编写流程',
   ],
   [
     'apps/server/src/market/market-period-',
@@ -294,9 +497,21 @@ const forbiddenFeatureDependencies = [
   ],
   ['apps/server/src/market/', serverBacktestPrefix, '市场事实与公告准备不得反向依赖回测编排'],
   ['apps/server/src/market/', 'apps/server/src/research/', '市场事实不得反向依赖研究产品编排'],
-  ['apps/server/src/market/', 'apps/server/src/performance/', '行情事实与回退诊断不得反向依赖收益计算或图表消费'],
-  ['apps/server/src/market/fund-', 'apps/server/src/ledger/', '基金公共估算不得依赖个人账本或持仓编排'],
-  ['apps/server/src/market/market-fund-valuation', 'apps/server/src/ledger/', '基金估值查询和采样不得依赖个人账本编排'],
+  [
+    'apps/server/src/market/',
+    'apps/server/src/performance/',
+    '行情事实与回退诊断不得反向依赖收益计算或图表消费',
+  ],
+  [
+    'apps/server/src/market/fund-',
+    'apps/server/src/ledger/',
+    '基金公共估算不得依赖个人账本或持仓编排',
+  ],
+  [
+    'apps/server/src/market/market-fund-valuation',
+    'apps/server/src/ledger/',
+    '基金估值查询和采样不得依赖个人账本编排',
+  ],
   ['apps/server/src/ai/', 'apps/server/src/research/', 'AI 执行适配不得反向依赖研究产品编排'],
   ...['market', 'integration', 'providers', 'notifications'].map((feature) => [
     'apps/server/src/research/research-report-comparison.ts',
@@ -382,7 +597,11 @@ const forbiddenFeatureDependencies = [
   ['apps/server/src/risk/', 'apps/server/src/automation/', '风险上下文不得反向依赖扫描编排'],
   ['apps/server/src/risk/', 'apps/server/src/performance/', '风险估值不得依赖收益页面或快照编排'],
   [serverLedgerPrefix, 'apps/server/src/journal/', '交易事实投影不得反向依赖复盘消费与持久化'],
-  [serverLedgerPrefix, 'apps/server/src/performance/', '账本盈亏事实不得反向依赖历史收益消费与图表编排'],
+  [
+    serverLedgerPrefix,
+    'apps/server/src/performance/',
+    '账本盈亏事实不得反向依赖历史收益消费与图表编排',
+  ],
   [
     serverProvidersPrefix,
     'apps/server/src/notifications/',
@@ -408,8 +627,13 @@ const forbiddenFeatureDependencies = [
   [
     serverBacktestPrefix,
     'apps/server/src/strategy-optimization/',
-    '回测版本及所属用户契约不得反向依赖优化分组消费层',
+    '回测版本、研究价格冻结与执行规则及所属用户契约不得反向依赖优化消费层',
   ],
+  ...['integration/', 'ai/'].map((target) => [
+    'apps/server/src/strategy-optimization/optimization-model-resolution.ts',
+    `apps/server/src/${target}`,
+    '实验执行设置解析只复用本地策略与研究规则，不直接请求行情或调用模型',
+  ]),
   [
     serverBacktestPrefix,
     'apps/server/src/portfolio/',
@@ -447,7 +671,16 @@ async function inspect(path) {
   ) {
     violations.push(`${file} -> 旧工具审计入口 (研究报告必须携带正文 locator 读取审计)`);
   }
-  for (const check of [aiCatalogBoundaryViolation, instrumentDisplayBoundaryViolation, dateInputBoundaryViolation, marketSessionBoundaryViolation, marketWindowConsumerBoundaryViolation, browserRequestIdBoundaryViolation, draftCloseSnapshotBoundaryViolation, navigationDraftSnapshotBoundaryViolation]) {
+  for (const check of [
+    aiCatalogBoundaryViolation,
+    instrumentDisplayBoundaryViolation,
+    dateInputBoundaryViolation,
+    marketSessionBoundaryViolation,
+    marketWindowConsumerBoundaryViolation,
+    browserRequestIdBoundaryViolation,
+    draftCloseSnapshotBoundaryViolation,
+    navigationDraftSnapshotBoundaryViolation,
+  ]) {
     const violation = check(file, source);
     if (violation) violations.push(`${file} -> ${violation}`);
   }
@@ -543,6 +776,18 @@ async function inspect(path) {
       /\b(?:prisma|client)\.marketBarSeries(?:Fact|Coverage)\b/u.test(source))
   ) {
     violations.push(`${file} -> 旧 BarSeries 事实链路 (必须使用现行精确窗口)`);
+  }
+  if (file.startsWith('packages/domain/src/') && imports.some((specifier) => specifier === '@thesis-ledger/schemas' || specifier.startsWith('@thesis-ledger/schemas/'))) {
+    violations.push(`${file} -> Schemas (领域纯模型不得反向依赖校验适配层，类型引用同样适用)`);
+  }
+  if (file === 'apps/server/src/market/market-arena-replay-reader.ts' && /\b(?:getQuote|readChartV3)\s*\(/u.test(source)) {
+    violations.push(`${file} -> 当前报价或交互图表 (历史回放必须消费已发布的冻结证据)`);
+  }
+  if (['apps/server/src/market/market-arena-replay-reader.ts', 'apps/server/src/market/market-arena-history-source.ts'].includes(file) && /\barenaHistoryCatalog\s*\(/u.test(source)) {
+    violations.push(`${file} -> 历史证券全集 (自主研究按选中证券读取资料)`);
+  }
+  if (file.startsWith('apps/desktop/src/') && /['"]tickflow-free['"]/u.test(source)) {
+    violations.push(`${file} -> TickFlow 分档来源身份 (须消费统一来源的逐功能权限)`);
   }
   for (const specifier of imports) {
     const mobileViolation = mobileBoundaryViolation(file, specifier);

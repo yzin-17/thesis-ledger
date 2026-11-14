@@ -35,6 +35,11 @@ const updateNested = (schema: StrategySchema, key: string, nestedKey: string, va
 const selectLabel = (value: unknown, labels: Record<string, string>, fallback: string) =>
   typeof value === 'string' ? (labels[value] ?? fallback) : fallback;
 
+type RiskFieldUpdates = {
+  updateNestedField: (key: string, nestedKey: string, value: unknown) => void;
+  updateTypeWithDefault: (key: string, type: string, value: number) => void;
+};
+
 export function StrategyRiskExecutionFields({
   draft,
   onChange,
@@ -59,110 +64,16 @@ export function StrategyRiskExecutionFields({
         <h3 className="text-sm font-semibold">风险与执行</h3>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel>{stopLossFieldLabel(stopLoss.type)}</FieldLabel>
-          <Input
-            type="number"
-            min="0"
-            max={stopLoss.type === 'atr' ? undefined : 100}
-            step={stopLoss.type === 'atr' ? '0.1' : '1'}
-            value={
-              stopLoss.type === 'atr'
-                ? typeof stopLoss.value === 'number'
-                  ? String(stopLoss.value)
-                  : ''
-                : fractionToPercent(stopLoss.value)
-            }
-            onChange={(event) =>
-              updateNestedField(
-                'stopLoss',
-                'value',
-                stopLoss.type === 'atr'
-                  ? Number(event.target.value)
-                  : percentToFraction(event.target.value),
-              )
-            }
-          />
-          <FieldDescription>{stopLossFieldDescription(stopLoss.type)}</FieldDescription>
-        </Field>
-        <Field>
-          <FieldLabel>止损类型</FieldLabel>
-          <Select
-            value={typeof stopLoss.type === 'string' ? stopLoss.type : 'fixed'}
-            onValueChange={(value) =>
-              value && updateTypeWithDefault('stopLoss', value, stopLossDefaultValue(value))
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue>
-                {selectLabel(
-                  stopLoss.type,
-                  { fixed: '固定比例', trailing: '移动止损', atr: 'ATR' },
-                  '固定比例',
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="fixed">固定比例</SelectItem>
-                <SelectItem value="trailing">移动止损</SelectItem>
-                <SelectItem value="atr">平均真实波幅</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field>
-          <FieldLabel>{sizingFieldLabel(sizing.type)}</FieldLabel>
-          <Input
-            type="number"
-            min="0"
-            max={sizing.type === 'fixed' ? undefined : 100}
-            step={sizing.type === 'fixed' ? '100' : '1'}
-            value={
-              sizing.type === 'fixed'
-                ? typeof sizing.value === 'number'
-                  ? String(sizing.value)
-                  : ''
-                : fractionToPercent(sizing.value)
-            }
-            onChange={(event) =>
-              updateNestedField(
-                'sizing',
-                'value',
-                sizing.type === 'fixed'
-                  ? Number(event.target.value)
-                  : percentToFraction(event.target.value),
-              )
-            }
-          />
-          <FieldDescription>{sizingFieldDescription(sizing.type)}</FieldDescription>
-        </Field>
-        <Field>
-          <FieldLabel>仓位类型</FieldLabel>
-          <Select
-            value={typeof sizing.type === 'string' ? sizing.type : 'weight'}
-            onValueChange={(value) =>
-              value && updateTypeWithDefault('sizing', value, sizingDefaultValue(value))
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue>
-                {selectLabel(
-                  sizing.type,
-                  { fixed: '固定投入金额', weight: '可用现金比例', risk: '单笔风险比例' },
-                  '资金权重',
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="fixed">固定投入金额</SelectItem>
-                <SelectItem value="weight">可用现金比例</SelectItem>
-                <SelectItem value="risk">单笔风险比例</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
+        <RiskStopLossFields
+          stopLoss={stopLoss}
+          updateNestedField={updateNestedField}
+          updateTypeWithDefault={updateTypeWithDefault}
+        />
+        <RiskSizingFields
+          sizing={sizing}
+          updateNestedField={updateNestedField}
+          updateTypeWithDefault={updateTypeWithDefault}
+        />
         <Field>
           <FieldLabel>执行价格</FieldLabel>
           <Select
@@ -333,4 +244,123 @@ function NestedNumberField({
       />
     </Field>
   );
+}
+
+function RiskStopLossFields({
+  stopLoss,
+  updateNestedField,
+  updateTypeWithDefault,
+}: RiskFieldUpdates & { stopLoss: Record<string, unknown> }) {
+  return (
+    <>
+      <Field>
+        <FieldLabel>{stopLossFieldLabel(stopLoss.type)}</FieldLabel>
+        <Input
+          type="number"
+          min="0"
+          max={stopLoss.type === 'atr' ? undefined : 100}
+          step={stopLoss.type === 'atr' ? '0.1' : '1'}
+          value={riskExecutionInputValue(stopLoss.value, stopLoss.type === 'atr')}
+          onChange={(event) =>
+            updateNestedField(
+              'stopLoss',
+              'value',
+              stopLoss.type === 'atr'
+                ? Number(event.target.value)
+                : percentToFraction(event.target.value),
+            )
+          }
+        />
+        <FieldDescription>{stopLossFieldDescription(stopLoss.type)}</FieldDescription>
+      </Field>
+      <Field>
+        <FieldLabel>止损类型</FieldLabel>
+        <Select
+          value={typeof stopLoss.type === 'string' ? stopLoss.type : 'fixed'}
+          onValueChange={(value) =>
+            value && updateTypeWithDefault('stopLoss', value, stopLossDefaultValue(value))
+          }
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue>
+              {selectLabel(
+                stopLoss.type,
+                { fixed: '固定比例', trailing: '移动止损', atr: 'ATR' },
+                '固定比例',
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="fixed">固定比例</SelectItem>
+              <SelectItem value="trailing">移动止损</SelectItem>
+              <SelectItem value="atr">平均真实波幅</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
+    </>
+  );
+}
+
+function RiskSizingFields({
+  sizing,
+  updateNestedField,
+  updateTypeWithDefault,
+}: RiskFieldUpdates & { sizing: Record<string, unknown> }) {
+  return (
+    <>
+      <Field>
+        <FieldLabel>{sizingFieldLabel(sizing.type)}</FieldLabel>
+        <Input
+          type="number"
+          min="0"
+          max={sizing.type === 'fixed' ? undefined : 100}
+          step={sizing.type === 'fixed' ? '100' : '1'}
+          value={riskExecutionInputValue(sizing.value, sizing.type === 'fixed')}
+          onChange={(event) =>
+            updateNestedField(
+              'sizing',
+              'value',
+              sizing.type === 'fixed'
+                ? Number(event.target.value)
+                : percentToFraction(event.target.value),
+            )
+          }
+        />
+        <FieldDescription>{sizingFieldDescription(sizing.type)}</FieldDescription>
+      </Field>
+      <Field>
+        <FieldLabel>仓位类型</FieldLabel>
+        <Select
+          value={typeof sizing.type === 'string' ? sizing.type : 'weight'}
+          onValueChange={(value) =>
+            value && updateTypeWithDefault('sizing', value, sizingDefaultValue(value))
+          }
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue>
+              {selectLabel(
+                sizing.type,
+                { fixed: '固定投入金额', weight: '可用现金比例', risk: '单笔风险比例' },
+                '资金权重',
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="fixed">固定投入金额</SelectItem>
+              <SelectItem value="weight">可用现金比例</SelectItem>
+              <SelectItem value="risk">单笔风险比例</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
+    </>
+  );
+}
+
+function riskExecutionInputValue(value: unknown, absolute: boolean) {
+  if (!absolute) return fractionToPercent(value);
+  return typeof value === 'number' ? String(value) : '';
 }

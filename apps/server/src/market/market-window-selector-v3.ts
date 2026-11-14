@@ -23,6 +23,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { readBarSeriesV3 } from '../integration/dsa/dsa-market-bars-v3.js';
 import { supportsBasicPriceFallback } from './market-basic-price-fallback.js';
+import { marketWindowReadFailureV3 } from './market-window-read-error-v3.js';
 
 type DateWindow = { start: string; end: string };
 
@@ -52,6 +53,8 @@ export type MarketWindowSelectionInputV3 = {
   tradabilityMode?: 'assume-untradable-no-bar';
   /** 由固定快照、归一化价格研究消费方启用。 */
   priceResearch?: boolean;
+  /** 成对价格研究约束精确来源；目标仍须属于当前有效路由。 */
+  requiredSource?: { providerId: string; upstreamSource: string };
   warmup?: MarketWindowWarmupRequirementV3;
   compatibility?: {
     proof: unknown;
@@ -358,6 +361,7 @@ const validateInput = (input: MarketWindowSelectionInputV3) => {
     ...(input.tradabilityMode ? { tradabilityMode: input.tradabilityMode } : {}),
   });
   if (!request.success || !Number.isFinite(Date.parse(input.now))) return null;
+  if (input.requiredSource && !input.priceResearch) return null;
   if (
     input.warmup &&
     (!Number.isInteger(input.warmup.minimumSessions) ||
@@ -413,17 +417,14 @@ export const selectMarketWindowV3 = async (
         catalogRevision: context.catalogRevision,
         effectivePolicyRevision: context.effectivePolicyRevision,
       });
-    } catch {
-      return { ok: false, reason: 'fetch_failed' };
+    } catch (error) {
+      return { ok: false, reason: marketWindowReadFailureV3(error) };
     }
-
     let response: MarketDataBarSeriesResponseV3;
     try {
-      response = (await readBarSeriesV3(
-        request,
-        () => Promise.resolve(raw),
-        input.readCapabilities,
-      ))();
+      response = (
+        await readBarSeriesV3(request, () => Promise.resolve(raw), input.readCapabilities)
+      )();
     } catch {
       return { ok: false, reason: classifyInvalidResponse(raw, request) };
     }
@@ -442,6 +443,23 @@ export const selectMarketWindowV3 = async (
     return { ok: true, response };
   };
 
+  const requiredSource = input.requiredSource;
+  if (requiredSource) {
+    const candidate = context.targets.find((item) => sameTarget(item.target, requiredSource));
+    if (!candidate) return unavailable('route_not_configured');
+    const result = await readTarget(candidate);
+    if (!result.ok) return unavailable('primary_unavailable', { primaryFailure: result.reason });
+    return {
+      status: 'selected',
+      source: candidate.routeIndex === 0 ? 'primary' : 'backup',
+      response: result.response,
+      target: candidate.target,
+      routeIndex: candidate.routeIndex,
+      desiredRevision: context.desiredRevision,
+      effectivePolicyRevision: context.effectivePolicyRevision,
+      catalogRevision: context.catalogRevision,
+    };
+  }
   const primaryResult = await readTarget(primary);
   if (primaryResult.ok) {
     return {
@@ -462,28 +480,14 @@ export const selectMarketWindowV3 = async (
   const backup = context.targets[1];
   if (!backup) return unavailable('primary_unavailable', { primaryFailure: primaryResult.reason });
 
-  const basicFallback = input.priceResearch &&
-    supportsBasicPriceFallback(input.routeKey, [primary.target, backup.target], context.catalog);
-  const compatibility = basicFallback ? null : parseCompatibility(input.compatibility);
-  if (!basicFallback && (!compatibility || !hasExpectedCompatibilityIdentity(input, context, compatibility))) {
+  const qualification = qualifyBackupWindow(input, context, primary, backup);
+  if (!qualification.ok)
     return unavailable('incompatible_backup', {
       primaryFailure: primaryResult.reason,
       backupFailure: 'incompatible_backup',
-      compatibilityReason: 'invalid_proof',
+      compatibilityReason: qualification.reason,
     });
-  }
-  const preflight = compatibility ? assessMarketRouteCompatibilityV3({
-    proof: compatibility.proof,
-    observation: compatibility.observation,
-    now: input.now,
-  }) : { eligible: true as const };
-  if (!preflight.eligible) {
-    return unavailable('incompatible_backup', {
-      primaryFailure: primaryResult.reason,
-      backupFailure: 'incompatible_backup',
-      compatibilityReason: preflight.reason,
-    });
-  }
+  const compatibility = qualification.compatibility;
 
   const backupResult = await readTarget(backup);
   if (!backupResult.ok) {
@@ -492,18 +496,23 @@ export const selectMarketWindowV3 = async (
       backupFailure: backupResult.reason,
     });
   }
-  if (compatibility && !actualBackupMatchesObservation(backupResult.response, compatibility.observation)) {
+  if (
+    compatibility &&
+    !actualBackupMatchesObservation(backupResult.response, compatibility.observation)
+  ) {
     return unavailable('incompatible_backup', {
       primaryFailure: primaryResult.reason,
       backupFailure: 'incompatible_backup',
       compatibilityReason: 'source_facts_mismatch',
     });
   }
-  const finalAssessment = compatibility ? assessMarketRouteCompatibilityV3({
-    proof: compatibility.proof,
-    observation: compatibility.observation,
-    now: input.now,
-  }) : { eligible: true as const };
+  const finalAssessment = compatibility
+    ? assessMarketRouteCompatibilityV3({
+        proof: compatibility.proof,
+        observation: compatibility.observation,
+        now: input.now,
+      })
+    : { eligible: true as const };
   if (!finalAssessment.eligible) {
     return unavailable('incompatible_backup', {
       primaryFailure: primaryResult.reason,
@@ -524,3 +533,33 @@ export const selectMarketWindowV3 = async (
     primaryFailure: primaryResult.reason,
   };
 };
+
+function qualifyBackupWindow(
+  input: MarketWindowSelectionInputV3,
+  context: ParsedContext,
+  primary: ParsedContext['targets'][number],
+  backup: ParsedContext['targets'][number],
+) {
+  const basicFallback =
+    input.priceResearch &&
+    supportsBasicPriceFallback(input.routeKey, [primary.target, backup.target], context.catalog);
+  const compatibility = basicFallback ? null : parseCompatibility(input.compatibility);
+  if (
+    !basicFallback &&
+    (!compatibility || !hasExpectedCompatibilityIdentity(input, context, compatibility))
+  ) {
+    return { ok: false as const, reason: 'invalid_proof' as const };
+  }
+  const preflight = compatibility
+    ? assessMarketRouteCompatibilityV3({
+        proof: compatibility.proof,
+        observation: compatibility.observation,
+        now: input.now,
+      })
+    : { eligible: true as const };
+  if (!preflight.eligible) {
+    return { ok: false as const, reason: preflight.reason };
+  }
+
+  return { ok: true as const, compatibility };
+}

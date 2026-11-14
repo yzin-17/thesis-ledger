@@ -75,7 +75,11 @@ it('更换、清空与未完成搜索不沿用旧身份，加载已有版本不�
   await mount(<StrategyEditorSheet open presentation="page" mode="edit" version={{ id: 'old', version: 1, schema, createdAt: '' }} busy={false} onOpenChange={vi.fn()} onSave={saved} />);
   expect(schema).toEqual(original);
   await search('目录'); await select('02800.HK');
-  expect(host.textContent).toContain('香港 · ETF');
+  expect(host.querySelector<HTMLInputElement>('[aria-label="执行标的"]')!.value).toBe('目录02800.HK · 02800.HK');
+  await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent === '高级 JSON')!.click(); await Promise.resolve(); });
+  expect(JSON.parse(host.querySelector<HTMLTextAreaElement>('#strategy-json')!.value).executionInstrument.symbol).toBe('02800.HK');
+  await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent === '常用配置')!.click(); await Promise.resolve(); });
+  expect(host.querySelector<HTMLInputElement>('[aria-label="执行标的"]')!.value).toBe('目录02800.HK · 02800.HK');
   await search('不存在的名称');
   await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent === '保存为新版本')!.click(); await Promise.resolve(); });
   expect(saved).not.toHaveBeenCalled();

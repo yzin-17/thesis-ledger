@@ -3,6 +3,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { StrategyStackParams } from '../../app/strategy-navigation';
 import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
 import { useStrategyLibrary } from './useStrategyLibrary';
+import { strategyInstrumentLabel } from './strategy-instrument-display';
 export function StrategyVersionScreen() {
   const { params } = useRoute<RouteProp<StrategyStackParams, 'StrategyVersion'>>();
   const navigation = useNavigation<NativeStackNavigationProp<StrategyStackParams>>();
@@ -15,6 +16,7 @@ export function StrategyVersionScreen() {
       {version ? (
         <>
           <Section title={`版本 ${version.version}`}>
+            <Copy>执行标的 {strategyInstrumentLabel(version)}</Copy>
             <Copy>策略 {params.strategyId}</Copy>
             <Copy>版本 {version.id}</Copy>
             <Copy>

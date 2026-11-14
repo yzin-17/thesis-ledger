@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { riskMonitoringSourceText } from '@thesis-ledger/domain';
+import { riskMonitoringRuleIssueLabel, riskMonitoringSourceText } from '@thesis-ledger/domain';
 import { Fragment } from 'react';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { Copy, QueryStatus, Section } from '../../components/MobilePrimitives';
@@ -22,15 +22,20 @@ export function RiskMonitoringSchedule({ enabledRules }: { enabledRules: number 
       {state.data && (
         <>
           <Copy>
-            {state.data.processorAvailable ? '自动消费已有行情更新' : '监控处理暂不可用，等待恢复'}{' '}
+            {state.data.processorAvailable
+              ? '自动评估已启用的风险规则'
+              : '监控处理暂不可用，等待恢复'}{' '}
             · {state.data.eligibleRules} 条规则已生效
           </Copy>
           {state.data.futureRules > 0 && <Copy>{state.data.futureRules} 条规则等待生效</Copy>}
           {state.data.unsupportedRules > 0 && (
-            <Copy>
-              {state.data.unsupportedRules} 条规则尚缺可自动消费的指标、正式净值或已完成 K 线数据
-            </Copy>
+            <Copy>{state.data.unsupportedRules} 条规则暂不支持自动评估</Copy>
           )}
+          {(state.data.ruleIssues ?? []).map((issue) => (
+            <Copy key={issue.ruleId}>
+              {riskMonitoringRuleIssueLabel(issue)}：{issue.reason}
+            </Copy>
+          ))}
           <Copy>{state.data.limitation}</Copy>
           {state.data.eligibleRules > 0 && !state.data.acquisitionAvailable && (
             <Copy>行情需求处理暂不可用，等待恢复</Copy>

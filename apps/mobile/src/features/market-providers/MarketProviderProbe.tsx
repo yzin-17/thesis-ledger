@@ -14,13 +14,14 @@ export function providerProbeInput(
   kind: 'test' | 'account',
   draft: ProviderProbeDraft,
   credentials: MarketProviderTestInput['credentials'],
+  levelSupported = true,
 ): MarketProviderTestInput {
-  if (kind === 'account' && (draft.hkDaily || draft.realtime) && !draft.points.trim())
+  if (kind === 'account' && levelSupported && (draft.hkDaily || draft.realtime) && !draft.points.trim())
     throw Error('声明独立权限时需同时填写账号积分');
   return marketProviderTestInputSchema.parse({
     ...(credentials ? { credentials } : {}),
     purpose: kind === 'account' ? 'account_access' : 'capability_read',
-    ...(kind === 'account' && draft.points.trim()
+    ...(kind === 'account' && levelSupported && draft.points.trim()
       ? {
           accountLevel: {
             points: Number(draft.points),
@@ -39,6 +40,7 @@ type Props = {
   change: (patch: Partial<ProviderProbeDraft>) => void;
   pending: boolean;
   accountSupported: boolean;
+  accountLevelSupported?: boolean;
   run: (kind: 'test' | 'account') => void;
   result: MarketProviderTestResponse | null;
 };
@@ -47,6 +49,7 @@ export function MarketProviderProbe({
   change,
   pending,
   accountSupported,
+  accountLevelSupported = false,
   run,
   result,
 }: Props) {
@@ -60,6 +63,7 @@ export function MarketProviderProbe({
         editable={!pending}
       />
       <Action label="检查数据能力" disabled={pending} onPress={() => run('test')} />
+      {accountLevelSupported && <>
       <Field
         label="账号积分（可选）"
         value={draft.points}
@@ -90,6 +94,7 @@ export function MarketProviderProbe({
         onChange={(value) => change({ realtime: value === 'true' })}
         disabled={pending}
       />
+      </>}
       {!accountSupported ? <Copy muted>该来源未声明账号接口检查能力。</Copy> : null}
       <Action
         label="检查账号访问"

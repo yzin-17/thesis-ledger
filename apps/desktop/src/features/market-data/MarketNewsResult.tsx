@@ -8,7 +8,6 @@ const statusLabels = { available: '可用', partial: '部分覆盖', unavailable
 export const newsSourceLabels: Record<string, string> = {
   hithink: 'HiThink 同花顺',
   akshare: 'AKShare · 东方财富',
-  'nvidia-news': 'NVIDIA 官方订阅',
   yfinance: 'Yahoo Finance 新闻',
   cls: '财联社',
   wallstreetcn: '华尔街见闻',
@@ -20,6 +19,7 @@ const reasonLabels: Record<string, string> = {
   market_feed_first_page_not_exhaustive: '市场快讯仅返回近期一页，不代表完整历史，也不自动关联个股',
   provider_text_used_as_title: '部分标题取自来源原有快讯文本',
   pagination_truncated: '结果受到条数或订阅范围限制',
+  timeline_order_unknown: '来源返回的新闻顺序存在异常，无法确认完整覆盖',
   published_time_unknown: '部分消息的发布时间未知',
   source_available_time_unknown: '来源首次可用时间未知',
   not_admitted: '当前没有可用于这个范围的新闻来源',
@@ -35,18 +35,27 @@ export function NewsResult({
   result,
   heading,
   compact = false,
+  hasMore,
 }: {
   refreshing?: boolean;
   result: MarketNewsResult | MarketNewsFeedResult;
   heading: string;
   compact?: boolean;
+  hasMore?: boolean;
 }) {
-  const { coverage } = result;
+  const { coverage, visibleReasons, normalPagination, emptyLabel } = newsPaginationPresentation(
+    result,
+    hasMore,
+  );
   if (compact && result.status === 'unavailable') {
-    const reasons = [...new Set([
-      ...result.errors.map((error) => reasonLabels[error.code]),
-      ...coverage.missingReasons.map((reason) => reasonLabels[reason]),
-    ].filter(Boolean))];
+    const reasons = [
+      ...new Set(
+        [
+          ...result.errors.map((error) => reasonLabels[error.code]),
+          ...coverage.missingReasons.map((reason) => reasonLabels[reason]),
+        ].filter(Boolean),
+      ),
+    ];
     return (
       <p role="status" className="py-2 text-sm text-muted-foreground">
         {reasons.join('；') || '当前时间范围的新闻暂不可读取。'}
@@ -55,28 +64,33 @@ export function NewsResult({
   }
   return (
     <section aria-label="新闻检索结果" className="flex flex-col gap-4">
-      {!compact && <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-medium">{heading}</h3>
-        <Badge variant="outline">{statusLabels[result.status]}</Badge>
-        <span className="text-sm text-muted-foreground tabular-nums">
-          {coverage.returnedCount} 条 · {coverage.uniqueEvidenceCount} 组独立证据
-        </span>
-      </div>}
-      <p className={compact ? 'order-last text-xs text-muted-foreground' : 'text-xs text-muted-foreground'}>
+      {!compact && (
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-medium">{heading}</h3>
+          {!normalPagination && <Badge variant="outline">{statusLabels[result.status]}</Badge>}
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {hasMore !== undefined && '已加载 '}
+            {coverage.returnedCount} 条
+          </span>
+        </div>
+      )}
+      <p
+        className={
+          compact ? 'order-last text-xs text-muted-foreground' : 'text-xs text-muted-foreground'
+        }
+      >
         数据来源：
         {result.source ? (newsSourceLabels[result.source.providerId] ?? '已配置来源') : '未选定'}
         <br />
         发布时间范围：{formatDateTime(coverage.publishedStart)} 至{' '}
         {formatDateTime(coverage.publishedEnd)}
-        <br />
-        抓取时间：{formatDateTime(result.fetchedAt, '未知')}
       </p>
-      {coverage.missingReasons.length > 0 && (
+      {visibleReasons.length > 0 && (
         <Alert>
           <AlertTitle>覆盖范围有缺口</AlertTitle>
           <AlertDescription>
             <ul className="list-disc pl-4">
-              {coverage.missingReasons.map((reason) => (
+              {visibleReasons.map((reason) => (
                 <li key={reason}>{reasonLabels[reason] ?? '来源未确认完整覆盖'}</li>
               ))}
             </ul>
@@ -94,11 +108,7 @@ export function NewsResult({
         </Alert>
       )}
       <ListRefreshRegion refreshing={refreshing} label="正在刷新新闻列表">
-        {result.items.length === 0 && (
-          <p className="py-4 text-muted-foreground">
-            {coverage.complete ? '该时段暂无新闻。' : '当前来源在该时段没有可展示的新闻。'}
-          </p>
-        )}
+        {result.items.length === 0 && <p className="py-4 text-muted-foreground">{emptyLabel}</p>}
         <ol className="divide-y divide-border">
           {result.items.map((item) => (
             <li key={item.id} className="flex flex-col gap-2 py-4 first:pt-0">
@@ -113,14 +123,30 @@ export function NewsResult({
               <p className="text-sm text-muted-foreground">
                 {item.publisher ?? '发布方未知'} · 发布于 {formatDateTime(item.publishedAt, '未知')}
               </p>
-              <p className="text-xs text-muted-foreground">
-                来源首次可用：{formatDateTime(item.sourceAvailableAt, '未知')} · 抓取于{' '}
-                {formatDateTime(item.fetchedAt)}
-              </p>
             </li>
           ))}
         </ol>
       </ListRefreshRegion>
     </section>
   );
+}
+
+function newsPaginationPresentation(
+  result: MarketNewsResult | MarketNewsFeedResult,
+  hasMore: boolean | undefined,
+) {
+  const { coverage } = result;
+  const visibleReasons = coverage.missingReasons.filter(
+    (reason) => !(hasMore && reason === 'pagination_truncated'),
+  );
+  const normalPagination =
+    hasMore &&
+    result.status === 'partial' &&
+    !visibleReasons.length &&
+    !result.errors.length &&
+    !coverage.unknownPublishedTimeCount;
+  let emptyLabel = '当前来源在该时段没有可展示的新闻。';
+  if (hasMore) emptyLabel = '已加载的页面中暂无该时段新闻，可继续加载。';
+  else if (coverage.complete) emptyLabel = '该时段暂无新闻。';
+  return { coverage, visibleReasons, normalPagination, emptyLabel };
 }

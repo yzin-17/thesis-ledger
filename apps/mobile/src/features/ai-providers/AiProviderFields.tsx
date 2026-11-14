@@ -1,12 +1,16 @@
-import { Action, Choices, Copy, Field, Section } from '../../components/MobilePrimitives';
+import { Action, Choices, Copy, Field, ContentSection as Section } from '../../components/MobilePrimitives';
+import { MultiSelect } from '../../components/MultiSelect';
 import type { AiProviderDraft } from './ai-provider-draft';
 type Props = {
   draft: AiProviderDraft;
   change: (patch: Partial<AiProviderDraft>) => void;
   editing: boolean;
   disabled: boolean;
+  availableModels?: string[];
 };
-export function AiProviderFields({ draft, change, editing, disabled }: Props) {
+export function AiProviderFields({ draft, change, editing, disabled, availableModels = [] }: Props) {
+  const capabilities = draft.capabilities.split(',').map((item) => item.trim()).filter(Boolean);
+  const models = draft.models.split(/[\n,]/u).map((item) => item.trim()).filter(Boolean);
   return (
     <>
       <Section title="模型服务">
@@ -83,21 +87,22 @@ export function AiProviderFields({ draft, change, editing, disabled }: Props) {
           editable={!disabled}
           keyboardType="number-pad"
         />
-        <Field
-          label="能力（逗号分隔）"
-          value={draft.capabilities}
-          onChange={(capabilities) => change({ capabilities })}
-          editable={!disabled}
+        <MultiSelect
+          label="提供方能力"
+          options={[...new Set(['chat', 'vision', ...capabilities])].map((value) => ({ value,
+            label: ({ chat: '对话', vision: '图像理解' } as Record<string, string>)[value] ?? `其他（${value}）` }))}
+          value={capabilities} allowCustom disabled={disabled}
+          onChange={(values) => change({ capabilities: values.join(',') })}
         />
       </Section>
       <Section title="模型与费用">
-        <Field
-          label="已选模型（每行一个）"
-          value={draft.models}
-          onChange={(models) => change({ models })}
-          multiline
-          editable={!disabled}
+        <MultiSelect
+          label="模型列表"
+          options={[...new Set([...availableModels, ...models])].map((value) => ({ value, label: value }))}
+          value={models} allowCustom disabled={disabled}
+          onChange={(values) => change({ models: values.join('\n') })}
         />
+        <Copy muted>可从已读取的模型目录选择，也可输入模型 ID 后添加。</Copy>
         <Copy muted>
           费用按每千 Token 填写；未填写代表未知，零单价需要明确填写
           0。价格、路由和推理配置均使用模型 ID 作为键。

@@ -187,6 +187,9 @@ describe('deterministic simulation events', () => {
     ).toBeUndefined();
   });
 
+});
+
+describe("成交应用与延后交收身份", () => {
   it('replays the complete signal-to-fill chain deterministically and mutates only on fill', () => {
     const onMutation = vi.fn();
     const execution = {
@@ -291,6 +294,9 @@ describe('deterministic simulation events', () => {
     expect(onMutation).toHaveBeenCalledTimes(2);
   });
 
+});
+
+describe("同刻成交顺序与交收调度", () => {
   it('completes tick one fill before evaluating tick two position-dependent risk', () => {
     const position = {
       isOpen: false,

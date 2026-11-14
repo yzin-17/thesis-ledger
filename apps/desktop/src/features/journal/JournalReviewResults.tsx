@@ -198,7 +198,197 @@ export function RawEvidenceSheet({
   );
 }
 
-export function SingleReviewResult({
+export function SingleReviewResult(props: {
+  trade: ReviewTrade;
+  candidate: JournalReviewCandidate | null;
+  result: DeterministicJournalReviewResult;
+  instrumentDirectory?: InstrumentDirectory | undefined;
+  aiRun: JournalReviewResult['aiRun'] | null;
+  aiPending: boolean;
+  aiError: Error | null;
+  onExplain: () => void;
+}) {
+  const control = useSingleReviewResult(props);
+  const { counterfactual, aiRun, aiPending, aiError, onExplain, setRawOpen, rawOpen, rawEvidence } =
+    control;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SingleReviewSummary control={control} />
+
+      <SingleReviewPlan control={control} />
+
+      <SingleReviewBehavior control={control} />
+
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle>反事实比较</CardTitle>
+          <CardDescription>假设结果不代表可实现收益，边界说明始终保留在结果中。</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Metric
+              label="实际盈亏"
+              value={formatMoney(readNumber(counterfactual, 'actualPnl'))}
+              toneValue={readNumber(counterfactual, 'actualPnl')}
+            />
+            <Metric
+              label="假设盈亏"
+              value={formatMoney(readNumber(counterfactual, 'counterfactualPnl'))}
+              toneValue={readNumber(counterfactual, 'counterfactualPnl')}
+            />
+            <Metric
+              label="差额"
+              value={formatMoney(readNumber(counterfactual, 'difference'))}
+              toneValue={readNumber(counterfactual, 'difference')}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {readString(counterfactual, 'assumption') ??
+              '按计划止损价成交，数量按每笔 1 单位归一化，未计滑点和流动性影响。'}
+          </p>
+        </CardContent>
+      </Card>
+
+      <AiReviewPanel aiRun={aiRun} isPending={aiPending} error={aiError} onExplain={onExplain} />
+      <div className="flex justify-end">
+        <Button type="button" variant="ghost" onClick={() => setRawOpen(true)}>
+          查看原始证据
+        </Button>
+      </div>
+      <RawEvidenceSheet open={rawOpen} onOpenChange={setRawOpen} value={rawEvidence} />
+    </div>
+  );
+}
+
+function SingleReviewSummary({ control }: { control: ReturnType<typeof useSingleReviewResult> }) {
+  return (
+    <>
+      <Card className="shadow-none">
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>
+                {control.instrumentName ?? control.trade.symbol}
+                {control.instrumentName && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    {control.trade.symbol}
+                  </span>
+                )}{' '}
+                · 复盘结论
+              </CardTitle>
+              <CardDescription>
+                {formatDateTime(control.trade.entryAt)} → {formatDateTime(control.trade.exitAt)}
+              </CardDescription>
+            </div>
+            <Badge variant={control.candidate ? 'secondary' : 'outline'}>
+              {control.candidate
+                ? completenessLabel(control.candidate.evidenceCompleteness)
+                : '手动输入'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-4">
+          <Metric
+            label="已实现盈亏"
+            value={formatMoney(control.trade.pnl)}
+            toneValue={control.trade.pnl}
+          />
+          <Metric label="实际持有" value={formatNumber(holdingDays(control.trade), ' 天')} />
+          <Metric label="成交数量" value={formatNumber(control.trade.quantity ?? null)} />
+          <Metric
+            label="证据状态"
+            value={control.missing.length === 0 ? '可完整判断' : '部分证据缺失'}
+            hint={control.missing.join('、')}
+          />
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+function SingleReviewPlan({ control }: { control: ReturnType<typeof useSingleReviewResult> }) {
+  return (
+    <>
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle>计划与执行</CardTitle>
+          <CardDescription>
+            计划值、实际值和差值并列展示；缺少必要事实时保留证据不足。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric
+            label="入场价偏差"
+            value={formatMoney(readNumber(control.planned, 'entryDeviation'))}
+            hint={`实际 ${formatMoney(control.trade.entryPrice ?? null)} / 计划 ${formatMoney(control.trade.plannedEntry ?? null)}`}
+          />
+          <Metric
+            label="退出价偏差"
+            value={formatMoney(readNumber(control.planned, 'exitDeviation'))}
+            hint={`实际 ${formatMoney(control.trade.exitPrice ?? null)} / 计划 ${formatMoney(control.trade.plannedExit ?? null)}`}
+          />
+          <Metric
+            label="持有天数偏差"
+            value={formatNumber(readNumber(control.planned, 'holdingDayDeviation'), ' 天')}
+            hint={`实际 ${formatNumber(holdingDays(control.trade), ' 天')} / 计划 ${formatNumber(control.trade.plannedHoldingDays ?? null, ' 天')}`}
+          />
+          <Metric
+            label="仓位偏差"
+            value={formatPercent(
+              control.trade.targetWeight === undefined || control.trade.peakWeight === undefined
+                ? null
+                : control.trade.peakWeight - control.trade.targetWeight,
+            )}
+            hint={`最高 ${formatPercent(control.trade.peakWeight ?? null)} / 目标 ${formatPercent(control.trade.targetWeight ?? null)}`}
+          />
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+function SingleReviewBehavior({ control }: { control: ReturnType<typeof useSingleReviewResult> }) {
+  return (
+    <>
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle>行为证据</CardTitle>
+          <CardDescription>这些是规则命中的研究分类，不是心理诊断。</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <EvidenceStatus
+            label="未按计划止损"
+            detected={control.stopDetected}
+            evidence={
+              control.stopDetected === null
+                ? '需要计划止损价和实际退出价。'
+                : `计划止损 ${formatMoney(control.trade.plannedStop ?? null)}，实际退出 ${formatMoney(control.trade.actualExit ?? null)}。`
+            }
+          />
+          <EvidenceStatus
+            label="提前止盈 / 退出"
+            detected={control.earlyProfitDetected}
+            evidence={
+              control.earlyProfitDetected === null
+                ? '需要计划退出价和实际退出价。'
+                : `计划退出 ${formatMoney(control.trade.plannedExit ?? null)}，实际退出 ${formatMoney(control.trade.actualExit ?? null)}。`
+            }
+          />
+          <EvidenceStatus
+            label="仓位超过目标"
+            detected={control.positionDetected}
+            evidence={
+              control.positionDetected === null
+                ? '需要目标仓位和最高仓位。'
+                : `目标 ${formatPercent(control.trade.targetWeight ?? null)}，最高 ${formatPercent(control.trade.peakWeight ?? null)}。`
+            }
+          />
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function useSingleReviewResult({
   trade,
   candidate,
   result,
@@ -244,152 +434,24 @@ export function SingleReviewResult({
     [behavior, counterfactual, planned, trade],
   );
 
-  return (
-    <div className="flex flex-col gap-4">
-      <Card className="shadow-none">
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle>
-                {instrumentName ?? trade.symbol}
-                {instrumentName && (
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    {trade.symbol}
-                  </span>
-                )}{' '}
-                · 复盘结论
-              </CardTitle>
-              <CardDescription>
-                {formatDateTime(trade.entryAt)} → {formatDateTime(trade.exitAt)}
-              </CardDescription>
-            </div>
-            <Badge variant={candidate ? 'secondary' : 'outline'}>
-              {candidate ? completenessLabel(candidate.evidenceCompleteness) : '手动输入'}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-4">
-          <Metric label="已实现盈亏" value={formatMoney(trade.pnl)} toneValue={trade.pnl} />
-          <Metric label="实际持有" value={formatNumber(holdingDays(trade), ' 天')} />
-          <Metric label="成交数量" value={formatNumber(trade.quantity ?? null)} />
-          <Metric
-            label="证据状态"
-            value={missing.length === 0 ? '可完整判断' : '部分证据缺失'}
-            hint={missing.join('、')}
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle>计划与执行</CardTitle>
-          <CardDescription>
-            计划值、实际值和差值并列展示；缺少必要事实时保留证据不足。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric
-            label="入场价偏差"
-            value={formatMoney(readNumber(planned, 'entryDeviation'))}
-            hint={`实际 ${formatMoney(trade.entryPrice ?? null)} / 计划 ${formatMoney(trade.plannedEntry ?? null)}`}
-          />
-          <Metric
-            label="退出价偏差"
-            value={formatMoney(readNumber(planned, 'exitDeviation'))}
-            hint={`实际 ${formatMoney(trade.exitPrice ?? null)} / 计划 ${formatMoney(trade.plannedExit ?? null)}`}
-          />
-          <Metric
-            label="持有天数偏差"
-            value={formatNumber(readNumber(planned, 'holdingDayDeviation'), ' 天')}
-            hint={`实际 ${formatNumber(holdingDays(trade), ' 天')} / 计划 ${formatNumber(trade.plannedHoldingDays ?? null, ' 天')}`}
-          />
-          <Metric
-            label="仓位偏差"
-            value={formatPercent(
-              trade.targetWeight === undefined || trade.peakWeight === undefined
-                ? null
-                : trade.peakWeight - trade.targetWeight,
-            )}
-            hint={`最高 ${formatPercent(trade.peakWeight ?? null)} / 目标 ${formatPercent(trade.targetWeight ?? null)}`}
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle>行为证据</CardTitle>
-          <CardDescription>这些是规则命中的研究分类，不是心理诊断。</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          <EvidenceStatus
-            label="未按计划止损"
-            detected={stopDetected}
-            evidence={
-              stopDetected === null
-                ? '需要计划止损价和实际退出价。'
-                : `计划止损 ${formatMoney(trade.plannedStop ?? null)}，实际退出 ${formatMoney(trade.actualExit ?? null)}。`
-            }
-          />
-          <EvidenceStatus
-            label="提前止盈 / 退出"
-            detected={earlyProfitDetected}
-            evidence={
-              earlyProfitDetected === null
-                ? '需要计划退出价和实际退出价。'
-                : `计划退出 ${formatMoney(trade.plannedExit ?? null)}，实际退出 ${formatMoney(trade.actualExit ?? null)}。`
-            }
-          />
-          <EvidenceStatus
-            label="仓位超过目标"
-            detected={positionDetected}
-            evidence={
-              positionDetected === null
-                ? '需要目标仓位和最高仓位。'
-                : `目标 ${formatPercent(trade.targetWeight ?? null)}，最高 ${formatPercent(trade.peakWeight ?? null)}。`
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle>反事实比较</CardTitle>
-          <CardDescription>假设结果不代表可实现收益，边界说明始终保留在结果中。</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Metric
-              label="实际盈亏"
-              value={formatMoney(readNumber(counterfactual, 'actualPnl'))}
-              toneValue={readNumber(counterfactual, 'actualPnl')}
-            />
-            <Metric
-              label="假设盈亏"
-              value={formatMoney(readNumber(counterfactual, 'counterfactualPnl'))}
-              toneValue={readNumber(counterfactual, 'counterfactualPnl')}
-            />
-            <Metric
-              label="差额"
-              value={formatMoney(readNumber(counterfactual, 'difference'))}
-              toneValue={readNumber(counterfactual, 'difference')}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {readString(counterfactual, 'assumption') ??
-              '按计划止损价成交，数量按每笔 1 单位归一化，未计滑点和流动性影响。'}
-          </p>
-        </CardContent>
-      </Card>
-
-      <AiReviewPanel aiRun={aiRun} isPending={aiPending} error={aiError} onExplain={onExplain} />
-      <div className="flex justify-end">
-        <Button type="button" variant="ghost" onClick={() => setRawOpen(true)}>
-          查看原始证据
-        </Button>
-      </div>
-      <RawEvidenceSheet open={rawOpen} onOpenChange={setRawOpen} value={rawEvidence} />
-    </div>
-  );
+  return {
+    instrumentName,
+    trade,
+    candidate,
+    missing,
+    planned,
+    stopDetected,
+    earlyProfitDetected,
+    positionDetected,
+    counterfactual,
+    aiRun,
+    aiPending,
+    aiError,
+    onExplain,
+    setRawOpen,
+    rawOpen,
+    rawEvidence,
+  };
 }
 
 export function PeriodReviewResult({

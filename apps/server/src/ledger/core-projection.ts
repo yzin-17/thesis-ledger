@@ -231,32 +231,7 @@ const replaceTradeProjection = async (
   await client.trade.deleteMany({ where: { accountId } });
   for (const trade of trades) {
     await client.trade.create({
-      data: {
-        id: trade.id,
-        accountId,
-        accountMode: trade.accountMode,
-        symbol: trade.symbol,
-        lifecycle: trade.lifecycle,
-        exitProgress: trade.exitProgress,
-        endEvidence: trade.endEvidence,
-        openedAt: date(trade.openedAt),
-        closedAt: date(trade.closedAt),
-        earliestEvidenceAt: date(trade.earliestEvidenceAt),
-        sourceQuantity: requiredDecimal(trade.sourceQuantity),
-        closedQuantity: requiredDecimal(trade.closedQuantity),
-        remainingQuantity: requiredDecimal(trade.remainingQuantity),
-        grossRealizedPnl: decimal(trade.grossRealizedPnl),
-        netRealizedPnl: decimal(trade.netRealizedPnl),
-        realizedNetReturnRate: decimal(trade.realizedNetReturnRate),
-        costEstimated: trade.costEstimated ?? false,
-        completeness: trade.completeness,
-        issues: json(trade.issues),
-        costIssues: json(trade.costIssues ?? []),
-        algorithmVersion: trade.algorithmVersion,
-        projectionFingerprint: projectionFingerprint(trade),
-        projectionGeneration,
-        costStrategyRevisionId: trade.costStrategyRevision?.id ?? null,
-      },
+      data: tradeProjectionData(trade, accountId, projectionGeneration),
     });
 
     for (const entryLeg of trade.entryLegs) {
@@ -529,3 +504,36 @@ export const rebuildCoreProjections = async (
 };
 
 export type { CoreProjectionClient };
+
+function tradeProjectionData(
+  trade: TradeProjection,
+  accountId: string,
+  projectionGeneration: bigint,
+) {
+  return {
+    id: trade.id,
+    accountId,
+    accountMode: trade.accountMode,
+    symbol: trade.symbol,
+    lifecycle: trade.lifecycle,
+    exitProgress: trade.exitProgress,
+    endEvidence: trade.endEvidence,
+    openedAt: date(trade.openedAt),
+    closedAt: date(trade.closedAt),
+    earliestEvidenceAt: date(trade.earliestEvidenceAt),
+    sourceQuantity: requiredDecimal(trade.sourceQuantity),
+    closedQuantity: requiredDecimal(trade.closedQuantity),
+    remainingQuantity: requiredDecimal(trade.remainingQuantity),
+    grossRealizedPnl: decimal(trade.grossRealizedPnl),
+    netRealizedPnl: decimal(trade.netRealizedPnl),
+    realizedNetReturnRate: decimal(trade.realizedNetReturnRate),
+    costEstimated: trade.costEstimated ?? false,
+    completeness: trade.completeness,
+    issues: json(trade.issues),
+    costIssues: json(trade.costIssues ?? []),
+    algorithmVersion: trade.algorithmVersion,
+    projectionFingerprint: projectionFingerprint(trade),
+    projectionGeneration,
+    costStrategyRevisionId: trade.costStrategyRevision?.id ?? null,
+  };
+}

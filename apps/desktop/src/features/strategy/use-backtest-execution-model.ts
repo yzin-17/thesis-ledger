@@ -9,13 +9,15 @@ import {
 import { parsedDesktopRequest } from '../shared/request.js';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 
-export function useBacktestExecutionModel(input: {
+type BacktestExecutionInput = {
   strategyVersionId: string;
   period: { start: string; end: string };
   currency: 'CNY' | 'HKD' | 'USD';
   adjustment: 'none' | 'qfq' | 'hfq';
   initialModel?: BacktestExecutionModelV3 | undefined;
-}) {
+};
+
+export function useBacktestExecutionModel(input: BacktestExecutionInput) {
   const request = backtestModelResolutionRequestSchema.safeParse({
     strategyVersionId: input.strategyVersionId,
     startDate: input.period.start,
@@ -24,19 +26,7 @@ export function useBacktestExecutionModel(input: {
     adjustment: input.adjustment,
     policy: 'research-defaults',
   });
-  const initial = input.initialModel;
-  const retained =
-    initial &&
-    initial.scope.currency === input.currency &&
-    initial.scope.range.start <= input.period.start &&
-    initial.scope.range.end >= input.period.end &&
-    executionModelAccountingIssuesV3(
-      initial,
-      { startDate: input.period.start, endDate: input.period.end },
-      input.adjustment === 'none' ? 'raw-events' : 'normalized-series',
-    ).length === 0
-      ? initial
-      : undefined;
+  const retained = retainedExecutionModel(input);
   const query = useQuery<BacktestModelResolutionResult>({
     queryKey: [
       'desktop',
@@ -73,4 +63,21 @@ export function useBacktestExecutionModel(input: {
     message,
     retry: () => void query.refetch(),
   };
+}
+
+function retainedExecutionModel(input: BacktestExecutionInput) {
+  const initial = input.initialModel;
+  const retained =
+    initial &&
+    initial.scope.currency === input.currency &&
+    initial.scope.range.start <= input.period.start &&
+    initial.scope.range.end >= input.period.end &&
+    executionModelAccountingIssuesV3(
+      initial,
+      { startDate: input.period.start, endDate: input.period.end },
+      input.adjustment === 'none' ? 'raw-events' : 'normalized-series',
+    ).length === 0
+      ? initial
+      : undefined;
+  return retained;
 }

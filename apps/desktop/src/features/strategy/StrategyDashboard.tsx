@@ -1,4 +1,3 @@
-import { ArenaPage } from '../model-arena/ArenaPage.js';
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
@@ -21,7 +20,6 @@ import { useBacktestJobEvents } from './strategy.events.js';
 import { useToastManager } from '@/components/ui/toast';
 import { StrategyCenterLayout } from './StrategyCenterLayout.js';
 import { StrategyEditorPage } from './StrategyEditorPage.js';
-import { StrategySubmissionList } from './StrategySubmissionList.js';
 import { StrategyExperimentCreatePage } from './StrategyExperimentCreatePage.js';
 import { StrategyExperimentDetailPage } from './StrategyExperimentDetailPage.js';
 import { StrategyExperimentListPage } from './StrategyExperimentListPage.js';
@@ -203,7 +201,6 @@ export function StrategyDashboard() {
     runMutation,
     cancelMutation,
     retryMutation,
-    onJobQueued: (job) => void navigate(strategyCenterPath.job(job.id)),
     queueErrorToastId,
     load,
   });
@@ -231,9 +228,7 @@ export function StrategyDashboard() {
           description={strategiesQuery.isError ? '策略列表暂未更新。已成功保存的策略或新版本无需再次提交，请重新读取列表。' : undefined}
           onRetry={() => void refresh()}
         />
-        <StrategySubmissionList />
         <Routes>
-          <Route path="arena/:match?/:round?" element={<ArenaPage />} />
           <Route index element={<LegacyStrategyRedirect />} />
           <Route
             path="library"

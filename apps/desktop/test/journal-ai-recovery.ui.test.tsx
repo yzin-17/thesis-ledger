@@ -58,6 +58,48 @@ describe('AI 任务引用恢复交互', () => {
     readRun: vi.fn(async () => run),
     onRunSelected: vi.fn(),
   });
+  it('安全上下文保持已有 SHA-256 任务引用键不变', async () => {
+    const scope = JSON.stringify(['object', '账户一', 'actual', { object: 'cycle:1' }]);
+    const key = await journalAiReferenceKey(scope);
+    const digest = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(scope));
+    const hex = Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+    expect(key).toBe(`journal-review-ai:v1:${hex}`);
+  });
+
+  it('内网 HTTP 缺少 WebCrypto 时仍能创建和恢复 AI 任务引用', async () => {
+    vi.stubGlobal('crypto', {});
+    const p = props();
+    const scope = JSON.stringify([p.kind, p.accountId, p.mode, p.scope]);
+    const key = await journalAiReferenceKey(scope);
+    expect(key).toMatch(/^journal-review-ai:v1-local:[a-f0-9]{32}$/);
+    expect(key).toBe(await journalAiReferenceKey(scope));
+    expect(key).not.toContain('cycle:1');
+    expect(key).not.toBe(await journalAiReferenceKey(scope + ':other'));
+
+    const first = await mountJournal(<JournalAiRunPanel {...p} />);
+    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
+    expect(first.host.textContent).not.toContain('AI 任务引用暂不可用');
+    await journalClick('开始 AI 解读');
+    await journalWait(() => expect(first.host.textContent).toContain('只解读已核对的事实'));
+    expect(sessionStorage.getItem(key)).toContain(run.id);
+    await first.dispose();
+
+    const second = await mountJournal(<JournalAiRunPanel {...p} />);
+    await journalWait(() => expect(second.host.textContent).toContain('只解读已核对的事实'));
+    expect(p.createRun).toHaveBeenCalledTimes(1);
+    expect(p.readRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('WebCrypto 摘要异常时不阻塞本地任务索引', async () => {
+    vi.stubGlobal('crypto', {
+      subtle: { digest: vi.fn().mockRejectedValue(new Error('blocked')) },
+    });
+    const key = await journalAiReferenceKey('test-scope');
+    expect(key).toMatch(/^journal-review-ai:v1-local:[a-f0-9]{32}$/);
+  });
+
   it('重新挂载只读取同一任务，引用中不保存事实和报告', async () => {
     const p = props();
     const first = await mountJournal(<JournalAiRunPanel {...p} />);
@@ -75,7 +117,8 @@ describe('AI 任务引用恢复交互', () => {
     expect(p.createRun).toHaveBeenCalledTimes(1);
     expect(p.readRun).toHaveBeenCalledTimes(2);
     expect(p.onRunSelected).toHaveBeenCalledWith(run.id);
-    expect(journalButton('开始 AI 解读').disabled).toBe(true);
+    expect(second.host.textContent).not.toContain('开始 AI 解读');
+    expect(second.host.textContent).toContain('移除任务引用');
   });
   it.each([
     { accountId: '账户二' },
@@ -110,7 +153,7 @@ describe('AI 任务引用恢复交互', () => {
     expect(p.createRun).toHaveBeenCalledTimes(1);
     await journalClick('重新读取');
     await journalWait(() => expect(restored.host.textContent).toContain('验收-v2'));
-    await journalClick('清除任务引用');
+    await journalClick('移除任务引用');
     const key = await journalAiReferenceKey(JSON.stringify([p.kind, p.accountId, p.mode, p.scope]));
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(restored.host.textContent).not.toContain('只解读已核对的事实');

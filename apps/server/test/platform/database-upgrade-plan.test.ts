@@ -66,6 +66,10 @@ describe('保留数据升级计划', () => {
       '20261106020000_fund_daily_estimate_error',
       '20261106030000_strategy_submission',
       '20261107010000_risk_notification_providers',
+      '20261112010000_autonomous_model_arena',
+      '20261112020000_optimization_manual_retry',
+      '20261112030000_arena_replay_timeline',
+      '20261114010000_journal_period_review_snapshots',
     ]);
   });
   it('仅列出当前 head 后的迁移且保留完整链摘要', () => {

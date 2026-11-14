@@ -3,7 +3,9 @@ import { fundNavHistorySchema, type FundNav, type FundNavHistory, type FundHoldi
 import type { DsaClient } from '../integration/dsa/dsa.client.js';
 import { redisKey, type RedisService } from '../platform/redis.service.js';
 import type { PrismaService } from '../platform/prisma.service.js';
-import { parseCurrentFundNav, parseCurrentFundHoldings } from './market-current-data.js';
+import { parseCurrentFundNav, parseCurrentFundHoldings, MarketDataIdentityError } from './market-current-data.js';
+import type { DataQualityService } from '../quality/data-quality.service.js';
+import { readWithDataQuality } from './market-data-quality.js';
 import { MarketCacheControl, type MarketCacheScope } from './market-cache-control.js';
 import { historicalSeriesFreshSeconds, MARKET_CACHE_POLICIES, MarketResultCache } from './market-result-cache.js';
 import { marketStaleReason } from './market-stale-reason.js';
@@ -19,7 +21,7 @@ export class MarketFundReader {
   private readonly resultCache: MarketResultCache;
   constructor(private readonly dsa: DsaClient, private readonly redis: RedisService,
     private readonly singleFlight: WorkGate, private readonly withDistributedLock: CancellableWorkGate,
-    private readonly prisma?: PrismaService) {
+    private readonly prisma?: PrismaService, private readonly quality?: DataQualityService) {
     this.control = new MarketCacheControl(dsa);
     this.resultCache = new MarketResultCache(redis);
   }
@@ -68,7 +70,9 @@ export class MarketFundReader {
       const raw = options.signal
         ? await this.dsa.get<Record<string, unknown>>(path, 1, undefined, options.signal)
         : await this.dsa.get<Record<string, unknown>>(path);
-      const nav = parseCurrentFundNav({ ...raw, servedFromCache: false }, symbol);
+      const nav = await readWithDataQuality(this.quality, {
+        capability: 'FUND_NAV', provider: 'dsa', symbol, scope: JSON.stringify(scope.context.routeKey),
+      }, () => parseCurrentFundNav({ ...raw, servedFromCache: false }, symbol));
       if (nav.freshness === 'unavailable') throw new Error('基金净值不可用');
       await this.control.assertCurrent(scope, options.signal);
       const serialized = JSON.stringify(nav);
@@ -95,7 +99,7 @@ export class MarketFundReader {
     const parse = (value: unknown) => {
       const points = fundNavHistorySchema.parse(value);
       if (points.some((point) => point.symbol !== symbol)) {
-        throw new Error('基金净值历史响应代码与请求不一致');
+        throw new MarketDataIdentityError('基金净值历史响应代码与请求不一致');
       }
       return points;
     };
@@ -134,12 +138,14 @@ export class MarketFundReader {
             const raw = await this.dsa.get<unknown[]>(
               `/api/v3/thesis-ledger/market/fund-nav/history?${query.toString()}`,
             );
-            const points = parse(
-              raw.map((point) => ({
+            const points = await readWithDataQuality(this.quality, {
+              capability: 'FUND_NAV_HISTORY', provider: 'dsa', symbol, scope: JSON.stringify(scope.context.routeKey),
+            }, () => parse(
+              Array.isArray(raw) ? raw.map((point) => ({
                 ...(point as Record<string, unknown>),
                 servedFromCache: false,
-              })),
-            );
+              })) : raw,
+            ));
             await this.control.assertCurrent(scope);
             if (this.prisma && options.persistIdentity !== false && points.length > 0) {
               try {
@@ -217,13 +223,15 @@ export class MarketFundReader {
         const raw = await this.dsa.get<Record<string, unknown>>(
           `/api/v3/thesis-ledger/market/fund-holdings?symbol=${encodeURIComponent(symbol)}`,
         );
-        const holdings = parseCurrentFundHoldings(
+        const holdings = await readWithDataQuality(this.quality, {
+          capability: 'FUND_HOLDINGS', provider: 'dsa', symbol, scope: JSON.stringify(scope.context.routeKey),
+        }, () => parseCurrentFundHoldings(
           {
             ...raw,
             servedFromCache: false,
           },
           symbol,
-        );
+        ));
         await this.control.assertCurrent(scope);
         await this.redis.client.set(key, JSON.stringify(holdings), 'EX', 86_400);
         return holdings;

@@ -69,20 +69,7 @@ export class AiProviderSaveService {
     if (row && parsed.expectedRevision !== row.updatedAt.toISOString())
       throw new ConflictException('配置版本已变化，请刷新后再验证');
     const stored = row ? parseAiProviderSettings(row.settings) : null;
-    const credentialSupplied = parsed.apiKey ?? parsed.credentialsRef;
-    if (
-      row &&
-      parsed.authMode === 'api_key' &&
-      !credentialSupplied &&
-      (!stored || new URL(stored.baseUrl).toString() !== new URL(parsed.baseUrl).toString())
-    )
-      throw new BadRequestException('服务地址已变化，请重新输入密钥，不能将旧密钥发送到新地址');
-    const credential =
-      parsed.authMode === 'none'
-        ? ''
-        : (credentialSupplied ?? (row ? await this.configs.readCredential(row) : ''));
-    if (parsed.authMode === 'api_key' && !credential && parsed.enabled !== false)
-      throw new BadRequestException('请填写 API Key');
+    const credential = await this.validationCredential(parsed, row, stored);
     const modelDefaults = mergeModelRequestOptionsDefaults(
       parsed.modelDefaults,
       stored?.modelDefaults,
@@ -128,6 +115,28 @@ export class AiProviderSaveService {
       return { route, fingerprint, record };
     });
     return { input, row, credential, routes, profile };
+  }
+
+  private async validationCredential(
+    parsed: AiProviderInput,
+    row: Awaited<ReturnType<ProviderConfigService['findStored']>>,
+    stored: ReturnType<typeof parseAiProviderSettings>,
+  ) {
+    const credentialSupplied = parsed.apiKey ?? parsed.credentialsRef;
+    if (
+      row &&
+      parsed.authMode === 'api_key' &&
+      !credentialSupplied &&
+      (!stored || new URL(stored.baseUrl).toString() !== new URL(parsed.baseUrl).toString())
+    )
+      throw new BadRequestException('服务地址已变化，请重新输入密钥，不能将旧密钥发送到新地址');
+    const credential =
+      parsed.authMode === 'none'
+        ? ''
+        : (credentialSupplied ?? (row ? await this.configs.readCredential(row) : ''));
+    if (parsed.authMode === 'api_key' && !credential && parsed.enabled !== false)
+      throw new BadRequestException('请填写 API Key');
+    return credential;
   }
 
   private planFor(context: Awaited<ReturnType<AiProviderSaveService['context']>>) {

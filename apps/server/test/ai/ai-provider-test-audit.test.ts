@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { researchGenerationV2Contract } from '@thesis-ledger/schemas';
+import { providerHealthDetailsSchema, researchGenerationV2Contract } from '@thesis-ledger/schemas';
 import { AiProviderService } from '../../src/ai/ai-provider.service.js';
 import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
 import {
@@ -80,8 +80,11 @@ describe('AI Provider 测试审计归因', () => {
       const records = outcome === 'cancelled' ? health.recordHistory : health.record;
       expect(records).toHaveBeenCalledOnce();
       const details = records.mock.calls[0]?.[6];
+      const auditStatus = { success: 'passed', failure: 'failed', cancelled: 'cancelled' };
+      expect(providerHealthDetailsSchema.safeParse(details).success).toBe(true);
       expect(details).toMatchObject({
-        kind: 'ai_provider_test',
+        kind: 'ai_provider_probe',
+        status: auditStatus[outcome],
         testKind: 'connection',
         mode: 'json_validated',
         model,
@@ -141,6 +144,9 @@ describe('AI Provider 测试审计归因', () => {
         contract: researchGenerationV2Contract.ref,
         usage,
       });
+      expect(providerHealthDetailsSchema.safeParse(health.record.mock.calls[0]?.[6]).success).toBe(
+        true,
+      );
     },
   );
 });

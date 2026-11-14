@@ -47,6 +47,7 @@ import { publicFeesArtifactKeyV3, publicFeesCompositionVersionV3 } from '@thesis
 import { tradingStatusArtifactKeyV3 } from '@thesis-ledger/schemas';
 import { collectSnapshotStatusInputsV1 } from './backtest-status-composition-v1.js';
 import { statusCompositionArtifactKeyV1 } from '@thesis-ledger/schemas';
+import { readPriceResearchReference } from './backtest-price-research-input.js';
 
 export interface BacktestSnapshotV3BuildInput {
   runId: string;
@@ -143,6 +144,9 @@ const buildBuildingManifest = (input: BacktestSnapshotV3BuildInput): BacktestSna
         }
       : {}),
     executionPriceProtocol: runConfig.executionPriceProtocol,
+    ...(runConfig.priceResearch
+      ? { priceResearch: { protocolVersion: runConfig.priceResearch.protocolVersion } }
+      : {}),
     ...(runConfig.frozenExecutionWindow
       ? { frozenExecutionWindow: runConfig.frozenExecutionWindow }
       : {}),
@@ -247,35 +251,11 @@ export const buildBacktestSnapshotV3 = async (
     end: initialManifest.dateRange.endDate,
   };
   if (input.runConfig.lifecyclePreparation) {
-    if (!lifecycle) throw new Error('生命周期准备冻结缺少当前来源复核端口');
-    const prepared = input.runConfig.lifecyclePreparation;
-    const current = await lifecycle.read({
-      market: 'CN',
-      symbol,
-      start: prepared.response.range.start,
-      end: prepared.response.range.end,
-    });
-    if (prepared.inputHash !== lifecycleInputHashV3(current))
-      throw new Error('生命周期准备输入变化，请重新准备');
+    await assertPreparedLifecycleSource(input.runConfig.lifecyclePreparation, symbol, lifecycle);
   }
-  const readResult = await bars.readV3({
-    market: routeKey.market,
-    symbol,
-    routeKey,
-    window,
-    ...backtestResearchReadOptionsV3(routeKey.market, initialManifest.executionPriceProtocol),
-    ...(initialManifest.frozenExecutionWindow
-      ? {
-          frozenWindowRef: initialManifest.frozenExecutionWindow,
-          warmup: {
-            analysisStart:
-              input.runConfig.lifecyclePreparation?.signalStartDate ??
-              initialManifest.dateRange.startDate,
-            minimumSessions: initialManifest.warmup.lookbackPeriods,
-          },
-        }
-      : {}),
-  });
+  const readResult = await bars.readV3(
+    snapshotExecutionReadRequest(input, initialManifest, routeKey, symbol, window),
+  );
   const sourceOutput = createBacktestSnapshotV3Source(
     { purpose: 'execution', symbol, routeKey, window },
     readResult,
@@ -293,9 +273,16 @@ export const buildBacktestSnapshotV3 = async (
     readResult.selection.response,
     symbol,
     initialManifest.executionPriceProtocol,
+    Boolean(input.runConfig.priceResearch),
   );
   if (rows.length === 0) throw new Error('V3 execution Snapshot 未返回完整 Bar 数据');
   const runConfig = runConfigSchemaV3.parse(input.runConfig);
+  const reference = await readPriceResearchReference({
+    strategy,
+    runConfig,
+    execution: readResult,
+    reader: bars,
+  });
   cashContext.assertPriceRevisions(readResult.evidence);
   const historyFailure = await backtestHistoricalExecutionPreflightFailureV3(
     {
@@ -316,28 +303,12 @@ export const buildBacktestSnapshotV3 = async (
   );
   const publicFees = await collectSnapshotPublicFeesV3(runConfig, dsa);
   const { statusComposition, tradingStatus } = await collectSnapshotStatusInputsV1(runConfig, dsa);
-  const inputPlan = runConfig.priceInputBindings
-    ? planSnapshotInputsV3({ strategy, runConfig })
-    : undefined;
-  if (inputPlan && !dsa) throw new Error('V3 完整冻结缺少非价格依赖读取器');
-  const dependencies =
-    inputPlan && dsa
-      ? await collectSnapshotDependenciesV3(
-          {
-            strategy,
-            runConfig,
-            plan: inputPlan.plan,
-            tradabilityWindow: tradabilityWindowFromResponseV3(readResult.selection.response),
-            settlementCalendarPolicy: 'settlement-calendar-v1',
-            eventRevisions: {
-              desiredRevision: readResult.evidence.desiredRevision,
-              effectivePolicyRevision: readResult.evidence.effectivePolicyRevision,
-              catalogRevision: readResult.evidence.catalogRevision,
-            },
-          },
-          dsa,
-        )
-      : undefined;
+  const { inputPlan, dependencies } = await collectPreparedSnapshotDependencies(
+    strategy,
+    runConfig,
+    readResult,
+    dsa,
+  );
   const evidenceRow: ArtifactRow = {
     ...sourceOutput.evidenceRow,
     barRowsFingerprint: hashCanonicalManifest(rows),
@@ -346,41 +317,19 @@ export const buildBacktestSnapshotV3 = async (
       : {}),
   };
   const knownCash = await cashContext.read();
-  const manifest = {
-    ...initialManifest,
-    benchmarkCostVersion: shareWindowBenchmarkCostVersionV3(
-      initialManifest.executionPriceProtocol,
-      sourceOutput.actualSource,
-    ),
-    ...(statusComposition ? { statusComposition: { artifactKey: `${input.runId}/${statusCompositionArtifactKeyV1}`, freezeVersion: statusComposition.freezeVersion } } : {}),
-    ...(tradingStatus
-      ? {
-          tradingStatus: {
-            artifactKey: `${input.runId}/${tradingStatusArtifactKeyV3}`,
-            freezeVersion: tradingStatus.freezeVersion,
-          },
-        }
-      : {}),
-    ...(publicFees
-      ? {
-          publicFees: {
-            artifactKey: `${input.runId}/${publicFeesArtifactKeyV3}`,
-            compositionVersion: publicFeesCompositionVersionV3,
-          },
-        }
-      : {}),
-    actualSources: inputPlan
-      ? [...new Set(inputPlan.priceInputs.map((alias) => alias.purpose))].map((purpose) => ({
-          ...sourceOutput.actualSource,
-          purpose,
-        }))
-      : [sourceOutput.actualSource],
-    ...cashContext.manifest,
-    providerRevisions: {
-      ...(dependencies?.providerRevisions ?? {}),
-      ...cashContext.providerRevisions,
-    },
-  } satisfies BacktestSnapshotManifestV3;
+  const manifest = preparedSnapshotManifest({
+    input,
+    initialManifest,
+    runConfig,
+    reference,
+    sourceOutput,
+    statusComposition,
+    tradingStatus,
+    publicFees,
+    inputPlan,
+    cashContext,
+    dependencies,
+  });
 
   const building = await snapshots.startBuild(manifest);
   if (building.status === 'finalized') return replayResult(await snapshots.replay(input.runId));
@@ -398,6 +347,7 @@ export const buildBacktestSnapshotV3 = async (
       tradingStatus,
       knownCash,
       statusComposition,
+      reference,
     );
     await input.beforeFinalize?.();
     await cashContext.read();
@@ -423,3 +373,160 @@ export const buildBacktestSnapshotV3 = async (
     throw error;
   }
 };
+
+async function assertPreparedLifecycleSource(
+  prepared: NonNullable<BacktestSnapshotV3BuildInput['runConfig']['lifecyclePreparation']>,
+  symbol: string,
+  lifecycle: MarketLifecycleReadPortV3 | undefined,
+) {
+  if (!lifecycle) throw new Error('生命周期准备冻结缺少当前来源复核端口');
+  const current = await lifecycle.read({
+    market: 'CN',
+    symbol,
+    start: prepared.response.range.start,
+    end: prepared.response.range.end,
+  });
+  if (prepared.inputHash !== lifecycleInputHashV3(current))
+    throw new Error('生命周期准备输入变化，请重新准备');
+}
+function snapshotExecutionReadRequest(
+  input: BacktestSnapshotV3BuildInput,
+  initialManifest: BacktestSnapshotManifestV3,
+  routeKey: ReturnType<typeof marketDataBarRouteKeyV3Schema.parse>,
+  symbol: string,
+  window: { start: string; end: string },
+): Parameters<MarketBarReader['readV3']>[0] {
+  return {
+    market: routeKey.market,
+    symbol,
+    routeKey,
+    window,
+    ...backtestResearchReadOptionsV3(routeKey.market, initialManifest.executionPriceProtocol),
+    ...(initialManifest.frozenExecutionWindow
+      ? {
+          frozenWindowRef: initialManifest.frozenExecutionWindow,
+          warmup: {
+            analysisStart:
+              input.runConfig.lifecyclePreparation?.signalStartDate ??
+              initialManifest.dateRange.startDate,
+            minimumSessions: initialManifest.warmup.lookbackPeriods,
+          },
+        }
+      : {}),
+  };
+}
+
+type SnapshotManifestMaterial = {
+  input: BacktestSnapshotV3BuildInput;
+  initialManifest: BacktestSnapshotManifestV3;
+  runConfig: ReturnType<typeof runConfigSchemaV3.parse>;
+  reference: Awaited<ReturnType<typeof readPriceResearchReference>>;
+  sourceOutput: ReturnType<typeof createBacktestSnapshotV3Source>;
+  statusComposition: Awaited<ReturnType<typeof collectSnapshotStatusInputsV1>>['statusComposition'];
+  tradingStatus: Awaited<ReturnType<typeof collectSnapshotStatusInputsV1>>['tradingStatus'];
+  publicFees: Awaited<ReturnType<typeof collectSnapshotPublicFeesV3>>;
+  inputPlan: ReturnType<typeof planSnapshotInputsV3> | undefined;
+  cashContext: ReturnType<typeof knownCashSnapshotContextV3>;
+  dependencies: Awaited<ReturnType<typeof collectSnapshotDependenciesV3>> | undefined;
+};
+function preparedSnapshotManifest({
+  input,
+  initialManifest,
+  runConfig,
+  reference,
+  sourceOutput,
+  statusComposition,
+  tradingStatus,
+  publicFees,
+  inputPlan,
+  cashContext,
+  dependencies,
+}: SnapshotManifestMaterial) {
+  return {
+    ...initialManifest,
+    ...(runConfig.priceResearch
+      ? {
+          priceResearch: {
+            protocolVersion: runConfig.priceResearch.protocolVersion,
+            ...(reference ? { actualPriceSource: reference.actualSource } : {}),
+          },
+        }
+      : {}),
+    benchmarkCostVersion: shareWindowBenchmarkCostVersionV3(
+      initialManifest.executionPriceProtocol,
+      sourceOutput.actualSource,
+    ),
+    ...(statusComposition
+      ? {
+          statusComposition: {
+            artifactKey: `${input.runId}/${statusCompositionArtifactKeyV1}`,
+            freezeVersion: statusComposition.freezeVersion,
+          },
+        }
+      : {}),
+    ...(tradingStatus
+      ? {
+          tradingStatus: {
+            artifactKey: `${input.runId}/${tradingStatusArtifactKeyV3}`,
+            freezeVersion: tradingStatus.freezeVersion,
+          },
+        }
+      : {}),
+    ...(publicFees
+      ? {
+          publicFees: {
+            artifactKey: `${input.runId}/${publicFeesArtifactKeyV3}`,
+            compositionVersion: publicFeesCompositionVersionV3,
+          },
+        }
+      : {}),
+    actualSources: inputPlan
+      ? [
+          ...new Set(
+            inputPlan.priceInputs
+              .filter((alias) => alias.artifactKey === 'execution/bars.parquet')
+              .map((alias) => alias.purpose),
+          ),
+        ].map((purpose) => ({
+          ...sourceOutput.actualSource,
+          purpose,
+        }))
+      : [sourceOutput.actualSource],
+    ...cashContext.manifest,
+    providerRevisions: {
+      ...(dependencies?.providerRevisions ?? {}),
+      ...cashContext.providerRevisions,
+    },
+  } satisfies BacktestSnapshotManifestV3;
+}
+
+async function collectPreparedSnapshotDependencies(
+  strategy: BacktestSnapshotV3BuildInput['strategy'],
+  runConfig: ReturnType<typeof runConfigSchemaV3.parse>,
+  readResult: Extract<Awaited<ReturnType<MarketBarReader['readV3']>>, { status: 'selected' }>,
+  dsa: Parameters<typeof collectSnapshotDependenciesV3>[1] | undefined,
+) {
+  const inputPlan = runConfig.priceInputBindings
+    ? planSnapshotInputsV3({ strategy, runConfig })
+    : undefined;
+  if (inputPlan && !dsa) throw new Error('V3 完整冻结缺少非价格依赖读取器');
+  const dependencies =
+    inputPlan && dsa
+      ? await collectSnapshotDependenciesV3(
+          {
+            strategy,
+            runConfig,
+            plan: inputPlan.plan,
+            tradabilityWindow: tradabilityWindowFromResponseV3(readResult.selection.response),
+            settlementCalendarPolicy: 'settlement-calendar-v1',
+            eventRevisions: {
+              desiredRevision: readResult.evidence.desiredRevision,
+              effectivePolicyRevision: readResult.evidence.effectivePolicyRevision,
+              catalogRevision: readResult.evidence.catalogRevision,
+            },
+          },
+          dsa,
+        )
+      : undefined;
+  return { inputPlan, dependencies };
+}

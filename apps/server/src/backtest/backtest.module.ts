@@ -45,10 +45,13 @@ import { StrategyCreationService } from './strategy-creation.service.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { StrategyIdentityGuard } from './strategy-identity.guard.js';
 import { StrategyAccessService } from './strategy-access.service.js';
+import { BacktestInstrumentSeriesController } from './backtest-instrument-series.controller.js';
+import { BacktestInstrumentSeriesService } from './backtest-instrument-series.service.js';
 
 @Module({
   imports: [DsaModule, MarketModule, PlatformModule, IdentityModule],
   controllers: [
+    BacktestInstrumentSeriesController,
     BacktestModelResolutionController,
     BacktestNavRunController,
     BacktestNavPreparationController,
@@ -57,6 +60,7 @@ import { StrategyAccessService } from './strategy-access.service.js';
     BacktestRunPreflightController,
   ],
   providers: [
+    BacktestInstrumentSeriesService,
     StrategyCreationService,
     StrategyIdentityGuard,
     StrategyAccessService,

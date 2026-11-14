@@ -185,6 +185,9 @@ describe('第 3 批手机异常保护', () => {
     expect(() => journalWindow('2026-10-02T00:00:00Z', '2026-10-01T00:00:00Z')).toThrow();
     expect(() => journalWindow('2026-10-01T00:00:00', '2026-10-02T00:00:00')).toThrow();
   });
+});
+
+describe('手机分析、材料与不确定提交恢复', () => {
   it('分析错误保留草稿，成功后草稿修改禁止保存旧结果', async () => {
     const evidence = journalEvidenceFixture();
     const candidate = journalReviewCandidateContractSchema.parse({

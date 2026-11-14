@@ -49,22 +49,25 @@ export function watchlistNumberSample(name: string) {
         ...(name === 'tiny' && { refreshFailure: 'budget_cooldown' }),
       }
     : undefined;
-  const price = sample
-    ? { kind: 'quote', quote }
-    : fund
-      ? {
-          kind: 'nav',
-          nav: {
-            version: 3,
-            symbol,
-            unitNav: 1e-7,
-            navDate: '2026-11-06T00:00:00Z',
-            provider: 'tushare',
-            fetchedAt: '2026-11-07T00:00:00Z',
-            freshness: 'delayed',
-          },
-        }
-      : { kind: 'unavailable', reason: 'not_eligible' };
+  let price: unknown;
+  if (sample) price = { kind: 'quote', quote };
+  else if (fund) {
+    price = {
+      kind: 'nav',
+      nav: {
+        version: 3,
+        symbol,
+        unitNav: 1e-7,
+        navDate: '2026-11-06T00:00:00Z',
+        provider: 'tushare',
+        fetchedAt: '2026-11-07T00:00:00Z',
+        freshness: 'delayed',
+      },
+    };
+  } else price = { kind: 'unavailable', reason: 'not_eligible' };
+  let session = 'trading';
+  if (name === 'ordinary') session = 'closed_snapshot';
+  else if (name === 'tiny') session = 'older_snapshot';
   const prices = watchlistPricesSchema.parse([
     {
       itemId: watchlistSampleId,
@@ -72,12 +75,7 @@ export function watchlistNumberSample(name: string) {
       price,
       ...(sample && {
         quoteContext: {
-          session:
-            name === 'ordinary'
-              ? 'closed_snapshot'
-              : name === 'tiny'
-                ? 'older_snapshot'
-                : 'trading',
+          session,
           evaluatedAt: '2026-11-07T00:00:00Z',
         },
       }),

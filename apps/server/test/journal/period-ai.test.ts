@@ -1,11 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  journalPeriodAiFrozenEvidenceSchema,
+  type IdentityPrincipal,
+} from '@thesis-ledger/schemas';
+import { journalResearchNumericFields } from '../../src/journal/journal-research-numeric-fields.js';
+import { localIdentityPrincipal } from '../../src/identity/local-workspace.js';
 import { JournalPeriodReviewAi } from '../../src/journal/journal-period-review-ai.js';
 import { JournalReviewAnalysis } from '../../src/journal/journal-review-analysis.js';
 import { journalReviewCandidate } from '../../src/journal/journal-review-candidate.js';
-import type { AiFrozenResearch } from '../../src/ai/ai-frozen-research.js';
 import { reviewEvidenceFixture } from './review-evidence.fixture.js';
 
 const id = '00000000-0000-4000-8000-000000000080';
+const principal = localIdentityPrincipal() as IdentityPrincipal;
+
 async function setup() {
   const evidence = reviewEvidenceFixture();
   const cycle = journalReviewCandidate({ evidence, fxMissing: false, projectionStale: false });
@@ -45,59 +52,87 @@ async function setup() {
       ]),
     ),
   };
-  let frozen: AiFrozenResearch | null = null;
-  const startResearch = vi.fn((_input: unknown, source: AiFrozenResearch) => {
-    frozen = structuredClone(source);
-    return Promise.resolve({ id });
-  });
-  const runs = {
-    startResearch,
-    frozenEvidence: vi.fn(() => Promise.resolve(frozen)),
-    resume: vi.fn().mockResolvedValue({
-      id,
-      provider: 'fixture',
-      model: 'fixture-model',
-      promptVersion: 'journal-period-review-v2',
-      status: 'queued',
-      context: { scope: 'account', accountId: evidence.trade.accountId },
-      result: null,
-      errorCode: null,
-      errorSummary: null,
-      createdAt: new Date('2026-10-04T09:00:00Z'),
+  let frozen: unknown = null;
+  const v2 = {
+    start: vi.fn(async (_principal: IdentityPrincipal, input: { data: unknown }) => {
+      frozen = structuredClone(input.data);
+      return id;
     }),
+    read: vi.fn(
+      async (
+        _principal: IdentityPrincipal,
+        _id: string,
+        requested: { accountId: string; mode: string },
+      ) => {
+        if (requested.accountId !== request.accountId || requested.mode !== request.mode)
+          return null;
+        return {
+          row: {
+            id,
+            provider: 'selected-provider',
+            model: 'selected-model',
+            promptVersion: 'journal-period-review-v5',
+            status: 'queued',
+            errorCode: null,
+            errorSummary: null,
+            createdAt: new Date('2026-11-13T09:00:00Z'),
+          },
+          object: null,
+          period: frozen,
+          result: null,
+        };
+      },
+    ),
   };
-  const executor = { dispatch: vi.fn() };
+  const runs = { startResearch: vi.fn(), resume: vi.fn().mockResolvedValue(null) };
   return {
-    service: new JournalPeriodReviewAi(analysis, runs as never, executor as never),
+    service: new JournalPeriodReviewAi(analysis, runs as never, v2 as never),
     request,
     cycle,
     runs,
-    executor,
+    v2,
   };
 }
-describe('周期 AI 的冻结统计范围', () => {
-  it('冻结两种独立粒度、窗口及全部来源，任务元数据可追溯', async () => {
-    const { service, request, runs, executor, cycle } = await setup();
+describe('周期 AI 冻结结果迁移 V2', () => {
+  it('冻结两种独立粒度、窗口与来源后提交 V2，未调用 V1', async () => {
+    const { service, request, runs, v2, cycle } = await setup();
     const before = structuredClone(cycle);
-    expect(await service.start(request)).toMatchObject({
+    expect(await service.start(request, principal)).toMatchObject({
       id,
       start: request.start,
       end: request.end,
       objectFingerprints: request.objectFingerprints,
+      promptVersion: 'journal-period-review-v5',
     });
-    const frozen = runs.startResearch.mock.calls[0]![1];
-    expect(frozen.source.tool).toBe('getJournalPeriodReview');
-    expect(frozen.source.evidence.data).toMatchObject({
-      result: {
-        tradeCycles: { includedObjectIds: ['TRADE_CYCLE:trade-1'] },
-        closeSlices: { includedObjectIds: ['CLOSE_SLICE:slice-1'] },
-      },
-    });
-    expect(executor.dispatch).toHaveBeenCalledExactlyOnceWith(id);
+    expect(v2.start).toHaveBeenCalledWith(
+      principal,
+      expect.objectContaining({
+        scope: { accountId: request.accountId, mode: request.mode },
+        prompt: expect.objectContaining({ version: 'journal-period-review-v5' }),
+        data: expect.objectContaining({
+          result: expect.objectContaining({
+            tradeCycles: expect.objectContaining({ includedObjectIds: ['TRADE_CYCLE:trade-1'] }),
+            closeSlices: expect.objectContaining({ includedObjectIds: ['CLOSE_SLICE:slice-1'] }),
+          }),
+        }),
+      }),
+    );
+    const frozen = journalPeriodAiFrozenEvidenceSchema.parse(v2.start.mock.calls[0]![1].data);
+    const numericFields = journalResearchNumericFields(frozen);
+    expect(numericFields.map((field) => field.fieldPath)).toContain(
+      '/result/tradeCycles/metrics/sampleCount/value',
+    );
+    expect(numericFields.map((field) => field.fieldPath)).toContain(
+      '/result/closeSlices/metrics/sampleCount/value',
+    );
+    expect(numericFields.some((field) => field.unit === 'count' && field.currency === null)).toBe(
+      true,
+    );
+    expect(runs.startResearch).not.toHaveBeenCalled();
     expect(cycle).toEqual(before);
   });
-  it('计划指纹、对象集合、Ledger 或世代改变后拒绝旧结果，不提交任务', async () => {
-    const { service, request, runs, executor } = await setup();
+  it('输入指纹、对象集合、Ledger 或世代改变拒绝，未提交任何研究', async () => {
+    const { service, request, v2 } = await setup();
     for (const changed of [
       { ...request, expectedLedgerRevision: '13' },
       { ...request, expectedProjectionGeneration: '8' },
@@ -110,36 +145,41 @@ describe('周期 AI 的冻结统计范围', () => {
         },
       },
     ])
-      await expect(service.start(changed)).rejects.toMatchObject({
+      await expect(service.start(changed, principal)).rejects.toMatchObject({
         response: { errorCode: 'JOURNAL_EVIDENCE_CHANGED' },
       });
-    expect(runs.startResearch).not.toHaveBeenCalled();
-    expect(executor.dispatch).not.toHaveBeenCalled();
+    expect(v2.start).not.toHaveBeenCalled();
   });
-  it('算法变化和客户端自造事实被拒绝，未设置模型只影响解读', async () => {
-    const { service, request, runs, executor, cycle } = await setup();
+  it('算法变化和客户端伪造事实被拒绝；模型不可用不影响确定性事实', async () => {
+    const { service, request, v2, cycle } = await setup();
     await expect(
-      service.start({ ...request, expectedAlgorithmVersion: 'future' }),
+      service.start({ ...request, expectedAlgorithmVersion: 'future' }, principal),
     ).rejects.toMatchObject({ response: { errorCode: 'JOURNAL_ALGORITHM_CHANGED' } });
-    await expect(service.start({ ...request, facts: [{ pnl: 999 }] })).rejects.toThrow();
+    await expect(service.start({ ...request, facts: [{ pnl: 999 }] }, principal)).rejects.toThrow();
     const before = structuredClone(cycle);
-    runs.startResearch.mockRejectedValueOnce(new Error('请先选择研究默认模型'));
-    await expect(service.start(request)).rejects.toThrow('请先选择研究默认模型');
-    expect(executor.dispatch).not.toHaveBeenCalled();
+    v2.start.mockRejectedValueOnce(new Error('研究默认模型尚无可执行的 V2 合同路由'));
+    await expect(service.start(request, principal)).rejects.toThrow('V2 合同路由');
     expect(cycle).toEqual(before);
   });
   it('拒绝其他账户、模式及单笔解读类型', async () => {
-    const { service, request, runs } = await setup();
-    await service.start(request);
+    const { service, request, v2 } = await setup();
+    await service.start(request, principal);
     await expect(
-      service.get(id, { accountId: request.accountId, mode: 'shadow' }),
+      service.get(id, { accountId: request.accountId, mode: 'shadow' }, principal),
     ).rejects.toMatchObject({ response: { errorCode: 'JOURNAL_AI_NOT_FOUND' } });
     await expect(
-      service.get(id, { accountId: '00000000-0000-4000-8000-000000000090' }),
+      service.get(
+        id,
+        {
+          accountId: '00000000-0000-4000-8000-000000000090',
+          mode: 'actual',
+        },
+        principal,
+      ),
     ).rejects.toMatchObject({ response: { errorCode: 'JOURNAL_AI_NOT_FOUND' } });
-    runs.frozenEvidence.mockResolvedValueOnce(null);
-    await expect(service.get(id, { accountId: request.accountId })).rejects.toMatchObject({
-      response: { errorCode: 'JOURNAL_AI_NOT_FOUND' },
-    });
+    v2.read.mockResolvedValueOnce(null as never);
+    await expect(
+      service.get(id, { accountId: request.accountId }, principal),
+    ).rejects.toMatchObject({ response: { errorCode: 'JOURNAL_AI_NOT_FOUND' } });
   });
 });

@@ -1,4 +1,5 @@
 import {useContinuousSubmission} from '../strategy-library/StrategySubmissions';
+import { PreparedPriceSources } from '../backtest-setup/PreparedPriceSources';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
@@ -24,12 +25,19 @@ import {
   Field,
   Page,
   QueryList, QueryStatus,
-  Section,
+  ContentSection as Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
 import { useStrategyLibrary } from '../strategy-library/useStrategyLibrary';
+import { OptimizationResearchChoice, useOptimizationResearch } from './OptimizationResearch';
+import { OptimizationModelFields } from './OptimizationModelFields';
 import { BacktestInputFields } from '../backtest-setup/BacktestInputFields';
 import { newBacktestForm, ordinaryPreparationIntentBase } from '../backtest-setup/backtest-intent';
+function optimizationPreparationTarget(source: 'existing' | 'discovery', versionId: string, discovery: string): OptimizationPreparationTarget {
+  if (source === 'existing') return { sourceMode: source, strategyVersionId: versionId };
+  return { sourceMode: source, discoveryScope: optimizationDiscoveryScopeSchema.parse(JSON.parse(discovery)) };
+}
+
 function useOptimizationSetupController() {
   const { params } = useRoute<RouteProp<StrategyStackParams, 'OptimizationSetup'>>();
   const { api, scope, baseUrl } = useMobileRuntime();
@@ -61,7 +69,7 @@ function useOptimizationSetupController() {
   const [rounds, setRounds] = useState('2');
   const [ack, setAck] = useState('no');
   const [form, setForm] = useState(() => newBacktestForm(''));
-  const [warmup, setWarmup] = useState('0');
+  const [warmup, setWarmup] = useState('60');
   const [edited, setEdited] = useState(false);
   const [receipt, setReceipt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -69,6 +77,8 @@ function useOptimizationSetupController() {
     signature: string;
     body: Parameters<typeof optimization.prepare>[0];
   } | null>(null);
+  const research = useOptimizationResearch({ source, versionId, discovery, form, library,
+    onAdopt: id => { setVersionId(id); setParameters([]); setSubmitted(null); setEdited(true); } });
   const key = JSON.stringify(['mobile-optimization-create-v1', baseUrl]);
   const pending = useQuery({
     queryKey: [...scope, 'optimization-pending'],
@@ -138,13 +148,7 @@ function useOptimizationSetupController() {
           prepared.status !== 'prepared'
         )
           throw Error('实验能力或当前准备尚未通过。');
-        const target: OptimizationPreparationTarget =
-          source === 'existing'
-            ? { sourceMode: source, strategyVersionId: versionId }
-            : {
-                sourceMode: source,
-                discoveryScope: optimizationDiscoveryScopeSchema.parse(JSON.parse(discovery)),
-              };
+        const target = optimizationPreparationTarget(source, versionId, discovery);
         body = optimizationExperimentCreateSchema.parse({ contractVersion:3,...target,...settings(),runConfig:prepared.runConfig,idempotencyKey:randomUUID() });
         if (
           !(await confirmAction(
@@ -172,22 +176,16 @@ function useOptimizationSetupController() {
   };
   const prepare = async (automatic=false) => {
     try {
-      const target =
-        source === 'existing'
-          ? { sourceMode: source, strategyVersionId: versionId }
-          : {
-              sourceMode: source,
-              discoveryScope: optimizationDiscoveryScopeSchema.parse(JSON.parse(discovery)),
-            };
-      const extra: unknown = JSON.parse(form.extras);
-      if (!extra || typeof extra !== 'object' || Array.isArray(extra))
-        throw Error('研究选项必须是 JSON 对象。');
+      const target = optimizationPreparationTarget(source, versionId, discovery);
       const intent = ordinaryPreparationIntentBase(
-        { ...form, extras: JSON.stringify({ ...extra, warmupBudgetSessions: Number(warmup) }) },
+        { ...form, priceResearch: true, adjustment: 'hfq', history: 'fixed-provider-snapshot',
+          model: research.model.data?.status === 'available' ? JSON.stringify(research.model.data.model) : '',
+          extras: JSON.stringify({ warmupBudgetSessions: Number(warmup) }) },
         randomUUID(),
         new Date().toISOString(),
       );
-      const body = optimizationRunPreparationRequestSchema.parse({ target, intent });
+      if (!research.ready || research.model.data?.status !== 'available') throw Error('请先确认研究版本并准备模拟成交设置。');
+      const body = optimizationRunPreparationRequestSchema.parse({ target, intent: { ...intent, priceResearchReference: 'freeze' } });
       if(automatic) {
         if(!capabilityReady)throw Error('实验能力尚未就绪');
         const options=settings();
@@ -214,6 +212,7 @@ function useOptimizationSetupController() {
     setParameters,
     setSubmitted,
     library,
+    research,
     versionId,
     setVersionId,
     descriptors,
@@ -300,6 +299,7 @@ export function OptimizationSetupScreen() {
         onChange={(v) => edit(() => setName(v))}
       />
       <OptimizationSelectionFields state={state} />
+      <OptimizationResearchChoice value={state.research} disabled={locked} />
       <Field
         label="优化目标 JSON"
         value={objective}
@@ -321,6 +321,7 @@ export function OptimizationSetupScreen() {
         editable={!locked}
         onChange={(v) => edit(() => setBudget(v))}
       />
+      <Copy>AI 调用次数、回测次数和输入/输出 Token 上限填 0 表示不限制对应累计用量；单次输出仍受模型限制，费用、时长及轮数仍然生效。</Copy>
       <Field
         label="最大轮数（1～3）"
         value={rounds}
@@ -328,6 +329,7 @@ export function OptimizationSetupScreen() {
         onChange={(v) => edit(() => setRounds(v))}
       />
       <BacktestInputFields
+        priceResearch
         kind="ordinary"
         value={form}
         disabled={locked}
@@ -362,6 +364,7 @@ export function OptimizationSetupScreen() {
       ) : null}
       {submitted && submitted.signature === signature && preparation.data ? (
         <Section title="实验准备结果">
+          {preparation.data.status === 'prepared' && <PreparedPriceSources value={preparation.data} />}
           <Copy>{JSON.stringify(preparation.data, null, 2)}</Copy>
         </Section>
       ) : null}
@@ -497,57 +500,9 @@ function OptimizationSelectionFields({
         />
       )}
       <Section title="模型与价格">
-        {(caps.data?.providers ?? []).map((v) => {
-          const modelKey = JSON.stringify([v.provider, v.model]);
-          const selected = models.includes(modelKey);
-          return (
-            <Section key={modelKey} title={`${v.provider} / ${v.model}`}>
-              <Copy>
-                {v.costStatus === 'unknown'
-                  ? '费用未知'
-                  : `价格已配置 · ${v.costCurrency ?? '币种未记录'}`}
-              </Copy>
-              <Action
-                label={`${selected ? '取消选择' : '选择模型'} ${v.provider} / ${v.model}`}
-                disabled={locked || (!selected && models.length >= 3)}
-                onPress={() =>
-                  edit(() => {
-                    setModels((list) =>
-                      selected ? list.filter((x) => x !== modelKey) : [...list, modelKey],
-                    );
-                    setAck('no');
-                  })
-                }
-              />
-              {selected && v.reasoning ? (
-                <Choices
-                  label="模型推理强度"
-                  value={efforts[modelKey] ?? 'auto'}
-                  disabled={locked}
-                  onChange={(value) => edit(() => setEfforts({ ...efforts, [modelKey]: value }))}
-                  options={[
-                    { value: 'auto', label: '使用已配置默认' },
-                    ...(v.reasoning.supportedEfforts ?? []).map((value) => ({
-                      value,
-                      label:
-                        (
-                          {
-                            none: '无推理',
-                            minimal: '极简',
-                            low: '低',
-                            medium: '中',
-                            high: '高',
-                            xhigh: '很高',
-                            max: '最高',
-                          } as Record<string, string>
-                        )[value] ?? '其他可用强度',
-                    })),
-                  ]}
-                />
-              ) : null}
-            </Section>
-          );
-        })}
+        <OptimizationModelFields providers={caps.data?.providers ?? []} models={models} disabled={locked}
+          onModelsChange={(values) => edit(() => { setModels(values); setAck('no'); })}
+          efforts={efforts} onEffortsChange={(values) => edit(() => setEfforts(values))} />
         <Choices
           label="实验未知费用确认"
           value={ack}

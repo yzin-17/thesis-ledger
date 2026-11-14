@@ -256,12 +256,18 @@ export class JournalReviewQuery {
     return candidate;
   }
 
-  async readContext(input: Pick<JournalPeriodReviewRequest, 'accountId' | 'mode' | 'symbol'>) {
-    const loaded = await this.load({
-      accountId: input.accountId,
-      mode: input.mode,
-      ...(input.symbol === undefined ? {} : { symbol: input.symbol }),
-    });
+  async readContext(
+    input: Pick<JournalPeriodReviewRequest, 'accountId' | 'mode' | 'symbol'>,
+    transaction?: Prisma.TransactionClient,
+  ) {
+    const loaded = await this.load(
+      {
+        accountId: input.accountId,
+        mode: input.mode,
+        ...(input.symbol === undefined ? {} : { symbol: input.symbol }),
+      },
+      transaction,
+    );
     return {
       version: loaded.version,
       candidates: loaded.candidates.filter(

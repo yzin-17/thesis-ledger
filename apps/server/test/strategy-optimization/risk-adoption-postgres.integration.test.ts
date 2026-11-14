@@ -19,6 +19,12 @@ if (databaseUrl) {
 }
 
 (databaseUrl ? describe : describe.skip)('真实持仓成本风险采纳 PostgreSQL 组合', () => {
+  const context = riskAdoptionContext();
+  registerRiskAdoptionCostAndRevision(context);
+  registerRiskAdoptionActivationAndRuleKinds(context);
+});
+
+function riskAdoptionContext() {
   const prisma = new PrismaService({
     datasources: { db: { url: databaseUrl ?? 'postgresql://localhost/risk_adoption_fixture' } },
   });
@@ -71,7 +77,6 @@ if (databaseUrl) {
         ),
       ),
     );
-
   beforeAll(async () => {
     vi.stubEnv('STRATEGY_RISK_APPLICATIONS_ENABLED', 'true');
     await prisma.$connect();
@@ -161,8 +166,44 @@ if (databaseUrl) {
     await prisma.$disconnect();
     vi.unstubAllEnvs();
   });
+  return {
+    get prisma() {
+      return prisma;
+    },
+    get bars() {
+      return bars;
+    },
+    get contexts() {
+      return contexts;
+    },
+    get store() {
+      return store;
+    },
+    get service() {
+      return service;
+    },
+    get accountId() {
+      return accountId;
+    },
+    get shadowAccountId() {
+      return shadowAccountId;
+    },
+    get symbol() {
+      return symbol;
+    },
+    get strategyVersionId() {
+      return strategyVersionId;
+    },
+    get witness() {
+      return witness;
+    },
+  };
+}
 
+function registerRiskAdoptionCostAndRevision(suiteContext: ReturnType<typeof riskAdoptionContext>) {
   it('以实际成本评价并持久化百分比规则，不改写真实持仓和账本', async () => {
+    const { prisma, bars, store, service, accountId, symbol, strategyVersionId, witness } = suiteContext;
+
     const before = await witness();
     const input = { accountId, symbol, strategyVersionId, cycleMode: 'existingAndFuture' };
     const preview = await service.preview(input);
@@ -191,8 +232,9 @@ if (databaseUrl) {
       expect.objectContaining({ identity: expect.objectContaining({ adjustment: 'none' }) }),
     );
   });
-
   it('真实成本变化使旧预览失效，拒绝新增或覆盖既有规则', async () => {
+    const { prisma, service, accountId, symbol, strategyVersionId, witness } = suiteContext;
+
     const input = { accountId, symbol, strategyVersionId, cycleMode: 'nextPositionCycle' };
     const preview = await service.preview(input);
     const rules = await prisma.riskRule.findMany({ orderBy: { id: 'asc' } });
@@ -223,8 +265,14 @@ if (databaseUrl) {
       });
     }
   });
+}
 
+function registerRiskAdoptionActivationAndRuleKinds(
+  suiteContext: ReturnType<typeof riskAdoptionContext>,
+) {
   it('日线应用启用时仍仅写风险配置，不写入模拟事实', async () => {
+    const { prisma, service, accountId, symbol, strategyVersionId, witness } = suiteContext;
+
     const input = { accountId, symbol, strategyVersionId, cycleMode: 'nextPositionCycle' };
     const preview = await service.preview(input);
     const before = await witness();
@@ -241,12 +289,13 @@ if (databaseUrl) {
     expect(rules[0]!.threshold.toString()).toBe('-0.08');
     expect(await witness()).toEqual(before);
   });
-
   it.each([
     { type: 'absoluteStopPrice', price: '1.5' },
     { type: 'fixedStop', percent: '0.08', price: '1.5' },
     { type: 'fixedQuantity', quantity: '1000000' },
   ])('直接提交非法风险 $type 时在落库前拒绝', async (risk) => {
+    const { prisma, service, accountId, symbol, strategyVersionId, witness } = suiteContext;
+
     const original = await prisma.strategyVersion.findUniqueOrThrow({
       where: { id: strategyVersionId },
     });
@@ -276,4 +325,4 @@ if (databaseUrl) {
     expect(await prisma.riskRule.findMany({ orderBy: { id: 'asc' } })).toEqual(rules);
     expect(await witness()).toEqual(before);
   });
-});
+}

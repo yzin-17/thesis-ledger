@@ -27,6 +27,7 @@ import {
 import { useStrategyLibrary } from '../strategy-library/useStrategyLibrary';
 import { StrategyVersionPicker } from '../strategy-library/StrategyVersionPicker';
 import { RiskNotificationFields } from './RiskNotificationFields';
+import { RiskRuleNotificationFields } from './RiskRuleNotificationFields';
 import { emptyRiskNotification, riskNotificationBody } from './risk-notification-model';
 import { riskCapabilityAvailable, riskCreateControls } from './risk-application-actions';
 function useStrategyRiskCreateController() {
@@ -76,8 +77,6 @@ function useStrategyRiskCreateController() {
     accountId,
     symbol: effectiveSymbol,
     cycleMode,
-    enabled,
-    notification,
   });
   const [submitted, setSubmitted] = useState<{
     signature: string;
@@ -161,6 +160,7 @@ function useStrategyRiskCreateController() {
     setEdited(true);
     setSubmitted(null);
   };
+  const editNotification = (value: typeof notification) => { setNotification(value); setEdited(true); };
   const prepare = () => {
     try {
       if (!ready || !account || !version)
@@ -197,7 +197,7 @@ function useStrategyRiskCreateController() {
     enabled,
     setEnabled,
     notification,
-    setNotification,
+    editNotification,
     ready,
     submitDisabled,
     preview,
@@ -232,7 +232,7 @@ export function StrategyRiskCreateScreen() {
     enabled,
     setEnabled,
     notification,
-    setNotification,
+    editNotification,
     ready,
     submitDisabled,
     preview,
@@ -264,6 +264,7 @@ export function StrategyRiskCreateScreen() {
           edit(() => {
             setVersionId(v);
             setSymbol(null);
+            editNotification({ ...notification, ruleOverrides: {} });
           })
         }
       />
@@ -305,7 +306,7 @@ export function StrategyRiskCreateScreen() {
       <RiskNotificationFields
         value={notification}
         disabled={locked}
-        onChange={(v) => edit(() => setNotification(v))}
+        onChange={editNotification}
       />
       <Action
         label="预览策略风险计划"
@@ -317,6 +318,7 @@ export function StrategyRiskCreateScreen() {
         <Section title="风险计划预览">
           <Copy>预览指纹 {current.previewHash}</Copy>
           <Copy>{JSON.stringify(current, null, 2)}</Copy>
+          <RiskRuleNotificationFields rules={current.plan.rules} value={notification} onChange={editNotification} disabled={locked} />
         </Section>
       ) : null}
       {pending.data ? (

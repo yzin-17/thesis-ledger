@@ -6,8 +6,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ArenaPriceLayer } from './ArenaPriceLayer.js';
 import type { MarketChartBar } from '../market-detail/market-chart-types.js';
-const mocks = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), points: vi.fn(), add: vi.fn(), close: vi.fn(), mount: vi.fn(), unmount: vi.fn() }));
-vi.mock('../../shared/api/client.js', () => ({ getDesktopApiClient: () => ({ modelArenas: { list: mocks.list, get: mocks.get, points: mocks.points } }) }));
+const mocks = vi.hoisted(() => ({ liveList: vi.fn(), liveGet: vi.fn(), livePoints: vi.fn(), list: vi.fn(), get: vi.fn(), points: vi.fn(), add: vi.fn(), close: vi.fn(), mount: vi.fn(), unmount: vi.fn() }));
+vi.mock('../../shared/api/client.js', () => ({ getDesktopApiClient: () => ({
+  modelArenas: { list: mocks.list, get: mocks.get, points: mocks.points },
+  arenaMatches: { list: mocks.liveList, get: mocks.liveGet, points: mocks.livePoints },
+}) }));
 vi.mock('@/components/ui/toast', () => ({ createToastManager: () => ({ add: mocks.add, close: mocks.close }) }));
 vi.mock('./ArenaEmptyToast.js', () => ({ ArenaEmptyToast: () => null }));
 vi.mock('../market-detail/MarketPriceLightweightChart.js', () => ({
@@ -32,6 +35,7 @@ const selectOption = async (label: string, optionLabel: string) => {
 const render = () => flush(() => root.render(<MemoryRouter><QueryClientProvider client={client}><ArenaPriceLayer bars={bars} chartPoints={[]} indicators={[]} visibleRange={30} chartMode="candles" activePane="MACD" visibleIndicators={[]} visibleMA={[]} rsiPeriod={12} showBothPanes={false} focusLatestRevision={0} resetRevision={0} onClick={() => {}} onHover={() => {}} /></QueryClientProvider></MemoryRouter>));
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.clearAllMocks(); sessionStorage.clear();
+  mocks.liveList.mockResolvedValue([]);
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
@@ -55,6 +59,20 @@ it('恢复过的空结果自动关闭，随后第一下主动点击即可提示'
   expect(mocks.add).not.toHaveBeenCalled(); expect(button().getAttribute('aria-pressed')).toBe('false');
   await flush(() => button().click()); await flush(() => {});
   expect(mocks.add).toHaveBeenCalledTimes(1); expect(mocks.mount).toHaveBeenCalledTimes(1);
+});
+it('自主比赛在旧列表为空时仍显示实际成交并链接模型账户', async () => {
+  sessionStorage.setItem(`arena-overlay:${window.location.origin}:local-workspace:600036.SH`, 'live1');
+  mocks.list.mockResolvedValue([]);
+  mocks.liveList.mockResolvedValue([{ id: 'live1', protocol: { version: 2, title: '自主比赛', universe: 'market', instruments: [] } }]);
+  mocks.liveGet.mockResolvedValue({ agents: [{ id: 'agent1', model: '自主模型' }] });
+  mocks.livePoints.mockResolvedValue([{ protocolVersion: 2, id: 'fill1', arenaId: 'live1', roundId: null, entrantId: 'agent1', model: '自主模型', symbol: '600036.SH', day: '2026-11-06', executedAt: '2026-11-06T02:00:00.000Z', side: 'buy', quantity: '100', price: '42' }]);
+  await render(); await flush(() => button().click()); await flush(() => {});
+  expect(host.querySelector('[data-plot]')?.getAttribute('data-model-points')).toBe('1');
+  await selectOption('模型筛选', '自主模型');
+  expect(mocks.livePoints).toHaveBeenLastCalledWith('live1', expect.objectContaining({ entrantId: 'agent1' }), expect.any(AbortSignal));
+  await flush(() => host.querySelector<HTMLButtonElement>('[data-arena-point-details]')!.click());
+  expect(document.querySelector('[aria-label="模拟成交记录"] a')?.getAttribute('href')).toBe('/arena/live1#model-agent1');
+  expect(mocks.points).not.toHaveBeenCalled();
 });
 it('加载中关闭后，迟到空结果不会提示或重建图表', async () => {
   let resolve!: (value: []) => void;

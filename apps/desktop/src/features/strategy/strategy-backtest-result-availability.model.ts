@@ -39,22 +39,10 @@ export const backtestBenchmarkDisplayMetrics = (result: BacktestJobResult) => {
   if (!benchmark) return null;
   const parsed = backtestBenchmarkCompatibilitySchemaV3.safeParse(result.benchmarkCompatibility);
   const compatibility = parsed.success ? parsed.data : null;
-  const cost = compatibility?.costAssumption;
-  let reason: string | null = null;
-  if (compatibility?.status === 'incompatible') reason = 'BENCHMARK_COMPARISON_INCOMPATIBLE';
-  else if (compatibility?.status !== 'compatible') reason = 'BENCHMARK_COMPARISON_UNVERIFIED';
-  else if (
-    compatibility.strategyFingerprint !== undefined &&
-    compatibility.benchmarkFingerprint !== undefined &&
-    compatibility.strategyFingerprint !== compatibility.benchmarkFingerprint
-  )
-    reason = 'BENCHMARK_COMPARISON_INCOMPATIBLE';
-  else if (cost?.kind === 'unsupported') reason = 'BENCHMARK_COST_MODEL_UNSUPPORTED';
-  else if (!['execution-model', 'zero-cost', 'proportional'].includes(String(cost?.kind)))
-    reason = 'BENCHMARK_COST_ASSUMPTION_UNAVAILABLE';
-  else if (backtestMetricPercent(record(result.metrics)?.totalReturn) === null)
+  let reason = benchmarkCompatibilityReason(compatibility);
+  if (!reason && backtestMetricPercent(record(result.metrics)?.totalReturn) === null)
     reason = 'STRATEGY_RETURN_UNAVAILABLE';
-  else if (backtestMetricPercent(benchmark.totalReturn) === null)
+  else if (!reason && backtestMetricPercent(benchmark.totalReturn) === null)
     reason = 'BENCHMARK_RETURN_UNAVAILABLE';
 
   let excessReturn = benchmark.excessReturn;
@@ -113,3 +101,22 @@ export const backtestPartialResultSummary = (result: BacktestJobResult) => {
     return '任务已完成，结果标记为部分可用；已返回指标按各自状态展示，缺口说明见诊断与复现。';
   return `以下项目暂不可用：${missing.join('；')}。有效指标、权益与成交仍按各自状态展示。`;
 };
+
+function benchmarkCompatibilityReason(
+  compatibility: ReturnType<typeof backtestBenchmarkCompatibilitySchemaV3.parse> | null,
+) {
+  const cost = compatibility?.costAssumption;
+  let reason: string | null = null;
+  if (compatibility?.status === 'incompatible') reason = 'BENCHMARK_COMPARISON_INCOMPATIBLE';
+  else if (compatibility?.status !== 'compatible') reason = 'BENCHMARK_COMPARISON_UNVERIFIED';
+  else if (
+    compatibility.strategyFingerprint !== undefined &&
+    compatibility.benchmarkFingerprint !== undefined &&
+    compatibility.strategyFingerprint !== compatibility.benchmarkFingerprint
+  )
+    reason = 'BENCHMARK_COMPARISON_INCOMPATIBLE';
+  else if (cost?.kind === 'unsupported') reason = 'BENCHMARK_COST_MODEL_UNSUPPORTED';
+  else if (!['execution-model', 'zero-cost', 'proportional'].includes(String(cost?.kind)))
+    reason = 'BENCHMARK_COST_ASSUMPTION_UNAVAILABLE';
+  return reason;
+}

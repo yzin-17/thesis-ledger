@@ -59,6 +59,47 @@ function legTip(events: LedgerEvent[], transferId: string, leg: 'INFLOW' | 'OUTF
     .reduce((a, b) => (BigInt(a.ledgerRevision) > BigInt(b.ledgerRevision) ? a : b));
   return { fact, tip };
 }
+function validateTransferAccounts(source: AccountResponse, target: AccountResponse, read: TransferRead): void {
+  if (!source.active || !target.active || source.mode !== 'actual' || target.mode !== 'actual')
+    throw new Error('划转只支持启用的实际账户。');
+  if (source.currency !== target.currency) throw new Error('划转两侧账户币种必须一致。');
+  if (!cashTransferPair(source.type, target.type))
+    throw new Error('现金划转仅支持现金账户与证券或基金账户之间操作。');
+  if (read.source.accountId !== source.id || read.target.accountId !== target.id)
+    throw new Error('划转账本与所选账户不一致。');
+}
+
+function buildTransferContent(form: TransferForm, event: TransferFact | undefined, currency: AccountResponse['currency'], id: string) {
+  return {
+    occurredAt: ledgerInputTime(form.occurredAt, 'INSTANT'),
+    timePrecision: 'INSTANT' as const,
+    sourceTimezone: event?.sourceTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+    economicOrderKey: id,
+    amount: form.amount.trim(),
+    currency,
+    ...(event?.payload.expectedAt ? { expectedAt: event.payload.expectedAt } : {}),
+    ...(event?.payload.settledAt ? { settledAt: event.payload.settledAt } : {}),
+    ...(form.note.trim() ? { note: form.note.trim() } : {}),
+  };
+}
+
+function readTransferCorrectionLegs(event: TransferFact | undefined, source: AccountResponse, target: AccountResponse, read: TransferRead, transferId: string) {
+  if (!event || !event.payload.transfer) throw new Error('请先选择划转事实。');
+  const linked = transferAccounts(event);
+  if (linked.sourceAccountId !== source.id || linked.targetAccountId !== target.id)
+    throw new Error('不能在更正时改变划转两侧账户。');
+  const from = legTip(read.sourceAudit, transferId, 'OUTFLOW');
+  const to = legTip(read.targetAudit, transferId, 'INFLOW');
+  if (
+    from.fact.accountId !== source.id ||
+    to.fact.accountId !== target.id ||
+    from.fact.payload.transfer?.counterpartyAccountId !== target.id ||
+    to.fact.payload.transfer?.counterpartyAccountId !== source.id
+  )
+    throw new Error('划转两端事实关联不一致。');
+  return { from, to };
+}
+
 export function buildTransferCommand(
   form: TransferForm,
   context: {
@@ -71,13 +112,7 @@ export function buildTransferCommand(
   },
 ) {
   const { source, target, read, id, event, action } = context;
-  if (!source.active || !target.active || source.mode !== 'actual' || target.mode !== 'actual')
-    throw new Error('划转只支持启用的实际账户。');
-  if (source.currency !== target.currency) throw new Error('划转两侧账户币种必须一致。');
-  if (!cashTransferPair(source.type, target.type))
-    throw new Error('现金划转仅支持现金账户与证券或基金账户之间操作。');
-  if (read.source.accountId !== source.id || read.target.accountId !== target.id)
-    throw new Error('划转账本与所选账户不一致。');
+  validateTransferAccounts(source, target, read);
   const base = {
     transferId: event?.payload.transfer?.transferId ?? id,
     sourceAccountId: source.id,
@@ -87,36 +122,14 @@ export function buildTransferCommand(
     source: { category: 'MANUAL' as const, channel: 'mobile-cash-transfer', externalId: id },
     actorId: 'mobile-user',
   };
-  const content = {
-    occurredAt: ledgerInputTime(form.occurredAt, 'INSTANT'),
-    timePrecision: 'INSTANT' as const,
-    sourceTimezone: event?.sourceTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-    economicOrderKey: id,
-    amount: form.amount.trim(),
-    currency: source.currency,
-    ...(event?.payload.expectedAt ? { expectedAt: event.payload.expectedAt } : {}),
-    ...(event?.payload.settledAt ? { settledAt: event.payload.settledAt } : {}),
-    ...(form.note.trim() ? { note: form.note.trim() } : {}),
-  };
+  const content = buildTransferContent(form, event, source.currency, id);
   if (!action)
     return createCashTransferCommandSchema.parse({
       ...base,
       ...content,
       command: 'CREATE_CASH_TRANSFER',
     });
-  if (!event || !event.payload.transfer) throw new Error('请先选择划转事实。');
-  const linked = transferAccounts(event);
-  if (linked.sourceAccountId !== source.id || linked.targetAccountId !== target.id)
-    throw new Error('不能在更正时改变划转两侧账户。');
-  const from = legTip(read.sourceAudit, base.transferId, 'OUTFLOW');
-  const to = legTip(read.targetAudit, base.transferId, 'INFLOW');
-  if (
-    from.fact.accountId !== source.id ||
-    to.fact.accountId !== target.id ||
-    from.fact.payload.transfer?.counterpartyAccountId !== target.id ||
-    to.fact.payload.transfer?.counterpartyAccountId !== source.id
-  )
-    throw new Error('划转两端事实关联不一致。');
+  const { from, to } = readTransferCorrectionLegs(event, source, target, read, base.transferId);
   const correction = {
     ...base,
     supersedesSourceEventId: from.tip.eventId,

@@ -1,3 +1,5 @@
+import type { TradeChartResponse } from '@thesis-ledger/schemas';
+import { tradeChartForScope } from './market-trade-chart-projection.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getDesktopApiClient } from '../../shared/api/client.js';
@@ -49,9 +51,7 @@ export function useMarketTradingOverlays(bars: MarketChartBar[], position?: Mark
   const state = selection.scope === scope ? selection : initial(scope);
   const measurementActive = chartMeasurementActive(state);
   const price = useMemo(() => overlayPriceScope(bars, position), [bars, position]);
-  const start = bars[0]?.bucketStartDate ?? (bars[0] ? overlayTradingDate(bars[0]) : undefined);
-  const end =
-    bars.at(-1)?.bucketEndDate ?? (bars.at(-1) ? overlayTradingDate(bars.at(-1)!) : undefined);
+  const { start, end } = overlayTradeWindow(bars);
   const canReadTrades = Boolean(
     price.comparable && position?.accountId && position.mode && start && end,
   );
@@ -83,22 +83,19 @@ export function useMarketTradingOverlays(bars: MarketChartBar[], position?: Mark
       ...change,
       scope,
     }));
-  const response =
-    query.data?.version === 'trade-chart-v1' &&
-    query.data.accountId === position?.accountId &&
-    query.data.mode === position?.mode &&
-    query.data.symbol === bars[0]?.symbol &&
-    query.data.start === start &&
-    query.data.end === end
-      ? query.data
-      : undefined;
+  const response = tradeChartForScope(query.data, {
+    accountId: position?.accountId,
+    mode: position?.mode,
+    symbol: bars[0]?.symbol,
+    start,
+    end,
+  });
   const placed = useMemo(() => {
     if (!state.trades || !price.comparable || !price.currency || response?.status !== 'ready')
       return { markers: [], omitted: 0 };
     return placeTradeMarkers(bars, response.markers, price.currency);
   }, [bars, state.trades, price.comparable, price.currency, response]);
-  const risk = Number(state.risk);
-  const riskInvalid = state.risk !== '' && (!Number.isFinite(risk) || risk <= 0 || risk >= 100);
+  const { risk, riskInvalid } = tradingOverlayRiskInput(state.risk);
   const measurement = useMemo(
     () => measureChartRange(bars, state.from, state.to),
     [bars, state.from, state.to],
@@ -123,17 +120,7 @@ export function useMarketTradingOverlays(bars: MarketChartBar[], position?: Mark
     window.addEventListener('keydown', cancel, true);
     return () => window.removeEventListener('keydown', cancel, true);
   }, [measurementActive]);
-  let notice: string | undefined;
-  if (state.trades && query.isPending) notice = '正在读取当前账户成交…';
-  else if (state.trades && query.isError) notice = '成交读取失败，图表仍可查看。';
-  else if (state.trades && response?.status === 'unavailable') notice = reasons[response.reason];
-  else if (state.trades && response?.status === 'ready') {
-    const omitted = placed.omitted + response.omittedCount;
-    notice = `当前绘制${placed.markers.length}条成交`;
-    if (omitted) notice += `；${omitted}条不具备当前坐标或时间条件，未绘制`;
-    if (response.unplacedCount) notice += `；该证券另有${response.unplacedCount}条无日期成交`;
-    notice += '。';
-  }
+  const notice = tradingOverlayNotice(state, query, response, placed);
   return {
     state,
     update,
@@ -153,3 +140,35 @@ export function useMarketTradingOverlays(bars: MarketChartBar[], position?: Mark
   };
 }
 export type MarketTradingOverlayState = ReturnType<typeof useMarketTradingOverlays>;
+
+function tradingOverlayNotice(
+  state: Pick<Selection, 'trades'>,
+  query: { isPending: boolean; isError: boolean },
+  response: TradeChartResponse | undefined,
+  placed: ReturnType<typeof placeTradeMarkers>,
+) {
+  let notice: string | undefined;
+  if (state.trades && query.isPending) notice = '正在读取当前账户成交…';
+  else if (state.trades && query.isError) notice = '成交读取失败，图表仍可查看。';
+  else if (state.trades && response?.status === 'unavailable') notice = reasons[response.reason];
+  else if (state.trades && response?.status === 'ready') {
+    const omitted = placed.omitted + response.omittedCount;
+    notice = `当前绘制${placed.markers.length}条成交`;
+    if (omitted) notice += `；${omitted}条不具备当前坐标或时间条件，未绘制`;
+    if (response.unplacedCount) notice += `；该证券另有${response.unplacedCount}条无日期成交`;
+    notice += '。';
+  }
+  return notice;
+}
+function tradingOverlayRiskInput(value: string) {
+  const risk = Number(value);
+  const riskInvalid = value !== '' && (!Number.isFinite(risk) || risk <= 0 || risk >= 100);
+  return { risk, riskInvalid };
+}
+
+function overlayTradeWindow(bars: MarketChartBar[]) {
+  const start = bars[0]?.bucketStartDate ?? (bars[0] ? overlayTradingDate(bars[0]) : undefined);
+  const end =
+    bars.at(-1)?.bucketEndDate ?? (bars.at(-1) ? overlayTradingDate(bars.at(-1)!) : undefined);
+  return { start, end };
+}

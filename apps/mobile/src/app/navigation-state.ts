@@ -5,6 +5,7 @@ export const mobileDestinations = {
   Accounts: '账户',
   Market: '市场',
   Research: '研究',
+  Arena: '竞技场',
   Settings: '更多',
 } as const;
 export type MobileDestination = keyof typeof mobileDestinations;

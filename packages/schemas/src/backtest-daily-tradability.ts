@@ -67,7 +67,7 @@ const day = z
  * Schema 只校验结构和日期分区；生产者及消费者仍须核对真实日历、上市事实、
  * Bar 内容、来源准入、冻结时点和历史决策可见性。
  */
-export const backtestDailyTradabilityEvidenceV3Schema = z
+const dailyTradabilityEvidenceFields = z
   .strictObject({
     contractVersion: z.literal(1),
     symbol: nonempty,
@@ -78,18 +78,28 @@ export const backtestDailyTradabilityEvidenceV3Schema = z
     calendar: z.strictObject({ source: factSource, expectedSessions: z.array(isoDate).min(1) }),
     barSource,
     days: z.array(day).min(1),
-  })
+  });
+
+function validateZeroVolumeExclusion(
+  value: z.infer<typeof dailyTradabilityEvidenceFields>,
+  context: z.RefinementCtx,
+): void {
+  const { start, end } = value.range;
+  const normalizedYahoo = value.market !== 'CN' && value.barSource.routeKey.adjustment === 'qfq' &&
+    value.barSource.routeTarget.upstreamSource === 'yfinance';
+  const hkShareWindow = value.market === 'HK' && value.symbol === '00147.HK' &&
+    start >= '2025-08-06' && end <= '2025-08-11' && value.barSource.routeKey.adjustment === 'none' &&
+    value.barSource.routeTarget.upstreamSource === 'yahoo-hk-share-window';
+  if (value.days.some((day) => day.excludedZeroVolumeObservation) &&
+    (value.instrumentType !== 'STOCK' || value.barSource.routeTarget.providerId !== 'yfinance' ||
+      !(normalizedYahoo || hkShareWindow)))
+    context.addIssue({ code: 'custom', path: ['days'], message: '零量排除仅适用于已限定Yahoo研究来源与窗口' });
+}
+
+export const backtestDailyTradabilityEvidenceV3Schema = dailyTradabilityEvidenceFields
   .superRefine((value, context) => {
     const { start, end } = value.range;
-    const normalizedYahoo = value.market !== 'CN' && value.barSource.routeKey.adjustment === 'qfq' &&
-      value.barSource.routeTarget.upstreamSource === 'yfinance';
-    const hkShareWindow = value.market === 'HK' && value.symbol === '00147.HK' &&
-      start >= '2025-08-06' && end <= '2025-08-11' && value.barSource.routeKey.adjustment === 'none' &&
-      value.barSource.routeTarget.upstreamSource === 'yahoo-hk-share-window';
-    if (value.days.some((day) => day.excludedZeroVolumeObservation) &&
-      (value.instrumentType !== 'STOCK' || value.barSource.routeTarget.providerId !== 'yfinance' ||
-        !(normalizedYahoo || hkShareWindow)))
-      context.addIssue({ code: 'custom', path: ['days'], message: '零量排除仅适用于已限定Yahoo研究来源与窗口' });
+    validateZeroVolumeExclusion(value, context);
     if (value.market !== value.barSource.routeKey.market)
       context.addIssue({
         code: 'custom',

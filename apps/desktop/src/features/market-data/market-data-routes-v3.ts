@@ -1,7 +1,6 @@
 import {
   marketRouteKeyIdV3,
   marketReferenceCatalog,
-  statusCapabilityNamesV1,
   type MarketRouteCapabilityV3,
   type MarketRouteKeyV3,
 } from '@thesis-ledger/schemas';
@@ -13,6 +12,7 @@ import type {
 } from './market-data.types.js';
 import { dataSourceDisplay, routeTargetKey, sameRouteTarget } from './market-data.types.js';
 import { statusQuerySupportLabelV1 } from './market-status-query-support-display.js';
+import { configuredPolicyDraftV3 } from './market-policy-draft-v3.js';
 
 export type MarketPolicyRouteRowV3 = {
   id: string;
@@ -42,13 +42,13 @@ const assetTypeOrder = {
 } as const;
 const capabilityOrder = { DAILY_BAR: 0, MINUTE_BAR: 1 } as const;
 
-const marketLabel: Record<string, string> = {
+export const marketLabel: Record<string, string> = {
   CN: '中国内地',
   HK: '香港',
   US: '美国',
 };
 
-const assetTypeLabel: Record<string, string> = {
+export const assetTypeLabel: Record<string, string> = {
   STOCK: '股票',
   ETF: 'ETF',
   MUTUAL_FUND: '公募基金',
@@ -68,6 +68,7 @@ const capabilityLabel: Record<string, string> = {
     ]),
   ),
   NEWS_SEARCH: '新闻检索',
+  WEB_SEARCH: '公开网页搜索',
   RESEARCH_REPORT_METADATA: '研报元数据',
   NEWS_FEED: '市场快讯',
   DAILY_BAR: '日线行情',
@@ -104,12 +105,6 @@ export const marketCapabilityLabel = (capability: string) =>
 const targetId = (target: RouteTarget) => routeTargetKey(target);
 
 export const routeKeyIdV3 = (key: MarketRouteKeyV3) => marketRouteKeyIdV3(key);
-
-export const isIndependentMarketFunctionV3 = (key: MarketRouteKeyV3) =>
-  key.kind === 'data' &&
-  (key.capability.startsWith('REFERENCE_') ||
-    key.capability === 'NEWS_FEED' ||
-    statusCapabilityNamesV1.some((name) => name === key.capability));
 
 export const routeKeyLabelV3 = (key: MarketRouteKeyV3) => {
   const scope = `${marketLabel[key.market] ?? key.market}${assetTypeLabel[key.assetType] ?? key.assetType}`;
@@ -175,8 +170,6 @@ export const readyRouteTargetsV3 = (
           Date.now(),
           providers.find((provider) => provider.providerId === entry.target.providerId)
             ?.configVersion,
-          providers.find((provider) => provider.providerId === entry.target.providerId)
-            ?.accountAccessSupported,
         ),
     )
     .map(({ target }) => ({
@@ -202,8 +195,6 @@ export const selectableRouteTargetsV3 = (
           Date.now(),
           providers.find((provider) => provider.providerId === entry.target.providerId)
             ?.configVersion,
-          providers.find((provider) => provider.providerId === entry.target.providerId)
-            ?.accountAccessSupported,
         ),
     )
     .map((entry) => {
@@ -233,7 +224,8 @@ export const policyRouteTargetsV3 = (
   policy: MarketPolicyDraftV3,
   key: MarketRouteKeyV3,
 ): RouteTarget[] =>
-  policy.routes.find((route) => routeKeyIdV3(route.key) === routeKeyIdV3(key))?.targets ?? [];
+  (policy.enabled && policy.routes.find((route) =>
+    route.enabled !== false && routeKeyIdV3(route.key) === routeKeyIdV3(key))?.targets) || [];
 
 export const updatePolicyRouteTargetV3 = (
   policy: MarketPolicyDraftV3,
@@ -241,7 +233,8 @@ export const updatePolicyRouteTargetV3 = (
   role: 'primary' | 'fallback',
   target: RouteTarget | null,
 ): MarketPolicyDraftV3 => {
-  const current = policyRouteTargetsV3(policy, key);
+  const draft = configuredPolicyDraftV3(policy);
+  const current = policyRouteTargetsV3(draft, key);
   let next: RouteTarget[] = [];
   if (role === 'primary' && target) {
     next = [target];
@@ -251,33 +244,11 @@ export const updatePolicyRouteTargetV3 = (
     if (target && !sameRouteTarget(current[0], target)) next.push(target);
   }
 
-  const routes = policy.routes.filter((route) => routeKeyIdV3(route.key) !== routeKeyIdV3(key));
+  const routes = draft.routes.filter((route) => routeKeyIdV3(route.key) !== routeKeyIdV3(key));
   if (next.length > 0) {
-    const existing = policy.routes.find((route) => routeKeyIdV3(route.key) === routeKeyIdV3(key));
-    const updated = { ...existing, key, targets: next };
-    if (isIndependentMarketFunctionV3(key) && updated.enabled === undefined) updated.enabled = true;
-    routes.push(updated);
+    routes.push({ key, targets: next, enabled: true });
   }
-  return { ...policy, routes };
-};
-
-export const policyRouteEnabledV3 = (policy: MarketPolicyDraftV3, key: MarketRouteKeyV3) => {
-  const route = policy.routes.find((item) => routeKeyIdV3(item.key) === routeKeyIdV3(key));
-  return Boolean(route && route.enabled !== false);
-};
-
-export const updatePolicyRouteEnabledV3 = (
-  policy: MarketPolicyDraftV3,
-  key: MarketRouteKeyV3,
-  enabled: boolean,
-) => {
-  if (!isIndependentMarketFunctionV3(key)) return policy;
-  return {
-    ...policy,
-    routes: policy.routes.map((route) =>
-      routeKeyIdV3(route.key) === routeKeyIdV3(key) ? { ...route, enabled } : route,
-    ),
-  };
+  return { ...draft, routes };
 };
 
 export const routeCatalogMessageV3 = (

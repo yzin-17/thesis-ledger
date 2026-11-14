@@ -1,4 +1,8 @@
-import { marketTimezones, marketTradingDate, tradingMarketForAssetMarket } from '@thesis-ledger/domain';
+import {
+  marketTimezones,
+  marketTradingDate,
+  tradingMarketForAssetMarket,
+} from '@thesis-ledger/domain';
 import type { SourcePriceBasisFact } from '@thesis-ledger/schemas';
 import type { MarketService } from './market.service.js';
 import type { MarketBarReader } from './market-bar-reader.js';
@@ -41,22 +45,20 @@ const symbolMarket = (symbol: string) =>
   tradingMarketForAssetMarket(symbol.split('.').at(-1) ?? '');
 
 /** 来源交易日由共享日历状态决定，不再回溯内置年度日历。 */
-export async function fundQuoteTradingDate(symbol: string, marketTime: string, marketReader: Pick<MarketService, 'getSession'>) {
+export async function fundQuoteTradingDate(
+  symbol: string,
+  marketTime: string,
+  marketReader: Pick<MarketService, 'getSession'>,
+) {
   const market = symbolMarket(symbol);
   if (!market || !Number.isFinite(Date.parse(marketTime))) return undefined;
   return marketTradingDate(await marketReader.getSession(market, new Date(marketTime)));
 }
 
 /** 两个价格始终位于同一份原生 qfq 序列，不推断 Quote 转换因子。 */
-export async function readFundAdjustedHoldingReturn(input: {
-  symbol: string;
-  assetType: 'STOCK' | 'ETF';
-  navDate: string;
-  at: Date;
-  market: Pick<MarketService, 'getQuote' | 'getSession'>;
-  bars: Pick<MarketBarReader, 'readChartV3'>;
-  maxPriceAgeMs?: number;
-}): Promise<{ change?: number; evidence: FundHoldingPriceEvidence }> {
+export async function readFundAdjustedHoldingReturn(
+  input: FundAdjustedHoldingReturnInput,
+): Promise<{ change?: number; evidence: FundHoldingPriceEvidence }> {
   const evidence: FundHoldingPriceEvidence = { symbol: input.symbol, status: 'unavailable' };
   const unavailable = (reasonCode: string) => ({ evidence: { ...evidence, reasonCode } });
   if (input.maxPriceAgeMs !== undefined && !/\.(SH|SZ|BJ)$/.test(input.symbol))
@@ -68,17 +70,18 @@ export async function readFundAdjustedHoldingReturn(input: {
     if (fundHoldingReturn(quote.price, 1) === undefined)
       return unavailable('quote_price_unavailable');
     const upper = Math.floor(input.at.getTime() / 60_000) * 60_000 + 60_000;
-    if (!quote.marketTime || !Number.isFinite(Date.parse(quote.marketTime)))
-      return unavailable('quote_market_time_unknown');
-    if (Date.parse(quote.marketTime) >= upper) return unavailable('quote_after_valuation_minute');
-    if (input.maxPriceAgeMs !== undefined &&
-        (quote.stale || quote.freshness === 'stale' || quote.freshness === 'unknown' ||
-         input.at.getTime() - Date.parse(quote.marketTime) > input.maxPriceAgeMs))
-      return unavailable('quote_too_old');
-    const tradingDate = await fundQuoteTradingDate(input.symbol, quote.marketTime, input.market);
+    const quoteTiming = fundQuoteTiming(input, quote, upper);
+    if (!quoteTiming.ok) return unavailable(quoteTiming.reason);
+    const tradingDate = await fundQuoteTradingDate(
+      input.symbol,
+      quoteTiming.marketTime,
+      input.market,
+    );
     if (!tradingDate) return unavailable('quote_calendar_unavailable');
-    if (input.maxPriceAgeMs !== undefined &&
-        tradingDate !== marketParts(input.at, marketTimezones.CN).day)
+    if (
+      input.maxPriceAgeMs !== undefined &&
+      tradingDate !== marketParts(input.at, marketTimezones.CN).day
+    )
       return unavailable('quote_before_current_session');
     evidence.quoteTradingDate = tradingDate;
     const anchorDate = input.navDate.slice(0, 10);
@@ -96,20 +99,9 @@ export async function readFundAdjustedHoldingReturn(input: {
       window: { start: start.toISOString(), end: tradingDate + 'T23:59:59.999Z' },
       acceptance: 'interactive',
     });
-    const basis = series.chartContextV3?.sourcePriceBasis;
-    if (
-      series.identity.symbol !== input.symbol ||
-      series.identity.assetType !== input.assetType ||
-      series.identity.timeframe !== '1d' ||
-      series.identity.adjustment !== 'qfq' ||
-      basis?.adjustment !== 'qfq'
-    )
-      return unavailable('adjusted_price_basis_unknown');
-    if (Date.parse(basis.observedAt) >= upper || Date.parse(series.provenance.fetchedAt) >= upper)
-      return unavailable('adjusted_basis_after_valuation_minute');
-    if (input.maxPriceAgeMs !== undefined &&
-        input.at.getTime() - Date.parse(basis.observedAt) > input.maxPriceAgeMs)
-      return unavailable('adjusted_basis_too_old');
+    const basisQualification = adjustedFundBasis(input, series, upper);
+    if (!basisQualification.ok) return unavailable(basisQualification.reason);
+    const basis = basisQualification.basis;
     const market = symbolMarket(input.symbol);
     if (!market) return unavailable('quote_calendar_unavailable');
     const timezone = marketTimezones[market];
@@ -140,4 +132,60 @@ export async function readFundAdjustedHoldingReturn(input: {
   } catch {
     return unavailable('adjusted_price_read_unavailable');
   }
+}
+
+type FundAdjustedHoldingReturnInput = {
+  symbol: string;
+  assetType: 'STOCK' | 'ETF';
+  navDate: string;
+  at: Date;
+  market: Pick<MarketService, 'getQuote' | 'getSession'>;
+  bars: Pick<MarketBarReader, 'readChartV3'>;
+  maxPriceAgeMs?: number;
+};
+
+const timingUnavailable = (reason: string) => ({ ok: false as const, reason });
+
+function fundQuoteTiming(
+  input: FundAdjustedHoldingReturnInput,
+  quote: Awaited<ReturnType<MarketService['getQuote']>>,
+  upper: number,
+) {
+  if (!quote.marketTime || !Number.isFinite(Date.parse(quote.marketTime)))
+    return timingUnavailable('quote_market_time_unknown');
+  if (Date.parse(quote.marketTime) >= upper)
+    return timingUnavailable('quote_after_valuation_minute');
+  if (
+    input.maxPriceAgeMs !== undefined &&
+    (quote.stale ||
+      quote.freshness === 'stale' ||
+      quote.freshness === 'unknown' ||
+      input.at.getTime() - Date.parse(quote.marketTime) > input.maxPriceAgeMs)
+  )
+    return timingUnavailable('quote_too_old');
+  return { ok: true as const, marketTime: quote.marketTime };
+}
+
+function adjustedFundBasis(
+  input: FundAdjustedHoldingReturnInput,
+  series: Awaited<ReturnType<MarketBarReader['readChartV3']>>,
+  upper: number,
+) {
+  const basis = series.chartContextV3?.sourcePriceBasis;
+  if (
+    series.identity.symbol !== input.symbol ||
+    series.identity.assetType !== input.assetType ||
+    series.identity.timeframe !== '1d' ||
+    series.identity.adjustment !== 'qfq' ||
+    basis?.adjustment !== 'qfq'
+  )
+    return timingUnavailable('adjusted_price_basis_unknown');
+  if (Date.parse(basis.observedAt) >= upper || Date.parse(series.provenance.fetchedAt) >= upper)
+    return timingUnavailable('adjusted_basis_after_valuation_minute');
+  if (
+    input.maxPriceAgeMs !== undefined &&
+    input.at.getTime() - Date.parse(basis.observedAt) > input.maxPriceAgeMs
+  )
+    return timingUnavailable('adjusted_basis_too_old');
+  return { ok: true as const, basis };
 }

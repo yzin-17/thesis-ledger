@@ -23,183 +23,16 @@ it.skipIf(!url)(
     const db = new PrismaService({ datasourceUrl: url! });
     const owner = randomUUID();
     try {
-      const instrumentId = randomUUID(),
-        symbol = '001937.SZ';
-      const friday = '2026-10-30',
-        monday = '2026-11-02',
-        tuesday = '2026-11-03';
-      const close = (d: string) => new Date(d + 'T07:01:00Z'),
-        open = (d: string) => new Date(d + 'T01:30:00Z');
-      await db.instrument.create({
-        data: {
-          id: instrumentId,
-          canonicalCode: '001937',
-          market: 'SZ',
-          instrumentType: 'STOCK',
-          displayName: '跨周样本',
-          generation: 1,
-        },
-      });
-      const budget = { requests: 10, tokens: 10000, costMicros: 200 };
-      const store = new ModelArenaRepository(db);
-      const match = await store.create(owner, {
-        version: 1,
-        title: '跨周样本',
-        market: 'CN',
-        currency: 'CNY',
-        calendarId: 'CN',
-        calendarVersion: 'fixture',
-        timeZone: 'Asia/Shanghai',
-        startsOn: friday,
-        endsOn: tuesday,
-        instruments: [{ instrumentId, symbol, assetType: 'STOCK' }],
-        entrants: ['甲', '乙'].map((model) => ({
-          providerId: 'fixture',
-          model,
-          budget,
-          maxInputTokens: 120,
-          maxOutputTokens: 20,
-        })),
-        initialCash: '1000',
-        maxPositionBps: 10000,
-        fees: { version: 'fixture', buyBps: 0, sellBps: 0, minimum: '1', slippageBps: 0 },
-        benchmarks: ['cash', 'equal_weight_buy_hold'],
-        decisionDeadlineMinutes: 60,
-        maxInfrastructureAttempts: 2,
-        budgetCurrency: 'USD',
-        budget,
-      });
-      await db.modelArena.update({ where: { id: match.id }, data: { state: 'running' } });
-      const entrants = (await store.read(owner, match.id)).entrants.sort((a, b) =>
-        a.model === '甲' ? -1 : b.model === '甲' ? 1 : 0,
-      );
-      const packets = new ArenaResearchPackets(db, {
-        read: async (_: unknown, day: string) => [
-          {
-            symbol,
-            kind: 'daily_bar',
-            date: day,
-            availableAt: close(day).toISOString(),
-            observedAt: close(day).toISOString(),
-            open: '10',
-            close: day === friday ? '10' : '12',
-            ref: 'bar:' + day,
-          },
-        ],
-      } as unknown as MarketInstrumentEvidence);
+      const context = await crossWeekMatch(db, owner);
+      const { symbol, friday, monday, tuesday, close, open, match, entrants } = context;
       let firstRound = '';
       for (const [day, next] of [
         [friday, monday],
         [monday, tuesday],
         [tuesday, '2026-11-04'],
       ] as const) {
-        await db.arenaOccurrence.create({
-          data: {
-            arenaId: match.id,
-            tradingDate: day,
-            dueAt: close(day),
-            nextOpenAt: open(next),
-            deadlineAt: open(next),
-            calendarRevision: 'fixture',
-            maxAttempts: 2,
-            state: 'complete',
-          },
-        });
-        const outcome =
-          day === monday
-            ? { state: 'unopened', reason: 'participant_budget', entrantId: entrants[0]!.id }
-            : { state: 'open' };
-        const round = await db.arenaRound.create({
-          data: {
-            arenaId: match.id,
-            tradingDate: day,
-            createdAt: close(day),
-            corporateActionCoverage: { [symbol]: ['cash', 'split'] },
-            outcome,
-            ...(day === friday
-              ? {
-                  openingFacts: {
-                    facts: [
-                      {
-                        symbol,
-                        openAt: open(monday).toISOString(),
-                        price: '10',
-                        lot: '1',
-                        tick: '0.01',
-                        sellable: '0',
-                        buyBlocked: null,
-                        sellBlocked: null,
-                        sourceRef: 'open:mon',
-                      },
-                    ],
-                  },
-                }
-              : {}),
-          },
-        });
-        if (day !== monday)
-          for (const e of entrants)
-            await db.arenaReservation.create({
-              data: { roundId: round.id, arenaId: match.id, entrantId: e.id, amount: budget },
-            });
-        await packets.freeze(round.id);
-        if (day === monday) continue;
-        await db.arenaRound.update({
-          where: { id: round.id },
-          data: { outcome: { state: 'sealed' } },
-        });
-        for (const [i, e] of entrants.entries()) {
-          const state =
-            day === friday
-              ? i === 0
-                ? 'decision'
-                : 'observe'
-              : i === 0
-                ? 'decision'
-                : 'invalid_output';
-          const action = i === 1 ? 'observe' : 'target';
-          const decision = {
-            actions: [
-              {
-                symbol,
-                action,
-                ...(action === 'target' && { weightBps: 2000 }),
-                reason: '固定输入',
-                invalidatedBy: '风险条件',
-                references: ['bar:' + day],
-              },
-            ],
-          };
-          const reservation = await db.arenaReservation.update({
-            where: { roundId_entrantId: { roundId: round.id, entrantId: e.id } },
-            data: {
-              decisionState: state,
-              settledAt: close(day),
-              ...(state === 'invalid_output' ? {} : { decision }),
-              executionAt: open(next),
-              execution:
-                day === tuesday
-                  ? { state: 'unfilled', reason: 'suspended' }
-                  : { state: 'complete' },
-            },
-          });
-          if (day === friday && i === 0)
-            await db.arenaFill.create({
-              data: {
-                reservationId: reservation.id,
-                symbol,
-                side: 'buy',
-                quantity: '20',
-                price: '10',
-                fee: '1',
-                cashDelta: '-201',
-                executedAt: open(monday),
-                recordedAt: open(monday),
-                sourceRef: 'open:mon',
-              },
-            });
-        }
-        if (day === friday) firstRound = round.id;
+        const roundId = await crossWeekRound(context, day, next);
+        if (roundId) firstRound = roundId;
       }
       const compare = new ArenaComparisons(db);
       const first = await compare.read(
@@ -308,3 +141,189 @@ it.skipIf(!url)(
     }
   },
 );
+
+async function crossWeekMatch(db: PrismaService, owner: string) {
+  const instrumentId = randomUUID(),
+    symbol = '001937.SZ';
+  const friday = '2026-10-30',
+    monday = '2026-11-02',
+    tuesday = '2026-11-03';
+  const close = (d: string) => new Date(d + 'T07:01:00Z'),
+    open = (d: string) => new Date(d + 'T01:30:00Z');
+  await db.instrument.create({
+    data: {
+      id: instrumentId,
+      canonicalCode: '001937',
+      market: 'SZ',
+      instrumentType: 'STOCK',
+      displayName: '跨周样本',
+      generation: 1,
+    },
+  });
+  const budget = { requests: 10, tokens: 10000, costMicros: 200 };
+  const store = new ModelArenaRepository(db);
+  const match = await store.create(owner, {
+    version: 1,
+    title: '跨周样本',
+    market: 'CN',
+    currency: 'CNY',
+    calendarId: 'CN',
+    calendarVersion: 'fixture',
+    timeZone: 'Asia/Shanghai',
+    startsOn: friday,
+    endsOn: tuesday,
+    instruments: [{ instrumentId, symbol, assetType: 'STOCK' }],
+    entrants: ['甲', '乙'].map((model) => ({
+      providerId: 'fixture',
+      model,
+      budget,
+      maxInputTokens: 120,
+      maxOutputTokens: 20,
+    })),
+    initialCash: '1000',
+    maxPositionBps: 10000,
+    fees: { version: 'fixture', buyBps: 0, sellBps: 0, minimum: '1', slippageBps: 0 },
+    benchmarks: ['cash', 'equal_weight_buy_hold'],
+    decisionDeadlineMinutes: 60,
+    maxInfrastructureAttempts: 2,
+    budgetCurrency: 'USD',
+    budget,
+  });
+  await db.modelArena.update({ where: { id: match.id }, data: { state: 'running' } });
+  const entrants = (await store.read(owner, match.id)).entrants.sort((a, b) => {
+    if (a.model === '甲') return -1;
+    if (b.model === '甲') return 1;
+    return 0;
+  });
+  const packets = new ArenaResearchPackets(db, {
+    read: async (_: unknown, day: string) => [
+      {
+        symbol,
+        kind: 'daily_bar',
+        date: day,
+        availableAt: close(day).toISOString(),
+        observedAt: close(day).toISOString(),
+        open: '10',
+        close: day === friday ? '10' : '12',
+        ref: 'bar:' + day,
+      },
+    ],
+  } as unknown as MarketInstrumentEvidence);
+
+  return { db, symbol, friday, monday, tuesday, close, open, budget, match, entrants, packets };
+}
+async function crossWeekRound(
+  context: Awaited<ReturnType<typeof crossWeekMatch>>,
+  day: string,
+  next: string,
+) {
+  const { db, symbol, friday, monday, tuesday, close, open, budget, match, entrants, packets } =
+    context;
+
+  await db.arenaOccurrence.create({
+    data: {
+      arenaId: match.id,
+      tradingDate: day,
+      dueAt: close(day),
+      nextOpenAt: open(next),
+      deadlineAt: open(next),
+      calendarRevision: 'fixture',
+      maxAttempts: 2,
+      state: 'complete',
+    },
+  });
+  const outcome =
+    day === monday
+      ? { state: 'unopened', reason: 'participant_budget', entrantId: entrants[0]!.id }
+      : { state: 'open' };
+  const round = await db.arenaRound.create({
+    data: {
+      arenaId: match.id,
+      tradingDate: day,
+      createdAt: close(day),
+      corporateActionCoverage: { [symbol]: ['cash', 'split'] },
+      outcome,
+      ...(day === friday
+        ? {
+            openingFacts: {
+              facts: [
+                {
+                  symbol,
+                  openAt: open(monday).toISOString(),
+                  price: '10',
+                  lot: '1',
+                  tick: '0.01',
+                  sellable: '0',
+                  buyBlocked: null,
+                  sellBlocked: null,
+                  sourceRef: 'open:mon',
+                },
+              ],
+            },
+          }
+        : {}),
+    },
+  });
+  if (day !== monday)
+    for (const e of entrants)
+      await db.arenaReservation.create({
+        data: { roundId: round.id, arenaId: match.id, entrantId: e.id, amount: budget },
+      });
+  await packets.freeze(round.id);
+  if (day === monday) return null;
+  await db.arenaRound.update({
+    where: { id: round.id },
+    data: { outcome: { state: 'sealed' } },
+  });
+  for (const [i, e] of entrants.entries()) {
+    const state = crossWeekDecisionState(day, friday, i);
+    const action = i === 1 ? 'observe' : 'target';
+    const decision = {
+      actions: [
+        {
+          symbol,
+          action,
+          ...(action === 'target' && { weightBps: 2000 }),
+          reason: '固定输入',
+          invalidatedBy: '风险条件',
+          references: ['bar:' + day],
+        },
+      ],
+    };
+    const reservation = await db.arenaReservation.update({
+      where: { roundId_entrantId: { roundId: round.id, entrantId: e.id } },
+      data: {
+        decisionState: state,
+        settledAt: close(day),
+        ...(state === 'invalid_output' ? {} : { decision }),
+        executionAt: open(next),
+        execution:
+          day === tuesday ? { state: 'unfilled', reason: 'suspended' } : { state: 'complete' },
+      },
+    });
+    if (day === friday && i === 0)
+      await db.arenaFill.create({
+        data: {
+          reservationId: reservation.id,
+          symbol,
+          side: 'buy',
+          quantity: '20',
+          price: '10',
+          fee: '1',
+          cashDelta: '-201',
+          executedAt: open(monday),
+          recordedAt: open(monday),
+          sourceRef: 'open:mon',
+        },
+      });
+  }
+  return day === friday ? round.id : null;
+}
+function crossWeekDecisionState(day: string, friday: string, index: number) {
+  if (day === friday) {
+    if (index === 0) return 'decision';
+    return 'observe';
+  }
+  if (index === 0) return 'decision';
+  return 'invalid_output';
+}

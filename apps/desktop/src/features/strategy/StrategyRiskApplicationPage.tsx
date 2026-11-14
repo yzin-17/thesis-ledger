@@ -1,29 +1,18 @@
 import { createClientRequestId } from '../../lib/client-request-id';
+import { strategyInstrumentLabel } from './strategy-instrument-display.js';
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { requestFailureMessage } from '@/shared/api/request-error';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { strategySchema } from '@thesis-ledger/schemas';
-import { AlertTriangle, ArrowLeft, Bell, ExternalLink, ShieldCheck } from 'lucide-react';
+import { strategySchema, DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES } from '@thesis-ledger/schemas';
+import { AlertTriangle, ArrowLeft, ExternalLink, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { useNavigationGuard } from '../shared/navigation-guard.js';
+import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
 import { useOptionalPortfolioMode } from '../portfolio/portfolio-mode-context.js';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Switch, SwitchThumb } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import {
   Sheet,
   SheetContent,
@@ -35,9 +24,7 @@ import {
 } from '@/components/ui/sheet';
 import { useToastManager } from '@/components/ui/toast';
 import { fetchAccounts } from '../portfolio/portfolio.api.js';
-import { accountDisplayLabel } from '../portfolio/portfolio.types.js';
-import { NotificationRouteSelect } from '../risk/NotificationRouteSelect.js';
-import { useNotificationRoutingQuery } from '../risk/risk.queries.js';
+import { useRiskNotificationRoutingQuery } from '../risk/risk.queries.js';
 import {
   createStrategyRiskApplication,
   fetchStrategyRiskApplications,
@@ -55,22 +42,15 @@ import {
 import {
   enabledRiskConflict,
   matchingRiskApplications,
-  parseCooldownMinutes,
   riskApplicationFingerprint,
   riskCenterApplicationPath,
   type RiskCycleMode,
 } from './strategy-risk-application.model.js';
-import {
-  strategyComparisonOperatorLabel,
-  strategyMonitoringCoverageSourceLabel,
-  strategyMonitoringMetricLabel,
-  strategyRiskCycleModeLabel,
-  strategyRiskCycleModeOptions,
-  strategyRiskEvaluationStateLabel,
-  strategyRiskNotificationSeverityLabel,
-  strategyRiskNotificationSeverityOptions,
-  strategyTimeframeLabel,
-} from './strategy-display-labels.js';
+import { strategyTimeframeLabel } from './strategy-display-labels.js';
+import { StrategyRiskConfiguration } from './StrategyRiskConfiguration.js';
+import { StrategyRiskPreview } from './StrategyRiskPreview.js';
+import { StrategyRiskRuleSettings } from './StrategyRiskRuleSettings.js';
+import { buildRiskNotification, type RuleNotificationDrafts } from './strategy-risk-notification-form.js';
 import type { StrategyRecord } from './strategy.types.js';
 const riskApplicationKey = ['desktop', 'strategy', 'risk-applications'] as const;
 
@@ -98,42 +78,61 @@ export function StrategyRiskApplicationPage({
   const [notificationEnabled, setNotificationEnabled] = useState(true);
   const [notificationSeverity, setNotificationSeverity] =
     useState<StrategyRiskNotification['severity']>('warning');
-  const [cooldownMinutes, setCooldownMinutes] = useState('60');
-  const [notificationChannel, setNotificationChannel] = useState('');
+  const [cooldownMinutes, setCooldownMinutes] = useState(String(DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES));
+  const [notificationProviders, setNotificationProviders] = useState<string[]>([]);
+  const providersInitialized = useRef(false);
+  const [ruleDrafts, setRuleDrafts] = useState<RuleNotificationDrafts>({});
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [previewInvalidated, setPreviewInvalidated] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => createClientRequestId());
   const [dirty, setDirty] = useState(false);
   const [savedApplicationId, setSavedApplicationId] = useState<string | null>(null);
-  const [closeRequested, setCloseRequested] = useState(false);
   const allowNavigationRef = useRef(false);
   const operationBusy = useRef(false);
   const saveErrorToastId = useRef<string | null>(null);
-  useNavigationGuard({
+  const requestClose = useDraftCloseGuard({
+    open: true,
     dirty,
     busy: operationBusy.current,
-    draft: { strategyId, versionId, accountId, cycleMode, notificationEnabled,
-      notificationSeverity, cooldownMinutes, notificationChannel },
+    draft: {
+      strategyId,
+      versionId,
+      accountId,
+      cycleMode,
+      notificationEnabled,
+      notificationSeverity,
+      cooldownMinutes,
+      notificationProviders,
+      ruleDrafts,
+    },
     bypass: () => allowNavigationRef.current,
+    discard: () => setDirty(false),
+    onOpenChange: (open) => {
+      if (open || !source || operationBusy.current) return;
+      setDirty(false);
+      allowNavigationRef.current = true;
+      void navigate(strategyCenterPath.strategyVersion(source.strategy.id, source.version.id), {
+        state: strategyCenterFocusState(strategyCenterTriggerId.riskApplication),
+      });
+    },
   });
   const accounts = useQuery({
     queryKey: ['desktop', 'accounts'],
     queryFn: () => fetchAccounts(),
   });
-  const notificationRouting = useNotificationRoutingQuery();
-  const notificationRoutes = notificationRouting.data?.routes ?? [];
+  const notificationRouting = useRiskNotificationRoutingQuery();
+  const notificationRoutes = notificationRouting.data?.availableRoutes ?? [];
   let notificationRoutingState: 'loading' | 'ready' | 'error' = 'ready';
   if (notificationRouting.isPending) notificationRoutingState = 'loading';
   else if (notificationRouting.isError) notificationRoutingState = 'error';
-  const selectedNotificationRoute = notificationRoutes.find(
-    (route) => route.channel === notificationChannel,
-  );
+  const selectedNotificationRoute = notificationProviders.length > 0 && notificationProviders.every((name) => notificationRoutes.some((route) => route.provider === name));
   useEffect(() => {
-    if (notificationRoutingState !== 'ready' || selectedNotificationRoute) return;
-    const nextChannel = notificationRoutes[0]?.channel ?? '';
-    setNotificationChannel(nextChannel);
-    if (!nextChannel) setNotificationEnabled(false);
-  }, [notificationRoutes, notificationRoutingState, selectedNotificationRoute]);
+    if (notificationRoutingState !== 'ready' || providersInitialized.current) return;
+    providersInitialized.current = true;
+    const selected = notificationRouting.data?.selectedProviders ?? [];
+    setNotificationProviders(selected);
+    if (!selected.length) setNotificationEnabled(false);
+  }, [notificationRoutingState, notificationRouting.data]);
   const globalMode = useOptionalPortfolioMode()?.mode ?? 'actual';
   const actualAccounts = (globalMode === 'shadow' ? [] : (accounts.data ?? [])).filter(
     (account) => account.mode === 'actual' && account.active !== false && account.type !== 'cash',
@@ -152,6 +151,7 @@ export function StrategyRiskApplicationPage({
     if (!preview || preview.fingerprint === currentFingerprint) return;
     setPreview(null);
     setPreviewInvalidated(true);
+    setRuleDrafts({});
     setIdempotencyKey(createClientRequestId());
   }, [currentFingerprint, preview]);
   const applications = useQuery({
@@ -178,8 +178,12 @@ export function StrategyRiskApplicationPage({
     matchingIds: sameIdentityIds,
   });
   const previewMutation = useMutation({
-    onMutate: () => { operationBusy.current = true; },
-    onSettled: () => { operationBusy.current = false; },
+    onMutate: () => {
+      operationBusy.current = true;
+    },
+    onSettled: () => {
+      operationBusy.current = false;
+    },
     mutationFn: () => {
       if (!source || !accountId || !symbol) throw new Error('请选择可用账户');
       return previewStrategyRiskApplication({
@@ -208,12 +212,12 @@ export function StrategyRiskApplicationPage({
       if (saveErrorToastId.current) toast.close?.(saveErrorToastId.current);
       saveErrorToastId.current = null;
     },
-    onSettled: () => { operationBusy.current = false; },
+    onSettled: () => {
+      operationBusy.current = false;
+    },
     mutationFn: (enabled: boolean) => {
-      const cooldown = parseCooldownMinutes(cooldownMinutes);
       if (!source || !preview || preview.fingerprint !== currentFingerprint)
         throw new Error('当前配置需要重新预览');
-      if (cooldown === null) throw new Error('通知冷却时间必须是 0 到 10080 的整数');
       if (notificationEnabled && !selectedNotificationRoute)
         throw new Error('请先选择已配置的通知提供方');
       return createStrategyRiskApplication({
@@ -224,15 +228,13 @@ export function StrategyRiskApplicationPage({
         previewHash: preview.data.previewHash,
         idempotencyKey,
         enabled,
-        notification: {
+        notification: buildRiskNotification({
           enabled: notificationEnabled,
-          cooldownMinutes: cooldown,
+          cooldownMinutes,
           severity: notificationSeverity,
-          channels:
-            notificationEnabled && selectedNotificationRoute
-              ? [selectedNotificationRoute.channel as StrategyRiskNotification['channels'][number]]
-              : [],
-        },
+          channel: '',
+          providers: notificationProviders,
+        }, ruleDrafts),
       });
     },
     onSuccess: async (application) => {
@@ -247,7 +249,8 @@ export function StrategyRiskApplicationPage({
         description: application.enabled ? '应用当前已启用。' : '应用已保存为停用。',
       });
       setDirty(false);
-      if (queryClient.getQueryState([...riskApplicationKey, accountId, symbol])?.status === 'error') return;
+      if (queryClient.getQueryState([...riskApplicationKey, accountId, symbol])?.status === 'error')
+        return;
       allowNavigationRef.current = true;
       const sourcePath = source
         ? strategyCenterPath.strategyVersion(source.strategy.id, source.version.id)
@@ -299,7 +302,7 @@ export function StrategyRiskApplicationPage({
         <Alert>
           <AlertTitle>当前版本不能生成风险规则</AlertTitle>
           <AlertDescription>
-            风险应用仅支持正式 V2 策略版本，当前版本仍可查看和回测。
+            风险应用需要可读取的正式策略版本，当前版本仍可查看和回测。
           </AlertDescription>
         </Alert>
       </div>
@@ -308,39 +311,16 @@ export function StrategyRiskApplicationPage({
 
   const previewData = preview?.data ?? null;
   const previewReady = Boolean(preview && preview.fingerprint === currentFingerprint);
-  const previewPositionId =
-    typeof previewData?.context.positionId === 'string'
-      ? previewData.context.positionId
-      : '当前无持仓';
   const submitDisabled =
     createMutation.isPending ||
     previewMutation.isPending ||
-    accounts.isError || applications.isError ||
+    accounts.isError ||
+    applications.isError ||
     Boolean(savedApplicationId) ||
     !previewReady ||
     sameIdentity.length > 0 ||
     (notificationEnabled && !selectedNotificationRoute);
   const sourcePath = strategyCenterPath.strategyVersion(source.strategy.id, source.version.id);
-  const requestClose = () => {
-    if (operationBusy.current) return;
-    if (dirty) {
-      setCloseRequested(true);
-      return;
-    }
-    allowNavigationRef.current = true;
-    void navigate(sourcePath, {
-      state: strategyCenterFocusState(strategyCenterTriggerId.riskApplication),
-    });
-  };
-  const discardAndClose = () => {
-    if (operationBusy.current) return;
-    setDirty(false);
-    setCloseRequested(false);
-    allowNavigationRef.current = true;
-    void navigate(sourcePath, {
-      state: strategyCenterFocusState(strategyCenterTriggerId.riskApplication),
-    });
-  };
   const saveActions = (
     <>
       <Button
@@ -360,7 +340,7 @@ export function StrategyRiskApplicationPage({
   );
 
   const content = (
-    <div className="space-y-4">
+    <div className="flex min-w-0 flex-col gap-6">
       {presentation === 'page' ? (
         <>
           <Button
@@ -376,12 +356,11 @@ export function StrategyRiskApplicationPage({
             className="-ml-2"
           />
           <div>
-            <p className="text-sm text-muted-foreground">
-              策略中心 / {source.strategy.name} v{source.version.version} / 生成风险规则
-            </p>
+            <p className="text-sm text-muted-foreground">策略中心 / 生成风险规则</p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight">生成风险规则</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              来源：{source.strategy.name} v{source.version.version} · {symbol} ·{' '}
+              {source.strategy.name} v{source.version.version} ·{' '}
+              {strategyInstrumentLabel(source.version.instrumentDirectory, symbol)} ·{' '}
               {strategyTimeframeLabel(parsed.data.primaryTimeframe)}
             </p>
           </div>
@@ -399,208 +378,98 @@ export function StrategyRiskApplicationPage({
       {savedApplicationId ? (
         <Alert>
           <AlertTitle>风险应用已保存</AlertTitle>
-          <AlertDescription>无需再次保存。当前读取恢复后，可关闭本页查看来源版本。</AlertDescription>
+          <AlertDescription>
+            无需再次保存。当前读取恢复后，可关闭本页查看来源版本。
+          </AlertDescription>
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>应用配置</CardTitle>
-          <CardDescription>
-            选择账户和生效范围后预览。策略版本与执行标的固定为当前来源。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,3fr)_minmax(260px,2fr)]">
-            <Field>
-              <FieldLabel>实际证券账户</FieldLabel>
-              <Select
-                value={accountId}
-                disabled={busy || Boolean(savedApplicationId)}
-                onValueChange={(value) => {
-                  if (!value) return;
-                  setAccountId(value);
-                  setDirty(true);
-                }}
-              >
-                <SelectTrigger aria-label="实际证券账户" className="w-full">
-                  <SelectValue placeholder="选择账户">
-                    {selectedAccount ? accountDisplayLabel(selectedAccount) : '选择账户'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {actualAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {accountDisplayLabel(account)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <FieldDescription>现金账户与模拟账户不参与实际风险应用。</FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel>生效范围</FieldLabel>
-              <Select
-                value={cycleMode}
-                disabled={busy || Boolean(savedApplicationId)}
-                onValueChange={(value) => {
-                  if (!value) return;
-                  setCycleMode(value);
-                  setDirty(true);
-                }}
-              >
-                <SelectTrigger aria-label="生效范围" className="w-full">
-                  <SelectValue>{strategyRiskCycleModeLabel(cycleMode)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {strategyRiskCycleModeOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <div className="rounded-md border p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 font-medium">
-                  <Bell className="size-4" aria-hidden="true" />
-                  通知
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">使用已配置的通知服务商路由。</p>
-              </div>
-              <Switch
-                checked={notificationEnabled}
-                onCheckedChange={(checked) => {
-                  setNotificationEnabled(checked);
-                  setDirty(true);
-                }}
-                disabled={busy || Boolean(savedApplicationId) || (!notificationEnabled && !selectedNotificationRoute)}
-                variant="risk"
-                aria-label="风险通知"
-              >
-                <SwitchThumb variant="risk" aria-hidden="true" />
-              </Switch>
-            </div>
-            <details className="mt-3 border-t pt-3">
-              <summary className="cursor-pointer select-none text-sm font-medium">
-                高级通知设置
-              </summary>
-              <div className="mt-4 grid gap-4 md:grid-cols-[minmax(180px,0.8fr)_minmax(220px,1.2fr)_minmax(240px,1fr)] md:items-start">
-                <Field>
-                  <FieldLabel>严重级别</FieldLabel>
-                  <Select
-                    value={notificationSeverity}
-                    disabled={busy || Boolean(savedApplicationId)}
-                    onValueChange={(value) => {
-                      if (!value) return;
-                      setNotificationSeverity(value);
-                      setDirty(true);
-                    }}
-                  >
-                    <SelectTrigger aria-label="通知严重级别" className="w-full">
-                      <SelectValue>
-                        {strategyRiskNotificationSeverityLabel(notificationSeverity)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {strategyRiskNotificationSeverityOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field>
-                  <FieldLabel>冷却时间（分钟）</FieldLabel>
-                  <Input
-                    value={cooldownMinutes}
-                    disabled={busy || Boolean(savedApplicationId)}
-                    type="number"
-                    min="0"
-                    max="10080"
-                    onChange={(event) => {
-                      setCooldownMinutes(event.target.value);
-                      setDirty(true);
-                    }}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>通知渠道</FieldLabel>
-                  <NotificationRouteSelect
-                    disabled={busy || Boolean(savedApplicationId)}
-                    routes={notificationRoutes}
-                    routingState={notificationRoutingState}
-                    value={notificationChannel}
-                    onValueChange={(value) => {
-                      setNotificationChannel(value);
-                      setDirty(true);
-                    }}
-                    ariaLabel="通知渠道"
-                  />
-                </Field>
-              </div>
-            </details>
-          </div>
-
-          {accounts.isPending ? <LoadingState label="正在读取账户" /> : null}
-          {accounts.isError || applications.isError ? (
-            <Alert variant="destructive">
-              <AlertTitle>账户或风险应用读取失败</AlertTitle>
-              <AlertDescription>已保存的应用无需再次提交；请先重新读取当前状态。</AlertDescription>
-              <Button
-                aria-busy={accounts.isFetching || applications.isFetching}
-                variant="outline"
-                disabled={accounts.isFetching || applications.isFetching}
-                onClick={() => {
-                  void accounts.refetch();
-                  if (accountId) void applications.refetch();
-                }}
-              >
-                {(accounts.isFetching || applications.isFetching) && (
-                  <Spinner data-icon="inline-start" aria-hidden="true" />
-                )}
-                重新读取应用状态
-              </Button>
-            </Alert>
-          ) : null}
-          {actualAccounts.length === 0 && !accounts.isPending && !accounts.isError ? (
-            <Alert>
-              <AlertTitle>没有可用实际证券账户</AlertTitle>
-              <AlertDescription>请先在账户数据中创建并启用实际证券账户。</AlertDescription>
-            </Alert>
-          ) : null}
-          {previewInvalidated ? (
-            <Alert>
-              <AlertTitle>配置已经变化</AlertTitle>
-              <AlertDescription>旧预览已失效，请按当前账户和生效范围重新预览。</AlertDescription>
-            </Alert>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">来源 v{source.version.version}</Badge>
-            <Badge variant="outline">执行标的 {symbol}</Badge>
+      <section aria-label="应用配置" className="flex min-w-0 flex-col gap-4">
+        <h3 className="text-xl font-semibold">应用配置</h3>
+        <StrategyRiskConfiguration
+          accounts={actualAccounts}
+          accountId={accountId}
+          cycleMode={cycleMode}
+          disabled={busy || Boolean(savedApplicationId)}
+          notification={{
+            enabled: notificationEnabled,
+            severity: notificationSeverity,
+            cooldownMinutes,
+            channel: '',
+            providers: notificationProviders,
+          }}
+          canEnableNotification={Boolean(selectedNotificationRoute)}
+          routes={notificationRoutes}
+          routingState={notificationRoutingState}
+          onAccountChange={(value) => {
+            setAccountId(value);
+            setDirty(true);
+          }}
+          onCycleModeChange={(value) => {
+            setCycleMode(value);
+            setDirty(true);
+          }}
+          onNotificationChange={(value) => {
+            setNotificationEnabled(value.enabled);
+            setNotificationSeverity(value.severity);
+            setCooldownMinutes(value.cooldownMinutes);
+            setNotificationProviders(value.providers ?? []);
+            setDirty(true);
+          }}
+        />
+        {accounts.isPending ? <LoadingState label="正在读取账户" /> : null}
+        {accounts.isError || applications.isError ? (
+          <Alert variant="destructive">
+            <AlertTitle>账户或风险应用读取失败</AlertTitle>
+            <AlertDescription>已保存的应用无需再次提交；请先重新读取当前状态。</AlertDescription>
             <Button
-              aria-busy={previewMutation.isPending}
+              aria-busy={accounts.isFetching || applications.isFetching}
               variant="outline"
-              disabled={!selectedAccount || busy || accounts.isError || applications.isError || Boolean(savedApplicationId) || sameIdentity.length > 0}
-              onClick={() => previewMutation.mutate()}
+              disabled={accounts.isFetching || applications.isFetching}
+              onClick={() => {
+                void accounts.refetch();
+                if (accountId) void applications.refetch();
+              }}
             >
-              {previewMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-              {previewMutation.isPending ? '正在预览…' : '预览风险规则'}
+              {(accounts.isFetching || applications.isFetching) && (
+                <Spinner data-icon="inline-start" aria-hidden="true" />
+              )}
+              重新读取应用状态
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </Alert>
+        ) : null}
+        {actualAccounts.length === 0 && !accounts.isPending && !accounts.isError ? (
+          <Alert>
+            <AlertTitle>没有可用实际证券账户</AlertTitle>
+            <AlertDescription>请先在账户数据中创建并启用实际证券账户。</AlertDescription>
+          </Alert>
+        ) : null}
+        {previewInvalidated ? (
+          <Alert>
+            <AlertTitle>配置已经变化</AlertTitle>
+            <AlertDescription>旧预览已失效，请按当前账户和生效范围重新预览。</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <div className="flex justify-end">
+          <Button
+            aria-busy={previewMutation.isPending}
+            variant="outline"
+            disabled={
+              !selectedAccount ||
+              busy ||
+              accounts.isError ||
+              applications.isError ||
+              Boolean(savedApplicationId) ||
+              sameIdentity.length > 0
+            }
+            onClick={() => previewMutation.mutate()}
+          >
+            {previewMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
+            {previewMutation.isPending ? '正在预览…' : '预览风险规则'}
+          </Button>
+        </div>
+      </section>
 
       {sameIdentity.length > 0 ? (
         <Alert>
@@ -662,79 +531,18 @@ export function StrategyRiskApplicationPage({
       ) : null}
 
       {previewData ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>规则预览</CardTitle>
-            <CardDescription>
-              已映射 {previewData.plan.coverage.riskMapped}/{previewData.plan.coverage.riskTotal}{' '}
-              项风险约束。保存后按所选状态进入风险中心管理。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">账户上下文</div>
-                <div className="mt-1 font-medium">
-                  {selectedAccount ? accountDisplayLabel(selectedAccount) : '账户不可用'}
-                </div>
-              </div>
-              <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">持仓</div>
-                <div className="mt-1 font-medium">{previewPositionId}</div>
-              </div>
-              <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">生效范围</div>
-                <div className="mt-1 font-medium">{strategyRiskCycleModeLabel(cycleMode)}</div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {previewData.plan.rules.map((rule) => {
-                const evaluation = previewData.evaluations.find(
-                  (item) => item.sourceKey === rule.sourceKey,
-                );
-                return (
-                  <div
-                    key={rule.sourceKey}
-                    className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3"
-                  >
-                    <div>
-                      <div className="font-medium">{rule.label}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {strategyMonitoringMetricLabel(rule.metric)}{' '}
-                        {strategyComparisonOperatorLabel(rule.operator)} {rule.threshold} ·{' '}
-                        {strategyTimeframeLabel(rule.evaluationTimeframe)}
-                      </div>
-                    </div>
-                    <Badge variant="outline">
-                      {strategyRiskEvaluationStateLabel(evaluation?.state)}
-                    </Badge>
-                    {evaluation?.reason ? (
-                      <p className="w-full text-xs text-muted-foreground">{evaluation.reason}</p>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="rounded-md border bg-muted/20 p-3">
-              <div className="text-sm font-medium">未转换条件</div>
-              <div className="mt-2 space-y-1">
-                {previewData.plan.coverage.items
-                  .filter((item) => item.status !== 'mapped')
-                  .map((item) => (
-                    <p
-                      key={`${item.category}:${item.source}`}
-                      className="text-xs text-muted-foreground"
-                    >
-                      {strategyMonitoringCoverageSourceLabel(item.source)}：{item.reason}
-                    </p>
-                  ))}
-              </div>
-            </div>
+        <>
+          <Separator />
+          <StrategyRiskPreview preview={previewData} renderRuleSettings={(rule) => (
+            <StrategyRiskRuleSettings rule={rule} value={ruleDrafts[rule.sourceKey]}
+              defaults={{ severity: notificationSeverity, cooldownMinutes }} disabled={busy || Boolean(savedApplicationId)}
+              onChange={(value) => { setRuleDrafts((current) => ({ ...current, [rule.sourceKey]: value })); setDirty(true); }} />
+          )}>
             {presentation === 'page' ? (
               <div className="flex flex-wrap justify-end gap-2">{saveActions}</div>
             ) : null}
-          </CardContent>
-        </Card>
+          </StrategyRiskPreview>
+        </>
       ) : null}
     </div>
   );
@@ -744,7 +552,9 @@ export function StrategyRiskApplicationPage({
       <Sheet
         open
         triggerId={strategyCenterTriggerId.riskApplication}
-        onOpenChange={(open) => !open && requestClose()}
+        onOpenChange={(open) => {
+          if (!open && !operationBusy.current) void requestClose(false);
+        }}
       >
         <SheetContent
           size="detail"
@@ -753,37 +563,14 @@ export function StrategyRiskApplicationPage({
         >
           <SheetHeader>
             <SheetTitle>生成风险规则</SheetTitle>
-            <SheetDescription>
-              来源固定为 {source.strategy.name} v{source.version.version} · {symbol} ·{' '}
+            <SheetDescription className="pr-8">
+              {source.strategy.name} v{source.version.version} ·{' '}
+              {strategyInstrumentLabel(source.version.instrumentDirectory, symbol)} ·{' '}
               {strategyTimeframeLabel(parsed.data.primaryTimeframe)}
             </SheetDescription>
           </SheetHeader>
           <SheetBody>{content}</SheetBody>
-          {closeRequested || previewData ? (
-            <SheetFooter>
-              {closeRequested ? (
-                <div className="mr-auto flex min-w-full flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  <span>当前配置或预览尚未保存，关闭后会丢失。</span>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setCloseRequested(false);
-                      }}
-                    >
-                      继续编辑
-                    </Button>
-                    <Button variant="destructive" size="sm" disabled={busy} onClick={discardAndClose}>
-                      放弃并关闭
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                saveActions
-              )}
-            </SheetFooter>
-          ) : null}
+          {previewData ? <SheetFooter>{saveActions}</SheetFooter> : null}
         </SheetContent>
       </Sheet>
     );

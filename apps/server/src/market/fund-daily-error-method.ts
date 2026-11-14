@@ -25,7 +25,8 @@ const evidenceSchema = z.object({
 });
 export function closingEstimate(row: FundValuationPoint, now: Date, session: MarketSessionState) {
   const at = row.lastValidAt;
-  if (!at || session.state !== 'open' || Date.parse(session.evaluatedAt) !== at.getTime()) return null;
+  if (!at || session.state !== 'open' || Date.parse(session.evaluatedAt) !== at.getTime())
+    return null;
   const day = fundValuationDay(at);
   const closingAt = session.sessions.filter((window) => window.tradingDate === day).at(-1)?.endAt;
   if (!closingAt || now.getTime() < Date.parse(closingAt)) return null;
@@ -42,37 +43,12 @@ export function closingEstimate(row: FundValuationPoint, now: Date, session: Mar
     !value.estimatedAt ||
     value.estimatedNav === null ||
     value.quality === 'unavailable' ||
-    value.marketState !== 'open' ||
-    value.symbol !== row.symbol ||
-    value.method !== row.method ||
-    Date.parse(value.estimatedAt) !== at.getTime() ||
-    Math.floor(at.getTime() / 60000) * 60000 !== row.minute.getTime()
+    !closingSnapshotMatches(value, row, at, value.estimatedAt)
   )
     return null;
   const e = parsed.data,
     available = e.holdingPrices.filter((p) => p.status === 'available');
-  if (
-    e.symbol !== row.symbol ||
-    e.estimatedNav !== value.estimatedNav ||
-    e.pricedCoverage !== value.pricedCoverage ||
-    e.disclosureCoverage !== value.disclosureCoverage ||
-    !(Date.parse(e.disclosureAvailableAt) <= at.getTime()) ||
-    !available.length ||
-    available.some(
-      (p) =>
-        !p.inputFingerprint ||
-        p.sourcePriceBasis?.adjustment !== 'qfq' ||
-        !p.anchorAdjustedClose ||
-        !p.currentAdjustedClose ||
-        p.anchorDate !== value.anchor!.navDate.slice(0, 10) ||
-        p.quoteTradingDate !== day ||
-        !(
-          Date.parse(p.quoteMarketTime ?? '') >= at.getTime() - 300000 &&
-          Date.parse(p.quoteMarketTime ?? '') < row.minute.getTime() + 60000
-        ),
-    )
-  )
-    return null;
+  if (!closingHoldingEvidenceMatches(e, available, value, row, at, day)) return null;
   return {
     symbol: row.symbol,
     method: row.method,
@@ -111,4 +87,52 @@ export function fundErrorFor(
     absolute: signed.abs().toFixed(),
     relativeAbsolute: signed.abs().div(String(nav.unitNav)).toFixed(),
   };
+}
+
+function closingSnapshotMatches(
+  value: z.infer<typeof fundValuationSchema>,
+  row: FundValuationPoint,
+  at: Date,
+  estimatedAt: string,
+) {
+  return (
+    value.marketState === 'open' &&
+    value.symbol === row.symbol &&
+    value.method === row.method &&
+    Date.parse(estimatedAt) === at.getTime() &&
+    Math.floor(at.getTime() / 60000) * 60000 === row.minute.getTime()
+  );
+}
+
+function closingHoldingEvidenceMatches(
+  e: z.infer<typeof evidenceSchema>,
+  available: z.infer<typeof evidenceSchema>['holdingPrices'],
+  value: z.infer<typeof fundValuationSchema>,
+  row: FundValuationPoint,
+  at: Date,
+  day: string,
+) {
+  if (
+    e.symbol !== row.symbol ||
+    e.estimatedNav !== value.estimatedNav ||
+    e.pricedCoverage !== value.pricedCoverage ||
+    e.disclosureCoverage !== value.disclosureCoverage ||
+    !(Date.parse(e.disclosureAvailableAt) <= at.getTime()) ||
+    !available.length ||
+    available.some(
+      (p) =>
+        !p.inputFingerprint ||
+        p.sourcePriceBasis?.adjustment !== 'qfq' ||
+        !p.anchorAdjustedClose ||
+        !p.currentAdjustedClose ||
+        p.anchorDate !== value.anchor!.navDate.slice(0, 10) ||
+        p.quoteTradingDate !== day ||
+        !(
+          Date.parse(p.quoteMarketTime ?? '') >= at.getTime() - 300000 &&
+          Date.parse(p.quoteMarketTime ?? '') < row.minute.getTime() + 60000
+        ),
+    )
+  )
+    return false;
+  return true;
 }

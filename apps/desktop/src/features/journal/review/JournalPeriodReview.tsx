@@ -1,6 +1,7 @@
-import { Spinner } from '@/components/ui/spinner';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
+import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
 import { useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   journalPeriodReviewRequestSchema,
   type JournalPeriodReviewResult,
@@ -8,7 +9,14 @@ import {
 } from '@thesis-ledger/schemas';
 import { journalReviewWindow } from '@thesis-ledger/domain';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { Separator } from '@/components/ui/separator';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
 import {
@@ -20,112 +28,47 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { getDesktopApiClient } from '@/shared/api/client';
-import { JournalMetricTable } from './JournalMetricTable.js';
+import { useToastManager } from '@/components/ui/toast';
+import {
+  journalPeriodExplanationInput,
+  matchesCurrentPeriodExplanation,
+} from './JournalPeriodAiExplanation.js';
+import { JournalPeriodResult } from './JournalPeriodResult.js';
 import { JournalRequestError } from './JournalReviewFeedback.js';
-import { evidenceLabel } from './journal-review-display.js';
-import { JournalPeriodAiExplanation } from './JournalPeriodAiExplanation.js';
+import { JournalPeriodAiPanel } from './JournalPeriodAiPanel.js';
 
 const presetLabels = { '7': '最近 7 天', '30': '最近 30 天', custom: '自定义窗口' };
 function recentWindow(days: number) {
   const end = new Date();
+  end.setSeconds(0, 0);
   return { start: new Date(end.getTime() - days * 86400000).toISOString(), end: end.toISOString() };
 }
-function PeriodGroup({
-  title,
-  group,
-  onSelect,
-}: {
-  title: string;
-  group: JournalPeriodReviewResult['tradeCycles'];
-  onSelect: (id: string) => void;
-}) {
+export function JournalPeriodReview(props: JournalPeriodReviewProps) {
+  const {
+    onSelect,
+    preset,
+    setPreset,
+    window,
+    setWindow,
+    completed,
+    setAiRunId,
+    analysis,
+    result,
+    changed,
+    ai,
+    aiQuery,
+    currentRun,
+    aiBusy,
+    aiError,
+    save,
+    canExplain,
+    canSave,
+  } = useJournalPeriodController(props);
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          窗口内 {group.observedSampleCount} 个对象，{group.includedObjectIds.length} 个符合资格，
-          {group.excluded.length} 个排除。
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <JournalMetricTable metrics={group.metrics} />
-        <details>
-          <summary className="cursor-pointer">查看样本与排除原因</summary>
-          <div className="mt-3 flex flex-col gap-2">
-            {group.includedObjectIds.map((id) => (
-              <Button
-                key={id}
-                variant="outline"
-                className="justify-start overflow-hidden"
-                onClick={() => onSelect(id)}
-              >
-                <span className="truncate">{id}</span>
-              </Button>
-            ))}
-            {group.excluded.map((row) => (
-              <div key={row.reviewObjectId}>
-                <Button
-                  variant="ghost"
-                  className="max-w-full justify-start overflow-hidden"
-                  onClick={() => onSelect(row.reviewObjectId)}
-                >
-                  <span className="truncate">{row.reviewObjectId}</span>
-                </Button>
-                <p className="text-sm text-muted-foreground">
-                  {row.reasons.map(evidenceLabel).join('；')}
-                </p>
-              </div>
-            ))}
-          </div>
-        </details>
-      </CardContent>
-    </Card>
-  );
-}
-export function JournalPeriodReview({
-  accountId,
-  mode,
-  symbol,
-  onSelect,
-}: {
-  accountId: string;
-  mode: 'actual' | 'shadow';
-  symbol: string;
-  onSelect: (id: string) => void;
-}) {
-  const [preset, setPreset] = useState<keyof typeof presetLabels>('7');
-  const [window, setWindow] = useState(() => recentWindow(7));
-  const [completed, setCompleted] = useState<{
-    data: JournalPeriodReviewResponse;
-    sequence: number;
-  }>();
-  const sequence = useRef(0);
-  const analysis = useMutation({
-    mutationFn: async () => {
-      const current = ++sequence.current;
-      const request = journalPeriodReviewRequestSchema.safeParse({
-        accountId,
-        mode,
-        ...window,
-        ...(symbol ? { symbol } : {}),
-      });
-      if (!request.success) throw new Error('请选择有效的开始和结束时间');
-      journalReviewWindow(request.data);
-      const data = await getDesktopApiClient().journalReviews.period(request.data);
-      return { data, sequence: current };
-    },
-    onSuccess: setCompleted,
-  });
-  const result = completed?.data.result;
-  const changed =
-    result !== undefined &&
-    (result.window.start !== window.start || result.window.end !== window.end);
-  return (
-    <div className="flex flex-col gap-3 pt-3">
-      <FieldGroup className="grid items-end gap-3 md:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
+    <div className="flex flex-col gap-3">
+      <FieldGroup className="max-w-xs">
         <Field>
-          <FieldLabel>统计窗口</FieldLabel>
+          <FieldLabel>统计周期</FieldLabel>
           <Select
             value={preset}
             onValueChange={(next) => {
@@ -134,7 +77,7 @@ export function JournalPeriodReview({
               if (next !== 'custom') setWindow(recentWindow(Number(next)));
             }}
           >
-            <SelectTrigger aria-label="统计窗口" className="w-full">
+            <SelectTrigger aria-label="统计周期" className="w-full">
               <SelectValue>{presetLabels[preset]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -148,76 +91,242 @@ export function JournalPeriodReview({
             </SelectContent>
           </Select>
         </Field>
-        <Field>
-          <FieldLabel>开始时间</FieldLabel>
-          <JournalWindowTimeInput
-            aria-label="周期开始时间"
-            value={window.start}
-            onValueChange={(start) => {
-              setPreset('custom');
-              setWindow({ ...window, start });
-            }}
-          />
-        </Field>
-        <Field>
-          <FieldLabel>结束时间</FieldLabel>
-          <JournalWindowTimeInput
-            aria-label="周期结束时间"
-            value={window.end}
-            onValueChange={(end) => {
-              setPreset('custom');
-              setWindow({ ...window, end });
-            }}
-          />
-        </Field>
+      </FieldGroup>
+      {preset === 'custom' && (
+        <FieldGroup className="grid gap-3 sm:grid-cols-2">
+          <Field>
+            <FieldLabel>开始时间</FieldLabel>
+            <JournalWindowTimeInput
+              aria-label="周期开始时间"
+              value={window.start}
+              onValueChange={(start) => setWindow({ ...window, start })}
+            />
+          </Field>
+          <Field>
+            <FieldLabel>结束时间</FieldLabel>
+            <JournalWindowTimeInput
+              aria-label="周期结束时间"
+              value={window.end}
+              onValueChange={(end) => setWindow({ ...window, end })}
+            />
+          </Field>
+        </FieldGroup>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           aria-busy={analysis.isPending}
-          className="self-end justify-self-start md:col-span-3 xl:col-span-1"
-          disabled={analysis.isPending}
-          onClick={() => analysis.mutate()}
+          disabled={analysis.isPending || save.isPending}
+          onClick={() => {
+            setAiRunId(null);
+            ai.reset();
+            save.reset();
+            analysis.mutate();
+          }}
         >
           {analysis.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {analysis.isPending ? '分析中…' : '分析周期'}
         </Button>
-      </FieldGroup>
-      <p className="text-xs text-muted-foreground">按本机时区输入，开始时刻计入、结束时刻不计入。</p>
+        <Button
+          variant="outline"
+          disabled={!canExplain || aiBusy}
+          aria-busy={aiBusy}
+          onClick={() => {
+            if (!completed || !canExplain) return;
+            setAiRunId(null);
+            ai.reset();
+            ai.mutate({ data: completed.data, sequence: completed.sequence });
+          }}
+        >
+          {aiBusy && <Spinner data-icon="inline-start" aria-hidden="true" />}
+          {periodAiActionLabel(aiBusy, Boolean(currentRun?.result))}
+        </Button>
+        <Button
+          variant="outline"
+          aria-busy={save.isPending}
+          disabled={!canSave}
+          onClick={() => save.mutate()}
+        >
+          {save.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
+          {save.isPending ? '保存中…' : '保存复盘快照'}
+        </Button>
+      </div>
       {analysis.isError && <JournalRequestError title="周期分析未完成" error={analysis.error} />}
+      {save.isError && <JournalRequestError title="周期快照未保存" error={save.error} />}
+      {!result && !analysis.isError && (
+        <>
+          <Separator />
+          {analysis.isPending ? (
+            <LoadingState label="正在分析周期" className="min-h-64" />
+          ) : (
+            <Empty className="min-h-64 py-12">
+              <EmptyHeader>
+                <EmptyMedia variant="icon" aria-hidden="true">
+                  <ChartLineUpIcon />
+                </EmptyMedia>
+                <EmptyTitle>暂无周期分析结果</EmptyTitle>
+                <EmptyDescription>
+                  选择统计周期并点击「分析周期」，查看交易统计与样本明细。分析完成后可使用 AI 解读。
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </>
+      )}
       {result && (
         <>
-          <p className="break-all text-sm text-muted-foreground">
-            本次结果窗口：[{result.window.start}, {result.window.end})
-          </p>
-          <PeriodGroup title="完整交易周期统计" group={result.tradeCycles} onSelect={onSelect} />
-          <PeriodGroup title="单次减仓统计" group={result.closeSlices} onSelect={onSelect} />
-          {result.unknownTime.length > 0 && (
-            <details>
-              <summary>时间未知的样本（{result.unknownTime.length}）</summary>
-              {result.unknownTime.map((row) => (
-                <p className="mt-2 break-all text-sm" key={row.reviewObjectId}>
-                  {row.reviewObjectId}：{row.reasons.map(evidenceLabel).join('；')}
-                </p>
-              ))}
-            </details>
-          )}
-          {result.assumptions.map((note) => (
-            <p className="text-sm text-muted-foreground" key={note}>
-              {note}
-            </p>
-          ))}
           {changed && (
             <p className="text-sm text-muted-foreground">
-              窗口已修改，重新分析后可提交对应的 AI 解读。
+              筛选条件已修改，以下仍为上次分析结果；请重新分析以更新结果和 AI 解读。
             </p>
           )}
-          {completed && (
-            <JournalPeriodAiExplanation
-              key={completed.sequence}
-              analysis={completed.data}
-              disabled={changed || analysis.isPending}
-            />
-          )}
+          <Separator />
+          <JournalPeriodResult result={result} onSelect={onSelect} />
+          <Separator />
+          <JournalPeriodAiPanel
+            run={currentRun}
+            busy={aiBusy}
+            error={aiError}
+            onRetry={() => {
+              if (aiQuery.isError) void aiQuery.refetch();
+              else if (completed && canExplain) {
+                setAiRunId(null);
+                ai.reset();
+                ai.mutate({ data: completed.data, sequence: completed.sequence });
+              }
+            }}
+          />
         </>
       )}
     </div>
   );
+}
+
+type JournalPeriodReviewProps = {
+  accountId: string;
+  mode: 'actual' | 'shadow';
+  onSelect: (id: string) => void;
+};
+
+function useJournalPeriodController({ accountId, mode, onSelect }: JournalPeriodReviewProps) {
+  const [preset, setPreset] = useState<keyof typeof presetLabels>('7');
+  const [window, setWindow] = useState(() => recentWindow(7));
+  const [completed, setCompleted] = useState<{
+    data: JournalPeriodReviewResponse;
+    sequence: number;
+  }>();
+  const sequence = useRef(0);
+  const client = useQueryClient();
+  const toast = useToastManager();
+  const api = getDesktopApiClient().journalReviews;
+  const [aiRunId, setAiRunId] = useState<string | null>(null);
+  const analysis = useMutation({
+    mutationFn: async () => {
+      const current = ++sequence.current;
+      const request = journalPeriodReviewRequestSchema.safeParse({
+        accountId,
+        mode,
+        ...window,
+      });
+      if (!request.success) throw new Error('请选择有效的开始和结束时间');
+      journalReviewWindow(request.data);
+      const data = await api.period(request.data);
+      return { data, sequence: current };
+    },
+    onSuccess: setCompleted,
+  });
+  const result = completed?.data.result;
+  const changed =
+    result !== undefined &&
+    (result.window.start !== window.start || result.window.end !== window.end);
+  const ai = useMutation({
+    mutationFn: async (input: { data: JournalPeriodReviewResponse; sequence: number }) => {
+      const run = await api.explainPeriod(journalPeriodExplanationInput(input.data));
+      if (!matchesCurrentPeriodExplanation(run, input.data))
+        throw new Error('AI 解读与本次周期输入不一致');
+      return { run, sequence: input.sequence };
+    },
+    onSuccess: ({ run, sequence: runSequence }) => {
+      if (runSequence === sequence.current) setAiRunId(run.id);
+    },
+  });
+  const aiQuery = useQuery({
+    queryKey: ['journal-period-current-ai', accountId, mode, completed?.sequence, aiRunId],
+    enabled: aiRunId !== null && completed !== undefined,
+    queryFn: async ({ signal }) => {
+      if (!aiRunId || !completed) throw new Error('本次解读任务不存在');
+      const run = await api.periodExplanation(aiRunId, { accountId, mode }, signal);
+      if (!matchesCurrentPeriodExplanation(run, completed.data))
+        throw new Error('AI 解读与本次周期输入不一致，请重新分析');
+      return run;
+    },
+    refetchInterval: (query) =>
+      ['queued', 'running'].includes(query.state.data?.status ?? '') ? 2000 : false,
+    retry: false,
+  });
+  const currentRun = aiQuery.data ?? ai.data?.run ?? null;
+  const aiBusy =
+    ai.isPending ||
+    (aiRunId !== null &&
+      (aiQuery.isPending || ['queued', 'running'].includes(currentRun?.status ?? '')));
+  const aiError = periodAiRequestError(ai, aiQuery);
+  const canUseResult = periodAnalysisUsable(result, changed, analysis);
+  const save = useMutation({
+    mutationFn: () => {
+      if (!completed || !canUseResult || aiBusy || aiQuery.isError)
+        throw new Error('请等待本次分析和 AI 解读完成后再保存');
+      return api.savePeriod({
+        ...journalPeriodExplanationInput(completed.data),
+        ...(aiRunId && currentRun?.status === 'succeeded' && currentRun.result ? { aiRunId } : {}),
+      });
+    },
+    onSuccess: () => {
+      toast.add({ title: '周期复盘快照已保存', type: 'success' });
+      void client.invalidateQueries({ queryKey: ['journal-review-history', accountId, mode] });
+    },
+  });
+  const canExplain = canUseResult && !save.isPending;
+  const canSave = canUseResult && !save.isPending && !aiBusy && !aiQuery.isError;
+  return {
+    onSelect,
+    preset,
+    setPreset,
+    window,
+    setWindow,
+    completed,
+    setAiRunId,
+    analysis,
+    result,
+    changed,
+    ai,
+    aiQuery,
+    currentRun,
+    aiBusy,
+    aiError,
+    save,
+    canExplain,
+    canSave,
+  };
+}
+
+function periodAiRequestError(
+  ai: { isError: boolean; error: unknown },
+  query: { isError: boolean; error: unknown },
+): unknown {
+  if (ai.isError) return ai.error;
+  if (query.isError) return query.error;
+  return null;
+}
+
+function periodAnalysisUsable(
+  result: JournalPeriodReviewResult | undefined,
+  changed: boolean,
+  analysis: { isPending: boolean; isError: boolean },
+) {
+  return Boolean(result) && !changed && !analysis.isPending && !analysis.isError;
+}
+
+function periodAiActionLabel(busy: boolean, hasResult: boolean) {
+  if (busy) return '解读中…';
+  if (hasResult) return '重新生成 AI 解读';
+  return 'AI 解读';
 }

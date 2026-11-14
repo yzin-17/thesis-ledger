@@ -8,6 +8,8 @@ import { StrategyOptimizationService } from '../../src/strategy-optimization/str
 import { formalizeOptimizationCandidate } from '../../src/strategy-optimization/strategy-optimization-adoption.js';
 import { PrismaService } from '../../src/platform/prisma.service.js';
 import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
+import { StrategyRiskApplicationService } from '../../src/strategy-optimization/strategy-risk-application.service.js';
+import { StrategyRiskApplicationStoreService } from '../../src/strategy-optimization/strategy-risk-application-store.service.js';
 
 const isolatedDescribe =
   process.env.RUN_STRATEGY_CENTER_T03_POSTGRES === '1' ? describe : describe.skip;
@@ -23,15 +25,21 @@ const makeSchema = (name: string) => ({
 });
 
 isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
+  const context = adoptionConsistencyContext();
+  registerAdoptionPublicationConsistency(context);
+  registerAdoptionReadinessAndDiscovery(context);
+});
+
+function adoptionConsistencyContext() {
   const prisma = new PrismaService();
   const policy = new ResultReadPolicyService(prisma);
   const reads = new StrategyOptimizationReadService(prisma, { list: () => [] } as never, policy);
-  const riskApplications = {
-    monitoringPlan: async (strategyVersionId: string) => ({
-      planHash: `plan-${strategyVersionId}`,
-      rules: [],
-    }),
-  };
+  const riskApplications = new StrategyRiskApplicationService(
+    prisma,
+    {} as never,
+    new StrategyRiskApplicationStoreService(prisma),
+    {} as never,
+  );
   const optimizer = new StrategyOptimizationService(
     prisma,
     { list: () => [] } as never,
@@ -44,7 +52,6 @@ isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
   const experimentIds: string[] = [];
   const riskApplicationIds: string[] = [];
   const accountId = randomUUID();
-
   const createCase = async (
     input: {
       sourceMode?: 'existing' | 'discovery';
@@ -138,7 +145,6 @@ isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
       candidateHash: optimizationSha256(candidateSchema),
     };
   };
-
   beforeAll(async () => {
     await prisma.$connect();
     await prisma.account.create({
@@ -152,7 +158,6 @@ isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
       },
     });
   });
-
   afterAll(async () => {
     if (experimentIds.length > 0) {
       await prisma.$executeRaw(Prisma.sql`
@@ -185,8 +190,46 @@ isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
     await prisma.account.delete({ where: { id: accountId } }).catch(() => undefined);
     await prisma.$disconnect();
   });
+  return {
+    get prisma() {
+      return prisma;
+    },
+    get policy() {
+      return policy;
+    },
+    get reads() {
+      return reads;
+    },
+    get riskApplications() {
+      return riskApplications;
+    },
+    get optimizer() {
+      return optimizer;
+    },
+    get strategyIds() {
+      return strategyIds;
+    },
+    get experimentIds() {
+      return experimentIds;
+    },
+    get riskApplicationIds() {
+      return riskApplicationIds;
+    },
+    get accountId() {
+      return accountId;
+    },
+    get createCase() {
+      return createCase;
+    },
+  };
+}
 
+function registerAdoptionPublicationConsistency(
+  suiteContext: ReturnType<typeof adoptionConsistencyContext>,
+) {
   it('返回基线/当前/候选三方差异，并让首次与同意图重放深相等', async () => {
+    const { prisma, optimizer, riskApplicationIds, accountId, createCase } = suiteContext;
+
     const item = await createCase();
     const context = await optimizer.adoptionContext(item.experimentId, item.candidateId);
     expect(context).toMatchObject({
@@ -290,8 +333,9 @@ isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
     `);
     expect(riskAfter).toEqual(riskBefore);
   });
-
   it('不同采纳意图在同一策略上原子收敛且不改变旧版本', async () => {
+    const { prisma, optimizer, createCase } = suiteContext;
+
     const item = await createCase();
     const secondCandidateId = randomUUID();
     const secondSchema = makeSchema(`${suffix}-second-candidate`);
@@ -341,8 +385,14 @@ isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
     });
     expect(versions.map((version) => version.version)).toEqual([1, 2, 3]);
   });
+}
 
-  it('未揭示、不合格、哈希变化均拒绝，并支持从零实验创建首个正式版本', async () => {
+function registerAdoptionReadinessAndDiscovery(
+  suiteContext: ReturnType<typeof adoptionConsistencyContext>,
+) {
+  it('未揭示、未完成和哈希变化均拒绝，并支持从零实验创建首个正式版本', async () => {
+    const { prisma, optimizer, createCase } = suiteContext;
+
     const hidden = await createCase({ reveal: false });
     await expect(
       optimizer.adopt(hidden.experimentId, {
@@ -352,7 +402,7 @@ isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
         idempotencyKey: `${suffix}-hidden`,
       }),
     ).rejects.toMatchObject({ response: { errorCode: 'ADOPTION_NOT_REVEALED' } });
-    const invalid = await createCase({ validationStatus: 'test_invalid' });
+    const invalid = await createCase({ validationStatus: 'test_running' });
     await expect(
       optimizer.adopt(invalid.experimentId, {
         candidateId: invalid.candidateId,
@@ -378,9 +428,10 @@ isolatedDescribe('T03 isolated PostgreSQL atomic adoption', () => {
       idempotencyKey: `${suffix}-discovery`,
     });
     expect(adopted.strategyVersion.version).toBe(1);
+    if (adopted.detailsStatus !== 'ready') throw new Error('正常采纳应读取完整上下文');
     expect(adopted.adoptionContext.current).toBeNull();
     expect(
       (await prisma.strategy.findUniqueOrThrow({ where: { id: discovery.strategyId } })).status,
     ).toBe('draft');
   });
-});
+}

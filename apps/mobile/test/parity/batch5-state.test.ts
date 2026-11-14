@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   aiProviderDraft,
   buildAiProviderInput,
@@ -6,7 +6,16 @@ import {
 } from '../../src/features/ai-providers/ai-provider-draft';
 import { aiProviderRecordSchema, aiProviderInputSchema } from '@thesis-ledger/schemas';
 import { b5Ai } from './batch5-fixture';
+import { providerProbeInput } from '../../src/features/market-providers/MarketProviderProbe';
+vi.mock('../../src/components/MobilePrimitives', () => ({
+  Action: () => null, Choices: () => null, Copy: () => null, Field: () => null, Section: () => null,
+}));
 describe('第 5 批配置语义与秘密边界', () => {
+  it('没有账号等级契约的来源不提交积分或独立权限残留', () => {
+    const input = providerProbeInput('account', { route: '', points: '120', hkDaily: true, realtime: true }, undefined, false);
+    expect(input.purpose).toBe('account_access');
+    expect(input).not.toHaveProperty('accountLevel');
+  });
   it('编辑只从安全摘要生成，密钥没有草稿字段，未知费用不会转换为零', () => {
     const row = aiProviderRecordSchema.parse({ ...b5Ai, apiKey: 'fixture-dummy' });
     const draft = aiProviderDraft(row);

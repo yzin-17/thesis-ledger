@@ -50,7 +50,10 @@ const normalizeCanonicalNumber = (value: number | null) => {
   const sign = mantissa.startsWith('-') ? '-' : '';
   const digits = mantissa.replace('-', '').replace('.', '');
   const decimalIndex = (mantissa.startsWith('-') ? mantissa.indexOf('.') - 1 : mantissa.indexOf('.')) + exponent;
-  const shifted = decimalIndex <= 0 ? `0.${'0'.repeat(-decimalIndex)}${digits}` : decimalIndex >= digits.length ? `${digits}${'0'.repeat(decimalIndex - digits.length)}` : `${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
+  let shifted: string;
+  if (decimalIndex <= 0) shifted = `0.${'0'.repeat(-decimalIndex)}${digits}`;
+  else if (decimalIndex >= digits.length) shifted = `${digits}${'0'.repeat(decimalIndex - digits.length)}`;
+  else shifted = `${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
   return `${sign}${shifted}`.replace(/\.0+$/, '').replace(/(\.[0-9]*?)0+$/, '$1');
 };
 

@@ -221,29 +221,7 @@ export function createResearchBrowserApi(
     scenario === 'registered'
       ? ['instrument', 'strategy']
       : ['instrument', 'portfolio', 'account', 'position', 'strategy'];
-  const matches = (row: ResearchReportDetail, params: URLSearchParams) => {
-    if (params.get('view') === 'legacy') return row.historicalScope.status === 'unrecorded';
-    if (row.historicalScope.status !== 'known') return false;
-    return (
-      row.historicalScope.snapshot.mode === params.get('mode') &&
-      (!params.get('kind') || row.historicalScope.snapshot.scope === params.get('kind'))
-    );
-  };
-  function readReport(url: URL) {
-    const parts = url.pathname.split('/');
-    const row = reports.get(parts[5] ?? '');
-    if (!row || !matches(row, url.searchParams)) return absent();
-    if (parts[6] !== 'evidence') return response(row);
-    if (row.result?.version !== 2 || row.result.evidenceBindings[0]?.audit.evidenceId !== parts[7])
-      return absent();
-    return response({
-      version: 2,
-      runId: row.id,
-      scopeSnapshot: row.result.scopeSnapshot,
-      evidence,
-      toolCallId: row.result.evidenceBindings[0].toolCallId,
-    });
-  }
+  const { matches, readReport } = researchBrowserReportReader(reports, evidence);
   async function submit(path: string, raw: unknown, signal?: AbortSignal | null) {
     const input = normalizeResearchSubmissionV2(raw);
     latest = input;
@@ -379,10 +357,37 @@ export function createResearchBrowserApi(
           (!url.searchParams.get('search') ||
             row.question?.includes(url.searchParams.get('search')!)),
       );
+      const symbols = [
+        ...new Set(
+          rows.flatMap((row) => {
+            const historical = row.historicalScope;
+            if (historical.status !== 'known') return [];
+            const scope = historical.snapshot;
+            return scope.scope === 'instrument' || scope.scope === 'position'
+              ? [scope.instrument.symbol]
+              : [];
+          }),
+        ),
+      ];
       return response({
         items: rows.map((row) => researchReportSummarySchema.strip().parse(row)),
         hasMore: false,
         nextCursor: null,
+        instrumentDirectory: {
+          generation: 1,
+          items: symbols.map((symbol) => {
+            const separator = symbol.lastIndexOf('.');
+            return {
+              symbol,
+              canonicalCode: symbol.slice(0, separator),
+              instrumentType: 'STOCK',
+              market: symbol.slice(separator + 1),
+              displayName: '受控目录标的',
+              active: true,
+            };
+          }),
+          unresolvedSymbols: [],
+        },
       });
     }
     if (url.pathname.startsWith('/api/v1/research/reports/')) return readReport(url);
@@ -401,4 +406,35 @@ export function createResearchBrowserApi(
       };
     },
   };
+}
+
+function researchBrowserReportReader(
+  reports: Map<string, ResearchReportDetail>,
+  evidence: ReturnType<typeof researchFrozenEvidenceV2Schema.parse>,
+) {
+  const matches = (row: ResearchReportDetail, params: URLSearchParams) => {
+    if (params.get('view') === 'legacy') return row.historicalScope.status === 'unrecorded';
+    if (row.historicalScope.status !== 'known') return false;
+    return (
+      row.historicalScope.snapshot.mode === params.get('mode') &&
+      (!params.get('kind') || row.historicalScope.snapshot.scope === params.get('kind'))
+    );
+  };
+  function readReport(url: URL) {
+    const parts = url.pathname.split('/');
+    const row = reports.get(parts[5] ?? '');
+    if (!row || !matches(row, url.searchParams)) return absent();
+    if (parts[6] !== 'evidence') return response(row);
+    if (row.result?.version !== 2 || row.result.evidenceBindings[0]?.audit.evidenceId !== parts[7])
+      return absent();
+    return response({
+      version: 2,
+      runId: row.id,
+      scopeSnapshot: row.result.scopeSnapshot,
+      evidence,
+      toolCallId: row.result.evidenceBindings[0].toolCallId,
+    });
+  }
+
+  return { matches, readReport };
 }

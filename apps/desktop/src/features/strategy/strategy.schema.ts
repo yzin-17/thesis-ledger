@@ -2,12 +2,13 @@ import { strategySchema } from '@thesis-ledger/schemas';
 import type { StrategySchema, StrategyVersion } from './strategy.types.js';
 
 export const createDefaultStrategySchema = (name = '我的第一条策略'): StrategySchema => ({
-  schemaVersion: '2',
+  schemaVersion: '3',
   name,
   description: '示例规则：收盘价高于开盘价时入场，持仓时退出；保存前请核对。',
   signalSources: [
     {
       id: 'execution',
+      priceCoordinate: 'research',
       asset: { symbol: '', market: 'CN', assetType: 'stock' },
       timeframe: '1d',
       series: ['open', 'close'],
@@ -45,7 +46,7 @@ export const schemaFromVersion = (version: StrategyVersion | null, fallbackName?
 export const schemaName = (schema: StrategySchema, fallback = '') =>
   typeof schema.name === 'string' ? schema.name : fallback;
 
-export const schemaSymbols = (schema: StrategySchema) => {
+export const schemaSymbols = (schema: StrategySchema = {}) => {
   const instrument = schema.executionInstrument;
   if (!instrument || typeof instrument !== 'object' || Array.isArray(instrument)) return [];
   const symbol = (instrument as { symbol?: unknown }).symbol;

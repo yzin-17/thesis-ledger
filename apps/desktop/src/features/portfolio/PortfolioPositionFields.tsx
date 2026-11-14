@@ -37,6 +37,12 @@ const toLocalDatetimeInputValue = (date: Date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+function positionCostCurrencyLabel(symbol: string, currency?: string) {
+  if (currency === 'HKD' || (!currency && symbol.endsWith('.HK'))) return '港元';
+  if (currency === 'USD' || (!currency && symbol.endsWith('.US'))) return '美元';
+  return '元';
+}
+
 function ManualAssetTypeOptions({ manualAssetType }: { manualAssetType: HeldAssetType }) {
   if (manualAssetType === 'fund') return <SelectItem value="fund">基金</SelectItem>;
   return (
@@ -182,7 +188,7 @@ export function PositionFields({
             />
             <InputGroupAddon align="inline-end">
               <InputGroupText className="text-xs font-normal">
-                元/
+                {positionCostCurrencyLabel(selectedInstrument?.symbol ?? editing?.symbol ?? instrumentQuery, editing?.currency)}/
                 {assetQuantityUnit(
                   positionAssetType(
                     selectedInstrument,

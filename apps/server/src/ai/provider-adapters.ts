@@ -31,6 +31,32 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+type ProviderPricingInput = {
+  costPer1kInput?: number;
+  costPer1kOutput?: number;
+  costCurrency?: string;
+  pricingVersion?: string;
+};
+type ProviderRuntimeOptions = {
+  modelCatalog?: AiProviderModelCatalogConfig;
+  priority?: number;
+  capabilities?: readonly string[];
+  health?: AiProviderHealth;
+  source?: 'database';
+  modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
+  upstreamFormat?: AiUpstreamFormat;
+  chatImplementation?: AiChatImplementation;
+  compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
+  adapter?: AiAdapter;
+  authMode?: AiAuthMode;
+  executionRoutes?: readonly AiProviderExecutionRouteInput[];
+  firstOutputTimeoutMs?: number;
+  outputIdleTimeoutMs?: number;
+  modelPricing?: Readonly<Record<string, AiProviderModelPricingView>>;
+  modelDefaults?: Readonly<Record<string, AiProviderModelDefaultConfig>>;
+  credentialFingerprint?: string;
+};
+
 export class OpenAiCompatibleProvider implements AiProvider {
   readonly metadata;
   private readonly modelCatalog: AiProviderModelCatalogConfig | undefined;
@@ -41,66 +67,17 @@ export class OpenAiCompatibleProvider implements AiProvider {
     private readonly baseUrl: string,
     private readonly apiKey: string,
     private readonly timeoutMs = DEFAULT_AI_TIMEOUT_MS,
-    pricing?: {
-      costPer1kInput?: number;
-      costPer1kOutput?: number;
-      costCurrency?: string;
-      pricingVersion?: string;
-    },
-    options?: {
-      modelCatalog?: AiProviderModelCatalogConfig;
-      priority?: number;
-      capabilities?: readonly string[];
-      health?: AiProviderHealth;
-      source?: 'database';
-      modelReasoning?: Readonly<Record<string, AiProviderModelReasoningMetadata>>;
-      upstreamFormat?: AiUpstreamFormat;
-      chatImplementation?: AiChatImplementation;
-      compatibilityExtensionProfile?: AiCompatibilityExtensionProfile;
-      adapter?: AiAdapter;
-      authMode?: AiAuthMode;
-      executionRoutes?: readonly AiProviderExecutionRouteInput[];
-      firstOutputTimeoutMs?: number;
-      outputIdleTimeoutMs?: number;
-      modelPricing?: Readonly<Record<string, AiProviderModelPricingView>>;
-      modelDefaults?: Readonly<Record<string, AiProviderModelDefaultConfig>>;
-      credentialFingerprint?: string;
-    },
+    pricing?: ProviderPricingInput,
+    options?: ProviderRuntimeOptions,
   ) {
     this.modelCatalog = options?.modelCatalog;
     this.metadata = {
       baseURL: baseUrl,
       timeoutMs: this.timeoutMs,
-      health: options?.health ?? ('unknown' as const),
-      priority: options?.priority ?? 100,
-      ...(options?.capabilities ? { capabilities: [...options.capabilities] } : {}),
-      ...(options?.source ? { source: options.source } : {}),
-      ...(options?.modelReasoning ? { modelReasoning: options.modelReasoning } : {}),
-      ...(options?.upstreamFormat ? { upstreamFormat: options.upstreamFormat } : {}),
-      ...(options?.chatImplementation ? { chatImplementation: options.chatImplementation } : {}),
-      ...(options?.compatibilityExtensionProfile
-        ? { compatibilityExtensionProfile: options.compatibilityExtensionProfile }
-        : {}),
-      ...(options?.adapter ? { adapter: options.adapter } : {}),
-      authMode: options?.authMode ?? 'api_key',
-      ...(options?.firstOutputTimeoutMs === undefined
-        ? {}
-        : { firstOutputTimeoutMs: options.firstOutputTimeoutMs }),
-      ...(options?.outputIdleTimeoutMs === undefined
-        ? {}
-        : { outputIdleTimeoutMs: options.outputIdleTimeoutMs }),
-      ...(options?.executionRoutes ? { executionRoutes: options.executionRoutes } : {}),
-      ...(options?.modelPricing ? { modelPricing: options.modelPricing } : {}),
-      ...(options?.modelDefaults ? { modelDefaults: options.modelDefaults } : {}),
-      ...(options?.credentialFingerprint
-        ? { credentialFingerprint: options.credentialFingerprint }
-        : {}),
-      ...(pricing?.costPer1kInput === undefined ? {} : { costPer1kInput: pricing.costPer1kInput }),
-      ...(pricing?.costPer1kOutput === undefined
-        ? {}
-        : { costPer1kOutput: pricing.costPer1kOutput }),
-      ...(pricing?.costCurrency ? { costCurrency: pricing.costCurrency } : {}),
-      ...(pricing?.pricingVersion ? { pricingVersion: pricing.pricingVersion } : {}),
+      ...providerGeneralMetadata(options),
+      ...providerTransportMetadata(options),
+      ...providerRouteMetadata(options),
+      ...providerPriceMetadata(pricing),
     };
   }
 
@@ -253,4 +230,52 @@ export class FixtureAiProvider implements AiProvider {
       actualModel: input.model,
     });
   }
+}
+
+function providerGeneralMetadata(options: ProviderRuntimeOptions | undefined) {
+  return {
+    health: options?.health ?? ('unknown' as const),
+    priority: options?.priority ?? 100,
+    ...(options?.capabilities ? { capabilities: [...options.capabilities] } : {}),
+    ...(options?.source ? { source: options.source } : {}),
+  } as const;
+}
+
+function providerTransportMetadata(options: ProviderRuntimeOptions | undefined) {
+  return {
+    ...(options?.modelReasoning ? { modelReasoning: options.modelReasoning } : {}),
+    ...(options?.upstreamFormat ? { upstreamFormat: options.upstreamFormat } : {}),
+    ...(options?.chatImplementation ? { chatImplementation: options.chatImplementation } : {}),
+    ...(options?.compatibilityExtensionProfile
+      ? { compatibilityExtensionProfile: options.compatibilityExtensionProfile }
+      : {}),
+    ...(options?.adapter ? { adapter: options.adapter } : {}),
+    authMode: options?.authMode ?? 'api_key',
+    ...(options?.firstOutputTimeoutMs === undefined
+      ? {}
+      : { firstOutputTimeoutMs: options.firstOutputTimeoutMs }),
+    ...(options?.outputIdleTimeoutMs === undefined
+      ? {}
+      : { outputIdleTimeoutMs: options.outputIdleTimeoutMs }),
+  } as const;
+}
+
+function providerRouteMetadata(options: ProviderRuntimeOptions | undefined) {
+  return {
+    ...(options?.executionRoutes ? { executionRoutes: options.executionRoutes } : {}),
+    ...(options?.modelPricing ? { modelPricing: options.modelPricing } : {}),
+    ...(options?.modelDefaults ? { modelDefaults: options.modelDefaults } : {}),
+    ...(options?.credentialFingerprint
+      ? { credentialFingerprint: options.credentialFingerprint }
+      : {}),
+  } as const;
+}
+
+function providerPriceMetadata(pricing: ProviderPricingInput | undefined) {
+  return {
+    ...(pricing?.costPer1kInput === undefined ? {} : { costPer1kInput: pricing.costPer1kInput }),
+    ...(pricing?.costPer1kOutput === undefined ? {} : { costPer1kOutput: pricing.costPer1kOutput }),
+    ...(pricing?.costCurrency ? { costCurrency: pricing.costCurrency } : {}),
+    ...(pricing?.pricingVersion ? { pricingVersion: pricing.pricingVersion } : {}),
+  } as const;
 }

@@ -39,6 +39,8 @@ export function requirePreparedOptimizationConfiguration(
   if (!prepared || JSON.stringify(prepared.target) !== JSON.stringify(target))
     throw new Error('请先准备当前实验的价格与执行模型配置');
   const config = prepared.result.runConfig;
+  if (!config.priceResearch?.actualPriceWindow || config.executionPriceProtocol.priceBasis.adjustment !== 'hfq')
+    throw new Error('请先准备统一后复权研究及原价参考，再创建实验');
   if (
     config.startDate !== startDate ||
     config.endDate !== endDate ||

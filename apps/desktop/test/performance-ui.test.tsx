@@ -137,6 +137,9 @@ describe('收益分析交互契约', () => {
     expect(markup).toContain('行情不完整，尚无完整估值');
   });
 
+});
+
+describe('配置目标、权重与缺失状态', () => {
   it('partial 配置保留金额、隐藏权重并暂停建议，包含无持仓指数目标', () => {
     const markup = renderToStaticMarkup(
       <PerformanceAllocationSection
@@ -234,6 +237,9 @@ describe('收益分析交互契约', () => {
     expect(markup).toContain('设置目标');
     expect(markup).not.toContain('数据读取失败');
   });
+});
+
+describe('快照空态与估值适配', () => {
   it('没有快照时使用紧凑空状态而不是空表格', () => {
     const markup = renderToStaticMarkup(
       <PerformanceSnapshotTable loadState="empty" snapshots={[]} onCompleteDataSetup={vi.fn()}

@@ -221,21 +221,7 @@ const projectFifo = (operations: PositionOperation[]): PositionProjection[] =>
         lots.push({ quantity: operation.quantity, unitCost: unitCost.plus(chargePerUnit) });
         continue;
       }
-      let remaining = operation.quantity;
-      const proceedsPerUnit = operation.quantity.isZero()
-        ? new Prisma.Decimal(0)
-        : (operation.unitCost ?? new Prisma.Decimal(0)).minus(
-            (operation.charges ?? new Prisma.Decimal(0)).div(operation.quantity),
-          );
-      while (remaining.gt(0)) {
-        const lot = lots[0];
-        if (!lot) throw new Error(`卖出数量超过持仓: ${operation.symbol}`);
-        const consumed = remaining.lt(lot.quantity) ? remaining : lot.quantity;
-        realizedPnl = realizedPnl.plus(consumed.mul(proceedsPerUnit.minus(lot.unitCost)));
-        lot.quantity = lot.quantity.minus(consumed);
-        remaining = remaining.minus(consumed);
-        if (lot.quantity.isZero()) lots.shift();
-      }
+      realizedPnl = consumeFifoSell(lots, operation, realizedPnl);
     }
     const quantity = lots.reduce((sum, lot) => sum.plus(lot.quantity), new Prisma.Decimal(0));
     const cost = lots.reduce(
@@ -323,3 +309,26 @@ export const rebuildLedgerProjection = async (
     realizedPnl: position.realizedPnl.toString(),
   }));
 };
+
+function consumeFifoSell(
+  lots: Array<{ quantity: Prisma.Decimal; unitCost: Prisma.Decimal }>,
+  operation: Exclude<PositionOperation, { kind: 'RATIO' }>,
+  realizedPnl: Prisma.Decimal,
+) {
+  let remaining = operation.quantity;
+  const proceedsPerUnit = operation.quantity.isZero()
+    ? new Prisma.Decimal(0)
+    : (operation.unitCost ?? new Prisma.Decimal(0)).minus(
+        (operation.charges ?? new Prisma.Decimal(0)).div(operation.quantity),
+      );
+  while (remaining.gt(0)) {
+    const lot = lots[0];
+    if (!lot) throw new Error(`卖出数量超过持仓: ${operation.symbol}`);
+    const consumed = remaining.lt(lot.quantity) ? remaining : lot.quantity;
+    realizedPnl = realizedPnl.plus(consumed.mul(proceedsPerUnit.minus(lot.unitCost)));
+    lot.quantity = lot.quantity.minus(consumed);
+    remaining = remaining.minus(consumed);
+    if (lot.quantity.isZero()) lots.shift();
+  }
+  return realizedPnl;
+}

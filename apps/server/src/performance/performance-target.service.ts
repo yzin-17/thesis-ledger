@@ -81,11 +81,7 @@ export class PerformanceTargetService {
       where: { scope: 'account', accountId: { in: accountIds }, active: true },
       orderBy: [{ accountId: 'asc' }, { version: 'desc' }],
     });
-    const latestTargetsByAccount = new Map<string, (typeof storedTargets)[number]>();
-    for (const target of storedTargets) {
-      if (target.accountId && !latestTargetsByAccount.has(target.accountId))
-        latestTargetsByAccount.set(target.accountId, target);
-    }
+    const latestTargetsByAccount = latestAccountTargets(storedTargets);
     if (latestTargetsByAccount.size === 0) {
       return { scope, accountId: null, targets: {}, source: 'none' as const };
     }
@@ -106,24 +102,7 @@ export class PerformanceTargetService {
         Math.max(0, (account.marketValue ?? 0) + (account.cashValue ?? 0)),
       ]),
     );
-    const weightedTargets: Array<{
-      accountId: string;
-      accountValue: number;
-      targets: Record<string, number>;
-    }> = [];
-    for (const [targetAccountId, target] of latestTargetsByAccount) {
-      const rawTargets =
-        target.targets && typeof target.targets === 'object' && !Array.isArray(target.targets)
-          ? (target.targets as Record<string, number>)
-          : {};
-      const normalized = normalizeAllocationTargets(rawTargets);
-      if (normalized.unknown.length > 0 || Object.keys(normalized.targets).length === 0) continue;
-      weightedTargets.push({
-        accountId: targetAccountId,
-        accountValue: accountValues.get(targetAccountId) ?? 0,
-        targets: normalized.targets,
-      });
-    }
+    const weightedTargets = validWeightedTargets(latestTargetsByAccount, accountValues);
     if (weightedTargets.length === 0) {
       return { scope, accountId: null, targets: {}, source: 'none' as const };
     }
@@ -155,4 +134,41 @@ export class PerformanceTargetService {
       aggregatedAccountCount: weightedTargets.length,
     };
   }
+}
+
+type StoredAllocationTarget = Awaited<
+  ReturnType<PrismaService['targetAllocation']['findMany']>
+>[number];
+function latestAccountTargets(storedTargets: StoredAllocationTarget[]) {
+  const latestTargetsByAccount = new Map<string, StoredAllocationTarget>();
+  for (const target of storedTargets) {
+    if (target.accountId && !latestTargetsByAccount.has(target.accountId))
+      latestTargetsByAccount.set(target.accountId, target);
+  }
+  return latestTargetsByAccount;
+}
+
+function validWeightedTargets(
+  latestTargetsByAccount: ReadonlyMap<string, StoredAllocationTarget>,
+  accountValues: ReadonlyMap<string, number>,
+) {
+  const weightedTargets: Array<{
+    accountId: string;
+    accountValue: number;
+    targets: Record<string, number>;
+  }> = [];
+  for (const [targetAccountId, target] of latestTargetsByAccount) {
+    const rawTargets =
+      target.targets && typeof target.targets === 'object' && !Array.isArray(target.targets)
+        ? (target.targets as Record<string, number>)
+        : {};
+    const normalized = normalizeAllocationTargets(rawTargets);
+    if (normalized.unknown.length > 0 || Object.keys(normalized.targets).length === 0) continue;
+    weightedTargets.push({
+      accountId: targetAccountId,
+      accountValue: accountValues.get(targetAccountId) ?? 0,
+      targets: normalized.targets,
+    });
+  }
+  return weightedTargets;
 }

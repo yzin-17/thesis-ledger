@@ -15,7 +15,9 @@ export type {
   MarketBarWindowReadResultV3,
 } from './market-bar-reader-v3.js';
 
-export class MarketBarUnavailableError extends Error {}
+export class MarketBarUnavailableError extends Error {
+  constructor(message: string, readonly reasonCode = 'daily_bars_unavailable') { super(message); }
+}
 
 export const isMarketBarTemporarilyUnavailable = (error: unknown) =>
   error instanceof MarketBarUnavailableError ||

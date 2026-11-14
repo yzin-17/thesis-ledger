@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -30,6 +31,8 @@ import {
 import { PrismaService } from '../platform/prisma.service.js';
 import { AutomationRuntimeHandlers } from './automation-runtime.service.js';
 import { AutomationService } from './automation.service.js';
+import { AutomationReadService } from './automation-read.service.js';
+import { ruleMonitorAutomationId } from './rule-monitor-automation-projection.js';
 import { AutomationWorkflowRunner } from './workflow-runner.service.js';
 import {
   dailyDigest,
@@ -47,6 +50,11 @@ const parsePositiveInteger = (value?: string) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
+function assertLocalJob(id: string) {
+  if (id === ruleMonitorAutomationId)
+    throw new BadRequestException('收费资料检查请在市场数据的规则监测中设置或执行');
+}
+
 @Controller('automations')
 export class AutomationController {
   constructor(
@@ -54,6 +62,7 @@ export class AutomationController {
     private readonly prisma: PrismaService,
     private readonly workflows: AutomationWorkflowRunner,
     private readonly handlers: AutomationRuntimeHandlers,
+    private readonly reads: AutomationReadService,
   ) {}
 
   @Post()
@@ -63,7 +72,7 @@ export class AutomationController {
 
   @Get()
   list() {
-    return this.automations.list();
+    return this.reads.list();
   }
 
   @Get('history')
@@ -72,32 +81,50 @@ export class AutomationController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    return this.automations.history(
+    return this.reads.history(
       jobId,
       parsePositiveInteger(page),
       parsePositiveInteger(pageSize),
     );
   }
 
+  @Get('issues')
+  issues(
+    @Query('jobId') jobId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.reads.history(
+      jobId,
+      parsePositiveInteger(page),
+      parsePositiveInteger(pageSize),
+      true,
+    );
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() input: unknown) {
+    assertLocalJob(id);
     return this.automations.update(id, input);
   }
 
   @Patch(':id/enabled')
   setEnabled(@Param('id') id: string, @Body() input: unknown) {
+    assertLocalJob(id);
     const body = automationEnabledInputSchema.parse(input);
     return this.prisma.automationJob.update({ where: { id }, data: { enabled: body.enabled } });
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
+    assertLocalJob(id);
     return this.automations.delete(id);
   }
 
   /** 手动立即执行：显式试跑，绕过启停与交易日检查；执行层照常负责锁、运行历史与重试。 */
   @Post(':id/run')
   async run(@Param('id') id: string) {
+    assertLocalJob(id);
     const job = await this.prisma.automationJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('任务不存在');
     const handler = this.handlers.for(automationJobTypeSchema.parse(job.type));

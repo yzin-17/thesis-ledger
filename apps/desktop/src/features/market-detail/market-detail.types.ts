@@ -23,8 +23,40 @@ export interface MarketDetailPosition {
   asset: { name: string; assetType?: 'stock' | 'etf' | 'fund' };
 }
 
-export function mergeMarketDetail(current: NativeDetailResponse | null, next: NativeDetailResponse): NativeDetailResponse;
-export function mergeMarketDetail(current: MarketDetailResponse | null, next: MarketDetailResponse): MarketDetailResponse;
+type OriginalBarSeries = Exclude<BarSeries, { derivation: unknown }>;
+
+function mergeCompatibleBarSeries(
+  currentSeries: OriginalBarSeries,
+  nextSeries: OriginalBarSeries,
+): OriginalBarSeries {
+  // 日线按交易日合并，分钟保留同日每个独立时刻；重叠项由本次有效响应替换。
+  const key = (timestamp: string) =>
+    isMarketMinuteTimeframe(nextSeries.identity.timeframe)
+      ? new Date(timestamp).toISOString()
+      : timestamp.slice(0, 10);
+  const byDate = new Map(currentSeries.points.map((bar) => [key(bar.timestamp), bar]));
+  nextSeries.points.forEach((bar) => byDate.set(key(bar.timestamp), bar));
+  const points = [...byDate.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  return {
+    ...nextSeries,
+    points,
+    coverage: {
+      ...nextSeries.coverage,
+      actualStart: points[0]?.timestamp ?? null,
+      actualEnd: points.at(-1)?.timestamp ?? null,
+      hasMoreBefore: nextSeries.coverage.hasMoreBefore || currentSeries.coverage.hasMoreBefore,
+    },
+  };
+}
+
+export function mergeMarketDetail(
+  current: NativeDetailResponse | null,
+  next: NativeDetailResponse,
+): NativeDetailResponse;
+export function mergeMarketDetail(
+  current: MarketDetailResponse | null,
+  next: MarketDetailResponse,
+): MarketDetailResponse;
 export function mergeMarketDetail(
   current: MarketDetailResponse | null,
   next: MarketDetailResponse,
@@ -32,9 +64,13 @@ export function mergeMarketDetail(
   if (!current) return next;
   if (current.symbol !== next.symbol) return current;
   const currentSeries = current.barSeries;
-  const nextSeries = next.barSeries?.points.length === 0 && currentSeries?.points.length
-    ? undefined : next.barSeries;
-  const canCombine = Boolean(currentSeries && nextSeries && canCombineChartSeries(currentSeries, nextSeries));
+  const nextSeries =
+    next.barSeries?.points.length === 0 && currentSeries?.points.length
+      ? undefined
+      : next.barSeries;
+  const canCombine = Boolean(
+    currentSeries && nextSeries && canCombineChartSeries(currentSeries, nextSeries),
+  );
   const sections = { ...current.sections };
   if (currentSeries && nextSeries && !canCombine) {
     delete sections.bars;
@@ -45,7 +81,8 @@ export function mergeMarketDetail(
   Object.entries(next.sections).forEach(([capability, nextSection]) => {
     const currentSection = sections[capability as MarketDetailCapability];
     const currentHasData =
-      currentSection?.data !== undefined && currentSection.data !== null &&
+      currentSection?.data !== undefined &&
+      currentSection.data !== null &&
       (currentSection.status === 'ready' || currentSection.status === 'stale');
     // 局部回源失败或空响应不能抹掉已经展示的有效数据；保留分段状态也能让用户继续手动重试。
     const preserveCurrent =
@@ -54,27 +91,17 @@ export function mergeMarketDetail(
         nextSection.data === null ||
         nextSection.status === 'unavailable' ||
         nextSection.status === 'empty');
-    if (!preserveCurrent)
-      sections[capability as MarketDetailCapability] = nextSection;
+    if (!preserveCurrent) sections[capability as MarketDetailCapability] = nextSection;
   });
   let mergedBarSeries = nextSeries ?? currentSeries;
-  if (currentSeries && nextSeries && canCombine && !('derivation' in currentSeries) && !('derivation' in nextSeries)) {
-    // 日线按交易日合并，分钟保留同日每个独立时刻；重叠项由本次有效响应替换。
-    const key = (timestamp: string) => isMarketMinuteTimeframe(nextSeries.identity.timeframe)
-      ? new Date(timestamp).toISOString() : timestamp.slice(0, 10);
-    const byDate = new Map(currentSeries.points.map((bar) => [key(bar.timestamp), bar]));
-    nextSeries.points.forEach((bar) => byDate.set(key(bar.timestamp), bar));
-    const points = [...byDate.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    const mergedSeries: BarSeries = {
-      ...nextSeries,
-      points,
-      coverage: {
-        ...nextSeries.coverage,
-        actualStart: points[0]?.timestamp ?? null,
-        actualEnd: points.at(-1)?.timestamp ?? null,
-        hasMoreBefore: nextSeries.coverage.hasMoreBefore || currentSeries.coverage.hasMoreBefore,
-      },
-    };
+  if (
+    currentSeries &&
+    nextSeries &&
+    canCombine &&
+    !('derivation' in currentSeries) &&
+    !('derivation' in nextSeries)
+  ) {
+    const mergedSeries = mergeCompatibleBarSeries(currentSeries, nextSeries);
     mergedBarSeries = mergedSeries;
     sections.bars = {
       ...next.sections.bars!,
@@ -133,5 +160,9 @@ export const marketDetailSectionTitle = (capability: MarketDetailCapability) => 
 
 export const isRetryableMarketDetailSection = (section: MarketDetailSection | undefined) =>
   section?.status === 'unavailable' &&
-  !['capability_not_enabled', 'capability_unsupported', 'market_data_unauthorized',
-    'market_data_contract_invalid'].includes(section.error?.code ?? '');
+  ![
+    'capability_not_enabled',
+    'capability_unsupported',
+    'market_data_unauthorized',
+    'market_data_contract_invalid',
+  ].includes(section.error?.code ?? '');

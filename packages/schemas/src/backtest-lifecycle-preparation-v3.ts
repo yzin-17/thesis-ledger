@@ -26,7 +26,7 @@ export const backtestLifecyclePreparationV3Schema = z
   });
 export type BacktestLifecyclePreparationV3 = z.infer<typeof backtestLifecyclePreparationV3Schema>;
 
-export function lifecycleRunIssuesV3(value: {
+type LifecycleRunInput = {
   lifecyclePreparation?: BacktestLifecyclePreparationV3 | undefined;
   startDate: string;
   endDate: string;
@@ -34,11 +34,11 @@ export function lifecycleRunIssuesV3(value: {
   executionModel?:
     { scope: { market: string; symbol: string; instrumentType: string } } | undefined;
   frozenExecutionWindow?: { responseHash: string } | undefined;
-}) {
-  const life = value.lifecyclePreparation;
-  if (!life) return [];
+};
+
+function lifecycleBindingMatches(value: LifecycleRunInput, life: BacktestLifecyclePreparationV3): boolean {
   const model = value.executionModel?.scope;
-  if (
+  return !(
     value.executionPriceProtocol.history.basis !== 'fixed-provider-snapshot' ||
     model?.market !== 'CN' ||
     model.instrumentType !== 'STOCK' ||
@@ -47,7 +47,13 @@ export function lifecycleRunIssuesV3(value: {
     life.response.range.end !== value.endDate ||
     life.signalStartDate < value.startDate ||
     life.priceResponseHash !== value.frozenExecutionWindow?.responseHash
-  )
+  );
+}
+
+export function lifecycleRunIssuesV3(value: LifecycleRunInput) {
+  const life = value.lifecyclePreparation;
+  if (!life) return [];
+  if (!lifecycleBindingMatches(value, life))
     return ['生命周期准备必须绑定固定来源同证券、原区间及冻结价格响应'];
   if (
     life.response.basicLifecycle?.ipoDateStatus !== 'known' &&

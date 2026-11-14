@@ -176,6 +176,9 @@ describe('backtest Series and Indicator domain', () => {
     expect(interrupted.status).toBe('unavailable');
   });
 
+});
+
+describe("指标时间对齐与公司行动可见性", () => {
   it('aligns by absolute occurredAt and availableAt without looking ahead', () => {
     const input = series([
       point('2025-01-01', '10', '2025-01-01T04:00:00Z'),

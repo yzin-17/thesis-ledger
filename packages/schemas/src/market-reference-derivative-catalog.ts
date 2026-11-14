@@ -8,8 +8,8 @@ type ColumnFactory = (
 ) => ReferenceColumn;
 
 // 衍生品资料列；价格口径不隐式换算为保证金或账户盈亏。
-export function derivativeReferenceCatalog(c: ColumnFactory) {
-  const dailyColumns = [
+function derivativeDailyColumns(c: ColumnFactory): ReferenceColumn[] {
+  return [
     c('date', '交易日', 'date', null),
     c('exchange', '交易所', 'text', null),
     c('contract', '来源合约代码', 'text', null),
@@ -25,7 +25,10 @@ export function derivativeReferenceCatalog(c: ColumnFactory) {
     c('openInterestChange', '持仓变化', 'integer', '手'),
     c('turnover10k', '成交额', 'decimal', '万元'),
   ];
-  const rankColumns = [
+}
+
+function derivativeRankColumns(c: ColumnFactory): ReferenceColumn[] {
+  return [
     c('date', '交易日', 'date', null),
     c('exchange', '交易所', 'text', null),
     c('level', '排名层级', 'text', null),
@@ -41,6 +44,11 @@ export function derivativeReferenceCatalog(c: ColumnFactory) {
     c('shortInterest', '持卖单量', 'integer', '手'),
     c('shortChange', '持卖单增减', 'integer', '手'),
   ];
+}
+
+export function derivativeReferenceCatalog(c: ColumnFactory) {
+  const dailyColumns = derivativeDailyColumns(c);
+  const rankColumns = derivativeRankColumns(c);
   return {
     'futures-daily-shfe': {
       label: '上期所期货日行情',

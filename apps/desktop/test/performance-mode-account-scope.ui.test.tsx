@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, notifyManager } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import type { Account, PortfolioMode } from '../src/features/portfolio/portfolio.types.js';
@@ -59,7 +59,9 @@ const fixture = (
   range?: string,
   interval?: string,
 ) => {
-  const value = mode === 'actual' ? 987654 : recoverShadow ? 223456 : 123456;
+  let value = 123456;
+  if (mode === 'actual') value = 987654;
+  else if (recoverShadow) value = 223456;
   const snapshot = (day: number) => ({
     id: `${mode}-snapshot-${day}`,
     capturedAt: `2026-09-${String(day).padStart(2, '0')}T00:00:00.000Z`,
@@ -101,8 +103,12 @@ const fixture = (
       })),
     };
   }
-  if (kind === 'summary')
-    return { ttwror: mode === 'actual' ? 0.77 : recoverShadow ? 0.25 : 0.1, xirr: null };
+  if (kind === 'summary') {
+    let ttwror = 0.1;
+    if (mode === 'actual') ttwror = 0.77;
+    else if (recoverShadow) ttwror = 0.25;
+    return { ttwror, xirr: null };
+  }
   if (kind === 'layers') {
     return {
       security: [],
@@ -162,14 +168,23 @@ const button = (selector: string) => {
 };
 
 async function click(target: HTMLElement) {
-  await act(async () => target.click());
+  await act(async () => {
+    target.click();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
 }
 
 async function waitFor(check: () => void) {
-  await vi.waitFor(async () => {
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
-    check();
-  });
+  const started = Date.now();
+  while (true) {
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+    try {
+      check();
+      return;
+    } catch (error) {
+      if (Date.now() - started >= 1000) throw error;
+    }
+  }
 }
 
 async function choose(selectLabel: string, optionText: string) {
@@ -182,10 +197,12 @@ async function choose(selectLabel: string, optionText: string) {
   await act(async () => {
     option.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
     option.click();
+    await new Promise((resolve) => setTimeout(resolve, 20));
   });
 }
 
 beforeEach(() => {
+  notifyManager.setNotifyFunction(act);
   vi.resetAllMocks();
   requests.splice(0);
   recoverShadow = false;
@@ -217,12 +234,16 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await act(async () => root?.unmount());
-  host?.remove();
-  client?.clear();
+  await act(async () => {
+    root?.unmount();
+    host?.remove();
+    client?.clear();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  });
   root = undefined;
   host = undefined;
   client = undefined;
+  notifyManager.setNotifyFunction((callback) => callback());
 });
 
 describe('收益分析账户范围切换', () => {

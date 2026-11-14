@@ -14,20 +14,14 @@ import {
 import { AuthoringSelect } from './AuthoringSelect.js';
 import { confirmationDraft, parseConfirmationDraft } from './authoring-confirmation.model.js';
 
-export function AuthoringConfirmation({
-  content,
-  onChange,
-  disabled,
-}: {
+export function AuthoringConfirmation(props: {
   content: AuthoringContent;
   onChange: (next: AuthoringContent) => void;
   disabled: boolean;
 }) {
-  const draft = confirmationDraft(content);
-  const [search, setSearch] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const edit = (patch: Partial<AuthoringConfirmationDraft>) =>
-    onChange({ ...content, confirmation: null, confirmationDraft: { ...draft, ...patch } });
+  const control = useAuthoringConfirmation(props);
+  const { draft, content, onChange, setError, search, disabled, setSearch, edit, error } = control;
+
   return (
     <form
       onSubmit={(event) => {
@@ -55,9 +49,7 @@ export function AuthoringConfirmation({
               let assetType: 'stock' | 'etf' | 'fund' = 'stock';
               if (item.instrumentType === 'ETF') assetType = 'etf';
               else if (item.instrumentType === 'MUTUAL_FUND') assetType = 'fund';
-              const market = ['SH', 'SZ', 'BJ', 'OF'].includes(item.market)
-                ? 'CN'
-                : item.market;
+              const market = ['SH', 'SZ', 'BJ', 'OF'].includes(item.market) ? 'CN' : item.market;
               edit({
                 instrumentId: item.id,
                 instrument: {
@@ -68,7 +60,9 @@ export function AuthoringConfirmation({
               });
             }}
           />
-          <FieldDescription>已选：{draft.instrument?.symbol ?? '尚未选择'}。只支持单标的。</FieldDescription>
+          <FieldDescription>
+            已选：{draft.instrument?.symbol ?? '尚未选择'}。只支持单标的。
+          </FieldDescription>
         </Field>
         <Field>
           <FieldLabel>信号周期</FieldLabel>
@@ -234,4 +228,22 @@ export function AuthoringConfirmation({
       </FieldGroup>
     </form>
   );
+}
+
+function useAuthoringConfirmation({
+  content,
+  onChange,
+  disabled,
+}: {
+  content: AuthoringContent;
+  onChange: (next: AuthoringContent) => void;
+  disabled: boolean;
+}) {
+  const draft = confirmationDraft(content);
+  const [search, setSearch] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const edit = (patch: Partial<AuthoringConfirmationDraft>) =>
+    onChange({ ...content, confirmation: null, confirmationDraft: { ...draft, ...patch } });
+
+  return { draft, content, onChange, setError, search, disabled, setSearch, edit, error };
 }

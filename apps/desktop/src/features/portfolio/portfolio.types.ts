@@ -36,6 +36,7 @@ export const instrumentMarketLabel = (market: string) => {
   if (market === 'SZ') return '深圳证券交易所';
   if (market === 'BJ') return '北京证券交易所';
   if (market === 'HK') return '香港交易所';
+  if (market === 'US') return '美国市场';
   if (market === 'OF') return '场外基金';
   return market;
 };

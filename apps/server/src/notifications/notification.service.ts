@@ -6,13 +6,15 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RedisService, redisKey } from '../platform/redis.service.js';
 import { ProviderHealthService } from '../providers/provider-health.service.js';
-import { availableNotificationRoutes, riskNotificationRouting } from './notification-routes.js';
+import { availableNotificationRoutes } from './notification-routes.js';
+import { selectedRiskNotificationRoutes } from './risk-notification-selection.js';
 import { admitNotificationDeliveries } from './notification-delivery-admission.js';
 import {
   assertAllowedFeishuWebhookUrl,
 } from '../providers/feishu-webhook-security.js';
 
 export interface NotificationPolicy {
+  providers?: string[];
   quietHours?: { start: string; end: string; timezone: string };
   cooldownMinutes: number;
   maxAttempts: number;
@@ -135,11 +137,7 @@ export const buildDailyDigest = (messages: readonly NotificationMessage[]) => ({
   body: messages
     .map((message) => `- [${message.severity}] ${message.title}: ${message.body}`)
     .join('\n'),
-  severity: messages.some((message) => message.severity === 'critical')
-    ? ('critical' as const)
-    : messages.some((message) => message.severity === 'error')
-      ? ('error' as const)
-      : ('info' as const),
+  severity: digestSeverity(messages),
   traceId: crypto.randomUUID(),
 });
 
@@ -152,12 +150,7 @@ const feishuBusinessError = (summary: string) => {
     return null;
   }
   const rawCode = payload?.code ?? payload?.StatusCode;
-  const code =
-    typeof rawCode === 'string'
-      ? rawCode
-      : typeof rawCode === 'number'
-        ? rawCode.toString()
-        : undefined;
+  const code = feishuBusinessCode(rawCode);
   if (code === undefined || Number(code) === 0) return null;
   const rawMessage = payload?.msg ?? payload?.StatusMessage;
   const message =
@@ -221,7 +214,7 @@ export class NotificationService {
     now = new Date(),
   ) {
     const routes = subject.type === 'risk-event'
-      ? (await riskNotificationRouting(this.prisma)).routes
+      ? await selectedRiskNotificationRoutes(this.prisma, policy.providers)
       : await this.configuredRoutes();
     if (routes.length === 0) return [];
     const messageSnapshot: Prisma.InputJsonValue = {
@@ -244,7 +237,7 @@ export class NotificationService {
         const cooldownTarget = route.legacyDefault ? route.channel : `${route.channel}:${encodeURIComponent(route.provider)}`;
         const cooldownKey = redisKey('cache', `notification:${cooldownTarget}:${fingerprint}`);
         const token = crypto.randomUUID();
-        if (!bypassCooldown) {
+        if (!bypassCooldown && policy.cooldownMinutes > 0) {
           const reserved = await this.redis.client.set(
             cooldownKey, token, 'EX', Math.max(1, policy.cooldownMinutes * 60), 'NX',
           );
@@ -455,9 +448,23 @@ export class NotificationService {
 
   list(status?: string) {
     return this.prisma.notificationDelivery.findMany({
-      ...(status ? { where: { status } } : {}),
+      ...(status
+        ? { where: { status: status.includes(',') ? { in: status.split(',') } : status } }
+        : {}),
       orderBy: { scheduledAt: 'desc' },
       take: 200,
     });
   }
+}
+
+
+function digestSeverity(messages: readonly NotificationMessage[]): 'critical' | 'error' | 'info' {
+  if (messages.some((message) => message.severity === 'critical')) return 'critical';
+  if (messages.some((message) => message.severity === 'error')) return 'error';
+  return 'info';
+}
+function feishuBusinessCode(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return value.toString();
+  return undefined;
 }

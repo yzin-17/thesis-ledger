@@ -106,8 +106,7 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     cancelMutation,
     load,
   } = dependencies;
-  let backgroundPreparationVersionId: string | null = null;
-  let backgroundPreparationIdempotencyKey: string | null = null;
+  let submitting = false;
 
   const refreshStrategyData = () => {
     void load().catch(() => undefined);
@@ -160,45 +159,35 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     }
   };
 
-  const startBacktest = (version: StrategyVersion, setup: BacktestSetupInput): Promise<boolean> => {
-    if (busyAction || backgroundPreparationVersionId) return Promise.resolve(false);
+  const startBacktest = async (version: StrategyVersion, setup: BacktestSetupInput): Promise<boolean> => {
+    if (busyAction || submitting) return false;
     const setupError = validateBacktestSetup(setup);
     if (setupError) {
       errorToast(toastManager, '回测配置无效', setupError);
-      return Promise.resolve(false);
+      return false;
     }
     const schema = version.schema;
     if (!schema) {
       errorToast(toastManager, '回测排队失败', '当前版本缺少可执行 Schema，请重新加载策略。');
-      return Promise.resolve(false);
+      return false;
     }
     if (!strategySchema.safeParse(schema).success) {
       errorToast(toastManager, '回测排队失败', '策略定义不可用，请先保存有效的当前策略版本。');
-      return Promise.resolve(false);
+      return false;
     }
     if (!setup.prepared) {
       errorToast(toastManager, '回测排队失败', '请先准备并确认回测配置。');
-      return Promise.resolve(false);
+      return false;
     }
     if (dependencies.queueErrorToastId?.current) {
       toastManager.close?.(dependencies.queueErrorToastId.current);
       dependencies.queueErrorToastId.current = null;
     }
-    backgroundPreparationVersionId = version.id;
-    backgroundPreparationIdempotencyKey = createClientRequestId();
+    submitting = true;
     setBusyAction(`queue:${version.id}`);
-    toastManager.add({
-      title: '正在后台准备回测',
-      description: '完成后会出现在回测任务列表。',
-      type: 'success',
-      timeout: 2800,
-    });
-    void (async () => {
       try {
-        const idempotencyKey = backgroundPreparationIdempotencyKey;
-        if (!idempotencyKey) throw new Error('backtest-idempotency');
         const job = await queueMutation.mutateAsync(
-          preparedBacktestSubmission(version.id, setup, idempotencyKey),
+          preparedBacktestSubmission(version.id, setup, createClientRequestId()),
         );
         if (job.status === 'failed') {
           const toastId = errorToast(
@@ -208,7 +197,8 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
           );
           if (dependencies.queueErrorToastId) dependencies.queueErrorToastId.current = toastId;
           refreshStrategyData();
-          return;
+          dependencies.onJobQueued?.(job);
+          return true;
         }
         toastManager.add({
           title: '回测已排队',
@@ -218,6 +208,7 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
         });
         dependencies.onJobQueued?.(job);
         refreshStrategyData();
+        return true;
       } catch (error) {
         const toastId = errorToast(
           toastManager,
@@ -226,13 +217,11 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
         );
         if (dependencies.queueErrorToastId) dependencies.queueErrorToastId.current = toastId;
         refreshStrategyData();
+        return false;
       } finally {
-        backgroundPreparationVersionId = null;
-        backgroundPreparationIdempotencyKey = null;
+        submitting = false;
         setBusyAction(null);
       }
-    })();
-    return Promise.resolve(true);
   };
 
   const run = async (jobId: string) => {

@@ -4,6 +4,11 @@ import { authoringStrategySchema } from '@thesis-ledger/schemas';
 import type { AuthoringExecutionCaseContext } from './authoring-execution.case-context.js';
 
 export function registerAuthoringSaveCases(getContext: () => AuthoringExecutionCaseContext) {
+  registerPublicationCases(getContext);
+  registerProposalReviewCases(getContext);
+}
+
+function registerPublicationCases(getContext: () => AuthoringExecutionCaseContext) {
   it('目录到生成、审阅、并发保存及来源形成真实纵向闭环，失败完整回滚', async () => {
     const context = getContext();
     const { request, observe, selection, alice, bob, db, blank, instrumentId, sources, access } =
@@ -170,6 +175,9 @@ export function registerAuthoringSaveCases(getContext: () => AuthoringExecutionC
     expect((await request(path, 200, undefined, alice.token)).state).toBe('saved');
     await request(path, 409, { expectedRevision: 2, content }, alice.token, 'PATCH');
   });
+}
+
+function registerProposalReviewCases(getContext: () => AuthoringExecutionCaseContext) {
   it('建议审核、并发应用、放弃和旧修订拒绝均走真实 API', async () => {
     const context = getContext();
     const { request, observe, selection, alice, bob, blank, instrumentId } = context;

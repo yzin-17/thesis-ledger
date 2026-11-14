@@ -43,6 +43,17 @@ export const formatDateTimeInTimeZone = (
   return Number.isNaN(date.getTime()) ? fallback : timeZoneDateTimeFormatter(timeZone).format(date);
 };
 
+/** User-facing instant in the device's local timezone, including an unambiguous IANA zone. */
+export const formatDateTimeWithLocalZone = (
+  value: number | string | Date | null | undefined,
+  fallback = '—',
+) => {
+  if (value === null || value === undefined || value === '') return fallback;
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const formatted = formatDateTimeInTimeZone(value, timeZone, fallback);
+  return formatted === fallback ? fallback : `${formatted}（${timeZone}）`;
+};
+
 /** Formats an API date-time as a business date for visible date ranges and tables. */
 export const formatDateOnly = (value: string | null | undefined, fallback = '—') => {
   if (!value) return fallback;

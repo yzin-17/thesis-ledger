@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { aiRunStatusSchema } from './ai.js';
 import { researchResultSchema } from './research.js';
+import { researchResultV2Schema } from './research-result-v2.js';
 import { journalAnalysisDraftSchema } from './journal-analysis-draft.js';
 import {
   journalDeterministicReviewSchema,
@@ -41,7 +42,7 @@ export const journalAiExplanationSchema = z
     errorCode: z.string().nullable(),
     errorSummary: z.string().nullable(),
     algorithmVersion: z.string().min(1),
-    result: researchResultSchema.nullable(),
+    result: z.union([researchResultSchema, researchResultV2Schema]).nullable(),
     createdAt: z.iso.datetime({ offset: true }),
   })
   .strict();

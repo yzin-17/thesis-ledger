@@ -39,6 +39,14 @@
 - 期权合约清单支持 `510050.SH`、`510300.SH`、`588000.SH`、`510500.SH`，返回来源当前可用近月的认购／认沽；独立报价和 Greeks 填写清单中的八位合约代码。数量为张，价格为每份 ETF 权利金；调整合约的份数不假定固定一万。IV 按小数展示，例如 `0.1317` 为 `13.17%`；来源未披露完整 Greek 模型／时间缩放假设，不自行重算账户风险。
 - 可转债按来源页读取，条款日期与来源最新债价／股价／转股价分列，规模为亿元、溢价率为百分比。未来摘牌日不提前判为摘牌，未来上市与未知状态分别保留；条款和报价不自动证明当前可交易性，也不回填历史时点。
 
+## 收费资料版本
+
+在“规则监测”的检查结果中打开“查看版本”，选择正文版本和比较基准，可切换“版本差异”与“正文快照”。差异以基准为起点，标记所选版本新增与删除的文字；观察时间只表示何时读到该内容，不表示正式发布时间或规则生效日期。
+
+新采集支持网页主体及引用、DOCX 段落、可提取文字的 PDF 和资料包 JSON。快照在监测采集时保存，查看和切换版本不重新抓取来源。旧记录若没有保存正文，会明确提示；以后再次观察到相同指纹时可以保存当次快照，其采集时间不会回填成历史时间。扫描 PDF、加密文件、解析失败或超限均保留具体原因。来源网页入口展示当前网页，不能代替历史快照。
+
+具体合同与验收边界见[资料正文快照与版本差异](../specs/2026-11-10-rule-monitor-snapshots.md)。
+
 ## 来源不可读时
 
 页面保留明确错误，用户可稍后重新读取。资料查询遵循已保存的来源启停与精确路由，不自动启用、续期或切换来源。保存了当前适配不支持的自定义传输设置时，会在出站前拒绝，不忽略设置。
@@ -53,4 +61,4 @@
 
 目标仅做代码更新时使用 infra 的 `scripts/sync-code.sh`，保留其兼容性预检。新资料路由由 infra 的 `scripts/market-reference-routes.mjs` 先生成只读计划，再通过前端同一 Server 策略 API 按期望修订应用；撤销本轮取消项须额外提供首次创建计划，不能删除原有路由。代码快更位于容器可写层，镜像重建后需要重新更新。
 
-来源解析与执行由 [DSA 资料规格](../../../daily-stock-analysis/docs/specs/2026-11-03-market-reference-data.md)、[公开协议规格](../../../daily-stock-analysis/docs/specs/2026-11-04-public-reference-data.md)及[衍生品适配规格](../../../daily-stock-analysis/docs/specs/2026-11-04-derivative-reference-data.md)维护；采证由 [infra 公开来源契约](../../../thesis-ledger-infra/docs/specs/2026-11-04-public-reference-source-check.md)与[衍生品采证契约](../../../thesis-ledger-infra/docs/specs/2026-11-04-derivative-source-check.md)维护，路由计划和保护边界继续使用[精确路由契约](../../../thesis-ledger-infra/docs/specs/2026-11-03-astock-existing-source-check.md)。
+来源解析与执行由 [DSA 资料规格](../../../daily-stock-analysis/docs/specs/2026-11-03-market-reference-data.md)、[公开协议规格](../../../daily-stock-analysis/docs/specs/2026-11-04-public-reference-data.md)及[衍生品适配规格](../../../daily-stock-analysis/docs/specs/2026-11-04-derivative-reference-data.md)维护；采证由 [infra 公开来源契约](../../../daily-stock-analysis/docs/specs/2026-11-04-public-reference-source-check.md)与[衍生品采证契约](../../../daily-stock-analysis/docs/specs/2026-11-04-derivative-source-check.md)维护，路由计划和保护边界继续使用[精确路由契约](../../../daily-stock-analysis/docs/specs/2026-11-03-astock-existing-source-check.md)。

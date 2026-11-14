@@ -55,10 +55,15 @@ export const optimizationRunPreparationResultSchema = z.discriminatedUnion('stat
       runConfig: runConfigSchemaV3,
       strategyContentHash: z.string().regex(/^[a-f0-9]{64}$/),
       actualSource: backtestSnapshotActualSourceV3Schema,
+      actualPriceSource: backtestSnapshotActualSourceV3Schema.optional(),
       routeRevisions: optimizationPreparationRouteRevisionsSchema,
       announcementPreparation: marketAnnouncementPreparationSchema.optional(),
     })
     .superRefine((value, context) => {
+      const reference = value.actualPriceSource;
+      if (reference && (reference.purpose !== 'execution' || reference.routeKey.kind !== 'bar' || reference.routeKey.adjustment !== 'none' ||
+          reference.symbol !== value.actualSource.symbol || !value.runConfig.priceResearch?.actualPriceWindow))
+        context.addIssue({ code: 'custom', path: ['actualPriceSource'], message: '不复权来源必须对应已冻结的原价参考窗口与同一标的' });
       if (
         !value.runConfig.executionModel ||
         !value.runConfig.priceInputBindings ||

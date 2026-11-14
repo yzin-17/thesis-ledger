@@ -26,7 +26,7 @@ export function StrategyExperimentConfigurationReview({
   return (
     <div className="rounded-lg border bg-muted/20 p-4 text-sm">
       <div className="flex flex-wrap gap-2">
-        <Badge variant="outline">{label}</Badge>
+        <Badge variant="outline" className="max-w-full whitespace-normal wrap-anywhere">{label}</Badge>
         <Badge variant="outline">{modelCount} 个模型</Badge>
         <Badge variant="outline">{currency}</Badge>
       </div>

@@ -10,7 +10,6 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -43,12 +42,14 @@ export function JournalDraftSheet({
   onApply,
   open,
   onOpenChange,
+  inline = false,
 }: {
   candidate: JournalReviewCandidateContract;
   value: JournalAnalysisDraft;
   onApply: (value: JournalAnalysisDraft) => void;
   open: boolean;
   onOpenChange: (value: boolean) => void;
+  inline?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState<unknown>(null);
@@ -73,37 +74,46 @@ export function JournalDraftSheet({
     onApply(parsed.data);
     onOpenChange(false);
   };
-  return (
-    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
-      <SheetContent className="overflow-y-auto">
+  const editor = (
+    <div className="flex flex-col gap-4">
+      {inline ? (
+        <div className="flex flex-col gap-1">
+          <h4 className="text-base font-semibold">补充本次计划</h4>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            只影响本次复盘：未修改的字段沿用原计划，修改后清空表示本次不使用。
+          </p>
+        </div>
+      ) : (
         <SheetHeader>
           <SheetTitle>本次分析草稿</SheetTitle>
           <SheetDescription>
-            原始计划保持原值。留空并修改表示本次清除；未修改的字段继续使用原计划。
+            只影响本次复盘：未修改的字段沿用原计划，修改后清空表示本次不使用。
           </SheetDescription>
         </SheetHeader>
-        <FieldGroup>
+      )}
+      <FieldGroup className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
           {Object.entries(prices).map(([rawKey, label]) => {
             const key = rawKey as keyof typeof prices;
             return (
               <Field key={key} invalid={Boolean(priceErrors[key])}>
                 <FieldLabel>{label}</FieldLabel>
                 <Input
+                  autoFocus={inline && key === 'plannedEntry'}
                   aria-label={label}
                   aria-invalid={Boolean(priceErrors[key])}
                   aria-describedby={priceErrors[key] ? `${errorId}-${key}` : undefined}
                   inputMode="decimal"
                   value={draft[key] ?? ''}
-                  placeholder={candidate.input.plan?.[key] ?? '未提供'}
+                  placeholder="选填"
                   onChange={(event) => {
                     setError(null);
                     setPriceErrors((previous) => ({ ...previous, [key]: '' }));
                     setDraft({ ...draft, [key]: event.target.value || null });
                   }}
                 />
-                <FieldDescription>
-                  原计划：{candidate.input.plan?.[key] ?? '未提供'}
-                </FieldDescription>
+                {candidate.input.plan?.[key] != null && (
+                  <FieldDescription>原计划：{candidate.input.plan[key]}</FieldDescription>
+                )}
                 {priceErrors[key] && (
                   <FieldError id={`${errorId}-${key}`}>{priceErrors[key]}</FieldError>
                 )}
@@ -116,7 +126,7 @@ export function JournalDraftSheet({
               aria-label="计划持有天数"
               inputMode="numeric"
               value={draft.expectedHoldingDays ?? ''}
-              placeholder={String(candidate.input.plan?.expectedHoldingDays ?? '未提供')}
+              placeholder="选填"
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -125,22 +135,24 @@ export function JournalDraftSheet({
                 })
               }
             />
-            <FieldDescription>
-              原计划：{candidate.input.plan?.expectedHoldingDays ?? '未提供'} 天
-            </FieldDescription>
+            {candidate.input.plan?.expectedHoldingDays != null && (
+              <FieldDescription>原计划：{candidate.input.plan.expectedHoldingDays} 天</FieldDescription>
+            )}
           </Field>
-          <Field>
+          <Field className="sm:col-span-2">
             <FieldLabel>草稿说明</FieldLabel>
             <Textarea
               aria-label="草稿说明"
               value={draft.note ?? ''}
+              rows={3}
               maxLength={4000}
+              placeholder="选填：补充本次复盘需要考虑的假设或备注"
               onChange={(event) => setDraft({ ...draft, note: event.target.value })}
             />
           </Field>
         </FieldGroup>
         {error !== null && <JournalRequestError title="草稿尚未应用" error={error} />}
-        <SheetFooter>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button variant="outline" onClick={() => void requestClose(false)}>
             取消
           </Button>
@@ -155,8 +167,28 @@ export function JournalDraftSheet({
             使用原计划
           </Button>
           <Button onClick={apply}>应用草稿</Button>
-        </SheetFooter>
-      </SheetContent>
+        </div>
+    </div>
+  );
+  if (inline) {
+    return (
+      <section
+        className="flex min-w-0 flex-col border-t pt-4"
+        aria-label="本次分析草稿"
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          event.stopPropagation();
+          void requestClose(false);
+        }}
+      >
+        {editor}
+      </section>
+    );
+  }
+  return (
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
+      <SheetContent className="overflow-y-auto">{editor}</SheetContent>
     </Sheet>
   );
 }

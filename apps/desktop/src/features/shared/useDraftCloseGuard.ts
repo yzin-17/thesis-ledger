@@ -8,6 +8,8 @@ export function useDraftCloseGuard({
   draft,
   busy,
   dirty,
+  bypass,
+  discard,
   onOpenChange,
   confirmation,
 }: {
@@ -15,6 +17,8 @@ export function useDraftCloseGuard({
   draft: unknown;
   busy: boolean;
   dirty?: boolean;
+  bypass?: () => boolean;
+  discard?: () => void;
   onOpenChange: (open: boolean) => void;
   confirmation?: {
     title: string;
@@ -62,11 +66,14 @@ export function useDraftCloseGuard({
     wasOpen.current = open;
   }, [open, serialized]);
   useNavigationGuard({
+    ...(bypass ? { bypass } : {}),
     draft: { open, serialized },
     dirty: open && (dirty ?? (wasOpen.current && serialized !== baseline.current)),
     busy: open && busy,
     discard: () => {
-      if (open) onOpenChange(false);
+      if (!open) return;
+      if (discard) discard();
+      else onOpenChange(false);
     },
   });
 

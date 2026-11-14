@@ -78,7 +78,7 @@ describe('Portfolio Trade UI 契约', () => {
     expect(markup).toContain('查看详情');
     expect(markup).toContain('text-button');
     expect(markup).toContain('已加载');
-    expect(markup).toContain('清除筛选');
+    expect(markup).toContain('清空筛选');
     const headers = [...markup.matchAll(/<th\b[^>]*>/g)].map((match) => match[0]);
     const cells = [...markup.matchAll(/<td\b[^>]*>/g)].map((match) => match[0]);
     for (const index of [3, 4, 6]) {

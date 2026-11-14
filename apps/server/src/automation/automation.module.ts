@@ -12,6 +12,7 @@ import { AutomationController } from './automation.controller.js';
 import { RiskMonitoringController } from './risk-monitoring.controller.js';
 import { AutomationScheduler } from './automation.scheduler.js';
 import { AutomationService } from './automation.service.js';
+import { AutomationReadService } from './automation-read.service.js';
 import { AutomationWorkflowRunner } from './workflow-runner.service.js';
 
 @Module({
@@ -28,6 +29,7 @@ import { AutomationWorkflowRunner } from './workflow-runner.service.js';
   controllers: [AutomationController, RiskMonitoringController],
   providers: [
     AutomationService,
+    AutomationReadService,
     AutomationScheduler,
     AutomationRuntimeHandlers,
     AutomationWorkflowRunner,

@@ -419,6 +419,79 @@ export class VersionedExecutionRules {
     };
   }
 
+  private checkPriceLimits(input: ExecutionOrderCandidate, normalizedPrice: DecimalValue, previousClose: DecimalValue, tick: DecimalValue, normalizedQuantity: string): ExecutionRuleRejection | undefined {
+    const minimumPriceTicks = this.facts.price.minimumPriceTicks;
+    if (
+      minimumPriceTicks !== undefined &&
+      normalizedPrice.compareTo(tick.times(minimumPriceTicks.toString())) < 0
+    ) {
+      return this.reject(input, 'PRICE_LIMIT', '价格低于规则最低 tick', normalizedQuantity);
+    }
+    if (this.facts.price.rounding === 'halfUpToTick') {
+      if (this.facts.price.maxUpRatio) {
+        const upperLimit = roundedLimit(
+          previousClose,
+          this.facts.price.maxUpRatio,
+          tick,
+          'up',
+          this.facts.price.minimumDistanceTicks,
+        );
+        if (normalizedPrice.compareTo(upperLimit) > 0) {
+          return this.reject(input, 'PRICE_LIMIT', '价格高于规则上限', normalizedQuantity);
+        }
+      }
+      if (this.facts.price.maxDownRatio) {
+        const lowerLimit = roundedLimit(
+          previousClose,
+          this.facts.price.maxDownRatio,
+          tick,
+          'down',
+          this.facts.price.minimumDistanceTicks,
+        );
+        if (normalizedPrice.compareTo(lowerLimit) < 0) {
+          return this.reject(input, 'PRICE_LIMIT', '价格低于规则下限', normalizedQuantity);
+        }
+      }
+    } else {
+      const change = normalizedPrice.minus(previousClose).dividedBy(previousClose);
+      if (this.facts.price.maxUpRatio && change.compareTo(this.facts.price.maxUpRatio) > 0) {
+        return this.reject(input, 'PRICE_LIMIT', '价格高于规则上限', normalizedQuantity);
+      }
+      if (
+        this.facts.price.maxDownRatio &&
+        change.compareTo(DecimalValue.from(this.facts.price.maxDownRatio).times('-1')) < 0
+      ) {
+        return this.reject(input, 'PRICE_LIMIT', '价格低于规则下限', normalizedQuantity);
+      }
+    }
+    return undefined;
+  }
+
+  private checkSellAvailability(input: ExecutionOrderCandidate, normalizedQuantity: string, tradingDate: string): ExecutionRuleRejection | undefined {
+    if (input.side === 'sell') {
+      const available = DecimalValue.from(input.availableQuantity ?? '0');
+      if (available.compareTo(normalizedQuantity) < 0) {
+        return this.reject(input, 'INSUFFICIENT_POSITION', '可卖持仓不足', normalizedQuantity);
+      }
+      if (input.acquiredOn) {
+        const sellableOn = dateAfterTradingDays(
+          this.facts.calendar,
+          input.acquiredOn,
+          this.facts.positionSettlement.sellableAfterTradingDays,
+        );
+        if (tradingDate < sellableOn) {
+          return this.reject(
+            input,
+            'POSITION_NOT_SETTLED',
+            `持仓将于 ${sellableOn} 可卖`,
+            normalizedQuantity,
+          );
+        }
+      }
+    }
+    return undefined;
+  }
+
   evaluate(input: ExecutionOrderCandidate): ExecutionRuleDecision {
     const trace = this.trace(input.evaluatedAt);
     if (
@@ -467,71 +540,10 @@ export class VersionedExecutionRules {
     if (!normalizedPrice.isPositive() || !previousClose.isPositive()) {
       return this.reject(input, 'PRICE_LIMIT', '价格和前收盘价必须为正数', normalizedQuantity);
     }
-    const minimumPriceTicks = this.facts.price.minimumPriceTicks;
-    if (
-      minimumPriceTicks !== undefined &&
-      normalizedPrice.compareTo(tick.times(minimumPriceTicks.toString())) < 0
-    ) {
-      return this.reject(input, 'PRICE_LIMIT', '价格低于规则最低 tick', normalizedQuantity);
-    }
-    if (this.facts.price.rounding === 'halfUpToTick') {
-      if (this.facts.price.maxUpRatio) {
-        const upperLimit = roundedLimit(
-          previousClose,
-          this.facts.price.maxUpRatio,
-          tick,
-          'up',
-          this.facts.price.minimumDistanceTicks,
-        );
-        if (normalizedPrice.compareTo(upperLimit) > 0) {
-          return this.reject(input, 'PRICE_LIMIT', '价格高于规则上限', normalizedQuantity);
-        }
-      }
-      if (this.facts.price.maxDownRatio) {
-        const lowerLimit = roundedLimit(
-          previousClose,
-          this.facts.price.maxDownRatio,
-          tick,
-          'down',
-          this.facts.price.minimumDistanceTicks,
-        );
-        if (normalizedPrice.compareTo(lowerLimit) < 0) {
-          return this.reject(input, 'PRICE_LIMIT', '价格低于规则下限', normalizedQuantity);
-        }
-      }
-    } else {
-      const change = normalizedPrice.minus(previousClose).dividedBy(previousClose);
-      if (this.facts.price.maxUpRatio && change.compareTo(this.facts.price.maxUpRatio) > 0) {
-        return this.reject(input, 'PRICE_LIMIT', '价格高于规则上限', normalizedQuantity);
-      }
-      if (
-        this.facts.price.maxDownRatio &&
-        change.compareTo(DecimalValue.from(this.facts.price.maxDownRatio).times('-1')) < 0
-      ) {
-        return this.reject(input, 'PRICE_LIMIT', '价格低于规则下限', normalizedQuantity);
-      }
-    }
-    if (input.side === 'sell') {
-      const available = DecimalValue.from(input.availableQuantity ?? '0');
-      if (available.compareTo(normalizedQuantity) < 0) {
-        return this.reject(input, 'INSUFFICIENT_POSITION', '可卖持仓不足', normalizedQuantity);
-      }
-      if (input.acquiredOn) {
-        const sellableOn = dateAfterTradingDays(
-          this.facts.calendar,
-          input.acquiredOn,
-          this.facts.positionSettlement.sellableAfterTradingDays,
-        );
-        if (day.date < sellableOn) {
-          return this.reject(
-            input,
-            'POSITION_NOT_SETTLED',
-            `持仓将于 ${sellableOn} 可卖`,
-            normalizedQuantity,
-          );
-        }
-      }
-    }
+    const priceRejection = this.checkPriceLimits(input, normalizedPrice, previousClose, tick, normalizedQuantity);
+    if (priceRejection) return priceRejection;
+    const sellRejection = this.checkSellAvailability(input, normalizedQuantity, day.date);
+    if (sellRejection) return sellRejection;
     return {
       accepted: true,
       normalizedQuantity,

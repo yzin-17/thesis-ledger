@@ -6,10 +6,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   canRevealTestMetrics,
-  canSelectCandidateForTest,
   candidateAdoptionEligibility,
+  canRetryOptimizationExperiment,
 } from '@thesis-ledger/schemas';
 import { confirmAction, useMobileRuntime } from '../../app/MobileRuntime';
+import { OptimizationInstrument } from './OptimizationInstrument';
 import { useMobileCommand } from '../../app/query/mobile-queries';
 import type { StrategyStackParams } from '../../app/strategy-navigation';
 import {
@@ -26,17 +27,40 @@ import {
 import {
   cloneExperimentInput,
   parseExperimentAction,
+  matchesFinalizationSelection,
   type ExperimentAction,
 } from './experiment-actions';
 import { optimizationStatusLabels } from './optimization-labels';
+function buildPendingExperimentAction({ action, id, name, acknowledgeUnknownCost, executionAttempt }: {
+  action: 'rename' | 'clone' | 'cancel' | 'complete' | 'retry';
+  id: string; name: string; acknowledgeUnknownCost: boolean; executionAttempt: number;
+}): ExperimentAction {
+  let entry: unknown;
+  if (action === 'rename') entry = { id, action, body: { name } };
+  else if (action === 'clone')
+    entry = {
+      id,
+      action,
+      body: {
+        idempotencyKey: randomUUID(),
+        acknowledgeUnknownCost: acknowledgeUnknownCost,
+        ...(name.trim() ? { name } : {}),
+      },
+    };
+  else if (action === 'cancel') entry = { id, action, body: {} };
+  else if (action === 'retry') entry = { id, action, body: {
+    idempotencyKey: randomUUID(), expectedExecutionAttempt: executionAttempt,
+  } };
+  else entry = { id, action: 'complete', body: {} };
+  return parseExperimentAction(entry);
+}
+
 function useOptimizationDetailController({ id }: { id: string }) {
   const { api, scope, baseUrl } = useMobileRuntime();
   const optimization = api.strategy.optimization;
   const navigation = useNavigation<NativeStackNavigationProp<StrategyStackParams>>();
   const [name, setName] = useState('');
   const [ack, setAck] = useState('no');
-  const [selected, setSelected] = useState<string[]>([]);
-  const [preferred, setPreferred] = useState('');
   const [planVersion, setPlanVersion] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [cloned, setCloned] = useState<string | null>(null);
@@ -46,7 +70,7 @@ function useOptimizationDetailController({ id }: { id: string }) {
     queryFn: ({ signal }) => optimization.compare(id, signal),
     retry: false,
     refetchInterval: (q) =>
-      q.state.data && ['queued', 'running', 'testing'].includes(q.state.data.experiment.status)
+      q.state.data && ['queued', 'running', 'testing', 'awaiting_finalization'].includes(q.state.data.experiment.status)
         ? 2000
         : false,
   });
@@ -68,48 +92,16 @@ function useOptimizationDetailController({ id }: { id: string }) {
     retry: false,
   });
   const command = useMobileCommand(
-    async (action: 'rename' | 'clone' | 'cancel' | 'finalize' | 'resume') => {
+    async (action: 'rename' | 'clone' | 'cancel' | 'complete' | 'retry' | 'resume') => {
       let entry = pending.data;
       const current = await optimization.compare(id);
       if (!entry) {
         if (action === 'resume') throw Error('没有待确认实验操作。');
         if (query.isError) throw Error('请先重新读取实验。');
-        if (action === 'rename') entry = { id, action, body: { name } };
-        else if (action === 'clone')
-          entry = {
-            id,
-            action,
-            body: {
-              idempotencyKey: randomUUID(),
-              acknowledgeUnknownCost: ack === 'yes',
-              ...(name.trim() ? { name } : {}),
-            },
-          };
-        else if (action === 'cancel') entry = { id, action, body: {} };
-        else {
-          if (
-            selected.some(
-              (cid) =>
-                !current.candidates.some(
-                  (c) => c.id === cid && canSelectCandidateForTest(current.experiment, c, false),
-                ),
-            )
-          )
-            throw Error('候选资格已变化，请重新核对。');
-          entry = {
-            id,
-            action,
-            body: {
-              candidateIds: selected,
-              selectedCandidateId: preferred,
-              expectedStage: 'awaiting_finalization',
-            },
-          };
-        }
-        entry = parseExperimentAction(entry);
-        if (
+        entry = buildPendingExperimentAction({ action, id, name, acknowledgeUnknownCost: ack === 'yes', executionAttempt: current.experiment.executionAttempt });
+        if (action !== 'retry' &&
           !(await confirmAction(
-            action === 'finalize' ? '锁定并进行封存测试？' : '确认实验操作？',
+            action === 'complete' ? '重试未完成测试？' : '确认实验操作？',
             action === 'clone'
               ? '克隆会创建新实验并消费上述模型与预算，请核对未知费用确认。'
               : `实验 ${current.experiment.name}；请核对当前输入。`,
@@ -128,13 +120,11 @@ function useOptimizationDetailController({ id }: { id: string }) {
       } else if (entry.action === 'cancel') {
         if (!['succeeded', 'failed', 'cancelled'].includes(current.experiment.status))
           await optimization.cancel(id);
-      } else if (current.experiment.stage === 'awaiting_finalization')
+      } else if (entry.action === 'complete') await optimization.complete(id);
+      else if (entry.action === 'retry') await optimization.retry(id, entry.body);
+      else if (current.experiment.stage === 'awaiting_finalization')
         await optimization.finalize(id, entry.body);
-      else if (
-        !entry.body.candidateIds.every((cid) =>
-          current.experiment.lockedCandidateIds?.includes(cid),
-        )
-      )
+      else if (!matchesFinalizationSelection(entry.body, current.experiment))
         throw Error('实验阶段已变化，锁定集合与原请求不一致，保留凭据。');
       await AsyncStorage.removeItem(key);
       await pending.refetch();
@@ -143,7 +133,7 @@ function useOptimizationDetailController({ id }: { id: string }) {
     },
     { refresh: false },
   );
-  const execute = (action: 'rename' | 'clone' | 'cancel' | 'finalize' | 'resume') =>
+  const execute = (action: 'rename' | 'clone' | 'cancel' | 'complete' | 'retry' | 'resume') =>
     void command.mutateAsync(action).catch((e) => setMessage(failureMessage(e)));
   const data = query.data;
   const locked = command.isPending || !!pending.data || query.isError || !pending.isSuccess;
@@ -161,10 +151,6 @@ function useOptimizationDetailController({ id }: { id: string }) {
     cloned,
     navigation,
     setPlanVersion,
-    selected,
-    setSelected,
-    setPreferred,
-    preferred,
     planVersion,
     plan,
     message,
@@ -186,10 +172,6 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
     cloned,
     navigation,
     setPlanVersion,
-    selected,
-    setSelected,
-    setPreferred,
-    preferred,
     planVersion,
     plan,
     message,
@@ -201,6 +183,7 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
       {data ? (
         <>
           <Section title={optimizationStatusLabels[data.experiment.status] ?? '状态待核对'}>
+            <OptimizationInstrument value={data.experiment} />
             <Copy>
               实验 {id} · 基线版本 {data.experiment.baselineStrategyVersionId}
             </Copy>
@@ -212,6 +195,10 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
             <Copy>停止原因 {data.experiment.stopReason ?? '无'} · 模型用量以操作记录为准</Copy>
             <Copy>来源 {JSON.stringify(data.experiment.source ?? null)}</Copy>
             <Copy>交易成本假设 {JSON.stringify(data.experiment.tradingCost)}</Copy>
+            {canRetryOptimizationExperiment(data.experiment) ? <>
+              <Action label={command.isPending ? '正在重试' : '失败重试'} disabled={locked} onPress={() => execute('retry')} />
+              <Copy>保留历史和累计用量，按原配置重新请求模型。</Copy>
+            </> : null}
           </Section>
           <Field label="实验新名称或克隆名称" value={name} editable={!locked} onChange={setName} />
           <Action
@@ -242,7 +229,7 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
               <Copy>
                 {
                   (
-                    { clone: '克隆', rename: '改名', cancel: '取消', finalize: '锁定候选' } as const
+                    { clone: '克隆', rename: '改名', cancel: '取消', finalize: '测试恢复', complete: '重试测试', retry: '失败重试' } as const
                   )[pending.data.action]
                 }{' '}
                 · {id}
@@ -281,6 +268,7 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
           </Section>
           {data.candidates.map((candidate) => {
             const adoptionReason = candidateAdoptionEligibility(data.experiment, candidate);
+            const testMetric = candidate.metrics.test as Record<string, unknown> | undefined;
             return (
               <Section key={candidate.id} title={`候选 ${candidate.candidateNumber}`}>
                 <Copy>
@@ -302,26 +290,11 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
                 <Copy>差异 {JSON.stringify(candidate.diff, null, 2)}</Copy>
                 <Copy>Run {JSON.stringify(candidate.runRefs)}</Copy>
                 <Action
-                  label={`${selected.includes(candidate.id) ? '取消锁定' : '锁定'}候选 ${candidate.candidateNumber}`}
-                  disabled={
-                    locked ||
-                    (!selected.includes(candidate.id) && selected.length >= 3) ||
-                    !canSelectCandidateForTest(data.experiment, candidate, false)
-                  }
-                  onPress={() => {
-                    setSelected((v) =>
-                      v.includes(candidate.id)
-                        ? v.filter((cid) => cid !== candidate.id)
-                        : [...v, candidate.id],
-                    );
-                    setPreferred('');
-                  }}
-                />
-                <Action
                   label={`读取候选 ${candidate.candidateNumber} 监控计划`}
                   onPress={() => setPlanVersion(candidate.candidateStrategyVersionId)}
                 />
                 {adoptionReason ? <Copy muted>{adoptionReason}</Copy> : null}
+                {testMetric?.tradeCount === 0 && typeof testMetric.fillCount === 'number' && testMetric.fillCount > 0 ? <Copy muted>期末仍有持仓，收益包含未实现盈亏；暂无已平仓交易。</Copy> : null}
                 <Action
                   label={`审核采用候选 ${candidate.candidateNumber}`}
                   disabled={locked || !!adoptionReason}
@@ -332,23 +305,8 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
               </Section>
             );
           })}
-          {selected.length ? (
-            <>
-              <Choices
-                label="封存测试预选候选"
-                value={preferred}
-                disabled={locked}
-                onChange={setPreferred}
-                options={data.candidates
-                  .filter((c) => selected.includes(c.id))
-                  .map((c) => ({ value: c.id, label: `候选 ${c.candidateNumber}` }))}
-              />
-              <Action
-                label="确认锁定并进行封存测试"
-                disabled={locked || !preferred || data.experiment.stage !== 'awaiting_finalization'}
-                onPress={() => execute('finalize')}
-              />
-            </>
+          {data.experiment.stopReason?.startsWith('final_test_retry_required:') ? (
+            <Action label="重试未完成测试" disabled={locked} onPress={() => execute('complete')} />
           ) : null}
           {planVersion ? (
             <>

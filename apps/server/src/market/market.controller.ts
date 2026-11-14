@@ -3,16 +3,15 @@ import { marketCalculationAnchor } from '@thesis-ledger/schemas';
 import { BadRequestException, Controller, Get, Optional, Param, Query } from '@nestjs/common';
 import {
   quoteAssetTypeSchema,
-  indicatorCalculateResponseSchema,
   marketDetailResponseSchema,
   type BarSeries,
   type MarketDetailCapability,
   type MarketDetailDiagnostic,
   type MarketDetailSection,
 } from '@thesis-ledger/schemas';
-import { DSA_MARKET_INDICATOR_ENGINE_VERSION, DsaClient } from '../integration/dsa/dsa.client.js';
+import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { RedisService } from '../platform/redis.service.js';
-import { MarketIndicatorCache, indicatorRequestKey } from './market-indicator-cache.js';
+import { MarketNativeIndicatorReader } from './market-native-indicator-reader.js';
 export { MarketIndicatorCache } from './market-indicator-cache.js';
 import { MarketBarReader } from './market-bar-reader.js';
 import {
@@ -34,11 +33,36 @@ import { type QuoteAssetType } from './market-quote-reader.js';
 import { MarketChartReaderV3 } from './market-chart-reader-v3.js';
 import { parseChartOptionsQuery, planChartOptionsRequest } from './market-chart-options-request.js';
 import { indicatorReadInput, indicatorWindows, projectIndicatorResponse, MAX_CHART_V3_INDICATOR_INPUT_POINTS } from './market-indicator-window.js';
-type IndicatorName = 'MA' | 'MACD' | 'RSI';
+
+type DetailSections = Partial<Record<MarketDetailCapability, MarketDetailSection>>;
+type DetailDependencies = Record<
+  string,
+  {
+    status: 'ready' | 'stale' | 'empty' | 'unsupported' | 'unavailable';
+    error?: MarketDetailDiagnostic;
+  }
+>;
+type DetailBarsInput = {
+  identity: Awaited<ReturnType<MarketDetailService['resolveIdentity']>>;
+  nativeTimeframe: ReturnType<typeof requireNativeMarketTimeframe>;
+  adjustment: string | undefined;
+  start: string | undefined;
+  chartEnd: string | undefined;
+  parsedBarsLimit: number;
+  acceptance: string | undefined;
+  refresh: string | undefined;
+  indicatorParams: string | undefined;
+  anchor: ReturnType<typeof marketCalculationAnchor>;
+  requested: MarketDetailCapability[];
+  barCapabilities: MarketDetailCapability[];
+  sections: DetailSections;
+  dependencies: DetailDependencies;
+  requestId: string;
+};
 
 @Controller('api/market')
 export class MarketController {
-  private readonly indicatorCache: MarketIndicatorCache;
+  private readonly nativeIndicators: MarketNativeIndicatorReader;
   constructor(
     private readonly reader: MarketBarReader,
     private readonly dsa: DsaClient,
@@ -51,30 +75,7 @@ export class MarketController {
     @Optional() private readonly periodOptions?: MarketPeriodOptionsService,
     @Optional() private readonly minutes?: MarketMinuteDisplayService,
     @Optional() private readonly minuteOptions?: MarketMinuteOptionsService,
-  ) { this.indicatorCache = new MarketIndicatorCache(redis); }
-
-  private async calculate(series: BarSeries, requests: Array<{ name: IndicatorName; parameters: Record<string, number> }>) {
-    const normalizedRequests = requests.map((request) => ({
-      name: request.name,
-      parameters: Object.fromEntries(Object.entries(request.parameters).sort(([left], [right]) => left.localeCompare(right))),
-    }));
-    const key = `${series.inputFingerprint}:${DSA_MARKET_INDICATOR_ENGINE_VERSION}:${JSON.stringify(normalizedRequests)}`;
-    const cached = await this.indicatorCache.get(key);
-    if (cached) return cached;
-    const response = indicatorCalculateResponseSchema.parse(await this.dsa.calculateIndicators({
-      identity: series.identity, inputFingerprint: series.inputFingerprint,
-      points: series.points, requests: normalizedRequests,
-    }));
-    if (response.results.some((result) => result.inputFingerprint !== response.inputFingerprint) || response.inputFingerprint !== series.inputFingerprint)
-      throw new Error('指标结果 fingerprint 与 BarSeries 不一致');
-    const expectedKeys = normalizedRequests.map(indicatorRequestKey).sort();
-    const actualKeys = response.results.map(indicatorRequestKey).sort();
-    if (expectedKeys.length !== actualKeys.length || expectedKeys.some((keyValue, index) => keyValue !== actualKeys[index]))
-      throw new Error('DSA 指标结果与请求集合不一致');
-    if (response.engineVersion !== DSA_MARKET_INDICATOR_ENGINE_VERSION) throw new Error('DSA 指标 engineVersion 不受支持');
-    await this.indicatorCache.set(key, response, new Date(series.provenance.freshUntil).getTime());
-    return response;
-  }
+  ) { this.nativeIndicators = new MarketNativeIndicatorReader(dsa, redis); }
 
   @Get(':symbol/bars') async bars(
     @Param('symbol') symbol: string,
@@ -131,7 +132,7 @@ export class MarketController {
     if (input.acceptance !== 'interactive' || input.asOf) throw new BadRequestException('图表只支持 interactive 验收，不接受 asOf');
     const acquired = await this.reader.readChartV3(indicatorReadInput(input, requests, MAX_CHART_V3_INDICATOR_INPUT_POINTS));
     const { visible, calculation } = indicatorWindows(acquired, input, requests);
-    return projectIndicatorResponse(await this.calculate(calculation, requests), calculation, visible);
+    return projectIndicatorResponse(await this.nativeIndicators.calculate(calculation, requests), calculation, visible);
   }
 
   @Get(':symbol/detail') async detail(
@@ -155,15 +156,12 @@ export class MarketController {
     if (!this.detailService) throw new Error('MarketDetailService 未注入');
     const identity = await this.detailService.resolveIdentity(symbol);
     const displayTimeframe = parseMarketTimeframe(timeframe);
-    let anchor: ReturnType<typeof marketCalculationAnchor>;
-    try { anchor = marketCalculationAnchor({ symbol: identity.symbol, timeframe: displayTimeframe, calculationAnchor, end }); }
-    catch { throw new BadRequestException('calculationAnchor必须是有效带时区时刻，且与end行情末日一致'); }
+    const anchor = detailCalculationAnchor({ symbol: identity.symbol, timeframe: displayTimeframe, calculationAnchor, end });
     const chartEnd = anchor?.end ?? end;
     if (!this.periodDetail) requireNativeMarketTimeframe(timeframe, identity.assetType);
     const supported = MARKET_DETAIL_CAPABILITY_MATRIX[identity.assetType];
     const requested = this.parseDetailInclude(include) ?? [...supported];
-    const parsedBarsLimit = this.parseDetailLimit(barsLimit ?? (displayTimeframe === '1y' ? '10' : undefined), 'barsLimit', 3000);
-    const parsedNavLimit = this.parseDetailLimit(navLimit, 'navLimit');
+    const { parsedBarsLimit, parsedNavLimit } = this.detailLimits(barsLimit, navLimit, displayTimeframe);
     if (this.periodDetail && displayTimeframe !== '1m' && displayTimeframe !== '1d' && !await hasNativeChartRoute(this.chartReader, identity.symbol, displayTimeframe, identity.assetType)) {
       return this.periodDetail.get(identity, displayTimeframe, {
         requested, barsLimit: parsedBarsLimit, navLimit: parsedNavLimit,
@@ -177,10 +175,7 @@ export class MarketController {
     let barSeries: BarSeries | undefined;
     const nonBarRequested = requested.filter((capability) => capability !== 'bars' && !capability.startsWith('indicator:'));
     if (nonBarRequested.length > 0) {
-      const legacy = await this.detailService.getDetail(identity.symbol, {
-        include: nonBarRequested, navLimit: parsedNavLimit,
-        ...(start ? { start } : {}), ...(end ? { end } : {}), refresh: refresh === '1',
-      });
+      const legacy = await this.detailService.getDetail(identity.symbol, legacyDetailQuery(nonBarRequested, parsedNavLimit, start, end, refresh));
       Object.assign(sections, legacy.sections);
       Object.assign(dependencies, legacy.dependencies);
     }
@@ -191,58 +186,7 @@ export class MarketController {
     const barCapabilities = requested.filter((capability) => supported.includes(capability) &&
       (capability === 'bars' || capability.startsWith('indicator:')));
     if (barCapabilities.length > 0) {
-      if (parseAcceptance(acceptance) !== 'interactive') {
-        throw new BadRequestException('图表只支持 interactive 验收');
-      }
-      const indicatorCapabilities = barCapabilities.filter((capability) => capability.startsWith('indicator:'));
-      // 参数错误属于 400，不得被吞成行情服务故障。
-      const requests = indicatorCapabilities.map((capability) => {
-        const name = normalizeIndicatorName(capability.slice('indicator:'.length));
-        return { name, parameters: selectIndicatorParameters(name, indicatorParams) };
-      });
-      const nativeInput = marketChartRequest(identity.symbol, {
-        assetType: identity.assetType, timeframe: nativeTimeframe, adjustment,
-        start, end: chartEnd, limit: String(parsedBarsLimit), acceptance, refresh,
-      });
-      const input = anchor ? { ...nativeInput, window: { ...nativeInput.window, end: anchor.timestamp } } : nativeInput;
-      const readInput = requests.length ? indicatorReadInput(input, requests,
-        MAX_CHART_V3_INDICATOR_INPUT_POINTS) : input;
-      let calculationSeries: BarSeries | undefined;
-      let barStatus: 'ready' | 'stale' | 'empty' = 'ready';
-      try {
-        const acquired = await this.reader.readChartV3(readInput);
-        if (requests.length) {
-          const windows = indicatorWindows(acquired, input, requests);
-          barSeries = windows.visible;
-          calculationSeries = windows.calculation;
-        } else { barSeries = acquired; }
-        barStatus = barSeries.points.length === 0 ? 'empty'
-          : barSeries.provenance.cacheStatus === 'stale' ? 'stale' : 'ready';
-        if (requested.includes('bars')) sections.bars = { capability: 'bars', status: barStatus, data: barSeries };
-        dependencies.DAILY_BAR = { status: barStatus };
-      } catch {
-        dependencies.DAILY_BAR = { status: 'unavailable', error: this.detailDiagnostic(requestId, 'bars', 'market_data_unavailable') };
-        for (const capability of barCapabilities) sections[capability] = this.detailFailure(capability, 'unavailable', requestId,
-          capability === 'bars' ? 'market_data_unavailable' : 'daily_bar_unavailable');
-      }
-      if (barSeries && calculationSeries && requests.length) {
-        if (barSeries.points.length === 0) {
-          for (const capability of indicatorCapabilities) sections[capability] = { capability, status: 'empty', data: null };
-        } else {
-          // 日线读取与指标计算独立降级：计算失败不覆盖 bars 或 DAILY_BAR 的成功状态。
-          try {
-            const response = await this.calculate(calculationSeries, requests);
-            const projected = projectIndicatorResponse(response, calculationSeries, barSeries);
-            for (const result of projected.results) {
-              const capability: MarketDetailCapability = `indicator:${result.name}`;
-              sections[capability] = { capability, status: barStatus, data: result };
-            }
-          } catch {
-            for (const capability of indicatorCapabilities) sections[capability] = this.detailFailure(
-              capability, 'unavailable', requestId, 'indicator_calculation_unavailable');
-          }
-        }
-      }
+      barSeries = await this.readDetailBars({ identity, nativeTimeframe, adjustment, start, chartEnd, parsedBarsLimit, acceptance, refresh, indicatorParams, anchor, requested, barCapabilities, sections, dependencies, requestId });
     }
     return marketDetailResponseSchema.parse({
       contractVersion: 3, symbol: identity.symbol, assetType: identity.assetType,
@@ -251,6 +195,140 @@ export class MarketController {
       limits: { bars: parsedBarsLimit, nav: parsedNavLimit, barsHasMoreBefore: barSeries?.coverage.hasMoreBefore ?? false },
       ...(barSeries ? { barSeries } : {}), sections, dependencies, requestId, generatedAt: new Date().toISOString(),
     });
+  }
+
+  private detailLimits(
+    barsLimit: string | undefined,
+    navLimit: string | undefined,
+    displayTimeframe: ReturnType<typeof parseMarketTimeframe>,
+  ) {
+    const parsedBarsLimit = this.parseDetailLimit(
+      barsLimit ?? (displayTimeframe === '1y' ? '10' : undefined),
+      'barsLimit',
+      3000,
+    );
+    const parsedNavLimit = this.parseDetailLimit(navLimit, 'navLimit');
+    return { parsedBarsLimit, parsedNavLimit };
+  }
+
+  private async readDetailBars({
+    identity,
+    nativeTimeframe,
+    adjustment,
+    start,
+    chartEnd,
+    parsedBarsLimit,
+    acceptance,
+    refresh,
+    indicatorParams,
+    anchor,
+    requested,
+    barCapabilities,
+    sections,
+    dependencies,
+    requestId,
+  }: DetailBarsInput) {
+    let barSeries: BarSeries | undefined;
+    if (parseAcceptance(acceptance) !== 'interactive') {
+      throw new BadRequestException('图表只支持 interactive 验收');
+    }
+    const indicatorCapabilities = barCapabilities.filter((capability) =>
+      capability.startsWith('indicator:'),
+    );
+    // 参数错误属于 400，不得被吞成行情服务故障。
+    const requests = indicatorCapabilities.map((capability) => {
+      const name = normalizeIndicatorName(capability.slice('indicator:'.length));
+      return { name, parameters: selectIndicatorParameters(name, indicatorParams) };
+    });
+    const nativeInput = marketChartRequest(identity.symbol, {
+      assetType: identity.assetType,
+      timeframe: nativeTimeframe,
+      adjustment,
+      start,
+      end: chartEnd,
+      limit: String(parsedBarsLimit),
+      acceptance,
+      refresh,
+    });
+    const input = anchor
+      ? { ...nativeInput, window: { ...nativeInput.window, end: anchor.timestamp } }
+      : nativeInput;
+    const readInput = requests.length
+      ? indicatorReadInput(input, requests, MAX_CHART_V3_INDICATOR_INPUT_POINTS)
+      : input;
+    let calculationSeries: BarSeries | undefined;
+    let barStatus: 'ready' | 'stale' | 'empty' = 'ready';
+    try {
+      const acquired = await this.reader.readChartV3(readInput);
+      if (requests.length) {
+        const windows = indicatorWindows(acquired, input, requests);
+        barSeries = windows.visible;
+        calculationSeries = windows.calculation;
+      } else {
+        barSeries = acquired;
+      }
+      barStatus = chartBarStatus(barSeries.points.length, barSeries.provenance.cacheStatus);
+      if (requested.includes('bars'))
+        sections.bars = { capability: 'bars', status: barStatus, data: barSeries };
+      dependencies.DAILY_BAR = { status: barStatus };
+    } catch {
+      dependencies.DAILY_BAR = {
+        status: 'unavailable',
+        error: this.detailDiagnostic(requestId, 'bars', 'market_data_unavailable'),
+      };
+      for (const capability of barCapabilities)
+        sections[capability] = this.detailFailure(
+          capability,
+          'unavailable',
+          requestId,
+          capability === 'bars' ? 'market_data_unavailable' : 'daily_bar_unavailable',
+        );
+    }
+    if (barSeries && calculationSeries && requests.length) {
+      if (barSeries.points.length === 0) {
+        for (const capability of indicatorCapabilities)
+          sections[capability] = { capability, status: 'empty', data: null };
+      } else {
+        await this.calculateDetailIndicators(
+          calculationSeries,
+          barSeries,
+          requests,
+          indicatorCapabilities,
+          barStatus,
+          sections,
+          requestId,
+        );
+      }
+    }
+    return barSeries;
+  }
+
+  private async calculateDetailIndicators(
+    calculationSeries: BarSeries,
+    barSeries: BarSeries,
+    requests: Parameters<MarketNativeIndicatorReader['calculate']>[1],
+    indicatorCapabilities: MarketDetailCapability[],
+    barStatus: 'ready' | 'stale' | 'empty',
+    sections: DetailSections,
+    requestId: string,
+  ) {
+    // 日线读取与指标计算独立降级：计算失败不覆盖 bars 或 DAILY_BAR 的成功状态。
+    try {
+      const response = await this.nativeIndicators.calculate(calculationSeries, requests);
+      const projected = projectIndicatorResponse(response, calculationSeries, barSeries);
+      for (const result of projected.results) {
+        const capability: MarketDetailCapability = `indicator:${result.name}`;
+        sections[capability] = { capability, status: barStatus, data: result };
+      }
+    } catch {
+      for (const capability of indicatorCapabilities)
+        sections[capability] = this.detailFailure(
+          capability,
+          'unavailable',
+          requestId,
+          'indicator_calculation_unavailable',
+        );
+    }
   }
 
   @Get(':symbol/period-options') async derivedOptions(@Param('symbol') symbol: string,
@@ -342,3 +420,32 @@ export class MarketController {
     return { capability, status, error: this.detailDiagnostic(requestId, capability, code) };
   }
 }
+
+
+function chartBarStatus(pointCount: number, cacheStatus: string) {
+  if (pointCount === 0) return 'empty';
+  return cacheStatus === 'stale' ? 'stale' : 'ready';
+}
+function detailCalculationAnchor(input: Parameters<typeof marketCalculationAnchor>[0]) {
+  try {
+    return marketCalculationAnchor(input);
+  } catch {
+    throw new BadRequestException('calculationAnchor必须是有效带时区时刻，且与end行情末日一致');
+  }
+}
+function legacyDetailQuery(
+  include: MarketDetailCapability[],
+  navLimit: number,
+  start: string | undefined,
+  end: string | undefined,
+  refresh: string | undefined,
+) {
+  return {
+    include,
+    navLimit,
+    ...(start ? { start } : {}),
+    ...(end ? { end } : {}),
+    refresh: refresh === '1',
+  };
+}
+

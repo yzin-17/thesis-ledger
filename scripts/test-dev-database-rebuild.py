@@ -29,7 +29,7 @@ def generate(database, mode='rebuild'):
         DEV_DATABASE_PROJECT='review', DEV_DATABASE_CONFIRM='review/' + database,
         DEV_DATABASE_EXPECTED_DATABASE=database, DEV_DATABASE_EXPECTED_OWNER=owner,
         DATABASE_URL='postgresql://review:placeholder@postgres/' + database,
-        DEV_DATABASE_PERMISSIONS_SQL=str(root.parent / 'thesis-ledger-infra/scripts/bootstrap-app-role.sql'),
+        DEV_DATABASE_PERMISSIONS_SQL=str(root / 'infra/docker/bootstrap-app-role.sql'),
         THESIS_LEDGER_SCHEMA_INPUT_ROOT=str(root / 'apps/server/prisma'))
     return run(['node', 'apps/server/dist/src/platform/dev-database-rebuild.js'],
                env=env, cwd=root).stdout

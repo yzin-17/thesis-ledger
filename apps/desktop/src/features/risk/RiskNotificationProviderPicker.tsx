@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Spinner } from '@/components/ui/spinner';
 import { notificationRouteLabel } from './risk.format.js';
 import { useRiskNotificationRoutingQuery } from './risk.queries.js';
@@ -31,23 +31,15 @@ export function RiskNotificationProviderPicker() {
     <Field className="mb-group">
       <FieldLabel id="risk-notification-provider-label">通知提供方</FieldLabel>
       <div className="flex flex-wrap items-center gap-2">
-        <Select
-          multiple
-          items={items}
-          value={selected.filter((name) => items.some((item) => item.value === name))}
+        <MultiSelect
+          label="通知提供方"
+          options={items}
+          value={selected}
           disabled={disabled}
           onValueChange={(value) => { setDraft(value); save.reset(); }}
-        >
-          <SelectTrigger aria-labelledby="risk-notification-provider-label" className="w-full sm:w-80">
-            {query.isPending && <Spinner aria-hidden="true" />}
-            <SelectValue placeholder={placeholder} />
-          </SelectTrigger>
-          <SelectContent align="start" alignItemWithTrigger={false}>
-            <SelectGroup>
-              {items.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+          placeholder={placeholder}
+          className="sm:w-80"
+        />
         <Button
           type="button"
           size="sm"

@@ -22,18 +22,19 @@ import { readAiTraceCli } from '../../src/ai/trace/ai-trace-read.cli.js';
 import { redactAiTrace } from '../../src/ai/trace/ai-trace-redaction.js';
 import { traceFixture, traceSse } from './ai-trace.fixture.js';
 
-describe('trace 的传输、隔离与只读存储边界', () => {
-  let root = '';
-  beforeEach(async () => {
+let root = '';
+
+beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'ai-trace-unit-'));
     vi.spyOn(StructuredLogger.prototype, 'log').mockImplementation(() => undefined);
   });
-  afterEach(async () => {
+
+afterEach(async () => {
     vi.restoreAllMocks();
     await rm(root, { recursive: true, force: true });
   });
 
-  const request = (
+const request = (
     httpClient: typeof fetch,
     answer = '受控响应',
   ): AiSdkGenerationRequest<{ answer: string }> => ({
@@ -52,12 +53,20 @@ describe('trace 的传输、隔离与只读存储边界', () => {
     signal: new AbortController().signal,
     httpClient,
   });
-  const finishBusiness = (f: ReturnType<typeof traceFixture>) =>
+
+const finishBusiness = (f: ReturnType<typeof traceFixture>) =>
     f.store.failOwned(
       { runId: f.run.id, executionAttempt: 1 },
       { errorCode: 'controlled_done', errorSummary: '受控终态' },
     );
 
+const saved = async () => {
+    const f = traceFixture(join(root, 'traces'));
+    await f.capture.runClaimed(f.run as never, () => finishBusiness(f).then(() => undefined));
+    return { f, found: await f.read() };
+  };
+
+describe("Trace 传输及派发身份", () => {
   it('传给消费者的状态、headers 和 UTF-8 响应字节完全不变，只有一次 transport 调用', async () => {
     const f = traceFixture(join(root, 'traces'));
     const raw = traceSse('{"answer":"原始上游中文🧪"}');
@@ -205,7 +214,9 @@ describe('trace 的传输、隔离与只读存储边界', () => {
       fact: { code: 'configuration_invalid', externalResult: 'not_sent' },
     });
   });
+});
 
+describe("Trace 脱敏与上下文", () => {
   it('脱敏保留 Token 上限和用量数值，移除凭据、cookie、reasoning 各种结构', () => {
     expect(
       redactAiTrace(
@@ -255,13 +266,9 @@ describe('trace 的传输、隔离与只读存储边界', () => {
     const content = '{ "answer": "原始正文", "count": 2 }';
     expect(redactAiTrace(content, new Set())).toBe(content);
   });
+});
 
-  const saved = async () => {
-    const f = traceFixture(join(root, 'traces'));
-    await f.capture.runClaimed(f.run as never, () => finishBusiness(f).then(() => undefined));
-    return { f, found: await f.read() };
-  };
-
+describe("Trace 只读校验及存储边界", () => {
   it('只读查看器校验 owner/run/attempt，并可按节点导出，不创建新文件', async () => {
     const { f, found } = await saved();
     await expect(

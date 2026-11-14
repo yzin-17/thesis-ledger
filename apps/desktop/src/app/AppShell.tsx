@@ -1,4 +1,5 @@
 import { StarIcon } from '@phosphor-icons/react/Star';
+import { TrophyIcon } from '@phosphor-icons/react/Trophy';
 import { useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import { ChartLineUpIcon } from '@phosphor-icons/react/ChartLineUp';
@@ -24,6 +25,7 @@ const navIcons: Record<DesktopNavigationView, typeof HouseIcon> = {
   'risk-center': ShieldCheckIcon,
   performance: ChartLineUpIcon,
   strategy: StrategyIcon,
+  arena: TrophyIcon,
   journal: FlaskIcon,
   'ai-chat': RobotIcon,
   providers: GearSixIcon,
@@ -36,6 +38,7 @@ const compactNavLabels: Record<DesktopNavigationView, string> = {
   performance: '收益',
   'risk-center': '风险',
   strategy: '策略',
+  arena: '竞技场',
   journal: '复盘',
   'ai-chat': '研究',
   providers: '数据',

@@ -355,6 +355,8 @@ const numericExpressionsIn = (expression: BooleanExpression): readonly NumericEx
 };
 
 export interface ExchangeVerticalResult {
+  researchBalances?: { fundsBalance: { amount: string; currency: 'CNY' | 'HKD' | 'USD' };
+    positionUnits: string; simulatedPnl?: { amount: string; currency: 'CNY' | 'HKD' | 'USD' } };
   fills: readonly SimulationFillRecord[];
   rejects: readonly ExchangeVerticalReject[];
   trades: ReturnType<typeof projectBacktestTrades>['trades'];

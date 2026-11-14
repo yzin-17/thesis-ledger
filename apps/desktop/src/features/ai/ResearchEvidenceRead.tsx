@@ -104,7 +104,7 @@ export function ResearchEvidenceRead({
   const evidence = query.data;
   const material: unknown = evidence?.version === 2 ? evidence.evidence.data : null;
   return (
-    <section className="flex flex-col gap-3 rounded-md border p-3">
+    <section className="flex min-w-0 flex-col gap-3 border-b border-border/70 py-3 last:border-b-0">
       <Button
         type="button"
         variant="link"
@@ -114,9 +114,7 @@ export function ResearchEvidenceRead({
       >
         {label}
       </Button>
-      {expanded && query.isPending && (
-        <LoadingState label="正在读取保存的材料" />
-      )}
+      {expanded && query.isPending && <LoadingState label="正在读取保存的材料" />}
       {expanded && query.isError && (
         <Alert variant="destructive">
           <AlertTitle>引用暂不可用</AlertTitle>
@@ -158,6 +156,14 @@ export function ResearchEvidenceRead({
               原始来源 {index + 1}
             </a>
           ))}
+          <details>
+            <summary className="cursor-pointer py-2 text-sm font-medium">
+              原始材料与审计字段
+            </summary>
+            <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">
+              {JSON.stringify(evidence, null, 2)}
+            </pre>
+          </details>
         </div>
       )}
       {expanded && !query.isError && evidence?.version === 1 && (

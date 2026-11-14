@@ -1,4 +1,5 @@
 import { observedDataRuleKinds } from './risk-observed-source.js';
+import { strategyMonitoringIssues } from './risk-monitoring-projection.js';
 import { Controller, Get, Optional } from '@nestjs/common';
 import { riskMonitoringSourceSchema } from '@thesis-ledger/schemas';
 import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
@@ -25,16 +26,20 @@ export class RiskMonitoringStatusController {
     const raw = await this.redis.client.get(backgroundQuoteStatusKey);
     const acquisition = raw ? (JSON.parse(raw) as { checkedAt: string; sources: unknown[] }) : null;
     const sources = riskMonitoringSourceSchema.array().parse(acquisition?.sources ?? []);
-    const names = await this.display.resolve(sources.map((source) => source.symbol));
+    const issues = strategyMonitoringIssues(eligible, health);
+    const names = await this.display.resolve([...sources.map((source) => source.symbol),
+      ...new Set(issues.flatMap((issue) => issue.symbol ? [issue.symbol] : []))]);
     return {
       mode: 'observed-data' as const,
       continuousSource: false,
       eligibleRules: eligible.length,
       futureRules: rows.filter((r) => r.enabled && !r.needsRepair && r.effectiveAt > now).length,
-      unsupportedRules: eligible.filter((r) => r.sourcePlanId || !observedDataRuleKinds.has(r.kind))
+      unsupportedRules: eligible.filter((r) => !r.sourcePlanId && !observedDataRuleKinds.has(r.kind))
         .length,
+      ruleIssues: issues.map((issue) => ({ ...issue,
+        ...(issue.symbol ? { assetName: names.name(issue.symbol) } : {}) })),
       checkedAt: health.checkedAt ?? null,
-      evaluatedAt: health.evaluatedAt ?? null,
+      evaluatedAt: [health.evaluatedAt, health.strategyEvaluatedAt].filter((value): value is string => !!value).sort().at(-1) ?? null,
       gapAt: health.gapAt ?? null,
       missingPrices: Number(health.missingPrices ?? 0),
       inputUnavailable: Number(health.inputUnavailable ?? 0),
@@ -49,7 +54,7 @@ export class RiskMonitoringStatusController {
       ),
       sources: sources.map((source) => ({ ...source, assetName: names.name(source.symbol) })),
       limitation:
-        '按当前来源能力自动获取并评估。腾讯中国 ETF 最短请求间隔600秒，上游更新频率未知；其他来源按下列状态处理。当前没有持续订阅，采样间和断线期间未取得的价格变化无法回溯；跨币种估值还需有效汇率。',
+        '报价规则随已取得的行情更新评估；策略应用按实际持仓和已完成周期检查。日线窗口至少间隔10分钟重新获取，未取得的盘中价格变化无法回溯。行情来源、交易日历和汇率不可用时会跳过相应评估并说明原因。',
     };
   }
 }

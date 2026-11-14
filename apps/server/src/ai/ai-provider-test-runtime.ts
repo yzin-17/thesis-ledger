@@ -101,6 +101,34 @@ export function buildAiProviderTestRuntime(
   return {
     ...(modelDefaults ? { modelDefaults } : {}),
     name: input.name,
+    ...providerTestTarget(input, requestId, testModel, testKind, purpose, mode, budgetAuthorized),
+    ...(input.modelPricing === undefined ? {} : { modelPricing: input.modelPricing }),
+    ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
+    credential,
+    enabled: input.enabled ?? existing?.enabled ?? true,
+    priority: input.priority,
+    capabilities: input.capabilities ?? ['chat'],
+    ...providerTestDefaults(input),
+    upstreamFormat: selection.upstreamFormat,
+    ...(selection.upstreamFormat === 'chat-completions'
+      ? { chatImplementation: selection.chatImplementation }
+      : {}),
+    ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
+    adapter,
+    ...(input.executionRoutes === undefined ? {} : { executionRoutes: input.executionRoutes }),
+  };
+}
+
+function providerTestTarget(
+  input: AiProviderInput,
+  requestId: string | undefined,
+  testModel: string | undefined,
+  testKind: AiProviderTestKind,
+  purpose: AiProviderTestPurpose | undefined,
+  mode: AiGenerationMode | undefined,
+  budgetAuthorized: boolean | undefined,
+) {
+  return {
     ...(requestId === undefined ? {} : { requestId }),
     baseUrl: input.baseUrl,
     models: input.models,
@@ -110,12 +138,11 @@ export function buildAiProviderTestRuntime(
     ...(purpose === undefined ? {} : { purpose }),
     ...(mode === undefined ? {} : { mode }),
     ...(budgetAuthorized === undefined ? {} : { budgetAuthorized }),
-    ...(input.modelPricing === undefined ? {} : { modelPricing: input.modelPricing }),
-    ...(input.modelReasoning ? { modelReasoning: input.modelReasoning } : {}),
-    credential,
-    enabled: input.enabled ?? existing?.enabled ?? true,
-    priority: input.priority,
-    capabilities: input.capabilities ?? ['chat'],
+  };
+}
+
+function providerTestDefaults(input: AiProviderInput) {
+  return {
     ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
     ...(input.firstOutputTimeoutMs === undefined
       ? {}
@@ -126,12 +153,5 @@ export function buildAiProviderTestRuntime(
     ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
     ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
     ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
-    upstreamFormat: selection.upstreamFormat,
-    ...(selection.upstreamFormat === 'chat-completions'
-      ? { chatImplementation: selection.chatImplementation }
-      : {}),
-    ...(compatibilityExtensionProfile ? { compatibilityExtensionProfile } : {}),
-    adapter,
-    ...(input.executionRoutes === undefined ? {} : { executionRoutes: input.executionRoutes }),
   };
 }

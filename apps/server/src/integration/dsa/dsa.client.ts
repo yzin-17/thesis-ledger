@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { readArenaHistoryCatalog, readArenaHistoryMinutes, readArenaHistoryInstruments, type ArenaHistoryMinuteInput } from './dsa-arena-history.js';
 import { DsaDataCapabilityReaderV3 } from './dsa-data-capability-reader-v3.js';
 import type {
   DesiredProviderPolicyV3,
@@ -120,12 +121,7 @@ export class DsaClient {
           } | null;
           if (mapHttpError) throw toDsaError(mapHttpError(response.status, payload));
           const detail = payload?.detail;
-          const code =
-            detail?.code === 'unauthorized'
-              ? 'unauthorized'
-              : detail?.code === 'unsupported_capability'
-                ? 'unsupported-capability'
-                : 'unavailable';
+          const code = dsaFailureCode(detail?.code);
           throw new DsaError(
             detail?.message ?? `DSA 返回 ${response.status}`,
             code,
@@ -256,6 +252,16 @@ export class DsaClient {
 
   health() {
     return this.get<unknown>('/health', 1);
+  }
+
+  arenaHistoryCatalog(input: { market: 'CN'; date: string }) {
+    return readArenaHistoryCatalog((path, body) => this.post(path, body, 1), input);
+  }
+  arenaHistoryInstruments(input: { market: 'CN'; date: string; query: string }) {
+    return readArenaHistoryInstruments((path, body) => this.post(path, body, 1), input);
+  }
+  arenaHistoryMinutes(input: ArenaHistoryMinuteInput) {
+    return readArenaHistoryMinutes((path, body) => this.post(path, body, 1), input);
   }
 
   backtestCalendar(input: {
@@ -589,3 +595,11 @@ export class DsaClient {
     ).then((raw) => parseCatalogDelta(raw, cursor));
   }
 }
+
+
+function dsaFailureCode(code: unknown) {
+  if (code === 'unauthorized') return 'unauthorized';
+  if (code === 'unsupported_capability') return 'unsupported-capability';
+  return 'unavailable';
+}
+

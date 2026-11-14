@@ -2,7 +2,7 @@ import { pinyin } from 'pinyin-pro';
 import type { CatalogItem } from '@thesis-ledger/schemas';
 
 export const CONFIRMABLE_INSTRUMENT_TYPES = new Set(['STOCK', 'ETF', 'MUTUAL_FUND']);
-export const SUPPORTED_PORTFOLIO_MARKETS = new Set(['SH', 'SZ', 'BJ', 'OF']);
+export const SUPPORTED_PORTFOLIO_MARKETS = new Set(['SH', 'SZ', 'BJ', 'OF', 'HK', 'US']);
 
 export const symbolForInstrument = (item: Pick<CatalogItem, 'canonicalCode' | 'market'>) =>
   `${item.canonicalCode}.${item.market}`;
@@ -18,14 +18,15 @@ export const assetTypeForInstrument = (instrumentType: string) => {
   }
 };
 
-export const isConfirmableInstrument = (instrumentType: string, market: string) =>
-  CONFIRMABLE_INSTRUMENT_TYPES.has(instrumentType) && SUPPORTED_PORTFOLIO_MARKETS.has(market);
-
 export const disabledReasonForInstrument = (instrumentType: string, market: string) => {
   if (!CONFIRMABLE_INSTRUMENT_TYPES.has(instrumentType)) return 'unsupported_instrument_type';
   if (!SUPPORTED_PORTFOLIO_MARKETS.has(market)) return 'unsupported_market';
+  if ((market === 'HK' || market === 'US') && instrumentType !== 'STOCK') return 'unsupported_instrument_type';
   return null;
 };
+
+export const isConfirmableInstrument = (instrumentType: string, market: string) =>
+  disabledReasonForInstrument(instrumentType, market) === null;
 
 const normalizedQuery = (value: string) => value.trim().toLocaleLowerCase('zh-CN');
 

@@ -124,19 +124,7 @@ export function verifyLiveExperimentResume(
   for (const entry of resume.completedArms) {
     const key = entry.caseId + ':' + entry.arm;
     const value = entry.result;
-    if (
-      completed.has(key) ||
-      !ids.has(entry.caseId) ||
-      !['single', 'staged'].includes(entry.arm) ||
-      value.status !== 'complete' ||
-      value.reason !== null ||
-      value.criticalViolations !== 0 ||
-      !Number.isFinite(value.durationMs) ||
-      value.durationMs < 0 ||
-      !value.output ||
-      value.requests.length !== (entry.arm === 'single' ? 1 : 3)
-    )
-      throw new Error('只复用已完成且身份精确的实验组');
+    assertCompletedArmIdentity(entry, value, completed, ids);
     const sample = benchmark.cases.find((item) => item.id === entry.caseId)!;
     verifyLiveExperimentOutput(sample, value.output, protocol, Date.now());
     const score = scoreLiveResearchOutput(
@@ -170,19 +158,7 @@ export function verifyLiveExperimentResume(
       throw new Error('接续结果与最后一次审计指纹不一致');
     completed.set(key, value);
   }
-  const ordinals = new Set<number>();
-  for (const request of resume.unresolvedRequests) {
-    if (
-      !ids.has(request.caseId) ||
-      !['single', 'staged'].includes(request.arm) ||
-      !Number.isInteger(request.ordinal) ||
-      request.ordinal <= 0 ||
-      ordinals.has(request.ordinal) ||
-      request.requestId !== null
-    )
-      throw new Error('未知请求身份无效');
-    ordinals.add(request.ordinal);
-  }
+  verifyUnresolvedRequestIdentities(resume.unresolvedRequests, ids);
   const perRequest = new Prisma.Decimal(protocol.budget.maxInputTokensPerArm)
     .mul(protocol.pricing.costPer1kInput)
     .plus(
@@ -203,4 +179,45 @@ export function verifyLiveExperimentResume(
     },
     unresolved: resume.unresolvedRequests,
   };
+}
+
+function assertCompletedArmIdentity(
+  entry: LiveExperimentResume['completedArms'][number],
+  value: LiveArmResult,
+  completed: Map<string, LiveArmResult>,
+  ids: Set<string>,
+): asserts value is LiveArmResult & { output: NonNullable<LiveArmResult['output']> } {
+  const key = entry.caseId + ':' + entry.arm;
+  if (
+    completed.has(key) ||
+    !ids.has(entry.caseId) ||
+    !['single', 'staged'].includes(entry.arm) ||
+    value.status !== 'complete' ||
+    value.reason !== null ||
+    value.criticalViolations !== 0 ||
+    !Number.isFinite(value.durationMs) ||
+    value.durationMs < 0 ||
+    !value.output ||
+    value.requests.length !== (entry.arm === 'single' ? 1 : 3)
+  )
+    throw new Error('只复用已完成且身份精确的实验组');
+}
+
+function verifyUnresolvedRequestIdentities(
+  requests: LiveExperimentResume['unresolvedRequests'],
+  ids: Set<string>,
+) {
+  const ordinals = new Set<number>();
+  for (const request of requests) {
+    if (
+      !ids.has(request.caseId) ||
+      !['single', 'staged'].includes(request.arm) ||
+      !Number.isInteger(request.ordinal) ||
+      request.ordinal <= 0 ||
+      ordinals.has(request.ordinal) ||
+      request.requestId !== null
+    )
+      throw new Error('未知请求身份无效');
+    ordinals.add(request.ordinal);
+  }
 }

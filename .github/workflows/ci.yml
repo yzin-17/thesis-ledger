@@ -32,6 +32,13 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: 验证本地运行业务工具
+        run: |
+          git clone --depth 1 https://github.com/yzin-17/thesis-ledger-infra.git ../thesis-ledger-infra
+          git clone --depth 1 --branch yzin https://github.com/yzin-17/daily_stock_analysis.git ../daily-stock-analysis
+          node --test scripts/local-runtime/*.test.mjs scripts/deployment/*.test.mjs
+          bash scripts/local-runtime/ai-deployment-contract.test.sh
+          bash scripts/local-runtime/database-role-contract.test.sh --check-only
 
   contracts-and-guardrails:
     runs-on: ubuntu-latest

@@ -1,5 +1,6 @@
-import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
+import { strategySchema, priceResearchStrategySummary, booleanExpressionSchema, riskRuleSchema, type BacktestStrategy } from '@thesis-ledger/schemas';
 import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
+import { strategyInstrumentLabel } from './strategy-instrument-display.js';
 import type { StrategySchema, StrategyVersion } from './strategy.types.js';
 import {
   strategyAssetTypeLabel,
@@ -52,11 +53,11 @@ const requiredStrategyFields = (schema: StrategySchema) => {
   return [...new Set(missing)];
 };
 
-const sourceDisplayLabels = (sources: BacktestStrategy['signalSources']) =>
+const sourceDisplayLabels = (sources: BacktestStrategy['signalSources'], version: StrategyVersion) =>
   new Map(
     sources.map((source) => [
       source.id,
-      `${source.asset.symbol}（${strategyTimeframeLabel(source.timeframe)}）`,
+      `${strategyInstrumentLabel(version.instrumentDirectory, source.asset.symbol)}（${strategyTimeframeLabel(source.timeframe)}${source.priceCoordinate ? ` · ${source.priceCoordinate === 'actual' ? '不复权' : '后复权'}` : ''}）`,
     ]),
   );
 
@@ -132,6 +133,18 @@ const riskSummary = (risks: BacktestStrategy['risk']) => {
     .join('；');
 };
 
+export const strategyDiffValueSummary = (path: string, value: unknown): string | null => {
+  if (path === '$.entry' || path === '$.exit') {
+    const parsed = booleanExpressionSchema.safeParse(value);
+    if (parsed.success) return booleanExpression(parsed.data, new Map());
+  }
+  if (path === '$.risk') {
+    const parsed = riskRuleSchema.array().safeParse(value);
+    if (parsed.success) return riskSummary(parsed.data);
+  }
+  return null;
+};
+
 const executionSummary = (schema: BacktestStrategy) => {
   const cost = `佣金率 ${percentage(schema.cost.commissionRate)}，滑点率 ${percentage(schema.cost.slippageRate)}`;
   if (schema.execution.mode === 'nav') return `按下一可用净值申购或赎回；${cost}`;
@@ -158,7 +171,7 @@ export const strategyVersionSummary = (version: StrategyVersion): StrategyVersio
   }
   const value = parsed.data as BacktestStrategy;
   const instrument = value.executionInstrument;
-  const sourceLabels = sourceDisplayLabels(value.signalSources);
+  const sourceLabels = sourceDisplayLabels(value.signalSources, version);
   return {
     kind: 'ready',
     sections: [
@@ -166,11 +179,11 @@ export const strategyVersionSummary = (version: StrategyVersion): StrategyVersio
       {
         group: 'context',
         label: '适用范围',
-        value: `${instrument.symbol} · ${strategyMarketLabel(instrument.market)} · ${strategyAssetTypeLabel(instrument.assetType)} · ${strategyTimeframeLabel(value.primaryTimeframe)}`,
+        value: `${strategyInstrumentLabel(version.instrumentDirectory, instrument.symbol)} · ${strategyMarketLabel(instrument.market)} · ${strategyAssetTypeLabel(instrument.assetType)} · ${strategyTimeframeLabel(value.primaryTimeframe)}`,
       },
       { group: 'signals', label: '入场逻辑', value: booleanExpression(value.entry, sourceLabels) },
       { group: 'signals', label: '退出逻辑', value: booleanExpression(value.exit, sourceLabels) },
-      { group: 'execution', label: '仓位管理', value: sizingSummary(value.sizing) },
+      { group: 'execution', label: '仓位管理', value: value.schemaVersion === '3' ? priceResearchStrategySummary(value).sizing : sizingSummary(value.sizing) },
       { group: 'execution', label: '风险约束', value: riskSummary(value.risk) },
       { group: 'execution', label: '执行假设', value: executionSummary(value) },
     ],

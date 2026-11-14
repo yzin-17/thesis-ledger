@@ -319,6 +319,9 @@ describe('写入与读取故障分离', () => {
     await wait(() => expect(api.fundConfirm).toHaveBeenCalledTimes(2));
     expect(api.fundConfirm.mock.calls[1]).toEqual(api.fundConfirm.mock.calls[0]);
   });
+});
+
+describe('成交及现金写入失败恢复', () => {
   it('成交作废服务端失败显示局部错误，保留原因且不会使页面崩溃', async () => {
     const onOpenChange = vi.fn();
     await mount(
@@ -391,6 +394,9 @@ describe('写入与读取故障分离', () => {
     expect(api.plans).toHaveBeenCalledTimes(3);
   });
 
+});
+
+describe('未验证成交与原始精度', () => {
   it('更正旧 VERIFIED 成交时按未验证提交；写入失败保留输入且不改原事件', async () => {
     const originalEvent = {
       eventId: 'execution-verified-1',
@@ -455,6 +461,7 @@ describe('写入与读取故障分离', () => {
 
   it.each([
     { symbol: '600000.SH', name: '浦发银行', market: 'SH', reference: 'unsupported' },
+    { symbol: 'AAPL.US', name: '苹果公司', market: 'US', reference: 'unsupported' },
     { symbol: '00700.HK', name: '腾讯控股', market: 'HK', reference: 'failure' },
     { symbol: '00147.HK', name: '验收港股', market: 'HK', reference: 'pending' },
     { symbol: '00941.HK', name: '中国移动', market: 'HK', reference: 'available' },
@@ -531,6 +538,7 @@ describe('写入与读取故障分离', () => {
     expect(option?.textContent).toContain(scenario.name);
     await act(async () => option!.click());
     await wait(() => expect(document.body.textContent).toContain(scenario.name));
+    expect(api.request).toHaveBeenCalledWith(`/api/market-data/instruments/${instrument.id}/confirm`, expect.objectContaining({ method: 'POST' }));
     if (scenario.reference !== 'unsupported') {
       await click('查询当前每手参考');
       let message = '每手参考暂不可用';

@@ -244,6 +244,9 @@ describe('LocalSnapshotV3Runner', () => {
     expect(result.completeness).toBe('complete');
   });
 
+});
+
+describe("冻结快照身份与防篡改", () => {
   it('rejects mismatched Snapshot identity, partial refs, duplicate refs, and tampered refs', async () => {
     const { runner, input } = await setup();
     const foreignArtifact = { ...input.artifactRefs[0]!, contentHash: '0'.repeat(64) };
@@ -313,7 +316,10 @@ describe('LocalSnapshotV3Runner', () => {
     ).rejects.toThrow('strategy metadata 与 strategyVersionHash 不一致');
   });
 
-  it('preserves cancellation and projects terminal DAY-expired buy and sell orders', async () => {
+});
+
+describe("取消、期末信号与诊断", () => {
+  it('preserves cancellation and projects window-end buy and sell signals without extra fills', async () => {
     const cancelled = await setup();
     const controller = new AbortController();
     controller.abort();
@@ -340,7 +346,7 @@ describe('LocalSnapshotV3Runner', () => {
       rejectedOrders: [
         {
           side: 'buy',
-          reasonCode: 'DAY_EXPIRED',
+          reasonCode: 'BACKTEST_WINDOW_ENDED',
           occurredAt: '2026-05-20T07:00:00.000Z',
         },
       ],
@@ -356,7 +362,7 @@ describe('LocalSnapshotV3Runner', () => {
       rejectedOrders: [
         {
           side: 'sell',
-          reasonCode: 'DAY_EXPIRED',
+          reasonCode: 'BACKTEST_WINDOW_ENDED',
           occurredAt: '2026-05-20T07:00:00.000Z',
         },
       ],

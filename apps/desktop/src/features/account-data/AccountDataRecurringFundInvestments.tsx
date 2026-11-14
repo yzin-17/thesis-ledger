@@ -67,8 +67,7 @@ export function RecurringFundInvestments({
     (item) => item.id === focusOccurrenceId && item.accountId === account.id,
   );
   const linkedPlan = plans.find((plan) => plan.id === linkedOccurrence?.planId);
-  const linkageMissing =
-    focusOccurrenceId && queries.occurrences.isSuccess && queries.plans.isSuccess && !linkedPlan;
+  const linkageMissing = missingFocusedFundPlan(focusOccurrenceId, queries, linkedPlan);
   if (!enabled) return null;
 
   const changePlanState = async (
@@ -116,87 +115,8 @@ export function RecurringFundInvestments({
           新建定投
         </Button>
       </header>
-      {(queries.plans.isError || queries.occurrences.isError) && (
-        <Alert variant="destructive">
-          <AlertTitle>基金定投读取失败</AlertTitle>
-          <AlertDescription>
-            计划或待确认记录未更新。已成功保存或确认的操作无需再次提交，请重新读取。
-          </AlertDescription>
-          <Button
-            aria-busy={queries.plans.isFetching || queries.occurrences.isFetching}
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={queries.plans.isFetching || queries.occurrences.isFetching}
-            onClick={() =>
-              void Promise.all([queries.plans.refetch(), queries.occurrences.refetch()])
-            }
-          >
-            重新读取基金定投
-          </Button>
-        </Alert>
-      )}
-      {linkageMissing && (
-        <Alert>
-          <AlertTitle>无法定位对应计划</AlertTitle>
-          <AlertDescription>
-            当前账户未返回这笔成交对应的定投记录或计划，可以通过成交历史查看原始来源。
-          </AlertDescription>
-        </Alert>
-      )}
-      {(queries.occurrences.isPending || pending.length > 0) && (
-        <section aria-label="定投待确认记录" className="flex flex-col gap-2">
-          {pending.length > 0 && (
-            <h3 className="m-0 text-sm font-semibold">待确认成交 · {pending.length} 条</h3>
-          )}
-          {queries.occurrences.isPending && <LoadingState label="正在读取待确认记录" />}
-          <ListRefreshRegion
-            refreshing={queries.occurrences.isRefetching && queries.occurrences.data !== undefined}
-            label="正在刷新待确认成交"
-          >
-            {pending.length > 0 && (
-              <div className="divide-y divide-border rounded-md border border-border px-3">
-                {pending.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-wrap items-center justify-between gap-3 py-3"
-                  >
-                    <div>
-                      <strong className="text-sm font-medium">
-                        {item.fundName} · {item.periodKey}
-                      </strong>
-                      <span className="mt-1 block text-xs text-muted-foreground">
-                        {item.symbol} · 计划 {formatDate(item.scheduledFor)} ·{' '}
-                        {formatCurrencyAmount(
-                          Number(item.expectedAmount),
-                          supportedCurrency(item.currency),
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        type="button"
-                        onClick={() => setAction({ type: 'confirm', occurrence: item })}
-                      >
-                        确认成交
-                      </Button>
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        onClick={() => setAction({ type: 'skip', occurrence: item })}
-                      >
-                        跳过
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ListRefreshRegion>
-        </section>
-      )}
+      <FundReadFeedback queries={queries} linkageMissing={Boolean(linkageMissing)} />
+      <FundPendingOccurrences query={queries.occurrences} pending={pending} setAction={setAction} />
       {queries.plans.isPending && <LoadingState label="正在读取定投计划" />}
       <ListRefreshRegion
         refreshing={queries.plans.isRefetching && queries.plans.data !== undefined}
@@ -262,6 +182,124 @@ export function RecurringFundInvestments({
         />
       )}
     </section>
+  );
+}
+
+type FundQueries = ReturnType<typeof useFundInvestmentQueries>;
+function missingFocusedFundPlan(
+  focusOccurrenceId: string | null,
+  queries: FundQueries,
+  linkedPlan: RecurringFundInvestmentPlan | undefined,
+) {
+  return Boolean(
+    focusOccurrenceId && queries.occurrences.isSuccess && queries.plans.isSuccess && !linkedPlan,
+  );
+}
+function FundReadFeedback({
+  queries,
+  linkageMissing,
+}: {
+  queries: FundQueries;
+  linkageMissing: boolean;
+}) {
+  return (
+    <>
+      {(queries.plans.isError || queries.occurrences.isError) && (
+        <Alert variant="destructive">
+          <AlertTitle>基金定投读取失败</AlertTitle>
+          <AlertDescription>
+            计划或待确认记录未更新。已成功保存或确认的操作无需再次提交，请重新读取。
+          </AlertDescription>
+          <Button
+            aria-busy={queries.plans.isFetching || queries.occurrences.isFetching}
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={queries.plans.isFetching || queries.occurrences.isFetching}
+            onClick={() =>
+              void Promise.all([queries.plans.refetch(), queries.occurrences.refetch()])
+            }
+          >
+            重新读取基金定投
+          </Button>
+        </Alert>
+      )}
+      {linkageMissing && (
+        <Alert>
+          <AlertTitle>无法定位对应计划</AlertTitle>
+          <AlertDescription>
+            当前账户未返回这笔成交对应的定投记录或计划，可以通过成交历史查看原始来源。
+          </AlertDescription>
+        </Alert>
+      )}
+    </>
+  );
+}
+function FundPendingOccurrences({
+  query,
+  pending,
+  setAction,
+}: {
+  query: FundQueries['occurrences'];
+  pending: RecurringFundInvestmentOccurrence[];
+  setAction: (action: OccurrenceAction) => void;
+}) {
+  return (
+    <>
+      {(query.isPending || pending.length > 0) && (
+        <section aria-label="定投待确认记录" className="flex flex-col gap-2">
+          {pending.length > 0 && (
+            <h3 className="m-0 text-sm font-semibold">待确认成交 · {pending.length} 条</h3>
+          )}
+          {query.isPending && <LoadingState label="正在读取待确认记录" />}
+          <ListRefreshRegion
+            refreshing={query.isRefetching && query.data !== undefined}
+            label="正在刷新待确认成交"
+          >
+            {pending.length > 0 && (
+              <div className="divide-y divide-border rounded-md border border-border px-3">
+                {pending.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3"
+                  >
+                    <div>
+                      <strong className="text-sm font-medium">
+                        {item.fundName} · {item.periodKey}
+                      </strong>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {item.symbol} · 计划 {formatDate(item.scheduledFor)} ·{' '}
+                        {formatCurrencyAmount(
+                          Number(item.expectedAmount),
+                          supportedCurrency(item.currency),
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        type="button"
+                        onClick={() => setAction({ type: 'confirm', occurrence: item })}
+                      >
+                        确认成交
+                      </Button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => setAction({ type: 'skip', occurrence: item })}
+                      >
+                        跳过
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ListRefreshRegion>
+        </section>
+      )}
+    </>
   );
 }
 

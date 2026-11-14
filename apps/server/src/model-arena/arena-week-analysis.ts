@@ -81,6 +81,33 @@ function contributions(
   };
 }
 
+type WeeklyReservation = {
+  entrantId: string;
+  privateBook: unknown;
+  decision: unknown;
+  settledAt: Date | null;
+};
+function settledDecisionWeights(reservations: readonly WeeklyReservation[], cutoff: Date) {
+  const weights = new Map<string, { id: string; bps: Prisma.Decimal }[]>();
+  for (const e of reservations) {
+    if (!e.decision || !e.settledAt || e.settledAt > cutoff) continue;
+    const own = arenaBookSchema.nullable().parse(e.privateBook);
+    for (const a of arenaDecisionSchema.parse(e.decision).actions) {
+      let bps = D(0);
+      if (a.action === 'target') bps = D(a.weightBps);
+      if (a.action === 'hold') {
+        const held = own?.positions.find((s) => s.symbol === a.symbol);
+        if (!own || !held || D(own.nav).isZero()) continue;
+        bps = D(held.quantity).times(held.close).times(10000).div(own.nav);
+      }
+      const choices = weights.get(a.symbol) ?? [];
+      choices.push({ id: e.entrantId, bps });
+      weights.set(a.symbol, choices);
+    }
+  }
+  return weights;
+}
+
 export async function analyzeArenaWeek(db: PrismaService, base: ArenaWeekly, initialCash: string) {
   const { arenaId, start, end } = base.comparison,
     cutoff = new Date(base.cutoff);
@@ -130,23 +157,7 @@ export async function analyzeArenaWeek(db: PrismaService, base: ArenaWeekly, ini
   for (const [i, slot] of slots.entries()) {
     const r = byDay.get(slot.tradingDate);
     if (!r) continue;
-    const weights = new Map<string, { id: string; bps: Prisma.Decimal }[]>();
-    for (const e of r.reservations) {
-      if (!e.decision || !e.settledAt || e.settledAt > cutoff) continue;
-      const own = arenaBookSchema.nullable().parse(e.privateBook);
-      for (const a of arenaDecisionSchema.parse(e.decision).actions) {
-        let bps = D(0);
-        if (a.action === 'target') bps = D(a.weightBps);
-        if (a.action === 'hold') {
-          const held = own?.positions.find((s) => s.symbol === a.symbol);
-          if (!own || !held || D(own.nav).isZero()) continue;
-          bps = D(held.quantity).times(held.close).times(10000).div(own.nav);
-        }
-        const choices = weights.get(a.symbol) ?? [];
-        choices.push({ id: e.entrantId, bps });
-        weights.set(a.symbol, choices);
-      }
-    }
+    const weights = settledDecisionWeights(r.reservations, cutoff);
     for (const [symbol, values] of weights) {
       if (slot.tradingDate >= start && r.packet) {
         const publishedAfter = r.packet.asOf.getTime();

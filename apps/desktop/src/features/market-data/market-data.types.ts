@@ -53,6 +53,7 @@ export interface ProviderManifest {
   credentialConfigured: boolean;
   requiresCredential?: boolean;
   accountAccessSupported?: boolean;
+  accountLevelSupported?: boolean;
   settings?: Record<string, unknown>;
   origin?: 'dsa';
   markets?: string[];
@@ -99,6 +100,7 @@ export interface InstrumentResult {
   market: string;
   displayName: string;
   confirmable: boolean;
+  confirmed?: boolean | undefined;
   disabledReason?: string | null;
 }
 

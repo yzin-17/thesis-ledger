@@ -49,6 +49,7 @@ const matchesFrozenConfiguration = (
   manifest.dataAsOf === config.dataAsOf &&
   manifest.dateRange.startDate === config.startDate &&
   manifest.dateRange.endDate === config.endDate &&
+  manifest.priceResearch?.protocolVersion === config.priceResearch?.protocolVersion &&
   hashCanonicalManifest(manifest.executionPriceProtocol) ===
     hashCanonicalManifest(config.executionPriceProtocol);
 
@@ -79,6 +80,9 @@ const matchesFrozenResult = (
   result.calendarVersion === manifest.calendarVersion &&
   result.aggregationVersion === manifest.aggregationVersion &&
   result.comparableDataFingerprint === manifest.comparableDataFingerprint &&
+  result.priceResearch?.protocolVersion === manifest.priceResearch?.protocolVersion &&
+  hashCanonicalManifest(result.priceResearch?.actualPriceSource ?? null) ===
+    hashCanonicalManifest(manifest.priceResearch?.actualPriceSource ?? null) &&
   hashCanonicalManifest(result.executionPriceProtocol) ===
     hashCanonicalManifest(manifest.executionPriceProtocol) &&
   hashCanonicalManifest(result.actualSources) === hashCanonicalManifest(manifest.actualSources);
@@ -99,12 +103,7 @@ export const isCurrentRunSummaryRecord = (job: RunReadRecord): boolean => {
   if (persistedContractVersion(job) !== 3) return false;
   const input = asRecord(job.input);
   if (input?.kind === 'preparation-failure') {
-    const parsed = backtestPreparationFailureInputSchema.safeParse(input);
-    return parsed.success && job.status === 'failed' && job.stage === 'preparation-failed' &&
-      job.errorCode === 'PREPARATION_FAILED' &&
-      parsed.data.preparation.strategyVersionId === job.strategyVersionId &&
-      job.result == null && job.resultChecksum == null && job.runConfig == null &&
-      job.snapshotId == null && job.snapshotManifest == null;
+    return matchesPreparationFailure(job, input);
   }
   if (!runConfigSchemaV3.safeParse(input?.runConfig).success) return false;
   if (job.result === null || job.result === undefined) return job.status !== 'succeeded';
@@ -169,3 +168,19 @@ export const isCurrentRunForRead = (job: CompleteRunReadRecord): boolean => {
     return false;
   }
 };
+
+function matchesPreparationFailure(job: RunReadRecord, input: Record<string, unknown>) {
+  const parsed = backtestPreparationFailureInputSchema.safeParse(input);
+  return (
+    parsed.success &&
+    job.status === 'failed' &&
+    job.stage === 'preparation-failed' &&
+    job.errorCode === 'PREPARATION_FAILED' &&
+    parsed.data.preparation.strategyVersionId === job.strategyVersionId &&
+    job.result == null &&
+    job.resultChecksum == null &&
+    job.runConfig == null &&
+    job.snapshotId == null &&
+    job.snapshotManifest == null
+  );
+}

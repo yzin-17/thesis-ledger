@@ -27,6 +27,7 @@ export class OptimizationBacktestFailure extends Error {
   constructor(
     readonly code: string,
     message: string,
+    readonly runId?: string,
   ) {
     super(message);
   }

@@ -196,6 +196,64 @@ const routeKey = (route: ModelConfigRoute) =>
     ? `${route.provider}:${route.model}`
     : null;
 
+const accumulateAttemptCosts = (
+  attempts: readonly AttemptRow[],
+  routeByKey: ReadonlyMap<string | null, ModelConfigRoute>,
+  observedCurrencies: Set<string>,
+  amounts: Map<string, string>,
+  initialReason: OptimizationCostSummary['reason'],
+) => {
+  let unknownReason = initialReason;
+  for (const attempt of attempts) {
+    const route = routeByKey.get(attempt.modelKey);
+    if (!route) unknownReason = 'historical_missing_metadata';
+    for (const part of optimizationAttemptCostParts(attempt)) {
+      const attemptStatus = part.costStatus;
+      const attemptCurrency = normalizeCostCurrency(part.costCurrency);
+      if (attemptStatus !== 'known') {
+        if (attemptStatus === 'unknown')
+          unknownReason = attemptCurrency ? 'unknown_cost' : 'unknown_currency';
+        else unknownReason = 'historical_missing_metadata';
+        continue;
+      }
+      if (!attemptCurrency) {
+        unknownReason = 'unknown_currency';
+        continue;
+      }
+      observedCurrencies.add(attemptCurrency);
+      const routeCurrency = route ? normalizeCostCurrency(route.costCurrency) : null;
+      if (route?.costStatus === 'known' && routeCurrency && routeCurrency !== attemptCurrency)
+        unknownReason = 'mixed_currency';
+      const amount = normalizeCostAmountText(part.cost);
+      if (amount === null) {
+        unknownReason = 'unknown_cost';
+        continue;
+      }
+      amounts.set(attemptCurrency, addAmount(amounts.get(attemptCurrency) ?? '0', amount));
+    }
+  }
+  return unknownReason;
+};
+
+const partialCostSummary = (
+  knownRoutes: readonly ModelConfigRoute[],
+  declaredCurrencies: readonly string[],
+  knownByCurrency: OptimizationCostSummary['knownByCurrency'],
+  currency: string | null,
+  unknownReason: OptimizationCostSummary['reason'],
+): OptimizationCostSummary => {
+  return {
+    status:
+      knownRoutes.length > 0 || declaredCurrencies.length > 0 || knownByCurrency.length > 0
+        ? 'partial'
+        : 'unavailable',
+    currency,
+    knownAmount: knownByCurrency.length === 1 ? knownByCurrency[0]!.amount : null,
+    knownByCurrency,
+    reason: unknownReason ?? 'unknown_cost',
+  };
+};
+
 export const optimizationCostSummary = (
   experiment: Pick<ExperimentRow, 'modelConfig'> & { costUsed: unknown },
   attempts?: readonly AttemptRow[],
@@ -234,36 +292,14 @@ export const optimizationCostSummary = (
   const routeByKey = new Map(routes.map((route) => [routeKey(route), route]));
   const observedCurrencies = new Set(declaredCurrencies);
 
-  if (attempts) {
-    for (const attempt of attempts) {
-      const route = routeByKey.get(attempt.modelKey);
-      if (!route) unknownReason = 'historical_missing_metadata';
-      for (const part of optimizationAttemptCostParts(attempt)) {
-        const attemptStatus = part.costStatus;
-        const attemptCurrency = normalizeCostCurrency(part.costCurrency);
-        if (attemptStatus !== 'known') {
-          if (attemptStatus === 'unknown')
-            unknownReason = attemptCurrency ? 'unknown_cost' : 'unknown_currency';
-          else unknownReason = 'historical_missing_metadata';
-          continue;
-        }
-        if (!attemptCurrency) {
-          unknownReason = 'unknown_currency';
-          continue;
-        }
-        observedCurrencies.add(attemptCurrency);
-        const routeCurrency = route ? normalizeCostCurrency(route.costCurrency) : null;
-        if (route?.costStatus === 'known' && routeCurrency && routeCurrency !== attemptCurrency)
-          unknownReason = 'mixed_currency';
-        const amount = normalizeCostAmountText(part.cost);
-        if (amount === null) {
-          unknownReason = 'unknown_cost';
-          continue;
-        }
-        amounts.set(attemptCurrency, addAmount(amounts.get(attemptCurrency) ?? '0', amount));
-      }
-    }
-  }
+  if (attempts)
+    unknownReason = accumulateAttemptCosts(
+      attempts,
+      routeByKey,
+      observedCurrencies,
+      amounts,
+      unknownReason,
+    );
 
   if (observedCurrencies.size > 1)
     return {
@@ -282,16 +318,13 @@ export const optimizationCostSummary = (
     amount,
   }));
   if (unknownRoute || unknownReason) {
-    return {
-      status:
-        knownRoutes.length > 0 || declaredCurrencies.length > 0 || knownByCurrency.length > 0
-          ? 'partial'
-          : 'unavailable',
-      currency,
-      knownAmount: knownByCurrency.length === 1 ? knownByCurrency[0]!.amount : null,
+    return partialCostSummary(
+      knownRoutes,
+      declaredCurrencies,
       knownByCurrency,
-      reason: unknownReason ?? 'unknown_cost',
-    };
+      currency,
+      unknownReason,
+    );
   }
   const amount = knownByCurrency[0]?.amount ?? normalizeCostAmountText(experiment.costUsed) ?? '0';
   return {

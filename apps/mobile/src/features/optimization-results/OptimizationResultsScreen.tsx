@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { OptimizationInstrument } from './OptimizationInstrument';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -45,7 +46,7 @@ function OptimizationList() {
     retry: false,
     refetchInterval: (q) =>
       q.state.data?.pages.some((p) =>
-        p.items.some((v) => ['queued', 'running', 'testing'].includes(v.status)),
+        p.items.some((v) => ['queued', 'running', 'testing', 'awaiting_finalization'].includes(v.status)),
       )
         ? 3000
         : false,
@@ -87,6 +88,7 @@ function OptimizationList() {
       >
         {rows.map((v) => (
           <Section key={v.id} title={v.name}>
+            <OptimizationInstrument value={v} />
             <Copy>
               {optimizationStatusLabels[v.status] ?? '状态待核对'} ·{' '}
               {

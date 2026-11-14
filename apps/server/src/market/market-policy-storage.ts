@@ -6,6 +6,7 @@ import {
   effectiveProviderPolicyV3Schema,
   marketRouteKeyIdV3,
   type DesiredProviderPolicyV3,
+  type RoutingAuthoring,
 } from '@thesis-ledger/schemas';
 import type { PrismaService } from '../platform/prisma.service.js';
 
@@ -39,9 +40,10 @@ export const decodeMarketPolicyRoutes = (storedRoutes: unknown): MarketPolicyRou
   return parsed.data;
 };
 
-export const encodeMarketPolicyRoutes = (routes: MarketPolicyRoutes) => ({
+export const encodeMarketPolicyRoutes = (routes: MarketPolicyRoutes, routingConfig?: RoutingAuthoring) => ({
   storageVersion: 3 as const,
   routes: desiredProviderPolicyV3Schema.shape.routes.parse(routes),
+  ...(routingConfig ? { routingConfig } : {}),
 });
 
 export const marketPolicyResponse = (row: Record<string, unknown>): Record<string, unknown> => {
@@ -115,6 +117,7 @@ export const persistMarketPolicyRevision = async (
   prisma: PrismaService,
   policy: MarketPolicyPayload,
   expectedRevision?: number,
+  routingConfig?: RoutingAuthoring,
 ) =>
   prisma.$transaction(async (transaction) => {
     await transaction.$queryRaw(Prisma.sql`
@@ -140,7 +143,7 @@ export const persistMarketPolicyRevision = async (
       return current;
     }
 
-    const routes = encodeMarketPolicyRoutes(policy.routes);
+    const routes = encodeMarketPolicyRoutes(policy.routes, routingConfig);
     const lastError = {
       code: 'policy_not_applied',
       message: 'Policy 等待精确 Route Capability 目录验证',

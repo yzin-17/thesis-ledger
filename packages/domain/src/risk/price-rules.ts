@@ -52,6 +52,33 @@ const costReturnComparison = (context: V01RiskContext, rule: RiskRule) => {
   return price.minus(costPrice).compareTo(boundary);
 };
 
+function projectV01RiskContext(context: V01RiskContext, value: number, reference: number, valueMetric: RiskEventMetric | undefined): RiskEvent['context'] {
+  return {
+    value,
+    reference,
+    ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
+    ...(context.accountName === undefined ? {} : { accountName: context.accountName }),
+    ...(context.assetName === undefined ? {} : { assetName: context.assetName }),
+    ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
+    ...(context.quantity === undefined ? {} : { quantity: context.quantity }),
+    ...(context.positionUpdatedAt === undefined ? {} : { positionUpdatedAt: context.positionUpdatedAt }),
+    symbol: context.symbol,
+    marketTime: context.marketTime,
+    inputs: {
+      ...(context.price === undefined ? {} : { price: context.price }),
+      ...(context.costPrice === undefined ? {} : { costPrice: context.costPrice }),
+      ...(context.weight === undefined ? {} : { weight: context.weight }),
+      ...(context.accountWeight === undefined ? {} : { accountWeight: context.accountWeight }),
+    },
+    ...(valueMetric === undefined ? {} : { metadata: { valueMetric } }),
+  };
+}
+
+function positionConcentrationWeight(rule: RiskRule, context: V01RiskContext): number {
+  if (rule.accountId) return context.accountWeight ?? context.weight ?? NaN;
+  return context.weight ?? NaN;
+}
+
 export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEvent | null => {
   if (context.price === undefined && rule.kind !== 'position-concentration') return null;
   let value: number;
@@ -82,9 +109,7 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
       break;
     }
     case 'position-concentration':
-      value = rule.accountId
-        ? (context.accountWeight ?? context.weight ?? NaN)
-        : (context.weight ?? NaN);
+      value = positionConcentrationWeight(rule, context);
       if (!Number.isFinite(value)) return null;
       triggered = value > rule.threshold;
       valueMetric = 'weight';
@@ -99,27 +124,7 @@ export const evaluateV01Rule = (rule: RiskRule, context: V01RiskContext): RiskEv
     severity: rule.severity,
     message: `${formatRiskEventName(rule, context)} ${triggered ? '已触发' : '未触发'}`,
     evaluatedAt: new Date().toISOString(),
-    context: {
-      value,
-      reference: rule.threshold,
-      ...(context.accountId === undefined ? {} : { accountId: context.accountId }),
-      ...(context.accountName === undefined ? {} : { accountName: context.accountName }),
-      ...(context.assetName === undefined ? {} : { assetName: context.assetName }),
-      ...(context.positionId === undefined ? {} : { positionId: context.positionId }),
-      ...(context.quantity === undefined ? {} : { quantity: context.quantity }),
-      ...(context.positionUpdatedAt === undefined
-        ? {}
-        : { positionUpdatedAt: context.positionUpdatedAt }),
-      symbol: context.symbol,
-      marketTime: context.marketTime,
-      inputs: {
-        ...(context.price === undefined ? {} : { price: context.price }),
-        ...(context.costPrice === undefined ? {} : { costPrice: context.costPrice }),
-        ...(context.weight === undefined ? {} : { weight: context.weight }),
-        ...(context.accountWeight === undefined ? {} : { accountWeight: context.accountWeight }),
-      },
-      ...(valueMetric === undefined ? {} : { metadata: { valueMetric } }),
-    },
+    context: projectV01RiskContext(context, value, rule.threshold, valueMetric),
   };
 };
 

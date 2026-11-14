@@ -56,11 +56,16 @@ export const effectiveRouteLabelV3 = (
   if (!policy) return '尚未配置';
   const desired = policy.routes.find((item) => routeKeyIdV3(item.key) === route.id);
   if (!desired) return '未配置';
+  if (!policy.enabled || desired.enabled === false) return '未配置';
   const issue = policyIssueForRouteV3(policy, route.id);
   if (issue) return routeAvailabilityLabelV3(issue);
 
+  return effectiveRouteStatusV3(policy, route.id);
+};
+
+const effectiveRouteStatusV3 = (policy: MarketPolicyResponse, routeId: string) => {
   const effective = effectivePolicyV3(policy);
-  const effectiveRoute = effective?.routes.find((item) => routeKeyIdV3(item.key) === route.id);
+  const effectiveRoute = effective?.routes.find((item) => routeKeyIdV3(item.key) === routeId);
   const isCurrent =
     policy.syncState === 'applied' &&
     effective?.sourceDesiredRevision === policy.revision &&

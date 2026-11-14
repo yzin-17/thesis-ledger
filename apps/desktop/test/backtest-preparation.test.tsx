@@ -229,7 +229,7 @@ describe('普通回测配置准备与披露', () => {
     );
     await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
     queueMutation.mutateAsync.mockRejectedValueOnce(new Error('creation-response-lost'));
-    expect(await handlers.startBacktest(version, setup)).toBe(true);
+    expect(await handlers.startBacktest(version, setup)).toBe(false);
     await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
     expect(toast).toHaveBeenLastCalledWith(expect.objectContaining({
       title: '回测排队失败', description: 'creation-response-lost',
@@ -283,6 +283,9 @@ describe('普通回测配置准备与披露', () => {
     unsubscribe();
     queryClient.clear();
   });
+});
+
+describe('准备响应的协议与身份边界', () => {
   it('提交意图并传递取消信号，保留阻断诊断', async () => {
     const send = vi.fn().mockResolvedValue(blocked());
     const signal = new AbortController().signal;
@@ -306,6 +309,9 @@ describe('普通回测配置准备与披露', () => {
       prepareBacktestRunConfig(request(), undefined, { request: send } as DesktopRequestClient),
     ).rejects.toThrow();
   });
+});
+
+describe('实际来源及基准口径披露', () => {
   it('展示实际备用来源、供应商定义分红及未知成本', () => {
     const html = renderToStaticMarkup(<BacktestPriceDisclosure result={result()} />);
     for (const text of [
@@ -327,7 +333,21 @@ describe('普通回测配置准备与披露', () => {
     expect(html).toContain('运行协议无法读取');
     expect(html).not.toContain('本次运行的价格与记账协议');
   });
-  it.each(['incompatible', 'unverified'] as const)('基准%s不显示兼容收益声明并保留重放版本', (status) => {
+  it('相同来源合并用途，实际备用来源仍单独展示', () => {
+    const value = result();
+    const source = value.actualSources[0]!;
+    value.actualSources = [
+      ...(['execution', 'signal', 'benchmark'] as const).map((purpose) => ({ ...source, purpose })),
+      { ...source, purpose: 'benchmark', provenance: { ...source.provenance, upstreamSource: 'alternate-source' } },
+    ];
+    const before = structuredClone(value);
+    const html = renderToStaticMarkup(<BacktestPriceDisclosure result={value} />);
+    expect(html).toContain('成交 / 信号 / 基准');
+    expect(html).toContain('alternate-source');
+    expect(html.match(/hithink-financial-api/g)).toHaveLength(1);
+    expect(value).toEqual(before);
+  });
+  it.each(['incompatible', 'unverified'] as const)('基准%s不显示兼容收益声明及技术标识', (status) => {
     const value = backtestResultSchemaV3.parse({
       ...result(),
       benchmarkCompatibility: {
@@ -344,7 +364,7 @@ describe('普通回测配置准备与披露', () => {
       ? '协议不兼容，不计算可比超额收益'
       : '兼容性未核实，不进入同一评价组');
     expect(html).not.toContain('收益、来源与成本协议兼容');
-    expect(html).toContain('重放版本');
-    expect(html).toContain('snapshot-manifest-v3');
+    expect(html).not.toContain('重放版本');
+    expect(html).not.toContain('snapshot-manifest-v3');
   });
 });

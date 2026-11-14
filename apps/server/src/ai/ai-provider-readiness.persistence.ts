@@ -132,16 +132,7 @@ export const settingsFromAiProviderInput = (input: AiProviderInput, existingSett
     { ...input, ...(modelDefaults ? { modelDefaults } : {}), modelPricing },
     runtimeAdapterForSelection(selection, compatibilityExtensionProfile),
   );
-  const legacySettingsFields =
-    input.modelPricing === undefined
-      ? {
-          ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
-          ...(input.costPer1kOutput === undefined
-            ? {}
-            : { costPer1kOutput: input.costPer1kOutput }),
-          ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
-        }
-      : {};
+  const legacySettingsFields = legacyProviderSettings(input);
   return {
     baseUrl: input.baseUrl,
     models,
@@ -318,3 +309,13 @@ export const persistAiCapabilityRevocation = async (
     },
   });
 };
+
+function legacyProviderSettings(input: AiProviderInput) {
+  return input.modelPricing === undefined
+    ? {
+        ...(input.costPer1kInput === undefined ? {} : { costPer1kInput: input.costPer1kInput }),
+        ...(input.costPer1kOutput === undefined ? {} : { costPer1kOutput: input.costPer1kOutput }),
+        ...(input.costCurrency === undefined ? {} : { costCurrency: input.costCurrency }),
+      }
+    : {};
+}

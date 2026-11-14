@@ -10,7 +10,7 @@
 
 ## 执行契约
 
-复用目标服务中现有的 `NotificationService.deliver`、`FeishuWebhookProvider`、ProviderConfig 与健康记录能力，不增加产品接口或原生依赖。操作只经 infra 的[专用维护契约](../../../thesis-ledger-infra/docs/specs/2026-11-03-mobile-notification-acceptance.md)执行。
+复用目标服务中现有的 `NotificationService.deliver`、`FeishuWebhookProvider`、ProviderConfig 与健康记录能力，不增加产品接口或原生依赖。操作只经 infra 的[专用维护契约](2026-11-03-mobile-notification-acceptance.md)执行。
 
 1. 每个平台独占验收命名空间，创建真实 NotificationDelivery 手动执行记录。执行中使用 `sending`，现行自动 dispatcher 只领取 pending/retrying，因此不能抢发本次记录；尝试数从 0 开始，不伪造历史尝试。
 2. 显式调用现有单次投递能力并提供 `maxAttempts=1`。实际发送器使用已保存 Provider 的凭证，传输观察器仅记录本次出站的状态、业务码、时间及摘要，不修改 URL、请求头、正文或响应。

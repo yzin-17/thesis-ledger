@@ -17,6 +17,7 @@ import { NavBacktestModel } from './NavBacktestModel.js';
 import { strategyCenterPath } from './strategy-center.navigation.js';
 import type { findStrategyVersion } from './strategy-center.navigation.js';
 import type { NavResearchRuleRange } from './strategy.nav.intent.js';
+import { strategyInstrumentLabel } from './strategy-instrument-display.js';
 
 export type FundType = 'domestic' | 'qdii';
 
@@ -82,7 +83,7 @@ export function NavSetupHeader({
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold tracking-tight">基金净值回测</h2>
         <p className="text-sm text-muted-foreground">
-          {selection.strategy.name} · v{selection.version.version} · {symbol}
+          {selection.strategy.name} · v{selection.version.version} · {strategyInstrumentLabel(selection.version.instrumentDirectory, symbol)}
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

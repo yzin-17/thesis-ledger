@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 
 import { Sheet } from '../src/components/ui/sheet.js';
+import { DateInput } from '../src/components/ui/date-input.js';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import { Toaster } from '../src/components/ui/toast.js';
 import {
@@ -350,6 +351,9 @@ describe('账户数据页面契约', () => {
     ).toBe(account.id);
   });
 
+});
+
+describe('账户类型、设置与读取状态', () => {
   it('现金账户只显示现金页签，并阻止成交和持仓入口', () => {
     const markup = renderPage('?tab=transactions&entry=execution', [cashAccount], false);
     const pageSource = readFileSync(
@@ -437,12 +441,19 @@ describe('账户数据页面契约', () => {
     expect(emptyMarkup).toContain('创建账户');
   });
 
+});
+
+describe('成交表单和快照页签语义', () => {
   it('成交表单表达成交字段、未验证规则和稳定写入语义', () => {
     const fullAccountName = '这是一个需要完整显示的长账户名称';
     const markup = renderPage('?entry=execution', [{ ...account, name: fullAccountName }]);
     const accountDataSource = [
       'AccountDataPage.tsx',
       'AccountDataExecutionSheet.tsx',
+      'use-execution-form.ts',
+      'ExecutionTradeFields.tsx',
+      'ExecutionCharges.tsx',
+      'account-data.execution-submit.ts',
       'ExecutionRuleReference.tsx',
       'AccountDataAuditSheets.tsx',
       'AccountDataReconciliationSheet.tsx',
@@ -451,14 +462,13 @@ describe('账户数据页面契约', () => {
         readFileSync(new URL(`../src/features/account-data/${fileName}`, import.meta.url), 'utf8'),
       )
       .join('\n');
-    const executionSource = readFileSync(
-      new URL('../src/features/account-data/AccountDataExecutionSheet.tsx', import.meta.url),
-      'utf8',
-    );
-    const dateInputSource = readFileSync(
-      new URL('../src/components/ui/date-input.tsx', import.meta.url),
-      'utf8',
-    );
+    const executionSource = ['AccountDataExecutionSheet.tsx', 'use-execution-form.ts',
+      'ExecutionTradeFields.tsx', 'ExecutionCharges.tsx', 'account-data.execution-submit.ts']
+      .map(file => readFileSync(new URL('../src/features/account-data/' + file, import.meta.url), 'utf8')).join('\n');
+    const dateInputMarkup = renderToStaticMarkup(<>
+      <DateInput type="date" />
+      <DateInput type="datetime-local" />
+    </>);
 
     expect(markup).toContain('录入成交');
     expect(markup).toContain(fullAccountName);
@@ -471,12 +481,9 @@ describe('账户数据页面契约', () => {
     expect(accountDataSource).toContain('结算时间（可选）');
     expect(executionSource).toContain('settlementTiming');
     expect(executionSource).toContain('expectedAt');
-    expect(dateInputSource).toContain('DateSelectionPanel');
-    expect(dateInputSource).toContain('YYYY-MM-DD');
-    expect(dateInputSource).toContain('YYYY-MM-DD HH:mm');
-    expect(dateInputSource).toContain('ref={setInputRef}');
-    expect(dateInputSource).toContain('CalendarIcon');
-    expect(dateInputSource).not.toContain('showPicker');
+    expect(dateInputMarkup.match(/placeholder="请选择日期"/g)).toHaveLength(2);
+    expect(dateInputMarkup).toContain('type="text"');
+    expect(dateInputMarkup).toContain('data-slot="date-input-value"');
     expect(executionSource.match(/<DateInput/g)).toHaveLength(2);
     expect(executionSource).not.toContain('DatePickerInput');
     expect(accountDataSource).toContain('费用明细');
@@ -499,7 +506,7 @@ describe('账户数据页面契约', () => {
     expect(executionSource).toContain('whitespace-normal break-words');
     expect(executionSource).not.toContain('truncate">{account.name}</span>');
     expect(executionSource).not.toContain('实际成交');
-    expect(executionSource).toContain('{accountSummary}');
+    expect(executionSource).toMatch(/\{(?:control\.)?accountSummary\}/);
     expect(executionSource).toContain('accountTypeLabel(account.type)');
     expect(['securities', 'fund', 'cash'].map(type => `${accountTypeLabel(type as 'securities' | 'fund' | 'cash')}账户`)).toEqual(['证券账户', '基金账户', '现金账户']);
     expect(executionSource).not.toContain('{category}');

@@ -5,8 +5,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { marketRouteKeyIdV3, fundNavHistorySchema } from '../packages/schemas/dist/index.js';
-import { sourceState } from '../../thesis-ledger-infra/scripts/research-dual-read.mjs';
-import { sql } from '../../thesis-ledger-infra/scripts/research-state-backup.mjs';
+import { sourceState } from '../../thesis-ledger/scripts/local-runtime/research-dual-read.mjs';
+import { sql } from '../../thesis-ledger/scripts/local-runtime/research-state-backup.mjs';
 import { readFundTarget, fundProviderState } from './fund-calibration-target.mjs';
 import { fundPolicyFingerprint } from './fund-nav-route-case.mjs';
 import {

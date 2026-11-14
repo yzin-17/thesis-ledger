@@ -67,7 +67,8 @@ export function optimizationModelDiff(
 export function optimizationModelResearchNotice(value: unknown): string {
   if (toRecord(value).schemaVersion !== '3')
     return '仅使用开发与验证摘要；未提供严格历史无前视证明，不得据此声称严格样本外有效。';
-  const { executionPriceProtocol: protocol } = runConfigSchemaV3.parse(value);
+  const config = runConfigSchemaV3.parse(value);
+  const protocol = config.executionPriceProtocol;
   const facts = {
     adjustment: protocol.priceBasis.adjustment,
     accountingBasis: protocol.accountingBasis,
@@ -79,6 +80,8 @@ export function optimizationModelResearchNotice(value: unknown): string {
     (protocol.history.basis === 'fixed-provider-snapshot'
       ? '这是事后固定供应商序列研究，复权价格可能包含后来事件影响，不得描述为严格无前视样本外。'
       : '严格历史时点语义仍须逐项证据验证，不得仅凭实验标签宣称通过。');
+  if (config.priceResearch)
+    return notice + '指标与模拟收益使用后复权；具体价格常量使用已冻结的不复权参考价。固定投入参考份数按操作时点原价确定投入，再换算研究单位；由共享研究规则装配，不得自行推导复权因子或改写阈值。';
   if (protocol.accountingBasis === 'normalized-series')
     return (
       notice +

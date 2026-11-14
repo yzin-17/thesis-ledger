@@ -26,11 +26,7 @@ const selectionFor = (draft: ProviderDraft, model: string) => {
   };
 };
 
-export function AiProviderExecutionFields({
-  draft,
-  onUpdateDraft,
-  onTestPurpose,
-}: {
+type AiProviderExecutionFieldsProps = {
   draft: ProviderDraft;
   onUpdateDraft: (updater: (current: ProviderDraft) => ProviderDraft) => void;
   onTestModel?: (model: string) => void;
@@ -39,7 +35,13 @@ export function AiProviderExecutionFields({
     purpose: AiProviderExecutionRouteDraft['contractId'],
     mode: AiProviderExecutionRouteDraft['mode'],
   ) => void;
-}) {
+};
+
+export function AiProviderExecutionFields({
+  draft,
+  onUpdateDraft,
+  onTestPurpose,
+}: AiProviderExecutionFieldsProps) {
   const [active, setActive] = useState<Record<string, string>>({});
   const models = modelsFromText(draft.modelsText);
   const updateRoute = (key: string, update: Partial<AiProviderExecutionRouteDraft>) =>
@@ -66,13 +68,13 @@ export function AiProviderExecutionFields({
         const title =
           aiContractOptions.find((option) => option.value === selected?.contractId)?.label ?? '';
         return (
-          <Card key={model} size="sm">
-            <CardHeader>
+          <Card key={model} size="sm" className="rounded-none border-0 bg-transparent py-0">
+            <CardHeader className="px-0">
               <CardTitle className="truncate font-mono text-sm" title={model}>
                 {model}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0">
               <FieldGroup>
                 <FieldSet className="gap-2">
                   <FieldLegend className="mb-0">用于哪些任务</FieldLegend>
@@ -142,7 +144,7 @@ export function AiProviderExecutionFields({
                     部分用途已单独设置，不受模型默认设置影响。
                   </p>
                 ) : null}
-                <details className="rounded-md border p-3">
+                <details>
                   <summary className="cursor-pointer text-sm">各用途的单独设置</summary>
                   <div className="mt-3 flex flex-col gap-3">
                     <div className="flex flex-wrap gap-2">
@@ -211,51 +213,14 @@ export function AiProviderExecutionFields({
                   </div>
                 </details>
                 {selected ? (
-                  <details className="rounded-md border p-3">
-                    <summary className="cursor-pointer text-sm">高级连接设置 · {title}</summary>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      {(
-                        [
-                          ['firstOutputTimeoutMs', '等待首次输出'],
-                          ['outputIdleTimeoutMs', '允许输出中断多久'],
-                        ] as const
-                      ).map(([key, label]) => (
-                        <Field key={key}>
-                          <FieldLabel>{label}</FieldLabel>
-                          <InputGroup>
-                            <InputGroupInput
-                              aria-label={`${model} ${title}${label}`}
-                              type="number"
-                              min={1}
-                              max={AI_MAX_TIMEOUT_MS / 1000}
-                              value={seconds(selected[key])}
-                              onChange={(event) =>
-                                updateRoute(selected.key, {
-                                  [key]: milliseconds(event.target.value),
-                                })
-                              }
-                            />
-                            <InputGroupAddon align="inline-end">秒</InputGroupAddon>
-                          </InputGroup>
-                          <p className="text-xs text-muted-foreground">
-                            留空使用服务默认值；修改后重新验证。
-                          </p>
-                        </Field>
-                      ))}
-                    </div>
-                    <AiProviderRouteReasoningField route={selected} reasoning={draft.modelReasoning[model]} onChange={(update) => updateRoute(selected.key, update)} />
-                    {onTestPurpose ? (
-                      <Button
-                        className="mt-3"
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onTestPurpose(model, selected.contractId, selected.mode)}
-                      >
-                        单次诊断（不保存）
-                      </Button>
-                    ) : null}
-                  </details>
+                  <AiProviderAdvancedConnectionFields
+                    selected={selected}
+                    model={model}
+                    title={title}
+                    reasoning={draft.modelReasoning[model]}
+                    updateRoute={updateRoute}
+                    onTestPurpose={onTestPurpose}
+                  />
                 ) : null}
               </FieldGroup>
             </CardContent>
@@ -263,5 +228,71 @@ export function AiProviderExecutionFields({
         );
       })}
     </FieldGroup>
+  );
+}
+
+function AiProviderAdvancedConnectionFields({
+  selected,
+  model,
+  title,
+  reasoning,
+  updateRoute,
+  onTestPurpose,
+}: {
+  selected: AiProviderExecutionRouteDraft;
+  model: string;
+  title: string;
+  reasoning: ProviderDraft['modelReasoning'][string] | undefined;
+  updateRoute: (key: string, update: Partial<AiProviderExecutionRouteDraft>) => void;
+  onTestPurpose: AiProviderExecutionFieldsProps['onTestPurpose'];
+}) {
+  return (
+    <details>
+      <summary className="cursor-pointer text-sm">高级连接设置 · {title}</summary>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {(
+          [
+            ['firstOutputTimeoutMs', '等待首次输出'],
+            ['outputIdleTimeoutMs', '允许输出中断多久'],
+          ] as const
+        ).map(([key, label]) => (
+          <Field key={key}>
+            <FieldLabel>{label}</FieldLabel>
+            <InputGroup>
+              <InputGroupInput
+                aria-label={`${model} ${title}${label}`}
+                type="number"
+                min={1}
+                max={AI_MAX_TIMEOUT_MS / 1000}
+                value={seconds(selected[key])}
+                onChange={(event) =>
+                  updateRoute(selected.key, {
+                    [key]: milliseconds(event.target.value),
+                  })
+                }
+              />
+              <InputGroupAddon align="inline-end">秒</InputGroupAddon>
+            </InputGroup>
+            <p className="text-xs text-muted-foreground">留空使用服务默认值；修改后重新验证。</p>
+          </Field>
+        ))}
+      </div>
+      <AiProviderRouteReasoningField
+        route={selected}
+        reasoning={reasoning}
+        onChange={(update) => updateRoute(selected.key, update)}
+      />
+      {onTestPurpose ? (
+        <Button
+          className="mt-3"
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => onTestPurpose(model, selected.contractId, selected.mode)}
+        >
+          单次诊断（不保存）
+        </Button>
+      ) : null}
+    </details>
   );
 }

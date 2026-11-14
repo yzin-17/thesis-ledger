@@ -7,32 +7,36 @@ import {
   type RiskRule,
 } from './types.js';
 
+function crossingOrLevel(previousLeft: number | undefined, previousRight: number | undefined, left: number, right: number, direction: 'above' | 'below'): boolean {
+  if (previousLeft !== undefined && previousRight !== undefined)
+    return crossed(previousLeft, previousRight, left, right, direction);
+  if (direction === 'above') return left > right;
+  return left < right;
+}
+
+function evaluateMovingAverageRule(rule: RiskRule, context: CompleteRiskContext): RiskEvent | null {
+  const price = context.price;
+  const ma = context.indicators?.ma;
+  if (price === undefined || ma === undefined) return null;
+  const direction = riskDirection(rule, 'below');
+  const triggered = crossingOrLevel(context.indicators?.previousPrice, context.indicators?.previousMa, price, ma, direction);
+  return completeRiskEvent(rule, context, price - ma, triggered, { price, ma }, { direction, valueMetric: 'ma_deviation' });
+}
+
+function evaluateMacdRule(rule: RiskRule, context: CompleteRiskContext): RiskEvent | null {
+  const dif = context.indicators?.dif;
+  const dea = context.indicators?.dea;
+  if (dif === undefined || dea === undefined) return null;
+  const direction = riskDirection(rule, 'below');
+  const triggered = crossingOrLevel(context.indicators?.previousDif, context.indicators?.previousDea, dif, dea, direction);
+  return completeRiskEvent(rule, context, dif - dea, triggered, { dif, dea }, { direction, valueMetric: 'macd_dea' });
+}
+
 export const evaluateIndicatorRule = (
   rule: RiskRule,
   context: CompleteRiskContext,
 ): RiskEvent | null => {
-  if (rule.kind === 'ma') {
-    const price = context.price;
-    const ma = context.indicators?.ma;
-    if (price === undefined || ma === undefined) return null;
-    const targetDirection = riskDirection(rule, 'below');
-    const previousPrice = context.indicators?.previousPrice;
-    const previousMa = context.indicators?.previousMa;
-    const triggered =
-      previousPrice === undefined || previousMa === undefined
-        ? targetDirection === 'above'
-          ? price > ma
-          : price < ma
-        : crossed(previousPrice, previousMa, price, ma, targetDirection);
-    return completeRiskEvent(
-      rule,
-      context,
-      price - ma,
-      triggered,
-      { price, ma },
-      { direction: targetDirection, valueMetric: 'ma_deviation' },
-    );
-  }
+  if (rule.kind === 'ma') return evaluateMovingAverageRule(rule, context);
   if (rule.kind === 'rsi') {
     const value = context.indicators?.rsi;
     if (value === undefined) return null;
@@ -46,28 +50,7 @@ export const evaluateIndicatorRule = (
       { valueMetric: 'rsi' },
     );
   }
-  if (rule.kind === 'macd') {
-    const dif = context.indicators?.dif;
-    const dea = context.indicators?.dea;
-    if (dif === undefined || dea === undefined) return null;
-    const targetDirection = riskDirection(rule, 'below');
-    const previousDif = context.indicators?.previousDif;
-    const previousDea = context.indicators?.previousDea;
-    const triggered =
-      previousDif === undefined || previousDea === undefined
-        ? targetDirection === 'above'
-          ? dif > dea
-          : dif < dea
-        : crossed(previousDif, previousDea, dif, dea, targetDirection);
-    return completeRiskEvent(
-      rule,
-      context,
-      dif - dea,
-      triggered,
-      { dif, dea },
-      { direction: targetDirection, valueMetric: 'macd_dea' },
-    );
-  }
+  if (rule.kind === 'macd') return evaluateMacdRule(rule, context);
   if (rule.kind === 'atr') {
     const result = ratioThreshold(context.indicators?.atr, context.price, rule.threshold);
     return result === null

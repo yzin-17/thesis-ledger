@@ -267,7 +267,7 @@ describe('收益分析统一工作区的真实路由', () => {
     expect(calls.trades).toHaveBeenLastCalledWith(
       expect.objectContaining({ accountId: 'a', lifecycle: 'ACTIVE' }),
     );
-    await click('清除筛选');
+    await click('清空筛选');
     expect(params().get('accountId')).toBe('a');
     expect(params().get('tab')).toBe('trades');
     expect(host.querySelector('[aria-label="收益账户范围"]')?.textContent).toContain('实际甲');
@@ -320,6 +320,9 @@ describe('收益分析统一工作区的真实路由', () => {
     expect(host.textContent).toContain('已实现盈亏');
     expect(host.textContent).not.toContain('累计盈亏走势');
   });
+});
+
+describe('页签及模式的查询身份', () => {
   it('四页签共享账户、同图保留两类口径，前进后退恢复范围', async () => {
     await mount('/performance?accountId=a');
     await click('收益分析', '[role="tab"]');
@@ -376,6 +379,9 @@ describe('收益分析统一工作区的真实路由', () => {
     expect(calls.summary).toHaveBeenCalledWith('shadow', undefined, expect.any(Object));
     expect(host.textContent).toContain('全部账户');
   });
+});
+
+describe('共享筛选及汇率选择恢复', () => {
   it('账户和换算控件位于页签外，跨四页签保留选择且不增加概览或交易请求', async () => {
     await mount('/performance');
     const merge = host.querySelector<HTMLButtonElement>('button[aria-label="汇率合并"]')!;
@@ -447,6 +453,9 @@ describe('收益分析统一工作区的真实路由', () => {
       });
     });
   });
+});
+
+describe('账户刷新与配置草稿失败恢复', () => {
   it('账户列表刷新失败保留已验证范围和正在编辑的配置草稿', async () => {
     await mount('/performance?accountId=a&tab=allocation');
     await click('调整目标');

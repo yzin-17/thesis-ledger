@@ -163,6 +163,9 @@ describe('V3运行配置准备', () => {
     expect(f.prisma.backtestJob.create).not.toHaveBeenCalled();
   });
 
+});
+
+describe("冻结观察时钟与来源修订", () => {
   it('显式取得后冻结允许首次观察，指定时点仍拒绝晚到事实', async () => {
     const f = await fixture();
     f.request.runConfig.dataAsOf = f.request.runConfig.endDate + 'T23:59:59.000Z';
@@ -264,6 +267,9 @@ describe('V3运行配置准备', () => {
     expect(result).not.toHaveProperty('runConfig');
   });
 
+});
+
+describe("路由门禁与准备响应", () => {
   it('未应用的路由不读取行情', async () => {
     const f = await fixture();
     f.policy.effectiveStale = true;

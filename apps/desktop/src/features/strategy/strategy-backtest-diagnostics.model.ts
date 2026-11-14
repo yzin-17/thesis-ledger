@@ -345,6 +345,7 @@ const traceabilityExport = (
   const jobDisclosure = record(job.executionModelDisclosure);
   return {
     engineVersion: safeScalar(firstPresent(result.engineVersion, job.engineVersion)),
+    snapshotVersion: safeScalar(result.snapshotVersion),
     snapshotId: safeScalar(firstPresent(result.snapshotId, job.snapshotId)),
     contentHash: safeScalar(result.contentHash),
     resultChecksum: safeScalar(firstPresent(result.resultChecksum, job.resultChecksum)),

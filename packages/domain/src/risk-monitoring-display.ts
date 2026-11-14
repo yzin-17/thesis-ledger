@@ -5,7 +5,8 @@ const sourceReasons: Record<string, string> = {
   background_budget_unverified: '当前来源尚未确认后台调用预算',
   identity_unverified: '标的分类尚未核实',
   official_nav_updates_required: '等待正式净值更新，尚未接入自动获取',
-  outside_market_session: '等待中国市场交易时段，未核实节假日',
+  outside_market_session: '当前不在交易时段，等待下次开市',
+  calendar_unavailable: '交易日历不可用，暂不能确认交易时段',
   source_request_window: '等待来源请求窗口',
   shared_quote_cache: '使用同范围已有报价',
   sample_observed: '已自动取得报价',
@@ -17,6 +18,12 @@ const sourceNames: Record<string, string> = {
   futu: '富途',
   longbridge: '长桥',
 };
+
+export function riskMonitoringRuleIssueLabel(issue: { assetName?: string | undefined; symbol: string | null; ruleLabel: string }) {
+  let target = issue.symbol ?? '';
+  if (issue.assetName && issue.assetName !== issue.symbol) target = issue.symbol ? `${issue.assetName}（${issue.symbol}）` : issue.assetName;
+  return target ? `${target} · ${issue.ruleLabel}` : issue.ruleLabel;
+}
 
 /** Shared business wording; source intervals are request limits, never update guarantees. */
 export function riskMonitoringSourceText(source: {

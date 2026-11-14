@@ -39,7 +39,7 @@ import { MarketReferenceResult } from './MarketReferenceResult.js';
 
 function ReferenceQuery() {
   const [dataset, setDataset] = useState<MarketReferenceDataset>('financial-balance');
-  const [symbol, setSymbol] = useState('600519.SH');
+  const [symbol, setSymbol] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [submitted, setSubmitted] = useState<MarketReferenceInput | null>(null);
@@ -208,7 +208,7 @@ export function MarketReferenceSheet() {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button variant="outline" />}>市场资料</SheetTrigger>
+      <SheetTrigger render={<Button variant="outline" size="sm" />}>查询资料</SheetTrigger>
       <SheetContent size="detail">
         <SheetHeader>
           <SheetTitle>市场资料查询</SheetTitle>

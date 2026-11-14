@@ -68,7 +68,7 @@ function availability(report: ResearchReportSummary): AiResearchResultAvailabili
   return report.availability;
 }
 /** 页面保留原列表/阅读壳；只转换展示字段，不补造历史上下文或计量。 */
-function reportObjects(report: ResearchReportSummary) {
+function reportObjects(report: ResearchReportSummary, instrumentNames?: ReadonlyMap<string, string>) {
   const historical = report.historicalScope;
   let object: NonNullable<AiRunRecord['display']>['object'] = {
     type: 'unknown',
@@ -84,9 +84,12 @@ function reportObjects(report: ResearchReportSummary) {
       type: scope.scope === 'strategy' ? 'strategy_version' : scope.scope,
       label: scopeLabels[scope.scope],
     };
-    if (scope.scope === 'instrument' || scope.scope === 'position')
-      object.code = scope.instrument.symbol;
-    else if (scope.scope === 'account') object.code = scope.accountId.slice(0, 8);
+    if (scope.scope === 'instrument' || scope.scope === 'position') {
+      const symbol = scope.instrument.symbol;
+      object.code = symbol;
+      const name = instrumentNames?.get(symbol.toUpperCase());
+      if (name && name !== symbol) object.name = name;
+    } else if (scope.scope === 'account') object.code = scope.accountId.slice(0, 8);
     else if (scope.scope === 'strategy') object.code = scope.strategyVersionId.slice(0, 8);
     else if (scope.scope === 'portfolio') object.code = scope.portfolioId?.slice(0, 8) ?? '全组合';
     source = {
@@ -96,9 +99,12 @@ function reportObjects(report: ResearchReportSummary) {
   }
   return { object, source };
 }
-export function reportToAiRun(report: ResearchReportSummary | ResearchReportDetail): AiRunRecord {
+export function reportToAiRun(
+  report: ResearchReportSummary | ResearchReportDetail,
+  instrumentNames?: ReadonlyMap<string, string>,
+): AiRunRecord {
   const historical = report.historicalScope;
-  const { object, source } = reportObjects(report);
+  const { object, source } = reportObjects(report, instrumentNames);
   const detail = 'result' in report ? report : null;
   const result = detail?.result;
   let verificationReason: string | null = null;

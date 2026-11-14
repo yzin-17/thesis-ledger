@@ -15,11 +15,10 @@ export const providerExactCapabilities = (
   if (catalog?.status !== 'complete') return null;
   return catalog.entries
     .filter((entry) => entry.target.providerId === provider.providerId)
-    .filter((entry) => !provider.accountAccessSupported || !!entry.accountAccess &&
-      accountAccessSelectable(entry.accountAccess, Date.now(), provider.configVersion))
     .map((entry) => {
       const local = isLocalHistoryProvider(provider);
-      let state = local ? '读取入口就绪' : '配置就绪';
+      let state = local ? '读取入口就绪' : '未验证，可尝试';
+      if (entry.verification?.state === 'verified') state = '已验证';
       if (entry.accountAccess && !accountAccessSelectable(entry.accountAccess, Date.now(), provider.configVersion))
         state = accountAccessLabel(entry.accountAccess, Date.now(), provider.configVersion);
       else if (!provider.enabled) state = '已停用';

@@ -17,7 +17,14 @@ import {
 } from '../../components/MobilePrimitives';
 import { confirmMonthlyOccurrence, monthlyClient, type OccurrenceDraft } from './plan-api';
 
-export function OccurrenceEditor() {
+function isWritablePlanAccount(
+  account: NonNullable<ReturnType<typeof useAccounts>['data']>[number] | undefined,
+  kind: AccountStackParams['OccurrenceEditor']['kind'],
+): account is NonNullable<typeof account> {
+  return Boolean(account?.active && account.mode === 'actual' && account.type === kind);
+}
+
+function useOccurrenceEditorController() {
   const { params } = useRoute<RouteProp<AccountStackParams, 'OccurrenceEditor'>>();
   const { api, scope } = useMobileRuntime();
   const accounts = useAccounts();
@@ -58,9 +65,7 @@ export function OccurrenceEditor() {
     done ||
     conflict ||
     mutation.isPending ||
-    !account?.active ||
-    account.mode !== 'actual' ||
-    account.type !== params.kind ||
+    !isWritablePlanAccount(account, params.kind) ||
     !canUseReadForWrite(accounts) ||
     !canUseReadForWrite(query) ||
     !latest ||
@@ -102,6 +107,41 @@ export function OccurrenceEditor() {
     }
   };
   const titles = { confirm: '确认本期发生', skip: '跳过本期', reopen: '重开本期' };
+  return {
+    params,
+    occurrence,
+    accounts,
+    query,
+    done,
+    mutation,
+    latest,
+    form,
+    change,
+    feedback,
+    refresh,
+    blocked,
+    submit,
+    titles,
+  };
+}
+
+export function OccurrenceEditor() {
+  const {
+    params,
+    occurrence,
+    accounts,
+    query,
+    done,
+    mutation,
+    latest,
+    form,
+    change,
+    feedback,
+    refresh,
+    blocked,
+    submit,
+    titles,
+  } = useOccurrenceEditorController();
   return (
     <Page title={titles[params.action]}>
       <Copy>

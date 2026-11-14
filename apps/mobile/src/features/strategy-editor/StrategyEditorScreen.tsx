@@ -1,4 +1,5 @@
 import { StrategyExecutionInstrumentField } from './StrategyExecutionInstrumentField';
+import { strategySchema, priceResearchStrategySummary, type BacktestStrategy, type InstrumentDirectory, type InstrumentSearchResult } from '@thesis-ledger/schemas';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -43,6 +44,22 @@ async function readDraft(key: string): Promise<Draft | null> {
     pending: row.pending ? parsePendingStrategySave(row.pending) : null,
   };
 }
+function initialEditorDraft(name: string | undefined, schema: unknown): Draft {
+  return {
+    name: name ?? '我的策略',
+    text: JSON.stringify(schema ?? initialStrategyDefinition('我的策略'), null, 2),
+    pending: null,
+  };
+}
+
+function strategyEditorDirectory(directory: InstrumentDirectory | undefined, selected: InstrumentSearchResult | null): InstrumentDirectory {
+  return {
+    generation: directory?.generation ?? 0,
+    items: [...(selected ? [selected] : []), ...(directory?.items ?? [])],
+    unresolvedSymbols: directory?.unresolvedSymbols ?? [],
+  };
+}
+
 export function StrategyEditorScreen() {
   const { params } = useRoute<RouteProp<StrategyStackParams, 'StrategyEditor'>>();
   const { strategyId, versionId } = params ?? {};
@@ -72,16 +89,9 @@ export function StrategyEditorScreen() {
           key={storageKey}
           storageKey={storageKey}
           strategyId={strategyId}
+          instrumentDirectory={version?.instrumentDirectory}
           initial={
-            stored.data ?? {
-              name: owner?.name ?? '我的策略',
-              text: JSON.stringify(
-                version?.schema ?? initialStrategyDefinition('我的策略'),
-                null,
-                2,
-              ),
-              pending: null,
-            }
+            stored.data ?? initialEditorDraft(owner?.name, version?.schema)
           }
         />
       ) : null}
@@ -95,10 +105,12 @@ function StrategyEditorForm({
   initial,
   storageKey,
   strategyId,
+  instrumentDirectory,
 }: {
   initial: Draft;
   storageKey: string;
   strategyId: string | undefined;
+  instrumentDirectory?: InstrumentDirectory | undefined;
 }) {
   const { api, scope } = useMobileRuntime();
   const client = useQueryClient();
@@ -107,6 +119,7 @@ function StrategyEditorForm({
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState<{ strategyId: string; versionId: string } | null>(null);
   const [advanced, setAdvanced] = useState('common');
+  const [selectedInstrument, setSelectedInstrument] = useState<InstrumentSearchResult | null>(null);
   const [dirty, setDirty] = useState(false);
   useDirtyForm(dirty, () => {
     setDraft(initial);
@@ -192,11 +205,21 @@ function StrategyEditorForm({
   );
   const execute = (action: 'local' | 'save' | 'recover') =>
     void command.mutateAsync(action).catch((e) => setMessage(failureMessage(e)));
+  let preview = null;
+  try {
+    const parsed = strategySchema.parse(validatedDefinition(draft.text));
+    if (parsed.schemaVersion === '3') preview = priceResearchStrategySummary(parsed as BacktestStrategy);
+  } catch { /* 输入尚未完整时保留草稿。 */ }
   return (
     <>
       <Copy muted>
         {strategyId ? '保存会创建新版本，原版本仍可阅读。' : '请核对示例规则后明确保存。'}
       </Copy>
+      {preview && <Section title="保存口径预览">
+        <Copy>买入：{preview.entry}</Copy>
+        <Copy>卖出：{preview.exit}</Copy>
+        <Copy>投入：{preview.sizing}</Copy>
+      </Section>}
       {draft.pending ? (
         <Section title="原保存待确认">
           <Copy>保存基线已留在本机；不会自动重复创建。</Copy>
@@ -232,6 +255,8 @@ function StrategyEditorForm({
       />
       {advanced === 'common' ? (
         <StrategyCommonFields
+          instrumentDirectory={strategyEditorDirectory(instrumentDirectory, selectedInstrument)}
+          onSelect={setSelectedInstrument}
           definition={definition}
           locked={!!draft.pending || command.isPending}
           onPatch={patch}
@@ -265,10 +290,14 @@ function StrategyEditorForm({
 
 function StrategyCommonFields({
   definition,
+  instrumentDirectory,
+  onSelect,
   locked,
   onPatch,
 }: {
   definition: Record<string, unknown>;
+  instrumentDirectory?: InstrumentDirectory | undefined;
+  onSelect: (item: InstrumentSearchResult) => void;
   locked: boolean;
   onPatch: (v: Record<string, unknown>) => void;
 }) {
@@ -282,6 +311,8 @@ function StrategyCommonFields({
         onChange={(description) => onPatch({ description })}
       />
       <StrategyExecutionInstrumentField
+        instrumentDirectory={instrumentDirectory}
+        onSelect={onSelect}
         definition={definition}
         locked={locked}
         onChange={onPatch}

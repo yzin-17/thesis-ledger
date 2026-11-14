@@ -27,7 +27,7 @@
 
 ## 执行与所有权
 
-主仓拥有覆盖表、当前产品合同的比较和结论。DSA 拥有来源语义、纯解析与离线核对入口，见[子规格](../../../daily-stock-analysis/docs/specs/2026-11-04-reference-backup-qualification.md)。infra 复用固定公开采证 CLI，维护精确端点和独占回执，见[子规格](../../../thesis-ledger-infra/docs/specs/2026-11-04-reference-backup-source-check.md)。不创建平行产品 API，不修改普通行情／回测或账户资产合同。
+主仓拥有覆盖表、当前产品合同的比较和结论。DSA 拥有来源语义、纯解析与离线核对入口，见[子规格](../../../daily-stock-analysis/docs/specs/2026-11-04-reference-backup-qualification.md)。infra 复用固定公开采证 CLI，维护精确端点和独占回执，见[子规格](../../../daily-stock-analysis/docs/specs/2026-11-04-reference-backup-source-check.md)。不创建平行产品 API，不修改普通行情／回测或账户资产合同。
 
 用户已授权四组公开来源读取。首批固定代表切片为三份财报、沪深两融各一份、沪深龙虎榜各一份、研报一页，共 8 次 HTTP；新增费用 0 USD，无模型或通知请求。后续只在实际响应、明确源码或已核对父链接支持时纠正参数、检查来源说明或补最小对照，并在执行前记录理由、对象和次数，不将首批次数当成用户设定的总上限。单项失败先诊断；没有新依据时不机械重试，继续独立组。
 

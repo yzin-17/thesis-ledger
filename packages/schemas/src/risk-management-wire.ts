@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { omitUndefinedDeep } from './exact-optional.js';
+import { riskRuleNotificationSchema } from './risk-notification-settings.js';
 const time = z.iso.datetime({ offset: true });
 const threshold = z
   .union([
@@ -19,6 +20,7 @@ export const riskRuleResponseSchema = z
     severity: z.enum(['info', 'warning', 'error', 'critical']),
     threshold,
     enabled: z.boolean(),
+    notification: riskRuleNotificationSchema.optional(),
     needsRepair: z.boolean(),
     repairReason: z.string().nullable(),
     archivedAt: time.nullable(),
@@ -128,6 +130,18 @@ export const riskMonitoringSourceSchema = z.object({
   nextAttemptAt: time.nullable(),
 });
 export const riskAutomaticMonitoringStatusSchema = z.object({
+  ruleIssues: z.array(z.object({
+    ruleId: z.uuid(),
+    ruleVersion: z.number().int().positive(),
+    applicationId: z.uuid().nullable(),
+    symbol: z.string().nullable(),
+    assetName: z.string().optional(),
+    ruleLabel: z.string(),
+    state: z.enum(['unavailable', 'not_applicable', 'error', 'pending']),
+    reasonCode: z.string().min(1),
+    reason: z.string().min(1),
+    checkedAt: time.nullable(),
+  })).default([]),
   mode: z.literal('observed-data'),
   continuousSource: z.literal(false),
   eligibleRules: z.number().int().nonnegative(),

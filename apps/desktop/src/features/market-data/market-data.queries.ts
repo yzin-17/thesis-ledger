@@ -58,7 +58,7 @@ export const useCatalogJobQuery = (jobId: string | null) =>
 export const useInstrumentSearchQuery = (query: string) =>
   useQuery({
     queryKey: marketDataKeys.search(query),
-    queryFn: () => searchMarketInstruments(query),
+    queryFn: ({ signal }) => searchMarketInstruments(query, signal),
     enabled: Boolean(query),
     staleTime: 30_000,
     retry: false,

@@ -161,6 +161,9 @@ describe('verified provider save', () => {
       ],
     );
   });
+});
+
+describe("结构化格式拒绝与显式回退", () => {
   it('only a machine-readable unsupported-format response advances to JSON Mode', async () => {
     const f = fixture();
     f.sdk.generate.mockRejectedValueOnce(unsupported());
@@ -236,6 +239,9 @@ describe('verified provider save', () => {
     );
     expect(f.sdk.generate).toHaveBeenCalledTimes(1);
   });
+});
+
+describe("保存授权、复用及审计", () => {
   it('allows disabled configuration saves without a call or complete pricing', async () => {
     const f = fixture();
     await f.service.save({ ...input(), enabled: false, modelPricing: {} });
@@ -316,6 +322,9 @@ describe('verified provider save', () => {
       routeValidationFingerprint(value, route, ''),
     );
   });
+});
+
+describe("验证取消事实", () => {
   it('cancels an active verification and keeps known usage without saving', async () => {
     const f = fixture();
     const value = input();
@@ -405,6 +414,9 @@ describe('verified provider save', () => {
     expect(message).toContain('生成请求已取消');
     expect(message).not.toContain('已按超时中断');
   });
+});
+
+describe("分用途复用与凭据范围", () => {
   it('reuses a passed purpose after another purpose fails, without hiding the failed one', async () => {
     const f = fixture();
     const value = input();

@@ -1,6 +1,31 @@
 {
   "tables": [
     {
+      "name": "ArenaLiveTimeline",
+      "owner": "model-arena",
+      "reason": "持久化自主比赛历史回放游标和实时衔接状态"
+    },
+    {
+      "name": "ArenaLiveMatch",
+      "owner": "model-arena",
+      "reason": "自主比赛协议和预算在显式 PostgreSQL 行锁中更新，与旧版日频比赛保持协议隔离。"
+    },
+    {
+      "name": "ArenaLiveAgent",
+      "owner": "model-arena",
+      "reason": "模拟账户 JSONB、账户版本和委托资金预留由竞技场 repository 在同一行锁事务内拥有。"
+    },
+    {
+      "name": "ArenaLiveCycle",
+      "owner": "model-arena",
+      "reason": "每模型仅一个活动周期依赖部分唯一索引，领取和 attempt 条件由显式 SQL 原子更新。"
+    },
+    {
+      "name": "ArenaLiveValuation",
+      "owner": "model-arena",
+      "reason": "共同估值批次与来源证据按比赛和时点只追加保存，不依赖日频轮次。"
+    },
+    {
       "name": "StrategyAuthoringOperation",
       "owner": "strategy-authoring",
       "reason": "编写操作的固定修订、幂等键、单活动操作部分唯一索引及状态/attempt 条件更新由 repository 拥有。"
@@ -38,7 +63,7 @@
     {
       "name": "OptimizationExperiment",
       "owner": "strategy-optimization",
-      "reason": "实验编排依赖租约、JSONB 原子更新、预算原子预留和恢复查询，当前由服务层 raw SQL 管理。"
+      "reason": "实验编排依赖租约、JSONB 原子更新、预算原子预留、人工重试审计和恢复查询，当前由服务层 raw SQL 管理。"
     },
     {
       "name": "OptimizationCandidate",

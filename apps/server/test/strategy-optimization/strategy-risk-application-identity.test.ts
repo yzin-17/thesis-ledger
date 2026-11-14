@@ -222,6 +222,31 @@ describe('StrategyRiskApplicationService identity and conflict handling', () => 
     expect(store.archiveFrozenRules).not.toHaveBeenCalled();
   });
 
+  it('创建保存单条设置，未知规则在写入前拒绝', async () => {
+    const { service, store } = setup();
+    const input = { strategyVersionId, accountId, symbol, cycleMode: 'existingAndFuture', previewHash: preview.previewHash, idempotencyKey: 'per-rule-create', enabled: false,
+      notification: { enabled: false, ruleOverrides: { 'risk.0': { severity: 'error', cooldownMinutes: 0 } } } };
+    await service.create(input);
+    expect(store.insertApplication).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ notification: expect.objectContaining({ ruleOverrides: input.notification.ruleOverrides }) }));
+    expect(store.createFrozenRules).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ notification: expect.objectContaining({ ruleOverrides: input.notification.ruleOverrides }) }));
+    store.insertApplication.mockClear();
+    await expect(service.create({ ...input, notification: { ruleOverrides: { unknown: { severity: 'error' } } } })).rejects.toThrow('不属于当前应用');
+    expect(store.insertApplication).not.toHaveBeenCalled();
+  });
+
+  it('升级原子保留仍存在的单条设置并移除失效规则设置', async () => {
+    const source = row({ notification: { enabled: false, severity: 'warning', cooldownMinutes: 60, channels: [], ruleOverrides: {
+      'risk.0': { severity: 'error', cooldownMinutes: 0 }, removed: { severity: 'info', cooldownMinutes: 10 },
+    } } });
+    const { service, store } = setup();
+    store.get.mockResolvedValue(source); store.getForUpdate.mockResolvedValue(source);
+    vi.spyOn(service, 'upgradePreview').mockResolvedValue({ ...preview, currentRevision: 1, diff: [] } as never);
+    await service.upgrade(source.id, { expectedRevision: 1, targetStrategyVersionId: '44444444-4444-4444-8444-444444444444', previewHash: preview.previewHash, idempotencyKey: 'per-rule-upgrade' });
+    const expected = { enabled: false, severity: 'warning', cooldownMinutes: 60, channels: [], ruleOverrides: { 'risk.0': { severity: 'error', cooldownMinutes: 0 } } };
+    expect(store.replacePlan).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ notification: expected }));
+    expect(store.createFrozenRules).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ notification: expected }));
+  });
+
   it('归档应用只读，重复进入不会自动恢复', async () => {
     const archived = row({ archivedAt: new Date('2026-09-17T00:00:00.000Z') });
     const { service, store } = setup();

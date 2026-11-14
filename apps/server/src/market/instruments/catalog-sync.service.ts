@@ -51,7 +51,7 @@ export class CatalogSyncService {
       }
       if (!state || snapshot.generation > state.generation) {
         await transaction.instrument.updateMany({
-          where: { generation: { lt: snapshot.generation } },
+          where: { generation: { gt: 0, lt: snapshot.generation } },
           data: { active: false },
         });
         await transaction.catalogSyncState.upsert({
@@ -114,12 +114,12 @@ export class CatalogSyncService {
       }
       for (const item of delta.deleted) {
         await transaction.instrument.updateMany({
-          where: item,
+          where: { ...item, generation: { gt: 0 } },
           data: { generation: delta.generation, active: false },
         });
       }
       const active = await transaction.instrument.findMany({
-        where: { active: true },
+        where: { active: true, generation: { gt: 0 } },
         select: {
           canonicalCode: true,
           instrumentType: true,
@@ -151,7 +151,7 @@ export class CatalogSyncService {
 
   async latestGeneration() {
     const [instrumentCount, syncState] = await Promise.all([
-      this.prisma.instrument.count({ where: { active: true } }),
+      this.prisma.instrument.count({ where: { active: true, generation: { gt: 0 } } }),
       this.prisma.catalogSyncState.findUnique({ where: { consumer: 'thesis-ledger' } }),
     ]);
     const current =

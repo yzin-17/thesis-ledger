@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { JournalAiRunPanel } from '../src/features/journal/review/JournalAiRunPanel.js';
 import { JournalAiTaskHistory } from '../src/features/journal/review/JournalAiTaskHistory.js';
 import {
+  journalAiReferenceKey,
+  readJournalAiTasks,
+  rememberJournalAiTask,
+} from '../src/features/journal/review/journal-ai-reference.js';
+import {
   journalButton,
   journalClick,
   journalWait,
@@ -90,9 +95,97 @@ describe('刷新后的已提交任务恢复', () => {
     api.explanation.mockRejectedValueOnce(new Error('引用已不可用'));
     const restored = await mountJournal(<JournalAiTaskHistory accountId="账户一" mode="actual" />);
     await journalWait(() => expect(restored.host.textContent).toContain('AI 状态读取失败'));
-    await journalClick('移除本机任务引用');
-    await journalWait(() => expect(restored.host.textContent).not.toContain('已提交的 AI 解读'));
+    await journalClick('移除任务引用');
+    await journalWait(() => expect(restored.host.textContent).not.toContain('历史任务'));
     expect(api.explanation).toHaveBeenCalledTimes(1);
     expect(api.periodExplanation).not.toHaveBeenCalled();
+  });
+
+  const currentAnalysis =
+    (createRun: () => Promise<typeof run>) => (onRunSelected: (id: string | null) => void) => (
+      <JournalAiRunPanel
+        accountId="账户一"
+        mode="actual"
+        kind="object"
+        scope={{ object: '当前单笔复盘' }}
+        disabled={false}
+        embedded
+        onRunSelected={onRunSelected}
+        createRun={createRun}
+        readRun={async () => run}
+      />
+    );
+
+  it('当前任务与本机历史引用为同一 ID 时仅展示一次，并统一移除引用', async () => {
+    const create = vi.fn(async () => run);
+    const view = await mountJournal(
+      <JournalAiTaskHistory
+        accountId="账户一"
+        mode="actual"
+        kind="object"
+        current={currentAnalysis(create)}
+      />,
+    );
+    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
+    await journalClick('开始 AI 解读');
+    await journalWait(() => expect(view.host.textContent).toContain(run.id));
+    await journalWait(() =>
+      expect(
+        Array.from(view.host.querySelectorAll('button')).some((button) =>
+          button.textContent?.includes('单笔 ·'),
+        ),
+      ).toBe(false),
+    );
+    expect(view.host.querySelectorAll('section[aria-label="AI 解读"]')).toHaveLength(1);
+    expect(
+      Array.from(view.host.querySelectorAll('button')).filter(
+        (button) => button.textContent === '移除任务引用',
+      ),
+    ).toHaveLength(1);
+    expect(view.host.textContent?.split(run.id)).toHaveLength(2);
+    expect(api.explanation).not.toHaveBeenCalled();
+    await journalClick('移除任务引用');
+    const key = await journalAiReferenceKey(JSON.stringify(['tasks', '账户一', 'actual']));
+    await journalWait(() => expect(readJournalAiTasks(key)).toHaveLength(0));
+    expect(view.host.textContent).toContain('开始 AI 解读');
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it('选择其他历史任务会替换当前详情，返回当前分析不会重复生成', async () => {
+    const oldId = '00000000-0000-4000-8000-000000000098';
+    const key = await journalAiReferenceKey(JSON.stringify(['tasks', '账户一', 'actual']));
+    rememberJournalAiTask(key, { id: oldId, kind: 'object' });
+    api.explanation.mockResolvedValue({
+      ...run,
+      id: oldId,
+      model: '之前的模型',
+      errorSummary: '之前的失败原因',
+    });
+    const create = vi.fn(async () => run);
+    const view = await mountJournal(
+      <JournalAiTaskHistory
+        accountId="账户一"
+        mode="actual"
+        kind="object"
+        current={currentAnalysis(create)}
+      />,
+    );
+    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
+    await journalClick('开始 AI 解读');
+    await journalWait(() => expect(view.host.textContent).toContain(run.id));
+    await journalWait(() => expect(view.host.textContent).toContain('单笔 · 00000098'));
+    await journalClick('单笔 · 00000098');
+    await journalWait(() => expect(view.host.textContent).toContain('之前的失败原因'));
+    expect(view.host.textContent).not.toContain(run.id);
+    expect(view.host.querySelectorAll('section[aria-label="AI 解读"]')).toHaveLength(1);
+    expect(
+      Array.from(view.host.querySelectorAll('button')).filter(
+        (button) => button.textContent === '移除任务引用',
+      ),
+    ).toHaveLength(1);
+    await journalClick('当前分析');
+    await journalWait(() => expect(view.host.textContent).toContain(run.id));
+    expect(view.host.textContent).not.toContain('之前的失败原因');
+    expect(create).toHaveBeenCalledOnce();
   });
 });

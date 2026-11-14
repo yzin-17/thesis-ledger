@@ -1,6 +1,6 @@
 # 手机通知 Provider 真实投递验收与最终复核
 
-日期：2026-11-03（北京时间）。对应[验收规格](../specs/2026-11-03-mobile-notification-provider-live-acceptance.md)、[验收任务](../archive/tasks/2026-11-03-mobile-notification-provider-live-acceptance.md)及 [infra 维护入口](../../../thesis-ledger-infra/docs/specs/2026-11-03-mobile-notification-acceptance.md)。
+日期：2026-11-03（北京时间）。对应[验收规格](../specs/2026-11-03-mobile-notification-provider-live-acceptance.md)、[验收任务](../archive/tasks/2026-11-03-mobile-notification-provider-live-acceptance.md)及 [infra 维护入口](../specs/2026-11-03-mobile-notification-acceptance.md)。
 
 ## 结论与授权
 

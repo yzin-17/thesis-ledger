@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   fetchAutomationHistory,
+  fetchAutomationFailures,
+  fetchProviderFailures,
   fetchAutomationJobs,
   fetchNotificationFailures,
   fetchProviderHealthHistory,
@@ -17,12 +19,40 @@ export const providerKeys = {
   jobs: () => [...providerKeys.root, 'automations'] as const,
   healthHistoryRoot: () => [...providerKeys.root, 'health-history'] as const,
   healthHistory: (page: number) => [...providerKeys.root, 'health-history', page] as const,
-  jobHistory: (page?: number) =>
-    [...providerKeys.root, 'automation-history', ...(page === undefined ? [] : [page])] as const,
+  jobHistory: (page?: number, jobId?: string) =>
+    [
+      ...providerKeys.root,
+      'automation-history',
+      ...(page === undefined ? [] : [page]),
+      ...(jobId ? ['job', jobId] : []),
+    ] as const,
   notificationFailures: () => [...providerKeys.root, 'notification-failures'] as const,
+  healthFailures: (page: number) => [...providerKeys.healthHistoryRoot(), 'issues', page] as const,
+  automationFailures: (page: number) => [...providerKeys.jobHistory(), 'issues', page] as const,
 };
 
-export const useProviderQueries = (healthHistoryPage: number, automationHistoryPage: number) => ({
+export const useProviderQueries = (
+  healthHistoryPage: number,
+  automationHistoryPage: number,
+  diagnostics?: {
+    healthPage: number;
+    automationPage: number;
+    enabled: boolean;
+    automationJobId?: string | undefined;
+  },
+) => ({
+  healthFailures: useQuery({
+    queryKey: providerKeys.healthFailures(diagnostics?.healthPage ?? 1),
+    queryFn: ({ signal }) => fetchProviderFailures(diagnostics?.healthPage ?? 1, signal),
+    enabled: diagnostics?.enabled ?? false,
+    placeholderData: (previous) => previous,
+  }),
+  automationFailures: useQuery({
+    queryKey: providerKeys.automationFailures(diagnostics?.automationPage ?? 1),
+    queryFn: ({ signal }) => fetchAutomationFailures(diagnostics?.automationPage ?? 1, signal),
+    enabled: diagnostics?.enabled ?? false,
+    placeholderData: (previous) => previous,
+  }),
   providers: useQuery({
     queryKey: providerKeys.providers(),
     queryFn: () => fetchProviders(),
@@ -44,9 +74,19 @@ export const useProviderQueries = (healthHistoryPage: number, automationHistoryP
     queryFn: () => fetchProviderHealthHistory(healthHistoryPage),
   }),
   jobHistory: useQuery({
-    queryKey: providerKeys.jobHistory(automationHistoryPage),
-    queryFn: () => fetchAutomationHistory(automationHistoryPage),
-    placeholderData: (previous) => previous,
+    queryKey: providerKeys.jobHistory(automationHistoryPage, diagnostics?.automationJobId),
+    queryFn: ({ signal }) =>
+      fetchAutomationHistory(
+        automationHistoryPage,
+        undefined,
+        diagnostics?.automationJobId,
+        signal,
+      ),
+    meta: { automationJobId: diagnostics?.automationJobId ?? 'all' },
+    placeholderData: (previous, query) =>
+      query?.meta?.automationJobId === (diagnostics?.automationJobId ?? 'all')
+        ? previous
+        : undefined,
   }),
   notificationFailures: useQuery({
     queryKey: providerKeys.notificationFailures(),

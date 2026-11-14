@@ -36,12 +36,7 @@ export function AuthoringEditorStatus({ model }: { model: AuthoringEditorModel }
             </Button>
           )}
         </div>
-        <AuthoringDraftRecovery
-          content={model.content}
-          disabled={busy || model.active}
-          onReadLatest={model.readLatest}
-          {...(editing ? { onDiscard: model.discardDraft } : {})}
-        />
+        <AuthoringDraftRecovery content={model.content} disabled={busy || model.active} />
       </div>
       {failure && (
         <Alert variant="destructive">

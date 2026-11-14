@@ -7,6 +7,7 @@ import {
 } from '@thesis-ledger/domain';
 import { monitoringRuleDefinitionSchema } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { strategyRiskNotification } from './strategy-risk-notification.js';
 import type { EvaluationCandidate, StoredRule } from './risk-types.js';
 import {
   StrategyRiskContextService,
@@ -24,6 +25,12 @@ type StrategyRiskApplicationRuntimeRow = {
   notification: unknown;
 };
 
+export type StrategyRiskRuntimeOptions = {
+  background?: boolean;
+  requiresHoldingPeriods?: boolean;
+  contexts?: Map<string, Promise<StrategyRiskActualContext>>;
+};
+
 export type StrategyRiskRuntimeEvaluation = {
   application: StrategyRiskApplicationRuntimeRow;
   evaluation: StrategyMonitoringEvaluation;
@@ -34,6 +41,7 @@ export type StrategyRiskRuntimeEvaluation = {
     cooldownMinutes: number;
     severity: RiskEvent['severity'];
     channels: string[];
+    providers?: string[] | undefined;
   };
 };
 
@@ -41,7 +49,6 @@ const toRecord = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-const severityValues = new Set<RiskEvent['severity']>(['info', 'warning', 'error', 'critical']);
 
 @Injectable()
 export class StrategyRiskRuntimeService {
@@ -62,25 +69,6 @@ export class StrategyRiskRuntimeService {
     return application;
   }
 
-  private notification(application: StrategyRiskApplicationRuntimeRow) {
-    const value = toRecord(application.notification);
-    const severity = severityValues.has(value.severity as RiskEvent['severity'])
-      ? (value.severity as RiskEvent['severity'])
-      : 'warning';
-    const channels = Array.isArray(value.channels)
-      ? value.channels.filter((item): item is string => typeof item === 'string')
-      : [];
-    return {
-      enabled: value.enabled !== false,
-      cooldownMinutes:
-        typeof value.cooldownMinutes === 'number' && Number.isFinite(value.cooldownMinutes)
-          ? Math.max(0, Math.floor(value.cooldownMinutes))
-          : 60,
-      severity,
-      channels,
-    };
-  }
-
   private assertCurrentRevision(
     stored: StoredRule,
     application: StrategyRiskApplicationRuntimeRow,
@@ -90,14 +78,14 @@ export class StrategyRiskRuntimeService {
       throw new BadRequestException('策略风险规则修订已经失效，请刷新后重试');
   }
 
-  private async target(symbol: string, timeframe: string, requiresHoldingPeriods: boolean) {
+  private async target(symbol: string, timeframe: string, requiresHoldingPeriods: boolean, background = false) {
     const asset = await this.prisma.asset.findUnique({
       where: { symbol },
       select: { assetType: true, market: true },
     });
-    if (!asset) throw new NotFoundException('策略风险应用标的不存在');
+    if (!asset && !background) throw new NotFoundException('策略风险应用标的不存在');
     return {
-      executionInstrument: { symbol, assetType: asset.assetType, market: asset.market },
+      executionInstrument: { symbol, assetType: asset?.assetType ?? 'unknown', ...(asset?.market ? { market: asset.market } : {}) },
       primaryTimeframe: timeframe,
       requiresHoldingPeriods,
     };
@@ -124,6 +112,7 @@ export class StrategyRiskRuntimeService {
       state: 'not_applicable',
       threshold: rule.threshold,
       reason: '应用配置为下一持仓周期，当前持仓周期不参与监控',
+      reasonCode: 'next_position_cycle',
       ...(actual.context.occurredAt ? { occurredAt: actual.context.occurredAt } : {}),
       ...(actual.context.availableAt ? { availableAt: actual.context.availableAt } : {}),
     };
@@ -178,7 +167,7 @@ export class StrategyRiskRuntimeService {
       id: `${stored.id}:${application.accountId}:${application.symbol}:${marketTime}`,
       ruleId: stored.id,
       triggered: evaluation.state === 'triggered',
-      severity: stored.severity as RiskEvent['severity'],
+      severity: strategyRiskNotification(application.notification, rule.sourceKey).severity,
       message: `${application.symbol} · ${rule.label} ${evaluation.state === 'triggered' ? '已触发' : '未触发'}`,
       evaluatedAt: evaluatedAt.toISOString(),
       context: {
@@ -205,6 +194,7 @@ export class StrategyRiskRuntimeService {
   async evaluateStoredRule(
     stored: StoredRule,
     evaluatedAt = new Date(),
+    options: StrategyRiskRuntimeOptions = {},
   ): Promise<StrategyRiskRuntimeEvaluation> {
     if (!stored.sourcePlanId) throw new BadRequestException('规则缺少策略风险应用来源');
     const application = await this.application(stored.sourcePlanId);
@@ -212,16 +202,17 @@ export class StrategyRiskRuntimeService {
     if (stored.accountId !== application.accountId || stored.symbol !== application.symbol)
       throw new BadRequestException('策略风险规则目标与来源应用不一致');
     const rule = monitoringRuleDefinitionSchema.parse(stored.config);
-    const actual = await this.contexts.load(
-      application.accountId,
-      application.symbol,
-      await this.target(
-        application.symbol,
-        rule.evaluationTimeframe,
-        rule.metric === 'holdingPeriods',
-      ),
-      evaluatedAt,
-    );
+    const key = `${application.id}:${application.revision}:${rule.evaluationTimeframe}`;
+    let loading = options.contexts?.get(key);
+    if (!loading) {
+      const target = await this.target(application.symbol, rule.evaluationTimeframe,
+        options.requiresHoldingPeriods ?? rule.metric === 'holdingPeriods', options.background ?? false);
+      loading = options.background
+        ? this.contexts.load(application.accountId, application.symbol, target, evaluatedAt, true)
+        : this.contexts.load(application.accountId, application.symbol, target, evaluatedAt);
+      options.contexts?.set(key, loading);
+    }
+    const actual = await loading;
     const evaluation =
       this.deferredEvaluation(application, rule, actual) ??
       evaluateStrategyMonitoringRule(rule, actual.context);
@@ -230,7 +221,7 @@ export class StrategyRiskRuntimeService {
       application,
       evaluation,
       ...(runtime ?? {}),
-      notification: this.notification(application),
+      notification: strategyRiskNotification(application.notification, rule.sourceKey),
     };
   }
 }

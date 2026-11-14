@@ -11,16 +11,20 @@ import { DsaSnapshotBuilder } from '../../src/backtest/backtest-snapshot-builder
 import { LocalSnapshotV3Runner } from '../../src/backtest/backtest-v3-runner.js';
 import { hashCanonicalManifest } from '../../src/backtest/backtest-snapshot.js';
 import { prepareTradingStatusExecutionV3 } from '../../src/backtest/backtest-trading-status-execution-v3.js';
-import { readSnapshotStatusCompositionV1, collectSnapshotStatusInputsV1 } from '../../src/backtest/backtest-status-composition-v1.js';
+import {
+  readSnapshotStatusCompositionV1,
+  collectSnapshotStatusInputsV1,
+} from '../../src/backtest/backtest-status-composition-v1.js';
 import type { ArtifactRow } from '../../src/backtest/backtest-artifact-store.js';
 import { statusExecutionFixture } from './trading-status-execution-fixtures.js';
 import { compositionFixture } from '../market/status-composition-fixtures.js';
+import { mapDataV3HttpError } from '../../src/integration/dsa/dsa-v3-protocol.js';
 
 const directories: string[] = [];
 afterEach(async () =>
   Promise.all(directories.splice(0).map((root) => rm(root, { recursive: true, force: true }))),
 );
-async function setup(datesOnly = false, sampledClock = false) {
+async function setup(datesOnly = false, sampledClock = false, sourceInvalidResponse = false) {
   const root = await mkdtemp(join(tmpdir(), 'status-composition-'));
   directories.push(root);
   const state = await statusExecutionFixture(root);
@@ -29,6 +33,24 @@ async function setup(datesOnly = false, sampledClock = false) {
     dates: ['2023-08-16', '2023-08-17', '2023-08-18', '2023-08-21'],
     riskFailure: true,
   });
+  if (sourceInvalidResponse) {
+    const post = c.post.getMockImplementation()!;
+    c.post.mockImplementation(async (path, request) => {
+      if (request.routeKey.capability === 'DAILY_TRADING_STATUS')
+        throw mapDataV3HttpError(
+          502,
+          {
+            detail: {
+              contractVersion: 3,
+              requestId: request.requestId,
+              error: { code: 'invalid_response', message: '行情上游响应格式无效' },
+            },
+          },
+          request.requestId,
+        );
+      return post(path, request);
+    });
+  }
   const old = await state.dsa.effectiveControlPolicyV3();
   if (datesOnly)
     c.policy.routes = c.policy.routes.filter(
@@ -44,15 +66,25 @@ async function setup(datesOnly = false, sampledClock = false) {
   );
   state.dsa.marketTradingStatusV3.mockClear();
   let sampling = 0;
-  if (sampledClock) c.readPolicy.mockImplementation(async () => ({ ...structuredClone(c.policy),
-    appliedAt: new Date(Date.parse(c.policy.appliedAt) + ++sampling).toISOString() }));
+  if (sampledClock)
+    c.readPolicy.mockImplementation(async () => ({
+      ...structuredClone(c.policy),
+      appliedAt: new Date(Date.parse(c.policy.appliedAt) + ++sampling).toISOString(),
+    }));
   const dsa = {
     ...state.dsa,
     dataCapabilities: c.reader,
     effectiveControlPolicyV3: vi.fn(async () => ({
-      projection: { effective: { ...structuredClone(c.policy), ...(sampledClock ? {
-        appliedAt: new Date(Date.parse(c.policy.appliedAt) + ++sampling).toISOString(),
-      } : {}) } },
+      projection: {
+        effective: {
+          ...structuredClone(c.policy),
+          ...(sampledClock
+            ? {
+                appliedAt: new Date(Date.parse(c.policy.appliedAt) + ++sampling).toISOString(),
+              }
+            : {}),
+        },
+      },
     })),
   };
   const input = { ...state.input, runId: 'composition-run' };
@@ -78,10 +110,37 @@ async function setup(datesOnly = false, sampledClock = false) {
 }
 
 describe('新组合经现有快照产物和离线执行闭环', () => {
+  it('可选来源坏响应冻结为失败，保留其他事实并离线重放', async () => {
+    const s = await setup(false, false, true);
+    const key = `${s.input.runId}/${statusCompositionArtifactKeyV1}`;
+    const frozen = readSnapshotStatusCompositionV1(
+      s.built.manifest,
+      s.input.runConfig,
+      s.rows.get(key)!,
+    );
+    expect(frozen?.composition.entries[0]).toMatchObject({
+      status: 'failed',
+      error: 'invalid-response',
+    });
+    expect(frozen?.composition.entries.filter((entry) => entry.status === 'included')).toHaveLength(
+      3,
+    );
+    expect(frozen?.adoption.suspendedDates).toEqual([]);
+    s.c.post.mockRejectedValue(new Error('离线禁止来源'));
+    s.c.readPolicy.mockRejectedValue(new Error('离线禁止控制'));
+    s.dsa.effectiveControlPolicyV3.mockRejectedValue(new Error('离线禁止控制'));
+    const result = await s.execute();
+    expect(result.warnings.some((warning) => warning.includes('可选失败 2 项'))).toBe(true);
+    expect(await s.execute()).toEqual(result);
+  });
   it('原Builder各次政策采样时间变化仍冻结完整组合，离线重复结果保持', async () => {
     const s = await setup(false, true);
     const key = `${s.input.runId}/${statusCompositionArtifactKeyV1}`;
-    const frozen = readSnapshotStatusCompositionV1(s.built.manifest, s.input.runConfig, s.rows.get(key)!);
+    const frozen = readSnapshotStatusCompositionV1(
+      s.built.manifest,
+      s.input.runConfig,
+      s.rows.get(key)!,
+    );
     expect(frozen?.composition.entries).toHaveLength(5);
     expect(frozen?.composition.policy.appliedAt).not.toBe(s.c.policy.appliedAt);
     expect(s.c.post).toHaveBeenCalledTimes(5);
@@ -93,11 +152,20 @@ describe('新组合经现有快照产物和离线执行闭环', () => {
   it.each([2, 4])('第%s次控制读取的真实操作身份变化仍阻断冻结', async (changeAt) => {
     const s = await setup();
     let reads = 0;
-    s.dsa.effectiveControlPolicyV3.mockImplementation(async () => ({ projection: {
-      effective: { ...structuredClone(s.c.policy), ...(++reads >= changeAt ? { requestId: 'changed-operation' } : {}) },
-    } }));
-    await expect(collectSnapshotStatusInputsV1(s.input.runConfig, s.dsa as unknown as DsaClient))
-      .rejects.toMatchObject({ code: 'stale-revision', message: changeAt === 2 ? '冻结前独立功能选择变化' : '冻结状态读取期间政策变化' });
+    s.dsa.effectiveControlPolicyV3.mockImplementation(async () => ({
+      projection: {
+        effective: {
+          ...structuredClone(s.c.policy),
+          ...(++reads >= changeAt ? { requestId: 'changed-operation' } : {}),
+        },
+      },
+    }));
+    await expect(
+      collectSnapshotStatusInputsV1(s.input.runConfig, s.dsa as unknown as DsaClient),
+    ).rejects.toMatchObject({
+      code: 'stale-revision',
+      message: changeAt === 2 ? '冻结前独立功能选择变化' : '冻结状态读取期间政策变化',
+    });
   });
   it('仅选择基础日期仍保留原交易状态约束，没有重复读取', async () => {
     const s = await setup(true);

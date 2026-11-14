@@ -206,13 +206,7 @@ export class AiResearchQuery {
       const parsedContext = contexts[index];
       const context = parsedContext?.success ? parsedContext.data : null;
       const metadataId = metadataExperimentId(row.modelMetadata);
-      let experimentRelation: 'verified' | 'missing' | 'conflict' | 'unchecked' = 'missing';
-      if (row.relationExperimentId) {
-        experimentRelation =
-          metadataId && metadataId !== row.relationExperimentId ? 'conflict' : 'verified';
-      } else if (metadataId) {
-        experimentRelation = 'unchecked';
-      }
+      const experimentRelation = researchExperimentRelation(row.relationExperimentId, metadataId);
       const taskKind = classifyAiResearchTask({
         promptVersion: row.promptVersion,
         context: row.context,
@@ -234,56 +228,12 @@ export class AiResearchQuery {
         ? strategyByVersionId.get(context.strategyVersionId)
         : undefined;
 
-      let object: AiResearchDisplayProjection['object'] = {
-        type: 'unknown',
-        label: '研究对象',
-      };
-      if (context?.scope === 'portfolio') {
-        object = { type: 'portfolio', label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}投资组合` : '当前投资组合' };
-      } else if (context?.scope === 'account') {
-        object = {
-          type: 'account',
-          label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}账户` : '账户',
-          ...(account?.name ? { name: account.name } : {}),
-        };
-      } else if (context?.scope === 'position') {
-        object = {
-          type: 'position',
-          label: context.mode ? `${context.mode === 'shadow' ? '模拟' : '实际'}持仓` : '持仓',
-          ...(instrumentName ? { name: instrumentName } : {}),
-          ...(context.symbol ? { code: context.symbol } : {}),
-        };
-      } else if (context?.scope === 'strategy') {
-        object = {
-          type: 'strategy_version',
-          label: '策略版本',
-          ...(strategyVersion?.strategy.name ? { name: strategyVersion.strategy.name } : {}),
-          ...(strategyVersion ? { version: `v${strategyVersion.version}` } : {}),
-        };
-      }
+      const object = researchDisplayObject({ context, account, instrumentName, strategyVersion });
 
-      let sourceType = contextSourceType(context);
-      let sourceLabel = '来源未识别';
-      let sourceName: string | undefined;
-      let sourceHref: string | undefined;
-      if (taskKind === 'experiment_internal') {
-        sourceType = 'strategy_experiment';
-        sourceLabel = '策略实验';
-        sourceName = strategyVersion?.strategy.name;
-        sourceHref = '/strategy?tab=optimization';
-      } else if (context?.scope === 'portfolio') {
-        sourceLabel = '组合研究';
-      } else if (context?.scope === 'account') {
-        sourceLabel = '账户研究';
-        sourceName = account?.name;
-      } else if (context?.scope === 'position') {
-        sourceLabel = '持仓研究';
-        sourceName = instrumentName;
-      } else if (context?.scope === 'strategy') {
-        sourceLabel = '策略研究';
-        sourceName = strategyVersion?.strategy.name;
-        if (strategyVersion) sourceHref = '/strategy';
-      }
+      const { sourceType, sourceLabel, sourceName, sourceHref } = researchDisplaySource(
+        { context, account, instrumentName, strategyVersion },
+        taskKind,
+      );
 
       const version = dataVersion({
         run: row.updatedAt.toISOString(),
@@ -414,4 +364,100 @@ export class AiResearchQuery {
       display,
     };
   }
+}
+
+type ResearchDisplayContext = {
+  context: ResearchContext | null;
+  account: { name: string } | undefined;
+  instrumentName: string | undefined;
+  strategyVersion: { version: number; strategy: { name: string } } | undefined;
+};
+
+function researchDisplayObject({
+  context,
+  account,
+  instrumentName,
+  strategyVersion,
+}: ResearchDisplayContext) {
+  let object: AiResearchDisplayProjection['object'] = {
+    type: 'unknown',
+    label: '研究对象',
+  };
+  if (context?.scope === 'portfolio') {
+    object = {
+      type: 'portfolio',
+      label: researchScopeLabel(context.mode, '投资组合', '当前投资组合'),
+    };
+  } else if (context?.scope === 'account') {
+    object = {
+      type: 'account',
+      label: researchScopeLabel(context.mode, '账户'),
+      ...(account?.name ? { name: account.name } : {}),
+    };
+  } else if (context?.scope === 'position') {
+    object = {
+      type: 'position',
+      label: researchScopeLabel(context.mode, '持仓'),
+      ...(instrumentName ? { name: instrumentName } : {}),
+      ...(context.symbol ? { code: context.symbol } : {}),
+    };
+  } else if (context?.scope === 'strategy') {
+    object = {
+      type: 'strategy_version',
+      label: '策略版本',
+      ...(strategyVersion?.strategy.name ? { name: strategyVersion.strategy.name } : {}),
+      ...(strategyVersion ? { version: `v${strategyVersion.version}` } : {}),
+    };
+  }
+
+  return object;
+}
+
+function researchDisplaySource(
+  { context, account, instrumentName, strategyVersion }: ResearchDisplayContext,
+  taskKind: AiResearchDisplayProjection['taskKind'],
+) {
+  let sourceType = contextSourceType(context);
+  let sourceLabel = '来源未识别';
+  let sourceName: string | undefined;
+  let sourceHref: string | undefined;
+  if (taskKind === 'experiment_internal') {
+    sourceType = 'strategy_experiment';
+    sourceLabel = '策略实验';
+    sourceName = strategyVersion?.strategy.name;
+    sourceHref = '/strategy?tab=optimization';
+  } else if (context?.scope === 'portfolio') {
+    sourceLabel = '组合研究';
+  } else if (context?.scope === 'account') {
+    sourceLabel = '账户研究';
+    sourceName = account?.name;
+  } else if (context?.scope === 'position') {
+    sourceLabel = '持仓研究';
+    sourceName = instrumentName;
+  } else if (context?.scope === 'strategy') {
+    sourceLabel = '策略研究';
+    sourceName = strategyVersion?.strategy.name;
+    if (strategyVersion) sourceHref = '/strategy';
+  }
+
+  return { sourceType, sourceLabel, sourceName, sourceHref };
+}
+
+function researchExperimentRelation(
+  relationExperimentId: string | null,
+  metadataId: string | null,
+) {
+  let experimentRelation: 'verified' | 'missing' | 'conflict' | 'unchecked' = 'missing';
+  if (relationExperimentId) {
+    experimentRelation =
+      metadataId && metadataId !== relationExperimentId ? 'conflict' : 'verified';
+  } else if (metadataId) {
+    experimentRelation = 'unchecked';
+  }
+  return experimentRelation;
+}
+
+function researchScopeLabel(mode: ResearchContext['mode'], subject: string, fallback = subject) {
+  if (!mode) return fallback;
+  return (mode === 'shadow' ? '模拟' : '实际') + subject;
 }

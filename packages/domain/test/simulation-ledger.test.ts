@@ -179,6 +179,9 @@ describe('SimulationLedger', () => {
     ).toMatchObject({ applied: false, code: 'FUTURE_DATA' });
   });
 
+});
+
+describe("模拟账本独立交收与公司行动", () => {
   it('settles only the referenced fill or dividend when settlement dates interleave', () => {
     const ledger = new SimulationLedger(config);
     expect(ledger.applyFill(buy('fill-day-1'))).toMatchObject({ applied: true });
@@ -344,6 +347,9 @@ describe('SimulationLedger', () => {
     expect(duplicate).toMatchObject({ applied: false, code: 'DUPLICATE_EVENT' });
   });
 
+});
+
+describe("归一化账本与币种守恒", () => {
   it('keeps fractional normalized units and suppresses split and dividend mutations', () => {
     const ledger = new SimulationLedger({
       executionInstrument: config.executionInstrument,

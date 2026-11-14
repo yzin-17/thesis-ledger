@@ -6,6 +6,7 @@ import type {
   BacktestRunCreateV3,
   ResultReadEligibility,
   StrategyVersionProvenance,
+  InstrumentDirectory,
 } from '@thesis-ledger/schemas';
 
 export type StrategyStatus = 'draft' | 'active' | 'archived';
@@ -14,6 +15,7 @@ export type BacktestJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 
 export type StrategySchema = Record<string, unknown>;
 
 export interface StrategyVersion {
+  instrumentDirectory?: InstrumentDirectory;
   id: string;
   version: number;
   schema?: StrategySchema;

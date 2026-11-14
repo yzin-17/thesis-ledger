@@ -1,11 +1,11 @@
 import { buildGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
 import { z } from 'zod';
-import { expressionSchema } from '@thesis-ledger/schemas';
+import { expressionSchema, STRATEGY_CROSS_SEMANTICS_PROMPT } from '@thesis-ledger/schemas';
 import type { AuthoringOperation } from './authoring-operation.repository.js';
 import { authoringContract } from './authoring-model-policy.js';
 import { currentAuthoringAnalysisContent } from './authoring-source-text.js';
 
-export const AUTHORING_PROMPT_VERSION = 'authoring-prompt-v6';
+export const AUTHORING_PROMPT_VERSION = 'authoring-prompt-v8';
 
 export const authoringMessages = (operation: AuthoringOperation) => {
   const contract = authoringContract(operation.input.selection.kind);
@@ -20,8 +20,10 @@ export const authoringMessages = (operation: AuthoringOperation) => {
         'coverage 必须覆盖每个 state=understood 的 requirementId，definitionPaths 使用真实定义字段路径。分析引用 quote 必须完整取自原描述或确认答案，不能虚构或截断遗漏句子。' +
         'coverage.definitionPaths 从策略定义根开始，例如 entry、exit、sizing.percent、risk.0.percent、execution、cost.commissionRate。不得使用 definition. 前缀、输出包装路径或逗号拼接多个字段；每个数组元素只指向一个存在字段。' +
         'entry/exit 必须是布尔 AST：all/any 使用 conditions 数组，not 使用 expression，compare 使用 operator/left/right，cross 使用 direction=above或below及left/right。' +
+        STRATEGY_CROSS_SEMANTICS_PROMPT +
         '指标使用 {type:indicator,name,input:{type:series,sourceId,field},params:{period:正整数}}，常量使用 {type:constant,value:十进制字符串}；不得使用字符串表达式、SMA名称、and/or、operator=cross或省略sourceId。MA表示简单移动均线。' +
-        'signalSources 只能有一个，其 id 必须与每个 series.sourceId 一致，信号源资产/周期与 confirmation 相同；首期不支持额外基准，必须省略 benchmark 字段。risk 是数组，比例复用已确认的小数比例字符串，不能将百分数原值写入比例字段。' +
+        '场内日线新生成使用 schemaVersion=3；signalSources 的 priceCoordinate=research 表示后复权，actual 表示不复权。同一标的每种口径最多一个来源，series.sourceId 指向相应来源。具体价格常量条件使用 actual；均线、指标与价格之间比较使用 research。独立条件可组合，不直接比较两种坐标的价格。固定份数按操作时点原价计算投入金额，持仓数量为研究单位。基金及局部修改保持原定义版本与口径。' +
+        '信号源资产/周期与 confirmation 相同；首期不支持额外基准，必须省略 benchmark 字段。risk 是数组，比例复用已确认的小数比例字符串，不能将百分数原值写入比例字段。' +
         `条件 AST 合同：${JSON.stringify(z.toJSONSchema(expressionSchema, { io: 'output' }))}` +
         '局部修改以现有 definitionText 为基线，只修改 modificationTarget。risk 只改已有 fixedStop 的明确比例，其他风险、入场、退出、名称及元数据保持完全相同。不得顺便优化规则。' +
         buildGenerationSchemaPrompt(contract.schema),

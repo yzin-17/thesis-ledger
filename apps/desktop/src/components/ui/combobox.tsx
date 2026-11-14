@@ -207,9 +207,11 @@ function ComboboxChip({
   className,
   children,
   showRemove = true,
+  removeLabel = '移除模型',
   ...props
 }: ComboboxPrimitive.Chip.Props & {
   showRemove?: boolean;
+  removeLabel?: string;
 }) {
   return (
     <ComboboxPrimitive.Chip
@@ -226,7 +228,7 @@ function ComboboxChip({
           render={<Button variant="ghost" size="icon-xs" />}
           className="-ml-1 opacity-50 hover:opacity-100"
           data-slot="combobox-chip-remove"
-          aria-label="移除模型"
+          aria-label={removeLabel}
         >
           <X className="pointer-events-none" />
         </ComboboxPrimitive.ChipRemove>

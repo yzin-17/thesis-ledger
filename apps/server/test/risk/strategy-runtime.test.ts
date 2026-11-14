@@ -122,6 +122,9 @@ describe('统一策略风险运行时', () => {
     expect(reader.readV3).not.toHaveBeenCalled();
   });
 
+});
+
+describe("策略来源分派及模式范围", () => {
   it('策略规则由 RiskService 分派到 Strategy evaluator，并复用 RiskEvent/Notification 管线', async () => {
     const stored = {
       id: 'rule-strategy',
@@ -248,6 +251,9 @@ describe('统一策略风险运行时', () => {
     expect(result.results).toEqual([]);
   });
 
+});
+
+describe("闭合行情事实与四态可用性", () => {
   it('策略上下文只读取已在评价时点闭合且可用的 MarketBar，不依赖实时 quote', async () => {
     const prisma = {
       account: { findUnique: vi.fn(async () => ({ active: true, mode: 'actual', type: 'securities' })) },
@@ -314,7 +320,8 @@ describe('统一策略风险运行时', () => {
         evaluatedAt,
       );
 
-      expect(actual.context).toEqual({ quantity: '100', averageCost: '100' });
+      expect(actual.context).toEqual({ quantity: '100', averageCost: '100',
+        inputIssue: { code: 'daily_bars_unavailable', reason: '日线来源暂不可用' } });
     },
   );
 
@@ -344,6 +351,9 @@ describe('统一策略风险运行时', () => {
     ).rejects.toMatchObject({ code: 'invalid-response' });
   });
 
+});
+
+describe("评价周期和阈值边界", () => {
   it('日线盘中已有当日数据时仍回退到上一根已闭合日线', async () => {
     const intraday = new Date('2026-09-11T06:00:00.000Z');
     const prisma = {

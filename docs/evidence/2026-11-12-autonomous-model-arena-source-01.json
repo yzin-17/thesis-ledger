@@ -1,0 +1,42 @@
+{
+  "authorization": "用户授权三市场各一只股票和ETF、最多12批、零新增费用的只读核验；覆盖不足即停止",
+  "receipt": {
+    "batch": 1,
+    "batchLimit": 12,
+    "market": "CN",
+    "assetType": "STOCK",
+    "symbol": "600036.SH",
+    "requestedDay": "2026-11-12",
+    "observedAt": "2026-11-12T04:13:57.239Z",
+    "dataReads": 1,
+    "externalQuoteReads": 0,
+    "modelCalls": 0,
+    "automaticRetries": 0,
+    "routeWrites": 0,
+    "additionalCostCny": 0,
+    "request": {
+      "contractVersion": 3,
+      "consumer": "thesis-ledger",
+      "requestId": "fd8c3e7d-e4f7-449e-88a1-6848b1662cc9",
+      "symbol": "600036.SH",
+      "routeKey": {
+        "kind": "data",
+        "market": "CN",
+        "assetType": "STOCK",
+        "capability": "HISTORICAL_PUBLIC_FEES"
+      },
+      "routeTarget": {
+        "providerId": "local-materials",
+        "upstreamSource": "local-materials",
+        "routeIndex": 0
+      },
+      "range": { "start": "2026-11-12", "end": "2026-11-12" }
+    },
+    "status": "stopped",
+    "executionReady": false,
+    "reason": "insufficient-coverage",
+    "httpStatus": 422,
+    "message": "规则核验未通过，停止且不自动重试"
+  },
+  "remaining": "其余11批未执行；CN ETF、HK和US样本以及全部外部报价均未核验，不能复用剩余额度自动继续"
+}

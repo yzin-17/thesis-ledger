@@ -17,4 +17,12 @@ test('共享日期控件不能反向依赖业务或回退原生弹层', () => {
   assert.match(check(control, 'input.showPicker()'), /原生日期弹层/u);
   assert.match(check(control, "import { convert } from '@/features/journal/time'"), /反向依赖/u);
   assert.equal(check(control, "import { cn } from '@/lib/utils'"), null);
+  assert.match(check(control, 'className="text-transparent"'), /聚焦格式/u);
+  assert.match(
+    check(
+      'apps/desktop/src/components/ui/use-date-input-editor.ts',
+      "import { convert } from '@/features/journal/time'",
+    ),
+    /反向依赖/u,
+  );
 });

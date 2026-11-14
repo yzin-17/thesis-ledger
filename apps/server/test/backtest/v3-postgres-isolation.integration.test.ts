@@ -26,6 +26,12 @@ const ownedIsolation = process.env.C02_POSTGRES_ISOLATED === '1';
 const postgresDescribe = databaseUrl || ownedIsolation ? describe : describe.skip;
 
 postgresDescribe('隔离 PostgreSQL V3 生命周期与真实域隔离', () => {
+  const context = v3IsolationContext();
+  registerV3DatabaseModeAndIdentity(context);
+  registerV3DatabaseClaimAndRecovery(context);
+});
+
+function v3IsolationContext() {
   let prisma: PrismaClient;
   let root: string;
   let baseline: string;
@@ -76,7 +82,6 @@ postgresDescribe('隔离 PostgreSQL V3 生命周期与真实域隔离', () => {
     if (root) await rm(root, { recursive: true, force: true });
     await isolated?.cleanup();
   });
-
   async function harness(failFirst = false) {
     const fixture = await completeSnapshotFixture();
     const strategy = await prisma.strategy.create({
@@ -129,8 +134,32 @@ postgresDescribe('隔离 PostgreSQL V3 生命周期与真实域隔离', () => {
     };
     return { fixture, service, request, run, queue };
   }
+  return {
+    get prisma() {
+      return prisma;
+    },
+    get root() {
+      return root;
+    },
+    get baseline() {
+      return baseline;
+    },
+    get isolated() {
+      return isolated;
+    },
+    get witness() {
+      return witness;
+    },
+    get harness() {
+      return harness;
+    },
+  };
+}
 
+function registerV3DatabaseModeAndIdentity(suiteContext: ReturnType<typeof v3IsolationContext>) {
   it('六处预算与恢复 CAS 在读取后模式变更时保留旧记录', async () => {
+    const { prisma, baseline, witness, harness } = suiteContext;
+
     const h = await harness();
     const created = await h.service.createRun(h.request);
     for (const scenario of [
@@ -205,8 +234,9 @@ postgresDescribe('隔离 PostgreSQL V3 生命周期与真实域隔离', () => {
     }
     expect(await witness()).toBe(baseline);
   }, 30_000);
-
   it('真实持久化创建、重复请求和成功终态，账户账本保持不变', async () => {
+    const { prisma, baseline, witness, harness } = suiteContext;
+
     const h = await harness();
     const created = await h.service.createRun(h.request);
     expect(created?.status).toBe('queued');
@@ -232,8 +262,12 @@ postgresDescribe('隔离 PostgreSQL V3 生命周期与真实域隔离', () => {
     );
     expect(await witness()).toBe(baseline);
   }, 30_000);
+}
 
+function registerV3DatabaseClaimAndRecovery(suiteContext: ReturnType<typeof v3IsolationContext>) {
   it('两个执行者同时领取只有一个 Runner 执行', async () => {
+    const { prisma, baseline, witness, harness } = suiteContext;
+
     const h = await harness();
     const created = await h.service.createRun(h.request);
     await Promise.all([h.service.runCurrent(created!.id), h.service.runCurrent(created!.id)]);
@@ -243,8 +277,9 @@ postgresDescribe('隔离 PostgreSQL V3 生命周期与真实域隔离', () => {
     ).toMatchObject({ status: 'succeeded', executionAttempt: 1 });
     expect(await witness()).toBe(baseline);
   }, 30_000);
-
   it('失败后仅重读冻结输入，实际数据库 attempt 单调递增', async () => {
+    const { prisma, baseline, witness, harness } = suiteContext;
+
     const h = await harness(true);
     const created = await h.service.createRun(h.request);
     await h.service.runCurrent(created!.id);
@@ -266,4 +301,4 @@ postgresDescribe('隔离 PostgreSQL V3 生命周期与真实域隔离', () => {
     expect(h.fixture.dsa.backtestInstrumentFacts).not.toHaveBeenCalled();
     expect(await witness()).toBe(baseline);
   }, 30_000);
-});
+}

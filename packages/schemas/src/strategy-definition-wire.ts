@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { strategyVersionProvenanceSchema } from './strategy-provenance.js';
+import { instrumentDirectorySchema } from './market.js';
 
 const id = z.string().min(1);
 const definition = z.record(z.string(), z.unknown());
@@ -9,6 +10,7 @@ export const strategyVersionReadSchema = z
     strategyId: id.optional(),
     version: z.number().int().positive(),
     schema: definition.optional(),
+    instrumentDirectory: instrumentDirectorySchema.optional(),
     schemaVersion: z.number().int().positive().optional(),
     source: strategyVersionProvenanceSchema.nullable().optional(),
     createdAt: z.string().optional(),

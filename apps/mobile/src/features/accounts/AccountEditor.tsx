@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRoute, type RouteProp } from '@react-navigation/native';
-import { accountInputSchema } from '@thesis-ledger/schemas';
+import { accountInputSchema, type AccountResponse } from '@thesis-ledger/schemas';
 import { useDirtyForm, useMobileRuntime } from '../../app/MobileRuntime';
 import { useAccounts, useMobileCommand } from '../../app/query/mobile-queries';
 import {
@@ -15,17 +15,21 @@ import {
 } from '../../components/MobilePrimitives';
 import type { AccountStackParams } from '../../app/navigation-types';
 
-export function AccountEditor() {
-  const { params } = useRoute<RouteProp<AccountStackParams, 'AccountEditor'>>();
-  const account = params.account;
-  const runtime = useMobileRuntime();
-  const accounts = useAccounts();
-  const initial = {
+function accountEditorDraft(account?: AccountResponse) {
+  return {
     name: account?.name ?? '',
     institution: account?.institution ?? '',
     type: account?.type ?? ('securities' as const),
     currency: account?.currency ?? ('CNY' as const),
   };
+}
+
+export function AccountEditor() {
+  const { params } = useRoute<RouteProp<AccountStackParams, 'AccountEditor'>>();
+  const account = params.account;
+  const runtime = useMobileRuntime();
+  const accounts = useAccounts();
+  const initial = accountEditorDraft(account);
   const [draft, setDraft] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [accountId, setAccountId] = useState(account?.id);
@@ -55,12 +59,7 @@ export function AccountEditor() {
     try {
       const result = await mutation.mutateAsync(draft);
       const value = result.result;
-      const savedDraft = {
-        name: value.name,
-        institution: value.institution ?? '',
-        type: value.type,
-        currency: value.currency,
-      };
+      const savedDraft = accountEditorDraft(value);
       setAccountId(value.id);
       setDraft(savedDraft);
       setSaved(savedDraft);

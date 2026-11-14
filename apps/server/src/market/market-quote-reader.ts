@@ -12,6 +12,8 @@ import { quoteFallbackReason } from './market-quote-diagnostics.js';
 import { MarketQuoteSessionReader } from './market-quote-session-reader.js';
 import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
 import type { MarketSessionReader } from './market-session-reader.js';
+import type { DataQualityService } from '../quality/data-quality.service.js';
+import { readWithDataQuality } from './market-data-quality.js';
 
 const DEFAULT_DSA_TIMEOUT_MS = 5_000;
 const QUOTE_LOCK_SAFETY_MARGIN_MS = 5_000;
@@ -42,7 +44,8 @@ export class MarketQuoteReader {
     private readonly dsa: DsaClient,
     private readonly redis: RedisService,
     sessions?: MarketSessionReader,
-  ) { this.sessionReader = new MarketQuoteSessionReader(new MarketPeriodCalendarReader(dsa), sessions); }
+    private readonly quality?: DataQualityService,
+  ) { this.sessionReader = new MarketQuoteSessionReader(new MarketPeriodCalendarReader(dsa, quality), sessions); }
 
   private singleFlight(key: string, work: () => Promise<Quote>) {
     const existing = this.flights.get(key);
@@ -286,7 +289,10 @@ export class MarketQuoteReader {
 
           let fallbackStage = 'invalid-response';
           try {
-            const quote = parseCurrentQuote({ ...raw, servedFromCache: false }, symbol);
+            const quote = await readWithDataQuality(this.quality, {
+              capability: 'REALTIME_QUOTE', provider: 'dsa', symbol,
+              scope: JSON.stringify(scope.context.routeKey),
+            }, () => parseCurrentQuote({ ...raw, servedFromCache: false }, symbol));
             await control.assertCurrent(scope, options.signal);
             fallbackStage = 'cache-write';
             if (!await this.writeQuoteCache(quote, freshKey, lastValidKey, assetType)) return readFallback('cache-unavailable');

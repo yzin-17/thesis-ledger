@@ -185,6 +185,9 @@ describe('AI Provider 专用请求与密钥边界', () => {
     ).resolves.toEqual(catalog);
   });
 
+});
+
+describe('Provider 密钥与测试目标边界', () => {
   it('编辑草稿不保留或提交已保存的 API Key，并校验模型列表', () => {
     const createInput = aiProviderInputFromDraft({
       ...newAiProviderDraft(),
@@ -245,6 +248,9 @@ describe('AI Provider 专用请求与密钥边界', () => {
     expect(input).toMatchObject({ model: 'target-model', testKind: 'generation' });
   });
 
+});
+
+describe('模型价格、路由和默认值', () => {
   it('保存模型用途时只提交已选择模型的价格，空白费用保持未知', () => {
     const input = aiProviderInputFromDraft({
       ...newAiProviderDraft(),
@@ -361,6 +367,9 @@ describe('AI Provider 专用请求与密钥边界', () => {
     expect(nextActivePurposeAfterRemoval([research], research.key)).toBeUndefined();
   });
 
+});
+
+describe('用途编辑控件语义', () => {
   it('用途编辑使用单一详情面板与紧凑控件，并交给父级表单保存', () => {
     const research = newAiProviderExecutionRouteDraft('model-a');
     const optimization = {
@@ -428,6 +437,9 @@ describe('AI Provider 专用请求与密钥边界', () => {
     expect(buttonSource).toContain('aria-pressed:bg-secondary aria-pressed:text-foreground');
   });
 
+});
+
+describe('通知 Provider 的通用协议', () => {
   it('通知 Provider 仍使用通用保存与草稿测试端点', async () => {
     const requestClient = client({});
     const notification = {

@@ -20,7 +20,8 @@ import {
   Copy,
   Choices,
   Feedback,
-  QueryList, QueryStatus,
+  QueryList,
+  QueryStatus,
   failureMessage,
 } from '../../components/MobilePrimitives';
 import { mobileInstrument } from '../market-detail/market-model';
@@ -42,7 +43,7 @@ export function WatchlistScreen() {
     <WatchlistView key={baseUrl + identity.data.principal.id} owner={identity.data.principal.id} />
   );
 }
-function WatchlistView({ owner }: { owner: string }) {
+function useWatchlistController(owner: string) {
   const { api, scope, mode } = useMobileRuntime();
   const client = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<MarketStackParams>>();
@@ -127,6 +128,67 @@ function WatchlistView({ owner }: { owner: string }) {
     });
   };
   const disabled = write.isPending || !data;
+  return {
+    adding,
+    disabled,
+    setAdding,
+    mutate,
+    group,
+    groups,
+    setGroup,
+    setOffset,
+    setEditing,
+    market,
+    setMarket,
+    instrumentType,
+    setType,
+    setManage,
+    manage,
+    data,
+    name,
+    setName,
+    write,
+    message,
+    prices,
+    page,
+    ids,
+    mode,
+    display,
+    editing,
+    offset,
+  };
+}
+
+function WatchlistView({ owner }: { owner: string }) {
+  const {
+    adding,
+    disabled,
+    setAdding,
+    mutate,
+    group,
+    groups,
+    setGroup,
+    setOffset,
+    setEditing,
+    market,
+    setMarket,
+    instrumentType,
+    setType,
+    setManage,
+    manage,
+    data,
+    name,
+    setName,
+    write,
+    message,
+    prices,
+    page,
+    ids,
+    mode,
+    display,
+    editing,
+    offset,
+  } = useWatchlistController(owner);
   return (
     <Page title="自选">
       <Action
@@ -171,39 +233,20 @@ function WatchlistView({ owner }: { owner: string }) {
       />
       <Action label="管理分组" disabled={disabled} onPress={() => setManage((v) => !v)} />
       {manage && data && (
-        <Section title="分组管理">
-          <Field label="分组名称" value={name} onChange={setName} />
-          <Action
-            label="新建分组"
-            disabled={disabled || !name.trim()}
-            onPress={() => void mutate({ action: 'createGroup', name, revision: data.revision })}
-          />
-          {group && group !== 'ungrouped' ? (
-            <>
-              <Action
-                label="重命名当前分组"
-                disabled={disabled || !name.trim()}
-                onPress={() =>
-                  void mutate({
-                    action: 'renameGroup',
-                    groupId: group,
-                    name,
-                    revision: data.revision,
-                  })
-                }
-              />
-              <Action
-                label="删除当前分组"
-                disabled={disabled}
-                onPress={() =>
-                  void mutate({ action: 'deleteGroup', groupId: group, revision: data.revision })
-                }
-              />
-            </>
-          ) : null}
-        </Section>
+        <WatchlistGroupManager
+          group={group}
+          data={data}
+          disabled={disabled}
+          mutate={mutate}
+          name={name}
+          setName={setName}
+        />
       )}
-      <Feedback busy={write.isPending} message={message ?? (prices.error ? failureMessage(prices.error) : null)} error />
+      <Feedback
+        busy={write.isPending}
+        message={message ?? (prices.error ? failureMessage(prices.error) : null)}
+        error
+      />
       <Action
         label="刷新"
         onPress={() => {
@@ -248,7 +291,7 @@ function WatchlistView({ owner }: { owner: string }) {
                   v.source,
                   v.refresh,
                   v.quality,
-                  snap?.held ? (mode === 'actual' ? '实际持有' : '模拟持有') : '',
+                  watchlistHoldingLabel(snap?.held, mode),
                 ]
                   .filter(Boolean)
                   .join(' · ')}
@@ -314,5 +357,59 @@ function WatchlistView({ owner }: { owner: string }) {
         <Action label="下一页" onPress={() => setOffset(data.nextOffset!)} />
       )}
     </Page>
+  );
+}
+
+function watchlistHoldingLabel(
+  held: boolean | null | undefined,
+  mode: ReturnType<typeof useMobileRuntime>['mode'],
+) {
+  if (!held) return '';
+  return mode === 'actual' ? '实际持有' : '模拟持有';
+}
+
+function WatchlistGroupManager({
+  group,
+  data,
+  disabled,
+  mutate,
+  name,
+  setName,
+}: Pick<
+  ReturnType<typeof useWatchlistController>,
+  'group' | 'disabled' | 'mutate' | 'name' | 'setName'
+> & { data: NonNullable<ReturnType<typeof useWatchlistController>['data']> }) {
+  return (
+    <Section title="分组管理">
+      <Field label="分组名称" value={name} onChange={setName} />
+      <Action
+        label="新建分组"
+        disabled={disabled || !name.trim()}
+        onPress={() => void mutate({ action: 'createGroup', name, revision: data.revision })}
+      />
+      {group && group !== 'ungrouped' ? (
+        <>
+          <Action
+            label="重命名当前分组"
+            disabled={disabled || !name.trim()}
+            onPress={() =>
+              void mutate({
+                action: 'renameGroup',
+                groupId: group,
+                name,
+                revision: data.revision,
+              })
+            }
+          />
+          <Action
+            label="删除当前分组"
+            disabled={disabled}
+            onPress={() =>
+              void mutate({ action: 'deleteGroup', groupId: group, revision: data.revision })
+            }
+          />
+        </>
+      ) : null}
+    </Section>
   );
 }

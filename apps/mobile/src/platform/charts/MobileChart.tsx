@@ -20,6 +20,7 @@ type MobileChartProps = {
   data: ChartData;
   onOlder?: () => void;
   onArenaTime?:(time:number)=>void;
+  onPointTime?: (time: number) => void;
   onReady?: () => void;
   onDiagnostic?: (kind: ChartDiagnostic) => void;
 };
@@ -46,14 +47,15 @@ function ChartInstance({
   data,
   onOlder,
   onArenaTime,
+  onPointTime,
   onReady,
   onDiagnostic,
   height,
 }: MobileChartProps & { height: number }) {
   const { theme } = useMobileRuntime();
   const [instance] = useState(() => Crypto.randomUUID());
-  const callbacks = useRef({ onOlder, onReady, onDiagnostic,onArenaTime });
-  callbacks.current = { onOlder, onReady, onDiagnostic,onArenaTime };
+  const callbacks = useRef({ onOlder, onReady, onDiagnostic,onArenaTime, onPointTime });
+  callbacks.current = { onOlder, onReady, onDiagnostic,onArenaTime, onPointTime };
   const diagnostics = Boolean(onDiagnostic);
   const colors = useMemo(
     () => ({
@@ -87,6 +89,7 @@ function ChartInstance({
           callbacks.current.onReady?.();
         },
         onArenaTime:(time)=>callbacks.current.onArenaTime?.(time),
+      onPointTime: (time) => callbacks.current.onPointTime?.(time),
         onDiagnostic: (kind) => callbacks.current.onDiagnostic?.(kind),
       }),
     [instance],

@@ -1,21 +1,16 @@
 import { createClientRequestId } from '../../lib/client-request-id';
-import { LoadingState, Spinner } from '@/components/ui/spinner';
+import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
+import { optimizationExperimentInstrumentLabel } from '@thesis-ledger/schemas';
+import { LoadingState } from '@/components/ui/spinner';
 import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { requestFailureMessage } from '@/shared/api/request-error';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router';
-import {
-  ArrowLeft,
-  CheckCircle2,
-  ExternalLink,
-  FlaskConical,
-  MoreHorizontal,
-  RotateCcw,
-} from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FlaskConical, MoreHorizontal, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,35 +28,36 @@ import {
   fetchOptimizationAdoptionContext,
   fetchOptimizationCompare,
   fetchOptimizationExperiment,
-  finalizeOptimizationExperiment,
+  completeOptimizationExperiment,
   type OptimizationCandidate,
 } from './strategy-optimization.api.js';
 import {
   candidateAdoptionEligibility,
   candidateDiffSummary,
   candidateMetric,
-  canSelectCandidateForTest,
   canRevealTestMetrics,
   experimentStageLabels,
-  experimentStopReasonText,
   findStrategyVersion,
+  latestExperimentAdoption,
   metricRecord,
   metricValue,
-  scalarText,
   strategyVersionLabel,
 } from './strategy-experiment-detail.model.js';
 import {
-  ExperimentAdoptionReview,
   ExperimentCandidateDiff,
   ExperimentRunLinks,
   ExperimentRuntimeDetails,
 } from './StrategyExperimentDetailSections.js';
 import { strategyCenterPath } from './strategy-center.navigation.js';
 import { strategyKeys } from './strategy.queries.js';
+import { ExperimentReturnValue } from './ExperimentReturnValue.js';
+import { ExperimentEvaluationNote } from './ExperimentEvaluationNote.js';
+import { ExperimentAdoptionDialog } from './ExperimentAdoptionDialog.js';
+import { ExperimentFailureNotice } from './ExperimentFailureNotice.js';
 import type { StrategyRecord } from './strategy.types.js';
 const optimizationKey = ['desktop', 'strategy', 'optimization'] as const;
 const settledStatuses = new Set(['succeeded', 'failed', 'cancelled']);
-const nonPollingStatuses = new Set(['awaiting_finalization', 'succeeded', 'failed', 'cancelled']);
+const nonPollingStatuses = new Set(['succeeded', 'failed', 'cancelled']);
 
 export function StrategyExperimentDetailPage({ strategies }: { strategies: StrategyRecord[] }) {
   const { experimentId } = useParams();
@@ -69,9 +65,8 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
   const queryClient = useQueryClient();
   const toast = useToastManager();
   const view = searchParams.get('view') === 'runtime' ? 'runtime' : 'candidates';
-  const [lockedCandidateIds, setLockedCandidateIds] = useState<string[]>([]);
-  const [preselectedCandidateId, setPreselectedCandidateId] = useState<string | null>(null);
   const [reviewCandidate, setReviewCandidate] = useState<OptimizationCandidate | null>(null);
+  const adoptionTrigger = useRef<HTMLButtonElement | null>(null);
   const [writeReceipt, setWriteReceipt] = useState<string | null>(null);
   const [clonedExperimentId, setClonedExperimentId] = useState<string | null>(null);
   const errorToasts = useRef<Record<string, string>>({});
@@ -81,7 +76,11 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
     delete errorToasts.current[operation];
   };
   const reportOperationError = (operation: string, title: string, error: unknown) => {
-    errorToasts.current[operation] = toast.add({ title, description: requestFailureMessage(error, '请保留当前配置后重试'), type: 'error' });
+    errorToasts.current[operation] = toast.add({
+      title,
+      description: requestFailureMessage(error, '请保留当前配置后重试'),
+      type: 'error',
+    });
   };
   const [adoptedVersion, setAdoptedVersion] = useState<{
     id: string;
@@ -110,12 +109,6 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
   const candidates = detailQuery.data?.candidates ?? [];
   const attempts = detailQuery.data?.attempts ?? [];
   const compare = compareQuery.data;
-  const serverLockedCandidateIds = experiment?.lockedCandidateIds?.join(',') ?? '';
-  useEffect(() => {
-    if (!experiment) return;
-    setLockedCandidateIds(experiment.lockedCandidateIds ?? []);
-    setPreselectedCandidateId(experiment.selectedCandidateId ?? null);
-  }, [experiment?.id, experiment?.selectedCandidateId, serverLockedCandidateIds]);
   const baseline = experiment
     ? findStrategyVersion(strategies, experiment.baselineStrategyVersionId)
     : null;
@@ -128,17 +121,15 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
   const finalizeMutation = useMutation({
     onMutate: () => clearOperationError('finalize'),
     mutationFn: () => {
-      if (!experimentId || !preselectedCandidateId || lockedCandidateIds.length === 0)
-        throw new Error('请选择封存测试候选和预选候选');
-      return finalizeOptimizationExperiment(experimentId, {
-        candidateIds: lockedCandidateIds,
-        selectedCandidateId: preselectedCandidateId,
-        expectedStage: 'awaiting_finalization',
-      });
+      if (!experimentId) throw new Error('实验不存在');
+      return completeOptimizationExperiment(experimentId);
     },
     onSuccess: async () => {
       setWriteReceipt('封存测试请求已确认');
-      toast.add({ title: '封存测试请求已确认', description: '完成与结果揭示以重新读取的服务端状态为准。' });
+      toast.add({
+        title: '封存测试请求已确认',
+        description: '完成与结果揭示以重新读取的服务端状态为准。',
+      });
       await invalidate();
     },
     onError: (error) => reportOperationError('finalize', '封存测试未完成', error),
@@ -159,7 +150,11 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
     onSuccess: async (created) => {
       setWriteReceipt('实验已确认克隆');
       setClonedExperimentId(created.id);
-      queryClient.setQueryData([...optimizationKey, 'experiment', created.id], { experiment: created, candidates: [], attempts: [] });
+      queryClient.setQueryData([...optimizationKey, 'experiment', created.id], {
+        experiment: created,
+        candidates: [],
+        attempts: [],
+      });
       toast.add({ title: '实验已克隆' });
       await invalidate();
     },
@@ -170,21 +165,28 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
     queryFn: () => fetchOptimizationAdoptionContext(experimentId ?? '', reviewCandidate?.id ?? ''),
     enabled: Boolean(experimentId && reviewCandidate),
   });
-  const adoptionIntentKey = useMemo(() => createClientRequestId(), [experimentId, reviewCandidate?.id]);
+  const adoptionIntent = useRef<{
+    experimentId: string;
+    body: Parameters<typeof adoptOptimizationCandidate>[1];
+  } | null>(null);
   const adoptMutation = useMutation({
     onMutate: () => clearOperationError('adopt'),
     mutationFn: () => {
       const context = adoptionContextQuery.data;
       if (!experimentId || !reviewCandidate || !context) throw new Error('采纳上下文尚未就绪');
-      return adoptOptimizationCandidate(experimentId, {
-        candidateId: reviewCandidate.id,
-        candidateHash: reviewCandidate.executionHash,
-        expectedStrategyVersion: context.expectedStrategyVersion,
-        idempotencyKey: adoptionIntentKey,
-        acknowledgeTestExposure: reviewCandidate.id !== experiment?.selectedCandidateId,
-      });
+      if (adoptionIntent.current?.experimentId !== experimentId || adoptionIntent.current.body.candidateId !== reviewCandidate.id) {
+        adoptionIntent.current = { experimentId, body: {
+          candidateId: reviewCandidate.id,
+          candidateHash: reviewCandidate.executionHash,
+          expectedStrategyVersion: context.expectedStrategyVersion,
+          idempotencyKey: createClientRequestId(),
+          acknowledgeTestExposure: reviewCandidate.id !== experiment?.selectedCandidateId,
+        } };
+      }
+      return adoptOptimizationCandidate(experimentId, adoptionIntent.current.body);
     },
     onSuccess: async (result) => {
+      adoptionIntent.current = null;
       setWriteReceipt(`已采纳为正式策略 v${result.strategyVersion.version}`);
       setAdoptedVersion({
         id: result.strategyVersion.id,
@@ -194,20 +196,31 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
       setReviewCandidate(null);
       toast.add({
         title: `已采纳为正式策略 v${result.strategyVersion.version}`,
-        description: '已有风险应用不会自动更新或启用。',
+        description: result.detailsStatus === 'unavailable'
+          ? '正式版本已保存，风险规则预览暂不可用。已有风险应用保持当前状态。'
+          : '已有风险应用不会自动更新或启用。',
       });
       await invalidate();
     },
-    onError: (error) => reportOperationError('adopt', '采纳失败', error),
+    onError: async (error) => {
+      await invalidate();
+      const refreshed = queryClient.getQueryData<Awaited<ReturnType<typeof fetchOptimizationExperiment>>>(
+        [...optimizationKey, 'experiment', experimentId],
+      );
+      const committed = refreshed?.candidates.find((item) => item.id === reviewCandidate?.id);
+      if (committed?.adoptedStrategyVersionId && committed.executionHash === adoptionIntent.current?.body.candidateHash) {
+        adoptionIntent.current = null;
+        setWriteReceipt('候选已采纳，正式版本已保存');
+        setReviewCandidate(null);
+        toast.add({ title: '已确认采纳', description: '正式版本已保存。已有风险应用不会自动更新或启用。' });
+        return;
+      }
+      const title = error instanceof ThesisLedgerApiError && error.payload?.error === 'ADOPTION_OUTCOME_UNCONFIRMED'
+        ? '采纳结果待确认' : '采纳失败';
+      if (title !== '采纳结果待确认') adoptionIntent.current = null;
+      reportOperationError('adopt', title, error);
+    },
   });
-  const toggleLocked = (candidateId: string) => {
-    if (writesDisabled) return;
-    setLockedCandidateIds((current) => {
-      if (current.includes(candidateId)) return current.filter((id) => id !== candidateId);
-      if (current.length >= 3) return current;
-      return [...current, candidateId];
-    });
-  };
 
   if (detailQuery.isPending || compareQuery.isPending)
     return <LoadingState label="正在读取实验详情" />;
@@ -224,7 +237,11 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
 
   const retryRequired = experiment.stopReason?.startsWith('final_test_retry_required:') ?? false;
   const readFailed = detailQuery.isError || compareQuery.isError;
-  const writeBusy = finalizeMutation.isPending || cancelMutation.isPending || cloneMutation.isPending || adoptMutation.isPending;
+  const writeBusy =
+    finalizeMutation.isPending ||
+    cancelMutation.isPending ||
+    cloneMutation.isPending ||
+    adoptMutation.isPending;
   const writesDisabled = readFailed || writeBusy;
   const testRevealed = canRevealTestMetrics(experiment);
   const active = !settledStatuses.has(experiment.status);
@@ -233,41 +250,28 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
   const finalizedCandidate = candidates.find(
     (candidate) => candidate.id === experiment.selectedCandidateId,
   );
-  const persistedAdoptedCandidate = candidates.find(
-    (candidate) => candidate.adoptedStrategyVersionId,
-  );
-  const persistedAdoptedVersion = persistedAdoptedCandidate?.adoptedStrategyVersionId
-    ? findStrategyVersion(strategies, persistedAdoptedCandidate.adoptedStrategyVersionId)
-    : null;
-  const displayedAdoptedVersion =
-    adoptedVersion ??
-    (persistedAdoptedVersion
-      ? {
-          id: persistedAdoptedVersion.version.id,
-          strategyId: persistedAdoptedVersion.strategy.id,
-          version: persistedAdoptedVersion.version.version,
-        }
-      : null);
+  const displayedAdoptedVersion = latestExperimentAdoption(candidates, strategies, adoptedVersion);
 
   return (
-    <div className="space-y-4">
-      {clonedExperimentId ? <Button nativeButton={false} variant="outline" render={<Link to={strategyCenterPath.experiment(clonedExperimentId)}>查看克隆实验</Link>} /> : null}
+    <div className="flex flex-col gap-4">
+      <Link
+        to={strategyCenterPath.experiments}
+        className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'self-start' })}
+      >
+        <ArrowLeft data-icon="inline-start" aria-hidden="true" />
+        返回 AI 实验
+      </Link>
       {readFailed ? (
-        <DataStateBanner state="stale" description={`${writeReceipt ? `${writeReceipt}，无需重复提交。` : '显示的是上次读取结果；已确认创建或保存的实验无需重复提交。'}实验详情或对比读取失败，请先重新读取。`} onRetry={() => { void detailQuery.refetch(); void compareQuery.refetch(); }} />
+        <DataStateBanner
+          state="stale"
+          description={`${writeReceipt ? `${writeReceipt}，无需重复提交。` : '显示的是上次读取结果；已确认创建或保存的实验无需重复提交。'}实验详情或对比读取失败，请先重新读取。`}
+          onRetry={() => {
+            void detailQuery.refetch();
+            void compareQuery.refetch();
+          }}
+        />
       ) : null}
-      <Button
-        nativeButton={false}
-        render={
-          <Link to={strategyCenterPath.experiments}>
-            <ArrowLeft aria-hidden="true" />
-            返回 AI 实验
-          </Link>
-        }
-        variant="ghost"
-        size="sm"
-        className="-ml-2"
-      />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">策略中心 / AI 实验</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -276,56 +280,76 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
               {experimentStageLabels[experiment.stage] ?? experiment.stage}
             </Badge>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span>基线：</span>
-            {baseline ? (
-              <Link
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-                to={strategyCenterPath.strategyVersion(baseline.strategy.id, baseline.version.id)}
-              >
-                {baseline.strategy.name} {strategyVersionLabel(baseline.version)}
-              </Link>
-            ) : (
-              <span>{experiment.sourceMode === 'discovery' ? '从零探索' : '基线版本不可用'}</span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            {optimizationExperimentInstrumentLabel(experiment) && (
+              <span className="text-foreground">
+                {optimizationExperimentInstrumentLabel(experiment)}
+              </span>
             )}
-            <span>· 当前阶段：{experimentStageLabels[experiment.stage] ?? experiment.stage}</span>
+            <span className="inline-flex flex-wrap items-baseline gap-1">
+              <span>基线：</span>
+              {baseline ? (
+                <Link
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                  to={strategyCenterPath.strategyVersion(baseline.strategy.id, baseline.version.id)}
+                >
+                  {baseline.strategy.name} {strategyVersionLabel(baseline.version)}
+                </Link>
+              ) : (
+                <span>{experiment.sourceMode === 'discovery' ? '从零探索' : '基线版本不可用'}</span>
+              )}
+            </span>
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="outline" size="icon" aria-label="实验更多操作">
-                <MoreHorizontal aria-hidden="true" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              disabled={writesDisabled}
-              onClick={() => cloneMutation.mutate()}
+        <div className="contents">
+          {clonedExperimentId ? (
+            <Link
+              to={strategyCenterPath.experiment(clonedExperimentId)}
+              className={cn(
+                buttonVariants({
+                  variant: 'outline',
+                  size: 'sm',
+                  className:
+                    'col-span-2 row-start-2 justify-self-start shadow-none sm:col-span-1 sm:col-start-2 sm:row-start-1',
+                }),
+              )}
             >
-              克隆实验
-            </DropdownMenuItem>
-            {active ? (
-              <DropdownMenuItem
-                variant="destructive"
-                disabled={writesDisabled}
-                onClick={() => cancelMutation.mutate()}
-              >
-                取消实验
+              查看克隆实验
+            </Link>
+          ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="实验更多操作"
+                  className="col-start-2 row-start-1 sm:col-start-3"
+                >
+                  <MoreHorizontal aria-hidden="true" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={writesDisabled} onClick={() => cloneMutation.mutate()}>
+                克隆实验
               </DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {active ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={writesDisabled}
+                  onClick={() => cancelMutation.mutate()}
+                >
+                  取消实验
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {experiment.stopReason && !retryRequired ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-          <div className="font-medium">实验已停止</div>
-          <div className="mt-1 text-muted-foreground">
-            {experimentStopReasonText(experiment.stopReason)}
-          </div>
-        </div>
+      {(experiment.stopReason || experiment.status === 'failed') && !retryRequired ? (
+        <ExperimentFailureNotice experiment={experiment} disabled={writesDisabled} onRetried={invalidate} />
       ) : null}
 
       {displayedAdoptedVersion ? (
@@ -344,7 +368,6 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                 )}
               >
                 查看策略版本
-                <ExternalLink aria-hidden="true" />
               </Link>
             }
             variant="outline"
@@ -367,10 +390,10 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
           <TabsTrigger value="runtime">运行详情</TabsTrigger>
         </TabsList>
         <TabsContent value="candidates" className="space-y-4">
-          {!testRevealed && (experiment.stage === 'testing' || retryRequired) ? (
+          {!testRevealed && (['testing', 'awaiting_finalization'].includes(experiment.stage) || retryRequired) ? (
             <div className="flex gap-2 rounded-md border border-caution/40 bg-caution/5 p-3 text-sm">
               <FlaskConical className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              封存测试尚未全部完成，测试指标和质量结论保持隐藏。
+              封存测试完成后自动展示完整结果。
             </div>
           ) : null}
           {retryRequired ? (
@@ -389,25 +412,26 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                 >
                   放弃实验
                 </Button>
-                <Button
-                  disabled={writesDisabled}
-                  onClick={() => finalizeMutation.mutate()}
-                >
+                <Button disabled={writesDisabled} onClick={() => finalizeMutation.mutate()}>
                   <RotateCcw aria-hidden="true" />
                   重试未完成测试
                 </Button>
               </div>
             </div>
           ) : null}
-          <Card>
-            <CardHeader>
-              <CardTitle>候选比较</CardTitle>
-              <CardDescription>
+          <section className="flex flex-col gap-4" aria-label="候选比较">
+            <header className="flex flex-col gap-1">
+              <h3 className="text-xl font-medium">候选比较</h3>
+              <p className="text-sm text-muted-foreground">
                 基线始终作为固定对照。选择和采纳资格来自当前服务端状态。
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <TableContainer frame="plain" refreshing={compareQuery.isRefetching || detailQuery.isRefetching} refreshLabel="正在刷新实验候选">
+              </p>
+            </header>
+            <div className="flex flex-col gap-3">
+              <TableContainer
+                frame="plain"
+                refreshing={compareQuery.isRefetching || detailQuery.isRefetching}
+                refreshLabel="正在刷新实验候选"
+              >
                 <table className="w-full min-w-[900px] text-sm">
                   <TableHeader className="text-left">
                     <tr>
@@ -417,9 +441,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                       <TableHead className="text-right">最大回撤</TableHead>
                       <TableHead className="text-right">已平仓交易</TableHead>
                       <TableHead>资格</TableHead>
-                      <StickyTableActionHeader>
-                        操作
-                      </StickyTableActionHeader>
+                      <StickyTableActionHeader>操作</StickyTableActionHeader>
                     </tr>
                   </TableHeader>
                   <tbody className="divide-y">
@@ -429,10 +451,10 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                       </td>
                       <td className="px-3 py-3 text-muted-foreground">固定对照</td>
                       <td className="px-3 py-3 text-right">
-                        {metricValue(baselineValidation, ['totalReturn', 'return'])}
+                        <ExperimentReturnValue metrics={baselineValidation} />
                       </td>
                       <td className="px-3 py-3 text-right">
-                        {metricValue(baselineValidation, ['maxDrawdown'])}
+                        {metricValue(baselineValidation, ['maxDrawdown'], 'percent')}
                       </td>
                       <td className="px-3 py-3 text-right">
                         {metricValue(baselineValidation, ['closedTradeCount', 'tradeCount'])}
@@ -441,7 +463,10 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                         <Badge variant="outline">对照</Badge>
                       </td>
                       <StickyTableActionCell className="px-3 py-3">
-                        <ExperimentRunLinks className="justify-end" runRefs={compare?.baseline.runRefs ?? {}} />
+                        <ExperimentRunLinks
+                          className="justify-end"
+                          runRefs={compare?.baseline.runRefs ?? {}}
+                        />
                       </StickyTableActionCell>
                     </tr>
                     {candidates.map((candidate) => {
@@ -455,7 +480,7 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                         <tr key={candidate.id} className="align-top">
                           <td className="px-3 py-3">
                             <div className="font-medium">候选 {candidate.candidateNumber}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-1 max-w-64 whitespace-normal break-words text-xs text-muted-foreground">
                               {candidate.modelKey}
                             </div>
                           </td>
@@ -463,18 +488,19 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                             {candidateDiffSummary(candidate)}
                           </td>
                           <td className="px-3 py-3 text-right">
-                            {metricValue(validation, ['totalReturn', 'return'])}
+                            <ExperimentReturnValue metrics={validation} />
                             {testRevealed && test.totalReturn !== undefined ? (
                               <div className="mt-1 text-xs text-muted-foreground">
-                                测试：{scalarText(test.totalReturn)}
+                                测试：
+                                <ExperimentReturnValue metrics={test} keys={['totalReturn']} />
                               </div>
                             ) : null}
                           </td>
                           <td className="px-3 py-3 text-right">
-                            {metricValue(validation, ['maxDrawdown'])}
+                            {metricValue(validation, ['maxDrawdown'], 'percent')}
                             {testRevealed && test.maxDrawdown !== undefined ? (
                               <div className="mt-1 text-xs text-muted-foreground">
-                                测试：{scalarText(test.maxDrawdown)}
+                                测试：{metricValue(test, ['maxDrawdown'], 'percent')}
                               </div>
                             ) : null}
                           </td>
@@ -491,44 +517,14 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                             <Badge variant={adoptionBlock ? 'outline' : 'default'}>
                               {adoptionBlock ?? '可采纳'}
                             </Badge>
+                            {testRevealed ? <ExperimentEvaluationNote metrics={test} /> : null}
                           </td>
                           <StickyTableActionCell className="px-3 py-3">
                             <div className="flex flex-col items-end gap-2">
-                              <ExperimentRunLinks className="justify-end" runRefs={candidate.runRefs} />
-                              {canSelectCandidateForTest(experiment, candidate, retryRequired) ? (
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="xs"
-                                    variant={
-                                      lockedCandidateIds.includes(candidate.id)
-                                        ? 'default'
-                                        : 'outline'
-                                    }
-                                    onClick={() => toggleLocked(candidate.id)}
-                                  >
-                                    {lockedCandidateIds.includes(candidate.id)
-                                      ? '已选测试'
-                                      : '进入测试'}
-                                  </Button>
-                                  <Button
-                                    size="xs"
-                                    variant={
-                                      preselectedCandidateId === candidate.id
-                                        ? 'default'
-                                        : 'outline'
-                                    }
-                                    onClick={() => {
-                                      setPreselectedCandidateId(candidate.id);
-                                      if (!lockedCandidateIds.includes(candidate.id))
-                                        setLockedCandidateIds((current) =>
-                                          [...current, candidate.id].slice(0, 3),
-                                        );
-                                    }}
-                                  >
-                                    预选采纳
-                                  </Button>
-                                </div>
-                              ) : null}
+                              <ExperimentRunLinks
+                                className="justify-end"
+                                runRefs={candidate.runRefs}
+                              />
                               {candidateAdoptedVersion ? (
                                 <Button
                                   nativeButton={false}
@@ -540,7 +536,6 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                                       )}
                                     >
                                       查看已采纳版本
-                                      <ExternalLink aria-hidden="true" />
                                     </Link>
                                   }
                                   size="xs"
@@ -548,7 +543,14 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
                                 />
                               ) : null}
                               {!adoptionBlock && !candidate.adoptedStrategyVersionId ? (
-                      <Button size="xs" disabled={writesDisabled} onClick={() => setReviewCandidate(candidate)}>
+                                <Button
+                                  size="xs"
+                                  disabled={writesDisabled}
+                                  onClick={(event) => {
+                                    adoptionTrigger.current = event.currentTarget;
+                                    setReviewCandidate(candidate);
+                                  }}
+                                >
                                   审阅并采纳
                                 </Button>
                               ) : null}
@@ -563,50 +565,12 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
               {candidates.map((candidate) => (
                 <ExperimentCandidateDiff key={candidate.id} candidate={candidate} />
               ))}
-              {experiment.stage === 'awaiting_finalization' && !retryRequired ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/20 p-3">
-                  <div className="text-sm">
-                    <div className="font-medium">
-                      已选择 {lockedCandidateIds.length} 个封存测试候选
-                    </div>
-                    <div className="text-muted-foreground">
-                      最多 3 个，预选候选必须包含在测试批次中。
-                    </div>
-                  </div>
-                  <Button
-                    aria-busy={finalizeMutation.isPending}
-                    disabled={
-                      writesDisabled ||
-                      lockedCandidateIds.length === 0 ||
-                      !preselectedCandidateId
-                    }
-                    onClick={() => finalizeMutation.mutate()}
-                  >
-                    {finalizeMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-                    {finalizeMutation.isPending ? '封存测试中…' : '锁定并运行封存测试'}
-                  </Button>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-          {reviewCandidate && adoptionContextQuery.isPending ? (
-            <LoadingState label="正在读取三方差异" />
-          ) : null}
-          {reviewCandidate && adoptionContextQuery.isError ? (
-            <DataStateBanner state="error" onRetry={() => void adoptionContextQuery.refetch()} />
-          ) : null}
-          {reviewCandidate && adoptionContextQuery.data ? (
-            <ExperimentAdoptionReview
-              context={adoptionContextQuery.data}
-              pending={adoptMutation.isPending || readFailed}
-              acknowledgeExposure={reviewCandidate.id !== finalizedCandidate?.id}
-              onConfirm={() => adoptMutation.mutate()}
-              onCancel={() => { if (!adoptMutation.isPending) setReviewCandidate(null); }}
-            />
-          ) : null}
+            </div>
+          </section>
           {testRevealed && baselineTest.totalReturn !== undefined ? (
             <p className="text-xs text-muted-foreground">
-              基线封存测试收益：{scalarText(baselineTest.totalReturn)}
+              基线封存测试收益：
+              <ExperimentReturnValue metrics={baselineTest} keys={['totalReturn']} />
             </p>
           ) : null}
         </TabsContent>
@@ -614,6 +578,20 @@ export function StrategyExperimentDetailPage({ strategies }: { strategies: Strat
           <ExperimentRuntimeDetails experiment={experiment} attempts={attempts} />
         </TabsContent>
       </Tabs>
+      <ExperimentAdoptionDialog
+        open={reviewCandidate !== null}
+        candidateNumber={reviewCandidate?.candidateNumber}
+        context={adoptionContextQuery.data}
+        loading={adoptionContextQuery.isPending}
+        error={adoptionContextQuery.isError}
+        submitting={adoptMutation.isPending}
+        disabled={readFailed}
+        acknowledgeExposure={reviewCandidate?.id !== finalizedCandidate?.id}
+        onRetry={() => void adoptionContextQuery.refetch()}
+        onConfirm={() => adoptMutation.mutate()}
+        onClose={() => setReviewCandidate(null)}
+        returnFocus={() => adoptionTrigger.current}
+      />
     </div>
   );
 }

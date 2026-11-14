@@ -7,7 +7,7 @@ import { controlledHash, controlledFingerprint } from './ai-controlled-config-co
 import { createLocalApi } from './market-route-failover-acceptance.mjs';
 import { readFundTarget, fundProviderState } from './fund-calibration-target.mjs';
 import { fundPolicyFingerprint } from './fund-nav-route-case.mjs';
-import { sourceState } from '../../thesis-ledger-infra/scripts/research-dual-read.mjs';
+import { sourceState } from '../../thesis-ledger/scripts/local-runtime/research-dual-read.mjs';
 import { marketRouteKeyIdV3 } from '../packages/schemas/dist/index.js';
 
 const key = {

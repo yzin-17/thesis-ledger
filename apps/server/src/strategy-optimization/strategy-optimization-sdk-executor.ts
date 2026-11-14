@@ -302,7 +302,9 @@ export class StrategyOptimizationSdkExecutor {
             ? { requestOptions: input.resolved.execution.requestOptions }
             : {}),
           transport: 'stream',
-          maxOutputTokens: input.outputTokenReservation,
+          ...(toRecord(input.experiment.budget).maxOutputTokens === 0
+            ? {}
+            : { maxOutputTokens: input.outputTokenReservation }),
           ...(input.route.reasoningEffort === undefined
             ? {}
             : { reasoningEffort: input.route.reasoningEffort }),

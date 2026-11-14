@@ -85,43 +85,12 @@ export class PerformanceLayerService {
       }),
     );
     const cashBalances = projectCashBalances(ledger as StoredCashEvent[], valuedAt);
-    const byAccountCurrency = new Map<string, Map<Currency, NativeCurrencyTotals>>();
-    const ensureAccountCurrency = (id: string, currency: Currency) => {
-      const currenciesForAccount =
-        byAccountCurrency.get(id) ?? new Map<Currency, NativeCurrencyTotals>();
-      const current = currenciesForAccount.get(currency) ?? {
-        currency,
-        nativeCostValue: 0,
-        nativeMarketValue: 0,
-        nativeCashValue: 0,
-        partial: false,
-        missingSymbols: [],
-      };
-      currenciesForAccount.set(currency, current);
-      byAccountCurrency.set(id, currenciesForAccount);
-      return current;
-    };
-    for (const [id, currency] of accountCurrencyMap.entries()) {
-      if (!id.startsWith('__currency-')) ensureAccountCurrency(id, currency);
-    }
-    if (accountId) ensureAccountCurrency(accountId, accountCurrencyMap.get(accountId) ?? 'CNY');
-    const cashAmounts = [...cashBalances.entries()].flatMap(([id, byCurrency]) =>
-      [...byCurrency.entries()].map(([rawCurrency, amount]) => {
-        const currency = supportedCurrency(rawCurrency) ?? accountCurrencyMap.get(id) ?? 'CNY';
-        const current = ensureAccountCurrency(id, currency);
-        current.nativeCashValue += amount.toNumber();
-        return { accountId: id, currency, amount: amount.toNumber() };
-      }),
+    const { byAccountCurrency, cashAmounts } = nativeAccountBalances(
+      accountCurrencyMap,
+      accountId,
+      cashBalances,
+      securityNative,
     );
-    for (const item of securityNative) {
-      const current = ensureAccountCurrency(item.accountId, item.currency);
-      current.nativeCostValue += item.nativeCostValue;
-      current.nativeMarketValue += item.nativeMarketValue ?? 0;
-      if (item.nativeMarketValue === null) {
-        current.partial = true;
-        current.missingSymbols.push(item.symbol);
-      }
-    }
     const currencies = [
       ...new Set([
         ...accountCurrencyMap.values(),
@@ -212,47 +181,7 @@ export class PerformanceLayerService {
         ],
       };
     });
-    const byCurrencyMap = new Map<Currency, NativeCurrencyTotals>();
-    for (const rowsByCurrency of byAccountCurrency.values()) {
-      for (const value of rowsByCurrency.values()) {
-        const current = byCurrencyMap.get(value.currency) ?? {
-          currency: value.currency,
-          nativeCostValue: 0,
-          nativeMarketValue: 0,
-          nativeCashValue: 0,
-          partial: false,
-          missingSymbols: [],
-        };
-        current.nativeCostValue += value.nativeCostValue;
-        current.nativeMarketValue += value.nativeMarketValue;
-        current.nativeCashValue += value.nativeCashValue;
-        current.partial ||= value.partial;
-        current.missingSymbols.push(...value.missingSymbols);
-        byCurrencyMap.set(value.currency, current);
-      }
-    }
-    for (const currency of currencies) {
-      if (!byCurrencyMap.has(currency))
-        byCurrencyMap.set(currency, {
-          currency,
-          nativeCostValue: 0,
-          nativeMarketValue: 0,
-          nativeCashValue: 0,
-          partial: false,
-          missingSymbols: [],
-        });
-    }
-    const byCurrency = [...byCurrencyMap.values()].map((value) => ({
-      currency: value.currency,
-      nativeCostValue: value.nativeCostValue,
-      nativeMarketValue: value.nativeMarketValue,
-      nativeCashValue: value.nativeCashValue,
-      costValue: value.nativeCostValue,
-      marketValue: value.nativeMarketValue,
-      cashValue: value.nativeCashValue,
-      partial: value.partial,
-      missingSymbols: [...new Set(value.missingSymbols)],
-    }));
+    const byCurrency = nativeCurrencyLayers(byAccountCurrency, currencies);
     const hasSingleCurrency = byCurrency.length <= 1;
     const nativePortfolio = hasSingleCurrency
       ? byCurrency.reduce(
@@ -320,4 +249,107 @@ export class PerformanceLayerService {
       },
     };
   }
+}
+
+type NativeSecurityAmount = {
+  accountId: string;
+  symbol: string;
+  currency: Currency;
+  nativeCostValue: number;
+  nativeMarketValue: number | null;
+};
+type AccountCurrencyTotals = Map<string, Map<Currency, NativeCurrencyTotals>>;
+function nativeAccountBalances(
+  accountCurrencyMap: Map<string, Currency>,
+  accountId: string | undefined,
+  cashBalances: ReturnType<typeof projectCashBalances>,
+  securityNative: readonly NativeSecurityAmount[],
+) {
+  const byAccountCurrency = new Map<string, Map<Currency, NativeCurrencyTotals>>();
+  const ensureAccountCurrency = (id: string, currency: Currency) => {
+    const currenciesForAccount =
+      byAccountCurrency.get(id) ?? new Map<Currency, NativeCurrencyTotals>();
+    const current = currenciesForAccount.get(currency) ?? {
+      currency,
+      nativeCostValue: 0,
+      nativeMarketValue: 0,
+      nativeCashValue: 0,
+      partial: false,
+      missingSymbols: [],
+    };
+    currenciesForAccount.set(currency, current);
+    byAccountCurrency.set(id, currenciesForAccount);
+    return current;
+  };
+  for (const [id, currency] of accountCurrencyMap.entries()) {
+    if (!id.startsWith('__currency-')) ensureAccountCurrency(id, currency);
+  }
+  if (accountId) ensureAccountCurrency(accountId, accountCurrencyMap.get(accountId) ?? 'CNY');
+  const cashAmounts = [...cashBalances.entries()].flatMap(([id, byCurrency]) =>
+    [...byCurrency.entries()].map(([rawCurrency, amount]) => {
+      const currency = supportedCurrency(rawCurrency) ?? accountCurrencyMap.get(id) ?? 'CNY';
+      const current = ensureAccountCurrency(id, currency);
+      current.nativeCashValue += amount.toNumber();
+      return { accountId: id, currency, amount: amount.toNumber() };
+    }),
+  );
+  for (const item of securityNative) {
+    const current = ensureAccountCurrency(item.accountId, item.currency);
+    current.nativeCostValue += item.nativeCostValue;
+    current.nativeMarketValue += item.nativeMarketValue ?? 0;
+    if (item.nativeMarketValue === null) {
+      current.partial = true;
+      current.missingSymbols.push(item.symbol);
+    }
+  }
+
+  return { byAccountCurrency, cashAmounts };
+}
+function nativeCurrencyLayers(
+  byAccountCurrency: AccountCurrencyTotals,
+  currencies: readonly Currency[],
+) {
+  const byCurrencyMap = new Map<Currency, NativeCurrencyTotals>();
+  for (const rowsByCurrency of byAccountCurrency.values()) {
+    for (const value of rowsByCurrency.values()) {
+      const current = byCurrencyMap.get(value.currency) ?? {
+        currency: value.currency,
+        nativeCostValue: 0,
+        nativeMarketValue: 0,
+        nativeCashValue: 0,
+        partial: false,
+        missingSymbols: [],
+      };
+      current.nativeCostValue += value.nativeCostValue;
+      current.nativeMarketValue += value.nativeMarketValue;
+      current.nativeCashValue += value.nativeCashValue;
+      current.partial ||= value.partial;
+      current.missingSymbols.push(...value.missingSymbols);
+      byCurrencyMap.set(value.currency, current);
+    }
+  }
+  for (const currency of currencies) {
+    if (!byCurrencyMap.has(currency))
+      byCurrencyMap.set(currency, {
+        currency,
+        nativeCostValue: 0,
+        nativeMarketValue: 0,
+        nativeCashValue: 0,
+        partial: false,
+        missingSymbols: [],
+      });
+  }
+  const byCurrency = [...byCurrencyMap.values()].map((value) => ({
+    currency: value.currency,
+    nativeCostValue: value.nativeCostValue,
+    nativeMarketValue: value.nativeMarketValue,
+    nativeCashValue: value.nativeCashValue,
+    costValue: value.nativeCostValue,
+    marketValue: value.nativeMarketValue,
+    cashValue: value.nativeCashValue,
+    partial: value.partial,
+    missingSymbols: [...new Set(value.missingSymbols)],
+  }));
+
+  return byCurrency;
 }

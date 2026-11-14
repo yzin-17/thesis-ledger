@@ -22,9 +22,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CheckIcon, ChevronDownIcon, LoaderCircle } from 'lucide-react';
+import { useRiskRuleNotification } from './useRiskRuleNotification.js';
+import { RiskRuleEnableField } from './RiskRuleEnableField.js';
+import { RiskRuleNotificationFields } from './RiskRuleNotificationFields.js';
+import { riskRuleNotificationForm, parseRuleNotificationForm, riskRuleNotificationErrors, type RuleNotificationForm } from './risk-rule-notification-form.js';
 
 import { accountDisplayLabel, type Account, type Position } from '../portfolio/portfolio.types.js';
 import type {
@@ -47,6 +50,7 @@ import {
 } from './risk.format.js';
 
 type RuleDraft = {
+  notification?: RuleNotificationForm;
   kind: string;
   scope: RiskRuleScope;
   severity: RiskRuleSeverity;
@@ -57,10 +61,11 @@ type RuleDraft = {
 };
 
 type RuleErrors = Partial<
-  Record<'kind' | 'scope' | 'severity' | 'threshold' | 'symbol' | 'accountId', string>
+  Record<'kind' | 'scope' | 'severity' | 'threshold' | 'symbol' | 'accountId' | 'notification', string>
 >;
 
 const emptyDraft: RuleDraft = {
+  notification: riskRuleNotificationForm(null),
   kind: 'price-below',
   scope: 'security',
   severity: 'warning',
@@ -78,6 +83,7 @@ const draftFromRule = (rule: RiskRuleRecord | null): RuleDraft => {
     ? ratioToPercentText(rule.threshold)
     : String(rule.threshold);
   return {
+    notification: riskRuleNotificationForm(rule),
     kind: rule.kind,
     scope: rule.scope,
     severity: rule.severity,
@@ -131,7 +137,7 @@ export const validateDraft = (
   draft: RuleDraft,
   existingScope: RiskRuleScope | null = null,
 ): RuleErrors => {
-  const errors: RuleErrors = {};
+  const errors: RuleErrors = riskRuleNotificationErrors(draft.notification);
   const thresholdInput = parseThreshold(draft.kind, draft.threshold);
   if (!draft.kind) errors.kind = '请选择规则类型。';
   if (!draft.scope) errors.scope = '请选择规则范围。';
@@ -163,6 +169,7 @@ export const toInput = (draft: RuleDraft): CreateRiskRuleInput => {
   const threshold = parseThreshold(draft.kind, draft.threshold);
   if (threshold === null) throw new Error('请输入有效阈值。');
   return {
+    ...(draft.notification ? { notification: parseRuleNotificationForm(draft.notification) } : {}),
     kind: draft.kind,
     scope: draft.scope,
     severity: draft.severity,
@@ -195,6 +202,7 @@ export function RiskRuleEditorSheet({
   const [draft, setDraft] = useState<RuleDraft>(emptyDraft);
   const [errors, setErrors] = useState<RuleErrors>({});
   const [kindOpen, setKindOpen] = useState(false);
+  const notification = useRiskRuleNotification(draft.notification);
   const [kindQuery, setKindQuery] = useState(riskRuleKindLabel(emptyDraft.kind));
   const editing = Boolean(rule);
   const securityNeedsAccount = riskRuleNeedsAccount(draft.kind);
@@ -326,10 +334,10 @@ export function RiskRuleEditorSheet({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending || readOnly) return;
-    const nextErrors = validateDraft(draft, rule?.scope ?? null);
+    const nextErrors = { ...validateDraft(draft, rule?.scope ?? null), ...notification.errors };
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    const saved = await onSubmit(toInput(draft));
+    const saved = await onSubmit(toInput({ ...draft, notification: notification.value }));
     if (saved) onOpenChange(false);
   };
 
@@ -636,20 +644,9 @@ export function RiskRuleEditorSheet({
                 {errors.severity && <FieldError>{errors.severity}</FieldError>}
               </Field>
 
-              <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
-                <div>
-                  <p className="m-0 text-sm font-medium">启用规则</p>
-                  <p className="field-hint">启用后会参与下一次当前模式风险扫描。</p>
-                </div>
-                <Switch
-                  variant="risk"
-                  checked={draft.enabled}
-                  aria-label="启用规则"
-                  onCheckedChange={(checked) => updateDraft('enabled', checked)}
-                >
-                  <SwitchThumb variant="risk" />
-                </Switch>
-              </div>
+              <RiskRuleNotificationFields value={notification.value} onChange={(value) => updateDraft('notification', value)} routes={notification.routes}
+                state={notification.state} disabled={pending || readOnly} onRetry={notification.retry} error={errors.notification} />
+              <RiskRuleEnableField enabled={draft.enabled} onChange={(enabled) => updateDraft('enabled', enabled)} />
 
               <div className="rounded-md bg-muted/50 p-3" aria-live="polite">
                 <p className="m-0 text-xs font-medium text-muted-foreground">规则预览</p>

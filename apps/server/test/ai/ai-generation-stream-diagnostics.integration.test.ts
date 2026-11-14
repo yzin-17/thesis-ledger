@@ -134,14 +134,7 @@ describe('G3 当前 SDK 的真实本地 SSE 回放', () => {
       const diagnostic = failure?.fact.diagnostic;
       const stream = diagnostic?.runtime?.stream;
       const sha256 = createHash('sha256').update(chunks.join('')).digest('hex');
-      expect(stream?.provider?.text.sha256).toBe(sha256);
-      expect(stream?.sdk.text.sha256).toBe(sha256);
-      expect(stream?.provider?.reasoning.sha256).toBe(stream?.sdk.reasoning.sha256);
-      expect(stream?.provider?.reportedUsage).toEqual({
-        inputTokens: 7,
-        outputTokens: 9,
-        reasoningTokens: 8,
-      });
+      assertStreamFingerprintsAndUsage(stream, sha256);
       if (expected !== 'output_truncated') {
         expect(diagnostic?.jsonStatus).toBe(expected);
         expect(diagnostic?.outputSha256).toBe(sha256);
@@ -159,3 +152,19 @@ describe('G3 当前 SDK 的真实本地 SSE 回放', () => {
     }
   });
 });
+
+function assertStreamFingerprintsAndUsage(
+  stream:
+    | NonNullable<NonNullable<AiSdkGenerationError['fact']['diagnostic']>['runtime']>['stream']
+    | undefined,
+  sha256: string,
+) {
+  expect(stream?.provider?.text.sha256).toBe(sha256);
+  expect(stream?.sdk.text.sha256).toBe(sha256);
+  expect(stream?.provider?.reasoning.sha256).toBe(stream?.sdk.reasoning.sha256);
+  expect(stream?.provider?.reportedUsage).toEqual({
+    inputTokens: 7,
+    outputTokens: 9,
+    reasoningTokens: 8,
+  });
+}

@@ -46,7 +46,112 @@ const errorMessage = (error: unknown) => {
   return '提交失败，请稍后重试。';
 };
 
-export function PortfolioTradeOpeningBoundarySheet({
+export function PortfolioTradeOpeningBoundarySheet(props: {
+  detail: TradeDetailResponse;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  readOnly?: boolean;
+}) {
+  const control = usePortfolioTradeOpeningBoundary(props);
+  const {
+    open,
+    requestClose,
+    setDirty,
+    submit,
+    error,
+    openingAt,
+    busy,
+    writeConfirmed,
+    readOnly,
+    setOpeningAt,
+    reason,
+    setReason,
+    readSavedTrades,
+    submitLabel,
+  } = control;
+  return (
+    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
+      <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden p-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+          <SheetHeader>
+            <SheetTitle>补录建仓时间</SheetTitle>
+            <SheetDescription>
+              这是用户补录的历史边界，不会生成买入成交；原始持仓快照仍会保留。
+            </SheetDescription>
+          </SheetHeader>
+          <form
+            onChangeCapture={() => setDirty(true)}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
+            onSubmit={(formEvent) => void submit(formEvent)}
+          >
+            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto scroll-p-2 px-1 py-1">
+              <FieldGroup>
+                <Field invalid={Boolean(error && !openingAt)}>
+                  <FieldLabel htmlFor="trade-opening-boundary-at">建仓时间</FieldLabel>
+                  <DateInput
+                    id="trade-opening-boundary-at"
+                    type="datetime-local"
+                    value={openingAt}
+                    max={currentLocalDateTime()}
+                    step={60}
+                    disabled={busy || writeConfirmed || readOnly}
+                    onChange={(inputEvent) => setOpeningAt(inputEvent.target.value)}
+                    required
+                  />
+                  <FieldDescription>精确到分钟；不能晚于当前时间或最早持仓证据。</FieldDescription>
+                </Field>
+                <Field invalid={Boolean(error && !reason.trim())}>
+                  <FieldLabel htmlFor="trade-opening-boundary-reason">补录依据</FieldLabel>
+                  <Textarea
+                    id="trade-opening-boundary-reason"
+                    value={reason}
+                    onChange={(inputEvent) => setReason(inputEvent.target.value)}
+                    placeholder="例如：券商历史账单显示首次买入时间"
+                    rows={4}
+                    disabled={busy || writeConfirmed || readOnly}
+                    required
+                  />
+                  <FieldDescription>请说明时间来自哪一份账单、记录或其他依据。</FieldDescription>
+                </Field>
+                {writeConfirmed && error ? (
+                  <Alert>
+                    <AlertTitle>补录已保存</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {error && !writeConfirmed ? (
+                  <Field invalid>
+                    <FieldError>{error}</FieldError>
+                  </Field>
+                ) : null}
+              </FieldGroup>
+            </div>
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void requestClose(false)}
+                disabled={busy}
+              >
+                取消
+              </Button>
+              <Button
+                type={writeConfirmed ? 'button' : 'submit'}
+                disabled={busy || (!writeConfirmed && readOnly)}
+                onClick={writeConfirmed ? () => void readSavedTrades() : undefined}
+              >
+                {busy ? <Loader2Icon data-icon="inline-start" className="animate-spin" /> : null}
+                {submitLabel}
+              </Button>
+            </SheetFooter>
+          </form>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function usePortfolioTradeOpeningBoundary({
   detail,
   open,
   onOpenChange,
@@ -186,84 +291,20 @@ export function PortfolioTradeOpeningBoundarySheet({
   if (writeConfirmed) submitLabel = confirmingRead ? '读取中…' : '重新读取交易';
   else if (busy) submitLabel = '补录中…';
 
-  return (
-    <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
-      <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden p-6">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
-          <SheetHeader>
-            <SheetTitle>补录建仓时间</SheetTitle>
-            <SheetDescription>
-              这是用户补录的历史边界，不会生成买入成交；原始持仓快照仍会保留。
-            </SheetDescription>
-          </SheetHeader>
-          <form
-            onChangeCapture={() => setDirty(true)}
-            className="flex min-h-0 min-w-0 flex-1 flex-col gap-6"
-            onSubmit={(formEvent) => void submit(formEvent)}
-          >
-            <div className="-mx-1 -my-1 min-h-0 flex-1 overflow-y-auto scroll-p-2 px-1 py-1">
-              <FieldGroup>
-                <Field invalid={Boolean(error && !openingAt)}>
-                  <FieldLabel htmlFor="trade-opening-boundary-at">建仓时间</FieldLabel>
-                  <DateInput
-                    id="trade-opening-boundary-at"
-                    type="datetime-local"
-                    value={openingAt}
-                    max={currentLocalDateTime()}
-                    step={60}
-                    disabled={busy || writeConfirmed || readOnly}
-                    onChange={(inputEvent) => setOpeningAt(inputEvent.target.value)}
-                    required
-                  />
-                  <FieldDescription>精确到分钟；不能晚于当前时间或最早持仓证据。</FieldDescription>
-                </Field>
-                <Field invalid={Boolean(error && !reason.trim())}>
-                  <FieldLabel htmlFor="trade-opening-boundary-reason">补录依据</FieldLabel>
-                  <Textarea
-                    id="trade-opening-boundary-reason"
-                    value={reason}
-                    onChange={(inputEvent) => setReason(inputEvent.target.value)}
-                    placeholder="例如：券商历史账单显示首次买入时间"
-                    rows={4}
-                    disabled={busy || writeConfirmed || readOnly}
-                    required
-                  />
-                  <FieldDescription>请说明时间来自哪一份账单、记录或其他依据。</FieldDescription>
-                </Field>
-                {writeConfirmed && error ? (
-                  <Alert>
-                    <AlertTitle>补录已保存</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                ) : null}
-                {error && !writeConfirmed ? (
-                  <Field invalid>
-                    <FieldError>{error}</FieldError>
-                  </Field>
-                ) : null}
-              </FieldGroup>
-            </div>
-            <SheetFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void requestClose(false)}
-                disabled={busy}
-              >
-                取消
-              </Button>
-              <Button
-                type={writeConfirmed ? 'button' : 'submit'}
-                disabled={busy || (!writeConfirmed && readOnly)}
-                onClick={writeConfirmed ? () => void readSavedTrades() : undefined}
-              >
-                {busy ? <Loader2Icon data-icon="inline-start" className="animate-spin" /> : null}
-                {submitLabel}
-              </Button>
-            </SheetFooter>
-          </form>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
+  return {
+    open,
+    requestClose,
+    setDirty,
+    submit,
+    error,
+    openingAt,
+    busy,
+    writeConfirmed,
+    readOnly,
+    setOpeningAt,
+    reason,
+    setReason,
+    readSavedTrades,
+    submitLabel,
+  };
 }

@@ -101,6 +101,19 @@ const createHarness = () => {
 };
 
 describe('Ledger position baseline composite mutations', () => {
+  it.each([
+    ['00700.HK','HK','HKD'], ['AAPL.US','US','USD'], ['600036.SH','CN','CNY'],
+  ])('手工保存 %s 为新资产设置正确市场币种并保留精度', async (symbol, market, currency) => {
+    const harness = createHarness();
+    await harness.service.setPosition(accountA, symbol, '0.1234567890123456789', '12.1234567890123456789', 'manual', '受控持仓');
+    expect(harness.transaction.asset.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ symbol, market, currency, identityStatus: 'confirmed' }),
+    }));
+    expect(harness.appendRevision).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      payload: expect.objectContaining({ symbol, currency, quantity: '0.1234567890123456789', averageCost: '12.1234567890123456789' }),
+    }));
+  });
+
   beforeEach(() => {
     rebuildLedgerProjection.mockClear();
   });

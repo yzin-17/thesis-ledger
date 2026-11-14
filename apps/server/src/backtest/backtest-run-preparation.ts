@@ -5,6 +5,11 @@ import {
   type BacktestRunPreparationRequestV3,
   type BacktestRunPreparationTerminalResultV3 as BacktestRunPreparationResultV3,
   type BacktestStrategy,
+  type BacktestSnapshotActualSourceV3,
+  runConfigSchemaV3,
+  type RunConfigV3,
+  type MarketDataBarRouteKeyV3,
+  priceResearchStrategyIssues,
 } from '@thesis-ledger/schemas';
 import {
   resolveBacktestPreparationProtocolV3,
@@ -34,8 +39,9 @@ import {
   preparationDiagnostic,
   preparationRouteContext,
 } from './backtest-preparation-context.js';
+import { readPriceResearchReference } from './backtest-price-research-input.js';
 
-export async function prepareBacktestRunConfigV3(input: {
+type BacktestPreparationInput = {
   request: BacktestRunPreparationRequestV3;
   strategy: BacktestStrategy;
   reader: Pick<MarketBarReader, 'readV3'>;
@@ -43,11 +49,158 @@ export async function prepareBacktestRunConfigV3(input: {
   checkedAt: string;
   lifecycle?: MarketLifecycleReadPortV3;
   knownCash?: KnownCashAcquisitionPortV3;
-}): Promise<BacktestRunPreparationResultV3> {
-  const { request, strategy, reader, control, checkedAt } = input;
+};
+
+export async function prepareBacktestRunConfigV3(
+  input: BacktestPreparationInput,
+): Promise<BacktestRunPreparationResultV3> {
+  const { request, strategy, control, checkedAt } = input;
   const blocked = (message: string) =>
     preparationBlocked(request, checkedAt, [preparationDiagnostic(request, message)]);
   const instrument = strategy.executionInstrument;
+  const plans = preparationPricePlan(input);
+  if (plans.status === 'blocked') return plans.result;
+  const { pricePlan, acquisitionPlan } = plans;
+  const routeKey = marketDataBarRouteKeyV3Schema.parse({
+    kind: 'bar',
+    market: instrument.market,
+    assetType: instrument.assetType === 'stock' ? 'STOCK' : 'ETF',
+    capability: 'DAILY_BAR',
+    timeframe: '1d',
+    adjustment: request.adjustment,
+  });
+  let routeContext: ReturnType<typeof preparationRouteContext>;
+  let policy: unknown;
+  try {
+    policy = await control.getPolicy();
+    routeContext = preparationRouteContext(policy, routeKey);
+  } catch {
+    return blocked('执行路由未应用、已失效或未配置，无法准备当前协议。');
+  }
+
+  const acquisition = await acquirePreparationWindow(
+    input,
+    routeKey,
+    pricePlan,
+    acquisitionPlan,
+    routeContext,
+  );
+  if (acquisition.status === 'blocked') return acquisition.result;
+  const {
+    window,
+    requirement,
+    selection,
+    readResult,
+    frozenExecutionWindow,
+    lifecyclePreparation,
+    acquiredExecution,
+  } = acquisition;
+  const protocol = await resolveBacktestPreparationProtocolV3({
+    request,
+    response: selection.response,
+    revisions: {
+      desiredRevision: routeContext.desiredRevision,
+      effectivePolicyRevision: selection.effectivePolicyRevision,
+      catalogRevision: selection.catalogRevision,
+    },
+    ...(input.knownCash ? { knownCash: input.knownCash } : {}),
+  });
+  if (protocol.status === 'blocked') return blocked(protocol.message);
+  const { executionPriceProtocol, knownCashPreparation, dataAsOf } = protocol;
+
+  const configResult = preparedRunConfigV3(
+    request,
+    {
+      dataAsOf,
+      frozenExecutionWindow,
+      lifecyclePreparation,
+      executionPriceProtocol,
+      knownCashPreparation,
+    },
+    pricePlan.signalSources.map((source) => source.id),
+    strategy.signalSources
+      .filter((source) => source.priceCoordinate === 'actual')
+      .map((source) => source.id),
+  );
+  if (!configResult.success) return blocked('实际来源价格事实与所选记账方式或执行模型不兼容。');
+  let runConfig = configResult.data;
+  let actualPriceSource: BacktestSnapshotActualSourceV3 | undefined;
+  if (request.priceResearch) {
+    try {
+      const reference = await preparedResearchReference(
+        input,
+        runConfig,
+        acquiredExecution,
+        request.priceResearch,
+      );
+      actualPriceSource = reference.actualPriceSource;
+      runConfig = reference.runConfig;
+    } catch (error) {
+      return blocked(error instanceof Error ? error.message : '原价参考准备失败');
+    }
+  }
+  const inputPlan = planSnapshotInputsV3({ strategy, runConfig });
+  const executionPreflight = await preflightBacktestExecutionWindowV3({
+    strategy,
+    runConfig,
+    dependencyPlan: inputPlan.plan,
+    reader: { readV3: () => Promise.resolve(readResult) },
+    context: {
+      checkedAt,
+      request: {
+        contractVersion: 3,
+        requestId: request.requestId,
+        strategyVersionId: request.strategyVersionId,
+        strategyContentHash: hashCanonicalManifest(strategy),
+        runConfigChecksum: hashCanonicalManifest(runConfig),
+        requirements: [requirement],
+      },
+      routeRevisions: {
+        ...routeContext,
+        effectiveRevision: selection.effectivePolicyRevision,
+        catalogRevision: selection.catalogRevision,
+      },
+    },
+  });
+  if (executionPreflight.status !== 'ready')
+    return preparationBlocked(request, checkedAt, executionPreflight.diagnostics);
+
+  return preparedSourceResult(
+    input,
+    runConfig,
+    readResult,
+    { purpose: 'execution', symbol: instrument.symbol, routeKey, window },
+    actualPriceSource,
+    executionPreflight,
+  );
+}
+
+function preparationPricePlan(input: BacktestPreparationInput) {
+  const { request, strategy, checkedAt } = input;
+  const instrument = strategy.executionInstrument;
+  const blocked = (message: string) => ({
+    status: 'blocked' as const,
+    result: preparationBlocked(request, checkedAt, [preparationDiagnostic(request, message)]),
+  });
+  if (request.priceResearch) {
+    if (strategy.schemaVersion !== '3') return blocked('请先确认并保存策略的价格研究版本');
+    const issues = priceResearchStrategyIssues(strategy);
+    if (issues.length)
+      return {
+        status: 'blocked' as const,
+        result: preparationBlocked(
+          request,
+          checkedAt,
+          issues.map((issue) =>
+            preparationDiagnostic(request, `${issue.path.join('.')}: ${issue.message}`, {
+              category: 'rule-incompatible',
+              code: 'RULE_REJECTED',
+              incompatibleRules: [issue.path.join('.')],
+            }),
+          ),
+        ),
+      };
+  }
   const cashSignalIssue = knownCashStrategyIssueV3(request, strategy);
   if (cashSignalIssue) return blocked(cashSignalIssue);
   if (request.marketRuleResearch && instrument.assetType !== 'stock')
@@ -68,7 +221,34 @@ export async function prepareBacktestRunConfigV3(input: {
       ? { minimumWarmupSessions: request.warmupBudgetSessions }
       : {}),
   });
-  if (
+  if (!preparationPlanSupported(strategy, pricePlan))
+    return blocked('配置准备当前仅支持同标的、同币种股票/ETF日线执行与信号、基准绑定。');
+
+  const modelIssues = executionModelRunIssues(
+    request.runConfig.executionModel,
+    request.runConfig,
+    instrument,
+  );
+  if (modelIssues.length)
+    return {
+      status: 'blocked' as const,
+      result: preparationBlocked(request, checkedAt, [
+        preparationDiagnostic(request, '所选执行模型与策略标的或运行区间不一致。', {
+          category: 'incompatible-accounting',
+          code: 'RULE_REJECTED',
+          incompatibleRules: modelIssues.map((issue) => issue.path.join('.')),
+        }),
+      ]),
+    };
+
+  return { status: 'ready' as const, pricePlan, acquisitionPlan };
+}
+function preparationPlanSupported(
+  strategy: BacktestStrategy,
+  pricePlan: ReturnType<typeof planBacktestPriceInputs>,
+) {
+  const instrument = strategy.executionInstrument;
+  return !(
     strategy.execution.mode !== 'exchange' ||
     strategy.primaryTimeframe !== '1d' ||
     instrument.assetType === 'fund' ||
@@ -78,38 +258,84 @@ export async function prepareBacktestRunConfigV3(input: {
     pricePlan.signalSources.some(
       (source) => source.instrument !== pricePlan.executionInstrument || source.timeframe !== '1d',
     )
-  )
-    return blocked('配置准备当前仅支持同标的、同币种股票/ETF日线执行与信号、基准绑定。');
-
-  const modelIssues = executionModelRunIssues(
-    request.runConfig.executionModel,
-    request.runConfig,
-    instrument,
   );
-  if (modelIssues.length)
-    return preparationBlocked(request, checkedAt, [
-      preparationDiagnostic(request, '所选执行模型与策略标的或运行区间不一致。', {
-        category: 'incompatible-accounting',
-        code: 'RULE_REJECTED',
-        incompatibleRules: modelIssues.map((issue) => issue.path.join('.')),
-      }),
-    ]);
+}
 
-  const routeKey = marketDataBarRouteKeyV3Schema.parse({
-    kind: 'bar',
-    market: instrument.market,
-    assetType: instrument.assetType === 'stock' ? 'STOCK' : 'ETF',
-    capability: 'DAILY_BAR',
-    timeframe: '1d',
-    adjustment: request.adjustment,
+async function preparedResearchReference(
+  input: BacktestPreparationInput,
+  runConfig: RunConfigV3,
+  acquiredExecution: Extract<MarketBarWindowReadResultV3, { status: 'selected' }>,
+  protocolVersion: NonNullable<BacktestRunPreparationRequestV3['priceResearch']>,
+) {
+  const { request } = input;
+  const reference = await readPriceResearchReference({
+    strategy: input.strategy,
+    runConfig,
+    execution: acquiredExecution,
+    reader: input.reader,
+    forceReference: request.priceResearchReference === 'freeze',
   });
-  let routeContext: ReturnType<typeof preparationRouteContext>;
-  try {
-    routeContext = preparationRouteContext(await control.getPolicy(), routeKey);
-  } catch {
-    return blocked('执行路由未应用、已失效或未配置，无法准备当前协议。');
-  }
+  const actualPriceSource = reference?.actualSource;
+  const preparedConfig = runConfigSchemaV3.parse({
+    ...runConfig,
+    ...(request.freezeTimePolicy === 'after-acquisition'
+      ? { dataAsOf: new Date().toISOString() }
+      : {}),
+    priceResearch: {
+      protocolVersion,
+      ...(reference ? { actualPriceWindow: reference.frozenWindowRef } : {}),
+    },
+  });
+  return { actualPriceSource, runConfig: preparedConfig };
+}
 
+function preparedSourceResult(
+  input: BacktestPreparationInput,
+  runConfig: RunConfigV3,
+  readResult: MarketBarWindowReadResultV3,
+  sourceInput: Parameters<typeof createBacktestSnapshotV3Source>[0],
+  actualPriceSource: BacktestSnapshotActualSourceV3 | undefined,
+  executionPreflight: Awaited<ReturnType<typeof preflightBacktestExecutionWindowV3>>,
+) {
+  const { request, checkedAt } = input;
+  const blocked = (message: string) =>
+    preparationBlocked(request, checkedAt, [preparationDiagnostic(request, message)]);
+  try {
+    const { actualSource } = createBacktestSnapshotV3Source(sourceInput, readResult);
+    try {
+      hkResearchLotForSourceV3(actualSource, runConfig);
+    } catch (error) {
+      return blocked(error instanceof Error ? error.message : '港股每手研究配置无效。');
+    }
+    return backtestRunPreparationResultV3Schema.parse({
+      contractVersion: 3,
+      requestId: request.requestId,
+      checkedAt,
+      scope: 'execution-window',
+      status: 'prepared',
+      runConfig,
+      actualSource,
+      ...(actualPriceSource ? { actualPriceSource } : {}),
+      executionPreflight,
+    });
+  } catch {
+    return blocked('实际来源未通过请求、覆盖或证据关联校验，配置未准备。');
+  }
+}
+
+async function acquirePreparationWindow(
+  input: BacktestPreparationInput,
+  routeKey: MarketDataBarRouteKeyV3,
+  pricePlan: ReturnType<typeof planBacktestPriceInputs>,
+  acquisitionPlan: ReturnType<typeof planBacktestPriceInputs>,
+  routeContext: ReturnType<typeof preparationRouteContext>,
+) {
+  const { request, strategy, reader, checkedAt } = input;
+  const instrument = strategy.executionInstrument;
+  const blocked = (message: string) => ({
+    status: 'blocked' as const,
+    result: preparationBlocked(request, checkedAt, [preparationDiagnostic(request, message)]),
+  });
   const window = { start: pricePlan.warmup.startDate, end: request.runConfig.endDate };
   const requirement = {
     symbol: instrument.symbol,
@@ -120,22 +346,16 @@ export async function prepareBacktestRunConfigV3(input: {
   };
   let lifecycleResponse;
   if (request.lifecycleResearch) {
-    if (!input.lifecycle || instrument.market !== 'CN') return blocked('生命周期读取端口不可用');
-    try {
-      lifecycleResponse = await input.lifecycle.read({
-        market: 'CN',
-        symbol: instrument.symbol,
-        start: window.start,
-        end: window.end,
-      });
-    } catch (error) {
-      return blocked(error instanceof Error ? error.message : '生命周期来源未取得');
-    }
+    const acquiredLifecycle = await acquirePreparationLifecycle(input, window);
+    if (acquiredLifecycle.status === 'blocked') return acquiredLifecycle;
+    lifecycleResponse = acquiredLifecycle.response;
   }
   let readResult: MarketBarWindowReadResultV3;
   try {
     readResult = await reader.readV3({
-      ...(request.reuseResearchData ? { frozenWindowRef: request.reuseResearchData.executionWindow } : {}),
+      ...(request.reuseResearchData
+        ? { frozenWindowRef: request.reuseResearchData.executionWindow }
+        : {}),
       market: instrument.market,
       symbol: instrument.symbol,
       routeKey,
@@ -154,9 +374,12 @@ export async function prepareBacktestRunConfigV3(input: {
     return blocked('统一行情Reader暂时不可用，配置未准备。');
   }
   if (readResult.status !== 'selected')
-    return preparationBlocked(request, checkedAt, [
-      mapWindowUnavailable(requirement, routeContext.targetSources, readResult),
-    ]);
+    return {
+      status: 'blocked' as const,
+      result: preparationBlocked(request, checkedAt, [
+        mapWindowUnavailable(requirement, routeContext.targetSources, readResult),
+      ]),
+    };
 
   const { selection } = readResult;
   const responseHash = readResult.evidence?.completeResponseHash;
@@ -184,6 +407,7 @@ export async function prepareBacktestRunConfigV3(input: {
     }
   }
   readResult = { ...readResult, frozenWindowRef: frozenExecutionWindow };
+  const acquiredExecution = readResult;
   if (lifecyclePreparation || acquisitionPlan.warmup.startDate !== window.start) {
     try {
       readResult = await reader.readV3({
@@ -201,83 +425,45 @@ export async function prepareBacktestRunConfigV3(input: {
       return blocked('冻结父窗口无法读取策略预检子窗口。');
     }
     if (readResult.status !== 'selected')
-      return preparationBlocked(request, checkedAt, [
-        mapWindowUnavailable(requirement, routeContext.targetSources, readResult),
-      ]);
+      return {
+        status: 'blocked' as const,
+        result: preparationBlocked(request, checkedAt, [
+          mapWindowUnavailable(requirement, routeContext.targetSources, readResult),
+        ]),
+      };
   }
-  const protocol = await resolveBacktestPreparationProtocolV3({
-    request,
-    response: selection.response,
-    revisions: {
-      desiredRevision: routeContext.desiredRevision,
-      effectivePolicyRevision: selection.effectivePolicyRevision,
-      catalogRevision: selection.catalogRevision,
-    },
-    ...(input.knownCash ? { knownCash: input.knownCash } : {}),
-  });
-  if (protocol.status === 'blocked') return blocked(protocol.message);
-  const { executionPriceProtocol, knownCashPreparation, dataAsOf } = protocol;
+  return {
+    status: 'ready' as const,
+    window,
+    requirement,
+    selection,
+    readResult,
+    frozenExecutionWindow,
+    lifecyclePreparation,
+    acquiredExecution,
+  };
+}
 
-  const configResult = preparedRunConfigV3(
-    request,
-    {
-      dataAsOf,
-      frozenExecutionWindow,
-      lifecyclePreparation,
-      executionPriceProtocol,
-      knownCashPreparation,
-    },
-    pricePlan.signalSources.map((source) => source.id),
-  );
-  if (!configResult.success) return blocked('实际来源价格事实与所选记账方式或执行模型不兼容。');
-  const runConfig = configResult.data;
-  const inputPlan = planSnapshotInputsV3({ strategy, runConfig });
-  const executionPreflight = await preflightBacktestExecutionWindowV3({
-    strategy,
-    runConfig,
-    dependencyPlan: inputPlan.plan,
-    reader: { readV3: () => Promise.resolve(readResult) },
-    context: {
-      checkedAt,
-      request: {
-        contractVersion: 3,
-        requestId: request.requestId,
-        strategyVersionId: request.strategyVersionId,
-        strategyContentHash: hashCanonicalManifest(strategy),
-        runConfigChecksum: hashCanonicalManifest(runConfig),
-        requirements: [requirement],
-      },
-      routeRevisions: {
-        ...routeContext,
-        effectiveRevision: selection.effectivePolicyRevision,
-        catalogRevision: selection.catalogRevision,
-      },
-    },
+async function acquirePreparationLifecycle(
+  input: BacktestPreparationInput,
+  window: { start: string; end: string },
+) {
+  const { request, strategy, checkedAt } = input;
+  const blocked = (message: string) => ({
+    status: 'blocked' as const,
+    result: preparationBlocked(request, checkedAt, [preparationDiagnostic(request, message)]),
   });
-  if (executionPreflight.status !== 'ready')
-    return preparationBlocked(request, checkedAt, executionPreflight.diagnostics);
-
+  if (!input.lifecycle || strategy.executionInstrument.market !== 'CN')
+    return blocked('生命周期读取端口不可用');
   try {
-    const { actualSource } = createBacktestSnapshotV3Source(
-      { purpose: 'execution', symbol: instrument.symbol, routeKey, window },
-      readResult,
-    );
-    try {
-      hkResearchLotForSourceV3(actualSource, runConfig);
-    } catch (error) {
-      return blocked(error instanceof Error ? error.message : '港股每手研究配置无效。');
-    }
-    return backtestRunPreparationResultV3Schema.parse({
-      contractVersion: 3,
-      requestId: request.requestId,
-      checkedAt,
-      scope: 'execution-window',
-      status: 'prepared',
-      runConfig,
-      actualSource,
-      executionPreflight,
+    const response = await input.lifecycle.read({
+      market: 'CN',
+      symbol: strategy.executionInstrument.symbol,
+      start: window.start,
+      end: window.end,
     });
-  } catch {
-    return blocked('实际来源未通过请求、覆盖或证据关联校验，配置未准备。');
+    return { status: 'ready' as const, response };
+  } catch (error) {
+    return blocked(error instanceof Error ? error.message : '生命周期来源未取得');
   }
 }

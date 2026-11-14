@@ -41,6 +41,7 @@ export const enabledRiskConflict = (
   ) ?? null;
 
 export const parseCooldownMinutes = (value: string) => {
+  if (!value.trim()) return null;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 10_080) return null;
   return parsed;

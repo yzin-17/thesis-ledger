@@ -19,6 +19,26 @@ import {
 import { useRiskRules } from './risk-queries';
 import { RiskMonitoringSchedule } from './RiskMonitoringSchedule';
 import { riskKinds, riskSeverities, riskScopes, isRiskPercentage } from './risk-rule-form';
+function RiskRuleSummary({ rule, accounts }: { rule: RiskRuleWire; accounts: ReturnType<typeof useAccounts>['data'] }) {
+  return (
+    <>
+      <Copy>
+        {riskScopes.find((row) => row.value === rule.scope)?.label} ·{' '}
+        {rule.symbol ?? '无标的'} ·{' '}
+        {accounts?.find((row) => row.id === rule.accountId)?.name ??
+          rule.accountId ??
+          '全组合'}{' '}
+        · 阈值 {isRiskPercentage(rule.kind) ? `${rule.threshold * 100}%` : rule.threshold}
+      </Copy>
+      <Copy>
+        {riskSeverities.find((row) => row.value === rule.severity)?.label} ·{' '}
+        {rule.enabled ? '启用' : '停用'} · 版本 {rule.version}
+        {rule.archivedAt ? ' · 已归档' : ''}
+      </Copy>
+    </>
+  );
+}
+
 export function RiskRulesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<PortfolioStackParams>>();
   const { api } = useMobileRuntime();
@@ -102,19 +122,7 @@ export function RiskRulesScreen() {
                 testID={`risk-rule-${rule.id}`}
                 title={riskKinds.find((row) => row.value === rule.kind)?.label ?? rule.kind}
               >
-                <Copy>
-                  {riskScopes.find((row) => row.value === rule.scope)?.label} ·{' '}
-                  {rule.symbol ?? '无标的'} ·{' '}
-                  {accounts.data?.find((row) => row.id === rule.accountId)?.name ??
-                    rule.accountId ??
-                    '全组合'}{' '}
-                  · 阈值 {isRiskPercentage(rule.kind) ? `${rule.threshold * 100}%` : rule.threshold}
-                </Copy>
-                <Copy>
-                  {riskSeverities.find((row) => row.value === rule.severity)?.label} ·{' '}
-                  {rule.enabled ? '启用' : '停用'} · 版本 {rule.version}
-                  {rule.archivedAt ? ' · 已归档' : ''}
-                </Copy>
+                <RiskRuleSummary rule={rule} accounts={accounts.data} />
                 {rule.needsRepair ? (
                   <Feedback message={`规则待修复：${rule.repairReason ?? '请核对账户绑定'}`} error />
                 ) : null}

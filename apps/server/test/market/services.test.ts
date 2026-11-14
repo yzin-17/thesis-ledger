@@ -4,8 +4,7 @@ import { MarketService } from '../../src/market/market.service.js';
 import { MarketDataController } from '../../src/market/market-data.controller.js';
 import { DataQualityService } from '../../src/quality/data-quality.service.js';
 
-describe('行情缓存', () => {
-  const quote = {
+const quote = {
     version: 3,
     symbol: '600519.SH',
     open: 10,
@@ -21,6 +20,8 @@ describe('行情缓存', () => {
     stale: false,
     provider: 'dsa-fork',
   };
+
+describe("报价缓存与共享请求", () => {
 
   it('重复请求命中新鲜缓存且不重复调用 Provider', async () => {
     const values = new Map<string, string>();
@@ -50,6 +51,7 @@ describe('行情缓存', () => {
     await service.getQuote('600519');
     expect(dsa.get).toHaveBeenCalledTimes(1);
   });
+
   it('普通请求与显式 refresh 在缓存未命中时共享同一底层 flight', async () => {
     const values = new Map<string, string>();
     let resolveProvider!: (value: typeof quote) => void;
@@ -92,6 +94,10 @@ describe('行情缓存', () => {
     resolveProvider(quote);
     await expect(Promise.all([regular, refresh])).resolves.toHaveLength(2);
   });
+});
+
+describe("基金净值版本及范围缓存", () => {
+
   it('基金净值拒绝上游旧版本，不补写为当前版本', async () => {
     const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(async () => ({
@@ -109,6 +115,7 @@ describe('行情缓存', () => {
     await expect(service.getFundNav('000001.OF')).rejects.toThrow();
     expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/fund-nav?symbol=000001.OF');
   });
+
   it('基金净值历史相同范围并发请求只调用一次 DSA 并使用完整锁 key', async () => {
     const points = [
       {
@@ -152,6 +159,7 @@ describe('行情缓存', () => {
     expect(lockKeys[0]).toContain('2025-01-31');
     expect(lockKeys[0]).toContain(':5');
   });
+
   it('基金净值历史相同范围的普通请求命中新鲜缓存', async () => {
     const values = new Map<string, string>();
     const ttls = new Map<string, number>();
@@ -217,6 +225,7 @@ describe('行情缓存', () => {
     const freshEntry = [...ttls.entries()].find(([key]) => key.endsWith(':fresh'));
     expect(freshEntry?.[1]).toBe(30 * 86_400);
   });
+
   it('基金净值历史不同范围不会合并 single-flight', async () => {
     const points = [
       {
@@ -247,6 +256,10 @@ describe('行情缓存', () => {
     expect(paths[0]).toContain('start=2025-01-01');
     expect(paths[1]).toContain('start=2025-02-01');
   });
+});
+
+describe("筹码摘要与历史入口", () => {
+
   it('把 DSA Chip 映射为统一契约', async () => {
     const timestamp = '2025-01-01T00:00:00Z';
     const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),

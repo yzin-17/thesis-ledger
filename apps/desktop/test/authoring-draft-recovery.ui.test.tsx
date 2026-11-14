@@ -41,8 +41,6 @@ let root: Root;
 let disabled = false;
 let controllerClient: QueryClient | undefined;
 let controllerRouter: ReturnType<typeof createMemoryRouter> | undefined;
-const read = vi.fn();
-const discard = vi.fn();
 const copy = vi.fn();
 const content = { description: '受控本地草稿，禁止发送生成请求' };
 const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
@@ -51,21 +49,14 @@ const button = (text: string) =>
     (element) => element.textContent?.trim() === text,
   )!;
 async function click(text: string) {
-  if (['复制本地草稿', '读取服务器最新草稿', '丢弃这个草稿'].includes(text)) {
+  if (text === '复制本地草稿') {
     await act(async () => button('草稿操作').click());
   }
   await act(async () => button(text).click());
 }
 async function render() {
   await act(async () =>
-    root.render(
-      <AuthoringDraftRecovery
-        content={content}
-        disabled={disabled}
-        onReadLatest={read}
-        onDiscard={discard}
-      />,
-    ),
+    root.render(<AuthoringDraftRecovery content={content} disabled={disabled} />),
   );
 }
 beforeEach(async () => {
@@ -90,34 +81,21 @@ afterEach(async () => {
   else Reflect.deleteProperty(navigator, 'clipboard');
 });
 
-describe('自然语言草稿恢复确认差集', () => {
-  it('读取和丢弃都先确认，取消不调用动作，确认只调用所选动作', async () => {
-    await click('读取服务器最新草稿');
-    expect(document.body.textContent).toContain('使用服务器最新内容？');
-    await click('继续编辑');
-    expect(read).not.toHaveBeenCalled();
-    await click('丢弃这个草稿');
-    await click('继续编辑');
-    expect(discard).not.toHaveBeenCalled();
-    await click('读取服务器最新草稿');
-    await click('确认');
-    expect(read).toHaveBeenCalledTimes(1);
-    expect(discard).not.toHaveBeenCalled();
-    await click('丢弃这个草稿');
-    await click('确认');
-    expect(discard).toHaveBeenCalledTimes(1);
+describe('自然语言草稿复制与在途保护', () => {
+  it('复制当前草稿原文并显示完成状态', async () => {
+    await click('复制本地草稿');
+    expect(copy).toHaveBeenCalledExactlyOnceWith(JSON.stringify(content, null, 2));
+    expect(document.body.textContent).toContain('已复制本地草稿');
   });
-  it('确认期间开始其他操作后锁住确认，解除后保留原确认意图', async () => {
-    await click('丢弃这个草稿');
+  it('在途操作锁住菜单，解除后允许复制', async () => {
     disabled = true;
     await render();
-    expect(button('确认').disabled).toBe(true);
-    expect(button('继续编辑').disabled).toBe(true);
-    expect(discard).not.toHaveBeenCalled();
+    expect(button('草稿操作').disabled).toBe(true);
+    expect(copy).not.toHaveBeenCalled();
     disabled = false;
     await render();
-    await click('继续编辑');
-    expect(discard).not.toHaveBeenCalled();
+    await click('复制本地草稿');
+    expect(copy).toHaveBeenCalledOnce();
   });
   it('复制失败说明如何保留文本，重试仅复制原草稿', async () => {
     copy.mockRejectedValueOnce(new Error('受控剪贴板不可用'));
@@ -127,8 +105,6 @@ describe('自然语言草稿恢复确认差集', () => {
     expect(document.body.textContent).toContain('已复制本地草稿');
     expect(document.body.textContent).not.toContain('无法复制');
     expect(copy).toHaveBeenLastCalledWith(JSON.stringify(content, null, 2));
-    expect(read).not.toHaveBeenCalled();
-    expect(discard).not.toHaveBeenCalled();
   });
 
   it('自动保存时模式保持锁定，路由按在途阻止而不进入放弃草稿确认', async () => {

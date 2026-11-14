@@ -32,11 +32,11 @@ export class StrategyCreationService {
         ownerId: input.ownerId,
         description: input.description ?? definition.description ?? null,
         status: 'draft',
-        schemaVersion: 2,
+        schemaVersion: Number(definition.schemaVersion),
         versions: {
           create: {
             version: 1,
-            schemaVersion: 2,
+            schemaVersion: Number(definition.schemaVersion),
             schema: definition as Prisma.InputJsonValue,
             source,
           },

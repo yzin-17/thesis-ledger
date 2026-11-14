@@ -149,6 +149,9 @@ describe('Ledger Snapshot 与收益摘要', () => {
     expect(result).toMatchObject({ marketValue: 1200, costValue: 1000, cashValue: 1000 });
     expect(result.payload).toMatchObject({ dataQuality: { partial: false } });
   });
+});
+
+describe("版本化目标与默认聚合", () => {
   it('目标配置按版本保存并拒绝总和不为 100%', async () => {
     const transaction = {
       $executeRaw: vi.fn(async () => 0),
@@ -261,6 +264,9 @@ describe('Ledger Snapshot 与收益摘要', () => {
       source: 'none',
     });
   });
+});
+
+describe("配置层及现金评价边界", () => {
   it('Security/Account/Portfolio 三层使用相同市值和缺失数据语义', async () => {
     const prisma = {
       position: {
@@ -330,6 +336,9 @@ describe('Ledger Snapshot 与收益摘要', () => {
     expect(layers.account).toMatchObject([{ accountId: accountA, cashValue: 0 }]);
   });
 
+});
+
+describe("历史现金快照与账户模式", () => {
   it('Snapshot capture 保留现金余额观察', async () => {
     const prisma = {
       position: { findMany: vi.fn(async () => []) },
@@ -411,6 +420,9 @@ describe('Ledger Snapshot 与收益摘要', () => {
     );
   });
 
+});
+
+describe("部分配置与分币种展示", () => {
   it('partial 配置保留金额但隐藏权重并暂停再平衡', () => {
     const service = new PerformanceService({} as never, {} as never);
     expect(
@@ -438,6 +450,9 @@ describe('Ledger Snapshot 与收益摘要', () => {
     expect(layers.fx).toMatchObject({ enabled: false, status: 'disabled' });
   });
 
+});
+
+describe("外汇合并及缺口处理", () => {
   it('开启 FX 合并后按基准币种换算证券与现金', async () => {
     const prisma = {
       position: {
@@ -622,6 +637,9 @@ describe('Ledger Snapshot 与收益摘要', () => {
     });
   });
 
+});
+
+describe("历史外汇与外部现金流", () => {
   it('历史快照按各自发生日请求 FX，并保留 historical-rate 证据', async () => {
     const prisma = {
       account: { findMany: vi.fn(async () => [{ id: 'account-a', currency: 'CNY' }]) },

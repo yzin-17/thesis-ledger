@@ -10,9 +10,9 @@ import type {
 } from './risk.types.js';
 import { formatDateTime } from './risk.format.js';
 import { RiskMonitoringSchedule } from './RiskMonitoringSchedule.js';
-import { RiskEventTable } from './RiskSections.js';
+import { RiskOverviewEvents } from './RiskOverviewEvents.js';
 
-type SummaryTab = 'overview' | 'rules' | 'events' | 'notifications';
+type SummaryTab = 'overview' | 'rules' | 'notifications';
 
 export const portfolioDataStatus = (state: LoadState) => {
   if (state === 'loading') return '加载中';
@@ -39,6 +39,7 @@ export function RiskOverview({
   scanDisabled = false,
   onScan,
   onSelectTab,
+  onSelectCriticalEvents,
   onRetryEvents,
 }: {
   eventsRefreshing?: boolean;
@@ -55,6 +56,7 @@ export function RiskOverview({
   scanDisabled?: boolean;
   onScan: () => void;
   onSelectTab: (tab: SummaryTab, filter?: string) => void;
+  onSelectCriticalEvents: () => void;
   onRetryEvents?: (() => void) | undefined;
 }) {
   const enabledRules = rules.filter((rule) => rule.enabled && !rule.archivedAt).length;
@@ -63,7 +65,7 @@ export function RiskOverview({
   const scanReady = isPortfolioScanReady(portfolioState);
   return (
     <div className="flex flex-col gap-6">
-      <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
+      <section>
         <h2 className="m-0 text-xl font-semibold">监控总览</h2>
         <RiskMonitoringSchedule
           enabledRules={rulesState === 'ready' || rulesState === 'empty' ? enabledRules : null}
@@ -108,7 +110,7 @@ export function RiskOverview({
           value={criticalEvents}
           state={loadState}
           {...(criticalEvents > 0 ? { tone: 'negative' as const } : {})}
-          onClick={() => onSelectTab('events', 'critical')}
+          onClick={onSelectCriticalEvents}
         />
         <SummaryMetric
           label="通知失败"
@@ -119,25 +121,11 @@ export function RiskOverview({
         />
       </section>
 
-      <RiskEventTable
+      <RiskOverviewEvents
         refreshing={eventsRefreshing}
         loadState={loadState}
         onRetry={onRetryEvents}
         events={events}
-        limit={4}
-        title="最近风险事件"
-        description="显示当前模式最近写入的事件，完整记录可在“事件”页签查看。"
-        headerAction={
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="text-button"
-            onClick={() => onSelectTab('events')}
-          >
-            查看全部
-          </Button>
-        }
       />
     </div>
   );

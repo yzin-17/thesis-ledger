@@ -42,10 +42,10 @@ export class BacktestRunPreparationService {
       where: { id: request.strategyVersionId },
     });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (version.schemaVersion !== 2)
+    if (![2, 3].includes(version.schemaVersion))
       throw new BadRequestException('配置准备要求schemaVersion=2的策略版本');
     const strategy = strategySchema.parse(version.schema) as BacktestStrategy;
-    const announcementPreparation = request.knownCashResearch
+    const announcementPreparation = request.knownCashResearch || request.priceResearch
       ? undefined
       : await this.announcements?.prepare({
           ...request.runConfig.executionModel.scope,
@@ -99,6 +99,7 @@ export class BacktestRunPreparationService {
       checkedAt: result.checkedAt,
       runConfig: result.runConfig,
       actualSource: result.actualSource,
+      ...(result.actualPriceSource ? { actualPriceSource: result.actualPriceSource } : {}),
       strategyContentHash,
       routeRevisions: { desiredRevision, effectiveRevision, catalogRevision },
     };

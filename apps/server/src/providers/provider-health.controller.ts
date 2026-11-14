@@ -32,4 +32,31 @@ export class ProviderHealthController {
       parsePositiveInteger(pageSize),
     );
   }
+
+  @Get('health/issues')
+  async issues(
+    @Query('provider') provider?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const pageResult = await this.health.history(
+      provider,
+      parsePositiveInteger(page),
+      parsePositiveInteger(pageSize),
+      true,
+    );
+    return {
+      ...pageResult,
+      items: pageResult.items.map(
+        ({ provider, state, errorCode, latencyMs, checkedAt, source }) => ({
+          provider,
+          state,
+          errorCode,
+          latencyMs,
+          checkedAt,
+          source,
+        }),
+      ),
+    };
+  }
 }

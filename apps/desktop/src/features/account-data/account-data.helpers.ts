@@ -366,12 +366,20 @@ export const executionDraft = (
   quantity: event?.payload.quantity ?? '',
   price: event?.payload.price ?? '',
   currency: supportedCurrency(event?.payload.currency ?? defaultCurrency),
-  occurredAt:
-    localDateTimeValue(event?.occurredAt, event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT') ||
-    currentLocalDateTime(),
-  timePrecision: event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT',
-  settledAt: localDateTimeValue(event?.payload.settledAt ?? event?.payload.expectedAt, 'INSTANT'),
+  ...executionDraftTimes(event),
   capabilityVerification: 'UNVERIFIED',
   note: event?.payload.note ?? '',
   reason: '',
 });
+
+function executionDraftTimes(
+  event: ExecutionEvent | null,
+): Pick<ExecutionDraft, 'occurredAt' | 'timePrecision' | 'settledAt'> {
+  return {
+    occurredAt:
+      localDateTimeValue(event?.occurredAt, event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT') ||
+      currentLocalDateTime(),
+    timePrecision: event?.timePrecision === 'DATE' ? 'DATE' : 'INSTANT',
+    settledAt: localDateTimeValue(event?.payload.settledAt ?? event?.payload.expectedAt, 'INSTANT'),
+  };
+}

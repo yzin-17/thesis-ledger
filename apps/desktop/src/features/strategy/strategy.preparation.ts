@@ -73,16 +73,29 @@ export const usePreparationRouteStale = (
     ((policy.data?.revision ?? 0) > (stamp.desiredRevision ?? 0) ||
       (policy.data?.dsaRevision ?? 0) > (stamp.effectiveRevision ?? 0) ||
       (catalog.data?.catalogRevision ?? 0) > (stamp.catalogRevision ?? 0) ||
-      (policy.dataUpdatedAt >= preparedAt &&
-        policy.data &&
-        (policy.data.contractVersion !== 3 ||
-          policy.data.revision !== stamp.desiredRevision ||
-          policy.data.dsaRevision !== stamp.effectiveRevision ||
-          policy.data.syncState !== 'applied' ||
-          policy.data.effectiveStale)) ||
+      preparedPolicyChanged(policy, stamp, preparedAt) ||
       (catalog.dataUpdatedAt >= preparedAt &&
         catalog.data &&
         (catalog.data.status !== 'complete' ||
           catalog.data.catalogRevision !== stamp.catalogRevision))),
   );
 };
+
+function preparedPolicyChanged(
+  policy: {
+    data: Awaited<ReturnType<typeof fetchMarketPolicy>> | undefined;
+    dataUpdatedAt: number;
+  },
+  stamp: { desiredRevision: number | null; effectiveRevision: number | null },
+  preparedAt: number,
+) {
+  return (
+    policy.dataUpdatedAt >= preparedAt &&
+    policy.data &&
+    (policy.data.contractVersion !== 3 ||
+      policy.data.revision !== stamp.desiredRevision ||
+      policy.data.dsaRevision !== stamp.effectiveRevision ||
+      policy.data.syncState !== 'applied' ||
+      policy.data.effectiveStale)
+  );
+}

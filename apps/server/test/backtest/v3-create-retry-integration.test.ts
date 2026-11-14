@@ -236,6 +236,9 @@ describe('V3 create and frozen retry integration', () => {
     expect(h.prisma.backtestJob.create).not.toHaveBeenCalled();
   });
 
+});
+
+describe("读取期间修订及最终提交门禁", () => {
   it('checks the actual Reader revision even when the control plane is unchanged', async () => {
     const h = await createHarness();
     const read = h.fixture.reader.readV3.getMockImplementation()!;
@@ -272,6 +275,9 @@ describe('V3 create and frozen retry integration', () => {
     expect(h.queue.ensureEnqueued).not.toHaveBeenCalled();
   });
 
+});
+
+describe("既有 Run 与创建身份", () => {
   it('returns an existing Run without accessing current routing', async () => {
     const h = await createHarness();
     const first = await h.service.createRun(h.request);
@@ -322,6 +328,9 @@ describe('V3 create and frozen retry integration', () => {
     expect(h.prisma.backtestJob.create).not.toHaveBeenCalled();
   });
 
+});
+
+describe("同源多信号绑定", () => {
   it('creates and executes multiple signal bindings that share one frozen source', async () => {
     const harness = await createHarness({ multipleSignals: true });
     const created = await harness.service.createRun(harness.request);
@@ -335,6 +344,9 @@ describe('V3 create and frozen retry integration', () => {
     expect(result.actualSources.filter((source) => source.purpose === 'signal')).toHaveLength(1);
     expect(harness.fixture.reader.readV3).toHaveBeenCalledOnce();
   });
+});
+
+describe("完整快照的创建与执行闭环", () => {
   it('creates, queues, claims, executes a real complete Snapshot, and reads the strict persisted result', async () => {
     const harness = await createHarness();
 
@@ -364,6 +376,9 @@ describe('V3 create and frozen retry integration', () => {
     expect(resultChecksum).toBe(deterministicResultChecksum(checksumPayload));
   });
 
+});
+
+describe("冻结重试及幂等竞争", () => {
   it('retries the frozen Snapshot with monotonic attempts and a fresh retry budget', async () => {
     const harness = await createHarness({ failFirstRun: true });
     const created = await harness.service.createRun(harness.request);
@@ -457,6 +472,9 @@ describe('V3 create and frozen retry integration', () => {
     expect(harness.queue.ensureEnqueued).not.toHaveBeenCalled();
   });
 
+});
+
+describe("取消与晚到提交", () => {
   it('does not let a cancellation commit a late result', async () => {
     const harness = await createHarness({ waitForAbort: true });
     const created = await harness.service.createRun(harness.request);

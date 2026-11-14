@@ -156,53 +156,8 @@ export const usePerformanceQueries = (
     enabled,
   });
 
-  const selectedTotal = accountId
-    ? (layers.data?.account ?? []).find((item) => item.accountId === accountId)
-    : layers.data?.portfolio;
-  const allocationUnavailable =
-    !accountId &&
-    layers.data?.portfolio === null &&
-    (options.fxMerge === false || layers.data?.fx?.status === 'blocked');
-  const baseQuality: PerformanceDataQuality = {
-    partial: layers.data?.dataQuality?.partial === true || selectedTotal?.partial === true,
-    missingSymbols: [
-      ...(layers.data?.dataQuality?.missingSymbols ?? []),
-      ...(selectedTotal?.missingSymbols ?? []),
-    ],
-  };
-  const positions: PerformanceAllocationInput['positions'] = [];
-  const unknownSymbols: string[] = [];
-  for (const position of layers.data?.security ?? []) {
-    if (position.marketValue === null) continue;
-    if (position.assetType.toLowerCase() === 'cash') {
-      unknownSymbols.push(position.symbol);
-      continue;
-    }
-    const category = normalizeAllocationCategory(position.assetType);
-    if (!category) {
-      unknownSymbols.push(position.symbol);
-      continue;
-    }
-    if (accountId && position.accountId !== accountId) continue;
-    positions.push({ category, marketValue: position.marketValue });
-  }
-  const targetNormalization = normalizeAllocationTargets(targets.data?.targets);
-  const targetsValue = targetNormalization.targets;
-  const cashValue = selectedTotal?.cashValue ?? 0;
-  if (cashValue !== 0 || targetsValue.cash !== undefined) {
-    positions.push({ category: 'cash', marketValue: cashValue });
-  }
-  const quality: PerformanceDataQuality = {
-    partial:
-      baseQuality.partial || unknownSymbols.length > 0 || targetNormalization.unknown.length > 0,
-    missingSymbols: [
-      ...new Set([
-        ...baseQuality.missingSymbols,
-        ...unknownSymbols,
-        ...targetNormalization.unknown.map((category) => `配置类别:${category}`),
-      ]),
-    ],
-  };
+  const { positions, targetsValue, quality, allocationUnavailable } =
+    performanceAllocationMaterials(layers.data, targets.data, options, accountId);
   const loadedPositionsKey = stablePositionsKey(positions);
   const loadedTargetsKey = stableObjectKey(targetsValue);
   const allocation = useQuery({
@@ -221,3 +176,76 @@ export const usePerformanceQueries = (
   });
   return { series, history, summary, layers, targets, allocation, quality, allocationUnavailable };
 };
+
+function performanceAllocationMaterials(
+  layers: Awaited<ReturnType<typeof fetchPerformanceLayers>> | undefined,
+  targets: Awaited<ReturnType<typeof fetchPerformanceTargets>> | undefined,
+  options: PerformanceQueryOptions,
+  accountId: string,
+) {
+  const selectedTotal = accountId
+    ? (layers?.account ?? []).find((item) => item.accountId === accountId)
+    : layers?.portfolio;
+  const allocationUnavailable =
+    !accountId &&
+    layers?.portfolio === null &&
+    (options.fxMerge === false || layers?.fx?.status === 'blocked');
+  const baseQuality = performanceAllocationBaseQuality(layers, selectedTotal);
+  const { positions, unknownSymbols } = performanceAllocationPositions(layers, accountId);
+  const targetNormalization = normalizeAllocationTargets(targets?.targets);
+  const targetsValue = targetNormalization.targets;
+  const cashValue = selectedTotal?.cashValue ?? 0;
+  if (cashValue !== 0 || targetsValue.cash !== undefined) {
+    positions.push({ category: 'cash', marketValue: cashValue });
+  }
+  const quality: PerformanceDataQuality = {
+    partial:
+      baseQuality.partial || unknownSymbols.length > 0 || targetNormalization.unknown.length > 0,
+    missingSymbols: [
+      ...new Set([
+        ...baseQuality.missingSymbols,
+        ...unknownSymbols,
+        ...targetNormalization.unknown.map((category) => `配置类别:${category}`),
+      ]),
+    ],
+  };
+  return { positions, targetsValue, quality, allocationUnavailable };
+}
+
+function performanceAllocationPositions(
+  layers: Awaited<ReturnType<typeof fetchPerformanceLayers>> | undefined,
+  accountId: string,
+) {
+  const positions: PerformanceAllocationInput['positions'] = [];
+  const unknownSymbols: string[] = [];
+  for (const position of layers?.security ?? []) {
+    if (position.marketValue === null) continue;
+    if (position.assetType.toLowerCase() === 'cash') {
+      unknownSymbols.push(position.symbol);
+      continue;
+    }
+    const category = normalizeAllocationCategory(position.assetType);
+    if (!category) {
+      unknownSymbols.push(position.symbol);
+      continue;
+    }
+    if (accountId && position.accountId !== accountId) continue;
+    positions.push({ category, marketValue: position.marketValue });
+  }
+  return { positions, unknownSymbols };
+}
+
+function performanceAllocationBaseQuality(
+  layers: Awaited<ReturnType<typeof fetchPerformanceLayers>> | undefined,
+  selectedTotal:
+    { partial?: boolean | undefined; missingSymbols?: string[] | undefined } | null | undefined,
+) {
+  const baseQuality: PerformanceDataQuality = {
+    partial: layers?.dataQuality?.partial === true || selectedTotal?.partial === true,
+    missingSymbols: [
+      ...(layers?.dataQuality?.missingSymbols ?? []),
+      ...(selectedTotal?.missingSymbols ?? []),
+    ],
+  };
+  return baseQuality;
+}

@@ -45,10 +45,7 @@ const normalizePortfolio = (value: PortfolioValuationWithDailyChange): Portfolio
     const currency = currencyValue(position.currency);
     const marketPrice = nullableNumberValue(position.marketPrice);
     const previousClose = nullableNumberValue(position.previousClose);
-    const baseMarketValue = nullableNumberValue(position.baseMarketValue);
-    const baseCostValue =
-      typeof position.baseCostValue === 'number' ? position.baseCostValue : undefined;
-    const basePnl = nullableNumberValue(position.basePnl);
+    const baseValues = portfolioBaseValuation(position);
     const pnlRatio = nullableNumberValue(position.pnlRatio);
     const dailyPnl = nullableNumberValue(position.dailyPnl);
     const dailyReturn = nullableNumberValue(position.dailyReturn);
@@ -73,9 +70,7 @@ const normalizePortfolio = (value: PortfolioValuationWithDailyChange): Portfolio
       ...(baseDailyPnl === undefined ? {} : { baseDailyPnl }),
       ...(updatedAt === undefined ? {} : { updatedAt }),
       ...(currency ? { currency } : {}),
-      ...(baseMarketValue === undefined ? {} : { baseMarketValue }),
-      ...(baseCostValue === undefined ? {} : { baseCostValue }),
-      ...(basePnl === undefined ? {} : { basePnl }),
+      ...baseValues,
       asset: {
         name: position.asset?.name ?? position.symbol,
         ...(assetType ? { assetType } : {}),
@@ -229,3 +224,15 @@ export const removePortfolioPosition = (
   positionId: string,
   client: Pick<ThesisLedgerApiClient, 'positionManagement'> = getDesktopApiClient(),
 ) => client.positionManagement.remove(positionId);
+
+function portfolioBaseValuation(position: PortfolioValuationWithDailyChange['positions'][number]) {
+  const baseMarketValue = nullableNumberValue(position.baseMarketValue);
+  const baseCostValue =
+    typeof position.baseCostValue === 'number' ? position.baseCostValue : undefined;
+  const basePnl = nullableNumberValue(position.basePnl);
+  return {
+    ...(baseMarketValue === undefined ? {} : { baseMarketValue }),
+    ...(baseCostValue === undefined ? {} : { baseCostValue }),
+    ...(basePnl === undefined ? {} : { basePnl }),
+  };
+}

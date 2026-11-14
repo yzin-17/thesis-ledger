@@ -55,6 +55,11 @@ export function DrawerAccountCases({ scenario }: { scenario: string }) {
       },
     ]);
     qc.setQueryData(portfolioKeys.accounts(), [account]);
+    if (scenario.startsWith('account-manager'))
+      qc.setQueryData(portfolioKeys.valuation('actual', account.id), {
+        mode: 'actual', totalMarketValue: 430, totalCost: 412.3456789, totalPnl: 17.6543211,
+        cashValue: 0, partial: false, valuedAt: '2026-11-14T08:00:00Z', positions: [position],
+      });
     qc.setQueryData(
       portfolioKeys.managedAccounts(),
       scenario === 'account-manager-list'
@@ -74,29 +79,8 @@ export function DrawerAccountCases({ scenario }: { scenario: string }) {
   });
   const props = { open, onOpenChange: setOpen };
   if (!open) return null;
-  if (scenario === 'audit' || scenario === 'audit-error')
-    return (
-      <AuditSheet
-        target={event}
-        query={query(audit, scenario.endsWith('error')) as never}
-        onOpenChange={setOpen}
-        onCorrect={() => {}}
-        onVoid={() => {}}
-        onRestore={() => {}}
-        onRestoreTransfer={() => {}}
-      />
-    );
-  if (scenario === 'reason-void' || scenario === 'reason-restore')
-    return (
-      <CorrectionReasonSheet
-        account={account}
-        action={scenario === 'reason-void' ? 'void' : 'restore'}
-        target={scenario === 'reason-void' ? event : drawerVoid}
-        restoreSource={event}
-        ledgerRevision="1"
-        onOpenChange={setOpen}
-      />
-    );
+  if (['audit', 'audit-error', 'reason-void', 'reason-restore'].includes(scenario))
+    return <DrawerAuditCase scenario={scenario} setOpen={setOpen} />;
   if (scenario.startsWith('transfer-'))
     return (
       <CashTransferCorrectionSheet
@@ -145,7 +129,8 @@ export function DrawerAccountCases({ scenario }: { scenario: string }) {
         {...props}
       />
     );
-  if (scenario.startsWith('account-manager')) return <AccountDataPage accounts={[account]} />;
+  if (scenario.startsWith('account-manager'))
+    return <main className="content"><AccountDataPage accounts={[account]} /></main>;
   if (scenario.startsWith('portfolio-'))
     return (
       <PortfolioManagement
@@ -162,5 +147,39 @@ export function DrawerAccountCases({ scenario }: { scenario: string }) {
         onSaved={() => {}}
       />
     );
+  return null;
+}
+
+function DrawerAuditCase({
+  scenario,
+  setOpen,
+}: {
+  scenario: string;
+  setOpen: (value: boolean) => void;
+}) {
+  if (scenario === 'audit' || scenario === 'audit-error')
+    return (
+      <AuditSheet
+        target={event}
+        query={query(audit, scenario.endsWith('error')) as never}
+        onOpenChange={setOpen}
+        onCorrect={() => {}}
+        onVoid={() => {}}
+        onRestore={() => {}}
+        onRestoreTransfer={() => {}}
+      />
+    );
+  if (scenario === 'reason-void' || scenario === 'reason-restore')
+    return (
+      <CorrectionReasonSheet
+        account={account}
+        action={scenario === 'reason-void' ? 'void' : 'restore'}
+        target={scenario === 'reason-void' ? event : drawerVoid}
+        restoreSource={event}
+        ledgerRevision="1"
+        onOpenChange={setOpen}
+      />
+    );
+
   return null;
 }

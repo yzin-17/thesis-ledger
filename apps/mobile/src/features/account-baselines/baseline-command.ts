@@ -1,5 +1,6 @@
 import {
   createBaselineObservationBatchCommandSchema,
+  currencyForMarket,
   type InstrumentSearchResult,
 } from '@thesis-ledger/schemas';
 import { ledgerInputTime } from '../accounts/ledger-input-time';
@@ -12,6 +13,11 @@ export type BaselineForm = {
   observedAt: string;
   costIncludesFees: 'UNKNOWN' | 'INCLUDES_FEES' | 'EXCLUDES_FEES';
 };
+export function baselineCurrency(instrument: Pick<InstrumentSearchResult, 'market'> | null, accountCurrency: string) {
+  if (instrument?.market === 'HK') return currencyForMarket.HK;
+  if (instrument?.market === 'US') return currencyForMarket.US;
+  return accountCurrency;
+}
 function baselineContent(form: BaselineForm) {
   if (!form.instrument || !form.observedAt.trim())
     throw new Error('请确认目录标的，并填写实际观察日期或 ISO 时间。');

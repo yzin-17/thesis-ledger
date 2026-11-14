@@ -10,7 +10,8 @@ import {
 import { MarketChartReaderV3 } from '../../src/market/market-chart-reader-v3.js';
 import type { BarReadInput } from '../../src/market/market-bar-reader.js';
 import type { MarketControlService } from '../../src/market/market-control.service.js';
-import type { DsaClient } from '../../src/integration/dsa/dsa.client.js';
+import { DsaError, type DsaClient } from '../../src/integration/dsa/dsa.client.js';
+import type { DataQualityService } from '../../src/quality/data-quality.service.js';
 import type { MarketChartProofRepository } from '../../src/market/market-chart-proof.repository.js';
 
 const fixture = (name: string): unknown =>
@@ -22,7 +23,7 @@ const input: BarReadInput = {
   acceptance: 'interactive',
   window: { start: '2026-05-18', end: '2026-05-20', limit: 2 },
 };
-const setup = (proofs?: MarketChartProofRepository) => {
+const setup = (proofs?: MarketChartProofRepository, quality?: DataQualityService) => {
   const desired = desiredProviderPolicyV3Schema.parse(fixture('market-route-v3.etf-qfq.json'));
   const effective = effectiveProviderPolicyV3Schema.parse(
     fixture('market-control-v3.effective.etf-qfq.json'),
@@ -54,11 +55,20 @@ const setup = (proofs?: MarketChartProofRepository) => {
     control as unknown as MarketControlService,
     dsa as unknown as DsaClient,
     proofs,
+    quality,
   );
   return { reader, control, dsa, response, catalog, effective, desired };
 };
 
 describe('统一行情图表 V3 读取', () => {
+  it('交互 K 线合同错误自动记录且保留原错误', async () => {
+    const observe = vi.fn(async () => null);
+    const { reader, dsa } = setup(undefined, { observe } as never);
+    const error = new DsaError('fixture', 'invalid-response');
+    dsa.marketChartBarsV3.mockRejectedValue(error);
+    await expect(reader.read(input)).rejects.toBe(error);
+    expect(observe).toHaveBeenCalledWith(expect.objectContaining({ capability: 'DAILY_BAR', symbol: input.identity.symbol, code: 'response_contract_invalid' }));
+  });
   it('按实际请求和当前三项修订向证明仓库查询，不用目录 ready 冒充证明', async () => {
     const proofs = { findExact: vi.fn().mockResolvedValue(null) };
     const { reader, dsa, control, catalog, effective, desired } = setup(

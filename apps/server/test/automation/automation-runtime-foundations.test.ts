@@ -83,6 +83,7 @@ describe('Automation history pagination', () => {
       {} as never,
       {} as never,
       {} as never,
+      automations as never,
     );
 
     controller.history('job-1', 'not-a-page', '-3');

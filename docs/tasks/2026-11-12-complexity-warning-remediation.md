@@ -1,0 +1,251 @@
+# 全仓告警清理任务
+
+对应[规格](../specs/2026-11-12-complexity-warning-remediation.md)。状态：实施中；发现范围已完成初步统计，尚未完成清理。原始总目标为全仓告警归零。
+
+## 当前执行摘要
+
+Schema、API Client、Domain 与 Mobile 已通过完整零告警检查及相关包验证。Server 已按来源、冻结身份、研究接续、账本和快照职责持续拆分；Desktop 已完成 Journal、实验结果、自选摘要及查询材料等批次和适用的四宽度受控验证。最新完整发现快照为 50 项（Desktop 50、Server 0），其余六组零告警；零错误，覆盖 3901 文件、8 组；该快照后完成的批次另持有局部验证，尚未全仓归零。五项文件尺寸告警均已清除，数据库集成仍待隔离验证。只允许本地源码和隔离／受控验证，不调用模型、真实 Provider 或改动真实业务数据；无子代理、部署或重启。
+
+实施证据：[验证记录](../evidence/2026-11-12-complexity-warning-remediation.md)。
+
+## 任务组与执行叶
+
+- [x] T1 公共合同与客户端校验告警（AC1、AC3）
+  - [x] T1.1：Schema 校验边界发现。已确认 28 项告警：20 项校验复杂度、2 项目录函数长度及6项测试分组长度；首先处理独立的市场证据一致性校验。
+  - [x] T1.1a：市场证据一致性校验（AC1、AC3）。写集为 `market-structured-status-v3.ts`、`market-known-cash-record-v3.ts`、`market-multi-window-v3.ts`。3 文件零告警；Schema 145 文件、1583 项测试及构建通过。原 issue 顺序、路径和金额计算保留。
+  - [x] T1.1b：日级可交易性（AC1、AC3）。`backtest-daily-tradability.ts` 零量来源适用范围验证独立，定向 lint 和直接合同测试通过，原上市边界、日期分区及 issue 顺序保留。
+  - [x] T1.1c：图表返回时钟（AC1、AC3）。`market-chart-wire-v3.ts` 的协议与分钟时钟验证独立；零告警，直接图表合同测试通过。
+  - [x] T1.1d：事件准入与公告引用（AC1、AC3）。`market-event-wire-v3.ts`、`market-notice-dividends-v3.ts` 日期映射准入和公告事件验证独立；零告警，相关测试通过。b—d 的定向验证合计 6 文件、96 项通过。
+  - [x] T1.1e：研究配置互斥与执行模型记账（AC1、AC3）。写集为 `backtest-run-preparation-v3.ts`、`backtest-run.ts`、`backtest-lifecycle-preparation-v3.ts`、`backtest-execution-model.ts`；按价格研究、现金研究、生命周期绑定及分段收费约束提取私有校验。维持全部错误路径、先后与模型收费语义；定向 lint、现有准备／运行／记账合同测试通过后完成。
+  - [x] T1.1f：冻结研究及 Provider 配置（AC1、AC3）。写集为 `ai-frozen-research-v2.ts`、`ai-provider-management-input.ts`；分开冻结时间和证据、模型选项及凭据校验。使用固定输入测试，不创建或执行 AiRun；定向 lint 与对应合同测试通过后完成。
+  - [x] T1.1g：策略 AST 与实验来源验证（AC1、AC3）。修改 `backtest-strategy.ts`、`strategy-optimization.ts`，提取指标参数、信号源声明及实验来源约束，保留递归 AST 与报错路径，使用现有策略／实验 Schema 测试验证。
+  - [x] T1.1h：来源兼容与行情规范编码（AC1、AC3）。修改 `market-route-compatibility-v3.ts`、`market-bar-series.ts`，独立验证来源身份、展开数字编码的嵌套条件；保留来源选择原因与字节指纹，通过现有兼容及跨语言 golden 合同验证。
+  - [x] T1.1i：HiThink／RQData 身份证据范围（AC1、AC3）。仅修改两个 identity 合同文件，分开摘要准入和映射范围校验；保留精确时钟、拒绝顺序和异常文本，使用各自原有身份合同测试验证。
+  - [x] T1.1j：参考资料目录（AC1、AC3）。仅修改两个 `market-reference-*-catalog.ts`，提取回购资料及衍生品日行情／排名列定义；工厂调用次序、字段、单位及返回对象不变。定向 lint 与原有 reference 合同测试验证。
+  - [x] T1.1k：Schema 测试分组发现。六个过长回调均为顶层 describe 下的独立 it，fixture 已在文件作用域，无需移动生命周期或变量。
+  - [x] T1.1k.1：公共 API 与账本测试按估值、查询审计、更正及事件恢复分组，仅改两个现有测试的 describe 边界，原 it 内容与数量保持；定向 lint 及两个文件验证。
+  - [x] T1.1k.2：回测数据、执行模型及 V2 合同测试按行情、公司行动、净值／冻结兼容、归一化及成交 AST 分组，仅改现有三个文件 describe 边界，原 it 内容与数量保持；定向 lint 及三个文件验证。
+  - [x] T1.1k.3：Market Data Wire 测试按请求身份、交易日覆盖及指纹／信封分组，仅改该测试 describe 边界，原 it 内容与数量保持；定向 lint 及该文件验证。
+  - [x] T1.2：API Client 发现。一个图表请求编排函数过复杂，三个测试套件过长；测试 fixture 均在文件作用域，无需移动生命周期。
+  - [x] T1.2a：图表计划获取（AC1、AC3）。仅修改 `planned-market-detail.ts`，分开计划读取／取消／可用性核对与计划窗口一致性核对；保持请求顺序、信号传递、价格口径和异常类型。定向 lint 及现有行情计划相关测试验证。
+  - [x] T1.2b：客户端测试分组（AC1、AC3）。三个告警测试按传输基础、研究、账本成交、行情、诊断、任务管理及复盘身份分组，保留 it 内容、模拟请求和断言；包级全部测试数量不减且通过。
+- [x] T1.3：公共合同增量复查。当前共享工作区 Journal V2 扩展新增 API Client 1 项和 Schema 3 项告警；限定周期记录客户端、冻结研究与周期快照合同，按周期记录、账户证据范围、确定性快照范围提取。保留端点、字段、AbortSignal、拒绝顺序与 issue 文本，原合同／传输测试及包门禁验证，不提交真实请求。
+- [x] T2 Domain 计算与行为测试告警（AC1、AC3）
+  - [x] T2.1：风险规则计算。写集限定 `risk/index.ts`、`risk/indicator-rules.ts`、`risk/portfolio-rules.ts`、`risk/price-rules.ts`。按指标、相关性、规则类别分派及事件上下文投影提取，保持成本比较精度、严格／包含边界、缺失资料和事件内容。定向 lint、原风险规则测试及包构建通过后完成。
+  - [x] T2.2：估值与自选展示。写集为 `valuation-display.ts`、`watchlist-display.ts`，提取缺失原因和报价会话状态投影，保持优先级、null 与陈旧区别、文本、日期和数值展示；定向 lint 与原展示测试验证。
+  - [x] T2.3：行为分析与十进制比较。写集为 `behavior.ts`、`decimal.ts`，分离退出纪律证据并展开中位数和整数比较条件；原精度、未知值和 evidence 不变，定向 lint 与原金融计算测试验证。
+  - [x] T2.4：成交模拟、执行规则与 NAV 生命周期发现。只读各告警函数及原测试，按状态转移与交易约束展开后续叶；不能使用真实账本或模型。
+  - [x] T2.4a：仓位输入事实读取。`backtest-sizing.ts` 的实际份额及归一化定仓共享价格／净值读取验证，保持先后、零目标清仓、输入证据和错误码；定向 lint 与原 sizing／归一化合同验证。
+  - [x] T2.4b：执行费用及卖出净收益率。`backtest-execution-model.ts` 提取旧佣金中性要求，`trade-costs.ts` 提取净收益率的空值／零分母判断；收费次序、舍入和十进制结果保持，定向 lint 与原费用／交易成本测试验证。
+  - [x] T2.4c：基准对齐和汇率换算。`backtest-result-analytics.ts` 提取观测对齐与逐点基准价值收集，保留未知汇率与无效值的区别、警告顺序及可用性原因；原基准分析测试及定向 lint 验证。
+  - [x] T2.4d：分钟桶完成状态。`market-minute-aggregation.ts` 独立计算未知／不完整／完成状态，保持真实日历、开盘边界、截点及聚合数值；原分钟聚合测试及定向 lint 验证。
+  - [x] T2.4e：规则 AST 与成交门禁。`backtest-rule-compatibility.ts` 提取参考名义价格零比较，`execution-rules.ts` 按价格限制及持仓可卖校验提取私有方法；原拒绝优先级、tick、价格边界与 T+N 时序不变；原执行及兼容测试、定向 lint 验证。
+  - [x] T2.4f：Arena 委托提交。`arena-live-submit.ts` 分离报价可见性、买单资金／仓位与卖单退出组校验；克隆隔离、取消顺序、Id 分配及守恒不变；原离线委托测试验证。
+  - [x] T2.4g：Arena 成交撮合。`arena-live-match-orders.ts` 提取可成交报价筛选及配对退出取消；过期、成交顺序、资金守恒、交收和 revision 只增一次保持；原离线成交测试验证。
+  - [x] T2.4h：交易证据完整性。仅展开 `trade-projection.ts` 的完整性优先级三元表达式，冲突高于部分、部分高于完整，使用原投影测试及 lint 验证。
+  - [x] T2.4i：NAV 请求模型与预留。仅在 `nav-simulation.ts` 内按冻结执行模型解析及资金／份额预留拆分私有方法；保持模型拒绝、费用、预留更新、重复请求和快照返回时机。定向 lint、NAV 及执行模型消费测试验证。
+  - [x] T2.4j：NAV 确认与交收。仅在同文件提取模型确认日期、成交后的状态更新及份额／赎回款可用日期校验；保留 NAV 可见性、收费、失败释放、日历和重放语义。定向 lint、NAV 与完整 Domain 测试验证。
+  - [x] T2.5a：分析与指标测试分组。`backtest-analytics-v2`、`backtest-corporate-actions`、`backtest-indicators` 按基准成本、复权和数据可见性分组；仅修改 describe 边界，原 fixture、it 和断言保持；对应文件测试及 lint 验证。
+  - [x] T2.5b：成交与定仓测试分组。`backtest-simulation-exchange`、`backtest-simulation`、`backtest-sizing`、`execution-model-consumption` 按交收顺序、归一化、输入可见性及 NAV 模型消费分组；仅改 describe 边界，原样本和断言保持；对应文件测试及 lint 验证。
+  - [x] T2.5c：账本与 NAV 测试分组。`nav-simulation`、`simulation-ledger`、`trade-costs`、`trade-projection` 按确认／交收／取消、公司行动、成本守恒和基线证据分组；仅改 describe 边界，原样本和断言保持；对应文件测试及 lint 验证。
+  - [x] T2.5d：日历聚合与规则样本。`market-period-aggregation` 按完成状态与日历截点分组，`execution-rules` 的三个市场参数改为显式 fixture 表，`arena-live-valuation` 的缺口样本展开条件。原测试输入保持，定向 lint 与完整 Domain 测试验证。
+- [ ] T3 Server 领域编排与测试告警（AC1、AC3）：按当前所属领域展开独立叶，跨模块变更维护边界门禁；数据库默认只读。
+  - [x] T3.39：V3 运行快照和结果的冻结身份。限定 backtest-v3-run-execution.ts，分开持久化身份、运行配置／时钟和 Runner 结果身份复核，保留校验内容、拒绝文本与次序，Store replay 和结果校验仍在原位置。离线篡改／重放样本、类型和原规则验证，不执行真实任务。
+  - [x] T3.74：SDK 持久化样本生命周期。限定 strategy-optimization-sdk-postgres.integration.test.ts，原本机 HTTP／数据库初始化及清理分别归生命周期 helper，按固定指标缓存、探索装配及无效输出注册用例；返回上下文后仍动态读取实际请求计数与响应。原规则、类型、原注册及 hook 词法还原验证，持久化只在隔离 V1 执行。
+  - [x] T3.73：封存测试状态机样本职责。限定 strategy-center-t06-postgres.integration.test.ts 与 strategy-center-t06.fixture.ts，数据和服务 fixture 归后者，分别拥有冻结 Run 持久化、受控执行、实验／候选构建与隐藏读取断言，再按自动完成、部分批次、取消与租约恢复注册原用例；所有可变失败开关和版本字段延迟读取，保留 SQL、原断言与重试集合。原规则、类型、词法引用还原和隔离 V1 验证。
+  - [x] T3.72：账本命令、HTTP 与编写持久化测试注册。三文件按经济投影／并发、回滚／旧行、HTTP 信封／伪报，以及草稿身份／执行租约／发布分组；只拆分注册与原生命周期，HTTP 快照闭包的纯声明前移至 setup，原用例顺序不变。原规则、类型与原 case 还原验证，真实数据库通过隔离 V1 运行。
+  - [x] T3.71：跨周与回放样本的阶段职责。四文件提取跨周比赛初始化、逐日封存与原决策状态，展开固定回放下一时点和采纳读取故障注入；原比较、成交、周报修订、权限及失败断言保持。原规则／类型和片段核对，真实持久化仍经隔离 V1。
+  - [x] T3.70：执行事实、升级与本地 SSE 测试职责。四文件按执行领取／预算／未知事实和升级准备／权限／回滚分组；取消与完整期限场景的本地 SSE 及网络隔离设置归各自 fixture，原流连接及清理实时读取保持。原规则、类型和注册／片段还原核对，真实数据库与 600 秒墙钟测试仍由隔离 V1 持有，禁止外部模型请求。
+  - [x] T3.69：提交准备收敛与比赛逐账户转换。限定 strategy-submissions.ts、live-matches.repository.ts，准备响应归已领取提交处理器，比赛转换分开逐账户动作及研究周期取消／未知收敛；保留锁、原逐项顺序、attempt 写条件、预约恢复和预算耗尽语义。原恢复／手动决策及新增受控准备、暂停／结束用例、类型与原规则验证，真实事务并发归隔离 V1。
+  - [x] T3.68：交易所回测冻结装配与状态适配。限定 backtest-v2-execution-exchange.ts，按规则装配、信号序列、风险输入、持仓状态闭包、委托定量及结果归集提取，保留同一 ledger／现金权益实例、调用顺序、下一有效开盘、可见时点及产物数值。原交易所／价格研究／现金权益测试、类型／原规则和尺寸门禁验证，不启动真实回测或模型。
+  - [x] T3.67：组合估值现金读取与收益总额。限定 portfolio.service.ts 与同 feature 的 portfolio-valuation-totals.ts，原现金物化读取保留顺序和结算金额，已／未实现及累计收益纯计算归后者；保留 null、零成本、FX 完整性、舍入位置及取数时点。原组合估值／汇率样本、类型及原规则验证，不读取或写入真实账户。
+  - [x] T3.66：收益分层的原币账户与币种汇总。限定 performance-layer.service.ts，提取账户／币种余额装配及原币跨账户归集，保留逐项累加顺序、空账户、未知行情 null、FX 货币顺序与公开投影。原收益／资金／汇率测试、类型和原规则验证，数据全部来自内存样本。
+  - [x] T3.65：轮次模型决策的已知路由定价。限定 arena-model-decisions.ts，提取 SDK 运行时、币种、输入／输出价格及上游不限输出资格检查；保留预留上限比较、发出标记、身份复核与 finally 事务结算。受控拒绝场景、相关费用测试、类型和原规则验证，禁止真实请求及结算写入。
+  - [x] T3.64：身份、风险监控及本地 SDK 套件上下文。三个长套件按身份访问／租约、来源／并发／恢复及 SDK 准入／费用／发现／未知结果分组；共享可变变量以带 getter／setter 的原生命周期上下文延迟读取，保留原赋值和跨 await 更新。原注册调用及词法绑定还原一致，原规则／类型与本地固定 HTTP 响应用例验证，数据库仍归隔离 V1，禁止外部模型请求。
+  - [x] T3.63：委托提交资格与回放账户推进。限定 live-orders.repository.ts、live-replay-runtime.ts，提取活动周期检查、回放截止时点、账户到期／预约推进及基准恢复；锁和校验仍位于原事务位置，逐账户保存及研究屏障顺序保持。原盘前委托与新增受控回放测试、类型／原规则验证，真实队列／事务并发归隔离 V1。
+  - [x] T3.62：基金误差比较的正式公开净值来源资格。限定 fund-daily-error.service.ts，将有效策略、Revision 与 akshare／eastmoney 精确目标验证提取；保留先记录检查时刻、缓存复核、来源限次和 CAS。原来源与基金误差受控测试、类型及原规则验证，真实误差行和 Provider 均不调用。
+  - [x] T3.61：回测分组的候选及用户来源。限定 strategy-optimization-read.service.ts 与同 feature 的 strategy-optimization-backtest-group-source.ts，来源合同与纯投影归后者，复用原候选来源装配并独立用户回测来源投影，保留排序、分页、读保护、关联优先与未知来源原因。原分组／来源单测、类型及原规则验证，不改写历史关联或真实实验。
+  - [x] T3.60：历史回放价格与执行证据。限定 market-arena-replay-reader.ts，提取冻结价格读取、可执行标的及日状态校验；保留证据插入顺序、历史可见时钟、价格坐标、费用、结算与到期判定。原回放／规则样本、类型与原规则验证，只使用冻结本地样本。
+  - [x] T3.59：基金净值及 V3 持久化、风险采纳与报告读取测试注册。七个长套件按准备身份／故障恢复、队列执行／取消、事务 CAS／重放、采纳一致性／准入、风险同源竞争／修订及报告身份／范围／篡改分组；保留原 setup／清理、原 case 文本和顺序。原规则及类型验证，数据库和实际 Worker 只经隔离 V1 运行，不触碰真实数据。
+  - [x] T3.58：自主模型请求的准入、参数与记账投影。限定 live-research-call.ts，提取活动租约、已知定价、SDK 请求参数和 token／费用已知判断；原 signal、预留、身份复核、异常与 finally 结算保持。原受控工具／调用预算测试、类型及原规则验证，SDK 必须为内存替身，禁止真实模型调用。
+  - [x] T3.57：隔离默认引用、人工重试、目录与估值的测试注册职责。四个 PostgreSQL 套件分离原 setup 生命周期与按默认引用竞争／清理、重试准入／终态、目录发布／历史及估值调度／修订／组合的注册函数，getter 在用例执行时读取原共享状态。原 it 除上下文读取外保持逐字相同，注册顺序和断言不变；原规则／类型先验证，真实运行仅归隔离 V1，不能用跳过计为通过。
+  - [x] T3.56：自主领取的回放身份与估值基准账户。限定 live-cycles.repository.ts、live-valuations.ts，提取原回放领取屏障及基准账户恢复／初始化，保留事务锁、attempt、租约、基准创建时机和估值 CAS。原受控相关测试、类型及原规则验证，数据库领取／估值并发仍归隔离 V1。
+  - [x] T3.55：当前执行的报价、标的与规则资格。限定市场实时执行 Reader、美股及开盘执行证据实现，按来源时钟、标的身份、规则覆盖与状态合同拆分私有验证，保留原拒绝顺序、当前会话复核、证据序列化及结算日期。原受控行情测试、类型和原规则验证，不访问真实来源或执行真实订单。
+  - [x] T3.54：候选采纳的事务内资格校验。限定 strategy-optimization-adoption.ts，将完成／揭示资格、完整策略哈希和当前版本确认分别提取，所有读取、锁、写入及 CAS 仍在原事务内原位置。原采纳受控测试、类型和原规则验证；并发／回滚保留隔离 V1，禁止真实采纳或写入正式策略。
+  - [x] T3.53：自主任务投递与会话选择。限定 live-runtime.ts 及受控回放准入测试，分开 pending 投递与已有会话中的执行窗口，保留自动收敛、实时休市可研究、历史回放屏障、attempt、领取条件和投递失败。原日期及新增受控状态用例、类型和原规则验证，不连接真实队列或运行研究。
+  - [x] T3.52：自主研究工具的预留与结果结算。限定 live-research-runner.ts，提取工具请求的顺序执行、预算预留／结算及审计，原取消信号、循环上限、时钟和失败状态保留。原受控研究执行用例、类型及原规则验证，不运行真实研究、模型或外部工具。
+  - [x] T3.51：账本样本的修订号转换。限定 ledger-event-fixtures.ts，将既有 bigint／数字／字符串／空值的转换命名为私有边界，保留默认值、显式零、异常和字段次序。原账本／投影受控用例及原规则验证，不生成真实账本记录。
+  - [x] T3.50：策略编写验收用例的主题注册。限定 authoring-execution-analysis.cases.ts、authoring-execution-save.cases.ts，将原分析门禁／修订与发布／建议审核用例按主题注册，保留 getContext 延迟读取、it 顺序及全部请求和断言。原 it 源码摘要、类型和原规则验证；完整 HTTP／PostgreSQL 仍列入隔离 V1，不运行真实模型或业务服务。
+  - [x] T3.49：V3 创建的资金、执行路由与 Builder 身份。限定 backtest-v3-run-lifecycle.ts，分离初始资金验证、执行路由定义及 Builder 返回身份复核；保留幂等检查、准备 fence、创建／投递顺序、失败落库和错误消息。原离线创建／重试／模式隔离测试、类型和原规则验证，不写真实任务或投递真实队列。
+  - [x] T3.48：快照构建的生命周期复核、读取请求及声明投影。限定 backtest-snapshot-v3-builder.ts，提取生命周期首次读后身份、冻结窗口请求和 manifest 声明，保留读取顺序、源身份、产物顺序、现金复核及失败删除。原离线快照／来源／重放用例、类型和原规则验证，不构建真实业务快照。
+  - [x] T3.47：回测准备的价格计划、原价参考及结果装配。限定 backtest-run-preparation.ts，分离请求／策略计划准入、研究参考取得与最终来源结果校验；保留 Reader 顺序、生命周期预热、父窗口冻结、错误优先级和原报价身份。原离线准备／冻结用例、类型和原规则验证，不准备真实实验或请求真实来源。
+  - [x] T3.46：收益采样的覆盖率与质量投影。限定 performance-valuation-series.service.ts，提取基金覆盖率与账户 partial 的质量优先级，保留无基金口径、低覆盖、原值及写入顺序。原受控采样测试、类型和原规则验证，不生成真实估值或写入业务库。
+  - [x] T3.45：报价控制与观察预算样本的条件表达。限定 quote-control-fixture.ts、live-research-wakeup-budget.test.ts，按基金／显式类型／默认股票顺序提取样本类型，展开晚周期读取的嵌套条件；保留测试输入、返回形状和全部断言。原报价缓存／类型及观察预算离线测试验证，无真实数据库或来源请求。
+  - [x] T3.44：V3 Runner 的冻结披露投影。限定 backtest-v3-runner.ts，统一生成研究价格、现金事件与执行模型披露，按原字段位置组合结果；保留来源读取、状态叠加、Decimal、警告与校验和顺序。原严格快照／离线重放测试、类型和原规则验证，不执行真实任务。
+  - [x] T3.43：V3 基准的执行模型引用与序列评价。限定 backtest-v3-benchmark.ts，分开冻结模型引用校验和通过来源准入后的日历／收盘对齐／计费评价。保留版本与来源身份、异常次序、不可用原因、警告顺序和 Decimal 计算；原基准样本、类型及原规则验证，不执行真实回测。
+  - [x] T3.42：无事件派生行情的准入与读后复核。限定 market-event-free-reader.ts，将适用输入、双价格口径主源匹配及读后策略／目录复核提取，保留冻结证书、日历、指纹、证据写入先后和原拒绝原因；使用原离线 Reader 样本和原规则验证，不生成真实证书、证据或来源请求。
+  - [x] T3.41：队列恢复的受控状态匹配。限定 retry-cancel-recovery.test.ts，将假数据库匹配器按状态、attempt 与取消字段提取，原 11 项测试与断言保留；只调整样本表达，不变更产品恢复条件或连接真实队列。
+  - [x] T3.40：V3 attempt 失败收敛。限定 backtest-run-attempt.ts，失败分支提取为私有异步职责，在原 catch 中等待完成后才释放 activeController；保留全部 attempt／状态 CAS、取消、重试、终态及异常传播。原受控取消／恢复样本、类型和原规则验证，不写业务库或投递真实队列。
+  - [x] T3.38：冻结停复牌产物与基准计费版本校验。限定 backtest-trading-status-snapshot-v3.ts、backtest-v3-benchmark-cost.ts，分开 source 披露身份复核、受支持版本与执行模型版本判断；保留旧版本回退、全部拒绝顺序、费用计算及冻结身份。原离线回测样本、类型和原规则验证，不准备真实实验或执行真实回测。
+  - [x] T3.37：Arena 执行上下文的标的／委托集合。限定 live-execution-context.ts，提取观察标的、需要报价的条件与委托到期日期投影，保留目录读取、持仓准入、Reader 先后、过期及回放行为。使用受控执行上下文与原回放／日期样本验证，不执行真实委托。
+  - [x] T3.36：Arena 离线工具与周报权重投影。限定 live-research-tools.ts、arena-week-analysis.ts，将回放工具派发与已结算决策权重聚合各自提取。保留取消检查、固定宇宙门禁、截止时钟、Decimal 运算和排序；原离线测试与类型／原规则验证，不调用模型或真实工具来源。
+  - [x] T3.35：Arena 估值的行情身份与会话资格。限定 market-arena-valuation-reader.ts，分开报价身份／时钟拒绝及休市快照／实时会话判断，保留双重会话读取、公司行动证据、并发读取及缺失原因；使用离线样本验证，不访问真实行情或生成真实估值。
+  - [x] T3.34：实验计费摘要按尝试累计与摘要展示分离。限定 strategy-optimization-cost.ts，保留每段用量、未知原因覆盖顺序、币种观察和 Decimal 累加次序；通过原计费样本、类型及原规则验证，不创建或执行真实实验。
+  - [x] T3.33：图表与冻结窗口的备用来源资格。限定 market-chart-selector-v3.ts、market-window-selector-v3.ts，分开读后证明复核及备用预检资格。保留主源先后、基础价格例外、精确目标／整窗证明、前后两次兼容判断、撤销拒绝和错误原因；原离线选择器测试、类型及原规则验证，不读取真实来源或更新路由。
+  - [x] T3.32：Arena 比较窗口。只从 arena-comparison.ts 提取按比赛时区解析的开始／结束范围，保留赛期边界、默认截点及读取过滤。受控读服务测试覆盖时区跨日、赛前／赛后、明确区间及越界时不读取明细；类型和原规则验证，不读取真实比赛或比较快照。
+  - [x] T3.31：预约价格唤醒资格。限定 live-appointments.ts 及其盘前受控测试，分开报价基础资格和截点会话／时差筛除，保持两次会话读取、时间／成交事件独立、冻结赛期、事务与去重。新增过期／未来报价和会话改变用例，原桩测试、类型、lint 和边界验证，不扫描真实比赛或新增预约。
+  - [x] T3.30：Arena 请求预留与开盘目标。限定 live-call-limits.ts、arena-open-execution.ts，分开参与者／比赛预算校验和排序后的目标构造。保持 Decimal 运算先后、空值不限额、请求守恒、零预算、卖出优先、lot／tick／涨跌幅、手续费和原 96 轮资金求解；原离线预算／撮合测试、类型及 lint 验证，不调用模型、提交预约或改变真实账户。
+  - [x] T3.29：基金持仓复权收益证据。只修改 fund-valuation-adjusted-return.ts，按报价时点和复权来源资格提取，保持拒绝顺序、上界分钟、最大时差、日历归属、锚点和收益计算。原估值桩测试、类型及 lint 验证，不读取真实报价、净值或持仓。
+  - [x] T3.28：行情窗口请求材料与交互准入。限定 market-bar-reader-v3.ts、market-chart-reader-v3.ts，提取研究／来源约束、覆盖要求和交互图表资格。保留原 getter／创建顺序、来源读取次数、质量封装、缓存和拒绝原因；原离线 Reader 测试、类型和原规则验证，不请求真实行情或缓存服务。
+  - [x] T3.27：冻结研究材料资格与 Journal 范围。限定 ai-research-evidence-quality-v2.ts、journal-ai-research-v2.ts，按私人材料种类提取资格及明确对象／周期范围分支；保留空值／未知／不可用、Schema 核验、归属和拒绝先后。原离线资格／研究／Journal 测试、类型与 lint 验证，不启动研究或模型。
+  - [x] T3.26：执行窗口预检职责。限定 backtest-preflight-v3-execution.ts，按输入身份／窗口、失败诊断映射、来源读取材料和冻结关联提取；保留校验顺序、诊断文本／字段、路由修订、Reader 次数与重建门禁，只运行原桩绑定预检测试、类型、lint 和尺寸检查，不获取真实行情或创建 Run。
+  - [x] T3.25：冻结标的序列读取。只修改 backtest-instrument-series.service.ts，将冻结文件逐行读取和原来源／时钟校验从服务编排分开。保留读资格、缺失原因、十万行上限、重复时点、日期过滤、原价字符串、错误降级与点排序；原服务离线测试、类型、lint 验证，不读取真实任务或文件。
+  - [x] T3.24：冻结日历与依赖集合。限定 backtest-snapshot-v3-calendar-alignment.ts、backtest-snapshot-v3-input-plan.ts、backtest-snapshot-v3-dependency-validation.ts，提取预期交易日枚举、期初身份、价格研究资格／信号绑定和依赖证明索引。保持交易日事实、预热／交收门禁、Artifact 集合与顺序、未知输入、错误类型及冻结指纹；原 Snapshot 受控测试、类型、lint 和边界验证，不获取 Provider 或写入真实 Artifact。
+  - [x] T3.23：Journal V2 增量类型卫生。限定复盘快照、数值字段投影及对应研究 V2 测试三文件，移除冗余断言／未使用 import，以类型收窄构造篡改样本；保留冻结摘要及篡改拒绝断言。原离线测试、类型和 lint 验证，不保存真实快照或启动研究。
+  - [x] T3.22：价格坐标与冻结参考证据。限定 backtest-dependency-price.ts、backtest-price-research-input.ts，按坐标失败路径、预热缓冲和 Artifact 解析／绑定校验提取；保持覆盖预算、缺失证据、原价与实际单位区别、字节摘要、时间截点和错误先后。原依赖／价格研究离线测试、类型及原规则验证，不读取来源或生成 Artifact。
+  - [x] T3.21：公共收费执行模型。只修改 backtest-public-fees-model-v3.ts，按覆盖政策、原件时钟、范围与费项连续性、原执行段求交提取；保留错误先后、Decimal 零费判断、原费项设置及覆盖、来源版本和 Schema 解析。原 ETF／扩展费项／模型／冻结测试、类型及 lint 验证，不读取真实公共费率。
+  - [x] T3.20：事件依赖与状态价格模型。限定 backtest-dependency-events.ts、backtest-status-price-model-v3.ts，按响应覆盖校验、来源身份、状态原件时钟和逐日执行段拆分；保持问题顺序、可见性、原价／规则研究门禁、模型来源与 Schema 解析，原依赖和状态价格离线测试、类型及零告警验证，不抓取来源或新建回测。
+  - [x] T3.19：导入身份、研究时点与风险消费状态。`import-draft.service.ts` 提取幂等摘要材料，`research-observation.service.ts` 提取复核时点界限，风险消费端复用原快照检查点读取，策略风险上下文提取原返回投影。保留摘要键序、解析／读取顺序、来源时钟、Redis 租约／恢复和数量空值；原受控测试、类型及 lint 验证，不创建真实草稿、复核或扫描。
+  - [x] T3.18：风险持仓高点与规则修订材料。`risk-context.service.ts` 分开持仓身份变化、高点计算与筹码字段；`risk-rule.service.ts` 分开修订合并及目标变化判断。保留原事务锁、upsert 时机、持仓生命周期、未知值、通知门禁、修复状态和审计写入顺序，原风险受控测试、类型、尺寸及 lint 验证，不扫描真实持仓或改动规则。
+  - [x] T3.17：研究实验编排职责。`research-live-experiment-arm.ts` 分离原提示材料、SDK 请求字段及失败／费用收敛，`research-live-experiment-driver.ts` 分离启动资格、预算恢复及失败确认资格。保留原提示字节、请求和回调次序、预算、取消、计时及失败策略；只运行既有桩绑定离线实验测试、类型及 lint，禁止真实模型调用。
+  - [x] T3.16：回测创建准备门禁。只修改 `backtest-creation-guard.service.ts`，按策略冻结身份、当前路由版本及生命周期复核提取，保留所有读取／等待顺序、摘要比较、既有费用与公告分支、稳定错误码和拒绝先后。原创建门禁及准备受控测试、类型和零告警验证，不创建真实 Run。
+  - [x] T3.15：市场、Provider 及发现测试主题。六文件按报价缓存、净值、凭据、通知草稿、冻结窗口、Control／Data 协议、修订竞争及发现边界分组。无其他消费者的静态 fixture 保留在本文件；DSA 的清理 hook 在各分组内各注册一次，每个测试仍只执行一次。保留原 it 调用源码摘要、注册及循环顺序，原测试、类型和零告警验证，全部来源为桩。
+  - [x] T3.14：公告现金事件校验。`market-notice-dividends-v3.ts` 分开公告修订／覆盖与逐条现金事实核对，保留原始字节和摘要、准入、源时钟、分红金额换算及失败顺序；原公告及离线事件测试、类型和 lint 验证，不读线上来源。
+  - [x] T3.13：快照聚合及历史 FX 合并。`performance-snapshot.service.ts` 保留读取、估值和 Revision 写入；同 feature 的 `performance-snapshot-aggregation.ts` 拥有原币汇总、捕获身份材料及逐时点账户合并。保留原浮点累加顺序、未知值、正式估值门禁、幂等键、历史证据和所有外部调用次序，原快照／收益离线测试、类型、尺寸及 lint 验证，不生成真实快照。
+  - [x] T3.12：收益目标与分析读取材料。只修改 `performance-analysis.service.ts`、`performance-target.service.ts`，将原收益校验与目标记录归一化提取；保留 partial 拒绝、历史 FX 优先级、目标加权及账户读取顺序，原收益受控测试、类型与 lint 验证，不生成真实快照或修改目标。
+  - [x] T3.11：G3 回环诊断断言。两个 `ai-generation-*-diagnostics.integration.test.ts` 将运行包／HTTP 摘要及流哈希／用量断言按主题提取为私有断言函数，保留同一实测结果、顺序、原断言与秘密隔离；原 6 项仅回环 HTTP 测试、类型和 lint 验证。
+  - [x] T3.10：结构化来源错误及完整性问题投影。DSA V3 错误按现行 envelope 与历史 HTTP 分支拆开映射，Integrity 的无活跃交易持仓检查独立；写集仅 `dsa-v3-protocol.ts`、`integrity.service.ts`。保留错误码、状态、来源原因、回退顺序及问题排列；原受控协议／完整性测试、类型和 lint 验证。
+  - [x] T3.9：账本投影计算职责。FIFO 卖出消费、现金快照选择及增量应用、Trade 持久化材料、基线时间材料分别提取，写集限定 `ledger-projection.ts`、`cash-projection.ts`、`core-projection.ts`、`ledger.service.ts`。保留 Decimal 每次运算先后与精度、共享 lot 变更、交收吸收、写入顺序及事务上下文，原账本离线测试、类型和 lint 验证，不调用真实写入入口。
+  - [x] T3.8：回测读取及身份时钟。写集为 `backtest-current-run-read.ts`、`backtest-hk-research-lot-v3.ts`、`backtest-identity-observation-clock-v3.ts`、`backtest-snapshot-v3-completeness-checks.ts`；分开准备失败记录、港股研究原价绑定、固定观察来源和完整 Artifact 清单，保留来源白名单、时钟比较、失败顺序、指纹及字段存在性。原冻结／执行／读取测试、类型和零告警验证，不重放真实 Run。
+  - [x] T3.7：历史研究实验的离线接续资格。仅修改 `research-live-experiment-{protocol,budget,continuation,resume,terminal}.ts`，按冻结案例绑定、费用报告解析、429 原终态、已完成组／未知请求及终态预算核对拆分。保留全部来源、摘要、请求顺序、Decimal 费用预留和拒绝优先级，只运行既有离线测试，禁止启动任何实验或访问模型。
+  - [x] T3.6：行情路由及冻结证据投影。`market-chart-options-v3.ts` 分开主路由不可用原因，`fund-daily-error-method.ts` 分开收盘持仓证据匹配，`market-frozen-window-view-v3.ts` 分开冻结请求身份及范围门禁。原备用来源准入、时点、复权证据、摘要和校验先后保持；原市场／基金／冻结窗口离线测试、类型和零告警验证，不读取真实 Provider。
+  - [x] T3.5：单一套件的受控测试 fixture 所有权。Trace 单元／回环集成、SDK 回环协议、周期详情 HTTP 和报价并发五文件均只有一个顶层套件，没有其他测试消费者；将各文件共享 fixture 与生命周期提升至本文件作用域，再按传输、脱敏、读回、失败、协议、周期降级及租约主题分组。hook 仍只注册／执行一次，原 it／test 调用逐字摘要保持，原五文件测试、类型及 lint 验证，不建立真实网络或数据库连接。
+  - [x] T3.4：独立领域验证职责。`api-exception.filter.ts` 的输入错误响应、`accounts.service.ts` 的更新材料、`import-position-validation.ts` 的利润交叉验证、`market-chart-request.ts` 的身份解析分别归私有函数；不改变响应优先级、账本门禁、Decimal 精度、校验顺序或外部调用。原各领域受控测试、类型与零告警验证。
+  - [x] T3.3d：配置校验和最终执行身份。Provider 输入按上游与模型约束分开校验，保存预检将凭据解析留在同一服务私有方法；研究结果分开最终请求身份与正文结果匹配，SDK 错误正文独立检查。原错误顺序、凭据来源、最终 attempt 绑定及诊断返回保持，4 文件零告警、Server 类型与 5 文件 84 项受控测试通过。
+  - [x] T3.3e：研究列表展示投影。只修改 `ai-research-query.ts`，分开对象身份、来源及数据版本投影；保留批量读取、冻结内容、名称目录、对象字段存在性、顺序和响应，原查询及投影测试验证。
+  - [x] T3.3f：HTTP 审计采集。只修改 trace 下的 HTTP／响应正文文件，按请求快照与 SSE／JSON 解析、正文事实收集职责提取；保留一次派发、原流转交、错误处理、字节摘要及取证顺序，用原回环假上游／受控 Trace 测试验证。
+  - [x] T3.3a：AI 安全诊断投影。`ai-generation-failure-diagnostics.ts` 按模型脱敏及错误类别投影提取，`ai-generation-stream-diagnostics.ts` 按帧载荷与样本摘要提取；保留帧计数、文本／推理哈希、用量、截断、脱敏及更新顺序，原离线／回环假上游诊断测试和定向 lint／类型验证，禁止真实模型请求。
+  - [x] T3.3b：Provider 持久化摘要与运行选项。`ai-provider-summary.ts` 分离显式／旧来源选择、Provider 默认字段及健康观察投影，`ai-provider-runtime.ts` 提取运行选项材料；保留旧 OpenRouter 迁移准入、空值／零值区别、模式和凭据指纹，无新增请求。原 Provider 配置、就绪、Registry 与上游分支测试及定向 lint／类型验证。
+  - [x] T3.3c：Provider 元数据与探针输入。`provider-adapters.ts` 按原字段顺序投影一般属性、传输配置、路由及定价，`ai-provider-test-runtime.ts` 分离目标与 Provider 默认字段，`ai-provider-readiness.persistence.ts` 分离旧定价材料。保留字段存在性、零值、数组复制、原参数及校验先后；原受控 Provider／契约测试、类型与 lint 验证，不发送真实请求。
+  - [x] T3.1：Server 条件分支发现。按当前告警定位费用、状态、来源和错误选择表达式；先处理可独立验证的非回测条件投影，再处理含冻结执行语义的回测分支，保留判断顺序及空值含义。
+  - [x] T3.1a：自动任务、通知及平台状态投影。写集为 `automation-execution-store.ts`、`notification.service.ts`、`data-export.service.ts`、`health.service.ts`，展开嵌套条件，保留优先级、事务及错误文本，原离线测试与定向 lint 验证。
+  - [x] T3.1b：Provider 和 DSA 来源状态。写集为 `provider-config.service.ts`、`provider-health.service.ts`、`dsa.client.ts`、`market.controller.ts`，按来源配置、故障和服务状态职责拆分条件；不改变请求、重试、缓存、能力或收费，原受控测试与定向 lint 验证。
+  - [x] T3.1c：Provider 保存材料与行情分区降级。同文件提取凭据轮换／保存数据投影及行情／指标独立降级；不改变 CAS、健康记录、事务客户端、HTTP 参数校验时机与 DAILY_BAR 成功事实。原 Provider 服务／目录及 Market 图表详情、周期降级测试，类型与完整告警规则验证。
+  - [x] T3.2：Server 测试分组发现。75 个过长回调中，32 个只含独立测试注册；其余含本地 fixture、hook 或单个长场景，不能直接移动 describe 边界。以下先处理无局部共享声明的主题分组。
+  - [x] T3.2a：AI 合同、就绪与执行测试。`ai-provider-readiness`、`ai-provider-upstream`、`ai-provider-verified-save`、`research-executor`、`ai/services` 按来源配置、权威证据、回退、授权、取消、冻结读取和失败分组；只改 describe 边界，不改 it、hook、网络样本及断言，对应文件 lint 和测试验证。
+  - [x] T3.2b：回测依赖、准备与估值测试。`backtest-dependency-plan`、`backtest-preflight-v3-execution`、`backtest-run-preparation`、`backtest-snapshot-v3-dependencies`、`price-research-snapshot`、`v2-equity-curve`、`v2-execution`、`v3-benchmark` 按冻结协议、时钟、事件、修订、估值和成本主题分组；原样本、测试顺序与断言保持，对应文件 lint 和离线测试验证。
+  - [x] T3.2c：次日开盘执行的长场景。`v2-execution.test.ts` 以原顺序调用原价／归一化／执行模型及拒绝条件断言；初始事实放入独立 `v2-exchange-open.fixtures.ts` 工厂，每个原场景仍只构建一次并共享原 Map。保留所有 it、原输入、断言及变更顺序，定向 lint 与原运行时测试验证。
+  - [x] T3.2d：V3 生命周期测试分组。`v3-create-retry-integration`、`v3-run-lifecycle`、`v3-runner` 按创建门禁、完整执行、冻结重试、取消及防篡改分组；原 it、样本及顺序不变，定向 lint 与离线测试验证。
+  - [x] T3.2e：导入及账本测试分组。`imports/services`、`ledger/core-projection`、`ledger-command.service`、`ledger-v2.repository` 按识别、幂等、回滚、现金重放、修正链和跨账户原子性分组；不改断言及 fixture，定向 lint 和原测试验证，不连接真实账本。
+  - [x] T3.2f：市场及通知测试分组。`market-control.service`、`market-window-selector-v3`、`notification-runtime` 按路由、备用来源证据、诊断、凭据、投递失败与竞争分组；原受控请求和断言保持，定向 lint 和测试验证。
+  - [x] T3.2g：收益及组合测试分组。`performance/services`、`performance/valuation-series`、`portfolio/services` 按快照、目标、现金、模式、外汇、采样及已实现收益分组；原金额、样本、it 和断言保持，定向 lint 和原测试验证。
+  - [x] T3.2h：风险测试分组。`risk-market-contracts`、`risk-state-machine`、`risk/services`、`risk/strategy-runtime` 按范围、峰值、持续越界、通知重试、持仓绑定、归档及闭合行情分组；不改变扫描、时钟和受控通知样本，定向 lint 和原测试验证。
+- [ ] T4 Desktop 告警及 Journal 文件尺寸（AC1、AC2、AC3）：按页面／共享投影和测试主题展开独立叶，实际页面使用受控输入验收。
+  - [x] T4.29：收益元数据与 Provider 草稿投影。限定 PerformanceWorkspace.tsx、useProviderCredentialProbe.ts、ai-provider.actions.ts，分离缓存元数据、账户权限差异、时限草稿及路由校验；保留缓存订阅不发请求、校验顺序、凭证闭包和原值。原受控用例、类型与原规则验证；页面样本验证原交互，不允许真实探针或保存。
+  - [x] T4.41：交易周期列表。限定 PortfolioTradeView.tsx，分离原账户／标的／生命周期控制器、已加载统计及交易表格；保留当前与停用账户名称、模式隔离、筛选清空、详情和分页，金额仍读原字符串。原交易／模式／收益范围用例、类型、原规则及受控四宽度验证，不创建或更正真实交易。
+  - [x] T4.40：成交表单、原始金额与提交职责。限定 AccountDataExecutionSheet.tsx 及同 feature 的表单控制器、交易字段／费用组件和提交模块，分离原校验、费用解析、创建／更正动作及原 JSX；保持校验先后、原始十进制、命令 ID／Revision、结算时点、错误恢复与标的确认。原精度／恢复用例、类型、原规则、尺寸及受控四宽度验证，禁止真实账本提交。
+  - [x] T4.39：定期现金计划及发生项。限定 AccountDataRecurringCashDeposits.tsx 与同 feature 编辑器模块，分别拥有计划／发生项编辑、原状态控制器及待确认／计划／历史列表；只读资格 guard 保持在原视图，原 mutation、版本、恢复与余额语义不变。原现金用例、类型、原规则、尺寸与受控四宽度验证，不执行真实计划或入账。
+  - [x] T4.38：账户导航、模式与持仓入口职责。限定 useAccountDataNavigation.ts、PortfolioAccountManagement.tsx、PortfolioManagementSections.tsx、PortfolioTradeOpeningBoundarySheet.tsx，提取原 URL 请求、账户模式字段、持仓动作及建仓补录控制器；保留返回、模式过滤、原状态及命令／确认顺序。原账户／持仓测试、类型、原规则及受控四宽度验证，不写入真实账户或账本。
+  - [x] T4.37：原研究创建表单职责。限定 NewResearchSheet.tsx 及同 feature 的控制器、资格投影与对象字段模块，按账户／持仓／策略对象、重试确认和读取边界提取；保持全部状态、hook 顺序、原 mutation、模式门禁、未知结果确认与金额／凭据处理。原受控模式及研究用例、类型、原规则、尺寸及四宽度浏览器验证，不提交真实研究。
+  - [x] T4.36：研究详情、提交与列表材料。限定 AiRunDetail.tsx、ResearchSavedReport.tsx、ResearchSubmissionSheet.tsx、use-research-workbench.ts，提取原任务标题、资料质量、提交控制器及列表过滤，保持模式隔离、旧报告、确认与重试、缓存键及抽屉导航。原受控测试、类型、原规则及四宽度浏览器验证，不发起真实研究。
+  - [x] T4.35：剩余浏览器夹具与复盘测试注册。限定 browser-drawer-account-cases.tsx、research-workbench-browser-data.ts、journal-object-interaction.ui.test.tsx，按审计面板、研究报告读取及复盘阶段拆分原回调；保持所有输入、断言、请求拦截和执行顺序。原规则、原用例及适用四宽度验证；已知 Journal V1 旧引用与当前 V2 工作区差异单列，不恢复已删除实现。
+  - [x] T4.34：授权与证券行情面板职责。限定 ProviderOAuthPanel.tsx、SecurityStaticPriceDialog.tsx，拆分原控制器、状态与动作／报价展示，保留自动开页、轮询、取消、失效、精确周期和源条件。原受控交互、类型、原规则及四宽度浏览器验证；授权和行情只用受控样本，不连接真实来源。
+  - [x] T4.33：收益走势材料与盈亏说明。限定 PerformanceTrendSection.tsx，提取原分币种材料、图表内容选择及盈亏状态说明；保留累计盈亏、缺点、刷新保留、空状态与回调。原趋势／盈亏测试、类型、原规则及受控四宽度浏览器验证。
+  - [x] T4.32：回测价格披露与图表时点读数。限定 BacktestPriceDisclosure.tsx、StrategyBacktestEquityChart.tsx，分别提取原比较口径、费用说明和图表浮层，保持协议拒绝、研究／规则／整手基准覆盖、数值精度和键盘事件；原合同／图表用例、类型／原规则和受控四宽度浏览器验证，不创建回测。
+  - [x] T4.31：收益账户范围状态。限定 PerformanceScopeControls.tsx，分离估值／快照与汇率状态投影，保留账户过滤、开关禁用和显式重试；原范围测试、类型、原规则及受控四宽度验证。
+  - [x] T4.30：策略库及回测列表行职责。限定 StrategySections.tsx，提取版本／摘要投影及任务状态展示；保留行、操作资格、版本选择和回测状态，原用例和受控四宽度浏览器验证。
+  - [x] T4.28：行情权限、能力详情与合约清单状态。限定 ProviderAccountAccessPanel.tsx、MarketProviderRow.tsx、MarketReferenceContractField.tsx，提取权限材料投影、原能力展开内容及清单状态／就绪判断；保留刷新计时、来源条件、显式查询、回显、分页和操作门禁。原组件用例、类型／原规则和受控四宽度浏览器验证，凭据、Provider 与合约请求均不放行真实服务。
+  - [x] T4.27：策略风险应用面板职责。限定 StrategyRiskApplicationPanel.tsx，按原控制器、配置、预览、应用条目及升级差异拆分，保留 hook 顺序、mutation、字段与宿主 DOM；原受控交互、类型、原规则及四宽度浏览器验证，不保存或启用真实风险规则。
+  - [x] T4.26：基金定投的读取反馈与待确认记录。限定 AccountDataRecurringFundInvestments.tsx，按读取／关联缺失反馈和待确认列表分离渲染职责，保留实际账户准入、查询、刷新、操作回调与固定记录顺序。原基金定投受控测试、类型、原规则及四宽度列表／抽屉验证，不确认真实成交或保存真实计划。
+  - [x] T4.25：现金划转表单状态与视图。限定 AccountDataCashTransferSheet.tsx，将原状态、账户过滤、重置、提交与草稿关闭保护保留在私有 hook，表单继续按原 JSX 渲染；不变更 DOM、请求金额、选项及提交边界。原现金／合同测试、类型、原规则及四宽度受控抽屉验证，不提交真实划转。
+  - [x] T4.24：模型模拟买卖点的价格坐标投影。限定 market-arena-marker-primitive.ts，将 K 线高低价与收盘线 value 的坐标取值提取，保留图形几何、成交方向、命中、悬停与缺值行为。原图形测试、类型、原规则及受控四宽度图表验证，不读取真实模拟交易或运行模型。
+  - [x] T4.23：探索实验目录元数据的旧测试样本。限定 experiment-discovery-instrument.test.tsx，准备替身补齐创建入口当前要求的后复权与原价窗口字段；保留四类标的的名称、市场、币种和资金断言，明确不作为准备协议／来源验收。原 12 项与原规则验证，不创建真实实验。
+  - [x] T4.22：当前基金估值与标的选择的状态投影。限定 FundCurrentValuation.tsx、InstrumentSymbolField.tsx，将请求／会话／质量状态和目录查询提示分别提取，保留状态优先级、未知与休市差异、查询参数、已选名称及原 DOM。原受控组件测试、类型、原规则及适用四宽度样本验证，不读取真实估值或目录。
+  - [x] T4.21：基金与行情成交叠加的响应身份及提示投影。限定 useFundNavTrades.ts、useMarketTradingOverlays.ts 和同 feature 的 market-trade-chart-projection.ts，统一同一成交协议的账户／模式／标的／日期核对，分离提示与风险输入判断。保留查询键、enabled、取消、旧响应隔离、刷新保留、测量与原文案；原受控 hook／图表测试与四宽度样本验证，不读取真实成交。
+  - [x] T4.20：市场路由建议、策略状态与详情合并的纯投影。限定 routing-recommendation.ts、market-policy-status-v3.ts、market-detail.types.ts，分开待确认／已选建议、有效状态及可合并行情序列。保留精确键匹配、并列保留、原来源、失败不抹数据和分钟／日线合并规则；原离线样本、类型和原规则验证，不保存路由或读取真实行情。
+  - [x] T4.19：复盘候选控制器与当前测试合同。限定 JournalCandidateBrowser.tsx、journal-candidates-interaction.ui.test.tsx，分离原查询／名称投影与表格，保留查询键、游标、重试、模式和选中态。测试按导航、目录、冻结状态及条件隔离分组；更新已移除历史引用模块的设置并保留当前任务不串用的断言，提示 Provider 使用真实共享上下文。原受控测试、类型、lint 和四宽度浏览器验证，不读取真实候选或解读任务。
+  - [x] T4.18：研究默认模型字段投影。限定 ResearchDefaultModelField.tsx，界面只依赖实际消费的状态；分开已选回显、错误优先级和按钮资格，保持默认模型、价格未知、保存／清除／重新读取条件和原 DOM。受控字段交互、类型、原规则及四宽度浏览器验证，不保存真实配置或测试模型。
+  - [x] T4.17：标的目录结果区。只从 InstrumentCatalogPanel.tsx 提取既有加载、失败、空态与结果内容，父级保留输入、选中行情和动作。保留刷新覆盖、重试、确认、标的目录名称和行情门禁；原受控搜索／确认测试、类型、lint 及四宽度样本验证，不同步真实目录或读取行情。
+  - [x] T4.16：复盘浏览器路由桩。限定 browser-journal-review.tsx，将受控 POST 的原响应逻辑提取；保持模拟端点、解析顺序、历史样本和失败语义，显式原规则、类型和实际页面验证，不新增真实网络请求。
+  - [x] T4.15：周期复盘控制器。限定 JournalPeriodReview.tsx，按查询／mutation 状态、分析结果资格与现有表单渲染分开；展开 AI 错误优先级和按钮标签。保留 hook 顺序、序列隔离、窗口、保存绑定、轮询与旧结果展示；原受控测试、类型、原规则及四宽度浏览器验证，不提交真实分析、解读或快照。
+  - [x] T4.14：共享工作区增量静态问题。当前全仓复查在研究标签、周期复盘、Arena 受控测试及诊断投影发现 39 项错误；限定原测试的桩类型、React act 回调、未知输入和未使用声明，保持全部断言、请求与诊断语义，定向规则、类型和原测试验证；新增告警继续按原门禁收敛，不忽略这些输入。
+  - [x] T4.13：研究执行与成交草稿只读材料。限定三个投影／查询文件，分开旧执行展示、请求用量／费用预留、冻结策略、重试模式和草稿时钟；保持聚合次序、空值、费用语义、查询身份与原始精度，使用原展示／账户模式／账本输入受控测试、类型及 lint 验证，不提交研究或成交。
+  - [x] T4.12：回测任务列表控制器及行展示。`StrategyBacktestJobsPage.tsx` 分开原 URL／查询／分页控制器和用户／实验行展示，保留原表格宿主结构、分组键、展开顺序、精确版本及返回状态。原列表／导航测试、类型、lint 与四宽度受控浏览器验证，不新建、取消或重跑真实任务。
+  - [x] T4.11：组合管理控制器。`PortfolioManagement.tsx` 的输入类型独立命名，状态、查询、导航保护、effect 和原动作闭包归同文件自定义 hook；页面保留原 JSX。保留 hook／默认值顺序、受控与非受控入口、草稿恢复、确认和写入资格，原账户／持仓受控测试、类型、lint 及四宽度浏览器验证，不保存或修改真实数据。
+  - [x] T4.10：数据与自动化页面控制器。`ProviderSettings.tsx` 的状态、查询、动作闭包和加载汇总归同文件自定义 hook，页面只组合原 JSX；保留 hook 顺序、页签、查询键、诊断 enabled、刷新和弹层动作，原 Provider／自动化受控测试、类型、lint 及四宽度浏览器验证，不点击真实测试、保存、运行或删除。
+  - [x] T4.9：图表比较及回测配置读取。仅修改 `market-chart-model.ts`、`market-trading-overlay-model.ts`、`strategy-backtest-detail.model.ts`，按来源可比性、交易标记可见性／分钟边界和重跑区间／资金／执行材料拆分。保留原择优顺序、时区及真实桶边界、字段缺失和受限结果门禁，原只读模型测试、类型及零告警验证，不新建回测或读取行情。
+  - [x] T4.8：账户与收益查询材料。写集为 `portfolio.api.ts`、`portfolio.queries.ts`、`portfolio.account-actions.ts`、`performance.queries.ts`；分开本位币字段、列表加载投影、账户表单／错误说明及配置试算输入。原查询键、enabled、失效顺序、刷新聚合、空值和未知类别不变；原账户、组合和收益受控测试、类型及零告警验证，不提交真实账户或配置。
+  - [x] T4.7：自选来源／走势及收益摘要投影。写集为 `WatchlistSource.tsx`、`WatchlistTrend.tsx`、`PerformanceMetrics.tsx`；提取已有来源状态、走势会话／状态／截止信息和资产说明，不改变加载、可见性、轮询、取证、日期或金额。原受控自选／收益测试、类型、lint 和适用的四宽度浏览器验证，保留原 DOM 与事件，不增加 API 调用。
+  - [x] T4.6：实验结果内容职责。`StrategyOptimizationExperimentResults.tsx` 提取现有实验记录与采纳后的风险升级差异，父级继续持有 mutation、幂等键、失效与反馈；展开变化标签嵌套判断。保留宿主 DOM、门禁和原行为，通过类型、lint、原实验相关测试及四宽度受控样本验证，不提交真实采纳或封存测试。
+  - [x] T4.5：只读展示及准备状态投影。写集为 `request-error.ts`、`strategy.preparation.ts`、`watchlist-trend.ts`、`strategy-backtest-result-availability.model.ts`、`use-backtest-execution-model.ts`；按 API 错误、已准备路由失效、行情曲线、基准兼容原因及冻结执行模型保留资格拆分。保持短路顺序、原消息、空值、时区、冻结输入与请求条件，原受控测试、类型和三项规则验证。
+  - [x] T4.1a：Journal 输入与状态展示。原交易／日期／JSON 投影归 `journal-review-input.ts`，账户状态和证据摘要归独立内容组件；保持数据原值、错误、缺失与空态，原 UI／API 测试验证。
+  - [x] T4.1b：Journal 控制器。原状态、候选查询与结果失效归 `useJournalReview.ts`，确定性计算、快照保存及高级 JSON 操作归 `useJournalReviewActions.ts`；保持 hook 顺序、查询键、来源定位、字段重置和显式 AI 操作。原接口及受控交互验证，不触发模型或真实快照写入。
+  - [x] T4.1c：Journal 页签内容。单笔候选、证据不足、确定性结果和周期窗口分别组合既有内容，保持相同宿主节点、控件、弹层、提示及导航；按 shadcn 技能核对现有 Tabs／Sheet／Card／Alert 及官方示例，不覆盖共享组件。原测试、类型、告警／尺寸和四宽度受控浏览器验证后完成。
+  - [x] T4.1d：候选筛选的容器适配。实际浏览器发现单笔左栏被视口 `lg` 三列最小宽度撑出内容边界；`ReviewCandidateList` 改为按实际容器宽度自动换列，两个页签共用，保留原 DOM 与日期／标的事件。四宽度检查控件边界、页签、展开、聚焦和取消；受控缓存样本不发业务请求。
+  - [x] T4.2：Desktop 测试主题发现。当前 18 个长套件分布在 17 个文件，均只含独立测试注册，fixture 与 hook 已在文件作用域；按原测试内容划分以下边界，不移动生命周期。
+  - [x] T4.2a：账户与策略合同测试。账户模式范围、写入恢复、现金操作、账户页面四文件及策略就地 UI 测试按地址恢复、账户类型、修正链、精度、输入、任务和结果分组；原 it 源码摘要不变，定向 lint 和全部对应测试验证。
+  - [x] T4.2b：Provider、研究、编写和行情测试。6 个文件按密钥与请求协议、用途、竞争、模型信息、研究证据、JSON 确认、准备响应及精确路由分组；保留样本、请求、断言与顺序，原 it 源码摘要不变，定向 lint 和测试验证。
+  - [x] T4.2c：收益、组合、风险和共享组件测试。6 个文件按 URL 范围、估值、目标、查询失效、列语义、风险反馈、配置指引及组件上下文分组；原 it 源码摘要不变，定向 lint 和测试验证，不改产品组件。
+  - [x] T4.3a：主题初始化与交叉方向标签。`src/main.tsx` 展开主题来源及系统色判断，`strategy-display-labels.ts` 展开交叉方向标签；保留 URL 优先、存储后备、按需读取系统色和原标签。隔离主题输入矩阵对照修改前结果，原标签测试及 lint／类型验证。
+  - [x] T4.3b：受控样本条件。图表周期跨度、基金百分比状态、收益模式恢复和自选价格／会话四个样本入口展开嵌套判断；输入、金额、预期状态与断言保持，原相关测试和定向 lint 验证，不改产品数据。
+  - [x] T4.3c：收益模式测试的 React 通知事务。定向测试暴露 Query 完成通知落在 `act` 外的既有警告；按已安装 TanStack API 与官方说明，在该测试的生命周期内将真实通知包进 React `act`，结束恢复默认通知函数，不修改告警开关、console 或业务代码。原模式隔离／失败恢复断言和 lint 通过，并确认运行日志无 `act` 警告。
+  - [x] T4.4a：策略风险与执行字段。`StrategyRiskExecutionFields.tsx` 按止损、仓位字段提取原 Fragment，父级继续持有更新闭包，比例／绝对值投影展开判断；保留原嵌套字段、默认值、开关、成本、数量和 DOM。原策略字段测试、类型／lint 及四宽度受控输入验证，不保存真实策略。
+  - [x] T4.4b：Provider 用途字段。`AiProviderExecutionFields.tsx` 按模型用途与选中用途设置提取现有内容，当前选中状态仍由父级按模型持有；保留默认继承、显式覆盖、研究版本、推理、超时、用途诊断和原更新顺序。既有受控用途／Provider 测试、类型／lint 与四宽度浏览器验证，不触发真实模型或保存。
+- [x] T5 Mobile 告警（AC1、AC3）
+  - [x] T5.5：增量复盘结果版本与 Arena 触发投影。共享工作区 Schema 已支持 V1／V2，手机两个消费者仍无条件读取 V1，造成 43 项静态错误与实际 V2 崩溃风险；按真实版本渲染 V2 冻结结果和绑定材料，V1 原引用保留，未知引用不读取额外调用。复用 ResearchBody 的稳定结果接口；Arena 按手动触发资格和原时钟投影提取。只运行受控合同／交互、类型、原规则和适用浏览器样本，不触发研究、预约或真实请求。
+  - [x] T5.1：现金划转与风险输入。写集 `cash-transfers/transfer-command.ts`、`risk-rules/risk-rule-form.ts`，分离账户／关联链校验、金额时间内容及风险阈值解析；保留动作协议、原始精度、错误顺序及双侧 Revision。原受控 parity 测试及定向 lint 验证。
+  - [x] T5.2：图表消息与数据合同。写集 `platform/charts/chart-bridge.ts`、`chart-document.ts`，分离消息路由与时间／曲线验证，保持节流、销毁、取消和跨实例隔离；原图表测试与 lint 验证。
+  - [x] T5.3：客户端控制器及视图发现。只读剩余告警入口与对应 parity、screen 测试，明确控制器状态、展示职责和受控验证后展开实施叶；保留已有并发修改，不先做开放式页面改写。
+  - [x] T5.3a：账户草稿与导航。`AccountEditor.tsx` 统一初始／保存后草稿投影；`AccountWorkspace.tsx` 提取同一账户的操作区。React 结构不增加宿主节点，不改变当前范围、账户模式、导航参数和写门禁；定向 lint、类型及原账户 parity 测试验证。
+  - [x] T5.3b：现金控制器与余额区。`CashEditor.tsx` 提取原状态与提交控制器，`CashScreen.tsx` 提取原余额区，保留预留请求标识、读取门禁、刷新、余额与现金流语义；不改变宿主节点、请求或表单值，定向 lint、类型及原现金 parity 测试验证。
+  - [x] T5.3c：标的选择与图表披露。`InstrumentPicker.tsx` 提取当前搜索结果筛选和失焦回显，`MarketReferenceContractField.tsx` 提取来源代码不可用判断，`MarketChartPanel.tsx` 提取已有窗口披露区；当前输入、来源、选择、加载、刷新和图表实例保持，定向 lint、类型、原 market parity 测试验证。
+  - [x] T5.3d：研究提交模型预检。仅在 `ResearchSubmitScreen.tsx` 提取已有设置的默认模型就绪投影，不改变提交、缓存、待确认凭据或任何调用；原受控研究测试及 lint／类型验证，禁止真实研究提交。
+  - [x] T5.3e：风险试算与编辑控制器。`RiskEvaluateScreen.tsx`、`RiskRuleForm.tsx` 的原状态及命令逻辑移入同文件自定义 hook，原 JSX 和宿主节点保持；启用确认、版本锁、试算／扫描、失败恢复与请求标识不变；原风险 parity、类型及 lint 验证，全部请求受控。
+  - [x] T5.3f：策略编辑草稿与名称目录投影。`StrategyEditorScreen.tsx` 提取未保存默认草稿及选中标的优先的目录合并，原保存／恢复事务和显示字段不变，无额外请求；原编辑 parity、类型及 lint 验证。
+  - [x] T5.3g：划转编辑器。`TransferEditor.tsx` 分离初始事实投影与原控制器／表单渲染，保留双侧读取、原始 Revision、提交幂等键、冲突确认与门禁；原划转 parity、类型和 lint 验证。
+  - [x] T5.3h：Arena 周报。`ArenaWeekScreen.tsx` 提取既有报告正文，展开状态仍由原父级持有，列表／详情读取及精确轮次导航不变；原受控周报测试、类型和 lint 验证。
+  - [x] T5.3i：风险与提交列表行投影。`RiskRulesScreen.tsx` 提取只读规则摘要，`StrategySubmissions.tsx` 分离提交回执及准备诊断解析；按钮门禁、导航、费用及来源展示不变，原列表 parity、类型和 lint 验证。
+  - [x] T5.3j：收益内容职责。`PerformanceResults.tsx` 提取现有收益汇总和配置目标区，原查询、刷新、分页限制和数值投影不变，无额外宿主节点；原收益 parity、类型和 lint 验证。
+  - [x] T5.3k：实验待确认意图。仅在 `OptimizationDetailScreen.tsx` 提取新操作凭据构建，原 compare、确认、缓存及写入顺序不变，resume 保持只读找回原意图；原受控实验 parity、类型和 lint 验证，禁止真实模型或实验调用。
+  - [x] T5.3l：回测研究版本与确认控件。`BacktestSetupScreen.tsx` 提取研究版本投影、原口径披露和创建确认按钮；准备、原 Run 找回、模型选择、锁和导航不变，原 ordinary／NAV parity、类型和 lint 验证。
+  - [x] T5.3m：实验目标构建。`OptimizationSetupScreen.tsx` 复用两处相同的 existing／discovery 目标解析；JSON 校验时机、未知费用确认、预算和缓存顺序不变，原实验准备 parity、类型和 lint 验证。
+  - [x] T5.3n：定期计划与发生项控制器。`PlanEditor.tsx`、`OccurrenceEditor.tsx` 分离草稿／账户写入资格、原命令控制器及表单视图；保留乐观版本、重复创建锁、确认、核对与冲突恢复，原定期计划 parity、类型和 lint 验证。
+  - [x] T5.3o：Arena 列表与详情内容。`ArenaScreen.tsx`、`ArenaLiveScreen.tsx` 按轮次报告、共同估值排名及生命周期操作提取已有展示区；查询键、焦点轮询、刷新、精确轮次导航和操作门禁保持，原 Arena parity、类型与 lint 验证，所有动作受控。
+  - [x] T5.3p：自选列表展示职责。自选结果页分离已有工具栏、视图切换及编辑控件，保持宿主结构、查询聚合刷新、选择与导航；原 parity、类型与 lint 及受控浏览器四宽度验证。
+  - [x] T5.4：Mobile 测试分组发现。两个过长 parity 回调没有局部共享声明，beforeEach 在文件作用域；数值样本只有两个三元表达式需要展开。
+  - [x] T5.4a：手机受控测试与数值样本。写集为 `test/parity/batch3.test.tsx`、`batch5-ui.test.tsx` 和 `test/watchlist-number-samples.ts`，按分析恢复和行情管理分组，展开价格种类与会话状态，原请求、输入、断言和数量不变；定向 lint 及对应 parity／数值测试验证。
+- [x] T6 其余四个超限文件（AC2、AC3）：AI Provider、账本导入及各自超限测试按职责提取，分别持有必要本地验证；不提高阈值。
+  - [x] T6.1：Provider 管理测试尺寸。原 28 项按生成测试、生命周期、配置／目录拆为三个入口，复用已有 fixture 模块；共享静态 key 和 SDK 桩归 fixture 所有，按实际引用保留 import。各文件与回调均低于原阈值，原 it、断言、样本和受控调用保持，三入口合计 28 项通过后完成。
+  - [x] T6.2：账本导入测试尺寸。原文件按审核提交、草稿 Revision、幂等竞争和部分提交拆为四个入口，继续复用 `baseline-import-ledger.fixture.ts`；原 15 项的输入、事务桩及断言保持。各文件、回调与 import 检查通过，四入口合计 15 项离线测试通过后完成，不连接真实数据库。
+  - [x] T6.3a：AI Provider 探针执行所有权。`AiProviderService` 保留配置、路由和 Registry 编排；同 feature 的 `ai-provider-tests.ts` 拥有探针执行、活动请求、草稿令牌及健康历史。每个原服务实例只创建一个执行器，保留配置／健康／SDK 实例、取消身份、TTL、令牌一次消费、健康阈值及原公共导出，不改变 Nest Module 或调用协议。
+  - [x] T6.3b：探针预检与结果收敛。新执行器按输入资格、成功事实和取消／失败收敛拆分原长方法，保持计时起点、请求标识、try／catch／finally、费用未知和落库顺序。85 项既有受控测试、类型、告警及尺寸通过；14 项数据库集成场景按原条件跳过，隔离验收仍由 V1 持有。
+  - [x] T6.3c：Provider 保存资格。原配置版本、模型价格完整性及保存材料投影归独立纯函数，保留验证和令牌消费顺序、默认引用锁、配置事务及健康发布；同批受控保存／生命周期测试通过。
+  - [x] T6.4a：导入草稿身份与冻结行。指纹序列化及历史指纹兼容归 `import-draft-identity.ts`，行读取、稳定行号和已提交行合并归 `import-draft-row-state.ts`；现有指纹公共导出保持，继续使用原 `isEqual`，不改变字节摘要、金额或历史记录。原指纹、幂等和修订测试及 lint／类型验证。
+  - [x] T6.4b：审核及修订事务。同 ledger feature 中提取 `baseline-import-review.ts` 和 `baseline-import-revision.ts`，审核仍只在原 `withAccountWrite` 回调内依次修订和提交；账户／账本指纹校验、时间精度、冻结行及问题行提交保持，按资格、行投影及修订材料拆分复杂方法。原审核／修订离线测试验证，隔离事务验收单列。
+  - [x] T6.4c：导入提交收敛。`baseline-import-submission.ts` 接收原 repository 与 `AccountLedgerWriteContext`，按已提交幂等重放、静态／孤立 SELL 验证、时间材料、资产约束和原子追加拆分；原顺序、Revision、部分提交、零观察及投影重建不变。原全部导入离线测试、类型、告警和尺寸门禁验证，禁止真实库写入。
+- [x] T3.75：剩余服务端集成夹具。按 Worker 创建／离线重放、比赛决策／执行／晚到回执、策略采纳及编写生命周期提取原职责；保持所有注册、断言、SQL、时钟和清理顺序。原规则、类型及尺寸先验证，真实数据库／队列运行仍归隔离 V1，不调用真实 Provider。
+- [x] T4.42：复盘结果、对象与运行面板。按原结果摘要／计划／行为证据和运行状态、对象控制器及账户内容分离；保持查询键、草稿版本、晚到结果拦截、保存门禁及原宿主节点，原受控测试、类型、lint 和四宽度隔离浏览器验证。历史 V1 测试缺失模块的问题独立保留，不调用模型或保存真实快照。
+- [x] T4.43：收益仪表盘、配置比较与 SVG 走势。按原查询控制器、当前估值材料、区域加载状态及展示片段拆分，展开配置结果的嵌套条件；保持盈亏计算、空值、汇率阻塞、目标编辑、图表几何与键盘事件。原受控收益测试、源码类型、原规则及四宽度样本验证，不保存真实目标配置或请求来源行情。
+- [x] T4.44：市场数据状态、新闻分页及提供方弹层。按读取状态、新闻分页说明、凭据控制器及精确检查结果拆分；保留认证切换、草稿凭据闭包、版本、取消保护、权限筛选和原事件，原测试、类型、规则及四宽度受控样本验证。所有连接检查、保存、移除及授权使用测试桩，禁止真实来源请求。
+- [x] T4.45：规则监测测试注册。限定 RuleSourceMonitorPanel.test.tsx，按任务创建／范围、冲突恢复及历史版本读取分组；保留 8 项原注册、断言、可变样本和 hook 生命周期，按词法反向核对、原用例和原规则验证，不发真实资料请求。
+- [x] T4.46：Arena 比赛与模型账户。限定 ArenaDailyActivity、ArenaLiveAgent、ArenaLivePage、ArenaLiveSetup、ArenaPage，按导航／查询、账户资格与四个明细、设置和模型选择拆分；保留缺失模型提前返回、时间读取、查询键、账户选择、页签／深链及预算和预约门禁。原受控合同、导航、刷新测试、源码类型和四宽度样本验证，不创建比赛、触发模型、预约或真实过渡。
+- [x] T4.47：研究已核验正文。限定 ResearchSavedReport.tsx，将已核验 V2 正文门禁及定位投影放到独立展示组件；保留历史范围、模式拒绝、质量披露和引用位置，原报告／证据测试、原规则、源码类型及四宽度只读样本验证，无研究提交。
+- [x] T4.48：自选工作区。限定 WatchlistPage.tsx，提取原状态／查询控制器和分组过滤工具栏；保持可见性、报价检查节奏、模式缓存、分页／URL、写入门禁和行情详情。原只读／内存测试、类型、原规则及四宽度受控样本验证，所有写操作不提交，行情由固定样本提供。
+- [x] T4.49：提供方编辑视图。限定 AiProviderEditorFields、ProviderEditorSheet，按模型多选、认证凭据状态、表单内容与底部动作拆分原 JSX；保持原草稿、默认值、回调、取消保护和表单提交，展开嵌套条件。原 Provider／模型／用途测试、原规则、类型及四宽度受控样本验证，不提交真实设置或测试。
+- [x] T4.50：增量历史快照测试注册。限定 journal-snapshot-interaction.ui.test.tsx，按混合分页／筛选、范围与刷新、冻结详情与恢复、旧记录／下钻分组；保留 10 个原注册、样本、断言和 lifecycle，词法反向核对及原用例、规则通过后完成，不写真实快照。
+- [x] T4.51：提供方编辑命令职责。限定 useAiProviderEditor 及同 feature 私有 editor-state、draft-actions、test-actions、lifecycle-actions；状态和 mutation hook 顺序保持，按草稿编辑／目录／保存、测试身份／取消／普通／生成／已保存测试、启停删除分工。仅创建原闭包，保留版本锁、单飞、取消身份、晚响应门禁、费用确认、令牌消费和 finally 清理；原离线 Provider 测试、类型、原规则与尺寸边界验证，浏览器不提交测试或设置。
+- [x] T4.52：策略编写。限定 AuthoringConfirmation、AuthoringOperation、AuthoringWorkPage、use-authoring-editor；按确认输入、操作展示、草稿列表控制器及编辑查询状态拆分。保留草稿自动保存、幂等提交、未知结果找回、修订／建议／审阅哈希门禁和原宿主节点；原受控编写测试、类型、规则及四宽度样本验证，不启动分析、生成、修改或真实保存。
+- [ ] T4.53：风险中心与规则工作台。限定 RiskCenter、RiskRuleWorkbench，分离原查询／写后读取状态、通知资格、规则选中／编辑状态和列表／详情片段；保留审计、版本、归档恢复、试算记录、忙状态和 URL，所有实际动作仍由原 action handler 执行。原受控风险用例、规则／类型和四宽度样本验证，不扫描、通知或写真实规则。
+- [ ] V1 整体门禁及最终核对（AC1—AC4）：所有实施叶就绪后验证完整零告警、尺寸、依赖和相关包，核对安全边界、证据及文档；不代替各叶的行为验收。
+  - [ ] V1.1：数据库集成验收。Provider 14 项与导入 HTTP 4 项目前按既有环境条件跳过；完成源码批次后，只通过维护的隔离环境入口验证，先读工作区 Docker 约束，绝不指向真实业务库。后续涉及事务的批次仍补入本清单，跳过不计通过。
+
+## 计划审查
+
+当前发现叶 Ready。后续任务组仅表示完整义务，不能作为巨型执行叶；确认职责、写集、行为断言、验证和停止条件后才能实施。单叶范围失效时只重拆剩余内容，保留已经适用的证据。
+
+## 最终一致性核对
+
+- [ ] 所有范围完成且每项有当前源码适用的验证，未用阶段进度代替总目标。
+- [ ] 规则、阈值、输入及测试覆盖保持，全部必要门禁通过。
+- [ ] 未调用模型、真实 Provider 或写入真实数据，无部署和重启。
+- [ ] 公共接口、依赖、测试、文档和共享工作区一致，无未处理的实施问题。

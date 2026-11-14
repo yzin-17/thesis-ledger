@@ -23,10 +23,17 @@ export function JournalEvidenceScreen() {
             signal,
           ),
   });
+  const result = run.data?.result;
   const references =
-    run.data?.result?.evidence
-      .flatMap((e) => e.citations)
-      .filter((c) => c.toolCallId === params.toolCallId) ?? [];
+    result?.version === 1
+      ? result.evidence
+          .flatMap((e) => e.citations)
+          .filter((c) => c.toolCallId === params.toolCallId)
+      : [];
+  const bindings =
+    result?.version === 2
+      ? result.evidenceBindings.filter((binding) => binding.toolCallId === params.toolCallId)
+      : [];
   const tools = useInfiniteQuery({
     queryKey: [...scope, 'journal-evidence-tools', params],
     enabled: references.length > 0,
@@ -42,31 +49,39 @@ export function JournalEvidenceScreen() {
   });
   return (
     <Page title="复盘引用来源">
-      {run.data && !references.length ? (
+      {run.data && !references.length && !bindings.length ? (
         <Copy>本任务没有该调用的引用，未读取其他来源。</Copy>
       ) : null}
-      <QueryList
-        query={run}
-        retry={() => void run.refetch()}
-        label="正在刷新复盘引用"
-      >
+      <QueryList query={run} retry={() => void run.refetch()} label="正在刷新复盘引用">
         {references.map((c, i) => (
           <Section key={i} title={c.tool}>
             <Copy>
               来源 {c.provider} · {c.sourceId}
             </Copy>
             <Copy>
-              观察 {c.observedAt} · 可见 {c.availableAt ?? '未记录'} · 抓取 {c.fetchedAt ?? '未记录'}
+              观察 {c.observedAt} · 可见 {c.availableAt ?? '未记录'} · 抓取{' '}
+              {c.fetchedAt ?? '未记录'}
             </Copy>
+          </Section>
+        ))}
+        {bindings.map(({ audit, toolCallId }) => (
+          <Section key={audit.evidenceId} title="冻结证据">
+            <Copy>
+              来源 {audit.providerId ?? '未记录'} · {audit.sourceIds.join('、')}
+            </Copy>
+            <Copy>
+              发布 {audit.publishedAt ?? '未记录'} · 可见 {audit.availableAt ?? '未记录'} · 抓取{' '}
+              {audit.fetchedAt ?? '未记录'}
+            </Copy>
+            <Copy>
+              证据 {audit.evidenceId} · 指纹 {audit.fingerprint}
+            </Copy>
+            <Copy>工具调用 {toolCallId}</Copy>
           </Section>
         ))}
       </QueryList>
       {references.length > 0 && (
-        <QueryList
-          query={tools}
-          retry={() => void tools.refetch()}
-          label="正在刷新证据调用"
-        >
+        <QueryList query={tools} retry={() => void tools.refetch()} label="正在刷新证据调用">
           {tools.data?.pages
             .flatMap((p) => p.items)
             .filter((t) => t.id === params.toolCallId)

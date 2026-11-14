@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
+import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { journalAnalyze, journalAnalyzePeriod } from '@thesis-ledger/domain';
 import {
@@ -10,6 +11,8 @@ import {
 } from '@thesis-ledger/schemas';
 import { JournalReviewWorkspace } from '../src/features/journal/review/JournalReviewWorkspace.js';
 import { Button } from '../src/components/ui/button.js';
+import { ToastProvider } from '../src/components/ui/toast.js';
+import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import { journalUiEvidenceFixture } from './journal-review.fixture.js';
 import {
   browserJournalCandidate,
@@ -53,7 +56,8 @@ let snapshotCount = 0;
 const history: JournalStoredSnapshotView[] = [];
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 const layoutPreview = new URLSearchParams(location.search).has('layout');
-const initialState = new URLSearchParams(location.search).get('state') === 'empty' ? 'no-objects' : 'ready';
+const initialState =
+  new URLSearchParams(location.search).get('state') === 'empty' ? 'no-objects' : 'ready';
 journalBrowserStateFixture.state = initialState;
 function candidate(accountId: string, objectId?: string) {
   const input = journalUiEvidenceFixture();
@@ -72,49 +76,8 @@ globalThis.fetch = async (input, init) => {
   if (failure) return failure;
   const scope = url.searchParams.get('accountId') ?? account.id;
   if (init?.method === 'POST') {
-    const raw: unknown = JSON.parse(String(init.body));
-    const ai = browserJournalAiResponse(url, raw, candidate);
-    if (ai) return ai;
-    if (url.pathname.endsWith('/analysis/period')) {
-      const request = journalPeriodReviewRequestSchema.parse(raw);
-      const candidates = browserJournalScenarioCandidates(candidate(request.accountId));
-      return json({
-        accountId: request.accountId,
-        mode: request.mode,
-        symbol: request.symbol ?? null,
-        ledgerRevision: '12',
-        projectionGeneration: '7',
-        candidates,
-        result: journalAnalyzePeriod(candidates, request),
-      });
-    }
-    const request = journalReviewSnapshotRequestSchema.parse(raw);
-    const current = candidate(request.accountId, request.reference.reviewObjectId);
-    if (request.evidenceFingerprint !== current.input.projection.evidenceFingerprint)
-      return json(
-        { errorCode: 'JOURNAL_EVIDENCE_CHANGED', message: '复盘证据已变化，请刷新' },
-        409,
-      );
-    current.input.analysisDraft = request.analysisDraft ?? null;
-    const result = journalDeterministicReviewSchema.parse(journalAnalyze(current));
-    if (url.pathname.endsWith('/analysis/object')) return json({ candidate: current, result });
-    if (url.pathname.endsWith('/review-snapshots')) {
-      result.aiExplanation = browserJournalAiMetadata(request.aiRunId);
-      const saved: JournalStoredSnapshotView = {
-        compatibility: 'CURRENT_CONTRACT',
-        accountId: request.accountId,
-        mode: request.mode,
-        snapshot: {
-          id: `00000000-0000-4000-8000-${String(++snapshotCount).padStart(12, '0')}`,
-          inputSnapshot: current.input,
-          outputSnapshot: result,
-          status: 'CURRENT',
-          createdAt: new Date().toISOString(),
-        },
-      };
-      history.unshift(saved);
-      return json(saved);
-    }
+    const response = journalBrowserPostResponse(url, init);
+    if (response) return response;
   }
   const ai = browserJournalAiResponse(url, undefined, candidate);
   if (ai) return ai;
@@ -176,41 +139,43 @@ function BrowserJournalReview() {
   return (
     <QueryClientProvider client={queryClient}>
       <main className="flex min-w-0 flex-col gap-4 p-4">
-        {!layoutPreview && <div className="flex flex-col gap-4">
-        <p>本页使用固定复盘输入验证实际组件交互。请求均在此页处理，不访问或写入业务服务。</p>
-        <JournalBrowserStateControls
-          onChange={(next) => {
-            setState(next);
-            void queryClient.invalidateQueries();
-          }}
-        />
-        <Button
-          variant="outline"
-          className="self-start"
-          onClick={() => browserJournalReleaseCandidateResponses()}
-        >
-          释放已延迟的候选响应
-        </Button>
-        <Button
-          variant="outline"
-          className="self-start"
-          onClick={() => {
-            version = 'source-2';
-            void queryClient.invalidateQueries();
-          }}
-        >
-          模拟相关证据变化
-        </Button>
-        <Button
-          variant="outline"
-          className="self-start"
-          onClick={() => {
-            journalBrowserAiFixture.enabled = true;
-          }}
-        >
-          启用固定 AI 终态验收
-        </Button>
-        </div>}
+        {!layoutPreview && (
+          <div className="flex flex-col gap-4">
+            <p>本页使用固定复盘输入验证实际组件交互。请求均在此页处理，不访问或写入业务服务。</p>
+            <JournalBrowserStateControls
+              onChange={(next) => {
+                setState(next);
+                void queryClient.invalidateQueries();
+              }}
+            />
+            <Button
+              variant="outline"
+              className="self-start"
+              onClick={() => browserJournalReleaseCandidateResponses()}
+            >
+              释放已延迟的候选响应
+            </Button>
+            <Button
+              variant="outline"
+              className="self-start"
+              onClick={() => {
+                version = 'source-2';
+                void queryClient.invalidateQueries();
+              }}
+            >
+              模拟相关证据变化
+            </Button>
+            <Button
+              variant="outline"
+              className="self-start"
+              onClick={() => {
+                journalBrowserAiFixture.enabled = true;
+              }}
+            >
+              启用固定 AI 终态验收
+            </Button>
+          </div>
+        )}
         <JournalReviewWorkspace
           accounts={state === 'no-accounts' ? [] : [account, shadow]}
           accountsPending={state === 'accounts-pending'}
@@ -224,4 +189,55 @@ function BrowserJournalReview() {
     </QueryClientProvider>
   );
 }
-createRoot(document.getElementById('root')!).render(<BrowserJournalReview />);
+createRoot(document.getElementById('root')!).render(
+  <MemoryRouter>
+    <ToastProvider>
+      <ConfirmDialogProvider>
+        <BrowserJournalReview />
+      </ConfirmDialogProvider>
+    </ToastProvider>
+  </MemoryRouter>,
+);
+
+function journalBrowserPostResponse(url: URL, init: RequestInit) {
+  const raw: unknown = JSON.parse(String(init.body));
+  const ai = browserJournalAiResponse(url, raw, candidate);
+  if (ai) return ai;
+  if (url.pathname.endsWith('/analysis/period')) {
+    const request = journalPeriodReviewRequestSchema.parse(raw);
+    const candidates = browserJournalScenarioCandidates(candidate(request.accountId));
+    return json({
+      accountId: request.accountId,
+      mode: request.mode,
+      symbol: request.symbol ?? null,
+      ledgerRevision: '12',
+      projectionGeneration: '7',
+      candidates,
+      result: journalAnalyzePeriod(candidates, request),
+    });
+  }
+  const request = journalReviewSnapshotRequestSchema.parse(raw);
+  const current = candidate(request.accountId, request.reference.reviewObjectId);
+  if (request.evidenceFingerprint !== current.input.projection.evidenceFingerprint)
+    return json({ errorCode: 'JOURNAL_EVIDENCE_CHANGED', message: '复盘证据已变化，请刷新' }, 409);
+  current.input.analysisDraft = request.analysisDraft ?? null;
+  const result = journalDeterministicReviewSchema.parse(journalAnalyze(current));
+  if (url.pathname.endsWith('/analysis/object')) return json({ candidate: current, result });
+  if (url.pathname.endsWith('/review-snapshots')) {
+    result.aiExplanation = browserJournalAiMetadata(request.aiRunId);
+    const saved: JournalStoredSnapshotView = {
+      compatibility: 'CURRENT_CONTRACT',
+      accountId: request.accountId,
+      mode: request.mode,
+      snapshot: {
+        id: `00000000-0000-4000-8000-${String(++snapshotCount).padStart(12, '0')}`,
+        inputSnapshot: current.input,
+        outputSnapshot: result,
+        status: 'CURRENT',
+        createdAt: new Date().toISOString(),
+      },
+    };
+    history.unshift(saved);
+    return json(saved);
+  }
+}

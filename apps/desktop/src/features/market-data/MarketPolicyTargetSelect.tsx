@@ -81,6 +81,7 @@ export function MarketPolicyTargetSelect({
   catalog,
   providers,
   disabled,
+  compact = false,
   onChange,
 }: {
   row: MarketPolicyRouteRowV3;
@@ -90,6 +91,7 @@ export function MarketPolicyTargetSelect({
   catalog: MarketRouteCatalogReadV3 | undefined;
   providers: readonly ProviderManifest[];
   disabled: boolean;
+  compact?: boolean;
   onChange: (target: RouteTarget | null) => void;
 }) {
   const candidates = selectableRouteTargetsV3(catalog, row.key, providers);
@@ -100,7 +102,7 @@ export function MarketPolicyTargetSelect({
 
   return (
     <Field className="min-w-0">
-      <FieldLabel><span className="sr-only">{row.label} </span>{fieldLabel}</FieldLabel>
+      <FieldLabel className={compact ? 'sr-only' : undefined}><span className="sr-only">{row.label} </span>{fieldLabel}</FieldLabel>
       <Select
         items={choices}
         value={value}

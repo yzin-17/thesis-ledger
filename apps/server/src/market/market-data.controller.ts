@@ -117,8 +117,7 @@ export class MarketDataController {
 
   @Get('instruments/search') async search(@Query('q') query = '', @Query('limit') limit = '20') {
     if (!query.trim()) return [];
-    await this.readiness().ensureReady();
-    return this.instruments.search(query, Number(limit));
+    return this.instruments.searchForPicker(query, Number(limit), this.dsa);
   }
 
   @Get('instruments/identity')

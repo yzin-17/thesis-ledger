@@ -89,6 +89,22 @@ type IdentityResponse = {
   dataAsOf: string;
   facts: readonly { currency?: string | undefined }[];
 };
+function validateRqdataIdentityMappings(
+  bundle: ReturnType<typeof parseMarketRqdataFundIdentityV3>,
+  admission: NonNullable<IdentityResponse['admission']>,
+  cutoff: number,
+): void {
+  for (const item of bundle.mappings) {
+    if (
+      !admission.scopeSymbols.includes(item.symbol) ||
+      item.scopeDateFrom < admission.scopeDateFrom ||
+      item.scopeDateTo > admission.scopeDateTo ||
+      Date.parse(item.observedAt) > cutoff
+    )
+      throw new Error('RQData 身份证据超出准入范围或观察截点');
+  }
+}
+
 /** 来源原文只用于明确准入的 ETF 身份；实际字节摘要由执行端另行重验。 */
 export function validateMarketRqdataIdentityResponseV3(response: IdentityResponse): void {
   const evidence = response.identityEvidence;
@@ -112,15 +128,7 @@ export function validateMarketRqdataIdentityResponseV3(response: IdentityRespons
   const cutoff = Math.min(Date.parse(response.fetchedAt), Date.parse(response.dataAsOf), recorded);
   if (recorded > Date.parse(response.dataAsOf)) throw new Error('RQData 身份准入晚于冻结截点');
   const bundle = parseMarketRqdataFundIdentityV3(evidence.content);
-  for (const item of bundle.mappings) {
-    if (
-      !admission.scopeSymbols.includes(item.symbol) ||
-      item.scopeDateFrom < admission.scopeDateFrom ||
-      item.scopeDateTo > admission.scopeDateTo ||
-      Date.parse(item.observedAt) > cutoff
-    )
-      throw new Error('RQData 身份证据超出准入范围或观察截点');
-  }
+  validateRqdataIdentityMappings(bundle, admission, cutoff);
   const selected = bundle.mappings.find(
     (item) =>
       item.symbol === response.symbol &&

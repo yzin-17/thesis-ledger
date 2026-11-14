@@ -41,63 +41,9 @@ isolated('用途完整期限：不加速时间的公开 HTTP/SDK/PostgreSQL 验�
 
   it('两用途共享真实 600 秒预算，持续输出在收尾预留前终止且不保存', async () => {
     expect(vi.isFakeTimers()).toBe(false);
-    const research = { id: 'research', version: 'research-generation-v2' } as const;
-    const requests: Array<{ at: string; path: string; stream: boolean; format: string }> = [];
-    const closed = deferred();
-    const responses = new Set<ServerResponse>();
-    const upstream = createServer(async (request, response) => {
-      let raw = '';
-      for await (const chunk of request) raw += chunk.toString();
-      const body = JSON.parse(raw);
-      requests.push({
-        at: new Date().toISOString(),
-        path: request.url ?? '',
-        stream: body.stream,
-        format: body.response_format?.type,
-      });
-      responses.add(response);
-      response.on('close', () => responses.delete(response));
-      response.writeHead(200, { 'content-type': 'text/event-stream' });
-      response.flushHeaders();
-      if (requests.length === 1) {
-        await delay(1000);
-        frame(response, JSON.stringify(researchConnectionProbe(research)), 'stop');
-        response.write(
-          `data: ${JSON.stringify({
-            id: 'isolated-deadline',
-            object: 'chat.completion.chunk',
-            created: 1,
-            model: 'model',
-            choices: [],
-            usage: { prompt_tokens: 12, completion_tokens: 9, total_tokens: 21 },
-          })}\n\n`,
-        );
-        response.end('data: [DONE]\n\n');
-        return;
-      }
-      const timer = setInterval(() => frame(response, 'x'), 250);
-      frame(response, 'x');
-      response.on('close', () => {
-        clearInterval(timer);
-        closed.resolve();
-      });
-    });
-    upstream.listen(0, '127.0.0.1');
-    await once(upstream, 'listening');
-    const address = upstream.address();
-    if (!address || typeof address === 'string') throw new Error('隔离上游地址缺失');
-    const origin = `http://127.0.0.1:${address.port}`;
-    const allowed = new Set([origin]);
-    const blocked: string[] = [];
-    const fetchOriginal = globalThis.fetch;
-    vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      if (!allowed.has(url.origin)) {
-        blocked.push(url.origin);
-        throw new Error('禁止隔离期限验收访问非所属地址');
-      }
-      return fetchOriginal(input, { ...init, redirect: 'error' });
-    });
+    const upstreamFixture = await deadlineUpstream();
+    const { research, requests, closed, responses, upstream, origin, allowed, blocked } =
+      upstreamFixture;
     try {
       const sdk = new AiSdkGenerationAdapter();
       const generate = vi.spyOn(sdk, 'generate');
@@ -283,3 +229,65 @@ isolated('用途完整期限：不加速时间的公开 HTTP/SDK/PostgreSQL 验�
     }
   }, 650000);
 });
+
+async function deadlineUpstream() {
+  const research = { id: 'research', version: 'research-generation-v2' } as const;
+  const requests: Array<{ at: string; path: string; stream: boolean; format: string }> = [];
+  const closed = deferred();
+  const responses = new Set<ServerResponse>();
+  const upstream = createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk.toString();
+    const body = JSON.parse(raw);
+    requests.push({
+      at: new Date().toISOString(),
+      path: request.url ?? '',
+      stream: body.stream,
+      format: body.response_format?.type,
+    });
+    responses.add(response);
+    response.on('close', () => responses.delete(response));
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.flushHeaders();
+    if (requests.length === 1) {
+      await delay(1000);
+      frame(response, JSON.stringify(researchConnectionProbe(research)), 'stop');
+      response.write(
+        `data: ${JSON.stringify({
+          id: 'isolated-deadline',
+          object: 'chat.completion.chunk',
+          created: 1,
+          model: 'model',
+          choices: [],
+          usage: { prompt_tokens: 12, completion_tokens: 9, total_tokens: 21 },
+        })}\n\n`,
+      );
+      response.end('data: [DONE]\n\n');
+      return;
+    }
+    const timer = setInterval(() => frame(response, 'x'), 250);
+    frame(response, 'x');
+    response.on('close', () => {
+      clearInterval(timer);
+      closed.resolve();
+    });
+  });
+  upstream.listen(0, '127.0.0.1');
+  await once(upstream, 'listening');
+  const address = upstream.address();
+  if (!address || typeof address === 'string') throw new Error('隔离上游地址缺失');
+  const origin = `http://127.0.0.1:${address.port}`;
+  const allowed = new Set([origin]);
+  const blocked: string[] = [];
+  const fetchOriginal = globalThis.fetch;
+  vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (!allowed.has(url.origin)) {
+      blocked.push(url.origin);
+      throw new Error('禁止隔离期限验收访问非所属地址');
+    }
+    return fetchOriginal(input, { ...init, redirect: 'error' });
+  });
+
+  return { research, requests, closed, responses, upstream, origin, allowed, blocked };
+}

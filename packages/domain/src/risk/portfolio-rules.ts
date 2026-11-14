@@ -7,6 +7,19 @@ import {
   type RiskRule,
 } from './types.js';
 
+function evaluateCorrelationRule(rule: RiskRule, context: CompleteRiskContext): RiskEvent | null {
+  const entries = Object.entries(context.returns ?? {});
+  if (entries.length < 2) return null;
+  let maximum: number | null = null;
+  for (let left = 0; left < entries.length; left += 1) {
+    for (let right = left + 1; right < entries.length; right += 1) {
+      const correlation = pearsonCorrelation(entries[left]![1], entries[right]![1]);
+      if (correlation !== null && (maximum === null || correlation > maximum)) maximum = correlation;
+    }
+  }
+  return maximum === null ? null : completeRiskEvent(rule, context, maximum, maximum > rule.threshold, { seriesCount: entries.length });
+}
+
 export const evaluatePortfolioRule = (
   rule: RiskRule,
   context: CompleteRiskContext,
@@ -63,22 +76,6 @@ export const evaluatePortfolioRule = (
       coverage: known.reduce((sum, position) => sum + position.weight, 0),
     });
   }
-  if (rule.kind === 'correlation') {
-    const entries = Object.entries(context.returns ?? {});
-    if (entries.length < 2) return null;
-    let maximum: number | null = null;
-    for (let left = 0; left < entries.length; left += 1) {
-      for (let right = left + 1; right < entries.length; right += 1) {
-        const correlation = pearsonCorrelation(entries[left]![1], entries[right]![1]);
-        if (correlation !== null && (maximum === null || correlation > maximum))
-          maximum = correlation;
-      }
-    }
-    return maximum === null
-      ? null
-      : completeRiskEvent(rule, context, maximum, maximum > rule.threshold, {
-          seriesCount: entries.length,
-        });
-  }
+  if (rule.kind === 'correlation') return evaluateCorrelationRule(rule, context);
   return null;
 };

@@ -30,6 +30,15 @@ const messagesFor = (sourceMode: 'existing' | 'discovery', useSdkContract = true
   });
 
 describe('优化业务输出合同提示', () => {
+  it.each([true, false])('探索消息明确左右主语、方向及等价交换（精简=%s）', async (sdk) => {
+    const messages = await messagesFor('discovery', sdk);
+    const system = messages[0]!.content;
+    expect(system).toContain('above 是前值 left<=right 且当前 left>right');
+    expect(system).toContain('left=价格、right=EMA、direction=above');
+    expect(system).toContain('left=价格、right=EMA、direction=below');
+    expect(system).toContain('同时反转 direction');
+  });
+
   it('探索实际消息提供精简合同、series 枚举和递归表达式定义', async () => {
     const messages = await messagesFor('discovery');
     const system = messages.find((message) => message.role === 'system')!.content;

@@ -115,6 +115,9 @@ describe('编写客户端合同与实际预览', () => {
     expect(html).toContain('min-w-0 truncate');
     expect(html).toContain(label);
   });
+});
+
+describe('编写确认及 JSON 语义编辑', () => {
   it('仅 JSON 格式调整保留审核，实际语义编辑或无效文本要求重新确认', () => {
     const content: AuthoringContent = {
       ...emptyAuthoringContent,
@@ -210,6 +213,9 @@ describe('编写客户端合同与实际预览', () => {
     expect(invalid).toContain('定义需要修正');
     expect(invalid).toContain('{broken');
   });
+});
+
+describe('会话凭据与失败状态', () => {
   it('会话仅在内存，头与网关凭据并存，退出移除个人凭据', () => {
     const session = {
       token: 'A'.repeat(43),

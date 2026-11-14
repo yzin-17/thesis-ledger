@@ -59,7 +59,6 @@ export function SettingsScreen() {
         <Action label="AI 模型与来源" onPress={() => navigation.navigate('AiProviders')} />
         <Action label="行情来源与账号" onPress={() => navigation.navigate('MarketProviders')} />
         <Action label="行情路由配置" onPress={() => navigation.navigate('MarketPolicy')} />
-        <Action label="标的目录与同步" onPress={() => navigation.navigate('MarketCatalog')} />
         <Action label="自动化任务" onPress={() => navigation.navigate('Automations')} />
         <Action label="来源与通知诊断" onPress={() => navigation.navigate('Diagnostics')} />
       </Section>

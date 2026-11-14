@@ -86,19 +86,14 @@ export function useAccountDataNavigation({
     },
     [request, confirmDiscard],
   );
-  const params = new URLSearchParams(location.search);
-  const requestedAccountId = params.get('accountId') ?? '';
-  const requestedContextMatches =
-    !requestedAccountId || selectionExistsInScope(requestedAccountId, accounts);
-  const entryRequested = requestedContextMatches ? params.get('entry') : null;
-  const requestedTab = params.get('tab');
-  const initialTab: AccountDataTab =
-    requestedTab === 'positions' ||
-    requestedTab === 'cash' ||
-    requestedTab === 'transactions' ||
-    requestedTab === 'fund-investments'
-      ? requestedTab
-      : 'transactions';
+  const {
+    params,
+    requestedAccountId,
+    requestedContextMatches,
+    entryRequested,
+    requestedTab,
+    initialTab,
+  } = readAccountNavigationRequest(location.search, accounts);
   const [accountId, setAccountId] = useState(() => {
     const requestedSelection = selectionExistsInScope(requestedAccountId, accounts)
       ? requestedAccountId
@@ -110,17 +105,12 @@ export function useAccountDataNavigation({
     });
   });
   const [accountManagerOpen, setAccountManagerOpen] = useState(params.get('setup') === '1');
-  const requestedSelection = selectionExistsInScope(requestedAccountId, accounts)
-    ? requestedAccountId
-    : '';
-  const stateSelection = selectionExistsInScope(accountId, accounts) ? accountId : '';
-  const rememberedSelection = readModeLastAccount(mode);
-  const preferredSelection = requestedSelection || stateSelection || rememberedSelection;
-  const effectiveAccountId = resolveAccountSelection({
+  const effectiveAccountId = currentNavigationAccount(
     accounts,
-    accountId: '',
-    requestedAccountId: preferredSelection,
-  });
+    requestedAccountId,
+    accountId,
+    mode,
+  );
   const selectedAccount = accounts.find((account) => account.id === effectiveAccountId);
   const isCashAccount = selectedAccount?.type === 'cash';
   let tab = initialTab;
@@ -296,4 +286,49 @@ export function useAccountDataNavigation({
     tab,
     updateLocation,
   };
+}
+
+function readAccountNavigationRequest(search: string, accounts: Account[]) {
+  const params = new URLSearchParams(search);
+  const requestedAccountId = params.get('accountId') ?? '';
+  const requestedContextMatches =
+    !requestedAccountId || selectionExistsInScope(requestedAccountId, accounts);
+  const entryRequested = requestedContextMatches ? params.get('entry') : null;
+  const requestedTab = params.get('tab');
+  const initialTab: AccountDataTab =
+    requestedTab === 'positions' ||
+    requestedTab === 'cash' ||
+    requestedTab === 'transactions' ||
+    requestedTab === 'fund-investments'
+      ? requestedTab
+      : 'transactions';
+
+  return {
+    params,
+    requestedAccountId,
+    requestedContextMatches,
+    entryRequested,
+    requestedTab,
+    initialTab,
+  };
+}
+
+function currentNavigationAccount(
+  accounts: Account[],
+  requestedAccountId: string,
+  accountId: string,
+  mode: Account['mode'],
+) {
+  const requestedSelection = selectionExistsInScope(requestedAccountId, accounts)
+    ? requestedAccountId
+    : '';
+  const stateSelection = selectionExistsInScope(accountId, accounts) ? accountId : '';
+  const rememberedSelection = readModeLastAccount(mode);
+  const preferredSelection = requestedSelection || stateSelection || rememberedSelection;
+  const effectiveAccountId = resolveAccountSelection({
+    accounts,
+    accountId: '',
+    requestedAccountId: preferredSelection,
+  });
+  return effectiveAccountId;
 }

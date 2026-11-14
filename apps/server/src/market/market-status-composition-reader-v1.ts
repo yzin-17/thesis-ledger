@@ -10,6 +10,7 @@ import {
 } from '@thesis-ledger/schemas';
 import type { DsaDataCapabilityReaderV3 } from '../integration/dsa/dsa-data-capability-reader-v3.js';
 import { DsaV3ProtocolError } from '../integration/dsa/dsa-v3-protocol.js';
+import { isReportedSourceInvalidResponseV3 } from '../integration/dsa/dsa-client-errors.js';
 import type { StatusPolicyReadV1 } from '../integration/dsa/dsa-status-route-reader-v1.js';
 
 const sourceErrors = new Set([
@@ -61,7 +62,11 @@ export async function readMarketStatusCompositionV1(
         });
         return { ...demand, status: 'included', request, result: read.result };
       } catch (error) {
-        if (!(error instanceof DsaV3ProtocolError) || !sourceErrors.has(error.code)) throw error;
+        if (
+          !(error instanceof DsaV3ProtocolError) ||
+          (!sourceErrors.has(error.code) && !isReportedSourceInvalidResponseV3(error))
+        )
+          throw error;
         return {
           ...demand,
           status: 'failed',

@@ -6,6 +6,9 @@ import { JournalReviewSnapshots } from '../../src/journal/journal-review-snapsho
 import { JournalReviewAnalysis } from '../../src/journal/journal-review-analysis.js';
 import { JournalReviewAi } from '../../src/journal/journal-review-ai.js';
 import { JournalPeriodReviewAi } from '../../src/journal/journal-period-review-ai.js';
+import { JournalAiResearchV2 } from '../../src/journal/journal-ai-research-v2.js';
+import { AiResearchReportsQuery } from '../../src/ai/ai-research-reports.query.js';
+import { localIdentityPrincipal } from '../../src/identity/local-workspace.js';
 import { AiRunService } from '../../src/ai/ai-run.service.js';
 import {
   createJournalCommandFixture,
@@ -77,70 +80,100 @@ describe.skipIf(!databaseUrl)('隔离 PostgreSQL 复盘解读与快照关联', (
     const runs = new AiRunService(app as never, providers as never, routing as never);
     const executor = { dispatch: vi.fn() };
     const analysis = new JournalReviewAnalysis(candidates);
-    const ai = new JournalReviewAi(analysis, runs, executor as never);
-    const run = await ai.start(request);
-    expect(run.status).toBe('queued');
-    const stored = await app.aiRun.findUniqueOrThrow({ where: { id: run.id } });
-    expect(stored.modelMetadata).toMatchObject({
-      researchSettingsRevision: '7',
-      frozenResearch: {
-        prompt: { version: 'journal-review-v2' },
-        source: {
-          evidence: {
-            data: {
-              analysisDraft: request.analysisDraft,
-              result: { metrics: { netRealizedPnl: { value: '4.6' } } },
+    const v2 = new JournalAiResearchV2(
+      runs,
+      executor as never,
+      routing as never,
+      new AiResearchReportsQuery(app as never),
+    );
+    const ai = new JournalReviewAi(analysis, runs, v2);
+    const previousWritePolicy = process.env.AI_RESEARCH_V2_WRITES_ENABLED;
+    process.env.AI_RESEARCH_V2_WRITES_ENABLED = 'true';
+    const principal = localIdentityPrincipal()!;
+    try {
+      const run = await ai.start(request, principal);
+      expect(run.status).toBe('queued');
+      const stored = await app.aiRun.findUniqueOrThrow({ where: { id: run.id } });
+      expect(stored.modelMetadata).toMatchObject({
+        researchSettingsRevision: '7',
+        frozenResearch: {
+          version: 'frozen-research-v2',
+          prompt: { version: 'journal-review-v5' },
+          evidence: [
+            {
+              audit: { kind: 'journal', providerId: 'thesis-ledger' },
+              data: {
+                analysisDraft: request.analysisDraft,
+                result: { metrics: { netRealizedPnl: { value: '4.6' } } },
+              },
             },
-          },
+          ],
         },
-      },
-    });
-    const withAi = new JournalReviewSnapshots(app as never, candidates, ai);
-    const saved = await withAi.save({ ...request, aiRunId: run.id });
-    if (saved.compatibility !== 'CURRENT_CONTRACT') throw new Error('未保存带解读的快照');
-    expect(saved.snapshot.outputSnapshot.aiExplanation).toEqual({
-      id: run.id,
-      provider: 'isolated-journal-provider',
-      model: 'isolated-model',
-      promptVersion: 'journal-review-v2',
-      status: 'queued',
-    });
-    await app.aiRun.update({
-      where: { id: run.id },
-      data: { status: 'failed', errorCode: 'fixture-failure', errorSummary: '隔离终态' },
-    });
-    expect(await withAi.get(saved.snapshot.id, { accountId })).toEqual(saved);
-    await expect(
-      withAi.save({ ...request, analysisDraft: { stopLoss: '9' }, aiRunId: run.id }),
-    ).rejects.toMatchObject({ response: { errorCode: 'JOURNAL_AI_CONTEXT_CHANGED' } });
-    const period = await analysis.period({
-      accountId,
-      mode: 'actual',
-      start: '2026-01-02T09:00:00Z',
-      end: '2026-01-04T09:00:00Z',
-    });
-    const periodRequest = {
-      accountId,
-      mode: 'actual',
-      start: period.result.window.start,
-      end: period.result.window.end,
-      expectedLedgerRevision: period.ledgerRevision,
-      expectedProjectionGeneration: period.projectionGeneration,
-      expectedAlgorithmVersion: period.result.algorithmVersion,
-      objectFingerprints: Object.fromEntries(
-        period.candidates.map((row) => [
-          row.input.reference.reviewObjectId,
-          row.input.projection.evidenceFingerprint,
+      });
+      const numericFields = (
+        stored.modelMetadata as unknown as {
+          frozenResearch: { evidence: Array<{ numericFields: unknown[] }> };
+        }
+      ).frozenResearch.evidence[0]!.numericFields;
+      expect(numericFields).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            fieldPath: '/result/metrics/netRealizedPnl/value',
+            unit: 'amount',
+            currency: 'USD',
+          }),
         ]),
-      ),
-    };
-    const periodAi = new JournalPeriodReviewAi(analysis, runs, executor as never);
-    const periodRun = await periodAi.start(periodRequest);
-    expect(periodRun.objectFingerprints).toEqual(periodRequest.objectFingerprints);
-    await expect(ai.get(periodRun.id, { accountId })).rejects.toMatchObject({
-      response: { errorCode: 'JOURNAL_AI_NOT_FOUND' },
-    });
-    expect(executor.dispatch).toHaveBeenCalledTimes(2);
-    expect(await economicRows()).toEqual(before);
+      );
+      const withAi = new JournalReviewSnapshots(app as never, candidates, ai);
+      const saved = await withAi.save({ ...request, aiRunId: run.id });
+      if (saved.compatibility !== 'CURRENT_CONTRACT') throw new Error('未保存带解读的快照');
+      expect(saved.snapshot.outputSnapshot.aiExplanation).toEqual({
+        id: run.id,
+        provider: 'isolated-journal-provider',
+        model: 'isolated-model',
+        promptVersion: 'journal-review-v5',
+        status: 'queued',
+      });
+      await app.aiRun.update({
+        where: { id: run.id },
+        data: { status: 'failed', errorCode: 'fixture-failure', errorSummary: '隔离终态' },
+      });
+      expect(await withAi.get(saved.snapshot.id, { accountId })).toEqual(saved);
+      await expect(
+        withAi.save({ ...request, analysisDraft: { stopLoss: '9' }, aiRunId: run.id }),
+      ).rejects.toMatchObject({ response: { errorCode: 'JOURNAL_AI_CONTEXT_CHANGED' } });
+      const period = await analysis.period({
+        accountId,
+        mode: 'actual',
+        start: '2026-01-02T09:00:00Z',
+        end: '2026-01-04T09:00:00Z',
+      });
+      const periodRequest = {
+        accountId,
+        mode: 'actual',
+        start: period.result.window.start,
+        end: period.result.window.end,
+        expectedLedgerRevision: period.ledgerRevision,
+        expectedProjectionGeneration: period.projectionGeneration,
+        expectedAlgorithmVersion: period.result.algorithmVersion,
+        objectFingerprints: Object.fromEntries(
+          period.candidates.map((row) => [
+            row.input.reference.reviewObjectId,
+            row.input.projection.evidenceFingerprint,
+          ]),
+        ),
+      };
+      const periodAi = new JournalPeriodReviewAi(analysis, runs, v2);
+      const periodRun = await periodAi.start(periodRequest, principal);
+      expect(periodRun.objectFingerprints).toEqual(periodRequest.objectFingerprints);
+      await expect(ai.get(periodRun.id, { accountId }, principal)).rejects.toMatchObject({
+        response: { errorCode: 'JOURNAL_AI_NOT_FOUND' },
+      });
+      expect(executor.dispatch).toHaveBeenCalledTimes(2);
+      expect(await economicRows()).toEqual(before);
+    } finally {
+      if (previousWritePolicy === undefined) delete process.env.AI_RESEARCH_V2_WRITES_ENABLED;
+      else process.env.AI_RESEARCH_V2_WRITES_ENABLED = previousWritePolicy;
+    }
   });
 });

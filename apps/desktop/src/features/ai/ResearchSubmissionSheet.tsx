@@ -24,71 +24,35 @@ import {
 import { ResearchDraftFields } from './ResearchDraftFields.js';
 import { ResearchCreationReadiness, researchCreationReady } from './ResearchCreationReadiness.js';
 import { researchStateMeta } from './research-state-display.js';
-export function ResearchSubmissionSheet({
-  open,
-  onOpenChange,
-  initialQuestion = '',
-  initialInstrument = null,
-  onCreated,
-}: {
+export function ResearchSubmissionSheet(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialQuestion?: string;
   initialInstrument?: InstrumentLookup | null;
   onCreated: (value: ResearchSubmissionReceiptV2) => void;
 }) {
-  const mode = useOptionalPortfolioMode()?.mode ?? 'actual';
-  const capabilities = useResearchCapabilitiesQuery(open);
-  const model = useResearchDefaultModel(open);
-  const settings = model.query;
-  const submission = useResearchSubmission(mode, open, onCreated);
-  const state = useResearchDraft(
+  const control = useResearchSubmissionSheet(props);
+  const {
     open,
-    initialQuestion,
+    close,
     mode,
-    !submission.pending,
-    capabilities.isError ? [] : (capabilities.data?.scopes ?? []),
-    initialInstrument,
-  );
-  const { draft, selection } = state;
-  const canSubmit =
-    researchCreationReady(state.valid, settings, capabilities, draft.scope) &&
-    model.ready &&
-    !submission.busy;
-  const close = useDraftCloseGuard({
-    open,
-    draft: { mode, ...draft, modelKey: model.selectedKey, submissionId: submission.pending?.submissionId },
-    dirty: Boolean(submission.pending || model.dirty || researchDraftDirty(draft, initialQuestion)),
-    busy: submission.busy || model.saving,
-    onOpenChange,
-    ...(submission.pending ? {
-      confirmation: {
-        title: '关闭提交面板？',
-        description: '提交结果尚未确认。关闭只收起面板，不会取消任务；原提交标识和输入会保留，重新打开后可找回或原样重试。需要取消任务时，请使用面板中的“取消已提交任务”。',
-        confirmLabel: '关闭面板',
-        cancelLabel: '继续确认',
-        variant: 'default' as const,
-      },
-    } : {}),
-  });
-  const submit = () => {
-    if (!selection || !canSubmit || !settings.data) return;
-    submission.submit({
-      version: 2,
-      mode,
-      scope: selection,
-      question: draft.question.trim(),
-      ...(draft.templateId ? { templateId: draft.templateId } : {}),
-      researchSettingsRevision: settings.data.revision,
-    });
-  };
+    model,
+    submission,
+    capabilities,
+    draft,
+    state,
+    settings,
+    canSubmit,
+    submit,
+  } = control;
   return (
     <Sheet open={open} onOpenChange={(next) => void close(next)}>
       <SheetContent side="right" size="form" className="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>新建研究</SheetTitle>
           <SheetDescription>
-            当前使用{mode === 'shadow' ? '模拟' : '实际'}模式。提交后会自动准备资料；价格方向论点到期后在报告中显示复核结果或缺少的材料。
+            当前使用{mode === 'shadow' ? '模拟' : '实际'}
+            模式。提交后会自动准备资料；价格方向论点到期后在报告中显示复核结果或缺少的材料。
           </SheetDescription>
         </SheetHeader>
         <ResearchDefaultModelField
@@ -170,4 +134,86 @@ export function ResearchSubmissionSheet({
       </SheetContent>
     </Sheet>
   );
+}
+
+function useResearchSubmissionSheet({
+  open,
+  onOpenChange,
+  initialQuestion = '',
+  initialInstrument = null,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialQuestion?: string;
+  initialInstrument?: InstrumentLookup | null;
+  onCreated: (value: ResearchSubmissionReceiptV2) => void;
+}) {
+  const mode = useOptionalPortfolioMode()?.mode ?? 'actual';
+  const capabilities = useResearchCapabilitiesQuery(open);
+  const model = useResearchDefaultModel(open);
+  const settings = model.query;
+  const submission = useResearchSubmission(mode, open, onCreated);
+  const state = useResearchDraft(
+    open,
+    initialQuestion,
+    mode,
+    !submission.pending,
+    capabilities.isError ? [] : (capabilities.data?.scopes ?? []),
+    initialInstrument,
+  );
+  const { draft, selection } = state;
+  const canSubmit =
+    researchCreationReady(state.valid, settings, capabilities, draft.scope) &&
+    model.ready &&
+    !submission.busy;
+  const close = useDraftCloseGuard({
+    open,
+    draft: {
+      mode,
+      ...draft,
+      modelKey: model.selectedKey,
+      submissionId: submission.pending?.submissionId,
+    },
+    dirty: Boolean(submission.pending || model.dirty || researchDraftDirty(draft, initialQuestion)),
+    busy: submission.busy || model.saving,
+    onOpenChange,
+    ...(submission.pending
+      ? {
+          confirmation: {
+            title: '关闭提交面板？',
+            description:
+              '提交结果尚未确认。关闭只收起面板，不会取消任务；原提交标识和输入会保留，重新打开后可找回或原样重试。需要取消任务时，请使用面板中的“取消已提交任务”。',
+            confirmLabel: '关闭面板',
+            cancelLabel: '继续确认',
+            variant: 'default' as const,
+          },
+        }
+      : {}),
+  });
+  const submit = () => {
+    if (!selection || !canSubmit || !settings.data) return;
+    submission.submit({
+      version: 2,
+      mode,
+      scope: selection,
+      question: draft.question.trim(),
+      ...(draft.templateId ? { templateId: draft.templateId } : {}),
+      researchSettingsRevision: settings.data.revision,
+    });
+  };
+
+  return {
+    open,
+    close,
+    mode,
+    model,
+    submission,
+    capabilities,
+    draft,
+    state,
+    settings,
+    canSubmit,
+    submit,
+  };
 }

@@ -296,6 +296,9 @@ describe('Trade Cost Projection 成本与收益守恒', () => {
     expect(afterSell.closeSlices[0]?.allocations[0]).toMatchObject({ originalCost: '400' });
   });
 
+});
+
+describe("交易成本币种与分配守恒", () => {
   it('不同币种费用只保留明细，不折算后混入原币净收益', () => {
     const trade = projectCosts(
       [

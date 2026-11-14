@@ -26,7 +26,10 @@ import {
 import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
 import { alignBacktestBenchmarkClosesV3 } from './backtest-v3-benchmark-alignment.js';
 import { resolveFrozenBenchmarkCostV3 } from './backtest-v3-benchmark-cost.js';
-import { researchBenchmarkLimitV3, supportsWholeShareWindowBenchmarkV3 } from './backtest-research-benchmark-limit-v3.js';
+import {
+  researchBenchmarkLimitV3,
+  supportsWholeShareWindowBenchmarkV3,
+} from './backtest-research-benchmark-limit-v3.js';
 import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot.js';
 import {
   benchmarkSourceIdentityV3 as sourceIdentity,
@@ -132,6 +135,12 @@ const assertFrozenInputs = (input: BacktestV3BenchmarkInput) => {
     failIntegrity('唯一 execution 来源与策略标的或 RunConfig 价格协议不一致');
   }
 
+  assertFrozenExecutionModel(runConfig, manifest);
+
+  return { runConfig, strategy, manifest, executionSource };
+};
+
+function assertFrozenExecutionModel(runConfig: RunConfigV3, manifest: BacktestSnapshotManifestV3) {
   const configuredModel = runConfig.executionModel;
   const manifestModel = manifest.executionModel;
   if (configuredModel) {
@@ -150,9 +159,7 @@ const assertFrozenInputs = (input: BacktestV3BenchmarkInput) => {
   } else if (manifestModel) {
     failIntegrity('manifest 冻结了 RunConfig 中不存在的 execution model');
   }
-
-  return { runConfig, strategy, manifest, executionSource };
-};
+}
 
 const rowsForExecutionArtifact = (
   manifest: BacktestSnapshotManifestV3,
@@ -328,7 +335,8 @@ const finish = (
 export const buildBacktestV3Benchmark = (
   input: BacktestV3BenchmarkInput,
 ): BacktestV3BenchmarkProjection => {
-  const { runConfig, strategy, manifest, executionSource } = assertFrozenInputs(input);
+  const frozen = assertFrozenInputs(input);
+  const { runConfig, strategy, manifest, executionSource } = frozen;
   const benchmarkConvention = EVALUATION_VERSION;
   const identity = (
     source: BacktestSnapshotManifestV3['actualSources'][number],
@@ -430,7 +438,10 @@ export const buildBacktestV3Benchmark = (
     );
   }
 
-  if (runConfig.executionPriceProtocol.accountingBasis !== 'normalized-series' && !supportsWholeShareWindowBenchmarkV3(runConfig.executionPriceProtocol, manifest)) {
+  if (
+    runConfig.executionPriceProtocol.accountingBasis !== 'normalized-series' &&
+    !supportsWholeShareWindowBenchmarkV3(runConfig.executionPriceProtocol, manifest)
+  ) {
     warnings.add('BENCHMARK_RAW_ACTIONS_UNSUPPORTED');
     const benchmarkIdentity = identity(benchmarkSource);
     delete benchmarkIdentity.returnProtocol;
@@ -456,6 +467,40 @@ export const buildBacktestV3Benchmark = (
     );
   }
 
+  return evaluateExecutionSeriesBenchmark({
+    input,
+    ...frozen,
+    benchmarkSource,
+    strategyIdentity,
+    identity,
+    strategyTotalReturn,
+    warnings,
+  });
+};
+
+type ExecutionSeriesBenchmarkContext = ReturnType<typeof assertFrozenInputs> & {
+  input: BacktestV3BenchmarkInput;
+  benchmarkSource: BacktestSnapshotManifestV3['actualSources'][number];
+  strategyIdentity: BacktestBenchmarkCompatibilityIdentity;
+  identity: (
+    source: BacktestSnapshotManifestV3['actualSources'][number],
+    costAssumption?: BacktestBenchmarkCostAssumption,
+  ) => BacktestBenchmarkCompatibilityIdentity;
+  strategyTotalReturn: BenchmarkMetric;
+  warnings: Set<string>;
+};
+function evaluateExecutionSeriesBenchmark({
+  input,
+  runConfig,
+  strategy,
+  manifest,
+  executionSource,
+  benchmarkSource,
+  strategyIdentity,
+  identity,
+  strategyTotalReturn,
+  warnings,
+}: ExecutionSeriesBenchmarkContext): BacktestV3BenchmarkProjection {
   const calendarRows = [...input.rows.entries()]
     .filter(([key]) => key.split('/').at(-2) === 'calendar')
     .flatMap(([, rows]) => rows)
@@ -550,4 +595,4 @@ export const buildBacktestV3Benchmark = (
     strategyTotalReturn,
     warnings,
   );
-};
+}

@@ -1,4 +1,6 @@
 import { LoadingState } from '@/components/ui/spinner';
+import { MarketDetailSecurityInfo } from './MarketDetailSecurityInfo.js';
+import { MarketDetailPositionContext } from './MarketDetailPositionContext.js';
 import { InstrumentReadingSidebar, ReadingSidebarToggle, InstrumentReadingSheet, useNarrowMarketDetail } from './MarketDetailReading.js';
 import { useId, useState, type ReactNode } from 'react';
 import type { MarketDetailCapability, MarketDisplayDetailResponse as MarketDetailResponse, MarketDisplayDetailSection as MarketDetailSection } from '@thesis-ledger/api-client';
@@ -9,16 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { marketToneForValue } from '@/ui/market-color';
 import {FundDailyComparison} from './FundDailyComparison.js';
-import { BarsSection, ChipSection, DetailMetric, FundNavHistorySection, FundNavSection, IndicatorSection, MarketDetailNotice, QuoteSection, sectionIsVisible, type MarketDetailNoticeState } from './MarketDetailSections.js';
+import { BarsSection, ChipSection, FundNavHistorySection, FundNavSection, IndicatorSection, MarketDetailNotice, QuoteSection, sectionIsVisible, type MarketDetailNoticeState } from './MarketDetailSections.js';
 import type { MarketIndicatorParams } from './MarketDetailCharts.js';
 import { marketDetailSectionTitle, type MarketDetailPosition } from './market-detail.types.js';
 import type { MarketChartIndicator } from './market-chart-types.js';
 import type { ChartPoint } from './market-chart-model.js';
 import type { MarketTradingOverlayState } from './useMarketTradingOverlays.js';
-const money = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
-const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
 
 export function MarketDetailDialogContent({
   chartControls,
@@ -94,7 +93,6 @@ export function MarketDetailDialogContent({
   const narrow = useNarrowMarketDetail();
   const readingId = useId();
   const [sidebar, setSidebar] = useState<'unopened' | 'open' | 'closed'>('unopened');
-  const positionPnlTone = marketToneForValue(position.pnl ?? null);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -206,20 +204,8 @@ export function MarketDetailDialogContent({
                 ) : null}
               </>
             ) : null}
-            {position.quantity !== undefined && position.costPrice !== undefined && (
-              <div
-                className="grid grid-cols-2 gap-x-4 border-t pt-2 sm:grid-cols-3"
-                data-market-detail-position-context
-              >
-                <DetailMetric label="持仓数量" value={`${number.format(position.quantity)} ${unit}`} />
-                <DetailMetric label="持仓成本" value={money.format(position.costPrice)} />
-                <DetailMetric
-                  label="持仓盈亏"
-                  value={position.pnl == null ? '—' : money.format(position.pnl)}
-                  {...(positionPnlTone ? { tone: positionPnlTone } : {})}
-                />
-              </div>
-            )}
+            <MarketDetailSecurityInfo position={position} />
+            <MarketDetailPositionContext position={position} unit={unit} />
             {visibleDetail && visibleDetail.capabilities.unsupported.length > 0 ? (
               <details
                 className="rounded-md bg-muted/20 p-3 text-sm text-muted-foreground"

@@ -146,8 +146,10 @@ export const aiProviderExecutionRouteInputSchema = z.preprocess(
       (route) => route.reasoningEnabled === undefined || isResearchV2Contract(route.contract),
       { path: ['reasoningEnabled'], message: '显式推理开关仅适用于研究 V2' },
     )
-    .refine((route) => route.reasoningEnabled === undefined || route.reasoningEffort === undefined,
-      { path: ['reasoningEffort'], message: '推理开关和推理强度不能同时指定' }),
+    .refine(
+      (route) => route.reasoningEnabled === undefined || route.reasoningEffort === undefined,
+      { path: ['reasoningEffort'], message: '推理开关和推理强度不能同时指定' },
+    ),
 );
 
 export type AiProviderExecutionRouteInput = z.infer<typeof aiProviderExecutionRouteInputSchema>;
@@ -165,7 +167,7 @@ export const aiProviderCapabilityRevocationSchema = z
 
 export type AiProviderCapabilityRevocation = z.infer<typeof aiProviderCapabilityRevocationSchema>;
 
-export const aiProviderInputSchema = z
+const aiProviderInputObjectSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     baseUrl: httpUrl,
@@ -193,80 +195,95 @@ export const aiProviderInputSchema = z
     expectedRevision: z.iso.datetime({ offset: true }).optional(),
     connectionTestToken: z.string().uuid().optional(),
   })
-  .strict()
-  .superRefine((value, context) => {
-    refineAiProviderModelCatalogOrigin(value, context);
-    if (
-      value.compatibilityExtensionProfile &&
-      (value.upstreamFormat !== 'chat-completions' ||
-        (value.chatImplementation ?? 'compatible') !== 'compatible')
-    )
-      context.addIssue({
-        code: 'custom',
-        path: ['compatibilityExtensionProfile'],
-        message: 'OpenRouter 兼容扩展仅适用于兼容 Chat Completions 实现',
-      });
-    const selection = aiUpstreamSelectionSchema.safeParse({
-      upstreamFormat: value.upstreamFormat,
-      ...(value.chatImplementation === undefined
-        ? {}
-        : { chatImplementation: value.chatImplementation }),
+  .strict();
+
+export const aiProviderInputSchema = aiProviderInputObjectSchema.superRefine((value, context) => {
+  refineAiProviderModelCatalogOrigin(value, context);
+  refineProviderUpstream(value, context);
+  refineProviderModels(value, context);
+});
+
+function refineProviderUpstream(
+  value: z.infer<typeof aiProviderInputObjectSchema>,
+  context: z.RefinementCtx,
+) {
+  if (
+    value.compatibilityExtensionProfile &&
+    (value.upstreamFormat !== 'chat-completions' ||
+      (value.chatImplementation ?? 'compatible') !== 'compatible')
+  )
+    context.addIssue({
+      code: 'custom',
+      path: ['compatibilityExtensionProfile'],
+      message: 'OpenRouter 兼容扩展仅适用于兼容 Chat Completions 实现',
     });
-    if (!selection.success)
-      for (const issue of selection.error.issues)
-        context.addIssue({
-          code: 'custom',
-          path: issue.path,
-          message: issue.message,
-        });
-    const models = value.models.map((model) => model.trim());
-    if (new Set(models).size !== models.length)
-      context.addIssue({ code: 'custom', path: ['models'], message: '模型不得重复' });
-    if (value.apiKey && value.credentialsRef)
-      context.addIssue({ code: 'custom', path: ['apiKey'], message: 'API Key 只能填写一个字段' });
-    if (value.authMode === 'none' && (value.apiKey || value.credentialsRef))
-      context.addIssue({
-        code: 'custom',
-        path: ['authMode'],
-        message: '无需认证模式不能提交 API Key',
-      });
-    const reasoningModels = Object.keys(value.modelReasoning ?? {});
-    const selectedModels = new Set(models);
-    if (reasoningModels.some((model) => !selectedModels.has(model)))
-      context.addIssue({
-        code: 'custom',
-        path: ['modelReasoning'],
-        message: '模型推理能力只能保存已选择的模型',
-      });
-    const pricingModels = Object.keys(value.modelPricing ?? {});
-    if (pricingModels.some((model) => !selectedModels.has(model)))
-      context.addIssue({
-        code: 'custom',
-        path: ['modelPricing'],
-        message: '模型价格只能保存已选择的模型',
-      });
-    const defaultModels = Object.keys(value.modelDefaults ?? {});
-    if (defaultModels.some((model) => !selectedModels.has(model)))
-      context.addIssue({
-        code: 'custom',
-        path: ['modelDefaults'],
-        message: '模型默认配置只能保存已选择的模型',
-      });
-    const executionRoutes = value.executionRoutes ?? [];
-    if (executionRoutes.some((route) => !selectedModels.has(route.model)))
-      context.addIssue({
-        code: 'custom',
-        path: ['executionRoutes'],
-        message: '执行路由只能配置已选择的模型',
-      });
-    const routeKeys = executionRoutes.map((route) => `${route.model}\u0000${route.contract.id}`);
-    if (new Set(routeKeys).size !== routeKeys.length)
-      context.addIssue({
-        code: 'custom',
-        path: ['executionRoutes'],
-        message: '同一模型、同一业务用途只能配置一条执行路由',
-      });
+  const selection = aiUpstreamSelectionSchema.safeParse({
+    upstreamFormat: value.upstreamFormat,
+    ...(value.chatImplementation === undefined
+      ? {}
+      : { chatImplementation: value.chatImplementation }),
   });
+  if (!selection.success)
+    for (const issue of selection.error.issues)
+      context.addIssue({
+        code: 'custom',
+        path: issue.path,
+        message: issue.message,
+      });
+}
+
+function refineProviderModels(
+  value: z.infer<typeof aiProviderInputObjectSchema>,
+  context: z.RefinementCtx,
+) {
+  const models = value.models.map((model) => model.trim());
+  if (new Set(models).size !== models.length)
+    context.addIssue({ code: 'custom', path: ['models'], message: '模型不得重复' });
+  if (value.apiKey && value.credentialsRef)
+    context.addIssue({ code: 'custom', path: ['apiKey'], message: 'API Key 只能填写一个字段' });
+  if (value.authMode === 'none' && (value.apiKey || value.credentialsRef))
+    context.addIssue({
+      code: 'custom',
+      path: ['authMode'],
+      message: '无需认证模式不能提交 API Key',
+    });
+  const reasoningModels = Object.keys(value.modelReasoning ?? {});
+  const selectedModels = new Set(models);
+  if (reasoningModels.some((model) => !selectedModels.has(model)))
+    context.addIssue({
+      code: 'custom',
+      path: ['modelReasoning'],
+      message: '模型推理能力只能保存已选择的模型',
+    });
+  const pricingModels = Object.keys(value.modelPricing ?? {});
+  if (pricingModels.some((model) => !selectedModels.has(model)))
+    context.addIssue({
+      code: 'custom',
+      path: ['modelPricing'],
+      message: '模型价格只能保存已选择的模型',
+    });
+  const defaultModels = Object.keys(value.modelDefaults ?? {});
+  if (defaultModels.some((model) => !selectedModels.has(model)))
+    context.addIssue({
+      code: 'custom',
+      path: ['modelDefaults'],
+      message: '模型默认配置只能保存已选择的模型',
+    });
+  const executionRoutes = value.executionRoutes ?? [];
+  if (executionRoutes.some((route) => !selectedModels.has(route.model)))
+    context.addIssue({
+      code: 'custom',
+      path: ['executionRoutes'],
+      message: '执行路由只能配置已选择的模型',
+    });
+  const routeKeys = executionRoutes.map((route) => `${route.model}\u0000${route.contract.id}`);
+  if (new Set(routeKeys).size !== routeKeys.length)
+    context.addIssue({
+      code: 'custom',
+      path: ['executionRoutes'],
+      message: '同一模型、同一业务用途只能配置一条执行路由',
+    });
+}
 
 export type AiProviderInput = z.infer<typeof aiProviderInputSchema>;
 
@@ -291,6 +308,7 @@ export const aiProviderTestPurposeSchema = z.enum([
   'parameter_optimization',
   'strategy_discovery',
   'arena_decision',
+  'arena_live_research',
 ]);
 export type AiProviderTestPurpose = z.infer<typeof aiProviderTestPurposeSchema>;
 

@@ -442,6 +442,9 @@ describe('execution-window V3 preflight', () => {
     });
   });
 
+});
+
+describe("时点可见性与微秒边界", () => {
   it('blocks PIT data observed after dataAsOf even when the selected series is identified', async () => {
     const fixture = validFixture({ pointInTime: true, futureObservation: true });
     const reader = readerFor(fixture.result);
@@ -532,6 +535,9 @@ describe('execution-window V3 preflight', () => {
     expect(reader.readV3).toHaveBeenCalledTimes(1);
   });
 
+});
+
+describe("固定研究与严格重建证据", () => {
   it('keeps the historical price times and actual research observation at the freeze boundary', async () => {
     const fixture = validFixture();
     if (fixture.result.status !== 'selected') throw new Error('selected fixture required');
@@ -661,6 +667,9 @@ describe('execution-window V3 preflight', () => {
     expect(fixture.input.runConfig.executionPriceProtocol.history.basis).toBe('point-in-time');
   });
 
+});
+
+describe("准备修订与请求绑定", () => {
   it('rejects a pinned target or window that disagrees with the preflight revision context', async () => {
     const fixture = validFixture();
     if (fixture.result.status !== 'selected') throw new Error('fixture result should be selected');

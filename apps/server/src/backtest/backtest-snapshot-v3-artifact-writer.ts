@@ -1,4 +1,6 @@
 import { runConfigSchemaV3, type RunConfigV3, type BacktestStrategy } from '@thesis-ledger/schemas';
+import { priceResearchReferenceArtifactKey, priceResearchEvidenceArtifactKey } from '@thesis-ledger/schemas';
+import type { readPriceResearchReference } from './backtest-price-research-input.js';
 import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 import type { BacktestSnapshotV3BuildInput } from './backtest-snapshot-v3-builder.js';
 import type { collectSnapshotDependenciesV3 } from './backtest-snapshot-v3-dependencies.js';
@@ -38,6 +40,7 @@ export const writeBacktestSnapshotV3Artifacts = async (
   tradingStatus?: BacktestTradingStatusSnapshotV3,
   knownCash?: ReturnType<typeof knownCashSnapshotRowsV3>,
   statusComposition?: BacktestStatusCompositionV1,
+  reference?: Awaited<ReturnType<typeof readPriceResearchReference>>,
 ): Promise<ArtifactRef[]> => {
   const artifactRefs: ArtifactRef[] = [];
   const putSnapshotArtifact = (key: string, artifactRows: readonly ArtifactRow[]) =>
@@ -68,6 +71,10 @@ export const writeBacktestSnapshotV3Artifacts = async (
     );
   }
   artifactRefs.push(await putSnapshotArtifact('execution/bars.parquet', rows));
+  if (reference) {
+    artifactRefs.push(await putSnapshotArtifact(priceResearchReferenceArtifactKey, reference.rows));
+    artifactRefs.push(await putSnapshotArtifact(priceResearchEvidenceArtifactKey, [reference.evidenceRow]));
+  }
   if (knownCash) {
     artifactRefs.push(await putSnapshotArtifact(knownCashMetadataKeyV3, knownCash.metadata));
     artifactRefs.push(await putSnapshotArtifact(knownCashRecordsKeyV3, knownCash.records));

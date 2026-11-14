@@ -1,5 +1,67 @@
 # 需求与验收规格
 
+- [竞技场条件委托与成交保护](2026-11-13-arena-contingent-orders.md)。从真实模型订单核对成交激活、部分成交与退出归属。
+
+- [策略风险规则自动监控与缺数说明](2026-11-13-strategy-risk-automatic-monitoring.md)：策略应用自动评估、后台窗口限频及逐条缺数诊断。
+
+- [策略定义统一与双向编辑](2026-11-13-strategy-definition-authoring.md)。协议、编辑与 AI 意图一致性。
+
+- [AI 策略交叉方向一致性](2026-11-12-strategy-cross-direction.md)：生成主语与方向、明确说明校验、历史保留及冻结回测对照。
+
+- [实验期末持仓、可比结果与候选采纳](2026-11-12-experiment-result-adoption.md)：期末市值、执行期比较、实际指标与完成候选采纳。
+
+- [富途港美股不复权研究参考](2026-11-12-futu-raw-research-reference.md)：复用已核验身份与日历，保留严格请求及真实份额边界。
+
+- [竞技场 Desktop 界面与交互](2026-11-12-arena-desktop-experience.md)：比赛实体标题、收益与账户分区、历史轮次、创建预算及真实只读消费边界。
+
+- [AI 实验原地失败重试](2026-11-12-experiment-manual-retry.md)：原身份追加重试，保留历史和累计用量，未知结果由人工明确恢复。
+
+- [失败行情口径有限复核](2026-11-12-provider-failed-recheck.md)：10点一次性预算、精确绑定、会话门禁及失败事实保留。
+
+- [AI 实验自动完成](2026-11-12-automatic-experiment-completion.md)：全部有效候选自动完成封存测试并统一展示结果，最终由用户审阅采纳。
+
+- [自主交易竞技场与独立观战入口](2026-11-12-autonomous-model-arena.md)：模型自主预约、模拟委托、共同估值及两端独立收益观战。
+
+- [实验候选预热与失败归因](2026-11-12-experiment-candidate-warmup-failure.md)：两套价格覆盖候选预算，旧窗口生成前阻断，候选执行失败保留具体原因。
+
+- [AI 实验标的名称展示](2026-11-12-experiment-instrument-display.md)：列表与详情批量投影当前目录名称，两端消费并保留历史名称和输入。
+
+- [准备结果披露两套行情来源](2026-11-12-prepared-price-source-disclosure.md)：普通回测与实验准备直接披露各自冻结提供方和主备索引。
+
+- [双价格研究按各自路由选择来源](2026-11-12-independent-research-price-sources.md)：后复权与原价分别选源、冻结与追溯，复用各自输入。
+
+- [实验 Token 累计预算支持零值不限额](2026-11-12-unlimited-token-budget.md)：输入和输出累计预算、实际结算与模型单次限制的边界。
+
+- [AI 调用次数支持零值不限额](2026-11-12-unlimited-ai-call-budget.md)：次数原样传递、原子累计与其他预算保持生效。
+
+- [AI 实验统一策略收益研究](2026-11-11-experiment-price-research.md)：复用后复权研究与原价参考，确认旧版本转换并保留历史实验。
+
+- [日期组件显示一致性](2026-11-11-date-input-consistency.md)：统一聚焦回显、文本编辑、原值校验与面板选中态。
+
+- [实验创建前校验与错误反馈](2026-11-11-experiment-create-validation.md)：预算范围同步、回测次数零值不限额、字段错误与同提交意图恢复。
+
+- [AI 实验执行设置与历史数据方式](2026-11-11-experiment-execution-settings.md)：自动生成模拟成交规则、继承策略费用与历史可见性说明。
+
+- [回测图表的标的走势](2026-11-11-backtest-instrument-chart.md)：冻结收盘价、独立价格轴和联动时点。
+
+- [实验候选的具体策略差异](2026-11-11-experiment-candidate-diff.md)：冻结版本对比、具体值与可读规则展示。
+
+- [能力首次使用与自动验证](2026-11-11-capability-first-use-verification.md)：一次真实完整调用成功后保存验证结果。
+
+- [港美股后复权回测准备](2026-11-11-overseas-hfq-backtest.md)：富途研究身份、日历及覆盖错误语义。
+
+- [基础行情60秒结果缓存](2026-11-11-market-base-result-cache.md)：股票／ETF普通交互短缓存、原始观察时点、控制代次及刷新隔离。
+
+- [开发库显式不备份增列升级](2026-11-12-development-upgrade-without-backup.md)：精确开发目标、唯一迁移摘要、空结构演练及旧列摘要核验；默认仍备份。
+
+- [策略收益研究的双价格输入](2026-11-11-backtest-return-research.md)：默认后复权研究、实际价格条件及模拟资金语义。
+
+- [业务流程内选择证券与港美股票支持](2026-11-10-instrument-selection-workflow.md)
+
+- [标的详情内自动展示证券资料](2026-11-10-instrument-detail-security-info.md)
+
+- [权限检查限频暂停与接续](2026-11-10-provider-access-rate-limit.md)
+
 - [分钟行情盘中自动刷新](2026-11-09-minute-chart-auto-refresh.md)
 
 - [行情图日期区间与自定义日期](2026-11-08-chart-date-ranges.md)
@@ -21,6 +83,18 @@
 Spec 按自身适用性独立判断归档：不再作为当前需求合同、且执行范围与验收已有明确收口或承接时，进入 `archive/specs/`；仍有效的需求合同继续保留。稳定设计的持续维护不依赖实施 Task 是否归档。
 
 ## 查阅入口
+
+- [资料正文快照与版本差异](2026-11-10-rule-monitor-snapshots.md)
+
+- [权限检查长期保留与凭证底部操作](2026-11-10-provider-access-retention.md)
+
+- [内部导航整页刷新排查与修复](2026-11-09-internal-navigation.md)
+
+- [收费资料检查执行时间归属](2026-11-09-rule-monitor-schedule.md)
+
+- [数据源统一身份与逐功能权限](2026-11-09-provider-functional-access.md)
+
+- [规则监测版本查看与统一自动化记录](2026-11-09-rule-monitor-automation.md)
 
 - [策略读取请求的限流分类与恢复](2026-11-07-strategy-read-rate-limit.md)
 
@@ -106,3 +180,5 @@ Spec 按自身适用性独立判断归档：不再作为当前需求合同、且
 - [统一市场开闭市状态与日历消费](2026-11-09-unified-market-session.md)：共享状态、基金估值、调度、采样、风险和后台报价复用。
 
 - [严格校验与数据投影排查](2026-11-09-schema-projection-audit.md)：完整对象误用子集 Schema 的排查、修复与完整行情证据边界。
+
+- [实验重试的冻结行情重新校验](2026-11-12-experiment-retry-catalog-revalidation.md)：目录更新后确认原来源准入、原实验重试预检和普通按钮颜色。

@@ -1,4 +1,4 @@
-import type { ArenaPoint } from '@thesis-ledger/schemas';
+import type { ArenaPricePoint } from '@thesis-ledger/schemas';
 import type { MarketChartBar } from '../market-detail/market-chart-types.js';
 import { chartPointKey } from '../market-detail/market-chart-time.js';
 
@@ -8,7 +8,7 @@ export function arenaChartWindow(bars: readonly MarketChartBar[]) {
   return { symbol: first.symbol, start: first.bucketStartDate ?? chartPointKey(first.timestamp), end: last.bucketEndDate ?? chartPointKey(last.timestamp) };
 }
 
-export function placeArenaPricePoints(bars: readonly MarketChartBar[], points: readonly ArenaPoint[]) {
+export function placeArenaPricePoints(bars: readonly MarketChartBar[], points: readonly ArenaPricePoint[]) {
   const window = arenaChartWindow(bars);
   if (!window) return [];
   return points.flatMap((point) => {

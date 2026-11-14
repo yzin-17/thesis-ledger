@@ -43,12 +43,11 @@ export const holdingPeriodMetrics = (trades: readonly CompletedTrade[]) => {
     .map((trade) => daysBetween(trade.entryAt, trade.exitAt))
     .sort((a, b) => a - b);
   const middle = Math.floor(values.length / 2);
-  const median =
-    values.length === 0
-      ? 0
-      : values.length % 2 === 1
-        ? values[middle]!
-        : (values[middle - 1]! + values[middle]!) / 2;
+  let median = 0;
+  if (values.length > 0) {
+    if (values.length % 2 === 1) median = values[middle]!;
+    else median = (values[middle - 1]! + values[middle]!) / 2;
+  }
   return {
     average:
       values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length,
@@ -105,17 +104,7 @@ export interface BehaviorEvidence {
   reason?: string;
 }
 
-export const detectBehavior = (
-  trade: CompletedTrade,
-  context: {
-    entryGapRatio?: number;
-    recentTradeCount?: number;
-    winnerHoldingDays?: number;
-    loserHoldingDays?: number;
-    anchoredPrice?: number;
-    referencePrice?: number;
-  },
-): BehaviorEvidence[] => [
+const exitDisciplineEvidence = (trade: CompletedTrade): BehaviorEvidence[] => [
   {
     label: 'missed-stop',
     detected:
@@ -140,6 +129,20 @@ export const detectBehavior = (
     },
     ...(trade.plannedExit === undefined ? { reason: 'insufficient data' } : {}),
   },
+];
+
+export const detectBehavior = (
+  trade: CompletedTrade,
+  context: {
+    entryGapRatio?: number;
+    recentTradeCount?: number;
+    winnerHoldingDays?: number;
+    loserHoldingDays?: number;
+    anchoredPrice?: number;
+    referencePrice?: number;
+  },
+): BehaviorEvidence[] => [
+  ...exitDisciplineEvidence(trade),
   {
     label: 'overtrading',
     detected: context.recentTradeCount === undefined ? null : context.recentTradeCount > 10,

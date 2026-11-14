@@ -6,6 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { IdentityPrincipal } from '@thesis-ledger/schemas';
 import {
   journalReviewSnapshotRequestSchema,
   journalSnapshotHistoryQuerySchema,
@@ -32,7 +33,7 @@ export class JournalReviewSnapshots {
     @Optional() private readonly ai?: JournalReviewAi,
   ) {}
 
-  async save(raw: unknown) {
+  async save(raw: unknown, principal?: IdentityPrincipal) {
     const request = journalReviewSnapshotRequestSchema.parse(raw);
     try {
       return await this.prisma.$transaction(
@@ -63,6 +64,7 @@ export class JournalReviewSnapshots {
               request.aiRunId,
               input,
               output.algorithmVersion,
+              principal,
             );
           }
           const reference = input.reference;

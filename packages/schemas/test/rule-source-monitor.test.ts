@@ -6,6 +6,10 @@ import {
   ruleMonitorJobResponseSchema,
   ruleMonitorStatusSchema,
   ruleMonitorVersionsSchema,
+  ruleMonitorHistorySchema,
+  ruleMonitorTaskSchema,
+  ruleMonitorScheduleSchema,
+  ruleMonitorConfigResponseSchema,
 } from '../src/rule-source-monitor.js';
 
 const fixture = () =>
@@ -23,6 +27,10 @@ describe('DSA生成的收费资料监测合同', () => {
     expect(changed.latestRun?.counts.changed).toBe(5);
     expect(ruleMonitorJobResponseSchema.parse(sample.queued).run.attempt).toBe(0);
     expect(ruleMonitorVersionsSchema.parse(sample.versions).versions).toHaveLength(2);
+    const history = ruleMonitorHistorySchema.parse(sample.history);
+    expect(history.items).toHaveLength(2);
+    expect(history.items[0]?.trigger).toBe('manual');
+    expect(history.total).toBe(2);
   });
   it('不接受任意URL、重复来源、无来源开启或不合法执行状态', () => {
     const sample = fixture();
@@ -46,5 +54,22 @@ describe('DSA生成的收费资料监测合同', () => {
     ).toBe(false);
     sample.queued.run.status = 'succeeded';
     expect(ruleMonitorJobResponseSchema.safeParse(sample.queued).success).toBe(false);
+  });
+  it('创建默认24小时任务，时间保存与来源保存各有独立字段', () => {
+    const sample = fixture();
+    expect(ruleMonitorTaskSchema.parse(sample.taskRequest).sourceIds).toHaveLength(1);
+    const created = ruleMonitorConfigResponseSchema.parse(sample.taskResponse).config;
+    expect(created.taskCreated).toBe(true);
+    expect(created.cron).toBe('@every24h');
+    expect(ruleMonitorScheduleSchema.parse(sample.scheduleRequest).cron).toBe('0 9 * * *');
+    expect(
+      ruleMonitorTaskSchema.safeParse({ ...sample.taskRequest, cron: '0 9 * * *' }).success,
+    ).toBe(false);
+    expect(
+      ruleMonitorScheduleSchema.safeParse({
+        ...sample.scheduleRequest,
+        sourceIds: sample.taskRequest.sourceIds,
+      }).success,
+    ).toBe(false);
   });
 });

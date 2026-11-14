@@ -1,4 +1,6 @@
 import { StrategyExecutionInstrumentField } from './StrategyExecutionInstrumentField.js';
+import type { InstrumentDirectory, InstrumentSearchResult } from '@thesis-ledger/schemas';
+import { strategyInstrumentLabel } from './strategy-instrument-display.js';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import {
   Field,
@@ -47,9 +49,13 @@ const sizingDescriptions: Record<string, string> = {
 
 export function StrategyConfigurationFields({
   schema,
+  instrumentDirectory,
+  onSelect,
   onChange,
 }: {
   schema: StrategySchema;
+  instrumentDirectory?: InstrumentDirectory | undefined;
+  onSelect?: ((item: InstrumentSearchResult) => void) | undefined;
   onChange: (schema: StrategySchema) => void;
 }) {
   const sizing = asRecord(schema.sizing);
@@ -72,7 +78,7 @@ export function StrategyConfigurationFields({
       <FieldSet className="min-w-0 gap-0">
         <FieldLegend className="mb-3 text-base font-semibold">交易标的</FieldLegend>
         <FieldGroup className="grid min-w-0 gap-3 sm:grid-cols-2">
-          <StrategyExecutionInstrumentField schema={schema} onChange={onChange} />
+          <StrategyExecutionInstrumentField schema={schema} instrumentDirectory={instrumentDirectory} onChange={onChange} onSelect={onSelect} />
           <Field>
             <FieldLabel htmlFor="strategy-v2-timeframe">主周期</FieldLabel>
             <Select
@@ -140,7 +146,9 @@ export function StrategyConfigurationFields({
               onChange={(event) => updateNested('sizing', sizingKey, event.target.value)}
             />
             <FieldDescription id="strategy-v2-sizing-help">
-              {sizingDescriptions[text(sizing.type, '')] ?? '请先选择仓位规则。'}
+              {schema.schemaVersion === '3' && sizing.type === 'fixedQuantity'
+                ? '按操作时点的不复权价格计算投入金额，后续按研究单位计算收益。'
+                : sizingDescriptions[text(sizing.type, '')] ?? '请先选择仓位规则。'}
             </FieldDescription>
           </Field>
           <Field>
@@ -174,7 +182,7 @@ export function StrategyConfigurationFields({
             {sources
               .map((source) => {
                 const record = asRecord(source);
-                return `${text(asRecord(record.asset).symbol)} / ${strategyTimeframeLabel(record.timeframe, '未配置')}`;
+                return `${strategyInstrumentLabel(instrumentDirectory, text(asRecord(record.asset).symbol))} / ${strategyTimeframeLabel(record.timeframe, '未配置')}`;
               })
               .join('、') || '未配置'}
           </dd>

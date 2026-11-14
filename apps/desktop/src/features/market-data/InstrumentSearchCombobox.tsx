@@ -41,6 +41,7 @@ export type InstrumentSearchComboboxProps<T extends CatalogChoice> = {
   id?: string | undefined;
   disabled?: boolean;
   invalid?: boolean | undefined;
+  placeholder?: string;
 };
 
 /** Shared accessible presentation for both directory fields and holding confirmation. */
@@ -60,6 +61,7 @@ export function InstrumentSearchCombobox<T extends CatalogChoice>({
   id,
   disabled = false,
   invalid = false,
+  placeholder = '搜索代码或名称',
 }: InstrumentSearchComboboxProps<T>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const closeOnEscape = (event: KeyboardEvent<HTMLElement>) => {
@@ -77,7 +79,9 @@ export function InstrumentSearchCombobox<T extends CatalogChoice>({
       autoHighlight
       open={open && !disabled}
       onOpenChange={onOpenChange}
-      itemToStringLabel={(item: T) => item.symbol}
+      itemToStringLabel={(item: T) =>
+        item.displayName !== item.symbol ? `${item.displayName} · ${item.symbol}` : item.symbol
+      }
       itemToStringValue={(item: T) => item.id}
       onInputValueChange={(next, details) => {
         if (details.reason === 'input-change' || details.reason === 'clear-press') {
@@ -95,7 +99,7 @@ export function InstrumentSearchCombobox<T extends CatalogChoice>({
         aria-label={label}
         aria-busy={busy}
         aria-invalid={invalid}
-        placeholder="搜索代码或名称"
+        placeholder={placeholder}
         disabled={disabled}
         onFocus={() => onOpenChange(true)}
         onClick={() => onOpenChange(true)}
@@ -133,7 +137,7 @@ export function InstrumentSearchCombobox<T extends CatalogChoice>({
             <Button
               type="button"
               size="sm"
-              variant="link"
+              variant="outline"
               disabled={busy}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {

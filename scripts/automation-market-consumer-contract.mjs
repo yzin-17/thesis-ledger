@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { sourceState } from '../../thesis-ledger-infra/scripts/research-dual-read.mjs';
-import { sql } from '../../thesis-ledger-infra/scripts/research-state-backup.mjs';
+import { sourceState } from '../../thesis-ledger/scripts/local-runtime/research-dual-read.mjs';
+import { sql } from '../../thesis-ledger/scripts/local-runtime/research-state-backup.mjs';
 import { frozenSnapshotInputs } from '../apps/server/dist/src/performance/performance-snapshot-inputs.js';
 
 const require = createRequire(new URL('../apps/server/package.json', import.meta.url));

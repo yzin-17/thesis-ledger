@@ -8,13 +8,22 @@ import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 
 const clock = new Intl.DateTimeFormat('zh-CN', {
-  timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  timeZone: 'Asia/Shanghai',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
 });
 const reasonLabels: Record<FundValuation['reasons'][number], string> = {
-  market_closed: '已休市', nav_unavailable: '净值不可用', disclosure_unavailable: '持仓证据不足',
-  prices_unavailable: '报价不可用', source_unavailable: '来源不可用',
-  low_coverage: '低覆盖', partial_coverage: '部分覆盖',
-  currency_unverified: '币种待确认', currency_unsupported: '币种暂不支持',
+  market_closed: '已休市',
+  nav_unavailable: '净值不可用',
+  disclosure_unavailable: '持仓证据不足',
+  prices_unavailable: '报价不可用',
+  source_unavailable: '来源不可用',
+  low_coverage: '低覆盖',
+  partial_coverage: '部分覆盖',
+  currency_unverified: '币种待确认',
+  currency_unsupported: '币种暂不支持',
   calendar_unavailable: '交易日历不可用',
 };
 
@@ -28,17 +37,9 @@ export function FundCurrentValuation({ symbol }: { symbol: string }) {
     retry: false,
   });
   const value = query.data;
-  let status = '估算';
-  if (query.isPending) status = '读取中';
-  else if (query.isError) status = '读取失败';
-  else if (value?.marketState === 'unknown') status = '交易时段未知';
-  else if (value?.marketState === 'closed') {
-    status = '已休市';
-    if (value.quality === 'low_coverage') status += ' · 低覆盖';
-    else if (value.quality === 'partial') status += ' · 部分覆盖';
-  }
-  else if (value?.reasons[0]) status = reasonLabels[value.reasons[0]];
-  const showRetry = query.isError || value?.quality === 'unavailable' && value.marketState !== 'closed';
+  const status = currentValuationStatus(query, value);
+  const showRetry =
+    query.isError || (value?.quality === 'unavailable' && value.marketState !== 'closed');
   const change = value?.changePercent;
   const tone = marketToneForValue(change ?? null);
 
@@ -55,15 +56,43 @@ export function FundCurrentValuation({ symbol }: { symbol: string }) {
           </span>
         ) : null}
       </div>
-      <div className="flex min-h-4 flex-wrap items-center gap-x-2 text-xs text-muted-foreground" role="status">
+      <div
+        className="flex min-h-4 flex-wrap items-center gap-x-2 text-xs text-muted-foreground"
+        role="status"
+      >
         {query.isFetching && <Spinner aria-label="正在读取盘中估值" />}
-        <span>{status}{value?.estimatedAt ? ` · ${clock.format(new Date(value.estimatedAt))}` : ''}</span>
+        <span>
+          {status}
+          {value?.estimatedAt ? ` · ${clock.format(new Date(value.estimatedAt))}` : ''}
+        </span>
         {showRetry ? (
-          <Button className="h-auto p-0 text-xs" type="button" size="sm" variant="link" onClick={() => void query.refetch()}>
+          <Button
+            className="h-auto p-0 text-xs"
+            type="button"
+            size="sm"
+            variant="link"
+            onClick={() => void query.refetch()}
+          >
             重试估值
           </Button>
         ) : null}
       </div>
     </div>
   );
+}
+
+function currentValuationStatus(
+  query: { isPending: boolean; isError: boolean },
+  value: FundValuation | undefined,
+) {
+  let status = '估算';
+  if (query.isPending) status = '读取中';
+  else if (query.isError) status = '读取失败';
+  else if (value?.marketState === 'unknown') status = '交易时段未知';
+  else if (value?.marketState === 'closed') {
+    status = '已休市';
+    if (value.quality === 'low_coverage') status += ' · 低覆盖';
+    else if (value.quality === 'partial') status += ' · 部分覆盖';
+  } else if (value?.reasons[0]) status = reasonLabels[value.reasons[0]];
+  return status;
 }

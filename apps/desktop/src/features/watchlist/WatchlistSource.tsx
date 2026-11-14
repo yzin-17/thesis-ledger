@@ -63,6 +63,32 @@ export function WatchlistSource({
           </HoverCardContent>
         </HoverCard>
       </div>
+      <WatchlistSourceStatus
+        snap={snap}
+        value={value}
+        status={status}
+        snapshot={snapshot}
+        paused={!cadence}
+      />
+    </div>
+  );
+}
+
+function WatchlistSourceStatus({
+  snap,
+  value,
+  status,
+  snapshot,
+  paused,
+}: {
+  snap: WatchlistPrice | undefined;
+  value: ReturnType<typeof watchlistPriceDisplay>;
+  status: string;
+  snapshot: boolean;
+  paused: boolean;
+}) {
+  return (
+    <>
       {snap && snap.price.kind !== 'unavailable' && (
         <span className="break-words tabular-nums">
           {snap?.price.kind === 'nav' ? '净值 ' : '行情 '}
@@ -76,7 +102,7 @@ export function WatchlistSource({
         </span>
       )}
       {value.refresh && <span>{value.refresh}</span>}
-      {!cadence && snap?.price.kind === 'quote' && <span>自动报价检查暂停</span>}
-    </div>
+      {paused && snap?.price.kind === 'quote' && <span>自动报价检查暂停</span>}
+    </>
   );
 }

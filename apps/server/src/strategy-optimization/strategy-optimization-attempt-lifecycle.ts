@@ -19,7 +19,7 @@ export type OptimizationStepRow = {
 };
 
 export const markOptimizationUnknownOutcome = async (
-  prisma: PrismaService,
+  prisma: Pick<PrismaService, '$queryRaw' | 'aiRun'>,
   step: OptimizationStepRow,
   error: unknown,
   durationMs?: number,

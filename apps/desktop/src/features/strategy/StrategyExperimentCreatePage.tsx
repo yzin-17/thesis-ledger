@@ -1,17 +1,22 @@
 import { createClientRequestId } from '../../lib/client-request-id';
-import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
+import { strategyInstrumentLabel } from './strategy-instrument-display.js';
+import { ExperimentDiscoveryInstrumentField, useExperimentDiscoveryInstrument } from './ExperimentDiscoveryInstrumentField.js';
 import { Spinner } from '@/components/ui/spinner';
 import { StrategyExperimentConfigurationReview } from './StrategyExperimentConfigurationReview.js';
-import { requestFailureMessage } from '@/shared/api/request-error';
+import { ExperimentBudgetFields } from './ExperimentBudgetFields.js';
+import { experimentBudgetError, experimentCreateFailure } from './experiment-budget.js';
 import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
 import {
   experimentPreparationTarget,
   requirePreparedOptimizationConfiguration,
   type PreparedOptimizationConfiguration,
 } from './optimization.preparation.js';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useExperimentResearchVersions } from './use-experiment-research-versions.js';
+import { ExperimentResearchVersionChoice } from './ExperimentResearchVersionChoice.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { ArrowLeft } from 'lucide-react';
 import { useNavigationGuard } from '../shared/navigation-guard.js';
 import {
   strategySchema,
@@ -20,9 +25,8 @@ import {
 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StrategyExperimentDateFields } from './StrategyExperimentDateFields.js';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useToastManager } from '@/components/ui/toast';
 import {
@@ -86,16 +90,8 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   const allowNavigationRef = useRef(false);
   const [searchParams] = useSearchParams();
   const lockedVersionId = searchParams.get('strategyVersionId') ?? '';
-  const versions = useMemo(
-    () =>
-      strategies.flatMap((strategy) =>
-        strategy.versions
-          .filter((version) => version.version > 0 && version.schemaVersion === 2 && version.schema)
-          .map((version) => ({ strategy, version })),
-      ),
-    [strategies],
-  );
-  const lockedVersion = versions.find((entry) => entry.version.id === lockedVersionId) ?? null;
+  const { versions, adoptVersion } = useExperimentResearchVersions(strategies);
+  const [convertingVersion, setConvertingVersion] = useState(false);
   const [step, setStep] = useState(1);
   const [sourceMode, setSourceMode] = useState<'existing' | 'discovery'>(
     lockedVersionId ? 'existing' : 'existing',
@@ -103,9 +99,10 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   const [strategyVersionId, setStrategyVersionId] = useState(
     lockedVersionId || versions[0]?.version.id || '',
   );
-  const [discoverySymbol, setDiscoverySymbol] = useState('');
-  const [discoveryMarket, setDiscoveryMarket] = useState<'CN' | 'HK' | 'US'>('CN');
-  const [discoveryAssetType, setDiscoveryAssetType] = useState<'stock' | 'etf' | 'fund'>('stock');
+  const discovery = useExperimentDiscoveryInstrument();
+  const discoverySymbol = discovery.symbol;
+  const discoveryMarket = discovery.instrument?.market ?? 'CN';
+  const discoveryAssetType = discovery.instrument?.assetType ?? 'stock';
   const [objective, setObjective] = useState<keyof typeof objectiveLabels>('balanced');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [reasoningEfforts, setReasoningEfforts] = useState<
@@ -143,8 +140,10 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
 
   useEffect(() => {
     if (lockedVersionId) setStrategyVersionId(lockedVersionId);
-    else if (!strategyVersionId && versions[0]) setStrategyVersionId(versions[0].version.id);
-  }, [lockedVersionId, strategyVersionId, versions]);
+  }, [lockedVersionId]);
+  useEffect(() => {
+    if (!strategyVersionId && versions[0]) setStrategyVersionId(versions[0].version.id);
+  }, [strategyVersionId, versions]);
   useEffect(() => {
     if (parameters.data?.length && selectedParameters.length === 0)
       setSelectedParameters(
@@ -173,6 +172,16 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   const parsedStrategy = selectedVersion?.version.schema
     ? strategySchema.safeParse(selectedVersion.version.schema)
     : null;
+  let reviewLabel = `${selectedVersion?.strategy.name ?? '策略'} v${selectedVersion?.version.version ?? '?'}`;
+  if (sourceMode === 'existing') {
+    if (parsedStrategy?.success)
+      reviewLabel += ` · ${strategyInstrumentLabel(selectedVersion?.version.instrumentDirectory, parsedStrategy.data.executionInstrument.symbol)}`;
+  } else {
+    reviewLabel = discovery.selected?.displayName || discoverySymbol || '未填写标的';
+    if (discovery.selected?.displayName && discovery.selected.displayName !== discoverySymbol)
+      reviewLabel += ` · ${discoverySymbol}`;
+    reviewLabel += ' 从零探索';
+  }
   let market: 'CN' | 'HK' | 'US' = discoveryMarket;
   if (sourceMode === 'existing') {
     market = parsedStrategy?.success ? parsedStrategy.data.executionInstrument.market : 'CN';
@@ -182,7 +191,9 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
     const errors: FieldErrors = {};
     if (targetStep >= 1) {
       if (sourceMode === 'existing' && !strategyVersionId) errors.source = '请选择明确的策略版本。';
-      if (sourceMode === 'discovery' && !discoverySymbol.trim()) errors.source = '请输入探索标的。';
+      if (sourceMode === 'existing' && parsedStrategy?.success && parsedStrategy.data.schemaVersion !== '3')
+        errors.source = '请先确认研究口径并保存新版本，再继续实验。';
+      if (sourceMode === 'discovery' && !discovery.instrument) errors.source = '请从目录选择探索标的。';
       if (sourceMode === 'existing' && selectedParameters.length === 0)
         errors.source = '至少授权一个可优化参数。';
     }
@@ -207,17 +218,19 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
       if (invalidReasoning) errors.models = '推理强度不符合提供方能力配置。';
     }
     if (targetStep >= 3) {
-      if (
-        ![
-          initialCash,
-          maxAiCalls,
-          maxBacktestRuns,
-          maxInputTokens,
-          maxOutputTokens,
-          maxDurationSeconds,
-        ].every((value) => Number(value) > 0)
-      )
-        errors.budget = '资金和全部硬限制必须为大于 0 的数字。';
+      const budgetError = experimentBudgetError({
+        maxAiCalls: Number(maxAiCalls), maxBacktestRuns: Number(maxBacktestRuns),
+        maxInputTokens: Number(maxInputTokens), maxOutputTokens: Number(maxOutputTokens),
+        maxDurationSeconds: Number(maxDurationSeconds),
+        ...(!hasUnknownCost && maxCost.trim() ? { maxCost: maxCost.trim() } : {}),
+      });
+      if (!Number.isFinite(Number(initialCash)) || Number(initialCash) <= 0)
+        errors.budget = '初始资金必须是大于 0 的有效金额。';
+      if (budgetError) errors.budget = budgetError;
+      if (!maxBacktestRuns.trim()) errors.budget = '请填写回测次数上限；填 0 表示不限制。';
+      if (!maxAiCalls.trim()) errors.budget = '请填写 AI 调用上限；填 0 表示不限制。';
+      if (!maxInputTokens.trim()) errors.budget = '请填写输入 Token 上限；填 0 表示不限制。';
+      if (!maxOutputTokens.trim()) errors.budget = '请填写输出 Token 上限；填 0 表示不限制。';
       if (hasUnknownCost && !acknowledgeUnknownCost)
         errors.cost = '所选模型存在未知费用或币种，请先确认。';
     }
@@ -226,7 +239,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   };
   const preparationTarget = experimentPreparationTarget(sourceMode, strategyVersionId, {
     executionInstrument: {
-      symbol: discoverySymbol.trim(),
+      symbol: discovery.instrument?.symbol ?? '',
       market: discoveryMarket,
       assetType: discoveryAssetType,
     },
@@ -291,12 +304,12 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
     onError: (error) =>
       setFieldErrors((current) => ({
         ...current,
-        budget: requestFailureMessage(error, '创建实验失败，请使用同一提交意图重试。'),
+        budget: experimentCreateFailure(error),
       })),
   });
   useNavigationGuard({
     dirty: touched,
-    busy: createMutation.isPending,
+    busy: createMutation.isPending || convertingVersion,
     bypass: () => allowNavigationRef.current,
     draft: { sourceMode, strategyVersionId, discoverySymbol, discoveryMarket, discoveryAssetType,
       objective, selectedModels, reasoningEfforts, selectedParameters, startDate, developmentEnd,
@@ -309,12 +322,12 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   };
   const markTouched = () => setTouched(true);
 
-  if (lockedVersionId && !lockedVersion && versions.length > 0)
+  if (lockedVersionId && !selectedVersion && versions.length > 0)
     return (
       <Alert variant="destructive">
         <AlertTitle>无法锁定实验来源</AlertTitle>
         <AlertDescription>
-          指定的策略版本不存在或不是正式 V2。系统不会改用其他版本。
+          指定的正式策略版本不可用，请重新选择来源。
         </AlertDescription>
       </Alert>
     );
@@ -329,13 +342,23 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
   }
   return (
     <div className="mx-auto max-w-5xl space-y-5" onChange={markTouched}>
-      <div>
-        <p className="text-sm text-muted-foreground">策略中心 / AI 实验 / 新建实验</p>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight">新建 AI 实验</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <header className="flex flex-col gap-2">
+        <Link
+          to={strategyCenterPath.experiments}
+          className="inline-flex min-h-8 items-center gap-2 self-start text-sm text-muted-foreground hover:text-foreground focus-visible:outline-ring aria-disabled:pointer-events-none aria-disabled:opacity-50"
+          aria-disabled={createMutation.isPending}
+          onClick={(event) => {
+            if (createMutation.isPending) event.preventDefault();
+          }}
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          返回 AI 实验
+        </Link>
+        <h2 className="text-xl font-semibold tracking-tight">新建 AI 实验</h2>
+        <p className="text-sm text-muted-foreground">
           前三步只保留输入，最后确认时才创建实验。
         </p>
-      </div>
+      </header>
       <ol className="grid grid-cols-3 gap-2" aria-label="创建实验步骤">
         {['策略与目标', '模型与数据', '预算与确认'].map((label, index) => (
           <li
@@ -347,20 +370,20 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
           </li>
         ))}
       </ol>
-      <Card>
-        <CardHeader>
-          <CardTitle>{stepTitle}</CardTitle>
-          <CardDescription>{stepDescription}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      <section className="flex flex-col gap-5" aria-label={stepTitle}>
+        <header className="flex flex-col gap-1">
+          <h3 className="text-xl font-medium">{stepTitle}</h3>
+          <p className="text-sm text-muted-foreground">{stepDescription}</p>
+        </header>
+        <div className="flex flex-col gap-5">
           {step === 1 ? (
-            <>
+            <FieldGroup className="max-w-2xl gap-5">
               {lockedVersionId ? (
                 <Alert>
                   <AlertTitle>来源已锁定</AlertTitle>
                   <AlertDescription>
-                    {lockedVersion
-                      ? `${lockedVersion.strategy.name} v${lockedVersion.version.version}`
+                    {selectedVersion
+                      ? `${selectedVersion.strategy.name} v${selectedVersion.version.version}`
                       : lockedVersionId}
                   </AlertDescription>
                 </Alert>
@@ -384,7 +407,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                 <Field invalid={Boolean(fieldErrors.source)}>
                   <FieldLabel>基线策略版本</FieldLabel>
                   <Select
-                    disabled={Boolean(lockedVersionId)}
+                    disabled={Boolean(lockedVersionId) || convertingVersion}
                     value={strategyVersionId}
                     onValueChange={(value) => {
                       if (value) {
@@ -414,65 +437,11 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                   )}
                 </Field>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Field invalid={Boolean(fieldErrors.source)}>
-                    <FieldLabel>探索标的</FieldLabel>
-                    <InstrumentSymbolField
-                      aria-label="探索标的"
-                      value={discoverySymbol}
-                      markets={
-                        discoveryMarket === 'CN' ? ['SH', 'SZ', 'BJ', 'OF'] : [discoveryMarket]
-                      }
-                      instrumentTypes={[
-                        discoveryAssetType === 'fund'
-                          ? 'MUTUAL_FUND'
-                          : discoveryAssetType.toUpperCase(),
-                      ]}
-                      onChange={(value) => setDiscoverySymbol(value)}
-                    />
-                    {fieldErrors.source ? <FieldError>{fieldErrors.source}</FieldError> : null}
-                  </Field>
-                  <Field>
-                    <FieldLabel>市场</FieldLabel>
-                    <Select
-                      value={discoveryMarket}
-                      onValueChange={(value) => value && setDiscoveryMarket(value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="CN">中国</SelectItem>
-                          <SelectItem value="HK" disabled={discoveryAssetType === 'fund'}>
-                            香港
-                          </SelectItem>
-                          <SelectItem value="US" disabled={discoveryAssetType === 'fund'}>
-                            美国
-                          </SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel>资产类型</FieldLabel>
-                    <Select
-                      value={discoveryAssetType}
-                      onValueChange={(value) => value && setDiscoveryAssetType(value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="stock">股票</SelectItem>
-                          <SelectItem value="etf">ETF</SelectItem>
-                          <SelectItem value="fund">基金 NAV</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                </div>
+                <ExperimentDiscoveryInstrumentField
+                  discovery={discovery}
+                  error={fieldErrors.source}
+                  onChange={markTouched}
+                />
               )}
               {sourceMode === 'existing' ? (
                 <Field invalid={Boolean(fieldErrors.source)}>
@@ -502,10 +471,17 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                   </div>
                 </Field>
               ) : null}
+              {sourceMode === 'existing' && <ExperimentResearchVersionChoice entry={selectedVersion}
+                disabled={createMutation.isPending || convertingVersion} onBusyChange={setConvertingVersion}
+                onAdopt={version => {
+                  if (!selectedVersion) return;
+                  adoptVersion(selectedVersion.strategy, version); setStrategyVersionId(version.id);
+                  setSelectedParameters([]); setPreparedConfig(null); setFieldErrors({}); markTouched();
+                }} />}
               <Field>
                 <FieldLabel>优化目标</FieldLabel>
                 <Select value={objective} onValueChange={(value) => value && setObjective(value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue>{objectiveLabels[objective]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -519,7 +495,7 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                   </SelectContent>
                 </Select>
               </Field>
-            </>
+            </FieldGroup>
           ) : null}
           {step === 2 ? (
             <>
@@ -572,51 +548,13 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                     onChange={(event) => setInitialCash(event.target.value)}
                   />
                 </Field>
-                <Field>
-                  <FieldLabel>AI 调用上限</FieldLabel>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={maxAiCalls}
-                    onChange={(event) => setMaxAiCalls(event.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>回测次数上限</FieldLabel>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={maxBacktestRuns}
-                    onChange={(event) => setMaxBacktestRuns(event.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>输入 Token 上限</FieldLabel>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={maxInputTokens}
-                    onChange={(event) => setMaxInputTokens(event.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>输出 Token 上限</FieldLabel>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={maxOutputTokens}
-                    onChange={(event) => setMaxOutputTokens(event.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>时长上限（秒）</FieldLabel>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={maxDurationSeconds}
-                    onChange={(event) => setMaxDurationSeconds(event.target.value)}
-                  />
-                </Field>
+                <ExperimentBudgetFields value={{ maxAiCalls, maxBacktestRuns, maxInputTokens, maxOutputTokens, maxDurationSeconds }}
+                  onChange={(field, value) => {
+                    const setters = { maxAiCalls: setMaxAiCalls, maxBacktestRuns: setMaxBacktestRuns,
+                      maxInputTokens: setMaxInputTokens, maxOutputTokens: setMaxOutputTokens, maxDurationSeconds: setMaxDurationSeconds };
+                    setters[field](value);
+                    setFieldErrors((current) => { const next = { ...current }; delete next.budget; return next; });
+                  }} />
                 <Field>
                   <FieldLabel>
                     费用上限{knownCurrencies[0] ? `（${knownCurrencies[0]}）` : ''}
@@ -653,15 +591,10 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
                 endDate={endDate}
                 currency={currency}
                 initialCash={initialCash}
-                settings={settings}
                 onPrepared={setPreparedConfig}
               />
               <StrategyExperimentConfigurationReview
-                label={
-                  sourceMode === 'existing'
-                    ? `${selectedVersion?.strategy.name ?? '策略'} v${selectedVersion?.version.version ?? '?'}`
-                    : `${discoverySymbol || '未填写标的'} 从零探索`
-                }
+                label={reviewLabel}
                 modelCount={selectedRoutes.length}
                 currency={currency}
                 startDate={startDate}
@@ -693,20 +626,20 @@ export function StrategyExperimentCreatePage({ strategies }: { strategies: Strat
               上一步
             </Button>
             {step < 3 ? (
-              <Button onClick={next}>下一步</Button>
+              <Button disabled={convertingVersion} onClick={next}>下一步</Button>
             ) : (
               <Button
                 disabled={!preparedConfig || createMutation.isPending}
                 aria-busy={createMutation.isPending}
-                onClick={() => createMutation.mutate()}
+                onClick={() => { if (validateStep(3)) createMutation.mutate(); }}
               >
                 {createMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
                 {createMutation.isPending ? '创建中…' : '创建实验'}
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   );
 }

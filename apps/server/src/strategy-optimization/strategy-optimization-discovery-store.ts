@@ -11,6 +11,7 @@ import {
 } from './strategy-optimization-common.js';
 import { createDiscoverySeed, STRATEGY_SPACE_VERSION } from './strategy-optimization-discovery.js';
 import type { OptimizationModelConfig } from './strategy-optimization-model-routing.js';
+import { RESEARCH_STRATEGY_SPACE_VERSION, usesOptimizationPriceResearch } from './strategy-optimization-research.js';
 
 const insert = async (
   prisma: Prisma.TransactionClient | PrismaService,
@@ -33,7 +34,7 @@ const insert = async (
       "id", "name", "sourceMode", "discoveryScope", "strategySpaceVersion", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds",
       "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds", "idempotencyKey", "updatedAt"
     ) VALUES (
-      ${id}::uuid, ${name}, 'discovery', ${JSON.stringify(parsed.discoveryScope)}::jsonb, ${STRATEGY_SPACE_VERSION}, ${baseline.id}::uuid, 'queued', 'preparing', ${JSON.stringify(parsed.objective)}::jsonb,
+      ${id}::uuid, ${name}, 'discovery', ${JSON.stringify(parsed.discoveryScope)}::jsonb, ${usesOptimizationPriceResearch(parsed.runConfig) ? RESEARCH_STRATEGY_SPACE_VERSION : STRATEGY_SPACE_VERSION}, ${baseline.id}::uuid, 'queued', 'preparing', ${JSON.stringify(parsed.objective)}::jsonb,
       '[]'::jsonb, ${JSON.stringify(parsed.split)}::jsonb, ${JSON.stringify(parsed.runConfig)}::jsonb, ${dataFingerprint}, ${JSON.stringify(modelConfig)}::jsonb,
       ${JSON.stringify(parsed.budget)}::jsonb, ${parsed.maxRounds}, ${idempotencyKey}, CURRENT_TIMESTAMP
     ) RETURNING *
@@ -59,20 +60,20 @@ export async function createDiscoveryExperiment(
 ) {
   return prisma.$transaction(async (transaction) => {
     const scope = parsed.discoveryScope!;
+    const seed = createDiscoverySeed(scope, usesOptimizationPriceResearch(parsed.runConfig));
     const strategy = await transaction.strategy.create({
       data: {
         name: `AI 探索种子 ${scope.executionInstrument.symbol}`,
         description: '实验专用隐藏策略，不进入策略库。',
         status: 'experiment-only',
-        schemaVersion: 2,
+        schemaVersion: Number(seed.schemaVersion),
       },
     });
-    const seed = createDiscoverySeed(scope);
     const version = await transaction.strategyVersion.create({
       data: {
         strategyId: strategy.id,
         version: 0,
-        schemaVersion: 2,
+        schemaVersion: Number(seed.schemaVersion),
         schema: asJson(seed),
       },
     });
@@ -97,20 +98,20 @@ export async function cloneDiscoveryExperiment(
 ) {
   const scope = source.discoveryScope as OptimizationExperimentCreate['discoveryScope'];
   return prisma.$transaction(async (transaction) => {
+    const seed = createDiscoverySeed(scope!, usesOptimizationPriceResearch(source.runConfig));
     const strategy = await transaction.strategy.create({
       data: {
         name: `AI 探索种子 ${scope!.executionInstrument.symbol}`,
         description: '实验专用隐藏策略，不进入策略库。',
         status: 'experiment-only',
-        schemaVersion: 2,
+        schemaVersion: Number(seed.schemaVersion),
       },
     });
-    const seed = createDiscoverySeed(scope!);
     const version = await transaction.strategyVersion.create({
       data: {
         strategyId: strategy.id,
         version: 0,
-        schemaVersion: 2,
+        schemaVersion: Number(seed.schemaVersion),
         schema: asJson(seed),
       },
     });

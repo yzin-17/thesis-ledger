@@ -1,4 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { journalAnalyze, journalAnalyzePeriod } from '@thesis-ledger/domain';
 import {
   journalDeterministicReviewSchema,
@@ -41,9 +42,9 @@ export class JournalReviewAnalysis {
     return { candidate, result };
   }
 
-  async period(raw: unknown) {
+  async period(raw: unknown, transaction?: Prisma.TransactionClient) {
     const request = journalPeriodReviewRequestSchema.parse(raw);
-    const context = await this.candidates.readContext(request);
+    const context = await this.candidates.readContext(request, transaction);
     const result = journalPeriodReviewResultSchema.parse(
       journalAnalyzePeriod(context.candidates, request),
     );

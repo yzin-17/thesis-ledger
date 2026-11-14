@@ -37,26 +37,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
       return;
     }
     if (exception instanceof ZodError) {
-      this.logger.warn({
-        operation: 'http.validation_error',
-        traceId: currentTraceId() ?? 'unknown',
-        status: HttpStatus.BAD_REQUEST,
-        fields: exception.issues.map((issue) => issue.path.join('.')),
-      });
-      void this.tracker?.capture({
-        operation: 'http.validation_error',
-        errorCode: 'validation_error',
-        traceId: currentTraceId() ?? 'unknown',
-        status: HttpStatus.BAD_REQUEST,
-      });
-      response.status(HttpStatus.BAD_REQUEST).json({
-        error: 'validation_error',
-        message: '输入不符合要求',
-        fields: exception.issues.map((issue) => ({
-          path: issue.path.join('.'),
-          message: issue.message,
-        })),
-      });
+      this.respondValidationError(exception, response);
       return;
     }
     if (exception instanceof DsaError) {
@@ -101,5 +82,27 @@ export class ApiExceptionFilter implements ExceptionFilter {
     response
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
       .json({ error: 'internal_error', message: '服务暂时不可用' });
+  }
+  private respondValidationError(exception: ZodError, response: Response) {
+    this.logger.warn({
+      operation: 'http.validation_error',
+      traceId: currentTraceId() ?? 'unknown',
+      status: HttpStatus.BAD_REQUEST,
+      fields: exception.issues.map((issue) => issue.path.join('.')),
+    });
+    void this.tracker?.capture({
+      operation: 'http.validation_error',
+      errorCode: 'validation_error',
+      traceId: currentTraceId() ?? 'unknown',
+      status: HttpStatus.BAD_REQUEST,
+    });
+    response.status(HttpStatus.BAD_REQUEST).json({
+      error: 'validation_error',
+      message: '输入不符合要求',
+      fields: exception.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    });
   }
 }

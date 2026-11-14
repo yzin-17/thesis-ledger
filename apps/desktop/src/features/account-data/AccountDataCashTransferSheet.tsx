@@ -32,104 +32,34 @@ export const cashTransferErrorMessage = (error: unknown) => {
   return '现金划转失败，请稍后重试。';
 };
 
-export function CashTransferSheet({
-  account,
-  accounts,
-  open,
-  onOpenChange,
-}: {
+type CashTransferSheetProps = {
   account: Account;
   accounts: Account[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}) {
-  const toastManager = useToastManager();
-  const [dirty, setDirty] = useState(false);
-  const mutations = useCashOperationsMutations(account.id, account.mode);
-  const [direction, setDirection] = useState<'out' | 'in'>('out');
-  const [counterpartyId, setCounterpartyId] = useState('');
-  const [amount, setAmount] = useState('');
-  const [occurredAt, setOccurredAt] = useState(currentLocalDateTime);
-  const [note, setNote] = useState('');
-  const [error, setError] = useState('');
-  const counterparties = useMemo(
-    () =>
-      accounts.filter((candidate) => {
-        if (candidate.id === account.id || candidate.active === false) return false;
-        if (candidate.mode !== 'actual' || candidate.currency !== account.currency) return false;
-        if (account.type === 'cash')
-          return candidate.type === 'securities' || candidate.type === 'fund';
-        return candidate.type === 'cash';
-      }),
-    [account, accounts],
-  );
+};
 
-  useEffect(() => {
-    if (!open || counterparties.some((candidate) => candidate.id === counterpartyId)) return;
-    setCounterpartyId(counterparties[0]?.id ?? '');
-  }, [counterparties, counterpartyId, open]);
-
-  const resetForm = () => {
-    setDirty(false);
-    setDirection('out');
-    setCounterpartyId('');
-    setAmount('');
-    setOccurredAt(currentLocalDateTime());
-    setNote('');
-    setError('');
-  };
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) setDirty(false);
-    if (!nextOpen) resetForm();
-    onOpenChange(nextOpen);
-  };
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (mutations.transfer.isPending) return;
-    setError('');
-    const numericAmount = Number(amount);
-    if (!counterpartyId) {
-      setError('请选择同币种的现金或投资账户。');
-      return;
-    }
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setError('划转金额必须大于 0。');
-      return;
-    }
-    const counterparty = counterparties.find((candidate) => candidate.id === counterpartyId);
-    if (!counterparty) return;
-    const sourceAccountId = direction === 'out' ? account.id : counterparty.id;
-    const targetAccountId = direction === 'out' ? counterparty.id : account.id;
-    try {
-      await mutations.transfer.mutateAsync({
-        sourceAccountId,
-        targetAccountId,
-        amount,
-        currency: account.currency,
-        occurredAt: new Date(occurredAt).toISOString(),
-        ...(note.trim() ? { note: note.trim() } : {}),
-      });
-      toastManager.add({
-        title: '现金划转已入账',
-        description: '两个账户的余额已更新。',
-        type: 'success',
-      });
-      handleOpenChange(false);
-    } catch (submissionError) {
-      setError(cashTransferErrorMessage(submissionError));
-    }
-  };
-
-  const requestClose = useDraftCloseGuard({
+export function CashTransferSheet(props: CashTransferSheetProps) {
+  const {
+    account,
     open,
-    draft: { accountId: account.id, direction, counterpartyId, amount, occurredAt, note },
-    dirty,
-    busy: mutations.transfer.isPending,
-    onOpenChange: handleOpenChange,
-  });
-
+    setDirty,
+    mutations,
+    direction,
+    setDirection,
+    counterpartyId,
+    setCounterpartyId,
+    amount,
+    setAmount,
+    occurredAt,
+    setOccurredAt,
+    note,
+    setNote,
+    error,
+    counterparties,
+    submit,
+    requestClose,
+  } = useCashTransferForm(props);
   return (
     <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="compact" className="h-[100dvh] min-h-0 overflow-hidden p-6">
@@ -264,4 +194,113 @@ export function CashTransferSheet({
       </SheetContent>
     </Sheet>
   );
+}
+
+function useCashTransferForm({ account, accounts, open, onOpenChange }: CashTransferSheetProps) {
+  const toastManager = useToastManager();
+  const [dirty, setDirty] = useState(false);
+  const mutations = useCashOperationsMutations(account.id, account.mode);
+  const [direction, setDirection] = useState<'out' | 'in'>('out');
+  const [counterpartyId, setCounterpartyId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [occurredAt, setOccurredAt] = useState(currentLocalDateTime);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const counterparties = useMemo(
+    () =>
+      accounts.filter((candidate) => {
+        if (candidate.id === account.id || candidate.active === false) return false;
+        if (candidate.mode !== 'actual' || candidate.currency !== account.currency) return false;
+        if (account.type === 'cash')
+          return candidate.type === 'securities' || candidate.type === 'fund';
+        return candidate.type === 'cash';
+      }),
+    [account, accounts],
+  );
+
+  useEffect(() => {
+    if (!open || counterparties.some((candidate) => candidate.id === counterpartyId)) return;
+    setCounterpartyId(counterparties[0]?.id ?? '');
+  }, [counterparties, counterpartyId, open]);
+
+  const resetForm = () => {
+    setDirty(false);
+    setDirection('out');
+    setCounterpartyId('');
+    setAmount('');
+    setOccurredAt(currentLocalDateTime());
+    setNote('');
+    setError('');
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setDirty(false);
+    if (!nextOpen) resetForm();
+    onOpenChange(nextOpen);
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (mutations.transfer.isPending) return;
+    setError('');
+    const numericAmount = Number(amount);
+    if (!counterpartyId) {
+      setError('请选择同币种的现金或投资账户。');
+      return;
+    }
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setError('划转金额必须大于 0。');
+      return;
+    }
+    const counterparty = counterparties.find((candidate) => candidate.id === counterpartyId);
+    if (!counterparty) return;
+    const sourceAccountId = direction === 'out' ? account.id : counterparty.id;
+    const targetAccountId = direction === 'out' ? counterparty.id : account.id;
+    try {
+      await mutations.transfer.mutateAsync({
+        sourceAccountId,
+        targetAccountId,
+        amount,
+        currency: account.currency,
+        occurredAt: new Date(occurredAt).toISOString(),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
+      toastManager.add({
+        title: '现金划转已入账',
+        description: '两个账户的余额已更新。',
+        type: 'success',
+      });
+      handleOpenChange(false);
+    } catch (submissionError) {
+      setError(cashTransferErrorMessage(submissionError));
+    }
+  };
+
+  const requestClose = useDraftCloseGuard({
+    open,
+    draft: { accountId: account.id, direction, counterpartyId, amount, occurredAt, note },
+    dirty,
+    busy: mutations.transfer.isPending,
+    onOpenChange: handleOpenChange,
+  });
+  return {
+    account,
+    open,
+    setDirty,
+    mutations,
+    direction,
+    setDirection,
+    counterpartyId,
+    setCounterpartyId,
+    amount,
+    setAmount,
+    occurredAt,
+    setOccurredAt,
+    note,
+    setNote,
+    error,
+    counterparties,
+    submit,
+    requestClose,
+  };
 }

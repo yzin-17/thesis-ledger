@@ -1,6 +1,6 @@
 import {
   AI_PARAMETER_OPTIMIZATION_CONTRACT_VERSION,
-  AI_RESEARCH_GENERATION_CONTRACT_VERSION,
+  researchGenerationV2Contract,
   AI_STRATEGY_DISCOVERY_CONTRACT_VERSION,
   aiGenerationContracts,
   aiGenerationContractRefSchema,
@@ -21,7 +21,8 @@ export const aiContractOptions: Array<{
   { value: 'strategy_authoring_modification', label: '策略局部修改' },
   { value: 'research', label: '研究报告' },
   { value: 'parameter_optimization', label: '参数优化' },
-  { value:'arena_decision',label:'模拟交易决策' },
+  { value: 'arena_decision', label: '模拟交易决策' },
+  { value: 'arena_live_research', label: '竞技场自主研究' },
   { value: 'strategy_discovery', label: '策略发现' },
 ];
 
@@ -29,12 +30,13 @@ const contractRefs: Record<AiGenerationContractRef['id'], AiGenerationContractRe
   strategy_authoring_analysis: aiGenerationContracts.authoringAnalysis.ref,
   strategy_authoring_generation: aiGenerationContracts.authoringGeneration.ref,
   strategy_authoring_modification: aiGenerationContracts.authoringModification.ref,
-  research: { id: 'research', version: AI_RESEARCH_GENERATION_CONTRACT_VERSION },
+  research: researchGenerationV2Contract.ref,
   parameter_optimization: {
     id: 'parameter_optimization',
     version: AI_PARAMETER_OPTIMIZATION_CONTRACT_VERSION,
   },
   arena_decision: aiGenerationContracts.arenaDecision.ref,
+  arena_live_research: aiGenerationContracts.arenaLiveResearch.ref,
   strategy_discovery: {
     id: 'strategy_discovery',
     version: AI_STRATEGY_DISCOVERY_CONTRACT_VERSION,

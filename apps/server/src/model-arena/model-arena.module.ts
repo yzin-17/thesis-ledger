@@ -14,12 +14,13 @@ import { ArenaRoundWorker } from './arena-round-worker.js';
 import { MarketModule } from '../market/market.module.js';
 import { AiModule } from '../ai/ai.module.js';
 import { Module } from '@nestjs/common';
+import { ArenaLiveModule } from './live/arena-live.module.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { ModelArenaController } from './model-arena.controller.js';
 import { ModelArenaRepository } from './model-arena.repository.js';
 import { ArenaRoundAdmission } from './arena-round-admission.js';
 @Module({
-  imports: [IdentityModule, MarketModule, AiModule],
+  imports: [IdentityModule, MarketModule, AiModule, ArenaLiveModule],
   controllers: [ModelArenaController, ArenaWeekController],
   providers: [
     ArenaWeekProjector,

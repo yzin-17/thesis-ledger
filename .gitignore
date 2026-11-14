@@ -25,3 +25,7 @@ apps/mobile/config/signing.env
 *.ipa
 .superpowers
 /.recovery-artifacts/
+/var/acceptance/
+
+# 包管理工具产生的空临时文件
+/apps/desktop/_tmp_*

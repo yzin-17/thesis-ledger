@@ -22,7 +22,7 @@ const rule = {
   id: 'rule-1',
   version: 1,
   kind: 'price-below',
-  sourcePlanId: null,
+  sourcePlanId: null as string | null,
   scope: 'security',
   symbol: '600519.SH',
   accountId: null,
@@ -57,6 +57,7 @@ function harness() {
     }),
   };
   const observations = { snapshots: vi.fn(async () => [observed(110)]) };
+  const strategyRun = vi.fn(async () => undefined);
   const scan = vi.fn<
     (
       contexts: unknown,
@@ -86,6 +87,7 @@ function harness() {
       { listEnabledRules: async () => rules } as never,
       { scan } as never,
       { build } as never,
+      { runNow: strategyRun } as never,
     );
   return {
     create,
@@ -93,6 +95,7 @@ function harness() {
     build,
     client,
     observations,
+    strategyRun,
     setRules: (next: (typeof rule)[]) => {
       rules = next;
     },
@@ -105,6 +108,16 @@ function harness() {
 }
 
 describe('rule-driven automatic monitoring', () => {
+  it('没有报价事件时仍调度策略规则，且不进入普通规则或模拟扫描', async () => {
+    const h = harness();
+    h.setRules([{ ...rule, sourcePlanId: 'application' }]);
+    await h.create().runNow(at);
+    await h.create().runNow(new Date(at.getTime() + 1000));
+    expect(h.strategyRun).toHaveBeenCalledTimes(2);
+    expect(h.strategyRun).toHaveBeenCalledWith([expect.objectContaining({ sourcePlanId: 'application' })], at);
+    expect(h.scan).not.toHaveBeenCalled();
+    expect(h.build).not.toHaveBeenCalled();
+  });
   it('newly enabled rules get an initial evaluation; unchanged data does not rescan', async () => {
     const h = harness();
     const monitor = h.create();

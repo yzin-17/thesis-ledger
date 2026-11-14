@@ -43,6 +43,7 @@ export const statusCompositionDemandV1Schema = z
   });
 export type StatusCompositionDemandV1 = z.infer<typeof statusCompositionDemandV1Schema>;
 const sourceError = z.enum([
+  'invalid-response',
   'timeout',
   'unavailable',
   'unsupported-capability',

@@ -7,6 +7,22 @@ import { canUseReadForWrite } from '../../app/query/query-state';
 import { Action, Copy, Page, QueryList, QueryStatus, Section } from '../../components/MobilePrimitives';
 import { CashEventView } from './CashEventView';
 
+function CashBalanceSummary({ valuation }: { valuation: ReturnType<typeof useValuation> }) {
+  return (
+    <Section title="已结算余额">
+      {(valuation.data?.cashByCurrency ?? []).map((row) => (
+        <Copy key={row.currency}>
+          {row.amount} {row.currency}
+        </Copy>
+      ))}
+      {!valuation.data?.cashByCurrency?.length ? <Copy muted>暂无币种余额。</Copy> : null}
+      {valuation.data?.partial ? (
+        <Copy muted>部分估值或汇率不完整；请核对来源后使用。</Copy>
+      ) : null}
+    </Section>
+  );
+}
+
 export function CashScreen() {
   const { params } = useRoute<RouteProp<AccountStackParams, 'Cash'>>();
   const navigation = useNavigation<NativeStackNavigationProp<AccountStackParams>>();
@@ -37,17 +53,7 @@ export function CashScreen() {
       </Copy>
       <QueryStatus query={accounts} retry={() => void accounts.refetch()} />
       <QueryStatus query={valuation} retry={() => void valuation.refetch()} />
-      <Section title="已结算余额">
-        {(valuation.data?.cashByCurrency ?? []).map((row) => (
-          <Copy key={row.currency}>
-            {row.amount} {row.currency}
-          </Copy>
-        ))}
-        {!valuation.data?.cashByCurrency?.length ? <Copy muted>暂无币种余额。</Copy> : null}
-        {valuation.data?.partial ? (
-          <Copy muted>部分估值或汇率不完整；请核对来源后使用。</Copy>
-        ) : null}
-      </Section>
+      <CashBalanceSummary valuation={valuation} />
       <Action
         label="记录现金快照"
         disabled={!writable}

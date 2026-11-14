@@ -482,6 +482,9 @@ describe('V2 public decimal and result contracts', () => {
     expect(valid).toEqual({ valid: true, errors: [] });
   });
 
+});
+
+describe('回测成交与 AST 合同', () => {
   it('accepts current BacktestResult fills and rejects the old result format', () => {
     const result = backtestResultSchemaV3.parse({
       ...createV3BacktestResult(),

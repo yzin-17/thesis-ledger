@@ -4,7 +4,7 @@ import {
   marketReferenceAssetType,
   type MarketReferenceDataset,
 } from '@thesis-ledger/schemas';
-import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { InstrumentSymbolField } from './InstrumentSymbolField.js';
 import { MarketReferenceContractField } from './MarketReferenceContractField.js';
 
@@ -34,7 +34,6 @@ export function MarketReferenceCodeField({
         onChange={onChange}
         instrumentTypes={[scope === 'etf' ? 'ETF' : marketReferenceAssetType(dataset)]}
       />
-      <FieldDescription>{input.example}</FieldDescription>
     </Field>
   );
 }

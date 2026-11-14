@@ -68,7 +68,7 @@ describe('HiThink 默认主源', () => {
   it('路由面板直接编辑主备并使用统一保存入口', () => {
     const html = renderToStaticMarkup(
       <MarketPolicyPanel
-        policy={withDefaultHithinkRoutes(draft, catalog, [provider])}
+        policy={withDefaultHithinkRoutes({ ...draft, enabled: true }, catalog, [provider])}
         serverPolicy={null}
         catalog={catalog}
         catalogPending={false}
@@ -84,7 +84,7 @@ describe('HiThink 默认主源', () => {
       />,
     );
     expect(html).toContain('HiThink');
-    expect(html).toContain('保存路由策略');
+    expect(html).toContain('保存全部修改');
     expect(html).not.toContain('预览 HiThink 优先');
     expect(html).not.toContain('应用到草稿');
   });

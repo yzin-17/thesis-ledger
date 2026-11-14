@@ -4,12 +4,13 @@ import {
   createNavPreparationRequest,
 } from '@thesis-ledger/schemas';
 export type BacktestForm = {
+  priceResearch?: boolean;
   start: string;
   end: string;
   cash: string;
   currency: 'CNY' | 'HKD' | 'USD';
   model: string;
-  adjustment: 'none' | 'qfq' | 'hfq';
+  adjustment: 'qfq' | 'hfq';
   history: 'fixed-provider-snapshot' | 'point-in-time';
   evidence: string;
   extras: string;
@@ -29,7 +30,7 @@ export function newBacktestForm(symbol: string, now = new Date()): BacktestForm 
     cash: '100000',
     currency: 'CNY',
     model: '',
-    adjustment: 'none',
+    adjustment: 'hfq',
     history: 'fixed-provider-snapshot',
     evidence: '',
     extras: '{}',
@@ -66,19 +67,16 @@ export function ordinaryPreparationIntentBase(form: BacktestForm, requestId: str
   const allowed = [
     'lifecycleResearch',
     'warmupBudgetSessions',
-    'marketRuleResearch',
-    'cashEventResearch',
-    'knownCashResearch',
-    'reuseResearchData',
   ];
   if (Object.keys(extras).some((v) => !allowed.includes(v)))
-    throw Error('研究选项只能包含已支持的预热、现金或原价规则决策。');
+    throw Error('研究选项只能包含已支持的预热设置。');
   return backtestRunPreparationIntentV3Schema.parse({
     ...extras,
     contractVersion: 3,
     requestId,
+    ...(form.priceResearch ? { priceResearch: 'price-research-v1' } : {}),
     adjustment: form.adjustment,
-    accountingBasis: form.adjustment === 'none' ? 'raw-events' : 'normalized-series',
+    accountingBasis: 'normalized-series',
     history:
       form.history === 'point-in-time'
         ? { basis: form.history, reconstructionEvidenceRef: form.evidence.trim() }

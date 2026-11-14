@@ -12,6 +12,16 @@ export function valuationPositionLabel(position: ValuationPosition) {
   return '已估值';
 }
 
+function missingValuationDescriptions(missing: readonly ValuationPosition[]): string[] {
+  const descriptions: string[] = [];
+  const reasons = new Set(missing.map((position) => position.availabilityReason));
+  if (reasons.has('not_selected')) descriptions.push('持仓所需的行情或净值路由尚未配置。');
+  if (reasons.has('disabled')) descriptions.push('持仓所需的行情或净值功能已关闭。');
+  if (reasons.has('not_eligible')) descriptions.push('所选行情或净值来源当前不可用，请检查来源配置。');
+  if (reasons.has('unavailable') || reasons.has(undefined)) descriptions.push('部分持仓价格暂不可用。');
+  return descriptions;
+}
+
 export function portfolioValuationNotice(portfolio: {
   partial: boolean;
   positions: readonly ValuationPosition[];
@@ -22,12 +32,7 @@ export function portfolioValuationNotice(portfolio: {
   const missing = portfolio.positions.filter((position) => valuationPositionLabel(position) === '未估值');
   const stale = portfolio.positions.some((position) => valuationPositionLabel(position) === '行情陈旧') ||
     portfolio.fx?.status === 'stale' || portfolio.fx?.stale || portfolio.fx?.fxStale;
-  const descriptions: string[] = [];
-  const reasons = new Set(missing.map((position) => position.availabilityReason));
-  if (reasons.has('not_selected')) descriptions.push('持仓所需的行情或净值路由尚未配置。');
-  if (reasons.has('disabled')) descriptions.push('持仓所需的行情或净值功能已关闭。');
-  if (reasons.has('not_eligible')) descriptions.push('所选行情或净值来源当前不可用，请检查来源配置。');
-  if (reasons.has('unavailable') || reasons.has(undefined)) descriptions.push('部分持仓价格暂不可用。');
+  const descriptions = missingValuationDescriptions(missing);
   if (portfolio.dataQuality?.missingCurrencies?.length) descriptions.push('部分币种缺少可用汇率。');
   if (portfolio.partial && descriptions.length === 0) descriptions.push('部分估值数据暂不可用。');
   if (stale) descriptions.push('部分行情或汇率使用了陈旧数据。');

@@ -162,7 +162,7 @@ export class BacktestV3RunLifecycle {
       where: { id: request.strategyVersionId },
     });
     if (!strategyVersion) throw new NotFoundException('策略版本不存在');
-    if (strategyVersion.schemaVersion !== 2)
+    if (![2, 3].includes(strategyVersion.schemaVersion))
       throw new BadRequestException('V3 Run 当前要求 schemaVersion=2 的策略版本');
 
     const parsedStrategy = strategySchema.parse(strategyVersion.schema);
@@ -173,16 +173,7 @@ export class BacktestV3RunLifecycle {
       execution: parsedStrategy.execution as BacktestStrategy['execution'],
     };
     const runConfig = runConfigSchemaV3.parse(request.runConfig);
-    const validation = validateStrategyInitialCash(strategy, runConfig);
-    if (!validation.valid) {
-      const firstError = validation.errors[0];
-      if (!firstError) throw new BadRequestException('RunConfig 校验失败');
-      throw new BadRequestException({
-        code: firstError.code,
-        message: firstError.message,
-        path: firstError.path,
-      });
-    }
+    assertRunInitialCash(strategy, runConfig);
 
     if (!this.creationGuard) preparationStale();
     const checkPreparation = () => this.creationGuard!.check(request, strategy);
@@ -198,25 +189,8 @@ export class BacktestV3RunLifecycle {
 
     let manifest: BacktestSnapshotManifestV3 & { contentHash: string };
     try {
-      const instrument = strategy.executionInstrument;
-      let assetType: 'STOCK' | 'ETF';
-      if (instrument.assetType === 'stock') assetType = 'STOCK';
-      else if (instrument.assetType === 'etf') assetType = 'ETF';
-      else throw new Error('当前 Snapshot V3 execution 写入切片仅支持股票与 ETF');
-      const timeframe = strategy.primaryTimeframe;
-      const executionRouteKey = marketDataBarRouteKeyV3Schema.parse({
-        kind: 'bar',
-        market: instrument.market,
-        assetType,
-        capability: timeframe === '1d' ? 'DAILY_BAR' : 'MINUTE_BAR',
-        timeframe,
-        adjustment: runConfig.executionPriceProtocol.priceBasis.adjustment,
-      });
-      const expectedSourcePurposes = [
-        'execution',
-        ...(runConfig.priceInputBindings?.signals.length ? ['signal'] : []),
-        ...(runConfig.priceInputBindings?.benchmark ? ['benchmark'] : []),
-      ].sort();
+      const executionRouteKey = runExecutionRouteKey(strategy, runConfig);
+      const expectedSourcePurposes = snapshotSourcePurposes(runConfig);
       const built: BacktestSnapshotV3BuildResult = await this.snapshotBuilder.buildV3({
         runId,
         strategyVersionId: request.strategyVersionId,
@@ -227,44 +201,14 @@ export class BacktestV3RunLifecycle {
         preparationStamp: request.preparationStamp,
         beforeFinalize: checkPreparation,
       });
-      const parsedManifest = backtestSnapshotManifestV3Schema.parse(built.manifest);
-      const expectedHash = hashCanonicalManifest(parsedManifest);
-      const executionSource = parsedManifest.actualSources.find(
-        (source) => source.purpose === 'execution',
-      );
-      const actualSourcePurposes = parsedManifest.actualSources
-        .map((source) => source.purpose)
-        .sort();
-      if (
-        parsedManifest.runId !== runId ||
-        parsedManifest.strategyVersionId !== request.strategyVersionId ||
-        parsedManifest.strategyVersionHash !== hashCanonicalManifest(strategy) ||
-        parsedManifest.runConfigChecksum !== hashCanonicalManifest(runConfig) ||
-        parsedManifest.dateRange.startDate !== runConfig.startDate ||
-        parsedManifest.dateRange.endDate !== runConfig.endDate ||
-        parsedManifest.dataAsOf !== runConfig.dataAsOf ||
-        canonicalizeManifest(parsedManifest.executionPriceProtocol) !==
-          canonicalizeManifest(runConfig.executionPriceProtocol) ||
-        canonicalizeManifest(actualSourcePurposes) !==
-          canonicalizeManifest(expectedSourcePurposes) ||
-        parsedManifest.actualSources.some(
-          (source) =>
-            source.symbol !== instrument.symbol ||
-            canonicalizeManifest(source.routeKey) !== canonicalizeManifest(executionRouteKey),
-        ) ||
-        !executionSource ||
-        executionSource.symbol !== instrument.symbol ||
-        canonicalizeManifest(executionSource.routeKey) !==
-          canonicalizeManifest(executionRouteKey) ||
-        parsedManifest.status !== 'finalized' ||
-        parsedManifest.contentHash !== expectedHash ||
-        built.snapshotRef.contentHash !== parsedManifest.contentHash ||
-        built.snapshotRef.snapshotId !== parsedManifest.contentHash ||
-        canonicalizeManifest(built.artifactRefs) !== canonicalizeManifest(parsedManifest.artifacts)
-      ) {
-        throw new Error('Snapshot V3 Builder 返回的 manifest、身份或 contentHash 不一致');
-      }
-      manifest = { ...parsedManifest, contentHash: expectedHash };
+      manifest = createdSnapshotManifest(built, {
+        request,
+        strategy,
+        runConfig,
+        runId,
+        executionRouteKey,
+        expectedSourcePurposes,
+      });
     } catch (error) {
       if (error instanceof ConflictException) throw error;
       return this.persistUnavailable(
@@ -363,4 +307,110 @@ export class BacktestV3RunLifecycle {
       });
     }
   }
+}
+
+function assertRunInitialCash(strategy: BacktestStrategy, runConfig: RunConfigV3) {
+  const validation = validateStrategyInitialCash(strategy, runConfig);
+  if (!validation.valid) {
+    const firstError = validation.errors[0];
+    if (!firstError) throw new BadRequestException('RunConfig 校验失败');
+    throw new BadRequestException({
+      code: firstError.code,
+      message: firstError.message,
+      path: firstError.path,
+    });
+  }
+}
+function runExecutionRouteKey(strategy: BacktestStrategy, runConfig: RunConfigV3) {
+  const instrument = strategy.executionInstrument;
+  let assetType: 'STOCK' | 'ETF';
+  if (instrument.assetType === 'stock') assetType = 'STOCK';
+  else if (instrument.assetType === 'etf') assetType = 'ETF';
+  else throw new Error('当前 Snapshot V3 execution 写入切片仅支持股票与 ETF');
+  const timeframe = strategy.primaryTimeframe;
+  return marketDataBarRouteKeyV3Schema.parse({
+    kind: 'bar',
+    market: instrument.market,
+    assetType,
+    capability: timeframe === '1d' ? 'DAILY_BAR' : 'MINUTE_BAR',
+    timeframe,
+    adjustment: runConfig.executionPriceProtocol.priceBasis.adjustment,
+  });
+}
+type SnapshotBuildIdentity = {
+  request: BacktestRunCreateV3;
+  strategy: BacktestStrategy;
+  runConfig: RunConfigV3;
+  runId: string;
+  executionRouteKey: ReturnType<typeof marketDataBarRouteKeyV3Schema.parse>;
+  expectedSourcePurposes: string[];
+};
+function createdSnapshotManifest(
+  built: BacktestSnapshotV3BuildResult,
+  {
+    request,
+    strategy,
+    runConfig,
+    runId,
+    executionRouteKey,
+    expectedSourcePurposes,
+  }: SnapshotBuildIdentity,
+) {
+  const instrument = strategy.executionInstrument;
+  const parsedManifest = backtestSnapshotManifestV3Schema.parse(built.manifest);
+  const expectedHash = hashCanonicalManifest(parsedManifest);
+  const actualSourcePurposes = parsedManifest.actualSources.map((source) => source.purpose).sort();
+  if (
+    parsedManifest.runId !== runId ||
+    parsedManifest.strategyVersionId !== request.strategyVersionId ||
+    parsedManifest.strategyVersionHash !== hashCanonicalManifest(strategy) ||
+    parsedManifest.runConfigChecksum !== hashCanonicalManifest(runConfig) ||
+    parsedManifest.dateRange.startDate !== runConfig.startDate ||
+    parsedManifest.dateRange.endDate !== runConfig.endDate ||
+    parsedManifest.dataAsOf !== runConfig.dataAsOf ||
+    parsedManifest.priceResearch?.protocolVersion !== runConfig.priceResearch?.protocolVersion ||
+    canonicalizeManifest(parsedManifest.executionPriceProtocol) !==
+      canonicalizeManifest(runConfig.executionPriceProtocol) ||
+    canonicalizeManifest(actualSourcePurposes) !== canonicalizeManifest(expectedSourcePurposes) ||
+    !executionSourcesMatchBuild(parsedManifest, instrument, executionRouteKey) ||
+    parsedManifest.status !== 'finalized' ||
+    parsedManifest.contentHash !== expectedHash ||
+    built.snapshotRef.contentHash !== parsedManifest.contentHash ||
+    built.snapshotRef.snapshotId !== parsedManifest.contentHash ||
+    canonicalizeManifest(built.artifactRefs) !== canonicalizeManifest(parsedManifest.artifacts)
+  ) {
+    throw new Error('Snapshot V3 Builder 返回的 manifest、身份或 contentHash 不一致');
+  }
+  return { ...parsedManifest, contentHash: expectedHash };
+}
+function executionSourcesMatchBuild(
+  parsedManifest: BacktestSnapshotManifestV3,
+  instrument: BacktestStrategy['executionInstrument'],
+  executionRouteKey: SnapshotBuildIdentity['executionRouteKey'],
+) {
+  const executionSource = parsedManifest.actualSources.find(
+    (source) => source.purpose === 'execution',
+  );
+  return !(
+    parsedManifest.actualSources.some(
+      (source) =>
+        source.symbol !== instrument.symbol ||
+        canonicalizeManifest(source.routeKey) !== canonicalizeManifest(executionRouteKey),
+    ) ||
+    !executionSource ||
+    executionSource.symbol !== instrument.symbol ||
+    canonicalizeManifest(executionSource.routeKey) !== canonicalizeManifest(executionRouteKey)
+  );
+}
+
+function snapshotSourcePurposes(runConfig: RunConfigV3) {
+  return [
+    'execution',
+    ...(runConfig.priceInputBindings?.signals.some(
+      (signal) => signal.binding === 'execution-series',
+    )
+      ? ['signal']
+      : []),
+    ...(runConfig.priceInputBindings?.benchmark ? ['benchmark'] : []),
+  ].sort();
 }

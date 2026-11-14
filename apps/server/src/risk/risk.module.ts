@@ -1,5 +1,7 @@
 import { RiskMonitoringStatusController } from './risk-monitoring.controller.js';
 import { RiskMonitoringService } from './risk-monitoring.service.js';
+import { StrategyRiskMonitoringService } from './strategy-risk-monitoring.service.js';
+import { StrategyRiskApplicationEvaluator } from './strategy-risk-application-evaluator.js';
 import { RiskMarketDemandService } from './risk-market-demand.service.js';
 import { Module } from '@nestjs/common';
 import { NotificationsModule } from '../notifications/notifications.module.js';
@@ -19,6 +21,8 @@ import { StrategyRiskRuntimeService } from './strategy-risk-runtime.service.js';
   providers: [
     RiskMarketDemandService,
     RiskMonitoringService,
+    StrategyRiskMonitoringService,
+    StrategyRiskApplicationEvaluator,
     RiskRuleService,
     RiskContextService,
     RiskEventService,

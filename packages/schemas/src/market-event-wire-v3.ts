@@ -100,7 +100,7 @@ function eventAdmissionMatchesResponse(
 }
 
 /** 完整覆盖引用必须由运行时核实其来源、窗口、修订与撤销状态。 */
-export const marketEventResponseV3Schema = z
+const eventResponseFields = z
   .strictObject({
     ...scope,
     fetchedAt: z.iso.datetime({ offset: true }),
@@ -139,7 +139,25 @@ export const marketEventResponseV3Schema = z
       z.strictObject({ complete: z.literal(false), reason: text }),
     ]),
     facts: z.array(corporateActionFactSchema).max(100_000),
-  })
+  });
+
+function validateEventDateMapping(value: z.infer<typeof eventResponseFields>, ctx: z.RefinementCtx): void {
+  const mapping = value.dateMappingEvidence;
+  const admission = value.admission;
+  if (
+    mapping &&
+    (value.routeKey.capability !== 'SPLIT_EVENT' ||
+      !admission ||
+      mapping.ref !== admission.evidenceRef ||
+      mapping.sha256 !== admission.evidenceSha256 ||
+      mapping.ref !== `sha256:${mapping.sha256}`)
+  )
+    ctx.addIssue({ code: 'custom', path: ['dateMappingEvidence'], message: '日期映射与拆分准入不匹配' });
+  if (admission?.adapterRevision === 'dsa-eastmoney-fund-split-mapped-v1' && !mapping)
+    ctx.addIssue({ code: 'custom', path: ['dateMappingEvidence'], message: '映射拆分缺少证据原文' });
+}
+
+export const marketEventResponseV3Schema = eventResponseFields
   .superRefine((value, ctx) => {
     const preciseIdentity =
       isMarketTushareCashIdentityRouteV3(value) || isMarketHithinkCashIdentityRouteV3(value);
@@ -178,28 +196,7 @@ export const marketEventResponseV3Schema = z
         message: '公告原文与精确来源不匹配',
       });
     }
-    const mapping = value.dateMappingEvidence;
-    if (
-      mapping &&
-      (value.routeKey.capability !== 'SPLIT_EVENT' ||
-        !admission ||
-        mapping.ref !== admission.evidenceRef ||
-        mapping.sha256 !== admission.evidenceSha256 ||
-        mapping.ref !== `sha256:${mapping.sha256}`)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['dateMappingEvidence'],
-        message: '日期映射与拆分准入不匹配',
-      });
-    }
-    if (admission?.adapterRevision === 'dsa-eastmoney-fund-split-mapped-v1' && !mapping) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['dateMappingEvidence'],
-        message: '映射拆分缺少证据原文',
-      });
-    }
+    validateEventDateMapping(value, ctx);
     if (
       value.coverage.complete &&
       (!admission || value.coverage.admissionEvidenceRef !== admission.evidenceRef)

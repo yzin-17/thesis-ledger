@@ -1,12 +1,16 @@
 import { createClientRequestId } from '../../lib/client-request-id';
-import { InstrumentSymbolField } from '../market-data/InstrumentSymbolField.js';
+import { ExperimentDiscoveryInstrumentField, useExperimentDiscoveryInstrument } from './ExperimentDiscoveryInstrumentField.js';
 import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
+import { ExperimentBudgetFields } from './ExperimentBudgetFields.js';
+import { experimentCreateFailure } from './experiment-budget.js';
 import {
   experimentPreparationTarget,
   requirePreparedOptimizationConfiguration,
   type PreparedOptimizationConfiguration,
 } from './optimization.preparation.js';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useExperimentResearchVersions } from './use-experiment-research-versions.js';
+import { ExperimentResearchVersionChoice } from './ExperimentResearchVersionChoice.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   strategySchema,
@@ -17,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -71,20 +75,13 @@ export function StrategyOptimizationExperimentPanel({
   strategies: StrategyRecord[];
 }) {
   const queryClient = useQueryClient();
-  const versions = useMemo(
-    () =>
-      strategies.flatMap((strategy) =>
-        strategy.versions
-          .filter((version) => version.version > 0 && version.schemaVersion === 2 && version.schema)
-          .map((version) => ({ strategy, version })),
-      ),
-    [strategies],
-  );
+  const { versions, adoptVersion } = useExperimentResearchVersions(strategies);
+  const [convertingVersion, setConvertingVersion] = useState(false);
   const [strategyVersionId, setStrategyVersionId] = useState(versions[0]?.version.id ?? '');
   const [sourceMode, setSourceMode] = useState<'existing' | 'discovery'>('existing');
-  const [discoverySymbol, setDiscoverySymbol] = useState('');
-  const [discoveryMarket, setDiscoveryMarket] = useState<'CN' | 'HK' | 'US'>('CN');
-  const [discoveryAssetType, setDiscoveryAssetType] = useState<'stock' | 'etf' | 'fund'>('stock');
+  const discovery = useExperimentDiscoveryInstrument();
+  const discoveryMarket = discovery.instrument?.market ?? 'CN';
+  const discoveryAssetType = discovery.instrument?.assetType ?? 'stock';
   const [discoveryTimeframe, setDiscoveryTimeframe] = useState<
     '1d' | '60m' | '30m' | '15m' | '5m' | '1m'
   >('1d');
@@ -190,15 +187,19 @@ export function StrategyOptimizationExperimentPanel({
 
   const preparationTarget = experimentPreparationTarget(sourceMode, strategyVersionId, {
     executionInstrument: {
-      symbol: discoverySymbol.trim(),
+      symbol: discovery.instrument?.symbol ?? '',
       market: discoveryMarket,
       assetType: discoveryAssetType,
     },
-    primaryTimeframe: discoveryTimeframe,
+    primaryTimeframe: discoveryAssetType === 'fund' ? '1d' : discoveryTimeframe,
   });
   const settings = (): Extract<StrategySubmissionInput, {kind:'optimization'}>['settings'] => {
+      if (!maxBacktestRuns.trim()) throw new Error('请填写回测次数上限；填 0 表示不限制。');
+      if (!maxAiCalls.trim()) throw new Error('请填写 AI 调用上限；填 0 表示不限制。');
+      if (!maxInputTokens.trim()) throw new Error('请填写输入 Token 上限；填 0 表示不限制。');
+      if (!maxOutputTokens.trim()) throw new Error('请填写输出 Token 上限；填 0 表示不限制。');
       if (sourceMode === 'existing' && !strategyVersionId) throw new Error('请选择策略版本');
-      if (sourceMode === 'discovery' && !discoverySymbol.trim()) throw new Error('请输入探索标的');
+      if (sourceMode === 'discovery' && !discovery.instrument) throw new Error('请从目录选择探索标的');
       if (selectedModels.length === 0) throw new Error('至少选择一个模型');
       if (sourceMode === 'existing' && selectedParameters.length === 0)
         throw new Error('至少授权一个参数');
@@ -254,7 +255,7 @@ export function StrategyOptimizationExperimentPanel({
       setFeedback('实验已创建。开发集与验证集先运行，测试集保持封存。');
       await invalidate();
     },
-    onError: (error) => setFeedback(error instanceof Error ? error.message : '创建优化实验失败'),
+    onError: (error) => setFeedback(experimentCreateFailure(error)),
   });
   const cancelMutation = useMutation({
     mutationFn: (id: string) => cancelOptimizationExperiment(id),
@@ -310,78 +311,12 @@ export function StrategyOptimizationExperimentPanel({
             </AlertDescription>
           </Alert>
           {sourceMode === 'discovery' ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field>
-                <FieldLabel>探索标的</FieldLabel>
-                <InstrumentSymbolField
-                  aria-label="探索标的"
-                  value={discoverySymbol}
-                  markets={
-                    discoveryMarket === 'CN' ? ['SH', 'SZ', 'BJ', 'OF'] : [discoveryMarket]
-                  }
-                  instrumentTypes={[
-                    discoveryAssetType === 'fund'
-                      ? 'MUTUAL_FUND'
-                      : discoveryAssetType.toUpperCase(),
-                  ]}
-                  onChange={(value) => setDiscoverySymbol(value)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel>市场</FieldLabel>
-                <Select
-                  value={discoveryMarket}
-                  onValueChange={(value) =>
-                    value &&
-                    !(discoveryAssetType === 'fund' && value !== 'CN') &&
-                    setDiscoveryMarket(value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="CN">中国</SelectItem>
-                      <SelectItem value="HK" disabled={discoveryAssetType === 'fund'}>
-                        香港
-                      </SelectItem>
-                      <SelectItem value="US" disabled={discoveryAssetType === 'fund'}>
-                        美国
-                      </SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel>资产类型</FieldLabel>
-                <Select
-                  value={discoveryAssetType}
-                  onValueChange={(value) => {
-                    if (!value) return;
-                    setDiscoveryAssetType(value);
-                    if (value === 'fund') {
-                      setDiscoveryMarket('CN');
-                      setDiscoveryTimeframe('1d');
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="stock">股票</SelectItem>
-                      <SelectItem value="etf">ETF</SelectItem>
-                      <SelectItem value="fund">基金 NAV</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
+            <FieldGroup className="max-w-2xl">
+              <ExperimentDiscoveryInstrumentField discovery={discovery} />
               <Field>
                 <FieldLabel>主周期</FieldLabel>
                 <Select
-                  value={discoveryTimeframe}
+                  value={discoveryAssetType === 'fund' ? '1d' : discoveryTimeframe}
                   onValueChange={(value) => value && setDiscoveryTimeframe(value)}
                 >
                   <SelectTrigger>
@@ -402,7 +337,7 @@ export function StrategyOptimizationExperimentPanel({
                   </SelectContent>
                 </Select>
               </Field>
-            </div>
+            </FieldGroup>
           ) : null}
           <div className="grid gap-3 lg:grid-cols-2">
             {sourceMode === 'existing' ? (
@@ -559,66 +494,12 @@ export function StrategyOptimizationExperimentPanel({
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <Field className="space-y-1 text-sm">
-              <FieldLabel>
-                <span className="text-muted-foreground">AI 调用上限</span>
-              </FieldLabel>
-              <Input
-                type="number"
-                min="1"
-                max="30"
-                value={maxAiCalls}
-                onChange={(event) => setMaxAiCalls(event.target.value)}
-              />
-            </Field>
-            <Field className="space-y-1 text-sm">
-              <FieldLabel>
-                <span className="text-muted-foreground">回测运行上限</span>
-              </FieldLabel>
-              <Input
-                type="number"
-                min="2"
-                max="100"
-                value={maxBacktestRuns}
-                onChange={(event) => setMaxBacktestRuns(event.target.value)}
-              />
-            </Field>
-            <Field className="space-y-1 text-sm">
-              <FieldLabel>
-                <span className="text-muted-foreground">输入 Token</span>
-              </FieldLabel>
-              <Input
-                type="number"
-                min="1"
-                max="10000000"
-                value={maxInputTokens}
-                onChange={(event) => setMaxInputTokens(event.target.value)}
-              />
-            </Field>
-            <Field className="space-y-1 text-sm">
-              <FieldLabel>
-                <span className="text-muted-foreground">输出 Token</span>
-              </FieldLabel>
-              <Input
-                type="number"
-                min="1"
-                max="2000000"
-                value={maxOutputTokens}
-                onChange={(event) => setMaxOutputTokens(event.target.value)}
-              />
-            </Field>
-            <Field className="space-y-1 text-sm">
-              <FieldLabel>
-                <span className="text-muted-foreground">最长计算（秒）</span>
-              </FieldLabel>
-              <Input
-                type="number"
-                min="30"
-                max="86400"
-                value={maxDurationSeconds}
-                onChange={(event) => setMaxDurationSeconds(event.target.value)}
-              />
-            </Field>
+            <ExperimentBudgetFields value={{ maxAiCalls, maxBacktestRuns, maxInputTokens, maxOutputTokens, maxDurationSeconds }}
+              onChange={(field, value) => {
+                const setters = { maxAiCalls: setMaxAiCalls, maxBacktestRuns: setMaxBacktestRuns,
+                  maxInputTokens: setMaxInputTokens, maxOutputTokens: setMaxOutputTokens, maxDurationSeconds: setMaxDurationSeconds };
+                setters[field](value);
+              }} />
             <Field className="space-y-1 text-sm">
               <FieldLabel>
                 <span className="text-muted-foreground">模型费用上限（可选）</span>
@@ -642,15 +523,21 @@ export function StrategyOptimizationExperimentPanel({
               </FieldLabel>
               <Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} />
             </Field>
-            <OptimizationPricePreparation
+            {sourceMode === 'existing' && <ExperimentResearchVersionChoice
+              entry={selectedVersion ?? null} disabled={convertingVersion || createMutation.isPending}
+              onBusyChange={setConvertingVersion} onAdopt={version => {
+                if (!selectedVersion) return;
+                adoptVersion(selectedVersion.strategy, version); setStrategyVersionId(version.id);
+                setSelectedParameters([]); setPreparedConfig(null);
+              }} />}
+            {(sourceMode === 'discovery' || selectedVersion?.version.schema?.schemaVersion === '3') && <OptimizationPricePreparation
               target={preparationTarget}
               startDate={startDate}
               endDate={endDate}
               currency={currency}
               initialCash={initialCash}
-              settings={settings}
                 onPrepared={setPreparedConfig}
-            />
+            />}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button

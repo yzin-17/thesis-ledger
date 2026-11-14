@@ -20,6 +20,7 @@ describe('服务连接检查竞态', () => {
     const changeConnection = vi.fn().mockResolvedValue(true);
     Object.assign(view.runtime, { baseUrl: 'https://one.test/api/v1', changeConnection });
     await mount(<SettingsScreen />);
+    expect(button('标的目录与同步')).toBeUndefined();
     await input(field('API 地址'), 'https://two.test/api/v1');
     await click(button('验证并连接'));
     expect(button('正在连接…').disabled).toBe(true);

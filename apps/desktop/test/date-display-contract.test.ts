@@ -4,6 +4,7 @@ import {
   formatDateOnly,
   formatDateTime,
   formatDateTimeInTimeZone,
+  formatDateTimeWithLocalZone,
 } from '../src/lib/date-display.js';
 
 const sourceRoot = new URL('../src/features/', import.meta.url);
@@ -33,6 +34,12 @@ describe('用户可见日期时间展示契约', () => {
     expect(formatDateTimeInTimeZone(timestamp, 'Asia/Shanghai', '未知')).toBe(
       '2026/09/08 17:31',
     );
+    const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    expect(formatDateTimeWithLocalZone(timestamp)).toBe(
+      `${formatDateTimeInTimeZone(timestamp, localZone)}（${localZone}）`,
+    );
+    expect(formatDateTimeWithLocalZone(null, '未知')).toBe('未知');
+    expect(formatDateTimeWithLocalZone('invalid', '未知')).toBe('未知');
   });
 
   it('证据链和回测数据时点不得直接插入原始时间字段', () => {

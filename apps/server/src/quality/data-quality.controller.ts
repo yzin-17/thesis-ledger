@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Patch, Post, Query } from '@nestjs/common';
 import { dataQualityIssueInputSchema, omitUndefinedDeep } from '@thesis-ledger/schemas';
 import { DataQualityService } from './data-quality.service.js';
 
 @Controller('data-quality')
 export class DataQualityController {
-  constructor(private readonly quality: DataQualityService) {}
+  constructor(@Inject(DataQualityService) private readonly quality: DataQualityService) {}
 
   @Get('issues')
   issues(@Query('status') status?: string) {

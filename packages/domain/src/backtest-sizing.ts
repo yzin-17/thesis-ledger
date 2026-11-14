@@ -6,6 +6,7 @@ import {
 } from './backtest-observation-clock.js';
 import type { FrozenNormalizedExecutionAssumptions } from './backtest-execution-model.js';
 import type { BacktestCurrency, BacktestStrategy } from './backtest-contract.js';
+import { computePriceResearchSizing } from './backtest-price-research-sizing.js';
 
 export interface SizingPriceFact extends BacktestAvailability {
   value: string;
@@ -45,6 +46,7 @@ export interface SizingInput {
   currentQuantity: string;
   evaluationAt: string;
   price?: SizingPriceFact;
+  priceResearchReference?: { protocolVersion: 'price-research-v1'; actualPrice?: SizingPriceFact };
   equity?: SizingEquityFact;
   fx?: SizingFxFact;
 }
@@ -385,7 +387,31 @@ const finalizeSizing = (
   };
 };
 
+type SizingMarketInputs = {
+  priceNeeded: boolean;
+  equityNeeded: boolean;
+  price: SizingPriceFact | undefined;
+  equity: DecimalValue | undefined;
+};
+
+function readSizingMarketInputs(input: SizingInput): SizingMarketInputs | SizingResult {
+  const priceNeeded = input.rule.type !== 'fixedQuantity';
+  const price = priceNeeded ? requirePrice(input) : undefined;
+  if (price && isSizingResult(price)) return price;
+  const equityNeeded = input.rule.type === 'percentOfEquity' || input.rule.type === 'targetWeight';
+  const equity = equityNeeded ? requireEquity(input) : undefined;
+  if (equity && isSizingResult(equity)) return equity;
+  return {
+    priceNeeded,
+    equityNeeded,
+    price: price && !isSizingResult(price) ? price : undefined,
+    equity: equity && !isSizingResult(equity) ? equity : undefined,
+  };
+}
+
 export const computeSizing = (input: SizingInput): SizingResult => {
+  if (input.priceResearchReference)
+    return computePriceResearchSizing(input, computeNormalizedSizing);
   if (input.accountingBasis === 'normalized-series') return computeNormalizedSizing(input);
   if (input.normalizedExecution !== undefined) {
     return reject('EXECUTION_MODEL_UNAVAILABLE', '原始份额定仓不能携带归一化执行假设', [
@@ -410,18 +436,15 @@ export const computeSizing = (input: SizingInput): SizingResult => {
     ]);
   }
 
-  const priceNeeded = input.rule.type !== 'fixedQuantity';
-  const price = priceNeeded ? requirePrice(input) : undefined;
-  if (price && isSizingResult(price)) return price;
-  const equityNeeded = input.rule.type === 'percentOfEquity' || input.rule.type === 'targetWeight';
-  const equity = equityNeeded ? requireEquity(input) : undefined;
-  if (equity && isSizingResult(equity)) return equity;
+  const market = readSizingMarketInputs(input);
+  if ('status' in market) return market;
+  const { priceNeeded, equityNeeded, price, equity } = market;
   const calculation = calculateRequested(
     input,
     lot,
     current,
-    price && !isSizingResult(price) ? price : undefined,
-    equity && !isSizingResult(equity) ? equity : undefined,
+    price,
+    equity,
   );
   if ('status' in calculation) return calculation;
   return finalizeSizing(
@@ -432,7 +455,7 @@ export const computeSizing = (input: SizingInput): SizingResult => {
       input,
       priceNeeded,
       equityNeeded,
-      price && !isSizingResult(price) ? price : undefined,
+      price,
     ),
     priceNeeded,
     equityNeeded,
@@ -580,17 +603,14 @@ export const computeNormalizedSizing = (input: SizingInput): SizingResult => {
     }
   }
 
-  const priceNeeded = input.rule.type !== 'fixedQuantity';
-  const price = priceNeeded ? requirePrice(input) : undefined;
-  if (price && isSizingResult(price)) return price;
-  const equityNeeded = input.rule.type === 'percentOfEquity' || input.rule.type === 'targetWeight';
-  const equity = equityNeeded ? requireEquity(input) : undefined;
-  if (equity && isSizingResult(equity)) return equity;
+  const market = readSizingMarketInputs(input);
+  if ('status' in market) return market;
+  const { priceNeeded, equityNeeded, price, equity } = market;
   const calculation = calculateNormalizedRequested(
     input,
     current,
-    price && !isSizingResult(price) ? price : undefined,
-    equity && !isSizingResult(equity) ? equity : undefined,
+    price,
+    equity,
   );
   if ('status' in calculation) return calculation;
   return finalizeNormalizedSizing(
@@ -600,7 +620,7 @@ export const computeNormalizedSizing = (input: SizingInput): SizingResult => {
       input,
       priceNeeded,
       equityNeeded,
-      price && !isSizingResult(price) ? price : undefined,
+      price,
     ),
     priceNeeded,
     equityNeeded,

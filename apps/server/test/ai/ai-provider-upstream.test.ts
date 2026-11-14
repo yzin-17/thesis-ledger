@@ -155,6 +155,9 @@ describe('AI Provider 上游格式路由', () => {
     });
   });
 
+});
+
+describe("模型价格与用途身份", () => {
   it('按模型保存费用，并将执行快照绑定到目标模型的价格', () => {
     const input = aiProviderInputSchema.parse({
       name: 'provider-a',
@@ -251,6 +254,9 @@ describe('AI Provider 上游格式路由', () => {
     );
   });
 
+});
+
+describe("配置指纹与发布证据", () => {
   it('配置指纹同时绑定地址与显式实现，地址不改写实现', () => {
     const compatible = configurationFingerprint(snapshot());
     const native = configurationFingerprint(

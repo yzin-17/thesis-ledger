@@ -6,6 +6,7 @@ export type DesktopView =
   | 'risk-center'
   | 'performance'
   | 'strategy'
+  | 'arena'
   | 'journal'
   | 'providers'
   | 'market-data'
@@ -20,6 +21,7 @@ export const desktopRoutes = [
   { view: 'position-entry', path: '/accounts', label: '账户数据' },
   { view: 'risk-center', path: '/risk-center', label: '风险中心' },
   { view: 'strategy', path: '/strategy', label: '策略中心' },
+  { view: 'arena', path: '/arena', label: '模型竞技场' },
   { view: 'journal', path: '/journal', label: '投资复盘' },
   { view: 'ai-chat', path: '/ai-chat', label: '研究助手' },
   { view: 'providers', path: '/providers', label: '数据与自动化' },

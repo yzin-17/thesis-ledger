@@ -3,7 +3,11 @@ import {
   runConfigSchemaV3,
   strategySchema,
   type BacktestSnapshotManifestV3,
+  type BacktestStrategy,
+  type RunConfigV3,
   type MarketDataBarRouteKeyV3,
+  priceResearchReferenceArtifactKey,
+  priceResearchStrategyIssues,
 } from '@thesis-ledger/schemas';
 import {
   planBacktestDependencies,
@@ -19,7 +23,7 @@ export interface SnapshotPriceInputAliasV3 {
   purpose: 'execution' | 'signal' | 'benchmark';
   instrument: string;
   sourceId?: string;
-  artifactKey: 'execution/bars.parquet';
+  artifactKey: 'execution/bars.parquet' | typeof priceResearchReferenceArtifactKey;
 }
 
 export interface SnapshotInputPlanV3 {
@@ -39,6 +43,7 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
   strategySchema.parse(input.strategy);
   const strategy = input.strategy;
   const runConfig = runConfigSchemaV3.parse(input.runConfig);
+  validateSnapshotPriceResearch(strategy, runConfig);
   const bindings = runConfig.priceInputBindings;
   if (!bindings) unavailable('缺少显式信号和基准价格绑定，不能生成完整 V3 Snapshot');
   const instrument = strategy.executionInstrument;
@@ -61,18 +66,7 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
   if (plan.benchmark.instrument !== plan.executionInstrument) {
     unavailable('基准绑定 execution-series 要求与执行标的身份完全一致');
   }
-  const expectedIds = new Set(plan.signalSources.map((source) => source.id));
-  if (
-    bindings.signals.length !== expectedIds.size ||
-    bindings.signals.some((binding) => !expectedIds.has(binding.sourceId))
-  ) {
-    unavailable('价格绑定必须准确覆盖策略实际引用的信号 sourceId');
-  }
-  for (const source of plan.signalSources) {
-    if (source.instrument !== plan.executionInstrument || source.timeframe !== '1d') {
-      unavailable(`信号 ${source.id} 不能复用不同标的或周期的执行价格序列`);
-    }
-  }
+  validateSnapshotSignalBindings(strategy, runConfig, plan, bindings);
   const executionRouteKey = marketDataBarRouteKeyV3Schema.parse({
     kind: 'bar',
     market: instrument.market,
@@ -87,11 +81,15 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
       instrument: plan.executionInstrument,
       artifactKey: 'execution/bars.parquet',
     },
-    ...plan.signalSources.map((source) => ({
+    ...plan.signalSources.map<SnapshotPriceInputAliasV3>((source) => ({
       purpose: 'signal' as const,
       instrument: source.instrument,
       sourceId: source.id,
-      artifactKey: 'execution/bars.parquet' as const,
+      artifactKey:
+        bindings.signals.find((binding) => binding.sourceId === source.id)?.binding ===
+        'actual-price-series'
+          ? priceResearchReferenceArtifactKey
+          : ('execution/bars.parquet' as const),
     })),
     {
       purpose: 'benchmark',
@@ -132,3 +130,41 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
     },
   };
 };
+
+function validateSnapshotPriceResearch(strategy: BacktestStrategy, runConfig: RunConfigV3) {
+  if (runConfig.priceResearch) {
+    if (strategy.schemaVersion !== '3') unavailable('请先确认并保存策略的价格研究版本');
+    const issues = priceResearchStrategyIssues(strategy);
+    if (issues.length)
+      unavailable(issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '));
+  }
+}
+
+function validateSnapshotSignalBindings(
+  strategy: BacktestStrategy,
+  runConfig: RunConfigV3,
+  plan: BacktestDependencyPlan,
+  bindings: NonNullable<RunConfigV3['priceInputBindings']>,
+) {
+  const expectedIds = new Set(plan.signalSources.map((source) => source.id));
+  if (
+    bindings.signals.length !== expectedIds.size ||
+    bindings.signals.some((binding) => !expectedIds.has(binding.sourceId))
+  ) {
+    unavailable('价格绑定必须准确覆盖策略实际引用的信号 sourceId');
+  }
+  for (const source of plan.signalSources) {
+    const coordinate = strategy.signalSources.find(
+      (candidate) => candidate.id === source.id,
+    )?.priceCoordinate;
+    const binding = bindings.signals.find((candidate) => candidate.sourceId === source.id)?.binding;
+    if (
+      runConfig.priceResearch &&
+      (coordinate === 'actual') !== (binding === 'actual-price-series')
+    )
+      unavailable(`信号 ${source.id} 的价格坐标与冻结绑定不一致`);
+    if (source.instrument !== plan.executionInstrument || source.timeframe !== '1d') {
+      unavailable(`信号 ${source.id} 不能复用不同标的或周期的执行价格序列`);
+    }
+  }
+}

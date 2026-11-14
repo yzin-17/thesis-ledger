@@ -39,7 +39,7 @@ export class HealthService {
       dsa: state(checks[2]) === 'healthy' && fundNavAvailable ? 'healthy' : 'down',
     } as const;
     const failed = Object.values(dependencies).filter((value) => value === 'down').length;
-    const status: Status = failed === 0 ? 'healthy' : failed === 3 ? 'down' : 'degraded';
+    const status = dependencyStatus(failed);
     return {
       status,
       service: 'thesis-ledger',
@@ -61,3 +61,11 @@ export class HealthService {
 
 const state = (result: PromiseSettledResult<unknown>): Status =>
   result.status === 'fulfilled' ? 'healthy' : 'down';
+
+
+function dependencyStatus(failed: number): Status {
+  if (failed === 0) return 'healthy';
+  if (failed === 3) return 'down';
+  return 'degraded';
+}
+

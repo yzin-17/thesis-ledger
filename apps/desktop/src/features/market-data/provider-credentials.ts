@@ -64,7 +64,7 @@ export const credentialFieldLabels: Record<string, string> = {
 };
 
 export function credentialSourceLabel(provider: ProviderManifest): string {
-  if (!provider.requiresCredential) return '内置，无需凭证';
+  if (!provider.requiresCredential && !provider.credentialSchema?.methods.length) return '内置，无需凭证';
   if (provider.credentialSource === 'control') {
     return provider.configured ? '使用页面配置' : '页面凭证不可用，请重新配置';
   }
@@ -75,7 +75,7 @@ export function credentialSourceLabel(provider: ProviderManifest): string {
     provider.configured
   )
     return '使用 DSA 环境配置';
-  return '尚未配置凭证';
+  return provider.requiresCredential ? '尚未配置凭证' : '部分功能无需凭证';
 }
 
 export function canRetainCredentialField(

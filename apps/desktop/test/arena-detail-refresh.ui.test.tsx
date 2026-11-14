@@ -111,7 +111,7 @@ describe('竞技场与周报后台读取', () => {
     it.each([false, true])(
       `${kind}等待两种响应顺序，保留原数据且始终只有一个圈：%s`,
       async (reverse) => {
-        const route = '/strategy/arena/' + ids.arena + (kind === '比赛轮次' ? '/' + ids.round : '');
+        const route = '/strategy/arena/' + ids.arena + (kind === '比赛轮次' ? '?view=activity&round=' + ids.round : '');
         const paths = [arenaPath, kind === '比赛轮次' ? roundPath : comparisonPath];
         await mount(route);
         const row = host.querySelector(kind === '比赛轮次' ? 'article' : 'tbody tr')!;
@@ -119,7 +119,7 @@ describe('竞技场与周报后台读取', () => {
         pending(paths);
         await refresh(2);
         await vi.waitFor(() => expect(indicators()).toHaveLength(1));
-        expect(label()).toBe('正在刷新' + kind);
+        expect(label()).toBe(kind === '比赛轮次' ? '正在刷新决策与成交' : '正在刷新比赛详情');
         expect(host.contains(row)).toBe(true);
         expect(row.textContent).toBe(before);
         const order = reverse ? [...paths].reverse() : paths;
@@ -166,16 +166,17 @@ describe('竞技场与周报后台读取', () => {
   it('首次详情读取后等待排名，保留首次加载和失败重试的区别', async () => {
     pending([arenaPath, comparisonPath]);
     await mount('/strategy/arena/' + ids.arena, false);
-    expect(host.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe('正在读取比赛');
+    expect(host.querySelector('[role="status"][aria-label="正在读取比赛"]')).not.toBeNull();
     expect(indicators()).toHaveLength(0);
     await release(arenaPath);
     await vi.waitFor(() => expect(indicators()).toHaveLength(1));
-    expect(host.textContent).toContain('模拟现金 10000 CNY');
+    expect(host.textContent).toContain('每模型初始本金');
+    expect(host.textContent).toContain('10,000 CNY');
     await release(comparisonPath, 503);
     await vi.waitFor(() => expect(client.isFetching()).toBe(0));
     await vi.waitFor(() => expect(indicators()).toHaveLength(0));
     const retry = [...host.querySelectorAll('button')].find(
-      (b) => b.textContent === '比较数据读取失败，重试',
+      (b) => b.textContent === '重新读取收益',
     )!;
     expect(retry).toBeTruthy();
     pending([comparisonPath]);
@@ -193,20 +194,20 @@ describe('竞技场与周报后台读取', () => {
     await refresh(1);
     await release(weekPath, 503);
     await vi.waitFor(() => expect(client.isFetching()).toBe(0));
-    await vi.waitFor(() => expect(host.textContent).toContain('读取失败，重新读取'));
+    await vi.waitFor(() => expect(host.textContent).toContain('周报读取失败'));
     expect(host.textContent).toContain('第 2 版');
     expect(host.textContent).toContain('本周决策');
     expect([...host.querySelectorAll('a')].map((a) => a.href)).toEqual(links);
     pending([weekPath]);
     await act(async () =>
       [...host.querySelectorAll('button')]
-        .find((b) => b.textContent === '读取失败，重新读取')!
+        .find((b) => b.textContent === '重新读取周报')!
         .click(),
     );
     await vi.waitFor(() => expect(indicators()).toHaveLength(1));
     await release(weekPath);
     await vi.waitFor(() => expect(indicators()).toHaveLength(0));
-    expect(host.textContent).not.toContain('读取失败，重新读取');
+    expect(host.textContent).not.toContain('周报读取失败');
     expect(host.textContent).toContain('第 2 版');
   });
 });

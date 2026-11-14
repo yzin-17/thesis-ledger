@@ -349,6 +349,9 @@ describe('账户数据页全局模式账户范围', () => {
     expect(host?.textContent).not.toContain('SHADOW-ONLY');
   });
 
+});
+
+describe('旧地址与账户范围恢复', () => {
   it('旧 all 地址使用当前模式的具体账户，不请求组合估值', async () => {
     const requests: URL[] = [];
     const fetcher = defaultControlledFetch(requests);
@@ -461,6 +464,9 @@ describe('账户数据页全局模式账户范围', () => {
     );
   });
 
+});
+
+describe('模式隔离与旧浮层清理', () => {
   it('模式切换后不让旧审核目标触发新账户审核查询或继续显示旧浮层', async () => {
     const requests: URL[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {

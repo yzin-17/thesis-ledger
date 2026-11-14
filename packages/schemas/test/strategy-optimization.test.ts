@@ -95,12 +95,28 @@ const experiment = {
     test: { start: '2024-10-01', end: '2024-12-31' },
   },
   runConfig,
-  budget: { maxAiCalls: 6, maxBacktestRuns: 13, maxDurationSeconds: 1800 },
+  budget: { maxAiCalls: 6, maxBacktestRuns: 15, maxDurationSeconds: 1800 },
   maxRounds: 2,
   idempotencyKey: 'experiment-1',
 };
 
 describe('strategy optimization contracts', () => {
+  it.each(['maxInputTokens', 'maxOutputTokens'] as const)('%s 支持显式零值累计不限额', field => {
+    const input = { ...experiment, budget: { ...experiment.budget, [field]: 0 } };
+    expect(optimizationExperimentCreateSchema.parse(input).budget[field]).toBe(0);
+    for (const value of [-1, 0.5, '0', null, Infinity])
+      expect(optimizationExperimentCreateSchema.safeParse({ ...input, budget: { ...input.budget, [field]: value } }).success).toBe(false);
+  });
+  it('调用与回测次数 0 表示不限额，有限次数仍满足计划预算', () => {
+    const unlimited = { ...experiment, budget: { ...experiment.budget, maxBacktestRuns: 0 } };
+    expect(optimizationExperimentCreateSchema.parse(unlimited).budget.maxBacktestRuns).toBe(0);
+    expect(optimizationExperimentCreateSchema.parse({ ...unlimited, budget: { ...unlimited.budget, maxAiCalls: 0 } }).budget.maxAiCalls).toBe(0);
+    for (const maxAiCalls of [-1, 0.5, 1, 3, 31, '0', undefined])
+      expect(optimizationExperimentCreateSchema.safeParse({ ...unlimited, budget: { ...unlimited.budget, maxAiCalls } }).success).toBe(false);
+    for (const maxBacktestRuns of [-1, 0.5, 1, 14, 101])
+      expect(optimizationExperimentCreateSchema.safeParse({ ...unlimited, budget: { ...unlimited.budget, maxBacktestRuns } }).success).toBe(false);
+    expect(optimizationExperimentCreateSchema.parse(experiment).budget.maxBacktestRuns).toBe(15);
+  });
   it('accepts a strict multi-model experiment contract', () => {
     const parsed = optimizationExperimentCreateSchema.parse({
       ...experiment,
@@ -346,9 +362,9 @@ describe('strategy optimization contracts', () => {
     expect(() =>
       optimizationExperimentCreateSchema.parse({
         ...experiment,
-        budget: { ...experiment.budget, maxBacktestRuns: 12 },
+        budget: { ...experiment.budget, maxBacktestRuns: 14 },
       }),
-    ).toThrow(/至少需要 13 次/);
+    ).toThrow(/至少需要 15 次/);
   });
 
   it('rejects duplicate proposal parameters and unknown fields', () => {

@@ -36,11 +36,7 @@ export const validateImportPositionCandidate = (row: ImportPositionCandidate) =>
     if (expected.gt(0) && marketValue.minus(expected).abs().div(expected).gt('0.02'))
       issues.push('市值与数量、市场价不一致');
   }
-  if (profit && quantity && costPrice && marketPrice) {
-    const expected = quantity.mul(marketPrice.minus(costPrice));
-    const tolerance = Prisma.Decimal.max(new Prisma.Decimal('0.01'), expected.abs().mul('0.02'));
-    if (profit.minus(expected).abs().gt(tolerance)) issues.push('盈亏与数量、成本价、市场价不一致');
-  }
+  appendImportProfitIssue(issues, profit, quantity, costPrice, marketPrice);
   if (profitRate && costPrice && marketPrice && costPrice.gt(0)) {
     const expected = marketPrice.div(costPrice).minus(1);
     if (profitRate.minus(expected).abs().gt('0.005')) issues.push('盈亏比例不一致');
@@ -48,3 +44,17 @@ export const validateImportPositionCandidate = (row: ImportPositionCandidate) =>
   if (row.confidence !== undefined && row.confidence < 0.75) issues.push('识别置信度较低');
   return issues;
 };
+
+function appendImportProfitIssue(
+  issues: string[],
+  profit: Prisma.Decimal | undefined,
+  quantity: Prisma.Decimal | undefined,
+  costPrice: Prisma.Decimal | undefined,
+  marketPrice: Prisma.Decimal | undefined,
+) {
+  if (profit && quantity && costPrice && marketPrice) {
+    const expected = quantity.mul(marketPrice.minus(costPrice));
+    const tolerance = Prisma.Decimal.max(new Prisma.Decimal('0.01'), expected.abs().mul('0.02'));
+    if (profit.minus(expected).abs().gt(tolerance)) issues.push('盈亏与数量、成本价、市场价不一致');
+  }
+}

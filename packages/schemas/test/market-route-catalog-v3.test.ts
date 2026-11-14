@@ -10,6 +10,14 @@ const fixture = (name: string) =>
   JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8')) as unknown;
 
 describe('Market Route Capability Catalog Control Wire V3', () => {
+  it('兼容旧目录并保留可选来源推荐依据，拒绝无效优先级', () => {
+    const catalog = marketRouteCatalogV3Schema.parse(fixture('market-route-catalog-v3.complete.json'));
+    const entry = { ...catalog.entries[0]!, credentialRequired: false,
+      recommendation: { upstreamGroup: 'eastmoney', priority: 0, readEvidence: true as const, reason: '精确来源声明' } };
+    expect(marketRouteCatalogV3Schema.parse({ ...catalog, entries: [entry] }).entries[0]).toEqual(entry);
+    expect(marketRouteCatalogV3Schema.safeParse({ ...catalog, entries: [{ ...entry,
+      recommendation: { ...entry.recommendation, priority: -1 } }] }).success).toBe(false);
+  });
   it('冻结独立 Control GET 端点与完整精确能力目录', () => {
     const catalog = marketRouteCatalogV3Schema.parse(
       fixture('market-route-catalog-v3.complete.json'),

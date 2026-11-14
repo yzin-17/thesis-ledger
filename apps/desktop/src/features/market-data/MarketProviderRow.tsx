@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch, SwitchThumb } from '@/components/ui/switch';
-import { LoaderCircle } from 'lucide-react';
+import { ChevronDownIcon, LoaderCircle } from 'lucide-react';
 import {
   providerDisplay,
   providerHealthLabel,
@@ -51,38 +51,7 @@ export function MarketProviderRow({
       key={provider.providerId}
       className="grid gap-3 py-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start"
     >
-      <div className="flex min-w-0 flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <strong className="text-sm font-medium">{providerDisplay(provider)}</strong>
-          <Badge variant={provider.updatedAt ? 'outline' : 'ghost'}>
-            {provider.updatedAt ? '手动配置' : 'DSA 默认'}
-          </Badge>
-          <Badge variant="outline">{providerHealthLabel(provider)}</Badge>
-        </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span>{credentialSourceLabel(provider)}</span>
-          {(provider.upstreamSources?.length ?? 0) > 0 && (
-            <span>
-              {local ? '资料类型：' : '上游：'}
-              {provider.upstreamSources?.map((source) => source.displayName).join('、')}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {capabilities?.map((capability) => (
-            <Badge key={capability.id} variant="outline">
-              {capability.label} · {capability.state}
-            </Badge>
-          ))}
-          {capabilities === null && (
-            <span className="text-xs text-muted-foreground">精确能力目录尚未加载</span>
-          )}
-          {capabilities?.length === 0 && (
-            <span className="text-xs text-muted-foreground">{provider.accountAccessSupported
-              ? '尚无已确认可用的功能，请配置账号后检查。' : '当前合同尚无精确接入'}</span>
-          )}
-        </div>
-      </div>
+      <ProviderCapabilityDetails provider={provider} capabilities={capabilities} local={local} />
       <div className="flex flex-wrap items-center gap-2 xl:justify-end">
         <div className="mr-1 flex items-center gap-2 text-sm">
           <span>启用</span>
@@ -141,5 +110,69 @@ export function MarketProviderRow({
         </Button>
       </div>
     </div>
+  );
+}
+
+function ProviderCapabilityDetails({
+  provider,
+  capabilities,
+  local,
+}: {
+  provider: ProviderManifest;
+  capabilities: ReturnType<typeof providerExactCapabilities>;
+  local: boolean;
+}) {
+  return (
+    <details className="group min-w-0">
+      <summary
+        aria-label={`${provider.displayName}能力详情`}
+        className="flex cursor-pointer list-none flex-col gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="flex flex-wrap items-center gap-2">
+          <strong className="text-sm font-medium">{providerDisplay(provider)}</strong>
+          <Badge variant={provider.updatedAt ? 'outline' : 'ghost'}>
+            {provider.updatedAt ? '手动配置' : 'DSA 默认'}
+          </Badge>
+          <Badge variant="outline">{providerHealthLabel(provider)}</Badge>
+          <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{capabilities === null ? '查看详情' : `${capabilities.length} 项能力`}</span>
+            <ChevronDownIcon
+              className="size-4 shrink-0 transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </span>
+        </span>
+        <span className="text-xs text-muted-foreground">{credentialSourceLabel(provider)}</span>
+      </summary>
+      <div className="mt-3 flex min-w-0 flex-col gap-2">
+        {(provider.upstreamSources?.length ?? 0) > 0 && (
+          <p className="text-xs text-muted-foreground wrap-anywhere">
+            {local ? '资料类型：' : '上游：'}
+            {provider.upstreamSources?.map((source) => source.displayName).join('、')}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          {capabilities?.map((capability) => (
+            <Badge
+              key={capability.id}
+              variant="outline"
+              className="h-auto max-w-full whitespace-normal wrap-anywhere"
+            >
+              {capability.label} · {capability.state}
+            </Badge>
+          ))}
+          {capabilities === null && (
+            <span className="text-xs text-muted-foreground">精确能力目录尚未加载</span>
+          )}
+          {capabilities?.length === 0 && (
+            <span className="text-xs text-muted-foreground">
+              {provider.accountAccessSupported
+                ? '尚无已确认可用的功能，请配置账号后检查。'
+                : '当前合同尚无精确接入'}
+            </span>
+          )}
+        </div>
+      </div>
+    </details>
   );
 }

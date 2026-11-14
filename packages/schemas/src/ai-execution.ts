@@ -1,4 +1,4 @@
-import { arenaDecisionSchema } from './arena-research.js';
+import { arenaGenerationContracts, arenaGenerationRefSchemas } from './arena-generation-contracts.js';
 import { z } from 'zod';
 import { aiTimeoutDecisionSchema } from './ai-timeout-decision.js';
 import { aiModelRequestOptionsSchema } from './ai-model-request-options.js';
@@ -110,7 +110,7 @@ export const aiGenerationContractRefSchema = z.discriminatedUnion('id', [
       version: z.literal(AI_PARAMETER_OPTIMIZATION_CONTRACT_VERSION),
     })
     .strict(),
-  z.strictObject({id:z.literal('arena_decision'),version:z.literal('arena-decision-v1')}),
+  ...arenaGenerationRefSchemas,
   z
     .object({
       id: z.literal('strategy_discovery'),
@@ -193,7 +193,7 @@ export const aiGenerationContracts = {
     } satisfies AiGenerationContractRef,
     schema: aiParameterOptimizationGenerationSchema,
   },
-  arenaDecision:{ref:{id:'arena_decision',version:'arena-decision-v1'} satisfies AiGenerationContractRef,schema:arenaDecisionSchema},
+  ...arenaGenerationContracts,
   strategyDiscovery: {
     ref: {
       id: 'strategy_discovery',

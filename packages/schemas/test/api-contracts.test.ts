@@ -146,6 +146,9 @@ describe('shared API contracts', () => {
     });
   });
 
+});
+
+describe('公共 API 查询、账本与审计合同', () => {
   it('rejects malformed risk event lists instead of accepting partial DTOs', () => {
     expect(riskEventsResponseSchema.safeParse([{ id: 'event-only' }]).success).toBe(false);
   });

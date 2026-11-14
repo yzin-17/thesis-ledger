@@ -73,6 +73,18 @@ const output = () => ({
 });
 
 describe('编写服务端确认与语义约束', () => {
+  it.each(['entry', 'exit'] as const)('拒绝与已确认 %s 摘要相反的价格交叉', (path) => {
+    const content = complete();
+    const price = { type: 'series', sourceId: 'price', field: 'close' } as const;
+    const ema = { type: 'indicator', name: 'EMA', input: price, params: { period: 20 } } as const;
+    content.confirmation![`${path}Summary`] = `价格${path === 'entry' ? '上穿' : '下穿'}均线`;
+    const result = { ...output(), definition: { ...definition,
+      [path]: { type: 'cross', direction: path === 'entry' ? 'above' : 'below', left: ema, right: price } } };
+    expect(() => validateAuthoringGeneration(content, result)).toThrow('交叉方向与确认规则或说明不一致');
+    Object.assign(result.definition, { [path]: { type: 'cross', direction: path === 'entry' ? 'above' : 'below', left: price, right: ema } });
+    expect(() => validateAuthoringGeneration(content, result)).not.toThrow();
+  });
+
   it('人工确认不能绕过明确并行交易代码的门禁；明确移除保留原文后才可继续', () => {
     const content = complete();
     content.description = '同时交易159516.SZ和510300.SH。';

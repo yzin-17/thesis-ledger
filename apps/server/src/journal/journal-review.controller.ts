@@ -1,11 +1,17 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { journalReviewListContractSchema } from '@thesis-ledger/schemas';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import type { IdentityPrincipal } from '@thesis-ledger/schemas';
+import { CurrentIdentity, IdentityGuard } from '../identity/identity.guard.js';
+import {
+  journalReviewListContractSchema,
+  journalSnapshotHistoryResponseSchema,
+} from '@thesis-ledger/schemas';
 import { InstrumentDirectoryService } from '../market/instruments/instrument-directory.service.js';
 import { JournalReviewQuery } from './journal-review-query.js';
 import { JournalReviewAnalysis } from './journal-review-analysis.js';
 import { JournalReviewSnapshots } from './journal-review-snapshots.js';
 import { JournalReviewAi } from './journal-review-ai.js';
 import { JournalPeriodReviewAi } from './journal-period-review-ai.js';
+import { JournalPeriodReviewSnapshots } from './journal-period-review-snapshots.js';
 
 @Controller('journal')
 export class JournalReviewController {
@@ -16,6 +22,7 @@ export class JournalReviewController {
     private readonly directory: InstrumentDirectoryService,
     private readonly ai: JournalReviewAi,
     private readonly periodAi: JournalPeriodReviewAi,
+    private readonly periodSnapshots: JournalPeriodReviewSnapshots,
   ) {}
 
   @Get('review-candidates')
@@ -57,33 +64,71 @@ export class JournalReviewController {
   }
 
   @Post('review-snapshots')
-  save(@Body() input: unknown) {
-    return this.snapshots.save(input);
+  @UseGuards(IdentityGuard)
+  save(@Body() input: unknown, @CurrentIdentity() principal: IdentityPrincipal) {
+    return this.snapshots.save(input, principal);
+  }
+
+  @Post('period-snapshots')
+  @UseGuards(IdentityGuard)
+  savePeriod(@Body() input: unknown, @CurrentIdentity() principal: IdentityPrincipal) {
+    return this.periodSnapshots.save(input, principal);
+  }
+
+  @Get('period-snapshots')
+  @UseGuards(IdentityGuard)
+  periodHistory(@Query() query: Record<string, string | undefined>) {
+    return this.periodSnapshots.list(query);
+  }
+
+  @Get('period-snapshots/:id')
+  @UseGuards(IdentityGuard)
+  periodSnapshot(@Param('id') id: string, @Query() query: Record<string, string | undefined>) {
+    return this.periodSnapshots.get(id, query);
   }
 
   @Post('explanations')
-  explain(@Body() input: unknown) {
-    return this.ai.start(input);
+  @UseGuards(IdentityGuard)
+  explain(@Body() input: unknown, @CurrentIdentity() principal: IdentityPrincipal) {
+    return this.ai.start(input, principal);
   }
 
   @Post('period-explanations')
-  explainPeriod(@Body() input: unknown) {
-    return this.periodAi.start(input);
+  @UseGuards(IdentityGuard)
+  explainPeriod(@Body() input: unknown, @CurrentIdentity() principal: IdentityPrincipal) {
+    return this.periodAi.start(input, principal);
   }
 
   @Get('period-explanations/:id')
-  periodExplanation(@Param('id') id: string, @Query() query: Record<string, string | undefined>) {
-    return this.periodAi.get(id, query);
+  @UseGuards(IdentityGuard)
+  periodExplanation(
+    @Param('id') id: string,
+    @Query() query: Record<string, string | undefined>,
+    @CurrentIdentity() principal: IdentityPrincipal,
+  ) {
+    return this.periodAi.get(id, query, principal);
   }
 
   @Get('explanations/:id')
-  explanation(@Param('id') id: string, @Query() query: Record<string, string | undefined>) {
-    return this.ai.get(id, query);
+  @UseGuards(IdentityGuard)
+  explanation(
+    @Param('id') id: string,
+    @Query() query: Record<string, string | undefined>,
+    @CurrentIdentity() principal: IdentityPrincipal,
+  ) {
+    return this.ai.get(id, query, principal);
   }
 
   @Get('review-snapshots')
-  history(@Query() query: Record<string, string | undefined>) {
-    return this.snapshots.list(query);
+  async history(@Query() query: Record<string, string | undefined>) {
+    const page = await this.snapshots.list(query);
+    const symbols = page.items.flatMap((item) =>
+      item.compatibility === 'CURRENT_CONTRACT' ? [item.snapshot.inputSnapshot.trade.symbol] : [],
+    );
+    return journalSnapshotHistoryResponseSchema.parse({
+      ...page,
+      instrumentDirectory: await this.directory.resolveSymbols(symbols),
+    });
   }
 
   @Get('review-snapshots/:id')

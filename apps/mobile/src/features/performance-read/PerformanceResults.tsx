@@ -18,32 +18,76 @@ const qualityLabels = {
   LOW_COVERAGE: '覆盖不足',
   UNAVAILABLE: '不可用',
 };
+function PerformanceSummary({ summary }: { summary: Results['summary'] }) {
+  const data = summary.data;
+  return (
+    <Section title="收益汇总">
+      <QueryStatus query={summary} retry={() => void summary.refetch()} />
+      {data ? (
+        <>
+          <Copy>
+            时间加权收益 {displayRatio(data.ttwror)}
+            {data.ttwrorReason ? ` · ${data.ttwrorReason}` : ''}
+          </Copy>
+          <Copy>
+            资金加权收益 {displayRatio(data.xirr)}
+            {data.xirrReason ? ` · ${data.xirrReason}` : ''}
+          </Copy>
+          <Copy muted>
+            汇率状态 {data.fx ? fxLabels[data.fx.status] : '未提供'} · 缺失币种{' '}
+            {data.fx?.missingCurrencies.join('、') || '无'}
+          </Copy>
+        </>
+      ) : null}
+    </Section>
+  );
+}
+
+function PerformanceAllocation({ queries }: { queries: Pick<Results, 'targets' | 'layers' | 'allocation' | 'allocationUnavailable'> }) {
+  const { targets, layers, allocation } = queries;
+  return (
+    <Section title="资产分布与目标差额">
+      <QueryStatus query={targets} retry={() => void targets.refetch()} />
+      {queries.allocationUnavailable && (
+        <Copy muted>当前范围无法合并估值，请选择单账户或核对汇率。</Copy>
+      )}
+      {allocation.data?.partial ? <Copy muted>数据不完整，权重和调整建议暂不可用。</Copy> : null}
+      {!queries.allocationUnavailable && (
+        <QueryList
+          query={allocation}
+          retry={() => void allocation.refetch()}
+          label="正在刷新配置明细"
+          gap={12}
+        >
+          {allocation.data?.allocation.map((row) => (
+            <Copy key={row.category}>
+              {allocationLabels[row.category]} · {row.value} · 权重 {displayRatio(row.weight)}
+            </Copy>
+          ))}
+          {!allocation.data?.partial && !targets.isError && !layers.isError
+            ? allocation.data?.rebalance.map((row) => (
+                <Copy key={row.category}>
+                  {allocationLabels[row.category]} · 目标 {displayRatio(row.targetWeight)} · 差额{' '}
+                  {row.amountGap} ·{' '}
+                  {row.direction === 'balanced'
+                    ? '已平衡'
+                    : `${row.direction === 'increase' ? '增加' : '减少'}配置`}
+                </Copy>
+              ))
+            : null}
+        </QueryList>
+      )}
+    </Section>
+  );
+}
+
 export function PerformanceResults({ queries }: { queries: Results }) {
   const [limit, setLimit] = useState(30);
-  const { summary, history, series, layers, targets, allocation } = queries;
-  const data = summary.data;
+  const { summary, history, series, layers } = queries;
   const unsupported = series.error instanceof ThesisLedgerApiError ? series.error.payload : null;
   return (
     <>
-      <Section title="收益汇总">
-        <QueryStatus query={summary} retry={() => void summary.refetch()} />
-        {data ? (
-          <>
-            <Copy>
-              时间加权收益 {displayRatio(data.ttwror)}
-              {data.ttwrorReason ? ` · ${data.ttwrorReason}` : ''}
-            </Copy>
-            <Copy>
-              资金加权收益 {displayRatio(data.xirr)}
-              {data.xirrReason ? ` · ${data.xirrReason}` : ''}
-            </Copy>
-            <Copy muted>
-              汇率状态 {data.fx ? fxLabels[data.fx.status] : '未提供'} · 缺失币种{' '}
-              {data.fx?.missingCurrencies.join('、') || '无'}
-            </Copy>
-          </>
-        ) : null}
-      </Section>
+      <PerformanceSummary summary={summary} />
       <Section title="资产走势">
         {unsupported?.availableIntervals && Array.isArray(unsupported.availableIntervals) ? (
           <Copy>当前可用粒度 {unsupported.availableIntervals.join('、')}</Copy>
@@ -111,38 +155,7 @@ export function PerformanceResults({ queries }: { queries: Results }) {
           ))}
         </QueryList>
       </Section>
-      <Section title="资产分布与目标差额">
-        <QueryStatus query={targets} retry={() => void targets.refetch()} />
-        {queries.allocationUnavailable && (
-          <Copy muted>当前范围无法合并估值，请选择单账户或核对汇率。</Copy>
-        )}
-        {allocation.data?.partial ? <Copy muted>数据不完整，权重和调整建议暂不可用。</Copy> : null}
-        {!queries.allocationUnavailable && (
-          <QueryList
-            query={allocation}
-            retry={() => void allocation.refetch()}
-            label="正在刷新配置明细"
-            gap={12}
-          >
-            {allocation.data?.allocation.map((row) => (
-              <Copy key={row.category}>
-                {allocationLabels[row.category]} · {row.value} · 权重 {displayRatio(row.weight)}
-              </Copy>
-            ))}
-            {!allocation.data?.partial && !targets.isError && !layers.isError
-              ? allocation.data?.rebalance.map((row) => (
-                  <Copy key={row.category}>
-                    {allocationLabels[row.category]} · 目标 {displayRatio(row.targetWeight)} · 差额{' '}
-                    {row.amountGap} ·{' '}
-                    {row.direction === 'balanced'
-                      ? '已平衡'
-                      : `${row.direction === 'increase' ? '增加' : '减少'}配置`}
-                  </Copy>
-                ))
-              : null}
-          </QueryList>
-        )}
-      </Section>
+      <PerformanceAllocation queries={queries} />
       <Section title="收益历史">
         <QueryList
           query={history}

@@ -316,6 +316,9 @@ describe('行情周期完成状态与拒绝路径', () => {
       }),
     ).toThrow('覆盖证据没有绑定');
   });
+});
+
+describe("行情周期截点、日历与输入身份", () => {
   it.each(['calendar', 'bar', 'evidence'] as const)('拒绝评估后可得的 %s', (kind) => {
     const future = '2027-01-01T00:00:00.000Z';
     let input = inputFixture();

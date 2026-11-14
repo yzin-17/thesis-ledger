@@ -1,3 +1,4 @@
+import { portfolioPnlTotals } from './portfolio-valuation-totals.js';
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { projectCashMaterialization, type StoredCashEvent } from '../ledger/cash-projection.js';
 import { positionInputSchema, type Currency } from '@thesis-ledger/schemas';
@@ -79,7 +80,8 @@ export class PortfolioService {
     @Optional() private readonly ledger?: LedgerService,
     @Optional() private readonly instruments?: InstrumentService,
     @Optional() private readonly trades?: TradeQueryService,
-    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
+    @Optional()
+    private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {}
 
   private requireLedger() {
@@ -108,10 +110,12 @@ export class PortfolioService {
   }
 
   async listPositions(accountId?: string, mode: 'actual' | 'shadow' = 'actual') {
-    return this.display.nameAssets(await this.prisma.position.findMany({
-      where: accountId ? { accountId, account: { mode } } : investmentAccountRelationWhere(mode),
-      include: { asset: true },
-    }));
+    return this.display.nameAssets(
+      await this.prisma.position.findMany({
+        where: accountId ? { accountId, account: { mode } } : investmentAccountRelationWhere(mode),
+        include: { asset: true },
+      }),
+    );
   }
 
   async upsertPosition(input: unknown) {
@@ -246,6 +250,40 @@ export class PortfolioService {
     return { id, removed: true, sourceOfTruth: 'ledger' as const };
   }
 
+  private async readValuationCash(
+    accountId: string | undefined,
+    mode: 'actual' | 'shadow',
+    accountCurrencyMap: Map<string, Currency>,
+    baseCurrency: Currency,
+    valuedAt: Date,
+  ) {
+    const cashByAccountAmounts = new Map<string, Array<{ currency: Currency; amount: number }>>();
+    const cashAmounts: Array<{ accountId: string; currency: Currency; amount: number }> = [];
+    const ledgerDelegate = this.prisma.ledgerEvent as
+      | {
+          findMany?: (args: unknown) => Promise<unknown[]>;
+        }
+      | undefined;
+    if (typeof ledgerDelegate?.findMany === 'function') {
+      const stored = await ledgerDelegate.findMany({
+        where: accountId ? { accountId, account: { mode } } : investmentAccountRelationWhere(mode),
+        orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+      });
+      const materialization = projectCashMaterialization(stored as StoredCashEvent[], valuedAt);
+      for (const balance of materialization.balances) {
+        const id = balance.accountId;
+        const accountAmounts = cashByAccountAmounts.get(id) ?? [];
+        const currency =
+          supportedCurrency(balance.currency) ?? accountCurrencyMap.get(id) ?? baseCurrency;
+        const numericAmount = balance.settledAmount.toNumber();
+        accountAmounts.push({ currency, amount: numericAmount });
+        cashAmounts.push({ accountId: id, currency, amount: numericAmount });
+        cashByAccountAmounts.set(id, accountAmounts);
+      }
+    }
+
+    return { cashByAccountAmounts, cashAmounts };
+  }
   async value(
     accountId?: string,
     mode: 'actual' | 'shadow' = 'actual',
@@ -286,30 +324,13 @@ export class PortfolioService {
     );
     valuationTrace.mark('position-valuation');
 
-    const cashByAccountAmounts = new Map<string, Array<{ currency: Currency; amount: number }>>();
-    const cashAmounts: Array<{ accountId: string; currency: Currency; amount: number }> = [];
-    const ledgerDelegate = this.prisma.ledgerEvent as
-      | {
-          findMany?: (args: unknown) => Promise<unknown[]>;
-        }
-      | undefined;
-    if (typeof ledgerDelegate?.findMany === 'function') {
-      const stored = await ledgerDelegate.findMany({
-        where: accountId ? { accountId, account: { mode } } : investmentAccountRelationWhere(mode),
-        orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
-      });
-      const materialization = projectCashMaterialization(stored as StoredCashEvent[], valuedAt);
-      for (const balance of materialization.balances) {
-        const id = balance.accountId;
-        const accountAmounts = cashByAccountAmounts.get(id) ?? [];
-        const currency =
-          supportedCurrency(balance.currency) ?? accountCurrencyMap.get(id) ?? baseCurrency;
-        const numericAmount = balance.settledAmount.toNumber();
-        accountAmounts.push({ currency, amount: numericAmount });
-        cashAmounts.push({ accountId: id, currency, amount: numericAmount });
-        cashByAccountAmounts.set(id, accountAmounts);
-      }
-    }
+    const { cashByAccountAmounts, cashAmounts } = await this.readValuationCash(
+      accountId,
+      mode,
+      accountCurrencyMap,
+      baseCurrency,
+      valuedAt,
+    );
     valuationTrace.mark('cash-materialization');
 
     const currencies = [
@@ -413,9 +434,9 @@ export class PortfolioService {
       amount: roundMoney(amount),
       convertedAmount: convertToBase(amount, currency),
     }));
-    const missingSymbols = [...new Set(valued
-      .filter((item) => item.marketValue === null)
-      .map((item) => item.symbol))];
+    const missingSymbols = [
+      ...new Set(valued.filter((item) => item.marketValue === null).map((item) => item.symbol)),
+    ];
     const missingCurrencies = [
       ...new Set([
         ...marketAggregate.missingCurrencies,
@@ -431,28 +452,21 @@ export class PortfolioService {
     const dailyChange = calculatePortfolioDailyChange(valuedRows.map((row) => row.daily));
     const totalPnl = roundMoney(valuedWithBase.reduce((sum, item) => sum + (item.basePnl ?? 0), 0));
     const unrealizedComplete = valuedRows.every((row) => row.position.basePnl !== null);
-    const unrealizedPnl = unrealizedComplete ? totalPnl : null;
-    const unrealizedCost = costAggregate.complete ? roundMoney(costAggregate.knownValue) : null;
-    const realizedComplete =
-      realizedSummary.complete && realizedPnlAggregate.complete && realizedCostAggregate.complete;
-    const realizedPnl = realizedComplete ? roundMoney(realizedPnlAggregate.knownValue) : null;
-    const realizedCost = realizedComplete ? roundMoney(realizedCostAggregate.knownValue) : null;
-    const realizedPnlRatio =
-      realizedPnl !== null && realizedCost !== null && realizedCost > 0
-        ? realizedPnl / realizedCost
-        : null;
-    const cumulativePnl =
-      unrealizedPnl !== null && realizedPnl !== null
-        ? roundMoney(unrealizedPnl + realizedPnl)
-        : null;
-    const cumulativeCost =
-      unrealizedCost !== null && realizedCost !== null
-        ? roundMoney(unrealizedCost + realizedCost)
-        : null;
-    const cumulativePnlRatio =
-      cumulativePnl !== null && cumulativeCost !== null && cumulativeCost > 0
-        ? cumulativePnl / cumulativeCost
-        : null;
+    const {
+      unrealizedPnl,
+      unrealizedPnlRatio,
+      realizedPnl,
+      realizedPnlRatio,
+      cumulativePnl,
+      cumulativePnlRatio,
+    } = portfolioPnlTotals({
+      totalPnl,
+      unrealizedComplete,
+      costAggregate,
+      hasRealizedFacts: realizedSummary.complete,
+      realizedPnlAggregate,
+      realizedCostAggregate,
+    });
     valuationTrace.mark('aggregation-total');
     return {
       positions: valuedWithBase,
@@ -463,10 +477,7 @@ export class PortfolioService {
       totalMarketValue: roundMoney(marketAggregate.knownValue + cashAggregate.knownValue),
       totalPnl,
       unrealizedPnl,
-      unrealizedPnlRatio:
-        unrealizedPnl !== null && unrealizedCost !== null && unrealizedCost > 0
-          ? unrealizedPnl / unrealizedCost
-          : null,
+      unrealizedPnlRatio,
       realizedPnl,
       realizedPnlRatio,
       cumulativePnl,

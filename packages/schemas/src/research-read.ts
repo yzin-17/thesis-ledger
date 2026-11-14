@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { aiRunStatusSchema, aiToolCallsPageSchema } from './ai.js';
 import { researchResultSchema } from './research.js';
+import { instrumentDirectorySchema } from './market.js';
 import { researchResultV2Schema } from './research-result-v2.js';
 import { researchObservationCutoffInputSchema } from './research-observation.js';
 import { researchQualityV2Schema, researchFrozenEvidenceV2Schema } from './research-evidence-v2.js';
@@ -155,6 +156,7 @@ export const researchReportPageSchema = z
     items: z.array(researchReportSummarySchema).max(50),
     hasMore: z.boolean(),
     nextCursor: z.string().min(1).max(2048).nullable(),
+    instrumentDirectory: instrumentDirectorySchema.optional(),
   })
   .refine((value) => value.hasMore === (value.nextCursor !== null), '研究分页状态不一致');
 export const researchReportDetailSchema = z

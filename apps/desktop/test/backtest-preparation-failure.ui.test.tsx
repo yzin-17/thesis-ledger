@@ -7,13 +7,9 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { backtestRunPreparationRequestV3Schema } from '@thesis-ledger/schemas';
 import { BacktestPreparationFailureDetails } from '../src/features/strategy/BacktestPreparationFailureDetails.js';
-import { StrategySubmissionList } from '../src/features/strategy/StrategySubmissionList.js';
+import { BacktestSubmissionFeedback } from '../src/features/strategy/BacktestSubmissionFeedback.js';
 import type { BacktestJob } from '../src/features/strategy/strategy.types.js';
 
-const list = vi.hoisted(() => vi.fn());
-vi.mock('../src/shared/api/client.js', () => ({
-  getDesktopApiClient: () => ({ strategySubmissions: { list } }),
-}));
 const model = JSON.parse(readFileSync('../../packages/schemas/fixtures/backtest-execution-model.cn-2024q1.json', 'utf8'));
 const version = '11111111-1111-4111-8111-111111111111';
 const preparation = backtestRunPreparationRequestV3Schema.parse({
@@ -45,15 +41,15 @@ describe('准备失败任务的展示归属', () => {
     expect(document.body.textContent).toContain('尚未执行回测');
     expect(document.querySelector('button')).toBeNull();
   });
-  it('已关联普通任务的提交退出顶部，净值确认记录继续保留', async () => {
-    list.mockResolvedValue([{ id: version, kind: 'ordinary', state: 'submitted', createdAt: '2026-11-08T00:00:00Z', prepared: null, outcome: { id: version } }]);
-    await render(<StrategySubmissionList />);
-    expect(document.body.textContent).not.toContain('后台提交');
-    expect(document.querySelector('details')).toBeNull();
-    await act(async () => root!.unmount()); root = undefined;
-    list.mockResolvedValue([{ id: version, kind: 'nav', state: 'blocked', createdAt: '2026-11-08T00:00:00Z', prepared: null, outcome: { reason: '净值准备未通过' } }]);
-    await render(<StrategySubmissionList />);
-    expect(document.body.textContent).toContain('后台提交（1）');
-    expect(document.body.textContent).toContain('净值准备未通过');
+  it('提交阻塞原因在当前表单显示', async () => {
+    await render(<BacktestSubmissionFeedback receipt={{ id: version, kind: 'ordinary', state: 'blocked', createdAt: '2026-11-08T00:00:00Z', prepared: null, outcome: { reason: '回测准备未通过' } }} error={null} onRetry={vi.fn()} onConfirm={vi.fn()} confirming={false} />);
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('回测准备未通过');
+  });
+  it('状态读取失败可重新读取，保留当前提交', async () => {
+    const retry = vi.fn();
+    await render(<BacktestSubmissionFeedback receipt={{ id: version, kind: 'ordinary', state: 'preparing', createdAt: '2026-11-08T00:00:00Z', prepared: null, outcome: null }} error={new Error('状态读取失败')} onRetry={retry} onConfirm={vi.fn()} confirming={false} />);
+    expect(document.body.textContent).toContain('状态读取失败');
+    await act(async () => document.querySelector<HTMLButtonElement>('button')!.click());
+    expect(retry).toHaveBeenCalledOnce();
   });
 });

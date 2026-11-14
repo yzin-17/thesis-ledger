@@ -40,6 +40,7 @@ export async function currentFundRiskContext(
     ...(source.trade ? { tradeId: source.trade.id } : {}),
     ...(openedAt ? { openedAt: openedAt.toISOString() } : {}),
     context: {
+      ...(requiresHoldingPeriods ? { holdingStartKnown: Boolean(openedAt) } : {}),
       ...(source.position
         ? {
             quantity: source.position.quantity.toString(),

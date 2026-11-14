@@ -53,16 +53,7 @@ export class BacktestCreationGuardService {
     const version = await this.prisma.strategyVersion.findUnique({
       where: { id: request.strategyVersionId },
     });
-    const current = strategySchema.safeParse(version?.schema);
-    if (
-      !current.success ||
-      version?.schemaVersion !== 2 ||
-      stamp.strategyVersionId !== request.strategyVersionId ||
-      stamp.strategyContentHash !== hashCanonicalManifest(strategy) ||
-      stamp.strategyContentHash !== hashCanonicalManifest(current.data) ||
-      stamp.runConfigChecksum !== hashCanonicalManifest(request.runConfig)
-    )
-      preparationStale();
+    assertPreparedStrategyIdentity(request, strategy, version);
     const plan = planBacktestPriceInputs(strategy, request.runConfig, {
       cashEventResearch: request.runConfig.executionPriceProtocol.cashEventResearch,
     });
@@ -88,36 +79,12 @@ export class BacktestCreationGuardService {
       !isDeepStrictEqual(sequence.requirement, requirement)
     )
       preparationStale();
-    try {
-      const currentRoute = await this.revisions.readCurrent(routeKey);
-      if (
-        stamp.desiredRevision !== currentRoute.desiredRevision ||
-        stamp.effectiveRevision !== currentRoute.effectiveRevision ||
-        stamp.catalogRevision !== currentRoute.catalogRevision ||
-        !isDeepStrictEqual(sequence.targets, currentRoute.targetSources)
-      )
-        preparationStale();
-    } catch {
-      preparationStale();
-    }
+    await this.checkCurrentRoute(stamp, routeKey, sequence.targets);
     const life = request.runConfig.lifecyclePreparation;
-    if (life) {
-      if (!this.lifecycle || lifecycleInputHashV3(life.response) !== life.inputHash)
-        preparationStale();
-      try {
-        const current = await this.lifecycle.read({
-          market: 'CN',
-          symbol: instrument.symbol,
-          start: life.response.range.start,
-          end: life.response.range.end,
-        });
-        if (lifecycleInputHashV3(current) !== life.inputHash) preparationStale();
-      } catch {
-        preparationStale();
-      }
-    }
+    if (life) await this.checkLifecycle(life, instrument.symbol);
     const model = request.runConfig.executionModel;
     if (!model) preparationStale();
+    if (request.runConfig.priceResearch) return;
     if (request.runConfig.knownCashPreparation) {
       if (!this.knownCash) preparationStale();
       try {
@@ -140,4 +107,60 @@ export class BacktestCreationGuardService {
         progress,
       });
   }
+  private async checkCurrentRoute(
+    stamp: BacktestRunCreateV3['preparationStamp'],
+    routeKey: ReturnType<typeof marketDataBarRouteKeyV3Schema.parse>,
+    targets: BacktestRunCreateV3['preparationStamp']['targetSequences'][number]['targets'],
+  ) {
+    try {
+      const currentRoute = await this.revisions.readCurrent(routeKey);
+      if (
+        stamp.desiredRevision !== currentRoute.desiredRevision ||
+        stamp.effectiveRevision !== currentRoute.effectiveRevision ||
+        stamp.catalogRevision !== currentRoute.catalogRevision ||
+        !isDeepStrictEqual(targets, currentRoute.targetSources)
+      )
+        preparationStale();
+    } catch {
+      preparationStale();
+    }
+  }
+
+  private async checkLifecycle(
+    life: NonNullable<BacktestRunCreateV3['runConfig']['lifecyclePreparation']>,
+    symbol: string,
+  ) {
+    if (!this.lifecycle || lifecycleInputHashV3(life.response) !== life.inputHash)
+      preparationStale();
+    try {
+      const current = await this.lifecycle.read({
+        market: 'CN',
+        symbol: symbol,
+        start: life.response.range.start,
+        end: life.response.range.end,
+      });
+      if (lifecycleInputHashV3(current) !== life.inputHash) preparationStale();
+    } catch {
+      preparationStale();
+    }
+  }
+}
+
+function assertPreparedStrategyIdentity(
+  request: BacktestRunCreateV3,
+  strategy: BacktestStrategy,
+  version: Awaited<ReturnType<PrismaService['strategyVersion']['findUnique']>>,
+) {
+  const stamp = request.preparationStamp;
+  const current = strategySchema.safeParse(version?.schema);
+  if (
+    !current.success ||
+    !version ||
+    ![2, 3].includes(version.schemaVersion) ||
+    stamp.strategyVersionId !== request.strategyVersionId ||
+    stamp.strategyContentHash !== hashCanonicalManifest(strategy) ||
+    stamp.strategyContentHash !== hashCanonicalManifest(current.data) ||
+    stamp.runConfigChecksum !== hashCanonicalManifest(request.runConfig)
+  )
+    preparationStale();
 }

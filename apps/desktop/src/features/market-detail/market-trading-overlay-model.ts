@@ -1,7 +1,8 @@
 import { measureChartValues } from './chart-measurement-model.js';
 import {
   isMarketMinuteTimeframe,
-  type Currency,type ArenaPoint,
+  type Currency,
+  type ArenaPricePoint,
   type TradeChartMarker,
 } from '@thesis-ledger/schemas';
 import type { MarketChartBar } from './market-chart-types.js';
@@ -10,7 +11,7 @@ import { chartPointKey } from './market-chart-time.js';
 
 export type PlacedTradeMarker = TradeChartMarker & { key: string };
 export type TradingOverlayModel = {
-  arenaMarkers?: Array<ArenaPoint & { key?: string }>;
+  arenaMarkers?: Array<ArenaPricePoint & { key?: string }>;
   markers: PlacedTradeMarker[];
   lines: Array<{ price: number; title: string; kind: 'cost' | 'risk' }>;
   measurement?: { from: string; to: string; fromPrice: number; toPrice: number } | undefined;
@@ -45,10 +46,14 @@ function overlayCurrency(symbol: string): Currency | undefined {
   const code = Number(hk[1]);
   // 港交所2026-03-12代码分配表；特殊海外证券柜台缺少币种事实时保留未知。
   if (code >= 80000 && code <= 89999) return 'CNY';
-  if ((code >= 9000 && code <= 9599) || (code >= 9700 && code <= 9849) ||
-      (code >= 41500 && code <= 41599)) return 'USD';
-  if (code < 1 || code > 9999 || (code >= 4330 && code <= 4399) ||
-      (code >= 6200 && code <= 6399)) return undefined;
+  if (
+    (code >= 9000 && code <= 9599) ||
+    (code >= 9700 && code <= 9849) ||
+    (code >= 41500 && code <= 41599)
+  )
+    return 'USD';
+  if (code < 1 || code > 9999 || (code >= 4330 && code <= 4399) || (code >= 6200 && code <= 6399))
+    return undefined;
   return 'HKD';
 }
 
@@ -94,15 +99,7 @@ export function placeTradeMarkers(
     }
     const time = Date.parse(marker.occurredAt);
     const matched = bars.find((bar, index) => {
-      const observedAt = bar.observedAt ?? bar.availableAt;
-      if (!observedAt) return false;
-      if (marker.timePrecision === 'INSTANT' && time > Date.parse(observedAt)) return false;
-      if (
-        marker.timePrecision === 'DATE' &&
-        marker.tradingDate > dateAt(observedAt, bar.symbol ?? '')
-      )
-        return false;
-      if (bar.calculationCutoffAt && time > Date.parse(bar.calculationCutoffAt)) return false;
+      if (!markerVisibleAtBar(bar, marker, time)) return false;
       if (!isMarketMinuteTimeframe(bar.timeframe)) {
         const start = bar.bucketStartDate ?? overlayTradingDate(bar);
         const end = bar.bucketEndDate ? bar.observedTradingDates?.at(-1) : start;
@@ -121,10 +118,7 @@ export function placeTradeMarkers(
         const boundary = time === end && (!next || Date.parse(next.timestamp) !== end);
         return time >= stamp && (time < end || boundary);
       }
-      if (bar.upstreamSource !== 'futu' || bar.session !== 'regular') return false;
-      const boundary = time === stamp && (!next || Date.parse(next.timestamp) - stamp > 60_000);
-      if (index === 0 && bar.symbol?.endsWith('.HK') && time === stamp) return true;
-      return time >= stamp - 60_000 && (time < stamp || boundary);
+      return legacyMinuteMarkerMatches(bar, next, stamp, time, index);
     });
     if (matched)
       placed.push({ ...marker, key: chartPointKey(matched.timestamp, matched.timeframe) });
@@ -144,10 +138,38 @@ export function measureChartRange(
   from: string | null,
   to: string | null,
 ) {
-  const result = measureChartValues(bars.map((bar) => ({
-    key: chartPointKey(bar.timestamp, bar.timeframe), value: bar.close,
-  })), from, to);
+  const result = measureChartValues(
+    bars.map((bar) => ({
+      key: chartPointKey(bar.timestamp, bar.timeframe),
+      value: bar.close,
+    })),
+    from,
+    to,
+  );
   if (!result) return undefined;
   const { count, ...measurement } = result;
   return { ...measurement, bars: count };
+}
+
+function markerVisibleAtBar(bar: MarketChartBar, marker: TradeChartMarker, time: number) {
+  const observedAt = bar.observedAt ?? bar.availableAt;
+  if (!observedAt) return false;
+  if (marker.timePrecision === 'INSTANT' && time > Date.parse(observedAt)) return false;
+  if (marker.timePrecision === 'DATE' && marker.tradingDate > dateAt(observedAt, bar.symbol ?? ''))
+    return false;
+  if (bar.calculationCutoffAt && time > Date.parse(bar.calculationCutoffAt)) return false;
+  return true;
+}
+
+function legacyMinuteMarkerMatches(
+  bar: MarketChartBar,
+  next: MarketChartBar | undefined,
+  stamp: number,
+  time: number,
+  index: number,
+) {
+  if (bar.upstreamSource !== 'futu' || bar.session !== 'regular') return false;
+  const boundary = time === stamp && (!next || Date.parse(next.timestamp) - stamp > 60_000);
+  if (index === 0 && bar.symbol?.endsWith('.HK') && time === stamp) return true;
+  return time >= stamp - 60_000 && (time < stamp || boundary);
 }

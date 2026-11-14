@@ -127,7 +127,9 @@ export const booleanExpressionSchema: z.ZodType<BooleanExpression> = z.lazy(() =
     z
       .object({
         type: z.literal('cross'),
-        direction: z.enum(['above', 'below']),
+        direction: z.enum(['above', 'below']).describe(
+          '以 left 为主语穿越 right：above 为前值 left<=right 且当前 left>right；below 为前值 left>=right 且当前 left<right。交换左右项须反转方向。',
+        ),
         left: numericExpressionSchema,
         right: numericExpressionSchema,
       })
@@ -160,6 +162,37 @@ const requiredIndicatorParams: Record<string, string[]> = {
   Highest: ['period'],
   Lowest: ['period'],
 };
+
+function validateIndicatorParameters(name: string, raw: unknown, ctx: z.RefinementCtx, path: (string | number)[]): void {
+  const params = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown> : {};
+  const required = requiredIndicatorParams[name] ?? [];
+  for (const param of required) {
+    if (!(param in params)) issue(ctx, [...path, 'params', param], '缺少 Indicator 参数');
+  }
+  for (const param of Object.keys(params)) {
+    if (!required.includes(param)) issue(ctx, [...path, 'params', param], '未知 Indicator 参数');
+    const val = params[param];
+    if (typeof val === 'number' && (!Number.isInteger(val) || val <= 0))
+      issue(ctx, [...path, 'params', param], '参数必须是正整数');
+    if (typeof val === 'string' && param.toLowerCase().includes('period') && !/^[1-9]\d*$/.test(val))
+      issue(ctx, [...path, 'params', param], '周期参数必须是正整数');
+  }
+}
+
+function validateIndicatorExpression(node: Record<string, unknown>, sources: Map<string, SignalSource>, ctx: z.RefinementCtx, path: (string | number)[]): void {
+  const name = typeof node.name === 'string' ? node.name : undefined;
+  if (!name || !indicatorNameSchema.options.includes(name as (typeof indicatorNameSchema.options)[number])) {
+    issue(ctx, [...path, 'name'], '未知 Indicator');
+    return;
+  }
+  validateNumericExpression(node.input, sources, ctx, [...path, 'input']);
+  validateIndicatorParameters(name, node.params, ctx, path);
+  if (name === 'MACD' && typeof node.output !== 'string')
+    issue(ctx, [...path, 'output'], 'MACD 必须显式选择 output');
+  if (name !== 'MACD' && node.output !== undefined)
+    issue(ctx, [...path, 'output'], '该 Indicator 不支持 output selector');
+}
 
 const validateNumericExpression = (
   value: unknown,
@@ -194,43 +227,7 @@ const validateNumericExpression = (
     return 'numeric';
   }
   if (node.type === 'indicator') {
-    const name = typeof node.name === 'string' ? node.name : undefined;
-    if (
-      !name ||
-      !indicatorNameSchema.options.includes(name as (typeof indicatorNameSchema.options)[number])
-    ) {
-      issue(ctx, [...path, 'name'], '未知 Indicator');
-      return 'numeric';
-    }
-    validateNumericExpression(node.input, sources, ctx, [...path, 'input']);
-    const params =
-      node.params && typeof node.params === 'object' && !Array.isArray(node.params)
-        ? (node.params as Record<string, unknown>)
-        : {};
-    const required = requiredIndicatorParams[name] ?? [];
-    for (const param of required) {
-      if (!(param in params)) issue(ctx, [...path, 'params', param], '缺少 Indicator 参数');
-    }
-    for (const param of Object.keys(params)) {
-      if (!required.includes(param)) issue(ctx, [...path, 'params', param], '未知 Indicator 参数');
-      const val = params[param];
-      if (typeof val === 'number' && (!Number.isInteger(val) || val <= 0)) {
-        issue(ctx, [...path, 'params', param], '参数必须是正整数');
-      }
-      if (
-        typeof val === 'string' &&
-        param.toLowerCase().includes('period') &&
-        !/^[1-9]\d*$/.test(val)
-      ) {
-        issue(ctx, [...path, 'params', param], '周期参数必须是正整数');
-      }
-    }
-    if (name === 'MACD' && typeof node.output !== 'string') {
-      issue(ctx, [...path, 'output'], 'MACD 必须显式选择 output');
-    }
-    if (name !== 'MACD' && node.output !== undefined) {
-      issue(ctx, [...path, 'output'], '该 Indicator 不支持 output selector');
-    }
+    validateIndicatorExpression(node, sources, ctx, path);
     return 'numeric';
   }
   issue(ctx, [...path, 'type'], '未知或不支持的数值 AST 节点');
@@ -343,7 +340,7 @@ export type ExecutionConfig = z.infer<typeof executionConfigSchema>;
 
 const strategyBaseSchema = z
   .object({
-    schemaVersion: z.literal('2'),
+    schemaVersion: z.enum(['2', '3']),
     name: z.string().trim().min(1),
     description: z.string().max(2000).optional(),
     signalSources: z.array(signalSourceSchema).min(1),
@@ -364,7 +361,13 @@ const strategyBaseSchema = z
 
 const exchangeTimeframes = new Set<Timeframe>(['1d', '60m', '30m', '15m', '5m', '1m']);
 
-export const strategySchema = strategyBaseSchema.superRefine((value, ctx) => {
+function validateStrategySignalSources(value: z.infer<typeof strategyBaseSchema>, ctx: z.RefinementCtx): Map<string, SignalSource> {
+  if (value.schemaVersion === '3') {
+    value.signalSources.forEach((source, index) => {
+      if (!source.priceCoordinate)
+        issue(ctx, ['signalSources', index, 'priceCoordinate'], '研究策略必须明确价格来源的坐标');
+    });
+  }
   const sourceIds = new Set<string>();
   const sources = new Map<string, SignalSource>();
   for (const [index, source] of value.signalSources.entries()) {
@@ -390,6 +393,11 @@ export const strategySchema = strategyBaseSchema.superRefine((value, ctx) => {
       issue(ctx, ['signalSources', index, 'timeframe'], '不支持的交易所周期');
     }
   }
+  return sources;
+}
+
+export const strategySchema = strategyBaseSchema.superRefine((value, ctx) => {
+  const sources = validateStrategySignalSources(value, ctx);
   if (!value.signalSources.some((source) => source.timeframe === value.primaryTimeframe)) {
     issue(ctx, ['primaryTimeframe'], '至少一个 SignalSource 必须使用 primaryTimeframe');
   }

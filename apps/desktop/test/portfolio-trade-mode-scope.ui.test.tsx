@@ -286,7 +286,7 @@ describe('交易周期的账户范围与全局模式', () => {
     await resolveRequest(0, 'actual');
     await selectAccount(actualAccount, 1);
     await resolveRequest(1, 'actual');
-    expect(button('清除筛选').disabled).toBe(false);
+    expect(button('清空筛选').disabled).toBe(false);
     await setSymbol('600519.SH', 2);
     await resolveRequest(2, 'actual');
     await selectLifecycle(3);
@@ -296,14 +296,14 @@ describe('交易周期的账户范围与全局模式', () => {
         queryKey: portfolioTradeKeys.list('actual', '', '', 'ALL'),
         exact: true,
       });
-      button('清除筛选').click();
+      button('清空筛选').click();
     });
     await waitForRequestCount(5);
     expect(requests[4]!.params).toEqual({ mode: 'actual', limit: 50 });
     expect(host!.querySelector('[aria-label="交易账户范围"]')?.textContent).toContain('全部账户');
     expect(host!.querySelector<HTMLInputElement>('[aria-label="交易标的筛选"]')?.value).toContain('全部标的');
     expect(host!.querySelector('[aria-label="交易生命周期"]')?.textContent).toContain('全部');
-    expect(button('清除筛选').disabled).toBe(true);
+    expect(button('清空筛选').disabled).toBe(true);
   });
 
   it('从完整选项选择名称与代码，加载时保留统计和筛选控件', async () => {

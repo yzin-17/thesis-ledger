@@ -209,14 +209,7 @@ const validateInput = (
   const request = parsedRequest.data;
   const strategy = parsedStrategy.data as BacktestStrategy;
   const runConfig = parsedRunConfig.data;
-  const identityMismatches = [
-    ...(hashCanonicalManifest(strategy) !== request.strategyContentHash
-      ? ['strategyContentHash']
-      : []),
-    ...(deriveRunConfigChecksum(runConfig) !== request.runConfigChecksum
-      ? ['runConfigChecksum']
-      : []),
-  ];
+  const identityMismatches = executionIdentityMismatches(strategy, runConfig, request);
   if (identityMismatches.length > 0) {
     return {
       ok: false,
@@ -225,12 +218,7 @@ const validateInput = (
   }
 
   const expectedInstrument = instrumentIdentity(strategy);
-  if (
-    input.dependencyPlan.executionInstrument !== expectedInstrument ||
-    input.dependencyPlan.runWindow.startDate !== runConfig.startDate ||
-    input.dependencyPlan.runWindow.endDate !== runConfig.endDate ||
-    input.dependencyPlan.warmup.startDate > runConfig.startDate
-  ) {
+  if (!executionPlanWindowMatches(input.dependencyPlan, expectedInstrument, runConfig)) {
     return {
       ok: false,
       result: invalidInputResult(request.requestId, checkedAt, ['dependencyPlan.executionWindow']),
@@ -241,12 +229,7 @@ const validateInput = (
     (candidate) => candidate.purpose === 'execution' && candidate.instrument === expectedInstrument,
   );
   const dataset = executionDatasets[0];
-  if (
-    executionDatasets.length !== 1 ||
-    !dataset ||
-    dataset.range.endDate !== runConfig.endDate ||
-    dataset.range.startDate > runConfig.startDate
-  ) {
+  if (!executionDatasetMatches(dataset, executionDatasets.length, runConfig)) {
     return {
       ok: false,
       result: invalidInputResult(request.requestId, checkedAt, ['dependencyPlan.executionDataset']),
@@ -373,21 +356,10 @@ export const mapWindowUnavailable = (
     return makeDiagnostic(requirement, routeTargets, {
       category: 'insufficient-coverage',
       code: 'DATA_UNAVAILABLE',
-      message:
-        failure === 'pre_listing'
-          ? '执行窗口早于已证明上市日期。'
-          : failure === 'insufficient_warmup'
-            ? '执行行情窗口未提供依赖计划要求的完整预热交易日。'
-            : '执行行情未完整覆盖依赖计划要求的同一窗口。',
+      message: coverageFailureDetails(failure).message,
       action: 'repair-data-coverage',
       actionDescription: '补齐上市后、完整且与请求窗口一致的行情后重新预检。',
-      missingFields: [
-        ...(failure === 'pre_listing'
-          ? ['coverageProof.listing.firstTradingDate']
-          : failure === 'insufficient_warmup'
-            ? ['coverageProof.warmupSessions']
-            : ['coverageProof.completeRequestedWindow']),
-      ],
+      missingFields: coverageFailureDetails(failure).missingFields,
     });
   }
   if (failure === 'provenance_mismatch' || failure === 'invalid_response') {
@@ -413,16 +385,7 @@ export const mapWindowUnavailable = (
   return makeDiagnostic(requirement, routeTargets, {
     category: 'data-unavailable',
     code: 'DATA_UNAVAILABLE',
-    message:
-      selection.reason === 'unsupported_granularity'
-        ? '统一行情 Reader 当前不支持依赖计划要求的执行行情周期。'
-        : selection.reason === 'catalog_unavailable'
-          ? '精确来源目录不可用或不完整。'
-          : selection.reason === 'policy_mismatch'
-            ? 'Desired 与 Effective 路由策略不一致或不可用。'
-            : selection.reason === 'route_not_configured'
-              ? '执行行情 RouteKey 未配置可用来源。'
-              : '执行行情来源当前不可用。',
+    message: unavailableWindowMessage(selection.reason),
     action:
       selection.reason === 'catalog_unavailable' || selection.reason === 'policy_mismatch'
         ? 'retry-preflight'
@@ -485,11 +448,7 @@ export const preflightBacktestExecutionWindowV3 = async (
   const targets = input.context.routeRevisions.targetSources;
   const plan = input.dependencyPlan;
 
-  const missingRevisions = [
-    ...(context.stamp.desiredRevision === null ? ['desiredRevision'] : []),
-    ...(context.stamp.effectiveRevision === null ? ['effectiveRevision'] : []),
-    ...(context.stamp.catalogRevision === null ? ['catalogRevision'] : []),
-  ];
+  const missingRevisions = missingExecutionRouteRevisions(context.stamp);
   if (missingRevisions.length > 0) {
     return finish('blocked', context, [
       makeDiagnostic(context.requirement, targets, {
@@ -539,27 +498,7 @@ export const preflightBacktestExecutionWindowV3 = async (
       }),
     ]);
   }
-  const routeKey = context.routeKey;
-  const readInput: MarketBarWindowReadInputV3 = {
-    market: routeKey.market,
-    symbol: context.requirement.symbol!,
-    routeKey,
-    window: { start: dataset.range.startDate, end: dataset.range.endDate },
-    ...backtestResearchReadOptionsV3(routeKey.market, context.runConfig.executionPriceProtocol),
-    ...(context.runConfig.frozenExecutionWindow
-      ? { frozenWindowRef: context.runConfig.frozenExecutionWindow }
-      : {}),
-    ...(context.runConfig.executionPriceProtocol.history.basis === 'point-in-time' ||
-    context.runConfig.frozenExecutionWindow
-      ? {
-          warmup: {
-            analysisStart: context.runConfig.lifecyclePreparation?.signalStartDate ?? context.runConfig.startDate,
-            minimumSessions: plan.warmup.lookbackPeriods,
-          },
-        }
-      : {}),
-    ...(input.context.compatibility ? { compatibility: input.context.compatibility } : {}),
-  };
+  const readInput = executionWindowReadInput(input, context, dataset, plan);
 
   let readResult: MarketBarWindowReadResultV3;
   try {
@@ -583,24 +522,7 @@ export const preflightBacktestExecutionWindowV3 = async (
 
   const { selection, request, seriesVersion } = readResult;
   const expectedTarget = targets.find((target) => target.routeIndex === selection.routeIndex);
-  if (
-    !expectedTarget ||
-    (context.runConfig.frozenExecutionWindow !== undefined &&
-      !isDeepStrictEqual(readResult.frozenWindowRef, context.runConfig.frozenExecutionWindow)) ||
-    request.symbol !== context.requirement.symbol ||
-    request.routeKey.kind !== 'bar' ||
-    !isDeepStrictEqual(request.routeKey, routeKey) ||
-    request.start !== dataset.range.startDate ||
-    request.end !== dataset.range.endDate ||
-    request.routeTarget.providerId !== expectedTarget.providerId ||
-    request.routeTarget.upstreamSource !== expectedTarget.upstreamSource ||
-    request.routeTarget.routeIndex !== selection.routeIndex ||
-    selection.target.providerId !== expectedTarget.providerId ||
-    selection.target.upstreamSource !== expectedTarget.upstreamSource ||
-    selection.desiredRevision !== context.stamp.desiredRevision ||
-    selection.effectivePolicyRevision !== context.stamp.effectiveRevision ||
-    selection.catalogRevision !== context.stamp.catalogRevision
-  ) {
+  if (!executionReadMatchesContext(readResult, context, expectedTarget, dataset)) {
     return finish('blocked', context, [
       makeDiagnostic(context.requirement, targets, {
         category: 'data-unavailable',
@@ -684,3 +606,144 @@ export const preflightBacktestExecutionWindowV3 = async (
 
   return finish('ready', context, []);
 };
+
+function executionIdentityMismatches(
+  strategy: BacktestStrategy,
+  runConfig: RunConfigV3,
+  request: BacktestPreflightRequestV3,
+) {
+  const identityMismatches = [
+    ...(hashCanonicalManifest(strategy) !== request.strategyContentHash
+      ? ['strategyContentHash']
+      : []),
+    ...(deriveRunConfigChecksum(runConfig) !== request.runConfigChecksum
+      ? ['runConfigChecksum']
+      : []),
+  ];
+  return identityMismatches;
+}
+
+function executionPlanWindowMatches(
+  plan: BacktestDependencyPlan,
+  expectedInstrument: string,
+  runConfig: RunConfigV3,
+) {
+  return !(
+    plan.executionInstrument !== expectedInstrument ||
+    plan.runWindow.startDate !== runConfig.startDate ||
+    plan.runWindow.endDate !== runConfig.endDate ||
+    plan.warmup.startDate > runConfig.startDate
+  );
+}
+
+type ExecutionDataset = BacktestDependencyPlan['datasets'][number];
+function executionDatasetMatches(
+  dataset: ExecutionDataset | undefined,
+  count: number,
+  runConfig: RunConfigV3,
+): dataset is ExecutionDataset {
+  return !(
+    count !== 1 ||
+    !dataset ||
+    dataset.range.endDate !== runConfig.endDate ||
+    dataset.range.startDate > runConfig.startDate
+  );
+}
+
+type UnavailableExecutionRead = Extract<MarketBarWindowReadResultV3, { status: 'unavailable' }>;
+function coverageFailureDetails(
+  failure: NonNullable<UnavailableExecutionRead['selection']['primaryFailure']>,
+) {
+  if (failure === 'pre_listing')
+    return {
+      message: '执行窗口早于已证明上市日期。',
+      missingFields: ['coverageProof.listing.firstTradingDate'],
+    };
+  if (failure === 'insufficient_warmup')
+    return {
+      message: '执行行情窗口未提供依赖计划要求的完整预热交易日。',
+      missingFields: ['coverageProof.warmupSessions'],
+    };
+  return {
+    message: '执行行情或覆盖证明未完整覆盖依赖计划要求的同一窗口。',
+    missingFields: ['coverageProof.completeRequestedWindow'],
+  };
+}
+function unavailableWindowMessage(reason: UnavailableExecutionRead['selection']['reason']) {
+  if (reason === 'unsupported_granularity')
+    return '统一行情 Reader 当前不支持依赖计划要求的执行行情周期。';
+  if (reason === 'catalog_unavailable') return '精确来源目录不可用或不完整。';
+  if (reason === 'policy_mismatch') return 'Desired 与 Effective 路由策略不一致或不可用。';
+  if (reason === 'route_not_configured') return '执行行情 RouteKey 未配置可用来源。';
+  return '执行行情来源当前不可用。';
+}
+
+function missingExecutionRouteRevisions(stamp: ValidatedExecutionInputs['stamp']) {
+  const missingRevisions = [
+    ...(stamp.desiredRevision === null ? ['desiredRevision'] : []),
+    ...(stamp.effectiveRevision === null ? ['effectiveRevision'] : []),
+    ...(stamp.catalogRevision === null ? ['catalogRevision'] : []),
+  ];
+  return missingRevisions;
+}
+
+function executionWindowReadInput(
+  input: BacktestExecutionWindowPreflightInputV3,
+  context: ValidatedExecutionInputs,
+  dataset: ExecutionDataset,
+  plan: BacktestDependencyPlan,
+): MarketBarWindowReadInputV3 {
+  const routeKey = context.routeKey;
+  const readInput: MarketBarWindowReadInputV3 = {
+    market: routeKey.market,
+    symbol: context.requirement.symbol!,
+    routeKey,
+    window: { start: dataset.range.startDate, end: dataset.range.endDate },
+    ...backtestResearchReadOptionsV3(routeKey.market, context.runConfig.executionPriceProtocol),
+    ...(context.runConfig.frozenExecutionWindow
+      ? { frozenWindowRef: context.runConfig.frozenExecutionWindow }
+      : {}),
+    ...(context.runConfig.executionPriceProtocol.history.basis === 'point-in-time' ||
+    context.runConfig.frozenExecutionWindow
+      ? {
+          warmup: {
+            analysisStart:
+              context.runConfig.lifecyclePreparation?.signalStartDate ??
+              context.runConfig.startDate,
+            minimumSessions: plan.warmup.lookbackPeriods,
+          },
+        }
+      : {}),
+    ...(input.context.compatibility ? { compatibility: input.context.compatibility } : {}),
+  };
+  return readInput;
+}
+
+type SelectedExecutionRead = Extract<MarketBarWindowReadResultV3, { status: 'selected' }>;
+function executionReadMatchesContext(
+  readResult: SelectedExecutionRead,
+  context: ValidatedExecutionInputs,
+  expectedTarget: BacktestPreflightTargetSourceV3 | undefined,
+  dataset: ExecutionDataset,
+) {
+  const { selection, request } = readResult;
+  const routeKey = context.routeKey;
+  return !(
+    !expectedTarget ||
+    (context.runConfig.frozenExecutionWindow !== undefined &&
+      !isDeepStrictEqual(readResult.frozenWindowRef, context.runConfig.frozenExecutionWindow)) ||
+    request.symbol !== context.requirement.symbol ||
+    request.routeKey.kind !== 'bar' ||
+    !isDeepStrictEqual(request.routeKey, routeKey) ||
+    request.start !== dataset.range.startDate ||
+    request.end !== dataset.range.endDate ||
+    request.routeTarget.providerId !== expectedTarget.providerId ||
+    request.routeTarget.upstreamSource !== expectedTarget.upstreamSource ||
+    request.routeTarget.routeIndex !== selection.routeIndex ||
+    selection.target.providerId !== expectedTarget.providerId ||
+    selection.target.upstreamSource !== expectedTarget.upstreamSource ||
+    selection.desiredRevision !== context.stamp.desiredRevision ||
+    selection.effectivePolicyRevision !== context.stamp.effectiveRevision ||
+    selection.catalogRevision !== context.stamp.catalogRevision
+  );
+}

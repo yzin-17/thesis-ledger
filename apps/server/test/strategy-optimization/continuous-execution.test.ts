@@ -4,19 +4,12 @@ import {backtestRunPreparationRequestV3Schema,optimizationRunPreparationRequestS
 import {BacktestRunPreparationService} from '../../src/backtest/backtest-run-preparation.service.js';
 import {OptimizationPreparation} from '../../src/strategy-optimization/optimization-preparation.js';
 import {StrategySubmissionExecution} from '../../src/strategy-optimization/strategy-submission-execution.js';
-import {completeSnapshotFixture} from '../backtest/v3-complete-snapshot-fixtures.js';
-import {makeReaderResult} from '../backtest/v3-snapshot-fixtures.js';
+import {priceResearchFixture} from '../backtest/price-research.fixtures.js';
 
 it('普通回测与零价优化使用原冻结输入；收费或未知模型在取价前阻断',async()=>{
-  const f=await completeSnapshotFixture(), c=f.input.runConfig, id=randomUUID();
-  f.reader.readV3.mockImplementation(async input=>{
-    const selected=await makeReaderResult(input);
-    return input.frozenWindowRef && selected.status==='selected'?{...selected,frozenWindowRef:input.frozenWindowRef}:selected;
-  });
-  const prep=new BacktestRunPreparationService({strategyVersion:{findUnique:async()=>({schemaVersion:2,schema:f.input.strategy})}} as never,f.reader as never,{
-    getPolicy:async()=>({contractVersion:3,consumer:'thesis-ledger',requestId:'policy',revision:7,enabled:true,syncState:'applied',effectiveStale:false,routes:[{key:f.input.executionRouteKey,targets:[{providerId:'hithink',upstreamSource:'hithink-financial-api'}]}]})
-  } as never);
-  const intent={contractVersion:3,requestId:id,warmupBudgetSessions:60,adjustment:'qfq',accountingBasis:'normalized-series',history:{basis:'fixed-provider-snapshot'},
+  const f=await priceResearchFixture(), c=f.input.runConfig, id=randomUUID();
+  const prep=new BacktestRunPreparationService({strategyVersion:{findUnique:async()=>({schemaVersion:3,schema:f.input.strategy})}} as never,f.reader as never,f.control as never);
+  const intent={contractVersion:3,requestId:id,warmupBudgetSessions:60,adjustment:'hfq',priceResearch:'price-research-v1',priceResearchReference:'freeze',accountingBasis:'normalized-series',history:{basis:'fixed-provider-snapshot'},
     runConfig:{startDate:c.startDate,endDate:c.endDate,dataAsOf:c.dataAsOf,baseCurrency:c.baseCurrency,initialCash:c.initialCash,valuationPolicy:c.valuationPolicy,executionModel:c.executionModel}};
   const ordinary:StrategySubmissionInput={kind:'ordinary',preparation:backtestRunPreparationRequestV3Schema.parse({...intent,strategyVersionId:id})};
   const optimization:Extract<StrategySubmissionInput,{kind:'optimization'}>={kind:'optimization',preparation:optimizationRunPreparationRequestSchema.parse({intent,target:{sourceMode:'existing',strategyVersionId:id}}),

@@ -56,8 +56,10 @@ export function mobileEquityCsv(
   if (range === 'month') start = end - 30 * 86400000;
   else if (range === 'quarter') start = end - 90 * 86400000;
   const cell = (v: string) => (/[",\n\r]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v);
+  const research = 'priceResearch' in result && result.priceResearch;
   const rows = [
-    [`时间（${timezone}）`, `组合权益（${currency}）`, '现金', '持仓市值'],
+    [`时间（${timezone}）`, `${research ? '研究权益' : '组合权益'}（${currency}）`,
+      research ? '研究资金余额' : '现金', research ? '研究持仓价值' : '持仓市值'],
     ...result.equityCurve
       .filter((p) => Date.parse(p.occurredAt) >= start)
       .map((p) => [p.occurredAt, p.value.amount, '', '']),

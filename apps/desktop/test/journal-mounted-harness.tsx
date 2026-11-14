@@ -1,9 +1,11 @@
 import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router';
 import { afterEach, expect, vi } from 'vitest';
 import { journalReviewCandidateContractSchema } from '@thesis-ledger/schemas';
 import { journalUiEvidenceFixture } from './journal-review.fixture.js';
+import { ToastProvider } from '../src/components/ui/toast.js';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import { journalLocalTime } from '../src/features/journal/review/JournalWindowTimeInput.js';
 
@@ -35,7 +37,11 @@ export async function mountJournal(node: ReactNode) {
     act(async () => {
       root.render(
         <QueryClientProvider client={client}>
-          <ConfirmDialogProvider>{next}</ConfirmDialogProvider>
+          <MemoryRouter>
+            <ToastProvider>
+              <ConfirmDialogProvider>{next}</ConfirmDialogProvider>
+            </ToastProvider>
+          </MemoryRouter>
         </QueryClientProvider>,
       );
     });
@@ -75,8 +81,12 @@ export async function journalFill(label: string, value: string) {
   const input = document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
   expect(input, `输入 ${label}`).not.toBeNull();
   await act(async () => {
-    const displayed = input!.type === 'datetime-local' && /Z$/.test(value) ? journalLocalTime(value) : value;
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, displayed);
+    const displayed =
+      input!.type === 'datetime-local' && /Z$/.test(value) ? journalLocalTime(value) : value;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      displayed,
+    );
     input!.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }

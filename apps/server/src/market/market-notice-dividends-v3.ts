@@ -25,20 +25,7 @@ export function verifyNoticeDividendsV3(response: MarketEventResponseV3): void {
     throw new Error('公告原文与准入摘要不匹配');
   const pack = parseMarketNoticeDividendPackV3(evidence.content);
   const revision = `official-cash-notices-sha256:${evidence.sha256}`;
-  if (
-    response.providerRevision !== revision ||
-    admission.sourceRevision !== revision ||
-    admission.adapterRevision !== 'official-cash-notices-v1' ||
-    admission.credentialRevision !== 'not-required' ||
-    pack.symbol !== response.symbol ||
-    response.start < pack.coverage.start ||
-    response.end > pack.coverage.end ||
-    admission.scopeSymbols.some((symbol) => symbol !== pack.symbol) ||
-    admission.scopeDateFrom < pack.coverage.start ||
-    admission.scopeDateTo > pack.coverage.end ||
-    !response.coverage.complete
-  )
-    throw new Error('公告来源修订或现金覆盖不匹配');
+  assertNoticeRevisionCoverage(response, pack, revision, admission);
   const observed = pack.sourceDocuments
     .map((item) => item.observedAt)
     .reduce((latest, item) =>
@@ -56,24 +43,57 @@ export function verifyNoticeDividendsV3(response: MarketEventResponseV3): void {
   );
   if (response.facts.length !== expected.length) throw new Error('现金事件遗漏或额外');
   for (const item of expected) {
-    const fact = response.facts.find((candidate) => candidate.effectiveDate === item.effectiveDate);
-    if (
-      !fact ||
-      fact.symbol !== pack.symbol ||
-      fact.market !== pack.market ||
-      fact.instrumentType !== pack.instrumentType ||
-      fact.type !== 'CASH_DIVIDEND' ||
-      fact.currency !== pack.currency ||
-      fact.ratio !== undefined ||
-      fact.strategyVisibility !== undefined ||
-      fact.provider !== response.routeTarget.providerId ||
-      fact.providerRevision !== revision ||
-      fact.recordDate !== item.recordDate ||
-      fact.paymentDate !== item.paymentDate ||
-      fact.occurredAt !== `${item.effectiveDate}T00:00:00+08:00` ||
-      compareMarketPitEvidenceInstantStringsV1(fact.availableAt, observed) !== 0 ||
-      fact.cashAmount !== DecimalValue.from(item.cashAmount).dividedBy('10').toString()
-    )
-      throw new Error('现金事件与公告原文不一致');
+    assertNoticeCashFact(response, pack, revision, observed, item);
   }
+}
+
+type NoticeDividendPack = ReturnType<typeof parseMarketNoticeDividendPackV3>;
+function assertNoticeRevisionCoverage(
+  response: MarketEventResponseV3,
+  pack: NoticeDividendPack,
+  revision: string,
+  admission: NonNullable<MarketEventResponseV3['admission']>,
+) {
+  if (
+    response.providerRevision !== revision ||
+    admission.sourceRevision !== revision ||
+    admission.adapterRevision !== 'official-cash-notices-v1' ||
+    admission.credentialRevision !== 'not-required' ||
+    pack.symbol !== response.symbol ||
+    response.start < pack.coverage.start ||
+    response.end > pack.coverage.end ||
+    admission.scopeSymbols.some((symbol) => symbol !== pack.symbol) ||
+    admission.scopeDateFrom < pack.coverage.start ||
+    admission.scopeDateTo > pack.coverage.end ||
+    !response.coverage.complete
+  )
+    throw new Error('公告来源修订或现金覆盖不匹配');
+}
+
+function assertNoticeCashFact(
+  response: MarketEventResponseV3,
+  pack: NoticeDividendPack,
+  revision: string,
+  observed: string,
+  item: NoticeDividendPack['events'][number],
+) {
+  const fact = response.facts.find((candidate) => candidate.effectiveDate === item.effectiveDate);
+  if (
+    !fact ||
+    fact.symbol !== pack.symbol ||
+    fact.market !== pack.market ||
+    fact.instrumentType !== pack.instrumentType ||
+    fact.type !== 'CASH_DIVIDEND' ||
+    fact.currency !== pack.currency ||
+    fact.ratio !== undefined ||
+    fact.strategyVisibility !== undefined ||
+    fact.provider !== response.routeTarget.providerId ||
+    fact.providerRevision !== revision ||
+    fact.recordDate !== item.recordDate ||
+    fact.paymentDate !== item.paymentDate ||
+    fact.occurredAt !== `${item.effectiveDate}T00:00:00+08:00` ||
+    compareMarketPitEvidenceInstantStringsV1(fact.availableAt, observed) !== 0 ||
+    fact.cashAmount !== DecimalValue.from(item.cashAmount).dividedBy('10').toString()
+  )
+    throw new Error('现金事件与公告原文不一致');
 }

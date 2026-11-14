@@ -20,5 +20,8 @@ describe('编写生产提示的实际 AST 合同', () => {
     expect(messages[0]!.content).toContain('下一可用净值申购/赎回');
     expect(JSON.parse(messages[1]!.content).content.description).toBe('只用用户确认条件');
     expect(messages[0]!.content).toContain('严格复用 content.confirmation');
+    expect(messages[0]!.content).toContain('above 是前值 left<=right 且当前 left>right');
+    expect(messages[0]!.content).toContain('left=价格、right=EMA、direction=above');
+    expect(messages[0]!.content).toContain('left=价格、right=EMA、direction=below');
   });
 });

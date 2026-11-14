@@ -21,6 +21,15 @@ import {
 } from '../../components/MobilePrimitives';
 import { InstrumentPicker } from '../market/InstrumentPicker';
 
+function hasUnusableReferenceCodes(
+  data: Parameters<typeof referenceContractChoices>[0] | undefined,
+  submitted: MarketReferenceInput | null,
+  choiceCount: number,
+  failed: boolean,
+): boolean {
+  return Boolean(data && submitted && !choiceCount && data.items.length > 0 && !failed);
+}
+
 export function MarketReferenceContractField({
   kind,
   value,
@@ -151,11 +160,8 @@ export function MarketReferenceContractField({
           ))}
         </QueryList>
       )}
-      {query.data &&
-        submitted &&
-        !choices.length &&
-        query.data.items.length > 0 &&
-        !query.isError && <Copy muted>本页来源代码不符合当前查询格式，未推断转换。</Copy>}
+      {hasUnusableReferenceCodes(query.data, submitted, choices.length, query.isError) &&
+        <Copy muted>本页来源代码不符合当前查询格式，未推断转换。</Copy>}
       {query.data && submitted && !query.isError && (
         <>
           <Copy muted>

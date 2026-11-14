@@ -188,44 +188,22 @@ export class ProviderConfigService {
     if (!existing && value.type === 'ai' && value.expectedRevision)
       throw new ConflictException('Provider 配置已删除，请刷新后重试');
     const tested = this.consumeDraftTest(value);
-    let credentialPayload = value.clearCredentials ? undefined : tested?.encryptedCredential;
-    const rawCredential = value.credentialsRef?.trim();
-    if (!value.clearCredentials && !credentialPayload && rawCredential)
-      credentialPayload = encryptProviderCredential(rawCredential);
-    if (!value.clearCredentials && !credentialPayload && existing?.encryptedCredentials) {
-      const normalized = normalizeProviderCredential(existing.encryptedCredentials);
-      if (normalized.needsRotation) credentialPayload = normalized.payload;
-    }
-    const credentialUpdate: { encryptedCredentials?: CredentialPayload | null } = {};
-    if (value.clearCredentials) credentialUpdate.encryptedCredentials = null;
-    else if (credentialPayload) credentialUpdate.encryptedCredentials = credentialPayload;
-
+    const { credentialPayload, credentialUpdate } = providerCredentialUpdate(
+      value,
+      tested,
+      existing,
+    );
     const testedHealthy = Boolean(tested);
     const enabled = value.enabled ?? true;
-    const healthReset = existing && existing.enabled !== enabled;
-    const updateData = {
-      type: value.type,
+    const healthReset = Boolean(existing && existing.enabled !== enabled);
+    const { updateData, createData } = providerSaveData(
+      value,
       enabled,
-      priority: value.priority,
-      capabilities: value.capabilities,
-      ...credentialUpdate,
-      settings: (value.settings ?? {}) as Prisma.InputJsonValue,
-      ...(value.quota === undefined ? {} : { quota: value.quota }),
-      ...(value.cost === undefined ? {} : { cost: value.cost }),
-      ...(testedHealthy ? { health: 'healthy' } : healthReset ? { health: 'unknown' } : {}),
-    };
-    const createData = {
-      name: value.name,
-      type: value.type,
-      enabled,
-      priority: value.priority,
-      capabilities: value.capabilities,
-      ...(credentialPayload ? { encryptedCredentials: credentialPayload } : {}),
-      settings: (value.settings ?? {}) as Prisma.InputJsonValue,
-      ...(value.quota === undefined ? {} : { quota: value.quota }),
-      ...(value.cost === undefined ? {} : { cost: value.cost }),
-      ...(testedHealthy ? { health: 'healthy' } : {}),
-    };
+      credentialPayload,
+      credentialUpdate,
+      testedHealthy,
+      healthReset,
+    );
     let saved;
     if (existing && value.type === 'ai') {
       if (!value.expectedRevision)
@@ -241,7 +219,7 @@ export class ProviderConfigService {
       try {
         saved = await persistence.providerConfig.create({ data: createData });
       } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002')
+        if (isProviderNameConflict(error))
           throw new ConflictException('同名接入配置已创建，请刷新后重试');
         throw error;
       }
@@ -471,14 +449,7 @@ export class ProviderConfigService {
       used,
       limit: limit ?? null,
       remaining: limit === undefined ? null : Math.max(0, limit - used),
-      state:
-        limit === undefined
-          ? 'unknown'
-          : used >= limit
-            ? 'exhausted'
-            : used / limit >= 0.9
-              ? 'warning'
-              : 'ok',
+      state: providerQuotaState(limit, used),
       resetsAt: quota.resetsAt ?? null,
     };
   }
@@ -495,4 +466,73 @@ export class ProviderConfigService {
       source,
     };
   }
+}
+
+function providerHealthUpdate(testedHealthy: boolean | null, healthReset: boolean | null) {
+  if (testedHealthy) return { health: 'healthy' as const };
+  if (healthReset) return { health: 'unknown' as const };
+  return {};
+}
+function isProviderNameConflict(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P2002');
+}
+function providerQuotaState(limit: number | undefined, used: number) {
+  if (limit === undefined) return 'unknown';
+  if (used >= limit) return 'exhausted';
+  if (used / limit >= 0.9) return 'warning';
+  return 'ok';
+}
+
+function providerCredentialUpdate(
+  value: ProviderConfigInput,
+  tested: DraftTestRecord | undefined,
+  existing: { encryptedCredentials: Uint8Array | null } | null,
+) {
+  let credentialPayload = value.clearCredentials ? undefined : tested?.encryptedCredential;
+  const rawCredential = value.credentialsRef?.trim();
+  if (!value.clearCredentials && !credentialPayload && rawCredential)
+    credentialPayload = encryptProviderCredential(rawCredential);
+  if (!value.clearCredentials && !credentialPayload && existing?.encryptedCredentials) {
+    const normalized = normalizeProviderCredential(existing.encryptedCredentials);
+    if (normalized.needsRotation) credentialPayload = normalized.payload;
+  }
+  const credentialUpdate: { encryptedCredentials?: CredentialPayload | null } = {};
+  if (value.clearCredentials) credentialUpdate.encryptedCredentials = null;
+  else if (credentialPayload) credentialUpdate.encryptedCredentials = credentialPayload;
+
+  return { credentialPayload, credentialUpdate };
+}
+
+function providerSaveData(
+  value: ProviderConfigInput,
+  enabled: boolean,
+  credentialPayload: CredentialPayload | undefined,
+  credentialUpdate: { encryptedCredentials?: CredentialPayload | null },
+  testedHealthy: boolean,
+  healthReset: boolean,
+) {
+  const updateData = {
+    type: value.type,
+    enabled,
+    priority: value.priority,
+    capabilities: value.capabilities,
+    ...credentialUpdate,
+    settings: (value.settings ?? {}) as Prisma.InputJsonValue,
+    ...(value.quota === undefined ? {} : { quota: value.quota }),
+    ...(value.cost === undefined ? {} : { cost: value.cost }),
+    ...providerHealthUpdate(testedHealthy, healthReset),
+  };
+  const createData = {
+    name: value.name,
+    type: value.type,
+    enabled,
+    priority: value.priority,
+    capabilities: value.capabilities,
+    ...(credentialPayload ? { encryptedCredentials: credentialPayload } : {}),
+    settings: (value.settings ?? {}) as Prisma.InputJsonValue,
+    ...(value.quota === undefined ? {} : { quota: value.quota }),
+    ...(value.cost === undefined ? {} : { cost: value.cost }),
+    ...(testedHealthy ? { health: 'healthy' } : {}),
+  };
+  return { updateData, createData };
 }

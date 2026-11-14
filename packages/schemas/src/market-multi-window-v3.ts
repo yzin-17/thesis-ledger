@@ -8,6 +8,34 @@ const observation = z.strictObject({
   response: marketDataBarSeriesResponseV3Schema,
 });
 
+type WindowResponse = z.infer<typeof marketDataBarSeriesResponseV3Schema>;
+
+function validateWindowIdentity(parent: WindowResponse, child: WindowResponse, fail: (message: string) => void): void {
+  if (
+    child.symbol !== parent.symbol ||
+    marketRouteKeyIdV3(child.routeKey) !== marketRouteKeyIdV3(parent.routeKey) ||
+    child.provenance.providerId !== parent.provenance.providerId ||
+    child.provenance.upstreamSource !== parent.provenance.upstreamSource ||
+    child.provenance.routeIndex !== parent.provenance.routeIndex ||
+    child.provenance.effectivePolicyRevision !== parent.provenance.effectivePolicyRevision
+  )
+    fail('子窗口身份必须与父响应一致');
+}
+
+function validateWindowPriceBasis(parent: WindowResponse, child: WindowResponse, fail: (message: string) => void): void {
+  const basisFields = [
+    'adjustment', 'method', 'methodVersion', 'anchor', 'volumeBasis',
+    'dividendMeaning', 'dividendEvidenceRef', 'conversionAvailable', 'conversionEvidenceRef',
+  ] as const;
+  if (basisFields.some((field) => child.sourcePriceBasis[field] !== parent.sourcePriceBasis[field]))
+    fail('子窗口价格协议不兼容');
+  if (
+    child.sourcePriceBasis.fieldUnits?.volume !== parent.sourcePriceBasis.fieldUnits?.volume ||
+    child.sourcePriceBasis.fieldUnits?.amount !== parent.sourcePriceBasis.fieldUnits?.amount
+  )
+    fail('子窗口单位不兼容');
+}
+
 const validateTradabilityWindowComposition = (
   parent: z.infer<typeof marketDataBarSeriesResponseV3Schema> & {
     windowObservations: z.infer<typeof observation>[];
@@ -62,15 +90,7 @@ export const marketDataMultiWindowResponseV3Schema = marketDataBarSeriesResponse
       if (Date.parse(child.sourcePriceBasis.observedAt) > Date.parse(item.completedAt)) {
         fail('子响应观测晚于采集完成');
       }
-      if (
-        child.symbol !== parent.symbol ||
-        marketRouteKeyIdV3(child.routeKey) !== marketRouteKeyIdV3(parent.routeKey) ||
-        child.provenance.providerId !== parent.provenance.providerId ||
-        child.provenance.upstreamSource !== parent.provenance.upstreamSource ||
-        child.provenance.routeIndex !== parent.provenance.routeIndex ||
-        child.provenance.effectivePolicyRevision !== parent.provenance.effectivePolicyRevision
-      )
-        fail('子窗口身份必须与父响应一致');
+      validateWindowIdentity(parent, child, fail);
       if (
         child.coverage.requestedStart < parent.coverage.requestedStart ||
         child.coverage.requestedEnd > parent.coverage.requestedEnd ||
@@ -78,29 +98,7 @@ export const marketDataMultiWindowResponseV3Schema = marketDataBarSeriesResponse
       )
         fail('子窗口必须在父窗口内且按开始日期严格升序');
       previousStart = child.coverage.requestedStart;
-      const basisFields = [
-        'adjustment',
-        'method',
-        'methodVersion',
-        'anchor',
-        'volumeBasis',
-        'dividendMeaning',
-        'dividendEvidenceRef',
-        'conversionAvailable',
-        'conversionEvidenceRef',
-      ] as const;
-      if (
-        basisFields.some(
-          (field) => child.sourcePriceBasis[field] !== parent.sourcePriceBasis[field],
-        )
-      ) {
-        fail('子窗口价格协议不兼容');
-      }
-      if (
-        child.sourcePriceBasis.fieldUnits?.volume !== parent.sourcePriceBasis.fieldUnits?.volume ||
-        child.sourcePriceBasis.fieldUnits?.amount !== parent.sourcePriceBasis.fieldUnits?.amount
-      )
-        fail('子窗口单位不兼容');
+      validateWindowPriceBasis(parent, child, fail);
       const timestamps = new Set(child.bars.map((bar) => bar.timestamp));
       if (previousTimestamps && ![...timestamps].some((value) => previousTimestamps?.has(value))) {
         fail('相邻子窗口必须存在已观测交易日交集');

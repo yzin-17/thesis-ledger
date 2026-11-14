@@ -63,8 +63,14 @@ describe.each(marketPercentSamples)('$name：实际行情百分比读数', ({ na
       return { ...bar, timestamp, availableAt: timestamp };
     });
     const before = structuredClone(bars);
-    const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } });
-    const html = renderToStaticMarkup(<QueryClientProvider client={client}><MarketPriceChart bars={bars} /></QueryClientProvider>);
+    const client = new QueryClient({
+      defaultOptions: { queries: { enabled: false, retry: false } },
+    });
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <MarketPriceChart bars={bars} />
+      </QueryClientProvider>,
+    );
     client.clear();
     if (sample.ratio === null) expect(html).not.toContain('可视区间');
     else expect(html).toContain('可视区间 ' + sample.ratioLabel);
@@ -90,9 +96,10 @@ describe.each(marketPercentSamples)('$name：实际行情百分比读数', ({ na
       );
       if (sample.percentLabel) expect(html).toContain(sample.percentLabel);
       else expect(html).not.toMatch(/NaN|Infinity|[+-]0.00%/);
-      expect(html).toContain(
-        kind === 'current' ? '已休市' : sample.percent === null ? '估值不可用' : '部分覆盖',
-      );
+      let status = '部分覆盖';
+      if (kind === 'current') status = '已休市';
+      else if (sample.percent === null) status = '估值不可用';
+      expect(html).toContain(status);
       expect({ valuation, today }).toEqual(before);
     } finally {
       client.clear();

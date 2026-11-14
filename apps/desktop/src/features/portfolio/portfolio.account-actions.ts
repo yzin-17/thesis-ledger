@@ -13,7 +13,10 @@ export const permanentAccountDeletionErrorMessage = (error: unknown) => {
   return '网络或服务暂不可用，请检查网络后重试。';
 };
 
-export const accountChangeImpact = (mode: Account['mode'], accountId: string): PortfolioChangeImpact => ({
+export const accountChangeImpact = (
+  mode: Account['mode'],
+  accountId: string,
+): PortfolioChangeImpact => ({
   mode,
   accountIds: [accountId],
   accounts: true,
@@ -47,13 +50,7 @@ export const createAccountActionHandlers = ({
     const isEditing = Boolean(editingAccount);
     setBusyAction('account-save');
     try {
-      const input: SaveAccountInput = {
-        name: formText(form, 'name'),
-        ...(formText(form, 'institution') ? { institution: formText(form, 'institution') } : {}),
-        type: formText(form, 'type') as Account['type'],
-        mode: (formText(form, 'mode') || 'actual') as Account['mode'],
-        currency: 'CNY',
-      };
+      const input = accountInputFromForm(form);
       const savedAccount = await mutations.saveAccount.mutateAsync({
         ...(editingAccount?.id ? { accountId: editingAccount.id } : {}),
         input,
@@ -74,12 +71,9 @@ export const createAccountActionHandlers = ({
         timeout: 2800,
       });
     } catch (error) {
-      const unavailable = !(error instanceof ThesisLedgerApiError) || error.status >= 500;
       const errorToastId = toastManager.add({
         title: isEditing ? '账户更新失败' : '账户创建失败',
-        description: unavailable
-          ? '网络或服务暂不可用，输入已保留，请稍后重试。'
-          : error.payload?.message ?? '请检查名称、机构和账户类型；有账本历史时类型、模式和币种不可修改。',
+        description: accountSaveFailureDescription(error),
         type: 'error',
         timeout: 0,
         priority: 'high',
@@ -108,7 +102,9 @@ export const createAccountActionHandlers = ({
     try {
       await mutations.toggleAccount.mutateAsync({ accountId: account.id, active });
       markDirty(false);
-      await Promise.resolve(onSaved(accountChangeImpact(account.mode, account.id))).catch(() => undefined);
+      await Promise.resolve(onSaved(accountChangeImpact(account.mode, account.id))).catch(
+        () => undefined,
+      );
       toastManager.add({
         title: active ? '账户已停用' : '账户已重新启用',
         type: 'success',
@@ -143,7 +139,9 @@ export const createAccountActionHandlers = ({
       try {
         await mutations.permanentlyDeleteAccount.mutateAsync(account.id);
         markDirty(false);
-        await Promise.resolve(onSaved(accountChangeImpact(account.mode, account.id))).catch(() => undefined);
+        await Promise.resolve(onSaved(accountChangeImpact(account.mode, account.id))).catch(
+          () => undefined,
+        );
         toastManager.add({
           title: '账户已永久删除',
           type: 'success',
@@ -167,3 +165,22 @@ export const createAccountActionHandlers = ({
 
   return { submitAccount, toggleAccount, permanentlyDeleteAccount };
 };
+
+function accountInputFromForm(form: FormData): SaveAccountInput {
+  const input: SaveAccountInput = {
+    name: formText(form, 'name'),
+    ...(formText(form, 'institution') ? { institution: formText(form, 'institution') } : {}),
+    type: formText(form, 'type') as Account['type'],
+    mode: (formText(form, 'mode') || 'actual') as Account['mode'],
+    currency: 'CNY',
+  };
+  return input;
+}
+
+function accountSaveFailureDescription(error: unknown) {
+  const unavailable = !(error instanceof ThesisLedgerApiError) || error.status >= 500;
+  return unavailable
+    ? '网络或服务暂不可用，输入已保留，请稍后重试。'
+    : (error.payload?.message ??
+        '请检查名称、机构和账户类型；有账本历史时类型、模式和币种不可修改。');
+}

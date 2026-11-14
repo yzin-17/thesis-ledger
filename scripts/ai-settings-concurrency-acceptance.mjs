@@ -3,8 +3,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { readFundTarget } from './fund-calibration-target.mjs';
-import { sourceState } from '../../thesis-ledger-infra/scripts/research-dual-read.mjs';
-import { sql } from '../../thesis-ledger-infra/scripts/research-state-backup.mjs';
+import { sourceState } from '../../thesis-ledger/scripts/local-runtime/research-dual-read.mjs';
+import { sql } from '../../thesis-ledger/scripts/local-runtime/research-state-backup.mjs';
 
 const endpoint = 'http://127.0.0.1:3000/api/v1/ai/settings';
 const fingerprint = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');

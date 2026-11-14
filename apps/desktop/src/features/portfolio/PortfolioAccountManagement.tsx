@@ -73,10 +73,10 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
         )}
         data-account-manager-view={accountFormInline ? 'list' : undefined}
       >
-        {accountFormInline && (
-          <SheetTitle className="sr-only p-0">账户设置</SheetTitle>
-        )}
-        <div className={cn('flex items-center justify-between gap-4', accountFormInline && 'pr-10')}>
+        {accountFormInline && <SheetTitle className="sr-only p-0">账户设置</SheetTitle>}
+        <div
+          className={cn('flex items-center justify-between gap-4', accountFormInline && 'pr-10')}
+        >
           <h2 className="m-0 text-xl font-semibold">已有账户</h2>
           <Button
             type="button"
@@ -107,11 +107,20 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
             </AlertDescription>
           </Alert>
         )}
-        <ListRefreshRegion refreshing={managedAccountsPending === true && managedAccounts.length > 0} label="正在刷新账户">
+        <ListRefreshRegion
+          refreshing={managedAccountsPending === true && managedAccounts.length > 0}
+          label="正在刷新账户"
+        >
           {managedAccounts.length > 0 ? (
-            <div className="mt-1.5 divide-y divide-border rounded-md border border-border px-3" aria-label="已有账户">
+            <div
+              className="mt-1.5 divide-y divide-border rounded-md border border-border px-3"
+              aria-label="已有账户"
+            >
               {managedAccounts.map((account) => (
-                <div key={account.id} className="flex min-h-[42px] items-center justify-between gap-2.5 text-xs text-muted-foreground">
+                <div
+                  key={account.id}
+                  className="flex min-h-[42px] items-center justify-between gap-2.5 text-xs text-muted-foreground"
+                >
                   <span className="block">
                     {account.name}
                     <small className="mt-1 block text-xs text-muted-foreground">
@@ -133,7 +142,11 @@ export function AccountManagementSection(props: PortfolioManagementViewProps) {
                         type="button"
                         variant="link"
                         disabled={Boolean(currentMode && account.mode !== currentMode)}
-                        title={currentMode && account.mode !== currentMode ? '请先使用全局开关切换到账户所属范围' : undefined}
+                        title={
+                          currentMode && account.mode !== currentMode
+                            ? '请先使用全局开关切换到账户所属范围'
+                            : undefined
+                        }
                         onClick={() => onAccountEntry(account.id)}
                       >
                         录入持仓
@@ -300,29 +313,11 @@ function AccountFormContent({
                 </SelectContent>
               </Select>
             </Field>
-            <Field>
-              <FieldLabel htmlFor="account-mode">账户模式</FieldLabel>
-              {editingAccount ? <Select
-                name="mode"
-                disabled={busyAction !== null}
-                defaultValue={editingAccount?.mode ?? 'actual'}
-              >
-                <SelectTrigger id="account-mode" className="w-full">
-                  <SelectValue>
-                    {(value: string | null) => (value === 'shadow' ? '模拟账户' : '实际账户')}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="actual">实际账户</SelectItem>
-                    <SelectItem value="shadow">模拟账户</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select> : <>
-                <Input id="account-mode" aria-label="账户模式" value={globalMode === 'shadow' ? '模拟账户' : '实际账户'} readOnly />
-                <input type="hidden" name="mode" value={globalMode} />
-              </>}
-            </Field>
+            <AccountModeField
+              editingAccount={editingAccount}
+              busyAction={busyAction}
+              globalMode={globalMode}
+            />
             <Field>
               <FieldLabel htmlFor="account-currency">币种</FieldLabel>
               <Input
@@ -352,5 +347,48 @@ function AccountFormContent({
         </SheetFooter>
       </form>
     </div>
+  );
+}
+
+function AccountModeField({
+  editingAccount,
+  busyAction,
+  globalMode,
+}: Pick<PortfolioManagementViewProps, 'editingAccount' | 'busyAction'> & {
+  globalMode: 'actual' | 'shadow';
+}) {
+  return (
+    <Field>
+      <FieldLabel htmlFor="account-mode">账户模式</FieldLabel>
+      {editingAccount ? (
+        <Select
+          name="mode"
+          disabled={busyAction !== null}
+          defaultValue={editingAccount?.mode ?? 'actual'}
+        >
+          <SelectTrigger id="account-mode" className="w-full">
+            <SelectValue>
+              {(value: string | null) => (value === 'shadow' ? '模拟账户' : '实际账户')}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="actual">实际账户</SelectItem>
+              <SelectItem value="shadow">模拟账户</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      ) : (
+        <>
+          <Input
+            id="account-mode"
+            aria-label="账户模式"
+            value={globalMode === 'shadow' ? '模拟账户' : '实际账户'}
+            readOnly
+          />
+          <input type="hidden" name="mode" value={globalMode} />
+        </>
+      )}
+    </Field>
   );
 }

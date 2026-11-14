@@ -80,10 +80,10 @@ describe('风险规则自动接入的桌面状态', () => {
     await mount();
     expect(host.textContent).toBe('自动监控必要汇率缺失，组合权重不可评估');
   });
-  it('正常监控说明何时评估', async () => {
+  it('正常监控显示生效规则正在自动评估', async () => {
     monitoring.mockResolvedValue({ ...status, inputUnavailable: 0, unsupportedRules: 0 });
     await mount();
-    expect(host.textContent).toBe('自动监控2 条生效规则随行情更新评估');
+    expect(host.textContent).toBe('自动监控2 条生效规则自动评估中');
   });
   it('状态失败不当作未开启，重读恢复不会写入任务或通知设置', async () => {
     monitoring.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(status);

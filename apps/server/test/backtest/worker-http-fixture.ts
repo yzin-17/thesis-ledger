@@ -11,7 +11,7 @@ export async function startWorkerHttpFixture(service: BacktestService): Promise<
 }> {
   const path = pathToFileURL(resolve('dist/src/backtest/backtest.controller.js')).href;
   const { BacktestController } = (await import(path)) as { BacktestController: Type<unknown> };
-  const [serviceToken, eventsToken] = Reflect.getMetadata('design:paramtypes', BacktestController);
+  const [serviceToken, eventsToken, accessToken, identityToken] = Reflect.getMetadata('design:paramtypes', BacktestController);
   class WorkerHttpFixtureModule {}
   const app = await NestFactory.create(
     {
@@ -20,9 +20,12 @@ export async function startWorkerHttpFixture(service: BacktestService): Promise<
       providers: [
         { provide: serviceToken, useValue: service },
         { provide: eventsToken, useValue: {} },
+        // 隔离计算测试的访问范围固定为本测试资源；身份授权由独立测试覆盖。
+        { provide: accessToken, useValue: { version: async () => undefined, run: async () => undefined } },
+        { provide: identityToken, useValue: {} },
       ],
     },
-    { logger: false },
+    { logger: false, abortOnError: false },
   );
   app.setGlobalPrefix('api/v1');
   await app.listen(0, '127.0.0.1');

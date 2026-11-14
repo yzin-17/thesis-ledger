@@ -2,7 +2,8 @@ import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { useRoute, type RouteProp } from '@react-navigation/native';
-import { resultReadEligibilitySchema } from '@thesis-ledger/schemas';
+import { resultReadEligibilitySchema, type BacktestResultV3 } from '@thesis-ledger/schemas';
+import { PriceResearchResult } from './PriceResearchResult';
 import { confirmAction, useMobileRuntime } from '../../app/MobileRuntime';
 import { useMobileCommand } from '../../app/query/mobile-queries';
 import type { StrategyStackParams } from '../../app/strategy-navigation';
@@ -262,6 +263,7 @@ function BacktestEconomicResult({
   state: ReturnType<typeof useBacktestResultController>;
 }) {
   const { currency, timezone, range, setRange, exportCommand, setMessage, query } = state;
+  const research = 'priceResearch' in result ? result.priceResearch : undefined;
   return (
     <>
       <Copy>
@@ -271,6 +273,7 @@ function BacktestEconomicResult({
       {result.warnings.map((v, i) => (
         <Copy key={i}>{v}</Copy>
       ))}
+      {research && <PriceResearchResult result={result as BacktestResultV3} currency={currency} />}
       <Choices
         label="权益曲线范围"
         value={range}
@@ -283,7 +286,7 @@ function BacktestEconomicResult({
       />
       <MobileChart data={mobileEquityChart(result, range)} />
       <Copy muted>
-        图表最多显示末尾 3000 点。CSV 保留所选日期范围的全部原始金额；未返回的现金和持仓市值留空。
+        图表最多显示末尾 3000 点。CSV 保留所选日期范围的全部原始金额；未返回的分项留空。
       </Copy>
       <Section title="回测指标">
         {Object.entries(result.metrics).map(([name, metric]) => (

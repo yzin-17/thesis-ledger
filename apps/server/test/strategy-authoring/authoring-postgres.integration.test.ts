@@ -90,6 +90,13 @@ const finishInput = (attempt: number) => ({
 });
 
 (enabled ? describe : describe.skip)('自然语言编写专用 PostgreSQL 集成', () => {
+  authoringDatabaseLifecycle();
+  registerAuthoringDraftIdentityCases();
+  registerAuthoringOperationLeaseCases();
+  registerAuthoringProposalAndPublicationCases();
+});
+
+function authoringDatabaseLifecycle() {
   beforeAll(async () => {
     await migrateFixture();
     await db!.$connect();
@@ -97,7 +104,8 @@ const finishInput = (attempt: number) => ({
   afterAll(async () => {
     await db?.$disconnect();
   });
-
+}
+function registerAuthoringDraftIdentityCases() {
   it('全部迁移、head、预期表与受限权限通过，旧记录保持原值', async () => {
     const structure = await migrateFixture();
     expect(ownerSql('SELECT version FROM "SchemaVersion" WHERE id=1')).toBe(structure.currentHead);
@@ -184,7 +192,6 @@ const finishInput = (attempt: number) => ({
     expect(actual).toEqual(expected);
     expect(new Set(actual).size).toBe(4);
   });
-
   it('跨 owner 读取、更新、丢弃均拒绝，分页不会泄露他人草稿', async () => {
     const draft = await drafts.create('private-owner', content());
     await Promise.all(
@@ -199,13 +206,18 @@ const finishInput = (attempt: number) => ({
     const pageOwner = `page-${randomUUID()}`;
     await drafts.create(pageOwner, content());
     await drafts.create(pageOwner, content());
+    const removed = await drafts.create(pageOwner, content());
+    await drafts.discard(pageOwner, removed.id, 1);
     const page = await drafts.list(pageOwner, { limit: 1 });
     expect(page.items).toHaveLength(1);
     expect(page.items[0]!.ownerId).toBe(pageOwner);
+    expect(page.items[0]!.id).not.toBe(removed.id);
     expect(page.nextCursor).not.toBeNull();
     const next = await drafts.list(pageOwner, { limit: 1, before: page.nextCursor! });
     expect(next.items[0]!.id).not.toBe(page.items[0]!.id);
+    expect(next.items[0]!.id).not.toBe(removed.id);
     expect(next.nextCursor).toBeNull();
+    expect((await drafts.read(pageOwner, removed.id)).state).toBe('discarded');
   });
   it('丢弃后不可写入或提交新操作', async () => {
     const draft = await drafts.create('alice', content());
@@ -217,6 +229,8 @@ const finishInput = (attempt: number) => ({
       response: { code: 'AUTHORING_CLOSED' },
     });
   });
+}
+function registerAuthoringOperationLeaseCases() {
   it('同意图并发只创建一个操作；更改选定模型和第二个活动意图被拒', async () => {
     const draft = await drafts.create('alice', content());
     const input = operationInput(1);
@@ -297,6 +311,8 @@ const finishInput = (attempt: number) => ({
     expect(failed.outcome!.cost.amount).toBeNull();
     expect(failed.outcome!.externalResult).toBe('unknown');
   });
+}
+function registerAuthoringProposalAndPublicationCases() {
   it('提案绑定定义和修订，读取可识别过期且他人不能处理', async () => {
     const draft = await drafts.create('alice', content(true));
     const operation = await operations.submit(
@@ -434,4 +450,4 @@ const finishInput = (attempt: number) => ({
     expect(await db!.strategy.count()).toBe(count);
     expect((await drafts.read('alice', draft.id)).state).toBe('editing');
   });
-});
+}

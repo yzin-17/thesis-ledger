@@ -184,7 +184,8 @@ describe('定期入账失败后的表单恢复', () => {
     await clickButton('确认入账');
     expectSubmissionError();
     expect(input('cash-occurrence-amount').value).toBe('123.45');
-    expect(input('cash-occurrence-date').value).toBe('2026-10-15T12:34');
+    expect(input('cash-occurrence-date').value).toBe('2026-10-15 12:34');
+    expect(input('cash-occurrence-date-value').value).toBe('2026-10-15T12:34');
     mocks.confirm.mockResolvedValueOnce({});
     await clickButton('确认入账');
     expect(mocks.confirm).toHaveBeenCalledTimes(2);

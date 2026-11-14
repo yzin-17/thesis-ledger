@@ -1,11 +1,12 @@
 import {
   runExchangeSimulation,
   availabilityForDecision,
+  DecimalValue,
   type BacktestEquityPoint,
   type BacktestCorporateActionFact,
 } from '@thesis-ledger/domain';
 import { lifecycleSignalDateV3, lifecycleWarmupRowV3 } from './backtest-lifecycle-execution-v3.js';
-import { runConfigSchemaV3 } from '@thesis-ledger/schemas';
+import { runConfigSchemaV3, priceResearchReferenceArtifactKey } from '@thesis-ledger/schemas';
 import { expectedStatusRejectionV3 } from './backtest-status-rejection-availability-v3.js';
 import {
   buildBacktestAnalytics,
@@ -72,8 +73,11 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     instrumentRows,
     (row) => row.symbol === instrument.symbol && row.market === instrument.market,
   );
-  const fact = instrumentFact(instrumentRow, isNormalizedSeries,
-    hkResearchLotForFactV3(instrumentRow, v3Config));
+  const fact = instrumentFact(
+    instrumentRow,
+    isNormalizedSeries,
+    hkResearchLotForFactV3(instrumentRow, v3Config),
+  );
   const executionModel = input.runConfig.executionModel as
     | NonNullable<Parameters<typeof runExchangeSimulation>[0]['exchange']['executionModel']>
     | undefined;
@@ -87,6 +91,207 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
   const calendar = tradingCalendarFromFact(
     calendarFact(rowFor(calendarRows, (row) => row.market === instrument.market)),
   );
+  const rules = frozenExchangeRules(
+    input,
+    calendarRows,
+    fact,
+    calendar,
+    executionModel,
+    ruleSnapshot,
+  );
+  const ledgerConfig = {
+    ...initialLedgerConfig(input.strategy, input.runConfig),
+    accountingBasis: snapshotProtocol.accountingBasis,
+  };
+  const ledger = new SimulationLedger(ledgerConfig);
+  const barRows = rowsForPurpose(input.rows, 'execution');
+  const bars = executionBars(
+    rowsAtTimeframe(barRows, input.strategy.primaryTimeframe, calendar),
+    calendar,
+    v3Config,
+  );
+  const fxRates = fxRatesFrom(input.rows);
+  const actualRows = input.rows.get(`${input.runId}/${priceResearchReferenceArtifactKey}`) ?? [];
+  const actualBars = v3Config.priceResearch ? executionBars(actualRows, calendar, v3Config) : [];
+  const sourceSeries = frozenExchangeSignalSeries(input, calendarRows, barRows, isNormalizedSeries);
+  const costs = {
+    version: executionModel
+      ? `execution-model-v1:${executionModel.id}:${executionModel.version}`
+      : 'snapshot-cost-v1',
+    commissionRate: executionModel ? '0' : input.strategy.cost.commissionRate,
+    slippageRate: input.strategy.cost.slippageRate,
+    ...(executionModel || input.strategy.cost.minimumCommission === undefined
+      ? {}
+      : { minimumCommission: input.strategy.cost.minimumCommission }),
+  };
+  const actionRows = rowsForPurpose(input.rows, 'corporateActions');
+  const corporateActions = actionRows
+    .filter((row) => row.kind !== 'empty-dataset')
+    .map(toCorporateAction);
+  const accountingActions = frozenAccountingActionsV3(v3Config, corporateActions, input.rows, {
+    calendar,
+    bars,
+  });
+  const cashEntitlement = knownCashEntitlementV3(calendar, v3Config);
+  const executionSeries: BacktestSeries = {
+    sourceId: `execution:${instrument.market}:${instrument.symbol}`,
+    symbol: instrument.symbol,
+    market: instrument.market,
+    assetType: instrument.assetType,
+    field: 'close',
+    timeframe: input.strategy.primaryTimeframe,
+    adjusted: isNormalizedSeries,
+    points: bars.map((bar) => ({
+      occurredAt: bar.occurredAt,
+      availableAt: bar.availableAt,
+      ...(bar.researchClock ? { researchClock: bar.researchClock } : {}),
+      value: bar.close,
+      status: bar.status,
+    })),
+  };
+  const valuationPriceSeries: BacktestSeries = {
+    ...executionSeries,
+    points: executionSeries.points.filter((point) => point.status === 'available'),
+  };
+  const executionRangeBars = bars.filter((bar) => {
+    const tradingDate = calendar.status(bar.occurredAt).date;
+    return tradingDate >= input.runConfig.startDate && tradingDate <= input.runConfig.endDate;
+  });
+  const decisionBars = executionRangeBars.filter((bar) =>
+    lifecycleSignalDateV3(v3Config, calendar.status(bar.occurredAt).date),
+  );
+  const ticks = exchangeDecisionTicksV3(
+    decisionBars,
+    input.strategy.primaryTimeframe,
+    (at) => calendar.status(at).date,
+  );
+  requireV3EventSignalVisibility({
+    strategy: input.strategy,
+    facts: corporateActions,
+    ticks,
+    symbol: instrument.symbol,
+    market: instrument.market,
+  });
+  const indicatorSeries = buildPointInTimeIndicatorSeries({
+    expressions: [input.strategy.entry, input.strategy.exit],
+    sourceSeries,
+    corporateActions: isNormalizedSeries ? [] : corporateActions,
+    ticks,
+  });
+  const equityCurve: BacktestEquityPoint[] = [];
+  const valuationUnavailableReasons: string[] = [];
+  const valuationTicks = buildDailyValuationTicks({
+    startDate: input.runConfig.startDate,
+    endDate: input.runConfig.endDate,
+    policy: input.runConfig.valuationPolicy,
+    calendar,
+  });
+  const riskAdapter = exchangeRiskAdapter(input, executionSeries);
+  const positionStateAt = exchangePositionState(ledger, cashEntitlement, ticks);
+  const simulation = runExchangeSimulation({
+    simulation: {
+      runId: input.runId,
+      strategy: {
+        entry: input.strategy.entry,
+        exit: input.strategy.exit,
+        executionInstrument: input.strategy.executionInstrument,
+        primaryTimeframe: input.strategy.primaryTimeframe,
+      },
+      ticks,
+      sourceSeries,
+      indicatorSeries,
+      portfolioValuation: {
+        ticks: valuationTicks,
+        valueAt: (tick) => {
+          const point = latestPointAt(valuationPriceSeries, tick.occurredAt);
+          const valuation = buildBacktestEquityPoint({
+            state: ledger.snapshot(),
+            valuationAt: tick.occurredAt,
+            policy: input.runConfig.valuationPolicy,
+            fxRates,
+            ...(point?.status === 'available' && point.value !== undefined
+              ? {
+                  price: {
+                    symbol: instrument.symbol,
+                    market: instrument.market,
+                    assetType: instrument.assetType,
+                    currency: fact.currency,
+                    price: point.value,
+                    occurredAt: point.occurredAt,
+                    availableAt: point.availableAt,
+                    ...(point.researchClock ? { researchClock: point.researchClock } : {}),
+                  },
+                }
+              : {}),
+          });
+          if (valuation.status === 'available') equityCurve.push(valuation.point);
+          else valuationUnavailableReasons.push(valuation.reason);
+        },
+      },
+      risk: (context) => riskAdapter.asSimulationRisk(context),
+      positionStateAt,
+      ...cashEntitlement?.checkpoint(accountingActions, () => ledger.snapshot().position.quantity),
+      corporateActions: isNormalizedSeries ? [] : accountingActions,
+      corporateActionSignalFacts: corporateActions,
+    },
+    ledger,
+    accountingBasis: snapshotProtocol.accountingBasis,
+    exchange: {
+      ...(cashEntitlement
+        ? {
+            cashEntitlementFor: (fact: BacktestCorporateActionFact) =>
+              cashEntitlement.quantityFor(fact),
+          }
+        : {}),
+      rules,
+      calendar,
+      bars,
+      costs,
+      ...(executionModel ? { executionModel, dataAsOf: input.runConfig.dataAsOf } : {}),
+      sizingForIntent: exchangeSizing(
+        input,
+        bars,
+        calendar,
+        fact,
+        fxRates,
+        actualBars,
+        isNormalizedSeries,
+      ),
+    },
+  });
+  return exchangeVerticalResult(input, {
+    simulation,
+    ledger,
+    isNormalizedSeries,
+    executionModel,
+    equityCurve,
+    valuationUnavailableReasons,
+    ticks,
+    fact,
+  });
+};
+
+export type { ExchangeVerticalResult };
+
+type FrozenExecutionModel =
+  | NonNullable<Parameters<typeof runExchangeSimulation>[0]['exchange']['executionModel']>
+  | undefined;
+type ExchangeCalendar = ReturnType<typeof tradingCalendarFromFact>;
+type ExchangeBars = ReturnType<typeof executionBars>;
+type ExchangeSizing = NonNullable<
+  Parameters<typeof runExchangeSimulation>[0]['exchange']['sizingForIntent']
+>;
+
+function frozenExchangeRules(
+  input: ExchangeVerticalInput,
+  calendarRows: ReturnType<typeof rowsForPurpose>,
+  fact: ReturnType<typeof instrumentFact>,
+  calendar: ExchangeCalendar,
+  executionModel: FrozenExecutionModel,
+  ruleSnapshot: ReturnType<typeof requireFrozenExecutionRules> | undefined,
+) {
+  const v3Config = input.runConfig;
+  const instrument = input.strategy.executionInstrument;
   const rules = new VersionedExecutionRules({
     version: input.marketRuleVersion,
     ...(v3Config.executionPriceProtocol.cashEventResearch ||
@@ -138,31 +343,51 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
           ...(charge.minimum === null ? {} : { minimum: charge.minimum }),
         })),
   });
-  const ledgerConfig = {
-    ...initialLedgerConfig(input.strategy, input.runConfig),
-    accountingBasis: snapshotProtocol.accountingBasis,
-  };
-  const ledger = new SimulationLedger(ledgerConfig);
-  const barRows = rowsForPurpose(input.rows, 'execution');
-  const bars = executionBars(
-    rowsAtTimeframe(barRows, input.strategy.primaryTimeframe, calendar),
-    calendar,
-    v3Config,
-  );
-  const fxRates = fxRatesFrom(input.rows);
+
+  return rules;
+}
+
+function frozenExchangeSignalSeries(
+  input: ExchangeVerticalInput,
+  calendarRows: ReturnType<typeof rowsForPurpose>,
+  barRows: ReturnType<typeof rowsForPurpose>,
+  isNormalizedSeries: boolean,
+) {
+  const v3Config = input.runConfig;
   const sourceSeries = new Map<string, BacktestSeries>();
   for (const source of input.strategy.signalSources) {
     const binding = v3Config.priceInputBindings?.signals.find(
       (alias) => alias.sourceId === source.id,
     );
+    const actualReference = binding?.binding === 'actual-price-series';
+    const priceKey = actualReference ? priceResearchReferenceArtifactKey : 'execution/bars.parquet';
     const ref = binding
-      ? input.artifacts.find((artifact) => artifact.key.endsWith('/execution/bars.parquet'))
+      ? input.artifacts.find((artifact) => artifact.key.endsWith(`/${priceKey}`))
       : signalArtifactFor(input.artifacts, source.asset.market, source.asset.symbol);
     if (ref) {
       const sourceCalendar = tradingCalendarFromFact(
         calendarFact(rowFor(calendarRows, (row) => row.market === source.asset.market)),
       );
-      const rows = rowsAtTimeframe(input.rows.get(ref.key) ?? [], source.timeframe, sourceCalendar).filter(row => lifecycleWarmupRowV3(v3Config, row));
+      let rows = rowsAtTimeframe(
+        input.rows.get(ref.key) ?? [],
+        source.timeframe,
+        sourceCalendar,
+      ).filter((row) => lifecycleWarmupRowV3(v3Config, row));
+      if (actualReference) {
+        const byTime = new Map(rows.map((row) => [Date.parse(String(row.occurredAt)), row]));
+        rows = barRows.map(
+          (row) =>
+            byTime.get(Date.parse(String(row.occurredAt))) ?? {
+              ...row,
+              open: null,
+              high: null,
+              low: null,
+              close: null,
+              volume: null,
+              amount: null,
+            },
+        );
+      }
       for (const field of source.series) {
         sourceSeries.set(sourceSeriesKey(source.id, field), {
           sourceId: source.id,
@@ -171,12 +396,23 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
           assetType: source.asset.assetType,
           field,
           timeframe: source.timeframe,
-          adjusted: isNormalizedSeries,
-          points: rows.flatMap((row) => {
+          adjusted: isNormalizedSeries && !actualReference,
+          points: rows.flatMap<BacktestSeries['points'][number]>((row) => {
             if (typeof row.occurredAt !== 'string' || typeof row.availableAt !== 'string')
               return [];
             const value = row[field];
-            if (typeof value !== 'string') return [];
+            if (typeof value !== 'string') {
+              if (!actualReference) return [];
+              return [
+                {
+                  occurredAt: row.occurredAt,
+                  availableAt: row.availableAt,
+                  ...barResearchClocksV3(row, sourceCalendar, v3Config),
+                  status: 'unavailable',
+                  reason: '该会话缺少不复权参考价格',
+                },
+              ];
+            }
             return [
               {
                 occurredAt: row.occurredAt,
@@ -191,69 +427,12 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
       }
     }
   }
-  const costs = {
-    version: executionModel
-      ? `execution-model-v1:${executionModel.id}:${executionModel.version}`
-      : 'snapshot-cost-v1',
-    commissionRate: executionModel ? '0' : input.strategy.cost.commissionRate,
-    slippageRate: input.strategy.cost.slippageRate,
-    ...(executionModel || input.strategy.cost.minimumCommission === undefined
-      ? {}
-      : { minimumCommission: input.strategy.cost.minimumCommission }),
-  };
-  const actionRows = rowsForPurpose(input.rows, 'corporateActions');
-  const corporateActions = actionRows
-    .filter((row) => row.kind !== 'empty-dataset')
-    .map(toCorporateAction);
-  const accountingActions = frozenAccountingActionsV3(v3Config, corporateActions, input.rows, { calendar, bars });
-  const cashEntitlement = knownCashEntitlementV3(calendar, v3Config);
-  const executionSeries: BacktestSeries = {
-    sourceId: `execution:${instrument.market}:${instrument.symbol}`,
-    symbol: instrument.symbol,
-    market: instrument.market,
-    assetType: instrument.assetType,
-    field: 'close',
-    timeframe: input.strategy.primaryTimeframe,
-    adjusted: isNormalizedSeries,
-    points: bars.map((bar) => ({
-      occurredAt: bar.occurredAt,
-      availableAt: bar.availableAt,
-      ...(bar.researchClock ? { researchClock: bar.researchClock } : {}),
-      value: bar.close,
-      status: bar.status,
-    })),
-  };
-  const valuationPriceSeries: BacktestSeries = {
-    ...executionSeries,
-    points: executionSeries.points.filter((point) => point.status === 'available'),
-  };
-  const executionRangeBars = bars.filter((bar) => {
-    const tradingDate = calendar.status(bar.occurredAt).date;
-    return tradingDate >= input.runConfig.startDate && tradingDate <= input.runConfig.endDate;
-  });
-  const decisionBars = executionRangeBars.filter(bar => lifecycleSignalDateV3(v3Config, calendar.status(bar.occurredAt).date));
-  const ticks = exchangeDecisionTicksV3(decisionBars, input.strategy.primaryTimeframe, (at) => calendar.status(at).date);
-  requireV3EventSignalVisibility({
-    strategy: input.strategy,
-    facts: corporateActions,
-    ticks,
-    symbol: instrument.symbol,
-    market: instrument.market,
-  });
-  const indicatorSeries = buildPointInTimeIndicatorSeries({
-    expressions: [input.strategy.entry, input.strategy.exit],
-    sourceSeries,
-    corporateActions: isNormalizedSeries ? [] : corporateActions,
-    ticks,
-  });
-  const equityCurve: BacktestEquityPoint[] = [];
-  const valuationUnavailableReasons: string[] = [];
-  const valuationTicks = buildDailyValuationTicks({
-    startDate: input.runConfig.startDate,
-    endDate: input.runConfig.endDate,
-    policy: input.runConfig.valuationPolicy,
-    calendar,
-  });
+
+  return sourceSeries;
+}
+
+function exchangeRiskAdapter(input: ExchangeVerticalInput, executionSeries: BacktestSeries) {
+  const instrument = input.strategy.executionInstrument;
   const riskAdapter = createRiskEvaluationAdapter({
     riskInputAt: (context) => {
       const position = context.positionState ?? {
@@ -296,6 +475,15 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
       };
     },
   });
+
+  return riskAdapter;
+}
+
+function exchangePositionState(
+  ledger: SimulationLedger,
+  cashEntitlement: ReturnType<typeof knownCashEntitlementV3>,
+  ticks: ReturnType<typeof exchangeDecisionTicksV3>,
+) {
   let positionOpenedAt: string | undefined;
   let positionWasOpen = false;
   const positionStateAt: NonNullable<
@@ -325,121 +513,126 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
       availableAt: tick.occurredAt,
     };
   };
-  const simulation = runExchangeSimulation({
-    simulation: {
-      runId: input.runId,
-      strategy: {
-        entry: input.strategy.entry,
-        exit: input.strategy.exit,
-        executionInstrument: input.strategy.executionInstrument,
-        primaryTimeframe: input.strategy.primaryTimeframe,
-      },
-      ticks,
-      sourceSeries,
-      indicatorSeries,
-      portfolioValuation: {
-        ticks: valuationTicks,
-        valueAt: (tick) => {
-          const point = latestPointAt(valuationPriceSeries, tick.occurredAt);
-          const valuation = buildBacktestEquityPoint({
-            state: ledger.snapshot(),
-            valuationAt: tick.occurredAt,
-            policy: input.runConfig.valuationPolicy,
-            fxRates,
-            ...(point?.status === 'available' && point.value !== undefined
-              ? {
-                  price: {
-                    symbol: instrument.symbol,
-                    market: instrument.market,
-                    assetType: instrument.assetType,
-                    currency: fact.currency,
-                    price: point.value,
-                    occurredAt: point.occurredAt,
-                    availableAt: point.availableAt,
-                    ...(point.researchClock ? { researchClock: point.researchClock } : {}),
-                  },
-                }
-              : {}),
-          });
-          if (valuation.status === 'available') equityCurve.push(valuation.point);
-          else valuationUnavailableReasons.push(valuation.reason);
-        },
-      },
-      risk: (context) => riskAdapter.asSimulationRisk(context),
-      positionStateAt,
-      ...cashEntitlement?.checkpoint(accountingActions, () => ledger.snapshot().position.quantity),
-      corporateActions: isNormalizedSeries ? [] : accountingActions,
-      corporateActionSignalFacts: corporateActions,
-    },
-    ledger,
-    accountingBasis: snapshotProtocol.accountingBasis,
-    exchange: {
-      ...(cashEntitlement ? { cashEntitlementFor: (fact: BacktestCorporateActionFact) => cashEntitlement.quantityFor(fact) } : {}),
-      rules,
-      calendar,
-      bars,
-      costs,
-      ...(executionModel ? { executionModel, dataAsOf: input.runConfig.dataAsOf } : {}),
-      sizingForIntent: (intent: SimulationTargetIntent, state) => {
-        const next = bars.find(
-          (bar) =>
-            Date.parse(bar.openedAt) > Date.parse(intent.occurredAt) &&
-            calendar.isTradingSession(bar.openedAt),
-        );
-        const openAvailability = next
-          ? {
+
+  return positionStateAt;
+}
+
+function exchangeSizing(
+  input: ExchangeVerticalInput,
+  bars: ExchangeBars,
+  calendar: ExchangeCalendar,
+  fact: ReturnType<typeof instrumentFact>,
+  fxRates: ReturnType<typeof fxRatesFrom>,
+  actualBars: ExchangeBars,
+  isNormalizedSeries: boolean,
+): ExchangeSizing {
+  const v3Config = input.runConfig;
+  const instrument = input.strategy.executionInstrument;
+  return (intent: SimulationTargetIntent, state) => {
+    const next = bars.find(
+      (bar) =>
+        Date.parse(bar.openedAt) > Date.parse(intent.occurredAt) &&
+        calendar.isTradingSession(bar.openedAt),
+    );
+    const openAvailability = next
+      ? {
+          availableAt: next.openAvailableAt,
+          ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
+        }
+      : undefined;
+    const evaluationAt = openAvailability
+      ? availabilityForDecision(openAvailability)!
+      : intent.occurredAt;
+    const sizingEquity = next
+      ? buildBacktestSizingEquity({
+          state,
+          executionCurrency: fact.currency,
+          evaluationAt,
+          policy: input.runConfig.valuationPolicy,
+          price: {
+            symbol: instrument.symbol,
+            market: instrument.market,
+            assetType: instrument.assetType,
+            currency: fact.currency,
+            price: next.open,
+            occurredAt: next.openedAt,
+            availableAt: next.openAvailableAt,
+            ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
+          },
+          fxRates,
+        })
+      : undefined;
+    let sizingRule = input.strategy.sizing;
+    if (intent.side === 'sell') {
+      if (isNormalizedSeries) sizingRule = { type: 'targetWeight', weight: '0' };
+      else sizingRule = { type: 'fixedQuantity', quantity: state.position.quantity };
+    }
+    const actual = next ? actualBars.find((bar) => bar.openedAt === next.openedAt) : undefined;
+    return {
+      rule: sizingRule,
+      ...(v3Config.priceResearch && sizingRule.type === 'fixedQuantity'
+        ? {
+            priceResearchReference: {
+              protocolVersion: v3Config.priceResearch.protocolVersion,
+              ...(actual
+                ? {
+                    actualPrice: {
+                      value: actual.open,
+                      occurredAt: actual.openedAt,
+                      availableAt: actual.openAvailableAt,
+                      ...(actual.openResearchClock
+                        ? { researchClock: actual.openResearchClock }
+                        : {}),
+                    },
+                  }
+                : {}),
+            },
+          }
+        : {}),
+      executionCurrency: fact.currency,
+      lotSize: fact.lotSize,
+      currentQuantity: state.position.quantity,
+      evaluationAt,
+      ...(next
+        ? {
+            price: {
+              value: next.open,
+              occurredAt: next.openedAt,
               availableAt: next.openAvailableAt,
               ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
-            }
-          : undefined;
-        const evaluationAt = openAvailability
-          ? availabilityForDecision(openAvailability)!
-          : intent.occurredAt;
-        const sizingEquity = next
-          ? buildBacktestSizingEquity({
-              state,
-              executionCurrency: fact.currency,
-              evaluationAt,
-              policy: input.runConfig.valuationPolicy,
-              price: {
-                symbol: instrument.symbol,
-                market: instrument.market,
-                assetType: instrument.assetType,
-                currency: fact.currency,
-                price: next.open,
-                occurredAt: next.openedAt,
-                availableAt: next.openAvailableAt,
-                ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
-              },
-              fxRates,
-            })
-          : undefined;
-        let sizingRule = input.strategy.sizing;
-        if (intent.side === 'sell') {
-          if (isNormalizedSeries) sizingRule = { type: 'targetWeight', weight: '0' };
-          else sizingRule = { type: 'fixedQuantity', quantity: state.position.quantity };
-        }
-        return {
-          rule: sizingRule,
-          executionCurrency: fact.currency,
-          lotSize: fact.lotSize,
-          currentQuantity: state.position.quantity,
-          evaluationAt,
-          ...(next
-            ? {
-                price: {
-                  value: next.open,
-                  occurredAt: next.openedAt,
-                  availableAt: next.openAvailableAt,
-                  ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
-                },
-              }
-            : {}),
-          ...(sizingEquity ?? {}),
-        };
-      },
-    },
-  });
+            },
+          }
+        : {}),
+      ...(sizingEquity ?? {}),
+    };
+  };
+}
+
+function exchangeVerticalResult(
+  input: ExchangeVerticalInput,
+  context: {
+    simulation: ReturnType<typeof runExchangeSimulation>;
+    ledger: SimulationLedger;
+    isNormalizedSeries: boolean;
+    executionModel: FrozenExecutionModel;
+    equityCurve: BacktestEquityPoint[];
+    valuationUnavailableReasons: string[];
+    ticks: ReturnType<typeof exchangeDecisionTicksV3>;
+    fact: ReturnType<typeof instrumentFact>;
+  },
+): ExchangeVerticalResult {
+  const {
+    simulation,
+    ledger,
+    isNormalizedSeries,
+    executionModel,
+    equityCurve,
+    valuationUnavailableReasons,
+    ticks,
+    fact,
+  } = context;
+  const v3Config = input.runConfig;
+  const instrument = input.strategy.executionInstrument;
   const fills = simulation.fills;
   const rejects = simulation.rejects.filter(
     (reject) => !isNormalizedSeries || reject.code !== 'CORPORATE_ACTION_IGNORED',
@@ -484,17 +677,47 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     equityCurve,
   });
   const expected = rejects.filter((reject) => expectedStatusRejectionV3(input.runConfig, reject));
-  const analytics = expected.length ? { ...computedAnalytics,
-    completeness: computedAnalytics.completeness === 'complete' ? 'partial' as const : computedAnalytics.completeness,
-    warnings: [...computedAnalytics.warnings, `已按冻结状态模型拒绝${expected.length}笔订单；有效成交、现金账与指标保留，未知状态仍按研究假设披露。`],
-  } : computedAnalytics;
+  const analytics = expected.length
+    ? {
+        ...computedAnalytics,
+        completeness:
+          computedAnalytics.completeness === 'complete'
+            ? ('partial' as const)
+            : computedAnalytics.completeness,
+        warnings: [
+          ...computedAnalytics.warnings,
+          `已按冻结状态模型拒绝${expected.length}笔订单；有效成交、现金账与指标保留，未知状态仍按研究假设披露。`,
+        ],
+      }
+    : computedAnalytics;
   return {
     fills,
     rejects,
     trades: trades.trades,
     analytics,
+    ...(v3Config.priceResearch
+      ? {
+          researchBalances: {
+            fundsBalance: {
+              amount: DecimalValue.from(ledger.snapshot().cash[v3Config.baseCurrency].settled)
+                .plus(ledger.snapshot().cash[v3Config.baseCurrency].unsettled)
+                .toString(),
+              currency: v3Config.baseCurrency,
+            },
+            positionUnits: ledger.snapshot().position.quantity,
+            ...(equityCurve.at(-1)
+              ? {
+                  simulatedPnl: {
+                    currency: v3Config.baseCurrency,
+                    amount: DecimalValue.from(equityCurve.at(-1)!.value.amount)
+                      .minus(v3Config.initialCash[v3Config.baseCurrency]!)
+                      .toString(),
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
     ...cashDividendExecutionEventsV3(input.runConfig, simulation),
   };
-};
-
-export type { ExchangeVerticalResult };
+}

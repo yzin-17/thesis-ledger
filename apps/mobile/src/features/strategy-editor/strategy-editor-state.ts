@@ -1,16 +1,20 @@
 import { isEqual } from 'es-toolkit';
 import {
   strategySchema,
+  projectPriceResearchStrategy,
+  priceResearchStrategyIssues,
   strategyDefinitionCreateSchema,
   type StrategyDefinitionRead,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 export const initialStrategyDefinition = (name: string) => ({
-  schemaVersion: '2',
+  schemaVersion: '3',
   name,
   description: '示例规则，保存前请核对信号、执行与成本。',
   signalSources: [
     {
       id: 'execution',
+      priceCoordinate: 'research',
       asset: { symbol: '', market: 'CN', assetType: 'stock' },
       timeframe: '1d',
       series: ['open', 'close'],
@@ -48,7 +52,11 @@ export function validatedDefinition(text: string) {
     const first = parsed.error.issues[0];
     throw Error(`${first?.path.join('.')}：${first?.message ?? '定义无效'}`);
   }
-  return value;
+  if (parsed.data.schemaVersion !== '3') return value;
+  const projected = projectPriceResearchStrategy(parsed.data as BacktestStrategy);
+  const issue = priceResearchStrategyIssues(projected)[0];
+  if (issue) throw Error(`${issue.path.join('.')}：${issue.message}`);
+  return projected;
 }
 export type PendingStrategySave = {
   name: string;

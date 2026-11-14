@@ -60,19 +60,7 @@ export class IntegrityService {
             suggestion: '在确认 Ledger 正确后重建 Trade 与 Position 核心投影',
           });
       }
-      for (const position of account.positions) {
-        if (
-          Math.abs(Number(position.quantity)) > POSITION_EPSILON &&
-          !activeTradeQuantities.has(position.symbol)
-        )
-          issues.push({
-            code: 'position_without_ledger_projection',
-            severity: 'error',
-            entity: `${account.id}:${position.symbol}`,
-            message: 'DB Position 存在，但 Ledger 没有对应的非零投影',
-            suggestion: '检查遗留 Position 或缺失 Ledger 事件，再执行 Position rebuild',
-          });
-      }
+      appendUnbackedPositionIssues(issues, account.id, account.positions, activeTradeQuantities);
       for (const snapshot of account.snapshots)
         if (Number(snapshot.marketValue) < 0 || Number(snapshot.costValue) < 0)
           issues.push({
@@ -90,5 +78,26 @@ export class IntegrityService {
       healthy: issues.every((issue) => issue.severity !== 'error'),
       issues,
     };
+  }
+}
+
+function appendUnbackedPositionIssues(
+  issues: IntegrityIssue[],
+  accountId: string,
+  positions: ReadonlyArray<{ symbol: string; quantity: unknown }>,
+  activeTradeQuantities: ReadonlyMap<string, number>,
+) {
+  for (const position of positions) {
+    if (
+      Math.abs(Number(position.quantity)) > POSITION_EPSILON &&
+      !activeTradeQuantities.has(position.symbol)
+    )
+      issues.push({
+        code: 'position_without_ledger_projection',
+        severity: 'error',
+        entity: `${accountId}:${position.symbol}`,
+        message: 'DB Position 存在，但 Ledger 没有对应的非零投影',
+        suggestion: '检查遗留 Position 或缺失 Ledger 事件，再执行 Position rebuild',
+      });
   }
 }

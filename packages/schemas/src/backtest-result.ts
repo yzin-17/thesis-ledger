@@ -8,6 +8,7 @@ import { backtestCashDividendDisclosureV3Schema } from './backtest-cash-dividend
 import { backtestKnownCashDisclosureV3Schema } from './backtest-known-cash-disclosure-v3.js';
 import { backtestSnapshotActualSourceV3Schema } from './backtest-data.js';
 import { backtestMoneySchema } from './backtest-values.js';
+import { priceResearchSizingSchema, priceResearchProtocolV1 } from './backtest-price-research.js';
 const issue = (ctx: z.RefinementCtx, path: (string | number)[], message: string) =>
   ctx.addIssue({ code: 'custom', path, message });
 export const simulationFillSchema = z
@@ -22,6 +23,8 @@ export const simulationFillSchema = z
     occurredAt: z.iso.datetime({ offset: true }),
     availableAt: z.iso.datetime({ offset: true }),
     reason: z.enum(['signal', 'risk']),
+    researchSizing: priceResearchSizingSchema.optional(),
+    actualReferencePrice: positiveDecimalStringSchema.optional(),
   })
   .strict();
 export type SimulationFill = z.infer<typeof simulationFillSchema>;
@@ -199,6 +202,12 @@ export const backtestResultSchemaV3 = z
     ...backtestResultCoreFields,
     schemaVersion: z.literal('3'),
     snapshotVersion: z.literal('snapshot-manifest-v3'),
+    priceResearch: z.strictObject({ protocolVersion: z.literal(priceResearchProtocolV1),
+      actualPriceSource: backtestSnapshotActualSourceV3Schema.optional(),
+      fundsBalance: backtestMoneySchema,
+      positionUnits: decimalStringSchema,
+      simulatedPnl: backtestMoneySchema.optional(),
+    }).optional(),
     executionModelDisclosure: executionModelDisclosureSchemaV3.optional(),
     publicFeesDisclosure: backtestPublicFeesDisclosureV3Schema.optional(),
     tradingStatusDisclosure: backtestTradingStatusDisclosureV3Schema.optional(),

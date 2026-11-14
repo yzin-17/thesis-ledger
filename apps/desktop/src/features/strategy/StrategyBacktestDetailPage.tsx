@@ -23,8 +23,8 @@ import {
   deriveBacktestRerun,
   resolveBacktestVersion,
 } from './strategy-backtest-detail.model.js';
-import { backtestJobsReturnPath, strategyCenterPath } from './strategy-center.navigation.js';
-import { useBacktestJobQuery } from './strategy.queries.js';
+import { backtestDetailReturnTarget, strategyCenterPath } from './strategy-center.navigation.js';
+import { useBacktestJobQuery, useBacktestInstrumentSeriesQuery } from './strategy.queries.js';
 import { StrategyBacktestResultTabs } from './StrategyBacktestDetailSections.js';
 import { backtestStageLabel, jobStatusLabel, jobStatusVariant } from './StrategySections.js';
 import type {
@@ -61,8 +61,10 @@ export function StrategyBacktestDetailPage({
   onRerun: (request: RerunRequest) => void;
 }) {
   const { jobId } = useParams();
-  const returnPath = backtestJobsReturnPath(useLocation().state);
+  const { path: returnPath, label: returnLabel } = backtestDetailReturnTarget(useLocation().state);
   const jobQuery = useBacktestJobQuery(jobId ?? null);
+  const instrumentQuery = useBacktestInstrumentSeriesQuery(jobId ?? null, jobQuery.data?.snapshotId,
+    jobQuery.data?.readEligibility?.state === 'readable' && Boolean(jobQuery.data.result));
   const groupQuery = useQuery({
     queryKey: ['desktop', 'strategy', 'backtest-group', jobId],
     queryFn: () => fetchStrategyBacktestGroups({ limit: 1, ...(jobId ? { jobId } : {}) }),
@@ -70,7 +72,7 @@ export function StrategyBacktestDetailPage({
     staleTime: 10_000,
   });
 
-  if (!jobId) return <NavigateBackMessage message="回测任务 ID 缺失。" returnPath={returnPath} />;
+  if (!jobId) return <NavigateBackMessage message="回测任务 ID 缺失。" returnPath={returnPath} returnLabel={returnLabel} />;
   if (jobQuery.isPending) {
     return (
       <div className="flex min-h-60 items-center justify-center text-sm text-muted-foreground">
@@ -85,7 +87,7 @@ export function StrategyBacktestDetailPage({
       message = '当前回测格式不受支持或冻结记录校验未通过，无法读取此任务。';
     return (
       <div className="space-y-4">
-        <NavigateBackMessage message={message} returnPath={returnPath} />
+        <NavigateBackMessage message={message} returnPath={returnPath} returnLabel={returnLabel} />
         <Button variant="outline" onClick={() => void jobQuery.refetch()}>
           <RefreshCw />
           重试
@@ -147,15 +149,15 @@ export function StrategyBacktestDetailPage({
         render={
           <Link to={returnPath}>
             <ArrowLeft />
-            返回回测任务
+            {returnLabel}
           </Link>
         }
       />
-      <header className="space-y-4 rounded-lg border bg-card p-5">
+      <header className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight">{identity.title}</h2>
+              <h2 className="break-words text-xl font-semibold tracking-tight">{identity.title}</h2>
               <Badge variant={jobStatusVariant(job.status)}>
                 {jobStatusLabel(job.status, job.cancelRequestedAt)}
               </Badge>
@@ -165,7 +167,7 @@ export function StrategyBacktestDetailPage({
               {symbol ?? '执行标的未记录'} · {timeframe ?? '周期未记录'} · {periodLabel}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             {sourcePath && (
               <Button
                 nativeButton={false}
@@ -273,12 +275,12 @@ export function StrategyBacktestDetailPage({
           </AlertDescription>
         </Alert>
       )}
-      {!preparationFailure && <StrategyBacktestResultTabs job={job} />}
+      {!preparationFailure && <StrategyBacktestResultTabs job={job} instrumentRequest={{ data: instrumentQuery.data, fetching: jobQuery.isFetching || instrumentQuery.isFetching, error: instrumentQuery.isError }} />}
     </div>
   );
 }
 
-function NavigateBackMessage({ message, returnPath }: { message: string; returnPath: string }) {
+function NavigateBackMessage({ message, returnPath, returnLabel }: { message: string; returnPath: string; returnLabel: string }) {
   return (
     <div className="rounded-lg border border-dashed p-8 text-center">
       <p className="text-sm text-muted-foreground">{message}</p>
@@ -286,7 +288,7 @@ function NavigateBackMessage({ message, returnPath }: { message: string; returnP
         nativeButton={false}
         className="mt-4"
         variant="outline"
-        render={<Link to={returnPath}>返回回测任务</Link>}
+        render={<Link to={returnPath}>{returnLabel}</Link>}
       />
     </div>
   );

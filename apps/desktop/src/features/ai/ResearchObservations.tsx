@@ -4,7 +4,6 @@ import type {
   ResearchReportLocatorInput,
   ResearchReportObservations,
 } from '@thesis-ledger/schemas';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,25 +45,22 @@ function ObservationCard({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <Card aria-label="研究结论复核">
-      <CardHeader>
-        <CardTitle>研究结论复核</CardTitle>
-        <CardDescription>
-          按保存的结构化断言观察固定交易日窗口，保留每次资料与结果。
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <section aria-label="研究结论复核" className="flex min-w-0 flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
           variant="outline"
+          size="sm"
+          className="shrink-0"
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
         >
           {open ? '收起复核状态' : '查看复核状态'}
         </Button>
-        {open && <ObservationRead report={report} locator={locator} />}
-      </CardContent>
-    </Card>
+        <span className="text-xs text-muted-foreground">结论复核与历次记录</span>
+      </div>
+      {open && <ObservationRead report={report} locator={locator} />}
+    </section>
   );
 }
 function ObservationRead({
@@ -115,9 +111,9 @@ function ObservationRead({
       </Alert>
     );
   return (
-    <div className="flex flex-col gap-4" aria-label="研究复核状态">
+    <div className="flex flex-col divide-y divide-border" aria-label="研究复核状态">
       {data.items.length === 0 && (
-        <p className="text-sm text-muted-foreground">报告尚未包含可观察的结构化断言。</p>
+        <p className="py-4 text-sm text-muted-foreground">报告尚未包含可观察的结构化断言。</p>
       )}
       {data.items.map((item) => (
         <ObservationItem
@@ -150,7 +146,7 @@ function ObservationItem({
   const command = useResearchObservation(runId, item.claimId, locator);
   const applicable = item.tradingDays !== null;
   return (
-    <section aria-label={description} className="flex flex-col gap-3 rounded-md border p-4">
+    <section aria-label={description} className="flex min-w-0 flex-col gap-3 py-5">
       <div className="flex flex-wrap items-center gap-2">
         <h4 className="font-semibold">{description}</h4>
         <Badge variant="outline">{state.label}</Badge>
@@ -178,20 +174,26 @@ function ObservationItem({
           <AlertDescription>可找回同一次尝试，避免重复创建。</AlertDescription>
         </Alert>
       )}
-      {applicable && (
-        <Button
-          aria-busy={command.mutation.isPending}
-          type="button"
-          variant="outline"
-          className="self-start"
-          disabled={command.mutation.isPending}
-          onClick={command.submit}
-        >
-          {command.mutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-          {command.label}
-        </Button>
+      {(applicable || item.id) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {applicable && (
+            <Button
+              aria-busy={command.mutation.isPending}
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={command.mutation.isPending}
+              onClick={command.submit}
+            >
+              {command.mutation.isPending && (
+                <Spinner data-icon="inline-start" aria-hidden="true" />
+              )}
+              {command.label}
+            </Button>
+          )}
+          <ResearchObservationHistory runId={runId} item={item} locator={locator} />
+        </div>
       )}
-      <ResearchObservationHistory runId={runId} item={item} locator={locator} />
     </section>
   );
 }

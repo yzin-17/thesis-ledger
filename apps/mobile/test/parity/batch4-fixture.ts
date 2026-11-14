@@ -14,7 +14,7 @@ function fixtureRoot() {
     const parent=dirname(candidate);if(parent===candidate)throw Error('未找到工作区测试夹具。');candidate=parent;}
 }
 export const fixture=(name:string)=>JSON.parse(readFileSync(join(fixtureRoot(),name),'utf8'));
-export const b4Definition={...initialStrategyDefinition('B4 受控策略'),executionInstrument:{symbol:'600519.SH',market:'CN',assetType:'stock'},
+export const b4Definition={...initialStrategyDefinition('B4 受控策略'),schemaVersion:'2',executionInstrument:{symbol:'600519.SH',market:'CN',assetType:'stock'},
   signalSources:[{id:'execution',asset:{symbol:'600519.SH',market:'CN',assetType:'stock'},timeframe:'1d',series:['open','close']}],risk:[{type:'fixedStop',percent:'0.1'}]};
 export const b4Strategy={id:b4StrategyId,name:'B4 受控策略',status:'active',versions:[{id:b4VersionId,strategyId:b4StrategyId,version:1,schemaVersion:2,schema:b4Definition}]};
 export function b4Prepared() {

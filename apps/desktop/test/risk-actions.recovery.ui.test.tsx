@@ -134,10 +134,10 @@ describe('风险管理未过的异常与确认读取', () => {
       await mount(tab);
       const panel = () => document.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])')!;
       expect(panel().textContent).toContain(`${subject}读取失败`);
-      expect(panel().textContent).not.toContain('暂无');
+      expect(panel().textContent).not.toContain(`暂无${subject}`);
       await act(async () => [...panel().querySelectorAll<HTMLButtonElement>('button')].find((element) => element.textContent?.trim() === '重新加载')!.click());
       await flush();
-      expect(panel().textContent).toContain('暂无');
+      expect(panel().textContent).toContain(`暂无${subject}`);
       expect(panel().textContent).not.toContain('读取失败');
       expect(request).toHaveBeenCalledTimes(2);
       expect(api.scanRisk).not.toHaveBeenCalled();

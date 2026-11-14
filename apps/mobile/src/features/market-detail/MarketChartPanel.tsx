@@ -31,6 +31,28 @@ function seriesSource(series: MarketDisplayBarSeries) {
     return `派生周期 · 基础来源 ${series.provenance.baseSources.map((row) => `${row.providerId}/${row.upstreamSource}`).join('、')}`;
   return `来源 ${series.provenance.providerId} / ${series.provenance.upstreamSource} · ${series.provenance.cacheStatus === 'stale' ? '陈旧缓存' : '已读取'} · ${series.provenance.fetchedAt}`;
 }
+function SeriesWindowDisclosure({ series }: { series: MarketDisplayBarSeries | null | undefined }) {
+  if (!series) return null;
+  return (
+    <>
+      <Copy muted>{seriesSource(series)}</Copy>
+      <Copy muted>
+        实际窗口 {series.coverage.actualStart ?? '无'} ～ {series.coverage.actualEnd ?? '无'}
+      </Copy>
+      {'derivation' in series ? (
+        <Copy muted>派生周期 · 基础数据、日历与聚合指纹已由服务端返回。</Copy>
+      ) : null}
+      {series.points.at(-1) ? (
+        <Copy>
+          最新开／高／低／收 {series.points.at(-1)!.open} / {series.points.at(-1)!.high} /{' '}
+          {series.points.at(-1)!.low} / {series.points.at(-1)!.close} · 成交量{' '}
+          {series.points.at(-1)!.volume ?? '未知'}
+        </Copy>
+      ) : null}
+    </>
+  );
+}
+
 export function MarketChartPanel({
   symbol,
   filters,
@@ -133,24 +155,7 @@ export function MarketChartPanel({
             : ` · 线型 ${['实线', '点线', '虚线'][line.style ?? 0]}`}
         </Copy>
       ))}
-      {series ? (
-        <>
-          <Copy muted>{seriesSource(series)}</Copy>
-          <Copy muted>
-            实际窗口 {series.coverage.actualStart ?? '无'} ～ {series.coverage.actualEnd ?? '无'}
-          </Copy>
-          {'derivation' in series ? (
-            <Copy muted>派生周期 · 基础数据、日历与聚合指纹已由服务端返回。</Copy>
-          ) : null}
-          {series.points.at(-1) ? (
-            <Copy>
-              最新开／高／低／收 {series.points.at(-1)!.open} / {series.points.at(-1)!.high} /{' '}
-              {series.points.at(-1)!.low} / {series.points.at(-1)!.close} · 成交量{' '}
-              {series.points.at(-1)!.volume ?? '未知'}
-            </Copy>
-          ) : null}
-        </>
-      ) : null}
+      <SeriesWindowDisclosure series={series} />
       {detail
         ? Object.values(detail.sections).map((section) =>
             section ? (

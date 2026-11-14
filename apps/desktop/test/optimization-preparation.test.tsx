@@ -94,7 +94,10 @@ describe('实验配置准备消费', () => {
     ).rejects.toThrow('当前请求不一致');
   });
   it('提交时重新比较目标、区间和资金，不复用旧准备', () => {
-    const runConfig = request().intent.runConfig;
+    const runConfig = { ...request().intent.runConfig,
+      priceResearch: { protocolVersion: 'price-research-v1', actualPriceWindow: { version: 'market-frozen-window-v1', identityFingerprint: 'a'.repeat(64), responseHash: 'b'.repeat(64) } },
+      executionPriceProtocol: { priceBasis: { adjustment: 'hfq' } },
+    };
     const prepared = { target, result: { runConfig } } as never;
     expect(
       requirePreparedOptimizationConfiguration(
@@ -157,7 +160,7 @@ describe('实验配置准备消费', () => {
       ),
     ).toThrow();
   });
-  it('模型未确认时禁用准备，口径与历史选择使用中文标签', () => {
+  it('自动设置尚未取得时禁用准备，历史选择说明数据可见性', () => {
     const client = new QueryClient();
     const html = renderToStaticMarkup(
       <QueryClientProvider client={client}>
@@ -172,15 +175,16 @@ describe('实验配置准备消费', () => {
       </QueryClientProvider>,
     );
     for (const label of [
-      '不复权',
-      '前复权',
-      '后复权',
-      '固定供应商快照',
-      '严格历史时点',
+      '后复权计算指标与模拟收益',
+      '使用本次取得的历史行情',
+      '不代表当时可见的数据版本',
+      '模拟成交设置',
       '准备实验配置',
     ])
       expect(html).toContain(label);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>准备实验配置<\/button>/);
+    expect(html).not.toContain('<textarea');
+    expect(html).not.toContain('实验价格口径');
     client.clear();
   });
 });

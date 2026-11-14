@@ -50,11 +50,13 @@ describe('正式复盘桌面读取', () => {
     row.input.analysisDraft = { stopLoss: '8' };
     const result = journalDeterministicReviewSchema.parse(journalAnalyze(row));
     const html = renderToStaticMarkup(<JournalDecimalResult result={result} />);
-    expect(html).toContain('实际入场价');
+    expect(html).toContain('计划与实际对照');
+    expect(html).toContain('入场价格');
     expect(html).toContain('按止损价退出的假设净收益');
     expect(html).toContain('证据不足');
     expect(html).toContain('实际数量');
-    expect(html).not.toContain('INSUFFICIENT_EVIDENCE');
+    expect(html.split('<pre')[0]).not.toContain('INSUFFICIENT_EVIDENCE');
+    expect(html).toContain('完整复盘结果字段');
   });
   it('失效深链账户不回退显示另一账户的事实', () => {
     const accounts = [

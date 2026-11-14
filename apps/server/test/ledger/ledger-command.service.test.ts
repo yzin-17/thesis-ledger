@@ -92,6 +92,9 @@ describe('Ledger V2 成交命令', () => {
     expect(repository.revisions.get(accountA)).toBe(4n);
   });
 
+});
+
+describe("命令幂等与执行事件映射", () => {
   it('相同幂等命令重放返回原事件且不增加 Revision', async () => {
     const repository = new InMemoryLedgerRepository();
     const service = new LedgerCommandService(repository as never);
@@ -147,6 +150,9 @@ describe('Ledger V2 成交命令', () => {
     expect(repository.revisions.get(accountA)).toBe(3n);
   });
 
+});
+
+describe("修正链末与乐观版本", () => {
   it('替代只能连接链末，且重放不受旧 expected Revision 影响', async () => {
     const repository = new InMemoryLedgerRepository();
     const service = new LedgerCommandService(repository as never);
@@ -277,6 +283,9 @@ describe('Ledger V2 成交命令', () => {
     ]);
   });
 
+});
+
+describe("跨账户原子更正", () => {
   it('跨账户更正按稳定账户 ID 顺序锁定并原子写入 VOID + CREATE', async () => {
     const repository = new InMemoryLedgerRepository();
     const service = new LedgerCommandService(repository as never);

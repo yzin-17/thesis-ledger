@@ -8,13 +8,16 @@ import { JournalReviewQuery } from './journal-review-query.js';
 import { JournalReviewAnalysis } from './journal-review-analysis.js';
 import { JournalReviewSnapshots } from './journal-review-snapshots.js';
 import { AiModule } from '../ai/ai.module.js';
+import { IdentityModule } from '../identity/identity.module.js';
+import { JournalAiResearchV2 } from './journal-ai-research-v2.js';
 import { JournalReviewAi } from './journal-review-ai.js';
 import { JournalPeriodReviewAi } from './journal-period-review-ai.js';
+import { JournalPeriodReviewSnapshots } from './journal-period-review-snapshots.js';
 import { JournalLegacyAnalysis } from './journal-legacy-analysis.js';
 import { JournalLegacyAnalysisController } from './journal-legacy-analysis.controller.js';
 
 @Module({
-  imports: [LedgerModule, MarketModule, AiModule],
+  imports: [LedgerModule, MarketModule, AiModule, IdentityModule],
   controllers: [JournalController, JournalReviewController, JournalLegacyAnalysisController],
   providers: [
     JournalService,
@@ -22,8 +25,10 @@ import { JournalLegacyAnalysisController } from './journal-legacy-analysis.contr
     JournalReviewQuery,
     JournalReviewAnalysis,
     JournalReviewSnapshots,
+    JournalAiResearchV2,
     JournalReviewAi,
     JournalPeriodReviewAi,
+    JournalPeriodReviewSnapshots,
   ],
   exports: [JournalService],
 })

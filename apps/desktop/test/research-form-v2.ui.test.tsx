@@ -382,7 +382,7 @@ it('独立标的使用目录 ID 且不确认资产、不带账户；真正点击
   await act(async () => option?.click());
   await wait(() =>
     expect(document.querySelector<HTMLInputElement>('input[aria-label="研究标的"]')?.value).toBe(
-      '600519.SH',
+      '受控目录标的 · 600519.SH',
     ),
   );
   await type('textarea', '这个标的有哪些资料缺口？');

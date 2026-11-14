@@ -1,6 +1,5 @@
 import { Spinner } from '@/components/ui/spinner';
 import { useState, type FormEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   marketNewsFeedReadInputSchema,
   type MarketNewsFeedReadInput,
@@ -11,34 +10,33 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { fetchMarketNewsFeed } from './market-news-feed.api.js';
-import { NewsResult, newsSourceLabels } from './MarketNewsResult.js';
+import { newsSourceLabels } from './MarketNewsResult.js';
+import { MarketNewsPages } from './MarketNewsPages.js';
+import { useMarketNewsPages } from './useMarketNewsPages.js';
+import { MarketNewsTimeRangeField, defaultMarketNewsTimeRange, resolveMarketNewsTimeRange } from './MarketNewsTimeRangeField.js';
 
 export function MarketNewsFeed() {
   const [provider, setProvider] = useState('cls');
+  const [range, setRange] = useState(defaultMarketNewsTimeRange);
+  const [validation, setValidation] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<MarketNewsFeedReadInput | null>(null);
-  const query = useQuery({
-    queryKey: ['desktop', 'market-news-feed', submitted],
-    queryFn: ({ signal }) => fetchMarketNewsFeed(submitted!, signal),
-    enabled: submitted !== null,
-    retry: false,
-    staleTime: 60_000,
-    gcTime: 0,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
+  const query = useMarketNewsPages('market-news-feed', submitted, fetchMarketNewsFeed);
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const end = new Date();
-    setSubmitted(
-      marketNewsFeedReadInputSchema.parse({
+    try {
+      const input = marketNewsFeedReadInputSchema.parse({
         market: 'CN',
         providerId: provider,
-        publishedStart: new Date(end.getTime() - 3 * 86_400_000).toISOString(),
-        publishedEnd: end.toISOString(),
+        ...resolveMarketNewsTimeRange(range),
         limit: 5,
         requestBudgetMs: 15_000,
-      }),
-    );
+      });
+      setValidation(null);
+      if (JSON.stringify(submitted) === JSON.stringify(input)) void query.refetch();
+      else setSubmitted(input);
+    } catch (error) {
+      setValidation(error instanceof Error ? error.message : '请核对时间范围。');
+    }
   };
   return (
     <div className="flex flex-col gap-6">
@@ -53,6 +51,7 @@ export function MarketNewsFeed() {
                 if (!values[0]) return;
                 setProvider(values[0]);
                 setSubmitted(null);
+                setValidation(null);
               }}
             >
               {['cls', 'wallstreetcn'].map((value) => (
@@ -62,22 +61,29 @@ export function MarketNewsFeed() {
               ))}
             </ToggleGroup>
           </Field>
+          <MarketNewsTimeRangeField value={range} onChange={(value) => {
+            setRange(value);
+            setSubmitted(null);
+            setValidation(null);
+          }} />
         </FieldGroup>
         <p className="text-xs text-muted-foreground">
-        财联社为全市场电报，华尔街见闻为 A 股频道。读取最近 3 天内的当前一页，最多 5 条，不会自动关联到某只股票。
+          财联社为全市场电报，华尔街见闻为 A 股频道。每次最多 5 条，不代表区间内完整历史，不会自动关联到某只股票。
         </p>
         <Button aria-busy={query.isFetching} type="submit" disabled={query.isFetching}>
           {query.isLoading && <Spinner data-icon="inline-start" aria-hidden="true" />}
           {query.isFetching ? '正在读取…' : '读取快讯'}
         </Button>
       </form>
-      {query.isError && (
+      {validation && <p role="alert" className="text-sm text-destructive">{validation}</p>}
+      {query.isError && !query.data && (
         <Alert variant="destructive">
           <AlertTitle>快讯未读取</AlertTitle>
           <AlertDescription>{requestFailureMessage(query.error)} 可保留来源重试。</AlertDescription>
         </Alert>
       )}
-      {query.data && <NewsResult result={query.data} refreshing={query.isRefetching} heading="市场快讯" />}
+      <MarketNewsPages result={query.result} loading={query.isFetching} hasNext={query.hasNextPage}
+        nextError={query.isFetchNextPageError} heading="市场快讯" onMore={() => void query.fetchNextPage()} />
     </div>
   );
 }

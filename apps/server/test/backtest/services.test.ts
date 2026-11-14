@@ -10,12 +10,15 @@ const strategy = JSON.parse(
   ),
 );
 
-const serviceWith = (prisma: object) =>
-  new BacktestService(prisma as never, undefined, undefined, testResultReadPolicy());
+const serviceWith = (prisma: object) => {
+  const transaction = { ...prisma, $executeRaw: vi.fn(async () => 1) };
+  const database = { ...transaction, $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(transaction)) };
+  return new BacktestService(database as never, undefined, undefined, testResultReadPolicy());
+};
 
 describe('现行策略创建', () => {
   it('创建版本时保留已有版本并写入现行策略合同', async () => {
-    const create = vi.fn(async ({ data }: { data: object }) => data);
+    const create = vi.fn(async ({ data }: { data: object }) => ({ ...data, versions: [{ schema: strategy }] }));
     const createVersion = vi.fn(async ({ data }: { data: object }) => data);
     const service = serviceWith({
       strategy: { create, findUnique: vi.fn(async () => ({ schemaVersion: 2 })) },
@@ -59,8 +62,8 @@ describe('现行策略创建', () => {
     await service.listStrategies();
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ schemaVersion: 2 }),
-        include: { versions: { where: { schemaVersion: 2 } } },
+        where: expect.objectContaining({ schemaVersion: { in: [2, 3] } }),
+        include: { versions: { where: { schemaVersion: { in: [2, 3] } } } },
       }),
     );
   });

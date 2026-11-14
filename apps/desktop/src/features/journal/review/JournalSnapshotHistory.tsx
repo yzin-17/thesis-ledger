@@ -1,117 +1,33 @@
-import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { useState } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import type { JournalStoredSnapshotView } from '@thesis-ledger/schemas';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { journalReviewWindow } from '@thesis-ledger/domain';
+import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { Badge } from '@/components/ui/badge';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { LoadingState, Spinner } from '@/components/ui/spinner';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
-import { getDesktopApiClient } from '@/shared/api/client';
 import { formatDateTime } from '@/lib/date-display';
-import { JournalDecimalResult } from './JournalMetricTable.js';
+import { StickyTableActionCell, StickyTableActionHeader } from '../../shared/StickyTableActions.js';
+import { JournalWindowTimeInput } from './JournalWindowTimeInput.js';
 import { JournalEmpty, JournalRequestError } from './JournalReviewFeedback.js';
-import { reviewObjectLabels } from './journal-review-display.js';
-import { JournalSourceFacts } from './JournalSourceFacts.js';
+import { JournalSnapshotDetail } from './JournalSnapshotDetail.js';
+import { JournalPeriodSnapshotDetail } from './JournalPeriodSnapshotDetail.js';
+import { useJournalSnapshotHistory, type JournalSnapshotRow } from './useJournalSnapshotHistory.js';
 
-function SnapshotDetail({
-  id,
-  accountId,
-  mode,
-}: {
-  id: string;
-  accountId: string;
-  mode: 'actual' | 'shadow';
-}) {
-  const query = useQuery({
-    queryKey: ['journal-review-snapshot', accountId, mode, id],
-    queryFn: ({ signal }) =>
-      getDesktopApiClient().journalReviews.snapshot(id, { accountId, mode }, signal),
-    retry: false,
-  });
-  if (query.isPending) return <LoadingState label="正在读取历史快照" />;
-  if (query.isError)
-    return (
-      <JournalRequestError
-        title="历史快照读取失败"
-        error={query.error}
-        retry={() => void query.refetch()}
-      />
-    );
-  const view = query.data;
-  if (view.compatibility === 'LEGACY_UNSUPPORTED')
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>旧快照待确认</CardTitle>
-          <CardDescription>
-            保留原始输入和结果；当前合同无法安全读取，不计入正式统计。
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <details>
-            <summary className="cursor-pointer">高级调试：旧快照原始记录</summary>
-            <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">
-              {JSON.stringify(view, null, 2)}
-            </pre>
-          </details>
-        </CardContent>
-      </Card>
-    );
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          {view.snapshot.status === 'STALE' ? '历史结果 · 证据已变化' : '已保存的复盘结果'}
-        </CardTitle>
-        <CardDescription>
-          {formatDateTime(view.snapshot.createdAt)} · 读取保留保存时的输入与结果
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <JournalDecimalResult result={view.snapshot.outputSnapshot} />
-        <JournalSourceFacts input={view.snapshot.inputSnapshot} />
-        <div className="text-sm">
-          <h3 className="font-medium">保存时的本次草稿</h3>
-          {view.snapshot.inputSnapshot.analysisDraft ? (
-            <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {Object.entries({
-                plannedEntry: '计划入场价',
-                plannedExit: '计划退出价',
-                stopLoss: '计划止损价',
-                expectedHoldingDays: '计划持有天数',
-                note: '草稿说明',
-              }).map(([key, label]) => {
-                const draft = view.snapshot.inputSnapshot.analysisDraft;
-                const value = draft?.[key as keyof NonNullable<typeof draft>];
-                return (
-                  <div key={key}>
-                    <dt>{label}</dt>
-                    <dd>{value === undefined ? '沿用原计划' : (value ?? '本次清除')}</dd>
-                  </div>
-                );
-              })}
-            </dl>
-          ) : (
-            <p>未补充草稿，沿用原计划。</p>
-          )}
-        </div>
-        <details>
-          <summary className="cursor-pointer">高级调试：保存时的原始输入</summary>
-          <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">
-            {JSON.stringify(view.snapshot.inputSnapshot, null, 2)}
-          </pre>
-        </details>
-      </CardContent>
-    </Card>
-  );
-}
-function snapshotLabel(view: JournalStoredSnapshotView) {
-  if (view.compatibility === 'LEGACY_UNSUPPORTED')
-    return `${formatDateTime(view.createdAt)} · 旧快照待确认`;
-  const input = view.snapshot.inputSnapshot;
-  return `${formatDateTime(view.snapshot.createdAt)} · ${input.trade.symbol} · ${reviewObjectLabels[input.reference.reviewObjectType]} · ${view.snapshot.status === 'STALE' ? '证据已变化' : '证据一致'}`;
-}
 export function JournalSnapshotHistory({
   accountId,
   mode,
@@ -121,48 +37,41 @@ export function JournalSnapshotHistory({
   mode: 'actual' | 'shadow';
   reviewObjectId: string | null;
 }) {
-  const [id, setId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<JournalSnapshotRow | null>(null);
   const [draft, setDraft] = useState({ start: '', end: '' });
   const [window, setWindow] = useState(draft);
-  const query = useInfiniteQuery({
-    queryKey: ['journal-review-history', accountId, mode, reviewObjectId, window],
-    initialPageParam: null as string | null,
-    queryFn: ({ pageParam, signal }) =>
-      getDesktopApiClient().journalReviews.history(
-        {
-          accountId,
-          mode,
-          ...(reviewObjectId ? { reviewObjectId } : {}),
-          ...(window.start ? { start: window.start } : {}),
-          ...(window.end ? { end: window.end } : {}),
-          ...(pageParam ? { cursor: pageParam } : {}),
-          limit: 20,
-        },
-        signal,
-      ),
-    getNextPageParam: (page) => page.nextCursor,
-    retry: false,
-  });
+  const [filterError, setFilterError] = useState<Error | null>(null);
+  const query = useJournalSnapshotHistory({ accountId, mode, reviewObjectId, ...window });
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const applyFilter = () => {
+    try {
+      journalReviewWindow({
+        ...(draft.start ? { start: draft.start } : {}),
+        ...(draft.end ? { end: draft.end } : {}),
+      });
+      setFilterError(null);
+      setSelected(null);
+      setWindow({ ...draft });
+    } catch {
+      setFilterError(new Error('请选择有效时间，结束时间不能早于开始时间'));
+    }
+  };
   return (
-    <div className="flex flex-col gap-3 pt-3">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-medium">复盘快照</h2>
-        <p className="text-xs text-muted-foreground">
-          按保存时间查询历史。{reviewObjectId ? '当前仅显示所选对象。' : '当前显示此账户全部对象。'}
-        </p>
-      </div>
+    <div className="flex min-w-0 flex-col gap-3">
+      {reviewObjectId && (
+        <p className="text-xs text-muted-foreground">仅显示所选复盘对象的历史快照。</p>
+      )}
       <FieldGroup className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-        <Field className="flex-1">
-          <FieldLabel>开始时间（可选）</FieldLabel>
+        <Field>
+          <FieldLabel>开始时间</FieldLabel>
           <JournalWindowTimeInput
             aria-label="快照开始时间"
             value={draft.start}
             onValueChange={(start) => setDraft({ ...draft, start })}
           />
         </Field>
-        <Field className="flex-1">
-          <FieldLabel>结束时间（可选）</FieldLabel>
+        <Field>
+          <FieldLabel>结束时间</FieldLabel>
           <JournalWindowTimeInput
             aria-label="快照结束时间"
             value={draft.end}
@@ -171,17 +80,12 @@ export function JournalSnapshotHistory({
         </Field>
         <Button
           className="self-end justify-self-start sm:col-span-2 lg:col-span-1"
-          onClick={() => {
-            setId(null);
-            setWindow({ ...draft });
-          }}
+          onClick={applyFilter}
         >
           查询历史
         </Button>
       </FieldGroup>
-      <p className="text-xs text-muted-foreground">
-        按本机时区输入，开始时刻计入、结束时刻不计入；留空表示不限。
-      </p>
+      {filterError && <JournalRequestError title="时间范围无效" error={filterError} />}
       {query.isPending && <LoadingState label="正在读取快照列表" />}
       {query.isError && (
         <JournalRequestError
@@ -190,28 +94,75 @@ export function JournalSnapshotHistory({
           retry={() => void query.refetch()}
         />
       )}
-      <ListRefreshRegion refreshing={query.isRefetching && query.data !== undefined} label="正在刷新快照列表">
+      <ListRefreshRegion
+        refreshing={query.isRefetching && query.data !== undefined}
+        label="正在刷新快照列表"
+      >
         {query.isSuccess && items.length === 0 && (
           <JournalEmpty
             title="没有复盘快照"
-            description="完成分析后显式保存，才能在这里查看历史输入与结果。"
+            description="单笔或周期复盘完成后保存快照，即可在这里查看保存时的输入与结果。"
           />
         )}
-        <div className="divide-y divide-border">
-          {items.map((item) => {
-            const snapshotId = item.compatibility === 'CURRENT_CONTRACT' ? item.snapshot.id : item.id;
-            return (
-              <Button
-                key={snapshotId}
-                className="h-auto w-full justify-start rounded-none px-0 py-3 whitespace-normal text-left"
-                variant="ghost"
-                onClick={() => setId(snapshotId)}
-              >
-                {snapshotLabel(item)}
-              </Button>
-            );
-          })}
-        </div>
+        {items.length > 0 && (
+          <Table className="min-w-[48rem]" aria-label="复盘历史快照">
+            <TableHeader>
+              <TableRow>
+                <TableHead>类型</TableHead>
+                <TableHead>标的 / 统计周期</TableHead>
+                <TableHead>保存时间</TableHead>
+                <TableHead>证据状态</TableHead>
+                <TableHead>AI 解读</TableHead>
+                <StickyTableActionHeader className="w-28 min-w-28">操作</StickyTableActionHeader>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((row) => {
+                const active = selected?.kind === row.kind && selected.id === row.id;
+                return (
+                  <TableRow
+                    key={`${row.kind}:${row.id}`}
+                    data-state={active ? 'selected' : undefined}
+                  >
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {row.kind === 'single' ? '单笔复盘' : '周期复盘'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="min-w-64 whitespace-normal">
+                      <p>{row.title}</p>
+                      <p className="text-xs text-muted-foreground">{row.description}</p>
+                    </TableCell>
+                    <TableCell className="tabular-nums">{formatDateTime(row.createdAt)}</TableCell>
+                    <TableCell>
+                      {row.evidenceStatus ? (
+                        <Badge variant="outline">{row.evidenceStatus}</Badge>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.aiSaved === null && '—'}
+                      {row.aiSaved !== null && (
+                        <Badge variant="outline">{row.aiSaved ? '已保存' : '未保存'}</Badge>
+                      )}
+                    </TableCell>
+                    <StickyTableActionCell className="w-28 min-w-28 p-2 text-right align-middle whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-pressed={active}
+                        onClick={() => setSelected(row)}
+                      >
+                        {active ? '查看中' : '查看快照'}
+                      </Button>
+                    </StickyTableActionCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
       </ListRefreshRegion>
       {query.hasNextPage && (
         <Button
@@ -224,7 +175,33 @@ export function JournalSnapshotHistory({
           读取下一页快照
         </Button>
       )}
-      {id && <SnapshotDetail key={id} id={id} accountId={accountId} mode={mode} />}
+      <Sheet open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
+        <SheetContent size="detail" className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{selected?.kind === 'period' ? '周期复盘快照' : '快照详情'}</SheetTitle>
+            <SheetDescription className="sr-only">
+              查看保存时的复盘数据、计算结果和 AI 解读。
+            </SheetDescription>
+          </SheetHeader>
+          {selected?.kind === 'single' && (
+            <JournalSnapshotDetail
+              key={selected.id}
+              id={selected.id}
+              accountId={accountId}
+              mode={mode}
+              instrumentLabel={selected.title}
+            />
+          )}
+          {selected?.kind === 'period' && (
+            <JournalPeriodSnapshotDetail
+              key={selected.id}
+              id={selected.id}
+              accountId={accountId}
+              mode={mode}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -346,6 +346,9 @@ describe('账户与组合', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+});
+
+describe("持仓估值与今日收益", () => {
   it('用三持仓 fixture 计算部分估值和盈亏', async () => {
     const positions = [
       { id: '1', symbol: '600519.SH', quantity: 100, costPrice: 10, asset: { name: 'A' } },
@@ -431,6 +434,9 @@ describe('账户与组合', () => {
     });
   });
 
+});
+
+describe("已实现收益及已清仓币种", () => {
   it('使用 Trade Close Slice 计算已实现与累计盈亏，不把未实现盈亏改名', async () => {
     const positions = [
       {
@@ -538,6 +544,9 @@ describe('账户与组合', () => {
     );
   });
 
+});
+
+describe("净值与多币种现金", () => {
   it('场外基金使用上一有效净值计算今日收益', async () => {
     const prisma = {
       position: {
@@ -701,6 +710,9 @@ describe('账户与组合', () => {
       ]),
     );
   });
+});
+
+describe("手工录入及持仓修正", () => {
   it('编辑持仓可同时修正账户、数量和成本', async () => {
     const findUniqueOrThrow = vi
       .fn()

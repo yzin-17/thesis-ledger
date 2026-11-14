@@ -50,6 +50,7 @@ export function preparedRunConfigV3(
     | 'lifecyclePreparation'
   >,
   signalIds: string[],
+  actualSourceIds: readonly string[] = [],
 ) {
   const { knownCashPreparation, lifecyclePreparation, ...required } = resolved;
   return runConfigSchemaV3.safeParse({
@@ -61,11 +62,13 @@ export function preparedRunConfigV3(
       : {}),
     ...(lifecyclePreparation ? { lifecyclePreparation } : {}),
     schemaVersion: '3',
+    ...(request.priceResearch ? { priceResearch: { protocolVersion: request.priceResearch } } : {}),
     ...(request.warmupBudgetSessions !== undefined
       ? { frozenWarmupBudgetSessions: request.warmupBudgetSessions }
       : {}),
     priceInputBindings: {
-      signals: signalIds.map((sourceId) => ({ sourceId, binding: 'execution-series' })),
+      signals: signalIds.map((sourceId) => ({ sourceId,
+        binding: request.priceResearch && actualSourceIds.includes(sourceId) ? 'actual-price-series' : 'execution-series' })),
       benchmark: { binding: 'execution-series' },
     },
   });

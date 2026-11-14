@@ -10,6 +10,7 @@ import {
   NotificationFailuresTable,
 } from '../src/features/providers/ProviderSettingsSections.js';
 import { ProviderSettings } from '../src/features/providers/ProviderSettings.js';
+import { automationScheduleOptions } from '../src/features/providers/automation-schedule-options.js';
 import { Toaster } from '../src/components/ui/toast.js';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
 import {
@@ -179,7 +180,7 @@ describe('自动化编辑器 Sheet 契约', () => {
   });
 
   it('执行时间预设引用共享预设清单并提供自定义输入', () => {
-    expect(source).toContain('automationSchedulePresets.map');
+    expect(automationScheduleOptions(false).map((option) => option.label)).toContain('每个交易日 16:00');
     expect(source).toContain('<SelectItem key={preset.value} value={preset.value}>');
     expect(source).toContain('AUTOMATION_SCHEDULE_CUSTOM');
     expect(source).toContain('Cron 表达式');

@@ -8,7 +8,6 @@ import { MarketProvidersScreen } from '../features/market-providers/MarketProvid
 import { MarketProviderEditor } from '../features/market-providers/MarketProviderEditor';
 import { ProviderOAuthScreen } from '../features/provider-oauth/ProviderOAuthScreen';
 import { MarketPolicyScreen } from '../features/market-policy/MarketPolicyScreen';
-import { MarketCatalogScreen } from '../features/market-catalog/MarketCatalogScreen';
 import { AutomationsScreen } from '../features/automation/AutomationsScreen';
 import { AutomationEditor } from '../features/automation/AutomationEditor';
 import { AutomationHistoryScreen } from '../features/automation/AutomationHistoryScreen';
@@ -29,7 +28,6 @@ export function SettingsNavigator() {
       <Stack.Screen name="MarketProviderEditor" component={MarketProviderEditor} />
       <Stack.Screen name="ProviderOAuth" component={ProviderOAuthScreen} />
       <Stack.Screen name="MarketPolicy" component={MarketPolicyScreen} />
-      <Stack.Screen name="MarketCatalog" component={MarketCatalogScreen} />
       <Stack.Screen name="Automations" component={AutomationsScreen} />
       <Stack.Screen name="AutomationEditor" component={AutomationEditor} />
       <Stack.Screen name="AutomationHistory" component={AutomationHistoryScreen} />

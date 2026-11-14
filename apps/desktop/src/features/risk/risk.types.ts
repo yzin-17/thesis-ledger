@@ -1,4 +1,5 @@
 import type { Portfolio, PortfolioMode } from '../portfolio/portfolio.types.js';
+import type { RiskRuleNotification } from '@thesis-ledger/schemas';
 
 export type { Portfolio, PortfolioMode };
 
@@ -30,6 +31,8 @@ export type RiskRuleScope = 'security' | 'account' | 'portfolio';
 export type RiskRuleSeverity = 'info' | 'warning' | 'error' | 'critical';
 
 export interface RiskRuleRecord {
+  sourcePlanId?: string | null;
+  notification?: RiskRuleNotification;
   id: string;
   version: number;
   kind: RiskRuleKind;
@@ -134,6 +137,7 @@ export interface RiskContext {
 }
 
 export interface CreateRiskRuleInput {
+  notification?: RiskRuleNotification;
   kind: RiskRuleKind;
   scope: RiskRuleScope;
   severity: RiskRuleSeverity;

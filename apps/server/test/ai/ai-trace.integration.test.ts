@@ -24,13 +24,17 @@ const upstreamError = {
   error: { code: 502, message: 'Provider returned error', metadata: { raw: '受控上游错误' } },
 };
 
-describe('正式 trace 的受控 HTTP → SDK → 业务链', () => {
-  let root = '';
-  let origin = '';
-  let calls = 0;
-  let requestBody = '';
-  let mode: 'success' | 'schema' | 'http' | 'sse' | 'disconnect' | 'hang' = 'success';
-  const server = createServer(async (request, response) => {
+let root = '';
+
+let origin = '';
+
+let calls = 0;
+
+let requestBody = '';
+
+let mode: 'success' | 'schema' | 'http' | 'sse' | 'disconnect' | 'hang' = 'success';
+
+const server = createServer(async (request, response) => {
     calls++;
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk as Uint8Array));
@@ -63,31 +67,35 @@ describe('正式 trace 的受控 HTTP → SDK → 业务链', () => {
       response.write(wire.subarray(offset, offset + 7));
     response.end();
   });
-  beforeAll(async () => {
+
+beforeAll(async () => {
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('受控服务启动失败');
     origin = `http://127.0.0.1:${address.port}`;
   });
-  beforeEach(async () => {
+
+beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'ai-trace-test-'));
     calls = 0;
     requestBody = '';
     mode = 'success';
     vi.spyOn(StructuredLogger.prototype, 'log').mockImplementation(() => undefined);
   });
-  afterEach(async () => {
+
+afterEach(async () => {
     vi.restoreAllMocks();
     await rm(root, { recursive: true, force: true });
   });
-  afterAll(async () => {
+
+afterAll(async () => {
     server.closeAllConnections();
     server.close();
     await once(server, 'close');
   });
 
-  const business = async (
+const business = async (
     selected = true,
     options: { rejectBusiness?: boolean; files?: AiTraceFileStore; v2?: boolean } = {},
   ) => {
@@ -159,7 +167,8 @@ describe('正式 trace 的受控 HTTP → SDK → 业务链', () => {
     );
     return f;
   };
-  const artifact = (
+
+const artifact = (
     found: Awaited<ReturnType<ReturnType<typeof traceFixture>['read']>>,
     stage: string,
     direction: 'input' | 'output',
@@ -169,6 +178,7 @@ describe('正式 trace 的受控 HTTP → SDK → 业务链', () => {
     return found.artifacts[node[direction].file]!.value;
   };
 
+describe("Trace 回环执行与契约", () => {
   it('成功时保存各节点 I/O，SDK 与业务消费同一次原响应，凭据和 reasoning 不落盘', async () => {
     const f = await business();
     const found = await f.read();
@@ -328,7 +338,9 @@ describe('正式 trace 的受控 HTTP → SDK → 业务链', () => {
       'failed',
     );
   });
+});
 
+describe("Trace 回环故障和取消", () => {
   it('没有 HTTP 响应时留存请求错误，响应阶段明确未到达', async () => {
     mode = 'disconnect';
     const f = await business();

@@ -35,6 +35,7 @@ import { BacktestNavRunExecution } from './backtest-nav-run-execution.js';
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
 import { verifyBacktestRunRetrySnapshot } from './backtest-nav-run-retry.js';
 import { classifyBacktestRunFailure } from './backtest-run-failure.js';
+import { comparableTradabilityWindows } from './backtest-comparable-tradability.js';
 
 export interface BacktestSnapshotBuilder {
   buildV3(input: BacktestSnapshotV3BuildInput): Promise<BacktestSnapshotV3BuildResult>;
@@ -89,6 +90,8 @@ const normalizeComparableField = (
   value: ArtifactRow['sessions'],
   range: ComparableDataFingerprintRange,
 ): ArtifactRow['sessions'] => {
+  if (key === 'historicalTradabilityWindows' && typeof value === 'string')
+    return comparableTradabilityWindows(value, range);
   if (comparableTimestampFields.has(key) && typeof value === 'string') {
     const timestamp = Date.parse(value);
     if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString();

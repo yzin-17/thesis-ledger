@@ -3,6 +3,7 @@ import { formalizeOptimizationCandidate } from '../../src/strategy-optimization/
 import { optimizationSha256 } from '../../src/strategy-optimization/strategy-optimization-common.js';
 import type { CandidateRow } from '../../src/strategy-optimization/strategy-optimization-common.js';
 import { createDiscoverySeed } from '../../src/strategy-optimization/strategy-optimization-discovery.js';
+import { projectPriceResearchStrategy, type BacktestStrategy } from '@thesis-ledger/schemas';
 
 const discoverySchema = {
   ...createDiscoverySeed({
@@ -21,19 +22,24 @@ const candidate = {
 } as CandidateRow;
 
 describe('策略探索采纳', () => {
-  it('在同一事务内把隐藏策略转为 draft 并发布正式 v1', async () => {
+  it.each([2, 3].flatMap(schemaVersion => ['valid', 'invalid', 'test_valid', 'test_invalid'].map(validationStatus => ({schemaVersion, validationStatus}))))('Schema V$schemaVersion 的 $validationStatus 候选在同一事务内发布正式 v1', async ({schemaVersion, validationStatus}) => {
+    const schema =
+      schemaVersion === 3
+        ? projectPriceResearchStrategy(discoverySchema as BacktestStrategy)
+        : discoverySchema;
+    const currentCandidate = { ...candidate, executionHash: optimizationSha256(schema) };
     const formal = { id: '44444444-4444-4444-8444-444444444444', version: 1 };
     const facts = {
       id: candidate.id,
       experimentId: candidate.experimentId,
       candidateStrategyVersionId: candidate.candidateStrategyVersionId,
-      executionHash: candidate.executionHash,
-      validationStatus: 'test_valid',
+      executionHash: currentCandidate.executionHash,
+      validationStatus,
       adoptedStrategyVersionId: null,
       candidateStrategyId: '55555555-5555-4555-8555-555555555555',
       candidateVersion: 0,
-      candidateSchemaVersion: 2,
-      candidateSchema: discoverySchema,
+      candidateSchemaVersion: schemaVersion,
+      candidateSchema: schema,
       sourceMode: 'discovery',
       experimentStatus: 'succeeded',
       experimentStage: 'completed',
@@ -46,7 +52,7 @@ describe('策略探索采纳', () => {
       experimentId: candidate.experimentId,
       candidateId: candidate.id,
       idempotencyKey: 'adopt-discovery',
-      candidateHash: candidate.executionHash,
+      candidateHash: currentCandidate.executionHash,
       formalStrategyVersionId: formal.id,
       baselineStrategyVersionId: candidate.candidateStrategyVersionId,
       confirmedCurrentStrategyVersionId: null,
@@ -58,7 +64,7 @@ describe('策略探索采纳', () => {
           id: candidate.candidateStrategyVersionId,
           strategyId: facts.candidateStrategyId,
           version: 0,
-          schemaVersion: 2,
+          schemaVersion,
         }),
         create: vi.fn().mockResolvedValue(formal),
       },
@@ -76,7 +82,7 @@ describe('策略探索采纳', () => {
         findUnique: vi.fn().mockResolvedValue({
           id: candidate.candidateStrategyVersionId,
           strategyId: '55555555-5555-4555-8555-555555555555',
-          schema: discoverySchema,
+          schema,
         }),
         aggregate: vi.fn().mockResolvedValue({ _max: { version: null } }),
       },
@@ -88,7 +94,7 @@ describe('策略探索采纳', () => {
       prisma as never,
       candidate.experimentId,
       candidate.id,
-      candidate.executionHash,
+      currentCandidate.executionHash,
       0,
       'adopt-discovery',
     );
@@ -97,7 +103,9 @@ describe('策略探索采纳', () => {
       data: { status: 'draft', name: '模型探索策略', description: '模型生成的说明' },
     });
     expect(transaction.strategyVersion.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ version: 1 }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ version: 1, schemaVersion, schema }),
+      }),
     );
   });
 

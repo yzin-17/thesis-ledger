@@ -1,7 +1,12 @@
 import { MarketObservationsService } from './market-observations.service.js';
 import { MarketBackgroundQuotesService } from './market-background-quotes.service.js';
+import { MarketBackgroundBarReader } from './market-background-bar-reader.js';
 import {MarketActionCoverage} from './market-action-coverage.js';
 import {MarketOpenEvidence} from './market-open-evidence.js';
+import { MarketLiveExecutionReader } from './market-live-execution-reader.js';
+import { MarketArenaValuationReader } from './market-arena-valuation-reader.js';
+import { MarketNativeIndicatorReader } from './market-native-indicator-reader.js';
+import { MarketResearchSeriesReader } from './market-research-series-reader.js';
 import {MarketInstrumentEvidence} from './market-instrument-evidence.js';
 import { MarketLifecycleReaderV3 } from './market-lifecycle-reader-v3.js';
 import { Module } from '@nestjs/common';
@@ -15,9 +20,12 @@ import { InstrumentDisplayService } from './instruments/instrument-display.servi
 import { InstrumentSearchService } from './instruments/instrument-search.service.js';
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { MarketControlService } from './market-control.service.js';
+import { MarketRoutingConfigService } from './market-routing-config.service.js';
+import { MarketRoutingConfigController } from './market-routing-config.controller.js';
 import { MarketRouteRevisionService } from './market-route-revision.service.js';
 import { MarketDataController } from './market-data.controller.js';
 import { MarketRuleMonitorController } from './market-rule-monitor.controller.js';
+import { MarketRuleMonitorReader } from './market-rule-monitor-reader.js';
 import { MarketSecurityLotSizeController } from './market-security-lot-size.controller.js';
 import { MarketSecurityStaticInfoController } from './market-security-static-info.controller.js';
 import { MarketAnnouncementsController } from './market-announcements.controller.js';
@@ -29,6 +37,7 @@ import { MarketWindowEvidenceV3Repository } from './market-window-evidence-v3.re
 import { MarketDerivedSeriesRepository } from './market-derived-series.repository.js';
 import { MarketFrozenWindowReaderV3 } from './market-frozen-window-reader-v3.js';
 import { MarketChartReaderV3 } from './market-chart-reader-v3.js';
+import { MarketChartResultCache } from './market-chart-result-cache.js';
 import { MarketChartProofRepository } from './market-chart-proof.repository.js';
 import { MarketPitReconstructionRepository } from './market-pit-reconstruction.repository.js';
 import { MarketBarReader } from './market-bar-reader.js';
@@ -39,6 +48,8 @@ import { MarketQuotesController } from './market-quotes.controller.js';
 import { MarketNavReaderV3 } from './market-nav-reader-v3.js';
 import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
 import { MarketSessionReader } from './market-session-reader.js';
+import { MarketArenaReplayReader } from './market-arena-replay-reader.js';
+import { MarketArenaHistorySource } from './market-arena-history-source.js';
 import { MarketPeriodReader } from './market-period-reader.js';
 import { MarketPeriodViewCache } from './market-period-view-cache.js';
 import { MarketPeriodIndicatorReader } from './market-period-indicator-reader.js';
@@ -62,6 +73,7 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
 @Module({
   imports: [QualityModule, DsaModule],
   controllers: [
+    MarketRoutingConfigController,
     MarketFundValuationController,
     MarketReferenceController,
     MarketDataController,
@@ -75,10 +87,17 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
     MarketReportMetadataController,
   ],
   providers: [
+    MarketRoutingConfigService,
+    MarketRuleMonitorReader,
     MarketBackgroundQuotesService,
+    MarketBackgroundBarReader,
     MarketObservationsService,
     MarketActionCoverage,
     MarketOpenEvidence,
+    MarketLiveExecutionReader,
+    MarketArenaValuationReader,
+    MarketNativeIndicatorReader,
+    MarketResearchSeriesReader,
     MarketInstrumentEvidence,
     MarketFundValuationService,
     FundValuationPointRepository,
@@ -91,6 +110,8 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
     MarketAnnouncementPreparationService,
     MarketPeriodCalendarReader,
     MarketSessionReader,
+    MarketArenaReplayReader,
+    MarketArenaHistorySource,
     MarketPeriodReader,
     MarketPeriodViewCache,
     MarketPeriodIndicatorReader,
@@ -116,6 +137,7 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
     MarketFrozenWindowReaderV3,
     MarketBarWindowReaderV3,
     MarketChartReaderV3,
+    MarketChartResultCache,
     MarketChartProofRepository,
     MarketPitReconstructionRepository,
     MarketBarReader,
@@ -123,6 +145,12 @@ import { FundValuationPointRepository } from './fund-valuation-point.repository.
     MarketEventFreeRepository,
   ],
   exports: [
+    MarketBackgroundBarReader,
+    MarketArenaReplayReader,
+    MarketArenaValuationReader,
+    MarketResearchSeriesReader,
+    MarketLiveExecutionReader,
+    MarketRuleMonitorReader,
     MarketBackgroundQuotesService,
     MarketObservationsService,
     MarketOpenEvidence,

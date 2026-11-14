@@ -15,20 +15,25 @@ const fundAccount = {
   active: true,
 };
 
-const renderFeature = (account: Account = fundAccount) => {
+const renderFeature = (account: Account = fundAccount, focusOccurrenceId: string | null = null) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(fundInvestmentKeys.plans(account.id), []);
   queryClient.setQueryData(fundInvestmentKeys.occurrences(account.id), []);
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
       <Toaster>
-        <RecurringFundInvestments account={account} />
+        <RecurringFundInvestments account={account} focusOccurrenceId={focusOccurrenceId} />
       </Toaster>
     </QueryClientProvider>,
   );
 };
 
 describe('账户定投计划', () => {
+  it('当前范围已返回但找不到指定成交时显示关联缺失，不伪造对应计划', () => {
+    const markup = renderFeature(fundAccount, 'missing-controlled-occurrence');
+    expect(markup).toContain('无法定位对应计划');
+    expect(markup).toContain('当前账户未返回这笔成交对应的定投记录或计划');
+  });
   it('真实基金账户显示定投入口和待确认语义', () => {
     const markup = renderFeature();
     expect(markup).toContain('定投计划');

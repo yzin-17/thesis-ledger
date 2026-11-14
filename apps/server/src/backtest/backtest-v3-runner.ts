@@ -33,6 +33,10 @@ import {
   prepareTradingStatusExecutionV3,
   tradingStatusWarningsV3,
 } from './backtest-trading-status-execution-v3.js';
+import {
+  priceResearchFills,
+  priceResearchInputWarnings,
+} from './backtest-price-research-result.js';
 
 export interface BacktestV3RunnerInput {
   runId: string;
@@ -64,6 +68,7 @@ export class BacktestV3RejectedOrderProjectionError extends Error {
 export const projectV3SimulationRejects = (
   rejects: ExchangeVerticalResult['rejects'],
   executionSymbol: string,
+  windowEndAt?: string,
 ) => {
   const rejectedOrders: BacktestResultV3['rejectedOrders'] = [];
   const warnings: string[] = [];
@@ -88,8 +93,14 @@ export const projectV3SimulationRejects = (
       orderId,
       executionSymbol,
       side,
-      reasonCode: reject.code,
-      message: reject.reason,
+      reasonCode:
+        reject.code === 'DAY_EXPIRED' && reject.occurredAt === windowEndAt
+          ? 'BACKTEST_WINDOW_ENDED'
+          : reject.code,
+      message:
+        reject.code === 'DAY_EXPIRED' && reject.occurredAt === windowEndAt
+          ? '回测窗口已结束，信号待下一交易日开盘执行；期末持仓按市值估值'
+          : reject.reason,
       occurredAt: reject.occurredAt,
     });
   }
@@ -185,7 +196,7 @@ const readStrictMetadata = (
 };
 
 export class LocalSnapshotV3Runner implements BacktestV3Runner {
-  readonly id = 'thesis-ledger-v3-local-runner-v3';
+  readonly id = 'thesis-ledger-v3-local-runner-v4';
 
   constructor(private readonly snapshots: LocalSnapshotStore) {}
 
@@ -193,19 +204,7 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
     assertNotAborted(signal);
     const manifest = await this.snapshots.v3.replay(input.runId);
     assertNotAborted(signal);
-    if (manifest.status !== 'finalized' || manifest.quality.completeness !== 'complete') {
-      throw new Error('V3 Runner 只执行 finalized complete Snapshot');
-    }
-    if (manifest.runId !== input.runId) {
-      throw new Error('V3 Runner Snapshot runId 不匹配');
-    }
-    if (
-      input.snapshotRef.snapshotId !== manifest.contentHash ||
-      input.snapshotRef.contentHash !== manifest.contentHash
-    ) {
-      throw new Error('V3 Snapshot contentHash 不匹配');
-    }
-    assertExactArtifactRefs(input.artifactRefs, manifest.artifacts);
+    assertRunnerSnapshotInput(manifest, input);
 
     const rowsByArtifact = await readArtifactRows(this.snapshots, manifest.artifacts, signal);
     const metadataKey = `${manifest.runId}/metadata/snapshot-metadata-v3.parquet`;
@@ -255,6 +254,7 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
     const projectedRejects = projectV3SimulationRejects(
       vertical.rejects,
       strategy.executionInstrument.symbol,
+      vertical.analytics.equityCurve.at(-1)?.occurredAt,
     );
     const benchmark = buildBacktestV3Benchmark({
       runConfig,
@@ -274,6 +274,7 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       completeness = 'partial';
     }
 
+    const disclosures = snapshotDisclosures(runConfig, manifest, vertical, rowsByArtifact);
     const resultPayload = {
       source: 'BACKTEST' as const,
       runId: manifest.runId,
@@ -282,44 +283,29 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       engineVersion: this.id,
       schemaVersion: '3' as const,
       snapshotVersion: 'snapshot-manifest-v3' as const,
+      ...disclosures.research,
       marketRuleVersion: manifest.marketRuleVersion,
       calendarVersion: manifest.calendarVersion,
       aggregationVersion: manifest.aggregationVersion,
       contentHash: manifest.contentHash,
       completeness,
-      ...(runConfig.knownCashPreparation
-        ? { knownCashDividendDisclosure: knownCashDisclosureV3(runConfig, vertical.cashEvents) }
-        : {}),
-      ...(runConfig.executionPriceProtocol.cashEventResearch && !runConfig.knownCashPreparation
-        ? {
-            cashDividendDisclosure: cashDividendDisclosureV3(
-              runConfig,
-              rowsByArtifact.get(`${manifest.runId}/${dependencyEvidenceKey}`) ?? [],
-              vertical.cashEvents,
-            ),
-          }
-        : {}),
+      ...disclosures.cash,
       ...(publicFees ? { publicFeesDisclosure: publicFees.disclosure } : {}),
       ...(tradingStatus.status ? { tradingStatusDisclosure: tradingStatus.status.disclosure } : {}),
-      ...(runConfig.executionModel && manifest.executionModel
-        ? {
-            executionModelDisclosure: {
-              model: runConfig.executionModel,
-              contentHash: manifest.executionModel.contentHash,
-            },
-          }
-        : {}),
+      ...disclosures.model,
       executionPriceProtocol: manifest.executionPriceProtocol,
       comparableDataFingerprint: manifest.comparableDataFingerprint,
       actualSources: manifest.actualSources,
       warnings: [
+        ...priceResearchInputWarnings(manifest.runId, strategy, runConfig, rowsByArtifact),
         ...zeroVolumeObservationWarningsV3(strategy, runConfig, rowsByArtifact, manifest.runId),
         ...backtestListingWarningsV3(
           rowsByArtifact.get(`${manifest.runId}/metadata/market-window-evidence-v3.parquet`)?.[0],
           tradingStatus.status?.disclosure,
         ),
         ...publicFeesWarningsV3(publicFees?.disclosure),
-        ...tradingStatusWarningsV3(tradingStatus.status?.disclosure), ...tradingStatus.compositionWarnings,
+        ...tradingStatusWarningsV3(tradingStatus.status?.disclosure),
+        ...tradingStatus.compositionWarnings,
         ...lifecycleExecutionWarningsV3(runConfig),
         ...(skippedTradingDates.length
           ? [`按冻结逐日状态跳过 ${skippedTradingDates.length} 个缺 Bar 交易日。`]
@@ -329,7 +315,13 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
         ...benchmark.warnings,
       ],
       rejectedOrders: projectedRejects.rejectedOrders,
-      simulationFills: vertical.fills.map((fill) => ({ ...fill, charges: [...fill.charges] })),
+      simulationFills: priceResearchFills(
+        manifest.runId,
+        strategy,
+        runConfig,
+        rowsByArtifact,
+        vertical.fills,
+      ),
       trades: vertical.trades,
       equityCurve: vertical.analytics.equityCurve,
       drawdownCurve: vertical.analytics.drawdownCurve,
@@ -344,4 +336,70 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       resultChecksum: deterministicResultChecksum(resultPayload),
     });
   }
+}
+
+function snapshotDisclosures(
+  runConfig: RunConfigV3,
+  manifest: BacktestSnapshotManifestV3,
+  vertical: ExchangeVerticalResult,
+  rowsByArtifact: ReadonlyMap<string, readonly ArtifactRow[]>,
+) {
+  return {
+    research: {
+      ...(runConfig.priceResearch
+        ? {
+            priceResearch: {
+              protocolVersion: runConfig.priceResearch.protocolVersion,
+              ...(manifest.priceResearch?.actualPriceSource
+                ? { actualPriceSource: manifest.priceResearch.actualPriceSource }
+                : {}),
+              ...vertical.researchBalances,
+            },
+          }
+        : {}),
+    },
+    cash: {
+      ...(runConfig.knownCashPreparation
+        ? { knownCashDividendDisclosure: knownCashDisclosureV3(runConfig, vertical.cashEvents) }
+        : {}),
+      ...(runConfig.executionPriceProtocol.cashEventResearch && !runConfig.knownCashPreparation
+        ? {
+            cashDividendDisclosure: cashDividendDisclosureV3(
+              runConfig,
+              rowsByArtifact.get(`${manifest.runId}/${dependencyEvidenceKey}`) ?? [],
+              vertical.cashEvents,
+            ),
+          }
+        : {}),
+    },
+    model: {
+      ...(runConfig.executionModel && manifest.executionModel
+        ? {
+            executionModelDisclosure: {
+              model: runConfig.executionModel,
+              contentHash: manifest.executionModel.contentHash,
+            },
+          }
+        : {}),
+    },
+  };
+}
+
+function assertRunnerSnapshotInput(
+  manifest: BacktestSnapshotManifestV3,
+  input: BacktestV3RunnerInput,
+): asserts manifest is BacktestSnapshotManifestV3 & { contentHash: string } {
+  if (manifest.status !== 'finalized' || manifest.quality.completeness !== 'complete') {
+    throw new Error('V3 Runner 只执行 finalized complete Snapshot');
+  }
+  if (manifest.runId !== input.runId) {
+    throw new Error('V3 Runner Snapshot runId 不匹配');
+  }
+  if (
+    input.snapshotRef.snapshotId !== manifest.contentHash ||
+    input.snapshotRef.contentHash !== manifest.contentHash
+  ) {
+    throw new Error('V3 Snapshot contentHash 不匹配');
+  }
+  assertExactArtifactRefs(input.artifactRefs, manifest.artifacts);
 }

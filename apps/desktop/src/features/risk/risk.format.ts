@@ -85,8 +85,8 @@ export const isRiskRuleScopeAllowed = (kind: string, scope: RiskRuleScope) =>
 export const riskSeverityOptions: Array<{ value: RiskRuleSeverity; label: string }> = [
   { value: 'info', label: '提示' },
   { value: 'warning', label: '警告' },
-  { value: 'error', label: '错误' },
-  { value: 'critical', label: '严重' },
+  { value: 'error', label: '严重' },
+  { value: 'critical', label: '关键' },
 ];
 
 const labelFor = <T extends string>(options: Array<{ value: T; label: string }>, value: string) =>

@@ -16,6 +16,11 @@ const sessionOpen: Record<TradingMarket, string> = {
 
 const currencyByMarket = { CN: 'CNY', HK: 'HKD', US: 'USD' } as const;
 const symbolByMarket = { CN: '600000.SH', HK: '00005.HK', US: 'AAPL.US' } as const;
+const quantityRulesByMarket = {
+  CN: { lotSize: '100', quantity: '250', sellCreditAfterTradingDays: 0 },
+  HK: { lotSize: '500', quantity: '1000', sellCreditAfterTradingDays: 2 },
+  US: { lotSize: '1', quantity: '3', sellCreditAfterTradingDays: 1 },
+} as const;
 
 const facts = (
   market: TradingMarket,
@@ -31,7 +36,7 @@ const facts = (
     market,
     instrumentType: 'STOCK',
     currency: currencyByMarket[market],
-    lotSize: market === 'CN' ? '100' : market === 'HK' ? '500' : '1',
+    lotSize: quantityRulesByMarket[market].lotSize,
     tickSize: '0.01',
     tradable: true,
     provider: 'fixture',
@@ -53,7 +58,7 @@ const facts = (
   positionSettlement: { sellableAfterTradingDays: market === 'CN' ? 1 : 0 },
   cashSettlement: {
     buyDebitAfterTradingDays: 0,
-    sellCreditAfterTradingDays: market === 'CN' ? 0 : market === 'HK' ? 2 : 1,
+    sellCreditAfterTradingDays: quantityRulesByMarket[market].sellCreditAfterTradingDays,
   },
   statutoryCharges:
     market === 'CN'
@@ -69,7 +74,7 @@ const order = (
   symbol: symbolByMarket[market],
   market,
   side: 'buy',
-  quantity: market === 'CN' ? '250' : market === 'HK' ? '1000' : '3',
+  quantity: quantityRulesByMarket[market].quantity,
   rawPrice: '10',
   previousClose: '10',
   evaluatedAt: sessionOpen[market],

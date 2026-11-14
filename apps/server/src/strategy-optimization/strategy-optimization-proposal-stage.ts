@@ -27,6 +27,7 @@ export const concludeOptimizationProposalStage = async (
   prisma: PrismaService,
   experimentId: string,
   candidates: readonly CandidateOutcome[],
+  executionAttempt: number,
 ) => {
   const attempts = candidates.some((candidate) => candidate.validationStatus === 'valid')
     ? []
@@ -35,14 +36,17 @@ export const concludeOptimizationProposalStage = async (
         FROM "OptimizationAttempt" AS attempt
         LEFT JOIN "AiRun" AS run ON run."id"=attempt."aiRunId"
         WHERE attempt."experimentId"=${experimentId}::uuid
+          AND attempt."attempt">COALESCE((SELECT ("retryState"->>'roundOffset')::int
+            FROM "OptimizationExperiment" WHERE "id"=${experimentId}::uuid), 0)
       `);
   const reason = proposalStageFailureReason(candidates, attempts);
-  if (reason) return reason;
-  await prisma.$executeRaw(Prisma.sql`
+  const status = reason ? 'failed' : 'awaiting_finalization';
+  const updated = await prisma.$executeRaw(Prisma.sql`
     UPDATE "OptimizationExperiment"
-    SET "status"='awaiting_finalization', "stage"='awaiting_finalization', "leaseUntil"=NULL,
+    SET "status"=${status}, "stage"=${status}, "stopReason"=${reason}, "leaseUntil"=NULL,
         "updatedAt"=CURRENT_TIMESTAMP
     WHERE "id"=${experimentId}::uuid AND "cancelRequestedAt" IS NULL
+      AND "status"='running' AND "executionAttempt"=${executionAttempt}
   `);
-  return null;
+  return updated === 1 ? reason : 'proposal_stage_changed';
 };

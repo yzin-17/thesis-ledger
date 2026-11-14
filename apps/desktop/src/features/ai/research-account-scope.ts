@@ -55,10 +55,7 @@ export function useResearchAccountScope({
     ),
     staleTime: 15_000,
   });
-  let retryMode = retryContext?.mode;
-  if (!retryMode && retryContext?.accountId)
-    retryMode = allAccounts.find((account) => account.id === retryContext.accountId)?.mode;
-  if (!retryMode && retryContext?.scope === 'portfolio') retryMode = 'actual';
+  const retryMode = researchRetryMode(retryContext, allAccounts);
   const retryModeMismatch =
     retryContext?.scope !== 'strategy' && Boolean(retryMode && retryMode !== mode);
   return {
@@ -73,4 +70,15 @@ export function useResearchAccountScope({
       label: accountDisplayLabel(account),
     })),
   };
+}
+
+function researchRetryMode(
+  retryContext: AiResearchContext | undefined,
+  allAccounts: Awaited<ReturnType<typeof fetchAccounts>>,
+) {
+  let retryMode = retryContext?.mode;
+  if (!retryMode && retryContext?.accountId)
+    retryMode = allAccounts.find((account) => account.id === retryContext.accountId)?.mode;
+  if (!retryMode && retryContext?.scope === 'portfolio') retryMode = 'actual';
+  return retryMode;
 }

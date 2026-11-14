@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigationGuard } from '../shared/navigation-guard.js';
 import { LoaderCircle } from 'lucide-react';
-import { strategySchema } from '@thesis-ledger/schemas';
+import { strategySchema, projectPriceResearchStrategy, priceResearchStrategySummary, priceResearchStrategyIssues, type BacktestStrategy } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { schemaFromVersion, schemaName } from './strategy.schema.js';
 import { hasUnappliedJson, shouldApplyAdvancedJson } from './strategy.formats.js';
 import { StrategyConfigurationFields } from './StrategyConfigurationFields.js';
+import { useStrategyInstrumentDirectory } from './useStrategyInstrumentDirectory.js';
 import type { StrategyRecord, StrategySchema, StrategyVersion } from './strategy.types.js';
 
 type EditorMode = 'create' | 'edit';
@@ -82,7 +83,7 @@ export function StrategyEditorSheet({
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const initializedSource = useRef<string | null>(null);
   const sourceKey = `${mode}:${strategy?.id ?? ''}:${version?.id ?? ''}`;
-
+  const instrumentDisplay = useStrategyInstrumentDirectory(version?.instrumentDirectory, sourceKey);
   useEffect(() => {
     if (!open) {
       initializedSource.current = null;
@@ -167,8 +168,16 @@ export function StrategyEditorSheet({
       setSchemaError(`${issue?.path.join('.') || '配置'}：${issue?.message ?? '策略配置校验失败'}`);
       return;
     }
-    onSave(validated.data);
+    const saved = validated.data.schemaVersion === '3'
+      ? projectPriceResearchStrategy(validated.data as BacktestStrategy) : validated.data;
+    const issue = saved.schemaVersion === '3' ? priceResearchStrategyIssues(saved as BacktestStrategy)[0] : undefined;
+    if (issue) { setSchemaError(`${issue.path.join('.')}：${issue.message}`); return; }
+    onSave(saved);
   };
+
+  const previewInput = strategySchema.safeParse(activeTab === 'advanced' ? parseJson(jsonText) : draft);
+  const preview = previewInput.success && previewInput.data.schemaVersion === '3'
+    ? priceResearchStrategySummary(projectPriceResearchStrategy(previewInput.data as BacktestStrategy)) : null;
 
   let saveButtonLabel = '保存为新版本';
   if (busy) saveButtonLabel = '保存中…';
@@ -225,7 +234,7 @@ export function StrategyEditorSheet({
                   placeholder="记录这条策略的假设和适用范围"
                 />
               </Field>
-              <StrategyConfigurationFields schema={draft} onChange={updateDraft} />
+              <StrategyConfigurationFields schema={draft} {...instrumentDisplay} onChange={updateDraft} />
             </FieldGroup>
           </TabsContent>
           <TabsContent value="advanced">
@@ -251,6 +260,14 @@ export function StrategyEditorSheet({
             </Field>
           </TabsContent>
         </Tabs>
+        {preview && (
+          <div className="mt-4 space-y-2 text-sm" aria-label="保存口径预览">
+            <p className="font-medium">保存口径预览</p>
+            <p>买入：{preview.entry}</p>
+            <p>卖出：{preview.exit}</p>
+            <p>投入：{preview.sizing}</p>
+          </div>
+        )}
         {schemaError && (mode === 'edit' || !schemaError.startsWith('name')) && (
           <p className="mt-4 text-sm text-destructive" role="alert">
             {schemaError}

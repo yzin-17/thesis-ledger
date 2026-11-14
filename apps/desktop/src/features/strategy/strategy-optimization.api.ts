@@ -35,6 +35,7 @@ export type OptimizationCapabilities = {
 };
 
 export type OptimizationExperimentSummary = {
+  executionAttempt?: number;
   runConfig?: unknown;
   readEligibility?: ResultReadEligibility;
   id: string;
@@ -72,6 +73,7 @@ export type OptimizationExperimentSummary = {
   costSummary: OptimizationCostSummary;
   tradingCost: OptimizationTradingCostReadModel;
   selectedCandidateId?: string | null;
+  exposure?: Record<string, unknown>;
   lockedCandidateIds?: string[] | null;
   testExposedAt?: string | null;
   stopReason?: string | null;
@@ -187,10 +189,15 @@ export type RiskApplicationUpgradePreview = RiskApplicationPreview & {
 };
 
 export type StrategyRiskNotification = {
+  providers?: string[];
   enabled: boolean;
   cooldownMinutes: number;
   severity: 'info' | 'warning' | 'error' | 'critical';
   channels: Array<'feishu'>;
+  ruleOverrides?: Record<string, {
+    severity?: StrategyRiskNotification['severity'];
+    cooldownMinutes?: number;
+  }>;
 };
 
 export type StrategyRiskApplication = {
@@ -298,11 +305,20 @@ export const finalizeOptimizationExperiment = (
   input: Parameters<ReturnType<typeof optimization>['finalize']>[1],
   client?: DesktopRequestClient,
 ): Promise<OptimizationCompare> => optimization(client).finalize(id, input).then(omitUndefinedDeep);
+export const retryOptimizationExperiment = (
+  id: string,
+  input: { idempotencyKey: string; expectedExecutionAttempt: number },
+  client?: DesktopRequestClient,
+): Promise<OptimizationExperimentSummary> => optimization(client).retry(id, input).then(omitUndefinedDeep);
 export const adoptOptimizationCandidate = (
   id: string,
   input: Parameters<ReturnType<typeof optimization>['adopt']>[1],
   client?: DesktopRequestClient,
 ) => optimization(client).adopt(id, input).then(omitUndefinedDeep);
+export const completeOptimizationExperiment = (
+  id: string,
+  client?: DesktopRequestClient,
+): Promise<OptimizationCompare> => optimization(client).complete(id).then(omitUndefinedDeep);
 export const fetchOptimizationAdoptionContext = (
   id: string,
   candidateId: string,

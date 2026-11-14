@@ -101,7 +101,7 @@ export const createHealthStub = () => ({
       slowAfterMs = DEFAULT_SLOW_AFTER_MS,
     ) => ({
       provider,
-      state: success ? (latencyMs > slowAfterMs ? 'degraded' : 'healthy') : 'degraded',
+      state: testProviderState(success, latencyMs, slowAfterMs),
       latencyMs,
       checkedAt,
     }),
@@ -179,3 +179,16 @@ export const createRoutingTransactionFixture = (
   };
   return { transaction, prisma };
 };
+
+export const key = 'test-api-key-not-returned';
+export const successfulSdk = () => ({
+  generate: vi.fn(async (input: unknown) => {
+    void input;
+    return { output: { ok: true } };
+  }),
+});
+
+function testProviderState(success: boolean, latencyMs: number, slowAfterMs: number) {
+  if (!success) return 'degraded';
+  return latencyMs > slowAfterMs ? 'degraded' : 'healthy';
+}

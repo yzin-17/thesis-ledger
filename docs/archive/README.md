@@ -1,5 +1,71 @@
 # 历史文档归档
 
+- [策略风险自动监控](tasks/2026-11-13-strategy-risk-automatic-monitoring.md)：策略应用自动评估、逐条缺数诊断、双端展示与本地快更完成，见[验收](evidence/2026-11-13-strategy-risk-automatic-monitoring.md)。
+
+- [AI 策略交叉方向修复](tasks/2026-11-12-strategy-cross-direction.md)：生成主语与方向校验、v2 与冻结对照回测、历史摘要保留；方向修正后仍频繁交叉且收益更差，见[验收](evidence/2026-11-12-strategy-cross-direction.md)。
+
+- [竞技场单模型参赛](tasks/2026-11-12-arena-single-model.md)：两版契约、隔离生命周期和研究、两端四宽度及正式快更通过，见[验收](../evidence/2026-11-12-arena-single-model.md)。
+
+- [竞技场创建就地校验](tasks/2026-11-12-arena-inline-validation.md)：字段／分组提示、首错定位、修正及请求失败恢复，两端四宽度通过，见[验收](../evidence/2026-11-12-arena-inline-validation.md)。
+
+- [自主比赛可选研究步骤与时限](tasks/2026-11-12-arena-unlimited-research.md)：研究由模型最终决策结束、独立续约与中止、两端四宽度及正式快更通过，见[验收](../evidence/2026-11-12-arena-unlimited-research.md)。
+
+- [自主比赛可选单次上限与配置默认值](tasks/2026-11-12-arena-optional-request-limits.md)：全部配置分类、单次无限与有限总预算联动、两端四宽度及正式快更通过，见[验收](../evidence/2026-11-12-arena-optional-request-limits.md)。
+
+- [自主比赛可选总预算](tasks/2026-11-12-arena-optional-budgets.md)：空白不限额、有限维度事务保护、两端页面及正式快更通过，见[验收](../evidence/2026-11-12-arena-optional-budgets.md)。
+
+- [自主比赛可选日期与持续运行](tasks/2026-11-12-arena-optional-dates.md)：空日期、跨年执行、手动结束、两端消费及本地快更通过，见[验收](../evidence/2026-11-12-arena-optional-dates.md)。
+
+- [提供方健康记录统一](tasks/2026-11-12-provider-health-records.md)：旧记录转换 2 条、删除 1 条，当前契约、真实 API 全分页及四宽页面读取通过，见[验收记录](evidence/2026-11-12-provider-health-records.md)。
+
+- [竞技场界面一致性巡检](tasks/2026-11-12-arena-ui-consistency.md)：列表、两个创建入口、全部详情页签及周报统一，见[验收](../evidence/2026-11-12-arena-ui-consistency.md)。
+
+- [竞技场比赛内记录导航](tasks/2026-11-12-arena-inline-round-navigation.md)：日频详情统一决策与成交，日期／模型筛选、旧链接和四宽度消费通过，见[验收](../evidence/2026-11-12-arena-inline-round-navigation.md)。
+
+- [竞技场 Desktop 界面重设计](tasks/2026-11-12-arena-desktop-experience.md)：日频／自主详情、轮次与创建流程、四宽度浏览器及真实历史只读消费通过；[证据](../evidence/2026-11-12-arena-desktop-experience.md)与父级真实来源、原生验收分开。
+
+- [基础行情结果缓存](tasks/2026-11-11-market-base-result-cache.md)：60秒普通交互缓存、目标Server及实际Desktop四宽通过，见[完成证据](../evidence/2026-11-12-market-base-result-cache-completion.md)；现行Spec保留。
+
+- [AI 实验原地失败重试](tasks/2026-11-12-experiment-manual-retry.md)：原身份、失败审计、累计预算与未知结果明确恢复；隔离状态机、四宽浏览器及正式运行态通过，见[验收记录](evidence/2026-11-12-experiment-manual-retry.md)。
+
+- [AI 实验自动完成](tasks/2026-11-12-automatic-experiment-completion.md)：全部有效候选自动测试并揭示，最终人工采纳；隔离 PostgreSQL、四宽浏览器及真实等待实验接续通过，见[验收记录](evidence/2026-11-12-automatic-experiment-completion.md)。
+
+- [日期组件显示一致性任务](tasks/2026-11-11-date-input-consistency.md)及[验收证据](evidence/2026-11-11-date-input-consistency.md)：统一日期输入与选中态，现行合同保留在规格和 UI 指南中。
+
+- [回测标的走势](tasks/2026-11-11-backtest-instrument-chart.md)：冻结标的收盘价、双轴与联动读数，沪港真实样本及四宽浏览器通过，见[验收记录](evidence/2026-11-11-backtest-instrument-chart.md)。
+
+- [实验候选的具体策略差异](tasks/2026-11-11-experiment-candidate-diff.md)：冻结版本只读投影与可读具体值，见[验收记录](evidence/2026-11-11-experiment-candidate-diff.md)。
+
+- [能力首次使用与自动验证](tasks/2026-11-11-capability-first-use-verification.md)：未知可尝试、真实成功后保存；苹果与腾讯正式请求、服务重启及四宽真实页面通过，[证据](../evidence/2026-11-11-capability-first-use-verification.md)保留实际范围与既有广回归差异。
+
+- [港美股后复权回测准备修复](tasks/2026-11-11-overseas-hfq-backtest.md)：富途研究通路与覆盖错误修复，两个标的原窗口通过取数校验；[证据](../evidence/2026-11-11-overseas-hfq-backtest.md)保留未重跑任务及当日未开市的边界。
+
+- 策略收益研究双价格输入的[归档任务](tasks/2026-11-11-backtest-return-research.md)、[首次实施证据](evidence/2026-11-11-backtest-return-research.md)和[价格对切换验收](evidence/2026-11-11-backtest-price-pair-recovery.md)分别保留实际检查范围及共同上游可用性边界。
+
+- 回测日线来源适用性：[规格](specs/2026-11-11-backtest-source-compatibility.md)、[任务](tasks/2026-11-11-backtest-source-compatibility.md)及[完整窗口证据](../evidence/2026-11-11-backtest-source-compatibility.md)。
+
+- [证券业务选择流程](tasks/2026-11-10-instrument-selection-workflow.md)：独立目录入口收敛，港美股票自动关联、原生币种及四宽业务表单通过；[证据](evidence/2026-11-10-instrument-selection-workflow.md)区分受控写入与真实只读检查。
+
+- [标的确认状态](tasks/2026-11-10-instrument-confirmation-state.md)：持久化状态、两端反馈和缓存已统一，受控转换与四宽真实只读验收通过；[证据](evidence/2026-11-10-instrument-confirmation-state.md)包含快更入口和镜像边界。
+
+- [标的详情证券资料](tasks/2026-11-10-instrument-detail-security-info.md)：独立表单并入共用详情，四宽界面验收通过；[证据](evidence/2026-11-10-instrument-detail-security-info.md)分别记录受控成功与真实来源路由未配置。
+
+- [权限检查限频暂停与接续](tasks/2026-11-10-provider-access-rate-limit.md)：首次限频暂停、60秒冷却及部分补查完成，126项后端、18项界面、四宽浏览器及完整镜像验收通过，详见[证据](../evidence/2026-11-10-provider-access-rate-limit.md)。
+
+- [权限检查长期保留与凭证底部操作](tasks/2026-11-10-provider-access-retention.md)：当前结果长期保存、同草稿保存复用及底部移除操作完成，完整 DSA 镜像与四宽实际页面通过，详见[验收记录](../evidence/2026-11-10-provider-access-retention.md)。
+
+- [内部导航整页刷新排查](tasks/2026-11-09-internal-navigation.md)：复盘共用入口统一应用路由，86项定向测试、构建及四宽导航通过；[验证记录](evidence/2026-11-09-internal-navigation.md)区分静态清单、受控输入与真实只读边界。
+
+- [收费资料检查执行时间](tasks/2026-11-09-rule-monitor-schedule.md)：规则页创建默认24小时任务、自动化编辑仅时间，持久计划、增量保留、接口成本登记与四宽实际页面通过；[验收记录](evidence/2026-11-09-rule-monitor-schedule.md)分列真实只读、受控写入及镜像/代码层边界。
+
+- [数据源统一身份与逐功能权限](tasks/2026-11-09-provider-functional-access.md)：TickFlow 统一来源、逐能力凭证门禁及通用权限展示完成，当前规格保留，详见[证据](../evidence/2026-11-09-provider-functional-access.md)。
+
+- [收费资料检查操作一致性](tasks/2026-11-09-rule-monitor-controls.md)：统一启停、原位编辑与立即运行，36项定向回归、构建及四宽浏览器通过；[证据](evidence/2026-11-09-rule-monitor-controls.md)保留受控写入和用户当前配置边界。
+
+- [规则监测版本查看与统一自动化记录](tasks/2026-11-09-rule-monitor-automation.md)：版本侧边详情、统一任务历史及逐次失败原因已接入，定向验证、正式代码同步和四宽实际页面通过；[验收记录](evidence/2026-11-09-rule-monitor-automation.md)保留旧历史缺口及运行边界。
+
+- [删除 NVIDIA 官方新闻数据源](tasks/2026-11-09-remove-nvidia-news.md)：来源、当前政策与页面已清理，定向测试及真实浏览器通过，运行态范围见[证据](evidence/2026-11-09-remove-nvidia-news.md)。
+
 - [富途与 HiThink 筹码账号核查](tasks/2026-11-09-chip-provider-expansion.md)：当前 Key／OpenD 条件核查完成；HiThink 筹码拒绝外部读取、富途 REST 缺独立认证，用户暂不新增认证，因此未触发新来源接入，详见[DSA 证据](../../../daily-stock-analysis/docs/evidence/2026-11-09-chip-provider-accounts.md)。
 
 - 2026-11-08 [行情日期区间](tasks/2026-11-08-chart-date-ranges.md)：七类区间、自定义日期、按需历史、四宽和真实基金三年读取已验收；[验证记录](evidence/2026-11-08-chart-date-ranges.md)保留来源覆盖及本地运行边界。

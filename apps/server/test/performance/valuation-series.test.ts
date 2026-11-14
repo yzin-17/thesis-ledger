@@ -7,6 +7,30 @@ import { PerformanceSnapshotService } from '../../src/performance/performance-sn
 import { controlledMarketSession } from '../market/market-session.fixture.js';
 
 describe('组合估值走势', () => {
+  it.each([false, true])('无基金账户的采样保留账户完整性与覆盖口径，partial=%s', async (partial) => {
+    const upsert = vi.fn(async ({ create }: { create: Record<string, unknown> }) => create);
+    const service = new PerformanceValuationSeriesService(
+      {
+        account: { findMany: vi.fn(async () => [{ id: 'controlled-account' }]) },
+        position: { findMany: vi.fn(async () => []) },
+        accountValuationPoint: { upsert },
+      } as never,
+      { layers: vi.fn(async () => ({ account: [{
+        accountId: 'controlled-account', marketValue: 10, cashValue: 3, partial,
+        missingSymbols: [], missingCurrencies: [],
+      }] })) } as never,
+      {} as never, {} as never,
+    );
+    const result = await service.sample(new Date('2026-11-12T08:00:15Z'));
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(upsert.mock.calls[0]![0].create).toMatchObject({
+      marketValue: 10, cashValue: 3, totalValue: 13, disclosureCoverage: 1,
+      pricedCoverage: partial ? 0 : 1, dataQuality: partial ? 'PARTIAL' : 'COMPLETE',
+    });
+    expect(result).toMatchObject({ at: '2026-11-12T08:00:00.000Z', sampled: 1,
+      pricedCoverage: partial ? 0 : 1, disclosureCoverage: 1, partial,
+    });
+  });
   it.each([
     ['actual', '1D', '1min'], ['shadow', '1Y', '1d'],
   ] as const)('无点位的 %s/%s/%s 保留不可用，不冒充完整或补零', async (mode, range, interval) => {
@@ -49,6 +73,9 @@ describe('组合估值走势', () => {
     expect(result.pricedCoverage).toBeCloseTo(0.08);
   });
 
+});
+
+describe("分钟序列及自动采样范围", () => {
   it('分钟序列按自然分钟归并并限制为最后 2000 点', async () => {
     const start = new Date('2026-09-01T01:30:00.000Z');
     const rows = Array.from({ length: 2_002 }, (_, index) => ({
@@ -167,6 +194,9 @@ describe('组合估值走势', () => {
     });
   });
 
+});
+
+describe("正式快照的追加修订", () => {
   it('正式快照以追加修订替代同一估值槽位的估算版本', async () => {
     const stored: Array<Record<string, unknown>> = [];
     const prisma = {

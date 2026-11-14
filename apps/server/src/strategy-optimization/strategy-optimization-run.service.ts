@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { runConfigSchemaV3 } from '@thesis-ledger/schemas';
-import { evaluateOptimizationResult } from './strategy-optimization-evaluation.js';
+import { evaluateOptimizationResult, invalidOptimizationComparison } from './strategy-optimization-evaluation.js';
 export { calculateOptimizationScore } from './strategy-optimization-evaluation.js';
 import { BacktestService } from '../backtest/backtest.service.js';
 import { assertCurrentRunForRead } from '../backtest/backtest-current-run-read.js';
@@ -34,6 +34,11 @@ export class StrategyOptimizationRunService {
     private readonly configuredRuns?: BacktestConfiguredRunService,
   ) {}
 
+  async assertFrozenResearchBudget(experiment: ExperimentRow) {
+    if (!this.configuredRuns) throw new BadRequestException('配置预检服务未就绪');
+    await this.configuredRuns.assertFrozenResearchBudget(experiment.baselineStrategyVersionId, experiment.runConfig);
+  }
+
   async reserveBudget(
     id: string,
     input: {
@@ -42,6 +47,7 @@ export class StrategyOptimizationRunService {
       inputTokens?: number;
       outputTokens?: number;
       estimatedCost?: number;
+      executionAttempt?: number;
     },
     transaction?: Prisma.TransactionClient,
   ) {
@@ -51,6 +57,7 @@ export class StrategyOptimizationRunService {
     const inputTokens = input.inputTokens ?? 0;
     const outputTokens = input.outputTokens ?? 0;
     const estimatedCost = input.estimatedCost ?? 0;
+    const executionAttempt = input.executionAttempt ?? null;
     const updated = await database.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "aiCallsUsed"="aiCallsUsed"+${aiCalls}, "backtestRunsUsed"="backtestRunsUsed"+${runs},
@@ -58,12 +65,14 @@ export class StrategyOptimizationRunService {
           "outputTokensUsed"="outputTokensUsed"+${outputTokens},
           "costUsed"="costUsed"+${estimatedCost}, "updatedAt"=CURRENT_TIMESTAMP
       WHERE "id"=${id}::uuid AND "cancelRequestedAt" IS NULL
+        AND (${executionAttempt}::int IS NULL OR
+          ("executionAttempt"=${executionAttempt} AND "status" IN ('running','testing')))
         AND (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "createdAt")) * 1000 - "pausedDurationMs")
           <= COALESCE(NULLIF("budget"->>'maxDurationSeconds', '')::int, 1800) * 1000
-        AND "aiCallsUsed"+${aiCalls} <= (("budget"->>'maxAiCalls')::int)
-        AND "backtestRunsUsed"+${runs} <= (("budget"->>'maxBacktestRuns')::int)
-        AND "inputTokensUsed"+${inputTokens} <= (("budget"->>'maxInputTokens')::int)
-        AND "outputTokensUsed"+${outputTokens} <= (("budget"->>'maxOutputTokens')::int)
+        AND ((("budget"->>'maxAiCalls')::int) = 0 OR "aiCallsUsed"+${aiCalls} <= (("budget"->>'maxAiCalls')::int))
+        AND ((("budget"->>'maxBacktestRuns')::int) = 0 OR "backtestRunsUsed"+${runs} <= (("budget"->>'maxBacktestRuns')::int))
+        AND ((("budget"->>'maxInputTokens')::int) = 0 OR "inputTokensUsed"+${inputTokens} <= (("budget"->>'maxInputTokens')::int))
+        AND ((("budget"->>'maxOutputTokens')::int) = 0 OR "outputTokensUsed"+${outputTokens} <= (("budget"->>'maxOutputTokens')::int))
         AND (("budget"->>'maxCost') IS NULL OR "costUsed"+${estimatedCost} <= (("budget"->>'maxCost')::decimal))
     `);
     if (updated !== 1)
@@ -78,7 +87,13 @@ export class StrategyOptimizationRunService {
     const budget = toRecord(experiment.budget);
     const maxOutputTokens =
       typeof budget.maxOutputTokens === 'number' ? budget.maxOutputTokens : 20_000;
-    const maxAiCalls = typeof budget.maxAiCalls === 'number' ? budget.maxAiCalls : 1;
+    // 不限累计输出时仍保留账务预估；SDK 沿用 Provider 单次输出配置。
+    if (maxOutputTokens === 0) return 20_000;
+    let maxAiCalls = typeof budget.maxAiCalls === 'number' ? budget.maxAiCalls : 1;
+    if (maxAiCalls === 0) {
+      const modelCount = Array.isArray(experiment.modelConfig) ? experiment.modelConfig.length : 1;
+      maxAiCalls = Math.max(1, modelCount) * Math.max(1, experiment.maxRounds ?? 1);
+    }
     return Math.max(1, Math.floor(maxOutputTokens / Math.max(1, maxAiCalls)));
   }
 
@@ -108,7 +123,7 @@ export class StrategyOptimizationRunService {
     const budget = toRecord(row.budget);
     const maxInput = typeof budget.maxInputTokens === 'number' ? budget.maxInputTokens : 0;
     const maxOutput = typeof budget.maxOutputTokens === 'number' ? budget.maxOutputTokens : 0;
-    if (row.inputTokensUsed > maxInput || row.outputTokensUsed > maxOutput)
+    if ((budget.maxInputTokens !== 0 && row.inputTokensUsed > maxInput) || (budget.maxOutputTokens !== 0 && row.outputTokensUsed > maxOutput))
       throw new BadRequestException('Provider 实际 token 用量超过预留预算，已停止新任务');
   }
 
@@ -226,7 +241,7 @@ export class StrategyOptimizationRunService {
     );
     if (resolved.kind === 'existing') run = resolved.job;
     else {
-      await this.reserveBudget(experiment.id, { backtestRuns: 1 });
+      await this.reserveBudget(experiment.id, { backtestRuns: 1, executionAttempt: experiment.executionAttempt });
       run = await this.backtests.createRun(resolved.input);
     }
     if (!run) throw new Error('Run 创建后未找到持久化记录');
@@ -242,6 +257,7 @@ export class StrategyOptimizationRunService {
       throw new OptimizationBacktestFailure(
         terminal.errorCode ?? 'INTERNAL_ERROR',
         `回测 Run ${terminal.id} ${terminal.status}: ${terminal.errorSummary ?? terminal.errorCode ?? 'unknown'}`,
+        terminal.id,
       );
     return terminal;
   }
@@ -274,14 +290,16 @@ export class StrategyOptimizationRunService {
       run,
       this.splitRangeFor(experiment, splitName),
     );
-    await this.prisma.$executeRaw(Prisma.sql`
+    const updated = await this.prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "baselineRunRefs"=COALESCE("baselineRunRefs", '{}'::jsonb) || ${JSON.stringify({ [splitName]: run.id })}::jsonb,
           "baselineMetrics"=COALESCE("baselineMetrics", '{}'::jsonb) || ${JSON.stringify({ [splitName]: summary })}::jsonb,
           "frozenDataFingerprints"=COALESCE("frozenDataFingerprints", '{}'::jsonb) || ${JSON.stringify({ [splitName]: fingerprint })}::jsonb,
           "updatedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${experiment.id}::uuid
+      WHERE "id"=${experiment.id}::uuid AND "status"='running'
+        AND "executionAttempt"=${experiment.executionAttempt} AND "cancelRequestedAt" IS NULL
     `);
+    if (updated !== 1) throw new Error('实验基线已被新的执行尝试接管');
     return { run, summary, fingerprint };
   }
 
@@ -303,14 +321,8 @@ export class StrategyOptimizationRunService {
       this.splitRangeFor(experiment, splitName),
     );
     if (fingerprint !== baselineFingerprint) {
-      const summary: EvaluationSummary = {
-        runId: run.id,
-        status: 'invalid',
-        completeness: 'unavailable',
-        tradeCount: 0,
-        reason: '候选与基准的数据 Artifact 指纹不一致，实验 fail-closed',
-        failureCategory: 'protocol-incompatible',
-      };
+      const summary = invalidOptimizationComparison(this.evaluateResult(run, experiment.objective),
+        '候选与基准的数据 Artifact 指纹不一致，实验 fail-closed');
       return { run, summary, fingerprint };
     }
     return { run, summary: this.evaluateResult(run, experiment.objective), fingerprint };

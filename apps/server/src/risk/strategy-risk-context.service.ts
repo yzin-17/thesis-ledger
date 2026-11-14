@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import {
   marketSessionDate,
   marketTimezones,
@@ -6,16 +6,20 @@ import {
   tradingMarketForAssetMarket,
   type DerivedBacktestBar,
   type TradingMarket,
+  type StrategyMonitoringContext,
+  DecimalValue,
 } from '@thesis-ledger/domain';
 import type { BarPoint } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketService } from '../market/market.service.js';
+import { MarketBackgroundBarReader } from '../market/market-background-bar-reader.js';
 import { currentFundRiskContext } from './strategy-risk-nav-context.js';
 import { assertStrategyRiskTargetAccount } from './strategy-risk-target-account.js';
 import {
   isMarketBarTemporarilyUnavailable,
   MarketBarReader,
   MarketBarUnavailableError,
+  type MarketBarWindowReadInputV3,
 } from '../market/market-bar-reader.js';
 
 export type StrategyRiskTarget = {
@@ -37,14 +41,7 @@ export type StrategyRiskActualContext = {
   positionId?: string;
   tradeId?: string;
   openedAt?: string;
-  context: {
-    quantity?: string;
-    price?: string;
-    averageCost?: string;
-    holdingPeriods?: number;
-    occurredAt?: string;
-    availableAt?: string;
-  };
+  context: StrategyMonitoringContext;
 };
 
 type ExchangeValues = {
@@ -75,6 +72,7 @@ export class StrategyRiskContextService {
     private readonly prisma: PrismaService,
     private readonly bars?: MarketBarReader,
     private readonly market?: MarketService,
+    @Optional() private readonly backgroundBars?: MarketBackgroundBarReader,
   ) {}
 
   private async assertTarget(accountId: string, symbol: string, target: StrategyRiskTarget) {
@@ -125,7 +123,9 @@ export class StrategyRiskContextService {
     const probe = marketCivilInstant(tradingDate, 12 * 60, marketTimezones[market]);
     const session = await this.market.getSession(market, new Date(probe));
     if (session.state === 'unknown') return null;
-    const end = session.sessions.filter((window) => window.tradingDate === tradingDate).at(-1)?.endAt;
+    const end = session.sessions
+      .filter((window) => window.tradingDate === tradingDate)
+      .at(-1)?.endAt;
     return end ? new Date(end) : null;
   }
 
@@ -144,9 +144,12 @@ export class StrategyRiskContextService {
   private async latestCompletedDailyDate(evaluatedAt: Date, market: TradingMarket) {
     const session = await this.market?.getSession(market, evaluatedAt);
     if (!session || session.state === 'unknown')
-      throw new MarketBarUnavailableError('策略风险交易日历未覆盖评价时点');
+      throw new MarketBarUnavailableError(
+        '交易日历未覆盖评价时点，无法确认已完成日线',
+        'calendar_unavailable',
+      );
     if (!session.latestCompletedTradingDate)
-      throw new MarketBarUnavailableError('策略风险缺少可确认的已收盘交易日');
+      throw new MarketBarUnavailableError('缺少可确认的已收盘交易日', 'calendar_unavailable');
     return session.latestCompletedTradingDate;
   }
 
@@ -158,9 +161,14 @@ export class StrategyRiskContextService {
     start?: Date,
     take?: number,
     availabilityCutoff = () => evaluatedAt,
+    background = false,
   ): Promise<RiskBar[]> {
     if (!this.bars) throw new BadRequestException('行情 Reader 不可用，策略风险拒绝读取行情');
-    if (timeframe === '1m') throw new MarketBarUnavailableError('分钟线现行合同仅支持交互图表，风险监控尚未接入已完成分钟线更新');
+    if (timeframe === '1m')
+      throw new MarketBarUnavailableError(
+        '风险监控尚无可用的已完成分钟线数据',
+        'timeframe_unsupported',
+      );
     const normalizedAssetType = assetType.toUpperCase();
     if (normalizedAssetType !== 'STOCK' && normalizedAssetType !== 'ETF')
       throw new MarketBarUnavailableError('策略风险日线资产类型尚无现行精确来源');
@@ -172,24 +180,42 @@ export class StrategyRiskContextService {
     const end = await this.latestCompletedDailyDate(evaluatedAt, market);
     const first = start ? marketSessionDate(start, marketTimezones[market]) : end;
     if (first > end) return [];
-    const selected = await this.bars.readV3({
+    const input: MarketBarWindowReadInputV3 = {
       market,
       symbol,
       routeKey: {
-        kind: 'bar',
+        kind: 'bar' as const,
         market,
         assetType: normalizedAssetType,
-        capability: 'DAILY_BAR',
-        timeframe: '1d',
-        adjustment: 'none',
+        capability: 'DAILY_BAR' as const,
+        timeframe: '1d' as const,
+        adjustment: 'none' as const,
       },
       window: {
         start: first,
         end,
       },
-    });
-    if (selected.status !== 'selected')
-      throw new MarketBarUnavailableError('策略风险日线窗口不可用');
+    };
+    if (background && !this.backgroundBars)
+      throw new MarketBarUnavailableError('后台日线读取器未就绪', 'daily_bars_unavailable');
+    const selected = background
+      ? await this.backgroundBars!.read(input)
+      : await this.bars.readV3(input);
+    if (selected.status !== 'selected') {
+      const reasons = {
+        route_not_configured: '尚未选择日线数据来源',
+        invalid_input: '日线请求参数无效',
+        policy_mismatch: '日线路由与来源能力不匹配',
+        catalog_unavailable: '日线数据来源目录暂不可用',
+        incompatible_backup: '备用来源不支持当前日线口径',
+        unsupported_granularity: '数据来源不支持当前周期',
+        primary_unavailable: '日线主要来源和可用备用来源暂不可用',
+      };
+      throw new MarketBarUnavailableError(
+        reasons[selected.selection.reason],
+        `daily_bars_${selected.selection.reason}`,
+      );
+    }
     const availableBy = availabilityCutoff();
     const rows = selected.selection.response.bars
       .filter(
@@ -214,6 +240,7 @@ export class StrategyRiskContextService {
     evaluatedAt: Date,
     start?: Date,
     availabilityCutoff?: () => Date,
+    background = false,
   ) {
     const rows = await this.storedBars(
       symbol,
@@ -223,8 +250,11 @@ export class StrategyRiskContextService {
       start,
       start ? undefined : 64,
       availabilityCutoff,
+      background,
     );
-    const completed = await Promise.all(rows.map((row) => this.completedAt(row.timestamp, timeframe, market)));
+    const completed = await Promise.all(
+      rows.map((row) => this.completedAt(row.timestamp, timeframe, market)),
+    );
     return rows.filter((_, index) => {
       const completedAt = completed[index];
       return completedAt !== null && completedAt !== undefined && completedAt <= evaluatedAt;
@@ -240,25 +270,23 @@ export class StrategyRiskContextService {
     evaluatedAt: Date,
     requiresHoldingPeriods: boolean,
     availabilityCutoff?: () => Date,
+    background = false,
   ): Promise<ExchangeValues> {
-    const bars = await this.directBars(symbol, timeframe, market, assetType, evaluatedAt, undefined, availabilityCutoff);
+    const start = requiresHoldingPeriods ? (source.trade?.openedAt ?? undefined) : undefined;
+    const bars = await this.directBars(
+      symbol,
+      timeframe,
+      market,
+      assetType,
+      evaluatedAt,
+      start,
+      availabilityCutoff,
+      background,
+    );
     const bar = bars.at(-1);
     const holdingPeriods =
       requiresHoldingPeriods && source.trade?.openedAt && bar
-        ? Math.max(
-            0,
-            (
-              await this.directBars(
-                symbol,
-                timeframe,
-                market,
-                assetType,
-                evaluatedAt,
-                source.trade.openedAt,
-                availabilityCutoff,
-              )
-            ).length - 1,
-          )
+        ? Math.max(0, bars.length - 1)
         : undefined;
     return {
       ...(bar
@@ -278,14 +306,23 @@ export class StrategyRiskContextService {
     source: StrategyRiskPositionTradeContext,
     evaluatedAt: Date,
     availabilityCutoff?: () => Date,
+    background = false,
   ): Promise<StrategyRiskActualContext> {
     const market = this.tradingMarket(target);
-    if (!market) throw new BadRequestException('策略风险应用缺少可识别的交易市场');
 
     let values: ExchangeValues = {};
+    let inputIssue: StrategyMonitoringContext['inputIssue'];
     try {
+      if (!market)
+        throw new MarketBarUnavailableError(
+          '缺少可识别的标的交易市场',
+          'instrument_identity_unavailable',
+        );
       if (isDerivedTimeframe(target.primaryTimeframe)) {
-        throw new MarketBarUnavailableError('分钟线现行合同仅支持交互图表，风险监控尚未接入已完成分钟线更新');
+        throw new MarketBarUnavailableError(
+          '风险监控尚无可用的已完成分钟线数据',
+          'timeframe_unsupported',
+        );
       } else if (target.primaryTimeframe === '1m' || target.primaryTimeframe === '1d') {
         values = await this.directExchangeValues(
           symbol,
@@ -296,18 +333,43 @@ export class StrategyRiskContextService {
           evaluatedAt,
           target.requiresHoldingPeriods === true,
           availabilityCutoff,
+          background,
+        );
+      } else {
+        throw new MarketBarUnavailableError(
+          '风险监控尚无此周期的已完成行情数据',
+          'timeframe_unsupported',
         );
       }
     } catch (error) {
       if (!isMarketBarTemporarilyUnavailable(error)) throw error;
+      inputIssue = {
+        code:
+          error instanceof MarketBarUnavailableError ? error.reasonCode : 'daily_bars_unavailable',
+        reason: error instanceof MarketBarUnavailableError ? error.message : '日线来源暂不可用',
+      };
     }
 
     const base = this.baseContext(source);
+    return this.exchangeContextProjection(target, source, base, values, inputIssue);
+  }
+
+  private exchangeContextProjection(
+    target: StrategyRiskTarget,
+    source: StrategyRiskPositionTradeContext,
+    base: ReturnType<StrategyRiskContextService['baseContext']>,
+    values: ExchangeValues,
+    inputIssue: StrategyMonitoringContext['inputIssue'],
+  ): StrategyRiskActualContext {
     return {
       ...(base.positionId ? { positionId: base.positionId } : {}),
       ...(base.tradeId ? { tradeId: base.tradeId } : {}),
       ...(base.openedAt ? { openedAt: base.openedAt } : {}),
       context: {
+        ...(inputIssue ? { inputIssue } : {}),
+        ...(target.requiresHoldingPeriods
+          ? { holdingStartKnown: Boolean(source.trade?.openedAt) }
+          : {}),
         ...(base.quantity ? { quantity: base.quantity } : {}),
         ...(base.averageCost ? { averageCost: base.averageCost } : {}),
         ...(values.price ? { price: values.price } : {}),
@@ -323,10 +385,19 @@ export class StrategyRiskContextService {
     symbol: string,
     target: StrategyRiskTarget,
     evaluatedAt?: Date,
+    background = false,
   ): Promise<StrategyRiskActualContext> {
     const requestedAt = evaluatedAt ?? new Date();
     await this.assertTarget(accountId, symbol, target);
     const source = await this.loadPositionTrade(accountId, symbol);
+    const base = this.baseContext(source);
+    if (background && (!base.quantity || !DecimalValue.from(base.quantity).isPositive()))
+      return {
+        context: {
+          ...(base.quantity ? { quantity: base.quantity } : {}),
+          ...(base.averageCost ? { averageCost: base.averageCost } : {}),
+        },
+      };
     if (target.executionInstrument.assetType === 'fund')
       return currentFundRiskContext(
         this.market,
@@ -340,7 +411,8 @@ export class StrategyRiskContextService {
       target,
       source,
       requestedAt,
-      evaluatedAt === undefined ? () => new Date() : undefined,
+      evaluatedAt === undefined || background ? () => new Date() : undefined,
+      background,
     );
   }
 }

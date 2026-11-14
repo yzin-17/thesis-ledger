@@ -27,7 +27,13 @@ const reservation = (cost: string | null = '1') => ({
   outputTokens: 10,
   cost:
     cost === null
-      ? { status: 'unknown' as const, amount: null, currency: null, source: null, pricingVersion: null }
+      ? {
+          status: 'unknown' as const,
+          amount: null,
+          currency: null,
+          source: null,
+          pricingVersion: null,
+        }
       : {
           status: 'estimated' as const,
           amount: cost,
@@ -46,11 +52,28 @@ const outcome = {
 
 const revision = (
   requestRevision: number,
-  usage: { status: 'reported' | 'partial' | 'unknown'; inputTokens: number | null; outputTokens: number | null },
-  cost: { status: 'known' | 'estimated' | 'unknown'; amount: string | null; currency: string | null; source: string | null; pricingVersion: string | null },
+  usage: {
+    status: 'reported' | 'partial' | 'unknown';
+    inputTokens: number | null;
+    outputTokens: number | null;
+  },
+  cost: {
+    status: 'known' | 'estimated' | 'unknown';
+    amount: string | null;
+    currency: string | null;
+    source: string | null;
+    pricingVersion: string | null;
+  },
 ) => ({ revision: requestRevision, usage, cost, recordedAt: new Date().toISOString() });
 
 postgresDescribe('AI execution state isolated PostgreSQL', () => {
+  const suiteScope = executionFactContext();
+  registerExecutionOwnershipAndLeaseCases(suiteScope);
+  registerExecutionUnknownAndSettlementCases(suiteScope);
+  registerExecutionCurrencyAndRevisionCases(suiteScope);
+});
+
+function executionFactContext() {
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl ?? '' });
   const store = new AiExecutionStateStore(prisma as never);
   const optimizationSettlements = new StrategyOptimizationAiSettlementStore(store);
@@ -59,7 +82,6 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
   let strategyId = '';
   let strategyVersionId = '';
   const experimentIds: string[] = [];
-
   const createRun = async (metadata: Record<string, unknown> = { legacyKey: 'preserve-me' }) => {
     const run = await prisma.aiRun.create({
       data: {
@@ -78,7 +100,6 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
     await store.initialize({ runId: run.id, executionAttempt: 1 }, execution());
     return run.id;
   };
-
   const prepare = async (runId: string, requestId = randomUUID(), cost: string | null = '1') => {
     const prepared = await store.prepareRequest({
       runId,
@@ -89,7 +110,6 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
     expect(prepared?.state).toBe('prepared');
     return requestId;
   };
-
   const createOptimization = async (runId: string, budget: Record<string, unknown>) => {
     const experimentId = randomUUID();
     const attemptId = randomUUID();
@@ -113,16 +133,16 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
     `);
     return { experimentId, attemptId };
   };
-
   beforeAll(async () => {
-    const strategy = await prisma.strategy.create({ data: { schemaVersion: 2, name: `AI execution ${suffix}` } });
+    const strategy = await prisma.strategy.create({
+      data: { schemaVersion: 2, name: `AI execution ${suffix}` },
+    });
     strategyId = strategy.id;
     const version = await prisma.strategyVersion.create({
       data: { strategyId, version: 1, schemaVersion: 2, schema: {} },
     });
     strategyVersionId = version.id;
   });
-
   afterAll(async () => {
     if (experimentIds.length > 0)
       await prisma.$executeRawUnsafe(
@@ -140,23 +160,77 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
     if (strategyId) await prisma.strategy.delete({ where: { id: strategyId } });
     await prisma.$disconnect();
   });
-
+  return {
+    get prisma() {
+      return prisma;
+    },
+    get store() {
+      return store;
+    },
+    get optimizationSettlements() {
+      return optimizationSettlements;
+    },
+    get runs() {
+      return runs;
+    },
+    get runIds() {
+      return runIds;
+    },
+    get strategyId() {
+      return strategyId;
+    },
+    set strategyId(value: typeof strategyId) {
+      strategyId = value;
+    },
+    get strategyVersionId() {
+      return strategyVersionId;
+    },
+    set strategyVersionId(value: typeof strategyVersionId) {
+      strategyVersionId = value;
+    },
+    get experimentIds() {
+      return experimentIds;
+    },
+    get createRun() {
+      return createRun;
+    },
+    get prepare() {
+      return prepare;
+    },
+    get createOptimization() {
+      return createOptimization;
+    },
+  };
+}
+function registerExecutionOwnershipAndLeaseCases(
+  suiteScope: ReturnType<typeof executionFactContext>,
+) {
   it('serializes double dispatch authorization and preserves concurrent JSON metadata', async () => {
-    const runId = await createRun();
-    const firstId = await prepare(runId);
+    const runId = await suiteScope.createRun();
+    const firstId = await suiteScope.prepare(runId);
     const [first, second] = await Promise.all([
-      store.authorizeDispatch({ runId, executionAttempt: 1 }, firstId),
-      store.authorizeDispatch({ runId, executionAttempt: 1 }, firstId),
+      suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, firstId),
+      suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, firstId),
     ]);
     expect([first, second].filter(Boolean)).toHaveLength(1);
 
     const secondId = randomUUID();
     const thirdId = randomUUID();
     await Promise.all([
-      store.prepareRequest({ runId, executionAttempt: 1, requestId: secondId, reservation: reservation() }),
-      store.prepareRequest({ runId, executionAttempt: 1, requestId: thirdId, reservation: reservation() }),
+      suiteScope.store.prepareRequest({
+        runId,
+        executionAttempt: 1,
+        requestId: secondId,
+        reservation: reservation(),
+      }),
+      suiteScope.store.prepareRequest({
+        runId,
+        executionAttempt: 1,
+        requestId: thirdId,
+        reservation: reservation(),
+      }),
     ]);
-    const stored = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } });
+    const stored = await suiteScope.prisma.aiRun.findUniqueOrThrow({ where: { id: runId } });
     const metadata = stored.modelMetadata as Record<string, unknown>;
     const savedExecution = metadata.sdkExecution as AiExecutionSummary;
     expect(metadata.legacyKey).toBe('preserve-me');
@@ -164,9 +238,8 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
       expect.arrayContaining([firstId, secondId, thirdId]),
     );
   });
-
   it('allows exactly one worker to claim a queued run', async () => {
-    const queued = await prisma.aiRun.create({
+    const queued = await suiteScope.prisma.aiRun.create({
       data: {
         provider: 'pending',
         model: 'pending',
@@ -174,20 +247,26 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
         status: 'queued',
       },
     });
-    runIds.push(queued.id);
-    const claimed = await Promise.all([runs.claim(queued.id), runs.claim(queued.id)]);
+    suiteScope.runIds.push(queued.id);
+    const claimed = await Promise.all([
+      suiteScope.runs.claim(queued.id),
+      suiteScope.runs.claim(queued.id),
+    ]);
     expect(claimed.filter(Boolean)).toHaveLength(1);
     expect(claimed.find(Boolean)).toMatchObject({ status: 'running', executionAttempt: 1 });
   });
-
   it('rejects stale owners for dispatch, lease renewal, and terminal writes', async () => {
-    const runId = await createRun();
-    const requestId = await prepare(runId);
-    await prisma.aiRun.update({ where: { id: runId }, data: { executionAttempt: 2 } });
-    await expect(store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId)).resolves.toBe(false);
-    await expect(store.renewLease({ runId, executionAttempt: 1 }, 60_000)).resolves.toBe(false);
+    const runId = await suiteScope.createRun();
+    const requestId = await suiteScope.prepare(runId);
+    await suiteScope.prisma.aiRun.update({ where: { id: runId }, data: { executionAttempt: 2 } });
     await expect(
-      store.completeAndSettle({
+      suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId),
+    ).resolves.toBe(false);
+    await expect(suiteScope.store.renewLease({ runId, executionAttempt: 1 }, 60_000)).resolves.toBe(
+      false,
+    );
+    await expect(
+      suiteScope.store.completeAndSettle({
         runId,
         executionAttempt: 1,
         requestId,
@@ -195,41 +274,48 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
         revision: revision(
           1,
           { status: 'reported', inputTokens: 1, outputTokens: 1 },
-          { status: 'known', amount: '0', currency: 'USD', source: 'fixture', pricingVersion: 'v1' },
+          {
+            status: 'known',
+            amount: '0',
+            currency: 'USD',
+            source: 'fixture',
+            pricingVersion: 'v1',
+          },
         ),
         result: { valid: true },
       }),
     ).resolves.toBeNull();
   });
-
+}
+function registerExecutionUnknownAndSettlementCases(
+  suiteScope: ReturnType<typeof executionFactContext>,
+) {
   it('turns an authorized send crash into unknown without releasing reservations', async () => {
-    const runId = await createRun();
-    const requestId = await prepare(runId, randomUUID(), null);
-    expect(await store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId)).toBe(true);
+    const runId = await suiteScope.createRun();
+    const requestId = await suiteScope.prepare(runId, randomUUID(), null);
     expect(
-      await store.markUnknown(
-        { runId, executionAttempt: 1 },
-        requestId,
-        {
-          code: 'transport_unknown',
-          phase: 'request',
-          externalResult: 'unknown',
-          summary: '发送授权后连接中断',
-          requestId,
-        },
-      ),
+      await suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId),
     ).toBe(true);
-    const stored = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } });
-    const saved = (stored.modelMetadata as Record<string, unknown>).sdkExecution as AiExecutionSummary;
+    expect(
+      await suiteScope.store.markUnknown({ runId, executionAttempt: 1 }, requestId, {
+        code: 'transport_unknown',
+        phase: 'request',
+        externalResult: 'unknown',
+        summary: '发送授权后连接中断',
+        requestId,
+      }),
+    ).toBe(true);
+    const stored = await suiteScope.prisma.aiRun.findUniqueOrThrow({ where: { id: runId } });
+    const saved = (stored.modelMetadata as Record<string, unknown>)
+      .sdkExecution as AiExecutionSummary;
     expect(saved.requests[0]).toMatchObject({ state: 'unknown', settledRevision: 0 });
     expect(saved.generationStatus).toBe('unknown');
   });
-
   it('aggregates usage and cost across separate fallback request facts', async () => {
-    const runId = await createRun();
-    const firstId = await prepare(runId);
-    await store.authorizeDispatch({ runId, executionAttempt: 1 }, firstId);
-    await store.completeAndSettle({
+    const runId = await suiteScope.createRun();
+    const firstId = await suiteScope.prepare(runId);
+    await suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, firstId);
+    await suiteScope.store.completeAndSettle({
       runId,
       executionAttempt: 1,
       requestId: firstId,
@@ -244,12 +330,18 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
       revision: revision(
         1,
         { status: 'reported', inputTokens: 2, outputTokens: 3 },
-        { status: 'known', amount: '0.25', currency: 'USD', source: 'provider', pricingVersion: 'v1' },
+        {
+          status: 'known',
+          amount: '0.25',
+          currency: 'USD',
+          source: 'provider',
+          pricingVersion: 'v1',
+        },
       ),
     });
-    const secondId = await prepare(runId);
-    await store.authorizeDispatch({ runId, executionAttempt: 1 }, secondId);
-    await store.completeAndSettle({
+    const secondId = await suiteScope.prepare(runId);
+    await suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, secondId);
+    await suiteScope.store.completeAndSettle({
       runId,
       executionAttempt: 1,
       requestId: secondId,
@@ -258,23 +350,32 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
       revision: revision(
         1,
         { status: 'reported', inputTokens: 5, outputTokens: 7 },
-        { status: 'known', amount: '0.5', currency: 'USD', source: 'provider', pricingVersion: 'v1' },
+        {
+          status: 'known',
+          amount: '0.5',
+          currency: 'USD',
+          source: 'provider',
+          pricingVersion: 'v1',
+        },
       ),
     });
 
-    expect(await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({
-      status: 'succeeded',
-      inputTokens: 7,
-      outputTokens: 10,
-      cost: new Prisma.Decimal('0.75'),
-    });
+    expect(await suiteScope.prisma.aiRun.findUniqueOrThrow({ where: { id: runId } })).toMatchObject(
+      {
+        status: 'succeeded',
+        inputTokens: 7,
+        outputTokens: 10,
+        cost: new Prisma.Decimal('0.75'),
+      },
+    );
   });
-
   it('persists overage facts and legal result before blocking continuation, once', async () => {
-    const runId = await createRun();
-    const requestId = await prepare(runId);
-    expect(await store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId)).toBe(true);
-    const optimization = await createOptimization(runId, {
+    const runId = await suiteScope.createRun();
+    const requestId = await suiteScope.prepare(runId);
+    expect(
+      await suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId),
+    ).toBe(true);
+    const optimization = await suiteScope.createOptimization(runId, {
       maxAiCalls: 1,
       maxInputTokens: 11,
       maxOutputTokens: 20,
@@ -296,17 +397,19 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
       attemptId: optimization.attemptId,
       proposal: { legal: true },
     };
-    const first = await optimizationSettlements.completeAndSettle(completion);
+    const first = await suiteScope.optimizationSettlements.completeAndSettle(completion);
     expect(first).toMatchObject({ applied: true, continuationBlockedReason: 'budget_exceeded' });
-    const duplicate = await optimizationSettlements.completeAndSettle(completion);
+    const duplicate = await suiteScope.optimizationSettlements.completeAndSettle(completion);
     expect(duplicate).toMatchObject({ applied: false, idempotent: true });
     const [run, account, attempt] = await Promise.all([
-      prisma.aiRun.findUniqueOrThrow({ where: { id: runId } }),
-      prisma.$queryRaw<Array<{ inputTokensUsed: number; outputTokensUsed: number; costUsed: Prisma.Decimal }>>(Prisma.sql`
+      suiteScope.prisma.aiRun.findUniqueOrThrow({ where: { id: runId } }),
+      suiteScope.prisma.$queryRaw<
+        Array<{ inputTokensUsed: number; outputTokensUsed: number; costUsed: Prisma.Decimal }>
+      >(Prisma.sql`
         SELECT "inputTokensUsed", "outputTokensUsed", "costUsed"
         FROM "OptimizationExperiment" WHERE "id"=${optimization.experimentId}::uuid
       `),
-      prisma.$queryRaw<Array<{ status: string; proposal: unknown }>>(Prisma.sql`
+      suiteScope.prisma.$queryRaw<Array<{ status: string; proposal: unknown }>>(Prisma.sql`
         SELECT "status", "proposal" FROM "OptimizationAttempt" WHERE "id"=${optimization.attemptId}::uuid
       `),
     ]);
@@ -316,18 +419,21 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
     expect(account[0]?.costUsed.toString()).toBe('1.5');
     expect(attempt[0]).toMatchObject({ status: 'succeeded', proposal: { legal: true } });
   });
-
+}
+function registerExecutionCurrencyAndRevisionCases(
+  suiteScope: ReturnType<typeof executionFactContext>,
+) {
   it('keeps the frozen estimate when an actual cost uses another currency', async () => {
-    const runId = await createRun();
-    const requestId = await prepare(runId);
-    await store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId);
-    const optimization = await createOptimization(runId, {
+    const runId = await suiteScope.createRun();
+    const requestId = await suiteScope.prepare(runId);
+    await suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId);
+    const optimization = await suiteScope.createOptimization(runId, {
       maxAiCalls: 1,
       maxInputTokens: 20,
       maxOutputTokens: 20,
       maxCost: '2',
     });
-    const settled = await optimizationSettlements.completeAndSettle({
+    const settled = await suiteScope.optimizationSettlements.completeAndSettle({
       runId,
       executionAttempt: 1,
       requestId,
@@ -335,21 +441,28 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
       revision: revision(
         1,
         { status: 'reported', inputTokens: 10, outputTokens: 10 },
-        { status: 'known', amount: '0.5', currency: 'EUR', source: 'provider', pricingVersion: 'v1' },
+        {
+          status: 'known',
+          amount: '0.5',
+          currency: 'EUR',
+          source: 'provider',
+          pricingVersion: 'v1',
+        },
       ),
       attemptId: optimization.attemptId,
     });
     expect(settled?.continuationBlockedReason).toBe('cost_unknown');
-    const account = await prisma.$queryRaw<Array<{ costUsed: Prisma.Decimal }>>(Prisma.sql`
+    const account = await suiteScope.prisma.$queryRaw<
+      Array<{ costUsed: Prisma.Decimal }>
+    >(Prisma.sql`
       SELECT "costUsed" FROM "OptimizationExperiment" WHERE "id"=${optimization.experimentId}::uuid
     `);
     expect(account[0]?.costUsed.toString()).toBe('1');
   });
-
   it('未知 Provider 费用不再因历史免费依据而放行后续执行', async () => {
-    const runId = await createRun();
+    const runId = await suiteScope.createRun();
     const requestId = randomUUID();
-    await store.prepareRequest({
+    await suiteScope.store.prepareRequest({
       runId,
       executionAttempt: 1,
       requestId,
@@ -366,15 +479,15 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
         },
       },
     });
-    await store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId);
-    const optimization = await createOptimization(runId, {
+    await suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId);
+    const optimization = await suiteScope.createOptimization(runId, {
       maxAiCalls: 1,
       maxInputTokens: 20,
       maxOutputTokens: 20,
       maxCost: '2',
     });
 
-    const settled = await optimizationSettlements.completeAndSettle({
+    const settled = await suiteScope.optimizationSettlements.completeAndSettle({
       runId,
       executionAttempt: 1,
       requestId,
@@ -394,17 +507,18 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
     });
 
     expect(settled?.continuationBlockedReason).toBe('cost_unknown');
-    const account = await prisma.$queryRaw<Array<{ costUsed: Prisma.Decimal }>>(Prisma.sql`
+    const account = await suiteScope.prisma.$queryRaw<
+      Array<{ costUsed: Prisma.Decimal }>
+    >(Prisma.sql`
       SELECT "costUsed" FROM "OptimizationExperiment" WHERE "id"=${optimization.experimentId}::uuid
     `);
     expect(account[0]?.costUsed.toString()).toBe('1');
   });
-
   it('keeps unknown reservation components and rolls back conflicting revisions', async () => {
-    const runId = await createRun();
-    const requestId = await prepare(runId);
-    await store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId);
-    const optimization = await createOptimization(runId, {
+    const runId = await suiteScope.createRun();
+    const requestId = await suiteScope.prepare(runId);
+    await suiteScope.store.authorizeDispatch({ runId, executionAttempt: 1 }, requestId);
+    const optimization = await suiteScope.createOptimization(runId, {
       maxAiCalls: 1,
       maxInputTokens: 20,
       maxOutputTokens: 20,
@@ -415,7 +529,7 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
       { status: 'partial', inputTokens: 12, outputTokens: null },
       { status: 'unknown', amount: null, currency: null, source: null, pricingVersion: null },
     );
-    const first = await optimizationSettlements.completeAndSettle({
+    const first = await suiteScope.optimizationSettlements.completeAndSettle({
       runId,
       executionAttempt: 1,
       requestId,
@@ -424,14 +538,16 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
       attemptId: optimization.attemptId,
     });
     expect(first).toMatchObject({ applied: true, continuationBlockedReason: null });
-    const before = await prisma.$queryRaw<Array<{ inputTokensUsed: number; outputTokensUsed: number; costUsed: Prisma.Decimal }>>(Prisma.sql`
+    const before = await suiteScope.prisma.$queryRaw<
+      Array<{ inputTokensUsed: number; outputTokensUsed: number; costUsed: Prisma.Decimal }>
+    >(Prisma.sql`
       SELECT "inputTokensUsed", "outputTokensUsed", "costUsed"
       FROM "OptimizationExperiment" WHERE "id"=${optimization.experimentId}::uuid
     `);
     expect(before[0]).toMatchObject({ inputTokensUsed: 12, outputTokensUsed: 10 });
     expect(before[0]?.costUsed.toString()).toBe('1');
     await expect(
-      optimizationSettlements.completeAndSettle({
+      suiteScope.optimizationSettlements.completeAndSettle({
         runId,
         executionAttempt: 1,
         requestId,
@@ -439,19 +555,27 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
         revision: revision(
           1,
           { status: 'reported', inputTokens: 99, outputTokens: 99 },
-          { status: 'known', amount: '9', currency: 'USD', source: 'conflict', pricingVersion: 'v1' },
+          {
+            status: 'known',
+            amount: '9',
+            currency: 'USD',
+            source: 'conflict',
+            pricingVersion: 'v1',
+          },
         ),
         attemptId: optimization.attemptId,
       }),
     ).rejects.toThrow('冲突事实');
-    const after = await prisma.$queryRaw<Array<{ inputTokensUsed: number; outputTokensUsed: number; costUsed: Prisma.Decimal }>>(Prisma.sql`
+    const after = await suiteScope.prisma.$queryRaw<
+      Array<{ inputTokensUsed: number; outputTokensUsed: number; costUsed: Prisma.Decimal }>
+    >(Prisma.sql`
       SELECT "inputTokensUsed", "outputTokensUsed", "costUsed"
       FROM "OptimizationExperiment" WHERE "id"=${optimization.experimentId}::uuid
     `);
     expect(after).toEqual(before);
 
     await expect(
-      optimizationSettlements.completeAndSettle({
+      suiteScope.optimizationSettlements.completeAndSettle({
         runId,
         executionAttempt: 1,
         requestId,
@@ -459,21 +583,30 @@ postgresDescribe('AI execution state isolated PostgreSQL', () => {
         revision: revision(
           2,
           { status: 'reported', inputTokens: 15, outputTokens: 15 },
-          { status: 'known', amount: '1.5', currency: 'USD', source: 'provider', pricingVersion: 'v1' },
+          {
+            status: 'known',
+            amount: '1.5',
+            currency: 'USD',
+            source: 'provider',
+            pricingVersion: 'v1',
+          },
         ),
         result: { valid: true },
         attemptId: optimization.attemptId,
         proposal: { invalid: 1n },
       }),
     ).rejects.toThrow();
-    const rolledBack = await prisma.$queryRaw<Array<{ inputTokensUsed: number; outputTokensUsed: number; costUsed: Prisma.Decimal }>>(Prisma.sql`
+    const rolledBack = await suiteScope.prisma.$queryRaw<
+      Array<{ inputTokensUsed: number; outputTokensUsed: number; costUsed: Prisma.Decimal }>
+    >(Prisma.sql`
       SELECT "inputTokensUsed", "outputTokensUsed", "costUsed"
       FROM "OptimizationExperiment" WHERE "id"=${optimization.experimentId}::uuid
     `);
     expect(rolledBack).toEqual(before);
-    const stored = await prisma.aiRun.findUniqueOrThrow({ where: { id: runId } });
-    const saved = (stored.modelMetadata as Record<string, unknown>).sdkExecution as AiExecutionSummary;
+    const stored = await suiteScope.prisma.aiRun.findUniqueOrThrow({ where: { id: runId } });
+    const saved = (stored.modelMetadata as Record<string, unknown>)
+      .sdkExecution as AiExecutionSummary;
     expect(stored.status).toBe('running');
     expect(saved.requests[0]?.settledRevision).toBe(1);
   });
-});
+}

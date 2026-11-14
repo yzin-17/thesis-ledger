@@ -14,6 +14,7 @@ import type { AiExecutionOwnership } from './ai-execution-state.store.js';
 import type { ReasoningEffort } from './ai-provider.contracts.js';
 import type { AiSdkGenerationResult, AiSdkGenerationRequest } from './ai-sdk-generation.adapter.js';
 import { verifyAiFrozenResearchV2 } from './ai-research-frozen-integrity-v2.js';
+import { researchOutputSchemaV2 } from './ai-research-output-schema-v2.js';
 import { researchReasoningFields } from './ai-research-reasoning-options.js';
 import { aiRequestOptionsFields } from './ai-model-request-options.js';
 
@@ -104,8 +105,9 @@ export function researchSdkProtocol(input: ResearchExecutionInput) {
   const version = input.contractVersion ?? 'research-generation-v1';
   if (parsed.data.contract.id !== 'research' || parsed.data.contract.version !== version)
     throw new Error('研究执行合同与任务冻结版本不一致');
+  let frozenV2: ReturnType<typeof verifyAiFrozenResearchV2> | null = null;
   if (version === 'research-generation-v2') {
-    verifyAiFrozenResearchV2(metadata.frozenResearch);
+    frozenV2 = verifyAiFrozenResearchV2(metadata.frozenResearch);
     const routes = metadata.researchRoutes;
     if (
       !Array.isArray(routes) ||
@@ -126,7 +128,7 @@ export function researchSdkProtocol(input: ResearchExecutionInput) {
   }
   const contract =
     version === 'research-generation-v2'
-      ? researchGenerationV2Contract
+      ? { ...researchGenerationV2Contract, schema: researchOutputSchemaV2(frozenV2!) }
       : aiGenerationContracts.research;
   return { execution: parsed.data, contract };
 }

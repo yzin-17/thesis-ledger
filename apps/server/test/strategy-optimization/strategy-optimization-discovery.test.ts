@@ -21,7 +21,29 @@ const scope = {
   primaryTimeframe: '1d' as const,
 };
 
-describe('AI discovery strategy space', () => {
+describe("策略发现方向及固定空间", () => {
+
+  it('精简与完整生成边界均拒绝价格交叉说明反向，保留正确的修正版', () => {
+    const seed = createDiscoverySeed(scope);
+    const price = { type: 'series', sourceId: 'discovery-primary', field: 'close' } as const;
+    const ema = { type: 'indicator', name: 'EMA', input: price, params: { period: 20 } } as const;
+    const strategy = {
+      ...seed,
+      description: '价格上穿均线时建立多头仓位，下穿均线时平仓。',
+      entry: { type: 'cross', direction: 'above', left: ema, right: price } as const,
+      exit: { type: 'cross', direction: 'below', left: ema, right: price } as const,
+    };
+    expect(() => parseDiscoveryProposal({ strategy }, scope)).toThrow('交叉方向与说明不一致');
+    const { name, description, entry, exit, sizing, risk } = strategy;
+    const generated = { strategy: { name, description, entry, exit, sizing, risk, series: ['close'] } };
+    expect(() => assembleDiscoveryGeneration({ discoveryScope: scope } as never, seed, generated))
+      .toThrow('交叉方向与说明不一致');
+    generated.strategy.entry = { ...entry, left: price, right: ema } as never;
+    generated.strategy.exit = { ...exit, left: price, right: ema } as never;
+    expect(assembleDiscoveryGeneration({ discoveryScope: scope } as never, seed, generated).strategy.entry)
+      .toMatchObject({ left: price, right: ema, direction: 'above' });
+  });
+
   it('creates a valid hidden v0 seed in the fixed space', () => {
     const seed = createDiscoverySeed(scope);
     expect(strategySchema.parse(seed).executionInstrument).toEqual(scope.executionInstrument);
@@ -58,6 +80,9 @@ describe('AI discovery strategy space', () => {
       validateDiscoveryStrategy({ ...candidate, entry: { type: 'code', code: 'x' } }, scope),
     ).toThrow();
   });
+});
+
+describe("策略发现响应与提示边界", () => {
 
   it('把首版候选的 benchmark null 归一化为未提供', () => {
     const proposal = parseDiscoveryProposal(

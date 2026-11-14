@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tradeChartResponseSchema, type TradeChartResponse } from '@thesis-ledger/schemas';
 import { MarketTradingOverlayControls } from './MarketTradingOverlayControls.js';
@@ -101,6 +101,9 @@ describe('交易叠加的账户隔离与交互', () => {
   let client: QueryClient;
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    notifyManager.setNotifyFunction((callback) => {
+      act(callback);
+    });
     api.getTradeChart.mockReset().mockResolvedValue(response());
     client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
     host = document.createElement('div');
@@ -111,6 +114,7 @@ describe('交易叠加的账户隔离与交互', () => {
     await interact(() => root.unmount());
     client.clear();
     host.remove();
+    notifyManager.setNotifyFunction((callback) => callback());
     vi.unstubAllGlobals();
   });
   const render = (current = position, points = bars) =>
@@ -182,7 +186,11 @@ describe('交易叠加的账户隔离与交互', () => {
     await click('2026-11-04');
     expect(host.querySelector('[aria-label="价格区间测量结果"]')?.textContent).toContain('20%');
     expect(model().measurement).toMatchObject({ bars: 3, difference: 2 });
-    expect([...host.querySelectorAll('button')].find((button) => button.textContent === '区间测量')?.getAttribute('aria-pressed')).toBe('true');
+    expect(
+      [...host.querySelectorAll('button')]
+        .find((button) => button.textContent === '区间测量')
+        ?.getAttribute('aria-pressed'),
+    ).toBe('true');
     expect(host.textContent).not.toContain('请选择区间');
     await click('区间测量');
     expect(model().measurement).toBeUndefined();
@@ -200,7 +208,9 @@ describe('交易叠加的账户隔离与交互', () => {
     await click('区间测量');
     await click('2026-11-02');
     await click('2026-11-04');
-    await interact(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await interact(() =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+    );
     expect(model().measurement).toBeUndefined();
     expect(host.textContent).not.toContain('请选择区间');
     window.removeEventListener('keydown', parent);

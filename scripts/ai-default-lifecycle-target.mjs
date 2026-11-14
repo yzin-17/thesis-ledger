@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { controlledFingerprint } from './ai-controlled-config-contract.mjs';
 import { readFundTarget } from './fund-calibration-target.mjs';
-import { sourceState } from '../../thesis-ledger-infra/scripts/research-dual-read.mjs';
-import { sql } from '../../thesis-ledger-infra/scripts/research-state-backup.mjs';
+import { sourceState } from '../../thesis-ledger/scripts/local-runtime/research-dual-read.mjs';
+import { sql } from '../../thesis-ledger/scripts/local-runtime/research-state-backup.mjs';
 
 const provider = 'lmstudio';
 async function request(endpoint, body) {

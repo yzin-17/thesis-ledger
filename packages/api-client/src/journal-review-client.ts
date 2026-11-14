@@ -22,6 +22,12 @@ import {
   journalReviewExplanationRequestSchema,
   journalPeriodExplanationRequestSchema,
   journalPeriodAiExplanationSchema,
+  journalPeriodSnapshotSaveRequestSchema,
+  journalStoredPeriodSnapshotSchema,
+  journalPeriodSnapshotListQuerySchema,
+  journalPeriodSnapshotHistorySchema,
+  type JournalPeriodSnapshotSaveRequest,
+  type JournalPeriodSnapshotListQuery,
   type JournalPeriodExplanationRequest,
   type JournalAnalysisDraft,
 } from '@thesis-ledger/schemas';
@@ -59,39 +65,7 @@ const sameAlgorithm = (actual: string, expected: string | undefined) =>
 
 export function journalReviewClient(get: RequestParsed, post: PostParsed, suffix: QuerySuffix) {
   return {
-    explainPeriod: (input: JournalPeriodExplanationRequest) => {
-      const request = journalPeriodExplanationRequestSchema.parse(input);
-      return post(
-        '/journal/period-explanations',
-        request,
-        journalPeriodAiExplanationSchema.refine(
-          (value) =>
-            savedBelongs(value, request) &&
-            value.symbol === (request.symbol ?? null) &&
-            value.start === request.start &&
-            value.end === request.end &&
-            value.ledgerRevision === request.expectedLedgerRevision &&
-            value.projectionGeneration === request.expectedProjectionGeneration &&
-            value.algorithmVersion === request.expectedAlgorithmVersion &&
-            sameFingerprints(value.objectFingerprints, request.objectFingerprints),
-        ),
-      );
-    },
-    periodExplanation: (
-      id: string,
-      input: { accountId: string; mode?: 'actual' | 'shadow' },
-      signal?: AbortSignal,
-    ) => {
-      const scope = journalSnapshotDetailQuerySchema.parse(input);
-      const runId = journalSnapshotIdSchema.parse(id);
-      return get(
-        `/journal/period-explanations/${encodeURIComponent(runId)}${suffix(scope)}`,
-        journalPeriodAiExplanationSchema.refine(
-          (value) => savedBelongs(value, scope) && value.id === runId,
-        ),
-        signal === undefined ? undefined : { signal },
-      );
-    },
+    ...journalPeriodRecordsClient(get, post, suffix),
     explain: (input: JournalReviewSnapshotRequest) => {
       const snapshot = journalReviewSnapshotRequestSchema.parse(input);
       const request = journalReviewExplanationRequestSchema.parse({
@@ -270,6 +244,102 @@ export function journalReviewClient(get: RequestParsed, post: PostParsed, suffix
             savedBelongs(value, query) &&
             (value.compatibility === 'CURRENT_CONTRACT' ? value.snapshot.id : value.id) ===
               snapshotId,
+        ),
+        signal === undefined ? undefined : { signal },
+      );
+    },
+  };
+}
+
+function journalPeriodRecordsClient(get: RequestParsed, post: PostParsed, suffix: QuerySuffix) {
+  return {
+    explainPeriod: (input: JournalPeriodExplanationRequest) => {
+      const request = journalPeriodExplanationRequestSchema.parse(input);
+      return post(
+        '/journal/period-explanations',
+        request,
+        journalPeriodAiExplanationSchema.refine(
+          (value) =>
+            savedBelongs(value, request) &&
+            value.symbol === (request.symbol ?? null) &&
+            value.start === request.start &&
+            value.end === request.end &&
+            value.ledgerRevision === request.expectedLedgerRevision &&
+            value.projectionGeneration === request.expectedProjectionGeneration &&
+            value.algorithmVersion === request.expectedAlgorithmVersion &&
+            sameFingerprints(value.objectFingerprints, request.objectFingerprints),
+        ),
+      );
+    },
+    savePeriod: (input: JournalPeriodSnapshotSaveRequest) => {
+      const request = journalPeriodSnapshotSaveRequestSchema.parse(input);
+      return post(
+        '/journal/period-snapshots',
+        request,
+        journalStoredPeriodSnapshotSchema.refine(
+          (value) =>
+            savedBelongs(value, request) &&
+            value.symbol === (request.symbol ?? null) &&
+            value.start === request.start &&
+            value.end === request.end &&
+            value.ledgerRevision === request.expectedLedgerRevision &&
+            value.projectionGeneration === request.expectedProjectionGeneration &&
+            value.algorithmVersion === request.expectedAlgorithmVersion &&
+            sameFingerprints(
+              Object.fromEntries(
+                value.analysis.candidates.map((row) => [
+                  row.input.reference.reviewObjectId,
+                  row.input.projection.evidenceFingerprint,
+                ]),
+              ),
+              request.objectFingerprints,
+            ) &&
+            (value.aiExplanation?.id ?? null) === (request.aiRunId ?? null),
+        ),
+      );
+    },
+    periodHistory: (
+      input: Partial<Pick<JournalPeriodSnapshotListQuery, 'limit' | 'cursor'>> & {
+        accountId: string;
+        mode?: 'actual' | 'shadow';
+      },
+      signal?: AbortSignal,
+    ) => {
+      const query = journalPeriodSnapshotListQuerySchema.parse(input);
+      return get(
+        `/journal/period-snapshots${suffix(query)}`,
+        journalPeriodSnapshotHistorySchema.refine((value) =>
+          value.items.every((item) => savedBelongs(item, query)),
+        ),
+        signal === undefined ? undefined : { signal },
+      );
+    },
+    periodSnapshot: (
+      id: string,
+      input: { accountId: string; mode?: 'actual' | 'shadow' },
+      signal?: AbortSignal,
+    ) => {
+      const query = journalSnapshotDetailQuerySchema.parse(input);
+      const snapshotId = journalSnapshotIdSchema.parse(id);
+      return get(
+        `/journal/period-snapshots/${encodeURIComponent(snapshotId)}${suffix(query)}`,
+        journalStoredPeriodSnapshotSchema.refine(
+          (value) => savedBelongs(value, query) && value.id === snapshotId,
+        ),
+        signal === undefined ? undefined : { signal },
+      );
+    },
+    periodExplanation: (
+      id: string,
+      input: { accountId: string; mode?: 'actual' | 'shadow' },
+      signal?: AbortSignal,
+    ) => {
+      const scope = journalSnapshotDetailQuerySchema.parse(input);
+      const runId = journalSnapshotIdSchema.parse(id);
+      return get(
+        `/journal/period-explanations/${encodeURIComponent(runId)}${suffix(scope)}`,
+        journalPeriodAiExplanationSchema.refine(
+          (value) => savedBelongs(value, scope) && value.id === runId,
         ),
         signal === undefined ? undefined : { signal },
       );

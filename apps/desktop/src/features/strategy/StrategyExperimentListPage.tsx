@@ -2,6 +2,7 @@ import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { Spinner } from '@/components/ui/spinner';
 import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { useEffect, useRef, useState } from 'react';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
@@ -23,7 +24,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { FilterReset } from '@/components/ui/filter-bar';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -62,7 +63,7 @@ const sourceModeOptions = [
 const statusOptions = [
   { value: 'all', label: '全部状态' },
   { value: 'running', label: '运行中' },
-  { value: 'awaiting_finalization', label: '等待锁定' },
+  { value: 'awaiting_finalization', label: '准备测试' },
   { value: 'succeeded', label: '已完成' },
   { value: 'failed', label: '失败' },
   { value: 'cancelled', label: '已取消' },
@@ -85,19 +86,21 @@ export function StrategyExperimentListPage() {
   const renameFlightRef = useRef(false);
   const renameReadFlightRef = useRef(false);
 
+  const debouncedSearch = useDebouncedValue(draftSearch);
+
   useEffect(() => setDraftSearch(search), [search]);
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      if (draftSearch === search) return;
-      const next = new URLSearchParams(searchParams);
-      if (draftSearch.trim()) next.set('search', draftSearch.trim());
-      else next.delete('search');
-      next.delete('cursor');
-      next.delete('trail');
-      setSearchParams(next, { replace: true });
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [draftSearch, search, searchParams, setSearchParams]);
+    // 防抖还没追上当前输入时不写 URL，避免把上一轮的旧值回写。
+    // 也让「后退导致 search 外部变化」这一路径自然收敛：draft 已同步为新值，写入被跳过。
+    if (debouncedSearch !== draftSearch) return;
+    if (debouncedSearch === search) return;
+    const next = new URLSearchParams(searchParams);
+    if (debouncedSearch.trim()) next.set('search', debouncedSearch.trim());
+    else next.delete('search');
+    next.delete('cursor');
+    next.delete('trail');
+    setSearchParams(next, { replace: true });
+  }, [debouncedSearch, draftSearch, search, searchParams, setSearchParams]);
 
   const filters: Parameters<typeof fetchOptimizationExperiments>[0] = {
     limit: PAGE_SIZE,
@@ -110,6 +113,9 @@ export function StrategyExperimentListPage() {
     queryKey: [...optimizationKey, 'experiments', filters],
     queryFn: () => fetchOptimizationExperiments(filters),
     staleTime: 5_000,
+    refetchInterval: (query) => query.state.data?.items.some((item) =>
+      ['queued', 'running', 'testing', 'awaiting_finalization'].includes(item.status) &&
+      !item.stopReason?.startsWith('final_test_retry_required:')) ? 3_000 : false,
   });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: optimizationKey });
   const refreshRenamedList = async (id: string) => {
@@ -191,6 +197,13 @@ export function StrategyExperimentListPage() {
     next.delete('trail');
     setSearchParams(next);
   };
+  const hasFilters = Boolean(search || draftSearch || sourceMode !== 'all' || status !== 'all');
+  const clearFilters = () => {
+    setDraftSearch('');
+    const next = new URLSearchParams(searchParams);
+    for (const key of ['search', 'sourceMode', 'status', 'cursor', 'trail']) next.delete(key);
+    setSearchParams(next);
+  };
   const goNext = () => {
     const nextCursor = experiments.data?.pageInfo.nextCursor;
     if (!nextCursor) return;
@@ -214,55 +227,55 @@ export function StrategyExperimentListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(12rem,1fr)_max-content_max-content_auto] lg:items-center">
+      <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(12rem,1fr)_max-content_max-content_max-content_auto] lg:items-center">
         <StrategyListSearchField
+          className="min-w-0 flex-1"
           value={draftSearch}
           onChange={setDraftSearch}
           placeholder="实验名称或来源"
           label="搜索实验"
         />
-        <Field className="w-auto shrink-0 flex-row items-center gap-2">
-          <FieldLabel className="shrink-0">来源</FieldLabel>
-          <Select
-            value={sourceMode}
-            onValueChange={(value) => value && updateFilter('sourceMode', value)}
-          >
-            <SelectTrigger aria-label="筛选实验来源" className="w-fit">
-              <SelectValue>
-                {sourceModeOptions.find((option) => option.value === sourceMode)?.label ??
-                  '全部来源'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent className="w-max min-w-(--anchor-width) max-w-(--available-width)">
-              <SelectGroup>
-                {sourceModeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field className="w-auto shrink-0 flex-row items-center gap-2">
-          <FieldLabel className="shrink-0">状态</FieldLabel>
-          <Select value={status} onValueChange={(value) => value && updateFilter('status', value)}>
-            <SelectTrigger aria-label="筛选实验状态" className="w-fit">
-              <SelectValue>
-                {statusOptions.find((option) => option.value === status)?.label ?? '全部状态'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent className="w-max min-w-(--anchor-width) max-w-(--available-width)">
-              <SelectGroup>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
+        <Select
+          value={sourceMode}
+          onValueChange={(value) => value && updateFilter('sourceMode', value)}
+        >
+          <SelectTrigger aria-label="筛选实验来源" className="w-36 shrink-0">
+            <SelectValue>
+              {sourceModeOptions.find((option) => option.value === sourceMode)?.label ??
+                '全部来源'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="w-max min-w-(--anchor-width) max-w-(--available-width)">
+            <SelectGroup>
+              {sourceModeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Select value={status} onValueChange={(value) => value && updateFilter('status', value)}>
+          <SelectTrigger aria-label="筛选实验状态" className="w-36 shrink-0">
+            <SelectValue>
+              {statusOptions.find((option) => option.value === status)?.label ?? '全部状态'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="w-max min-w-(--anchor-width) max-w-(--available-width)">
+            <SelectGroup>
+              {statusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <FilterReset
+          className="shrink-0 justify-self-start"
+          hasConditions={hasFilters}
+          onReset={clearFilters}
+        />
         <Button
           nativeButton={false}
           render={
@@ -386,7 +399,7 @@ export function StrategyExperimentListPage() {
                           >
                             {experiment.name}
                           </Link>
-                          <div className="mt-1 truncate text-xs text-muted-foreground">
+                          <div className="mt-1 truncate text-xs text-muted-foreground" title={experimentSourceLabel(experiment)}>
                             {experimentSourceLabel(experiment)}
                           </div>
                         </>

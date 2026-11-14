@@ -33,6 +33,14 @@ export function ResearchSubmitScreen() {
   if (params?.retryRunId) return <ResearchRetryScreen runId={params.retryRunId} />;
   return <ResearchNewScreen key={params?.instrumentId ?? "new"} initialInstrumentId={params?.instrumentId ?? ""} />;
 }
+type ResearchSettings = Awaited<ReturnType<ReturnType<typeof useMobileRuntime>['api']['researchRuns']['settings']>>;
+
+function researchDefaultState(settings: ResearchSettings | undefined) {
+  const model = settings?.researchDefault;
+  const candidate = settings?.candidates.find((entry) => entry.providerId === model?.providerId && entry.model === model?.model);
+  return { model, modelReady: Boolean(model && candidate?.enabled) };
+}
+
 export function ResearchNewScreen({initialInstrumentId = ""}: {initialInstrumentId?: string} = {}) {
   const { api, scope, baseUrl, mode } = useMobileRuntime();
   const client = useQueryClient();
@@ -65,11 +73,7 @@ export function ResearchNewScreen({initialInstrumentId = ""}: {initialInstrument
     retry: false,
     staleTime: 15000,
   });
-  const model = settings.data?.researchDefault;
-  const candidate = settings.data?.candidates.find(
-    (c) => c.providerId === model?.providerId && c.model === model?.model,
-  );
-  const modelReady = Boolean(model && candidate?.enabled);
+  const { model, modelReady } = researchDefaultState(settings.data);
   useDirtyForm(Boolean(question || effectivePending), () => {
     setQuestion('');
   });

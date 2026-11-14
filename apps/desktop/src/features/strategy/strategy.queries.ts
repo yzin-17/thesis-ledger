@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchBacktestJob, fetchBacktestJobs, fetchStrategies } from './strategy.api.js';
+import { fetchBacktestJob, fetchBacktestJobs, fetchStrategies, fetchBacktestInstrumentSeries } from './strategy.api.js';
 
 export const strategyKeys = {
   root: ['desktop', 'strategy'] as const,
@@ -7,6 +7,7 @@ export const strategyKeys = {
   jobs: () => [...strategyKeys.root, 'jobs'] as const,
   groups: () => [...strategyKeys.root, 'backtest-groups'] as const,
   job: (jobId: string) => [...strategyKeys.jobs(), jobId] as const,
+  instrument: (jobId: string, snapshotId: string | null | undefined) => [...strategyKeys.job(jobId), 'instrument-series', snapshotId] as const,
 };
 
 const terminalJobStatuses = new Set(['succeeded', 'failed', 'cancelled']);
@@ -48,4 +49,10 @@ export const useBacktestJobQuery = (jobId: string | null) =>
     queryFn: () => fetchBacktestJob(jobId ?? ''),
     enabled: Boolean(jobId),
     refetchInterval: (query) => jobDetailFallbackInterval(query.state.data),
+  });
+
+export const useBacktestInstrumentSeriesQuery = (jobId: string | null, snapshotId: string | null | undefined, enabled: boolean) =>
+  useQuery({ queryKey: strategyKeys.instrument(jobId ?? 'closed', snapshotId),
+    queryFn: ({ signal }) => fetchBacktestInstrumentSeries(jobId ?? '', signal), enabled: Boolean(jobId) && enabled,
+    staleTime: Infinity, retry: false,
   });

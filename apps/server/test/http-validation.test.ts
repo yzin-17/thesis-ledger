@@ -43,6 +43,7 @@ describe('HTTP runtime validation', () => {
       prisma as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     expect(() => controller.setEnabled('job', { enabled: 'true' })).toThrow(z.ZodError);

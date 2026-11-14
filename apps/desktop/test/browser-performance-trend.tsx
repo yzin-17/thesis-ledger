@@ -6,7 +6,9 @@ import type {
   PerformanceSeriesInterval,
   PerformanceSeriesPoint,
   PerformanceSeriesRange,
+  SnapshotRecord,
 } from '../src/features/performance/performance.types.js';
+import type { PnlChartPoint } from '../src/features/performance/performance-pnl-model.js';
 import '../src/ui/styles.css';
 
 const sparse: PerformanceSeriesPoint[] = [0, 1, 10, 24].map((hour, index) => ({
@@ -25,12 +27,34 @@ const dense: PerformanceSeriesPoint[] = Array.from({ length: 2000 }, (_, index) 
   value: 1000 + index,
   sourceSnapshotId: null,
 }));
+const pnlPoints: PnlChartPoint[] = sparse.map((point, index) => ({
+  at: point.at,
+  value: index === 1 ? null : index * 10,
+  realizedPnl: index * 10,
+  unrealizedPnl: 0,
+  current: index === 3,
+  reason: index === 1 ? 'price_unavailable' : null,
+}));
+const currencySnapshots: SnapshotRecord[] = sparse.map((point, index) => ({
+  id: 'currency-' + index,
+  capturedAt: point.at,
+  marketValue: point.value,
+  costValue: 1000,
+  cashValue: 0,
+  partial: false,
+  missingSymbols: [],
+  currency: index < 2 ? 'CNY' : 'USD',
+}));
 
 function Fixture() {
   const [range, setRange] = useState<PerformanceSeriesRange>('1Y');
   const [interval, setInterval] = useState<PerformanceSeriesInterval>('1d');
   const [scenario, setScenario] = useState<'sparse' | 'dense' | 'single' | 'empty'>('sparse');
   const [pointerType, setPointerType] = useState('尚未交互');
+  const [withPnl, setWithPnl] = useState(false);
+  const [grouped, setGrouped] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   let points = sparse;
   if (scenario === 'dense') points = dense;
   else if (scenario === 'single') points = sparse.slice(0, 1);
@@ -58,10 +82,31 @@ function Fixture() {
         <Button onClick={() => setScenario('dense')}>2000 个分钟点</Button>
         <Button onClick={() => setScenario('single')}>单点</Button>
         <Button onClick={() => setScenario('empty')}>空数据</Button>
+        <Button onClick={() => setWithPnl(!withPnl)}>切换盈亏</Button>
+        <Button onClick={() => setGrouped(!grouped)}>切换分币种</Button>
+        <Button onClick={() => setFailed(!failed)}>切换读取失败</Button>
+        <Button onClick={() => setRefreshing(!refreshing)}>切换刷新</Button>
       </div>
       <PerformanceSnapshotTable
-        loadState={points.length ? 'ready' : 'empty'}
-        snapshots={[]}
+        loadState={trendFixtureLoadState(failed, points.length)}
+        snapshots={grouped ? currencySnapshots : []}
+        groupedByCurrency={grouped}
+        refreshing={refreshing}
+        onRetry={() => setFailed(false)}
+        {...(withPnl
+          ? {
+              pnl: {
+                points: pnlPoints,
+                currency: 'CNY' as const,
+                loading: false,
+                error: failed,
+                historyEmpty: false,
+                truncated: true,
+                currentUnavailable: false,
+                onRetry: () => setFailed(false),
+              },
+            }
+          : {})}
         range={range}
         interval={interval}
         onRangeChange={(nextRange, nextInterval) => {
@@ -84,3 +129,9 @@ function Fixture() {
   );
 }
 createRoot(document.getElementById('root')!).render(<Fixture />);
+
+function trendFixtureLoadState(failed: boolean, count: number) {
+  if (failed) return 'stale';
+  if (count > 0) return 'ready';
+  return 'empty';
+}

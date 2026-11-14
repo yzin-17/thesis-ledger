@@ -1,20 +1,17 @@
+import { useState, type ReactNode } from 'react';
 import { LoadingState } from '@/components/ui/spinner';
-import { Field, FieldLabel, FieldGroup, FieldLegend, FieldSet } from '@/components/ui/field';
-import { Switch, SwitchThumb } from '@/components/ui/switch';
-import { MarketPolicyTargetSelect } from './MarketPolicyTargetSelect.js';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { marketPolicyRouteRowsV3 } from './market-data-routes-v3.js';
 import {
-  marketPolicyRouteRowsV3,
-  policyRouteTargetsV3,
-  policyRouteEnabledV3,
-  isIndependentMarketFunctionV3,
-  readyRouteTargetsV3,
-  routeAvailabilityMessageV3,
-  routeKeyLabelV3,
-  updatePolicyRouteTargetV3,
-  updatePolicyRouteEnabledV3,
-} from './market-data-routes-v3.js';
-import { marketPolicyRouteGroupsV3 } from './market-policy-route-groups-v3.js';
-import { effectiveRouteLabelV3 } from './market-policy-status-v3.js';
+  marketPolicyRouteGroupsV3,
+  marketPolicyCategoryV3,
+  filterMarketPolicyRowsV3,
+  type MarketPolicyFilter,
+} from './market-policy-route-groups-v3.js';
+import { MarketPolicyFilters, MarketPolicyChoice } from './MarketPolicyFilters.js';
+import { MarketPolicyRouteTable } from './MarketPolicyRouteTable.js';
 import type {
   MarketPolicyDraftV3,
   MarketPolicyResponse,
@@ -28,99 +25,127 @@ export function MarketPolicyRoutes({
   catalog,
   providers,
   disabled,
-  dirty,
+  changedIds,
   onChange,
+  actions,
 }: {
   policy: MarketPolicyDraftV3 | null;
   serverPolicy: MarketPolicyResponse | null;
   catalog: MarketRouteCatalogReadV3 | undefined;
   providers: ProviderManifest[];
   disabled: boolean;
-  dirty: boolean;
+  changedIds: ReadonlySet<string>;
   onChange: (policy: MarketPolicyDraftV3) => void;
+  actions: ReactNode;
 }) {
-  if (!policy) {
-    return <LoadingState label="正在读取路由策略" />;
-  }
-  const rows = marketPolicyRouteRowsV3(catalog, policy);
-  if (rows.length === 0) {
-    if (catalog?.status !== 'complete') return null;
-    return <p className="text-sm text-muted-foreground">当前目录没有可配置的数据能力。</p>;
-  }
+  const [category, setCategory] = useState('market');
+  const [filter, setFilter] = useState<MarketPolicyFilter>({
+    market: 'all',
+    assetType: 'all',
+    search: '',
+  });
+  if (!policy) return <LoadingState label="正在读取路由策略" />;
+  const stored = serverPolicy?.routes ?? [];
+  const rows = marketPolicyRouteRowsV3(catalog, {
+    ...policy,
+    routes: [...stored, ...policy.routes],
+  });
+  const filtered = filterMarketPolicyRowsV3(rows, filter);
+  const groups = marketPolicyRouteGroupsV3(filtered);
+  const activeCategory = groups.some((group) => group.id === category) ? category : 'market';
+  const current = groups.find((group) => group.id === activeCategory);
+  const visible = current?.rows ?? [];
+  const visibleChanges = visible.filter((row) => changedIds.has(row.id)).length;
+  const hiddenChanges = changedIds.size - visibleChanges;
+  const choices = groups.map((group) => ({
+    value: group.id,
+    label: group.label + '（' + group.rows.length + '）',
+  }));
   return (
-    <FieldGroup>
-      {marketPolicyRouteGroupsV3(rows).map((group) => (
-        <FieldSet key={group.id}>
-          <FieldLegend>{group.label}</FieldLegend>
-          <div className="divide-y divide-border">
-            {group.rows.map((row) => {
-              const [primary, fallback] = policyRouteTargetsV3(policy, row.key);
-              const candidates = readyRouteTargetsV3(catalog, row.key, providers);
-              const routeMessage = routeAvailabilityMessageV3(catalog, row.key);
-              return (
-                <div
-                  key={row.id}
-                  className="grid gap-4 py-4 lg:grid-cols-[minmax(190px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-end"
+    <div className="flex min-w-0 flex-col gap-4">
+      <MarketPolicyFilters filter={filter} onChange={setFilter} />
+      <Tabs
+        value={activeCategory}
+        onValueChange={(value) => setCategory(String(value))}
+        orientation="vertical"
+        className="grid min-w-0 grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)]"
+      >
+        <TabsList
+          aria-label="路由能力分类"
+          variant="navigation"
+          className="hidden w-full lg:flex"
+        >
+          {groups.map((group) => {
+            const changes = rows.filter(
+              (row) => changedIds.has(row.id) && marketPolicyCategoryV3(row.key) === group.id,
+            ).length;
+            return (
+              <TabsTrigger
+                key={group.id}
+                value={group.id}
+                className="h-auto min-h-10 flex-none justify-between gap-2 whitespace-normal px-3 py-2 text-left"
+              >
+                <span>
+                  {group.label}
+                  {changes > 0 && (
+                    <span className="block text-xs text-inherit">已修改 {changes} 项</span>
+                  )}
+                </span>
+                <span className="text-xs text-inherit tabular-nums">{group.rows.length}</span>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+        <div className="min-w-0">
+          <MarketPolicyChoice
+            className="mb-4 lg:hidden"
+            label="数据分类"
+            value={activeCategory}
+            items={choices}
+            onChange={setCategory}
+          />
+          <TabsContent value={activeCategory} className="min-w-0">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xl font-semibold">
+                {groups.find((group) => group.id === activeCategory)?.label}
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {visible.length} 条路由，已修改 {visibleChanges} 项
+              </span>
+            </div>
+            {visible.length > 0 ? (
+              <MarketPolicyRouteTable
+                rows={visible}
+                policy={policy}
+                serverPolicy={serverPolicy}
+                catalog={catalog}
+                providers={providers}
+                disabled={disabled}
+                changedIds={changedIds}
+                onChange={onChange}
+              />
+            ) : (
+              <Empty className="border border-dashed p-6">
+                <EmptyDescription>当前范围没有此类路由</EmptyDescription>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilter({ market: 'all', assetType: 'all', search: '' })}
                 >
-                  <div className="flex flex-col gap-1 self-center">
-                    <strong className="block text-sm font-medium">
-                      {routeKeyLabelV3(row.key)}
-                    </strong>
-                    <span className="text-xs text-muted-foreground">
-                      {effectiveRouteLabelV3(serverPolicy, row, dirty)}
-                    </span>
-                    {candidates.length === 0 && routeMessage && (
-                      <span className="text-xs text-muted-foreground">{routeMessage}</span>
-                    )}
-                    {isIndependentMarketFunctionV3(row.key) && (
-                      <Field className="flex-row items-center justify-between">
-                        <FieldLabel>
-                          <span className="sr-only">{row.label} </span>启用功能
-                        </FieldLabel>
-                        <Switch
-                          variant="risk"
-                          aria-label={`${row.label} 启用功能`}
-                          checked={policyRouteEnabledV3(policy, row.key)}
-                          disabled={disabled || !primary || catalog?.status !== 'complete'}
-                          onCheckedChange={(enabled) =>
-                            onChange(updatePolicyRouteEnabledV3(policy, row.key, enabled))
-                          }
-                        >
-                          <SwitchThumb variant="risk" />
-                        </Switch>
-                      </Field>
-                    )}
-                  </div>
-                  <MarketPolicyTargetSelect
-                    row={row}
-                    role="primary"
-                    selected={primary}
-                    other={fallback}
-                    catalog={catalog}
-                    providers={providers}
-                    disabled={disabled}
-                    onChange={(target) =>
-                      onChange(updatePolicyRouteTargetV3(policy, row.key, 'primary', target))
-                    }
-                  />
-                  <MarketPolicyTargetSelect
-                    row={row}
-                    role="fallback"
-                    selected={fallback}
-                    other={primary}
-                    catalog={catalog}
-                    providers={providers}
-                    disabled={disabled}
-                    onChange={(target) =>
-                      onChange(updatePolicyRouteTargetV3(policy, row.key, 'fallback', target))
-                    }
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </FieldSet>
-      ))}
-    </FieldGroup>
+                  清除筛选
+                </Button>
+              </Empty>
+            )}
+          </TabsContent>
+        </div>
+      </Tabs>
+      <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t bg-card py-3 [@media(max-width:520px)]:bottom-20">
+        <p className="text-xs text-muted-foreground">
+          共修改 {changedIds.size} 项
+          {hiddenChanges > 0 && '，其中 ' + hiddenChanges + ' 项不在当前视图'}
+        </p>
+        {actions}
+      </div>
+    </div>
   );
 }

@@ -74,11 +74,7 @@ export const deriveEventDependencyPlan = (
   const instrumentId = instrumentKey(instrument);
   const signalTypes = collectEventTypes(strategy);
   const dependencies: BacktestEventDependency[] = [];
-  if (
-    runConfig.executionPriceProtocol.accountingBasis === 'raw-events' &&
-    !runConfig.executionPriceProtocol.marketRuleResearch &&
-    !runConfig.knownCashPreparation
-  ) {
+  if (requiresRawAccounting(runConfig)) {
     dependencies.push({
       instrument: instrumentId,
       purpose: 'raw-accounting',
@@ -120,7 +116,13 @@ export const deriveEventDependencyPlan = (
 
   const issues: BacktestDependencyPlanIssue[] = [];
   if (runConfig.knownCashPreparation && signalTypes.length) {
-    issues.push(issue('RULE_INCOMPATIBLE', ['knownCashPreparation'], '已知现金方案研究不能使用公司行动策略信号'));
+    issues.push(
+      issue(
+        'RULE_INCOMPATIBLE',
+        ['knownCashPreparation'],
+        '已知现金方案研究不能使用公司行动策略信号',
+      ),
+    );
   }
   if (runConfig.executionPriceProtocol.marketRuleResearch && signalTypes.length) {
     issues.push(
@@ -147,87 +149,15 @@ export const deriveEventDependencyPlan = (
   } else if (dependencies.length > 0 && response) {
     let blocked = false;
     for (const dependency of dependencies) {
-      if (response.status !== 'supported') {
-        blocked = true;
-        issues.push(
-          issue(
-            'EVENT_COVERAGE_UNAVAILABLE',
-            ['corporateActionResponses', instrumentId, 'status'],
-            response.reason ?? `${instrumentId} 的公司行动能力不可用`,
-          ),
-        );
-        continue;
-      }
-      if (!covers(response, dependency.effectiveDateWindow)) {
-        blocked = true;
-        issues.push(
-          issue(
-            'EVENT_COVERAGE_INCOMPLETE',
-            ['corporateActionResponses', instrumentId, 'coverage'],
-            `${instrumentId} 的公司行动覆盖未完整覆盖 ${dependency.effectiveDateWindow.startDate}..${dependency.effectiveDateWindow.endDate}`,
-          ),
-        );
-      }
-      const relevantFacts = response.facts.filter(
-        (fact) =>
-          factMatches(fact, instrument) &&
-          (dependency.purpose === 'raw-accounting' || dependency.eventTypes.includes(fact.type)),
-      );
-      for (const fact of relevantFacts) {
-        if (!fact.effectiveDate) {
-          blocked = true;
-          issues.push(
-            issue(
-              'EVENT_EFFECTIVE_DATE_MISSING',
-              ['corporateActionResponses', instrumentId, 'facts'],
-              `${fact.type} 公司行动缺少 effectiveDate，不能判断其是否影响本次窗口`,
-            ),
-          );
-          continue;
-        }
-        const range = dependency.effectiveDateWindow;
-        if (fact.effectiveDate < range.startDate || fact.effectiveDate > range.endDate) continue;
-        const availableAtOrder = compareMarketPitEvidenceInstantStringsV1(
-          fact.availableAt,
-          runConfig.dataAsOf,
-        );
-        if (availableAtOrder === undefined || availableAtOrder > 0) {
-          blocked = true;
-          issues.push(
-            issue(
-              'EVENT_FACT_AFTER_DATA_AS_OF',
-              ['corporateActionResponses', instrumentId, 'facts'],
-              `${fact.type} 公司行动的 availableAt 无效或晚于 dataAsOf`,
-            ),
-          );
-        }
-        if (dependency.visibilityRequired && fact.strategyVisibility === undefined) {
-          blocked = true;
-          issues.push(
-            issue(
-              'EVENT_STRATEGY_VISIBILITY_MISSING',
-              ['corporateActionResponses', instrumentId, 'facts'],
-              `${fact.type} 事件信号缺少 strategyVisibility；occurredAt/availableAt 不能替代`,
-            ),
-          );
-        }
-        if (dependency.visibilityRequired && fact.strategyVisibility?.kind === 'announcement') {
-          const announcementAtOrder = compareMarketPitEvidenceInstantStringsV1(
-            fact.strategyVisibility.announcedAt,
-            runConfig.dataAsOf,
-          );
-          if (announcementAtOrder === undefined || announcementAtOrder > 0) {
-            blocked = true;
-            issues.push(
-              issue(
-                'EVENT_FACT_AFTER_DATA_AS_OF',
-                ['corporateActionResponses', instrumentId, 'facts', 'strategyVisibility'],
-                '事件公告可见时间晚于 dataAsOf',
-              ),
-            );
-          }
-        }
-      }
+      blocked =
+        validateEventDependency(
+          response,
+          dependency,
+          instrument,
+          instrumentId,
+          runConfig,
+          issues,
+        ) || blocked;
     }
     validation = blocked ? 'blocked' : 'complete';
   }
@@ -247,3 +177,104 @@ export const deriveEventDependencyPlan = (
     datasets,
   };
 };
+
+function validateEventDependency(
+  response: BacktestCorporateActionsResponse,
+  dependency: BacktestEventDependency,
+  instrument: AssetSymbolRef,
+  instrumentId: string,
+  runConfig: RunConfigV3,
+  issues: BacktestDependencyPlanIssue[],
+) {
+  let blocked = false;
+  if (response.status !== 'supported') {
+    blocked = true;
+    issues.push(
+      issue(
+        'EVENT_COVERAGE_UNAVAILABLE',
+        ['corporateActionResponses', instrumentId, 'status'],
+        response.reason ?? `${instrumentId} 的公司行动能力不可用`,
+      ),
+    );
+    return true;
+  }
+  if (!covers(response, dependency.effectiveDateWindow)) {
+    blocked = true;
+    issues.push(
+      issue(
+        'EVENT_COVERAGE_INCOMPLETE',
+        ['corporateActionResponses', instrumentId, 'coverage'],
+        `${instrumentId} 的公司行动覆盖未完整覆盖 ${dependency.effectiveDateWindow.startDate}..${dependency.effectiveDateWindow.endDate}`,
+      ),
+    );
+  }
+  const relevantFacts = response.facts.filter(
+    (fact) =>
+      factMatches(fact, instrument) &&
+      (dependency.purpose === 'raw-accounting' || dependency.eventTypes.includes(fact.type)),
+  );
+  for (const fact of relevantFacts) {
+    if (!fact.effectiveDate) {
+      blocked = true;
+      issues.push(
+        issue(
+          'EVENT_EFFECTIVE_DATE_MISSING',
+          ['corporateActionResponses', instrumentId, 'facts'],
+          `${fact.type} 公司行动缺少 effectiveDate，不能判断其是否影响本次窗口`,
+        ),
+      );
+      continue;
+    }
+    const range = dependency.effectiveDateWindow;
+    if (fact.effectiveDate < range.startDate || fact.effectiveDate > range.endDate) continue;
+    const availableAtOrder = compareMarketPitEvidenceInstantStringsV1(
+      fact.availableAt,
+      runConfig.dataAsOf,
+    );
+    if (availableAtOrder === undefined || availableAtOrder > 0) {
+      blocked = true;
+      issues.push(
+        issue(
+          'EVENT_FACT_AFTER_DATA_AS_OF',
+          ['corporateActionResponses', instrumentId, 'facts'],
+          `${fact.type} 公司行动的 availableAt 无效或晚于 dataAsOf`,
+        ),
+      );
+    }
+    if (dependency.visibilityRequired && fact.strategyVisibility === undefined) {
+      blocked = true;
+      issues.push(
+        issue(
+          'EVENT_STRATEGY_VISIBILITY_MISSING',
+          ['corporateActionResponses', instrumentId, 'facts'],
+          `${fact.type} 事件信号缺少 strategyVisibility；occurredAt/availableAt 不能替代`,
+        ),
+      );
+    }
+    if (dependency.visibilityRequired && fact.strategyVisibility?.kind === 'announcement') {
+      const announcementAtOrder = compareMarketPitEvidenceInstantStringsV1(
+        fact.strategyVisibility.announcedAt,
+        runConfig.dataAsOf,
+      );
+      if (announcementAtOrder === undefined || announcementAtOrder > 0) {
+        blocked = true;
+        issues.push(
+          issue(
+            'EVENT_FACT_AFTER_DATA_AS_OF',
+            ['corporateActionResponses', instrumentId, 'facts', 'strategyVisibility'],
+            '事件公告可见时间晚于 dataAsOf',
+          ),
+        );
+      }
+    }
+  }
+  return blocked;
+}
+
+function requiresRawAccounting(runConfig: RunConfigV3) {
+  return (
+    runConfig.executionPriceProtocol.accountingBasis === 'raw-events' &&
+    !runConfig.executionPriceProtocol.marketRuleResearch &&
+    !runConfig.knownCashPreparation
+  );
+}

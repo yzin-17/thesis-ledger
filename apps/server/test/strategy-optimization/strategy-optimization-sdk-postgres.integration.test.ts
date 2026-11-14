@@ -56,6 +56,12 @@ const writeSse = (response: ServerResponse, content: string) => {
 };
 
 postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () => {
+  const suiteScope = sdkPostgresContext();
+  registerSdkPersistenceAndCacheCase(suiteScope);
+  registerSdkDiscoveryAndFormatCases(suiteScope);
+});
+
+function sdkPostgresContext() {
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl ?? '' });
   const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const strategy = createStrategyFixture('600519.SH', suffix)('0.05');
@@ -87,7 +93,6 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
     receivedRequests.push(JSON.parse(body));
     writeSse(response, responseContent);
   });
-
   const provider = (credentialFingerprint: string) =>
     new OpenAiCompatibleProvider(
       'local-sdk-postgres',
@@ -119,140 +124,124 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
         ],
       },
     );
-
   const readExperiment = async () => {
     const rows = await prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
       SELECT * FROM "OptimizationExperiment" WHERE "id"=${experimentId}::uuid
     `);
     return rows[0]!;
   };
-
   const readDiscoveryExperiment = async () => {
     const rows = await prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
       SELECT * FROM "OptimizationExperiment" WHERE "id"=${discoveryExperimentId}::uuid
     `);
     return rows[0]!;
   };
-
   const readFormatExperiment = async () => {
     const rows = await prisma.$queryRaw<ExperimentRow[]>(Prisma.sql`
       SELECT * FROM "OptimizationExperiment" WHERE "id"=${formatExperimentId}::uuid
     `);
     return rows[0]!;
   };
-
+  const fixtureState = {
+    get prisma() {
+      return prisma;
+    },
+    get suffix() {
+      return suffix;
+    },
+    get strategy() {
+      return strategy;
+    },
+    get experimentId() {
+      return experimentId;
+    },
+    get formatExperimentId() {
+      return formatExperimentId;
+    },
+    get discoveryExperimentId() {
+      return discoveryExperimentId;
+    },
+    get discoveryScope() {
+      return discoveryScope;
+    },
+    get discoverySeed() {
+      return discoverySeed;
+    },
+    get strategyId() {
+      return strategyId;
+    },
+    set strategyId(value: typeof strategyId) {
+      strategyId = value;
+    },
+    get strategyVersionId() {
+      return strategyVersionId;
+    },
+    set strategyVersionId(value: typeof strategyVersionId) {
+      strategyVersionId = value;
+    },
+    get discoveryStrategyId() {
+      return discoveryStrategyId;
+    },
+    set discoveryStrategyId(value: typeof discoveryStrategyId) {
+      discoveryStrategyId = value;
+    },
+    get discoveryStrategyVersionId() {
+      return discoveryStrategyVersionId;
+    },
+    set discoveryStrategyVersionId(value: typeof discoveryStrategyVersionId) {
+      discoveryStrategyVersionId = value;
+    },
+    get baseURL() {
+      return baseURL;
+    },
+    set baseURL(value: typeof baseURL) {
+      baseURL = value;
+    },
+    get requestCount() {
+      return requestCount;
+    },
+    set requestCount(value: typeof requestCount) {
+      requestCount = value;
+    },
+    get receivedRequests() {
+      return receivedRequests;
+    },
+    get proposal() {
+      return proposal;
+    },
+    get responseContent() {
+      return responseContent;
+    },
+    set responseContent(value: typeof responseContent) {
+      responseContent = value;
+    },
+    get server() {
+      return server;
+    },
+    get provider() {
+      return provider;
+    },
+    get readExperiment() {
+      return readExperiment;
+    },
+    get readDiscoveryExperiment() {
+      return readDiscoveryExperiment;
+    },
+    get readFormatExperiment() {
+      return readFormatExperiment;
+    },
+  };
   beforeAll(async () => {
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
-    const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('本地 Provider fixture 启动失败');
-    baseURL = `http://127.0.0.1:${address.port}`;
-    const storedStrategy = await prisma.strategy.create({
-      data: { schemaVersion: 2, name: `SDK PostgreSQL ${suffix}` },
-    });
-    strategyId = storedStrategy.id;
-    const version = await prisma.strategyVersion.create({
-      data: { strategyId, version: 1, schemaVersion: 2, schema: strategy },
-    });
-    strategyVersionId = version.id;
-    const storedDiscoveryStrategy = await prisma.strategy.create({
-      data: { schemaVersion: 2, name: `SDK discovery PostgreSQL ${suffix}` },
-    });
-    discoveryStrategyId = storedDiscoveryStrategy.id;
-    const discoveryVersion = await prisma.strategyVersion.create({
-      data: {
-        strategyId: discoveryStrategyId,
-        version: 0,
-        schemaVersion: 2,
-        schema: discoverySeed,
-      },
-    });
-    discoveryStrategyVersionId = discoveryVersion.id;
-    await prisma.$executeRaw(Prisma.sql`
-      INSERT INTO "OptimizationExperiment" (
-        "id", "baselineStrategyVersionId", "status", "stage", "objective",
-        "allowedParameterIds", "split", "runConfig", "dataFingerprint", "modelConfig",
-        "budget", "maxRounds", "idempotencyKey"
-      ) VALUES (
-        ${experimentId}::uuid, ${strategyVersionId}::uuid, 'running', 'generation',
-        '{"mode":"balanced","minClosedTrades":1}'::jsonb,
-        '["risk.0.percent"]'::jsonb, '{}'::jsonb, '{}'::jsonb, ${`sdk-pg-${suffix}`},
-        '[{"provider":"local-sdk-postgres","model":"fixture-model","costStatus":"known","costCurrency":"USD"}]'::jsonb,
-        '{"maxAiCalls":2,"maxBacktestRuns":2,"maxInputTokens":20000,"maxOutputTokens":2000,"maxCost":"10","maxDurationSeconds":1800}'::jsonb,
-        1, ${`sdk-pg-${suffix}`}
-      )
-    `);
-    await prisma.$executeRaw(Prisma.sql`
-      INSERT INTO "OptimizationExperiment" (
-        "id", "sourceMode", "discoveryScope", "strategySpaceVersion",
-        "baselineStrategyVersionId", "status", "stage", "objective",
-        "allowedParameterIds", "split", "runConfig", "dataFingerprint", "modelConfig",
-        "budget", "maxRounds", "idempotencyKey"
-      ) VALUES (
-        ${discoveryExperimentId}::uuid, 'discovery', ${JSON.stringify(discoveryScope)}::jsonb,
-        ${STRATEGY_SPACE_VERSION}, ${discoveryStrategyVersionId}::uuid, 'running', 'generation',
-        '{"mode":"balanced","minClosedTrades":1}'::jsonb, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb,
-        ${`sdk-discovery-pg-${suffix}`},
-        '[{"provider":"local-sdk-postgres","model":"fixture-model","costStatus":"known","costCurrency":"USD"}]'::jsonb,
-        '{"maxAiCalls":1,"maxBacktestRuns":2,"maxInputTokens":20000,"maxOutputTokens":2000,"maxCost":"10","maxDurationSeconds":1800}'::jsonb,
-        1, ${`sdk-discovery-pg-${suffix}`}
-      )
-    `);
-    await prisma.$executeRaw(Prisma.sql`
-      INSERT INTO "OptimizationExperiment" (
-        "id", "baselineStrategyVersionId", "status", "stage", "objective",
-        "allowedParameterIds", "split", "runConfig", "dataFingerprint", "modelConfig",
-        "budget", "maxRounds", "idempotencyKey"
-      ) VALUES (
-        ${formatExperimentId}::uuid, ${strategyVersionId}::uuid, 'running', 'generation',
-        '{"mode":"balanced","minClosedTrades":1}'::jsonb,
-        '["risk.0.percent"]'::jsonb, '{}'::jsonb, ${JSON.stringify(createNormalizedRunConfig())}::jsonb,
-        ${`sdk-format-pg-${suffix}`},
-        '[{"provider":"local-sdk-postgres","model":"fixture-model","costStatus":"known","costCurrency":"USD"}]'::jsonb,
-        '{"maxAiCalls":1,"maxBacktestRuns":1,"maxInputTokens":20000,"maxOutputTokens":2000,"maxCost":"10","maxDurationSeconds":1800}'::jsonb,
-        1, ${`sdk-format-pg-${suffix}`}
-      )
-    `);
+    await initializeSdkPostgresFixture(fixtureState);
   });
-
   afterAll(async () => {
-    await prisma.$executeRaw(Prisma.sql`
-      DELETE FROM "OptimizationCandidate" WHERE "experimentId"=${experimentId}::uuid
-    `);
-    await prisma.$executeRaw(Prisma.sql`
-      DELETE FROM "OptimizationAttempt"
-      WHERE "experimentId" IN (${experimentId}::uuid, ${discoveryExperimentId}::uuid, ${formatExperimentId}::uuid)
-    `);
-    await prisma.$executeRaw(Prisma.sql`
-      DELETE FROM "OptimizationExperiment"
-      WHERE "id" IN (${experimentId}::uuid, ${discoveryExperimentId}::uuid, ${formatExperimentId}::uuid)
-    `);
-    await prisma.aiRun.deleteMany({
-      where: {
-        OR: [
-          { modelMetadata: { path: ['optimizationExperimentId'], equals: experimentId } },
-          {
-            modelMetadata: {
-              path: ['optimizationExperimentId'],
-              equals: discoveryExperimentId,
-            },
-          },
-          { modelMetadata: { path: ['optimizationExperimentId'], equals: formatExperimentId } },
-        ],
-      },
-    });
-    if (strategyId) await prisma.strategyVersion.deleteMany({ where: { strategyId } });
-    if (discoveryStrategyId)
-      await prisma.strategyVersion.deleteMany({ where: { strategyId: discoveryStrategyId } });
-    if (strategyId) await prisma.strategy.delete({ where: { id: strategyId } });
-    if (discoveryStrategyId) await prisma.strategy.delete({ where: { id: discoveryStrategyId } });
-    await prisma.$disconnect();
-    server.close();
-    await once(server, 'close');
+    await releaseSdkPostgresFixture(fixtureState);
   });
-
+  return fixtureState;
+}
+function registerSdkPersistenceAndCacheCase(suiteScope: ReturnType<typeof sdkPostgresContext>) {
   it('贯通 ready route、本地 HTTP、事实结算与同指纹缓存', async () => {
-    responseContent = JSON.stringify(proposal);
+    suiteScope.responseContent = JSON.stringify(suiteScope.proposal);
     const feedback = {
       development: {
         status: 'valid',
@@ -275,19 +264,19 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
       test: { status: 'valid', totalReturn: '0.987654321', turnover: '987654321' },
       overall: { futureHigh: 'sealed-a02-only' },
     };
-    await prisma.$executeRaw(Prisma.sql`
+    await suiteScope.prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment"
       SET "baselineMetrics"=${JSON.stringify(feedback)}::jsonb,
           "runConfig"=${JSON.stringify(createNormalizedRunConfig())}::jsonb
-      WHERE "id"=${experimentId}::uuid
+      WHERE "id"=${suiteScope.experimentId}::uuid
     `);
-    await prisma.$executeRaw(Prisma.sql`
+    await suiteScope.prisma.$executeRaw(Prisma.sql`
       INSERT INTO "OptimizationCandidate" (
         "experimentId", "candidateNumber", "modelKey", "candidateStrategyVersionId",
         "executionHash", "proposal", "diff", "validationStatus", "metrics"
       ) VALUES (
-        ${experimentId}::uuid, 99, 'local-sdk-postgres:fixture-model', ${strategyVersionId}::uuid,
-        ${`feedback-${suffix}`}, '{}'::jsonb,
+        ${suiteScope.experimentId}::uuid, 99, 'local-sdk-postgres:fixture-model', ${suiteScope.strategyVersionId}::uuid,
+        ${`feedback-${suiteScope.suffix}`}, '{}'::jsonb,
         ${JSON.stringify([
           {
             parameterId: 'risk.0.percent',
@@ -301,42 +290,42 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
       )
     `);
     const registry = new AiProviderRegistry();
-    registry.register(provider('credential-v1'));
-    const runs = new StrategyOptimizationRunService(prisma as never, {} as never);
-    const executions = new AiExecutionStateStore(prisma as never);
+    registry.register(suiteScope.provider('credential-v1'));
+    const runs = new StrategyOptimizationRunService(suiteScope.prisma as never, {} as never);
+    const executions = new AiExecutionStateStore(suiteScope.prisma as never);
     const executor = new StrategyOptimizationSdkExecutor(
-      prisma as never,
+      suiteScope.prisma as never,
       registry,
       new AiSdkGenerationAdapter(),
       executions,
       new StrategyOptimizationAiSettlementStore(executions),
     );
     const candidates = new StrategyOptimizationCandidateService(
-      prisma as never,
+      suiteScope.prisma as never,
       registry,
       runs,
       executor,
     );
     const baseline = {
-      id: strategyVersionId,
-      strategyId,
+      id: suiteScope.strategyVersionId,
+      strategyId: suiteScope.strategyId,
       version: 1,
       schemaVersion: 2,
-      schema: strategy,
-      strategy: strategySchema.parse(strategy),
+      schema: suiteScope.strategy,
+      strategy: strategySchema.parse(suiteScope.strategy),
     } as never;
     const route = { provider: 'local-sdk-postgres', model: 'fixture-model' };
 
     const first = await candidates.generateProposal(
-      await readExperiment(),
+      await suiteScope.readExperiment(),
       baseline,
-      describeStrategyParameters(strategy),
+      describeStrategyParameters(suiteScope.strategy),
       route,
       1,
     );
-    expect(first.proposal).toEqual(proposal);
-    expect(requestCount).toBe(1);
-    const actualRequest = JSON.stringify(receivedRequests[0]!.messages);
+    expect(first.proposal).toEqual(suiteScope.proposal);
+    expect(suiteScope.requestCount).toBe(1);
+    const actualRequest = JSON.stringify(suiteScope.receivedRequests[0]!.messages);
     for (const hidden of [
       'sealed-a02-only',
       '2038-11-22',
@@ -355,7 +344,7 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
     expect(actualRequest).toContain('-0.12345');
     expect(actualRequest).toContain('data-unavailable');
     expect(actualRequest).toContain('不得描述为严格无前视样本外');
-    const user = receivedRequests[0]!.messages.find(
+    const user = suiteScope.receivedRequests[0]!.messages.find(
       (message) =>
         typeof message === 'object' &&
         message !== null &&
@@ -368,62 +357,63 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
     expect(projected.baselineMetrics.validation).not.toHaveProperty('totalReturn');
     await expect(
       candidates.createAndEvaluateCandidate(
-        await readExperiment(),
+        await suiteScope.readExperiment(),
         baseline,
-        describeStrategyParameters(strategy),
+        describeStrategyParameters(suiteScope.strategy),
         'local-sdk-postgres:fixture-model',
         first.proposal,
       ),
     ).rejects.toThrow();
-    expect(requestCount).toBe(1);
+    expect(suiteScope.requestCount).toBe(1);
     const replay = await candidates.generateProposal(
-      await readExperiment(),
+      await suiteScope.readExperiment(),
       baseline,
-      describeStrategyParameters(strategy),
+      describeStrategyParameters(suiteScope.strategy),
       route,
       1,
     );
     expect(replay.aiRunId).toBe(first.aiRunId);
-    expect(requestCount).toBe(1);
+    expect(suiteScope.requestCount).toBe(1);
 
-    const saved = await prisma.aiRun.findUniqueOrThrow({ where: { id: first.aiRunId } });
+    const saved = await suiteScope.prisma.aiRun.findUniqueOrThrow({ where: { id: first.aiRunId } });
     expect(saved).toMatchObject({ status: 'succeeded', inputTokens: 13, outputTokens: 5 });
-    expect(saved.result).toEqual(proposal);
+    expect(saved.result).toEqual(suiteScope.proposal);
     const metadata = saved.modelMetadata as Record<string, unknown>;
     expect(metadata).toHaveProperty('sdkCacheIdentity.configurationFingerprint');
     expect(metadata).toHaveProperty('sdkExecution.generationStatus', 'complete');
 
-    registry.replace([provider('credential-v2')]);
+    registry.replace([suiteScope.provider('credential-v2')]);
     await expect(
       candidates.generateProposal(
-        await readExperiment(),
+        await suiteScope.readExperiment(),
         baseline,
-        describeStrategyParameters(strategy),
+        describeStrategyParameters(suiteScope.strategy),
         route,
         1,
       ),
     ).rejects.toThrow(/配置已变更/);
-    expect(requestCount).toBe(1);
+    expect(suiteScope.requestCount).toBe(1);
 
-    await prisma.$executeRaw(Prisma.sql`
+    await suiteScope.prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment" SET "cancelRequestedAt"=CURRENT_TIMESTAMP
-      WHERE "id"=${experimentId}::uuid
+      WHERE "id"=${suiteScope.experimentId}::uuid
     `);
     await expect(
       candidates.generateProposal(
-        await readExperiment(),
+        await suiteScope.readExperiment(),
         baseline,
-        describeStrategyParameters(strategy),
+        describeStrategyParameters(suiteScope.strategy),
         route,
         2,
       ),
     ).rejects.toThrow(/已取消/);
-    expect(requestCount).toBe(1);
+    expect(suiteScope.requestCount).toBe(1);
   });
-
+}
+function registerSdkDiscoveryAndFormatCases(suiteScope: ReturnType<typeof sdkPostgresContext>) {
   it('discovery 经严格路由和本地 HTTP 后由服务端装配固定字段并持久化', async () => {
-    requestCount = 0;
-    responseContent = JSON.stringify({
+    suiteScope.requestCount = 0;
+    suiteScope.responseContent = JSON.stringify({
       strategy: {
         name: 'SDK discovery 候选',
         series: ['close'],
@@ -441,107 +431,110 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
       evidenceRefs: [],
     });
     const registry = new AiProviderRegistry();
-    registry.register(provider('credential-discovery'));
-    const runs = new StrategyOptimizationRunService(prisma as never, {} as never);
-    const executions = new AiExecutionStateStore(prisma as never);
+    registry.register(suiteScope.provider('credential-discovery'));
+    const runs = new StrategyOptimizationRunService(suiteScope.prisma as never, {} as never);
+    const executions = new AiExecutionStateStore(suiteScope.prisma as never);
     const executor = new StrategyOptimizationSdkExecutor(
-      prisma as never,
+      suiteScope.prisma as never,
       registry,
       new AiSdkGenerationAdapter(),
       executions,
       new StrategyOptimizationAiSettlementStore(executions),
     );
     const candidates = new StrategyOptimizationCandidateService(
-      prisma as never,
+      suiteScope.prisma as never,
       registry,
       runs,
       executor,
     );
     const baseline = {
-      id: discoveryStrategyVersionId,
-      strategyId: discoveryStrategyId,
+      id: suiteScope.discoveryStrategyVersionId,
+      strategyId: suiteScope.discoveryStrategyId,
       version: 0,
       schemaVersion: 2,
-      schema: discoverySeed,
-      strategy: discoverySeed,
+      schema: suiteScope.discoverySeed,
+      strategy: suiteScope.discoverySeed,
     } as never;
 
     const generated = await candidates.generateProposal(
-      await readDiscoveryExperiment(),
+      await suiteScope.readDiscoveryExperiment(),
       baseline,
       [],
       { provider: 'local-sdk-postgres', model: 'fixture-model' },
       1,
     );
 
-    expect(requestCount).toBe(1);
+    expect(suiteScope.requestCount).toBe(1);
     expect(generated.proposal).toMatchObject({
       strategy: {
-        schemaVersion: discoverySeed.schemaVersion,
-        signalSources: discoverySeed.signalSources,
-        executionInstrument: discoverySeed.executionInstrument,
-        primaryTimeframe: discoverySeed.primaryTimeframe,
-        execution: discoverySeed.execution,
-        cost: discoverySeed.cost,
+        schemaVersion: suiteScope.discoverySeed.schemaVersion,
+        signalSources: suiteScope.discoverySeed.signalSources,
+        executionInstrument: suiteScope.discoverySeed.executionInstrument,
+        primaryTimeframe: suiteScope.discoverySeed.primaryTimeframe,
+        execution: suiteScope.discoverySeed.execution,
+        cost: suiteScope.discoverySeed.cost,
       },
     });
-    const saved = await prisma.aiRun.findUniqueOrThrow({ where: { id: generated.aiRunId } });
+    const saved = await suiteScope.prisma.aiRun.findUniqueOrThrow({
+      where: { id: generated.aiRunId },
+    });
     expect(saved).toMatchObject({ status: 'succeeded', inputTokens: 13, outputTokens: 5 });
     expect(saved.result).toEqual(generated.proposal);
   });
-
   it('完整但无效的模型格式在隔离 PostgreSQL 中保留具体错误码和用量，不创建回测', async () => {
-    requestCount = 0;
-    responseContent = '{"changes":"not-an-array"}';
+    suiteScope.requestCount = 0;
+    suiteScope.responseContent = '{"changes":"not-an-array"}';
     const registry = new AiProviderRegistry();
-    registry.register(provider('credential-format'));
-    const runs = new StrategyOptimizationRunService(prisma as never, {} as never);
-    const executions = new AiExecutionStateStore(prisma as never);
+    registry.register(suiteScope.provider('credential-format'));
+    const runs = new StrategyOptimizationRunService(suiteScope.prisma as never, {} as never);
+    const executions = new AiExecutionStateStore(suiteScope.prisma as never);
     const executor = new StrategyOptimizationSdkExecutor(
-      prisma as never,
+      suiteScope.prisma as never,
       registry,
       new AiSdkGenerationAdapter(),
       executions,
       new StrategyOptimizationAiSettlementStore(executions),
     );
     const candidates = new StrategyOptimizationCandidateService(
-      prisma as never,
+      suiteScope.prisma as never,
       registry,
       runs,
       executor,
     );
     const baseline = {
-      id: strategyVersionId,
-      strategyId,
+      id: suiteScope.strategyVersionId,
+      strategyId: suiteScope.strategyId,
       version: 1,
       schemaVersion: 2,
-      schema: strategy,
-      strategy: strategySchema.parse(strategy),
+      schema: suiteScope.strategy,
+      strategy: strategySchema.parse(suiteScope.strategy),
     } as never;
 
     await expect(
       candidates.generateProposal(
-        await readFormatExperiment(),
+        await suiteScope.readFormatExperiment(),
         baseline,
-        describeStrategyParameters(strategy),
+        describeStrategyParameters(suiteScope.strategy),
         { provider: 'local-sdk-postgres', model: 'fixture-model' },
         1,
       ),
     ).rejects.toMatchObject({
       fact: { code: 'schema_invalid', externalResult: 'complete' },
     });
-    expect(requestCount).toBe(1);
+    expect(suiteScope.requestCount).toBe(1);
 
-    const attempts = await prisma.$queryRaw<
+    const attempts = await suiteScope.prisma.$queryRaw<
       Array<{ aiRunId: string; status: string; error: string }>
     >(
       Prisma.sql`SELECT "aiRunId", "status", "error" FROM "OptimizationAttempt"
-        WHERE "experimentId"=${formatExperimentId}::uuid`,
+        WHERE "experimentId"=${suiteScope.formatExperimentId}::uuid`,
     );
     expect(attempts).toHaveLength(1);
     expect(attempts[0]).toMatchObject({ status: 'failed' });
     expect(attempts[0]!.error).toContain('[模型格式错误]');
-    const aiRun = await prisma.aiRun.findUniqueOrThrow({ where: { id: attempts[0]!.aiRunId } });
+    const aiRun = await suiteScope.prisma.aiRun.findUniqueOrThrow({
+      where: { id: attempts[0]!.aiRunId },
+    });
     expect(aiRun).toMatchObject({
       status: 'failed',
       errorCode: 'optimization_schema_invalid',
@@ -552,7 +545,7 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
       'sdkExecution.requests.0.error.code',
       'schema_invalid',
     );
-    const experiment = await readFormatExperiment();
+    const experiment = await suiteScope.readFormatExperiment();
     expect(experiment).toMatchObject({
       aiCallsUsed: 1,
       backtestRunsUsed: 0,
@@ -560,4 +553,142 @@ postgresDescribe('strategy optimization SDK isolated PostgreSQL vertical', () =>
       outputTokensUsed: 5,
     });
   });
-});
+}
+
+async function initializeSdkPostgresFixture(
+  lifecycleScope: ReturnType<typeof sdkPostgresContext>,
+): Promise<void> {
+  lifecycleScope.server.listen(0, '127.0.0.1');
+  await once(lifecycleScope.server, 'listening');
+  const address = lifecycleScope.server.address();
+  if (!address || typeof address === 'string') throw new Error('本地 Provider fixture 启动失败');
+  lifecycleScope.baseURL = `http://127.0.0.1:${address.port}`;
+  const storedStrategy = await lifecycleScope.prisma.strategy.create({
+    data: { schemaVersion: 2, name: `SDK PostgreSQL ${lifecycleScope.suffix}` },
+  });
+  lifecycleScope.strategyId = storedStrategy.id;
+  const version = await lifecycleScope.prisma.strategyVersion.create({
+    data: {
+      strategyId: lifecycleScope.strategyId,
+      version: 1,
+      schemaVersion: 2,
+      schema: lifecycleScope.strategy,
+    },
+  });
+  lifecycleScope.strategyVersionId = version.id;
+  const storedDiscoveryStrategy = await lifecycleScope.prisma.strategy.create({
+    data: { schemaVersion: 2, name: `SDK discovery PostgreSQL ${lifecycleScope.suffix}` },
+  });
+  lifecycleScope.discoveryStrategyId = storedDiscoveryStrategy.id;
+  const discoveryVersion = await lifecycleScope.prisma.strategyVersion.create({
+    data: {
+      strategyId: lifecycleScope.discoveryStrategyId,
+      version: 0,
+      schemaVersion: 2,
+      schema: lifecycleScope.discoverySeed,
+    },
+  });
+  lifecycleScope.discoveryStrategyVersionId = discoveryVersion.id;
+  await lifecycleScope.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "OptimizationExperiment" (
+        "id", "baselineStrategyVersionId", "status", "stage", "objective",
+        "allowedParameterIds", "split", "runConfig", "dataFingerprint", "modelConfig",
+        "budget", "maxRounds", "idempotencyKey"
+      ) VALUES (
+        ${lifecycleScope.experimentId}::uuid, ${lifecycleScope.strategyVersionId}::uuid, 'running', 'generation',
+        '{"mode":"balanced","minClosedTrades":1}'::jsonb,
+        '["risk.0.percent"]'::jsonb, '{}'::jsonb, '{}'::jsonb, ${`sdk-pg-${lifecycleScope.suffix}`},
+        '[{"provider":"local-sdk-postgres","model":"fixture-model","costStatus":"known","costCurrency":"USD"}]'::jsonb,
+        '{"maxAiCalls":2,"maxBacktestRuns":2,"maxInputTokens":20000,"maxOutputTokens":2000,"maxCost":"10","maxDurationSeconds":1800}'::jsonb,
+        1, ${`sdk-pg-${lifecycleScope.suffix}`}
+      )
+    `);
+  await lifecycleScope.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "OptimizationExperiment" (
+        "id", "sourceMode", "discoveryScope", "strategySpaceVersion",
+        "baselineStrategyVersionId", "status", "stage", "objective",
+        "allowedParameterIds", "split", "runConfig", "dataFingerprint", "modelConfig",
+        "budget", "maxRounds", "idempotencyKey"
+      ) VALUES (
+        ${lifecycleScope.discoveryExperimentId}::uuid, 'discovery', ${JSON.stringify(lifecycleScope.discoveryScope)}::jsonb,
+        ${STRATEGY_SPACE_VERSION}, ${lifecycleScope.discoveryStrategyVersionId}::uuid, 'running', 'generation',
+        '{"mode":"balanced","minClosedTrades":1}'::jsonb, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb,
+        ${`sdk-discovery-pg-${lifecycleScope.suffix}`},
+        '[{"provider":"local-sdk-postgres","model":"fixture-model","costStatus":"known","costCurrency":"USD"}]'::jsonb,
+        '{"maxAiCalls":1,"maxBacktestRuns":2,"maxInputTokens":20000,"maxOutputTokens":2000,"maxCost":"10","maxDurationSeconds":1800}'::jsonb,
+        1, ${`sdk-discovery-pg-${lifecycleScope.suffix}`}
+      )
+    `);
+  await lifecycleScope.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "OptimizationExperiment" (
+        "id", "baselineStrategyVersionId", "status", "stage", "objective",
+        "allowedParameterIds", "split", "runConfig", "dataFingerprint", "modelConfig",
+        "budget", "maxRounds", "idempotencyKey"
+      ) VALUES (
+        ${lifecycleScope.formatExperimentId}::uuid, ${lifecycleScope.strategyVersionId}::uuid, 'running', 'generation',
+        '{"mode":"balanced","minClosedTrades":1}'::jsonb,
+        '["risk.0.percent"]'::jsonb, '{}'::jsonb, ${JSON.stringify(createNormalizedRunConfig())}::jsonb,
+        ${`sdk-format-pg-${lifecycleScope.suffix}`},
+        '[{"provider":"local-sdk-postgres","model":"fixture-model","costStatus":"known","costCurrency":"USD"}]'::jsonb,
+        '{"maxAiCalls":1,"maxBacktestRuns":1,"maxInputTokens":20000,"maxOutputTokens":2000,"maxCost":"10","maxDurationSeconds":1800}'::jsonb,
+        1, ${`sdk-format-pg-${lifecycleScope.suffix}`}
+      )
+    `);
+}
+
+async function releaseSdkPostgresFixture(
+  lifecycleScope: ReturnType<typeof sdkPostgresContext>,
+): Promise<void> {
+  await lifecycleScope.prisma.$executeRaw(Prisma.sql`
+      DELETE FROM "OptimizationCandidate" WHERE "experimentId"=${lifecycleScope.experimentId}::uuid
+    `);
+  await lifecycleScope.prisma.$executeRaw(Prisma.sql`
+      DELETE FROM "OptimizationAttempt"
+      WHERE "experimentId" IN (${lifecycleScope.experimentId}::uuid, ${lifecycleScope.discoveryExperimentId}::uuid, ${lifecycleScope.formatExperimentId}::uuid)
+    `);
+  await lifecycleScope.prisma.$executeRaw(Prisma.sql`
+      DELETE FROM "OptimizationExperiment"
+      WHERE "id" IN (${lifecycleScope.experimentId}::uuid, ${lifecycleScope.discoveryExperimentId}::uuid, ${lifecycleScope.formatExperimentId}::uuid)
+    `);
+  await lifecycleScope.prisma.aiRun.deleteMany({
+    where: {
+      OR: [
+        {
+          modelMetadata: {
+            path: ['optimizationExperimentId'],
+            equals: lifecycleScope.experimentId,
+          },
+        },
+        {
+          modelMetadata: {
+            path: ['optimizationExperimentId'],
+            equals: lifecycleScope.discoveryExperimentId,
+          },
+        },
+        {
+          modelMetadata: {
+            path: ['optimizationExperimentId'],
+            equals: lifecycleScope.formatExperimentId,
+          },
+        },
+      ],
+    },
+  });
+  if (lifecycleScope.strategyId)
+    await lifecycleScope.prisma.strategyVersion.deleteMany({
+      where: { strategyId: lifecycleScope.strategyId },
+    });
+  if (lifecycleScope.discoveryStrategyId)
+    await lifecycleScope.prisma.strategyVersion.deleteMany({
+      where: { strategyId: lifecycleScope.discoveryStrategyId },
+    });
+  if (lifecycleScope.strategyId)
+    await lifecycleScope.prisma.strategy.delete({ where: { id: lifecycleScope.strategyId } });
+  if (lifecycleScope.discoveryStrategyId)
+    await lifecycleScope.prisma.strategy.delete({
+      where: { id: lifecycleScope.discoveryStrategyId },
+    });
+  await lifecycleScope.prisma.$disconnect();
+  lifecycleScope.server.close();
+  await once(lifecycleScope.server, 'close');
+}

@@ -157,7 +157,10 @@ export class StrategySubmissions {
   }
   private async step(row: StrategySubmission, now: Date) {
     const original = { id: row.id, state: row.state, attempt: row.attempt };
-    if (row.state === 'blocked' && !(row.outcome as Record<string, unknown> | null)?.uncertainCreation) {
+    if (
+      row.state === 'blocked' &&
+      !(row.outcome as Record<string, unknown> | null)?.uncertainCreation
+    ) {
       await this.execution.authorize(row.ownerId, strategySubmissionInputSchema.parse(row.input));
       const outcome = row.outcome as { reason?: string } | null;
       await settleOrdinarySubmissionFailure(this.db, row, outcome?.reason ?? '回测准备未通过');
@@ -170,7 +173,14 @@ export class StrategySubmissions {
     if (row.state === 'preparing') {
       // 进程中断后无法证明取数是否发生，不自动再次访问来源。
       await this.execution.authorize(row.ownerId, strategySubmissionInputSchema.parse(row.input));
-      if (await settleOrdinarySubmissionFailure(this.db, row, '准备中断，取数结果未知，请重新创建回测。')) return;
+      if (
+        await settleOrdinarySubmissionFailure(
+          this.db,
+          row,
+          '准备中断，取数结果未知，请重新创建回测。',
+        )
+      )
+        return;
       await this.db.strategySubmission.updateMany({
         where: original,
         data: { state: 'blocked', outcome: { reason: '准备中断，取数结果未知' } },
@@ -193,31 +203,7 @@ export class StrategySubmissions {
       const input = strategySubmissionInputSchema.parse(row.input);
       await this.execution.authorize(row.ownerId, input);
       if (preparing) {
-        const p = await this.execution.prepare(input);
-        if (p.status === 'preparing') {
-          if (row.attempt >= 60) throw new BadRequestException('公告准备超时');
-          await write({
-            state: 'queued',
-            nextAt: new Date(Date.now() + 10000),
-            outcome: { reason: '正在准备公告资料' },
-          });
-          return;
-        }
-        if (p.status === 'blocked') {
-          await write({
-            state: 'blocked',
-            prepared: json(p),
-            outcome: { reason: '准备预检未通过', diagnostics: json(p.diagnostics) },
-          });
-          await settleOrdinarySubmissionFailure(this.db, { ...row, state: 'blocked', attempt: row.attempt + 1 }, '回测准备或预检未通过', p);
-          return;
-        }
-        await write({
-          state: this.execution.requiresConfirmation(input, p) ? 'awaiting_confirmation' : 'ready',
-          prepared: json(p),
-          nextAt: new Date(),
-          outcome: Prisma.DbNull,
-        });
+        await this.prepareClaimedSubmission(row, input, write);
       } else {
         const result = await this.execution.create(row.id, input, row.prepared);
         if (!result) throw new Error('创建未返回业务任务');
@@ -234,10 +220,55 @@ export class StrategySubmissions {
       });
       if (preparing) {
         try {
-          await this.execution.authorize(row.ownerId, strategySubmissionInputSchema.parse(row.input));
-          await settleOrdinarySubmissionFailure(this.db, { ...row, state: 'blocked', attempt: row.attempt + 1 }, e instanceof Error ? e.message : '回测准备失败');
-        } catch { this.log.warn({ operation: 'strategy.submission.failure-record', id: row.id }); }
+          await this.execution.authorize(
+            row.ownerId,
+            strategySubmissionInputSchema.parse(row.input),
+          );
+          await settleOrdinarySubmissionFailure(
+            this.db,
+            { ...row, state: 'blocked', attempt: row.attempt + 1 },
+            e instanceof Error ? e.message : '回测准备失败',
+          );
+        } catch {
+          this.log.warn({ operation: 'strategy.submission.failure-record', id: row.id });
+        }
       }
     }
+  }
+  private async prepareClaimedSubmission(
+    row: StrategySubmission,
+    input: StrategySubmissionInput,
+    write: (data: Prisma.StrategySubmissionUpdateManyMutationInput) => Promise<{ count: number }>,
+  ) {
+    const p = await this.execution.prepare(input);
+    if (p.status === 'preparing') {
+      if (row.attempt >= 60) throw new BadRequestException('公告准备超时');
+      await write({
+        state: 'queued',
+        nextAt: new Date(Date.now() + 10000),
+        outcome: { reason: '正在准备公告资料' },
+      });
+      return;
+    }
+    if (p.status === 'blocked') {
+      await write({
+        state: 'blocked',
+        prepared: json(p),
+        outcome: { reason: '准备预检未通过', diagnostics: json(p.diagnostics) },
+      });
+      await settleOrdinarySubmissionFailure(
+        this.db,
+        { ...row, state: 'blocked', attempt: row.attempt + 1 },
+        '回测准备或预检未通过',
+        p,
+      );
+      return;
+    }
+    await write({
+      state: this.execution.requiresConfirmation(input, p) ? 'awaiting_confirmation' : 'ready',
+      prepared: json(p),
+      nextAt: new Date(),
+      outcome: Prisma.DbNull,
+    });
   }
 }

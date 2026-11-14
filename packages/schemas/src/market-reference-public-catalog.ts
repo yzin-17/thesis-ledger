@@ -8,7 +8,7 @@ type ColumnFactory = (
 ) => ReferenceColumn;
 
 // 已验公开来源资料的稳定列；外部协议由 DSA 拥有。
-export function publicReferenceCatalog(c: ColumnFactory) {
+function repoReferenceCatalog(c: ColumnFactory) {
   return {
     'repo-fr': {
       label: '回购定盘利率 FR',
@@ -32,6 +32,12 @@ export function publicReferenceCatalog(c: ColumnFactory) {
         c('fortnight', '十四天', 'decimal', '%'),
       ],
     },
+  } as const;
+}
+
+export function publicReferenceCatalog(c: ColumnFactory) {
+  return {
+    ...repoReferenceCatalog(c),
     'etf-shares-sh': {
       label: '上交所 ETF 份额',
       scope: 'etf',

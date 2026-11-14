@@ -119,6 +119,8 @@ it('在已有详情内按需比较，标签不激活控件，回显与选项复�
   expect(api.compare).not.toHaveBeenCalled();
   await click('比较已存报告');
   await wait(() => expect(host.textContent).toContain('受控比较后的研究文字。'));
+  expect(host.querySelector('[data-slot="card"]')).toBeNull();
+  expect(host.querySelector('[role="region"][aria-label="报告比较"]')).not.toBeNull();
   const trigger = host.querySelector<HTMLButtonElement>('[role="combobox"]')!;
   expect(trigger.textContent).toContain('默认前序');
   await act(async () => host.querySelector('label')!.click());
@@ -144,6 +146,42 @@ it('在已有详情内按需比较，标签不激活控件，回显与选项复�
   expect(trigger.textContent).toContain(label);
   expect(trigger.textContent).not.toContain(sample().previous!.id);
   expect(api.submit).not.toHaveBeenCalled();
+});
+
+it('比较先呈现证据与输入变化，选中具体项后展开原文，仅文字差异标为表述变化', async () => {
+  await mount();
+  await click('比较已存报告');
+  await wait(() => expect(host.querySelector('[aria-label="报告比较结果"]')).not.toBeNull());
+  const result = host.querySelector('[aria-label="报告比较结果"]')!;
+  const groups = [...result.querySelectorAll('section[role="region"]')];
+  expect(groups[0]?.getAttribute('aria-label')).toBe('引用证据');
+  expect(groups[1]?.getAttribute('aria-label')).toBe('输入质量与路由');
+  expect(result.textContent).toContain('表述变化');
+  expect(result.textContent).not.toContain('观点字段有变化');
+  const opinion = result.querySelector('[aria-label="观点字段"]')!;
+  const original = [...opinion.querySelectorAll('details')].find((item) =>
+    item.querySelector('summary')?.textContent?.includes('表述变化'),
+  )!;
+  expect(original.open).toBe(false);
+  await act(async () => original.querySelector('summary')!.click());
+  expect(original.open).toBe(true);
+  expect(original.textContent).toContain('前一份报告');
+  expect(original.textContent).toContain('当前报告');
+  expect(api.submit).not.toHaveBeenCalled();
+});
+
+it('范围不可比较时直接显示原因，不再嵌套提示框', async () => {
+  api.compare.mockResolvedValueOnce({
+    ...sample(),
+    status: 'incompatible',
+    issues: [{ code: 'scope_mismatch', message: '研究范围类别不同，不作字段比较' }],
+  } as unknown as ResearchReportComparison);
+  await mount();
+  await click('比较已存报告');
+  await wait(() => expect(host.textContent).toContain('研究范围类别不同，不作字段比较'));
+  expect(host.textContent).toContain('报告范围不具备可比性');
+  expect(host.querySelector('[data-slot="card"]')).toBeNull();
+  expect(host.querySelector('[data-slot="alert"]')).toBeNull();
 });
 
 it('前后证据入口绑定各自报告与引用，未变字段不会标为变化', async () => {

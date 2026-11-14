@@ -1,5 +1,9 @@
 # 数据库结构测试矩阵
 
+## AI 实验原地失败重试（2026-11-12）
+
+`20261112020000_optimization_manual_retry` 为 raw-owned `OptimizationExperiment` 新增 `retryState` 对象列，历史记录默认空对象，保存追加的人工重试审计与独立轮次起点。无新表，Prisma model 不变；raw-owned 说明同步更新。动态 matrix、运行时打包与结构门禁读取全部迁移，不另设静态 head。隔离 PostgreSQL 验证旧失败/候选/用量保留、同请求幂等、并发仅受理一次、未知结果显式恢复、预算拒绝与 attempt 隔离；实施和目标保留数据升级的分层记录见[已完成重试任务](../archive/tasks/2026-11-12-experiment-manual-retry.md)。
+
 ## 研究幂等提交（2026-10-19）
 
 `20261019010000_research_submission_v2` 仅扩展 AiRun，追加可空身份、提交标识、输入摘要与范围快照，不修改旧报告、来源、费用或状态。新写入要求四项完整、摘要为 SHA-256 形式、快照标明 V2/模式/范围；按身份和提交标识建立唯一约束。未新增表，raw-owned 清单不变；动态 migration matrix、运行时打包输入和结构 head 自动包含本项。

@@ -1,19 +1,6 @@
-import { InstrumentOptionField } from '../market-data/InstrumentOptionField.js';
-import { Spinner } from '@/components/ui/spinner';
-import { useDraftCloseGuard } from '../shared/useDraftCloseGuard.js';
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -22,21 +9,21 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Spinner } from '@/components/ui/spinner';
+import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Switch, SwitchThumb } from '@/components/ui/switch';
 import { LoaderCircle } from 'lucide-react';
-import { researchContextForScope, useResearchAccountScope } from './research-account-scope.js';
-import { fetchStrategies } from '../strategy/strategy.api.js';
-import { strategyKeys } from '../strategy/strategy.queries.js';
-import type { StrategyRecord } from '../strategy/strategy.types.js';
-import { useToastManager } from '@/components/ui/toast';
-import { useCreateAiRunMutation } from './ai.mutations.js';
-import { useAiCapabilitiesQuery, useAiResearchRetryPrefillQuery } from './ai.queries.js';
 import { researchQuestionTemplates } from './ai.templates.js';
+import type { AiResearchScope, AiRunResult } from './ai.types.js';
+import {
+  NewResearchAccountField,
+  NewResearchPositionFields,
+  NewResearchReadBoundary,
+  NewResearchStrategyField,
+} from './NewResearchObjectFields.js';
 import { ResearchDefaultModelField } from './ResearchDefaultModelField.js';
-import { useResearchDefaultModel } from './use-research-default-model.js';
-import type { AiResearchScope, AiRunResult, StartResearchInput } from './ai.types.js';
+import { useNewResearchSheet } from './use-new-research-sheet.js';
 
 const scopeOptions: Array<{ value: AiResearchScope; label: string }> = [
   { value: 'portfolio', label: '全组合' },
@@ -45,253 +32,37 @@ const scopeOptions: Array<{ value: AiResearchScope; label: string }> = [
   { value: 'strategy', label: '策略版本' },
 ];
 
-const errorMessage = (error: unknown) =>
-  error instanceof Error && error.message ? error.message : '研究暂时无法启动，请稍后重试。';
-
-const questionErrorFor = (value: string) => {
-  const length = value.trim().length;
-  if (length === 0) return '请先描述需要回答的问题。';
-  if (length > 2000) return '研究问题不能超过 2000 个字符。';
-  return null;
-};
-
-export function NewResearchSheet({
-  open,
-  onOpenChange,
-  initialQuestion = '',
-  retryOfRunId,
-  onCreated,
-}: {
+export function NewResearchSheet(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialQuestion?: string | undefined;
   retryOfRunId?: string | undefined;
   onCreated: (run: AiRunResult) => void;
 }) {
-  const [scope, setScope] = useState<AiResearchScope>('portfolio');
-  const [accountId, setAccountId] = useState<string | null>(null);
-  const [symbol, setSymbol] = useState<string | null>(null);
-  const [strategyVersionId, setStrategyVersionId] = useState<string | null>(null);
-  const [question, setQuestion] = useState(initialQuestion);
-  const [templateId, setTemplateId] = useState<StartResearchInput['templateId']>();
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
-  const [retryContextReselected, setRetryContextReselected] = useState(false);
-  const [retryConfirmed, setRetryConfirmed] = useState(false);
-  const [unknownRiskConfirmed, setUnknownRiskConfirmed] = useState(false);
-  const mutation = useCreateAiRunMutation();
-  const capabilitiesQuery = useAiCapabilitiesQuery(open);
-  const researchModel = useResearchDefaultModel(open);
-  const routingSettingsQuery = researchModel.query;
-  const retryPrefillQuery = useAiResearchRetryPrefillQuery(retryOfRunId, open);
-  const toastManager = useToastManager();
-
-  useEffect(() => {
-    if (!open) return;
-    setQuestion(initialQuestion);
-    setScope('portfolio');
-    setAccountId(null);
-    setSymbol(null);
-    setStrategyVersionId(null);
-    setTemplateId(undefined);
-    setSubmitError(null);
-    setHasAttemptedSubmit(false);
-    setRetryContextReselected(false);
-    setRetryConfirmed(false);
-    setUnknownRiskConfirmed(false);
-  }, [open, initialQuestion]);
-
-  useEffect(() => {
-    const prefill = retryPrefillQuery.data;
-    if (!open || !prefill || prefill.sourceRunId !== retryOfRunId) return;
-    setQuestion(prefill.question);
-    setScope(prefill.context.scope);
-    setAccountId(prefill.context.accountId ?? null);
-    setSymbol(prefill.context.symbol ?? null);
-    setStrategyVersionId(prefill.context.strategyVersionId ?? null);
-    setTemplateId(prefill.templateId ?? undefined);
-  }, [open, retryOfRunId, retryPrefillQuery.data]);
-
+  const control = useNewResearchSheet(props);
   const {
-    mode,
-    accountsQuery,
-    positionsQuery,
-    positions,
-    accountOptions,
-    effectiveAccountId,
-    retryModeMismatch,
-  } = useResearchAccountScope({
     open,
+    requestClose,
+    retryOfRunId,
+    researchModel,
+    mutation,
     scope,
-    accountId,
-    ...(retryPrefillQuery.data ? { retryContext: retryPrefillQuery.data.context } : {}),
-  });
-  const strategiesQuery = useQuery({
-    queryKey: strategyKeys.strategies(),
-    queryFn: () => fetchStrategies(),
-    enabled: open && scope === 'strategy',
-    staleTime: 15_000,
-  });
-
-  const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
-  const strategyVersions = useMemo(
-    () =>
-      strategies.flatMap((strategy) => strategy.versions.map((version) => ({ strategy, version }))),
-    [strategies],
-  );
-  const selectedStrategy = strategyVersions.find((item) => item.version.id === strategyVersionId);
-  const positionOptions = positions.map((position) => ({
-    value: position.symbol,
-    label: `${position.symbol} · ${position.asset.name}`,
-  }));
-  const strategyOptions = strategyVersions.map(({ strategy, version }) => ({
-    value: version.id,
-    label: `${strategy.name} · v${version.version}`,
-  }));
-  const questionError = questionErrorFor(question);
-  let entityError: string | null = null;
-  if (scope === 'account' && !accountId) entityError = '请选择一个账户。';
-  if (scope === 'position' && !accountId) entityError = '请先选择账户。';
-  if (scope === 'position' && accountId && !symbol) entityError = '请选择账户中的实际持仓。';
-  if (scope === 'strategy' && !strategyVersionId) entityError = '请选择一个具体策略版本。';
-  if (retryPrefillQuery.data?.contextState === 'missing' && !retryContextReselected && !entityError)
-    entityError = '原研究对象已失效，请显式重新选择研究范围或对象。';
-  if (retryPrefillQuery.data?.contextState === 'forbidden' && !entityError)
-    entityError = '原研究对象已不可访问，不能再次生成。';
-  const visibleQuestionError = hasAttemptedSubmit ? questionError : null;
-  const visibleEntityError = hasAttemptedSubmit ? entityError : null;
-  const canSubmit =
-    !retryModeMismatch &&
-    ((scope !== 'account' && scope !== 'position') ||
-      (Boolean(effectiveAccountId) && !accountsQuery.isError && !accountsQuery.isPending)) &&
-    !questionError &&
-    !entityError &&
-    !mutation.isPending &&
-    (!retryOfRunId || !retryPrefillQuery.isPending) &&
-    (!retryOfRunId || !retryPrefillQuery.isError) &&
-    (!retryOfRunId || retryConfirmed) &&
-    (!retryPrefillQuery.data?.requiresUnknownOutcomeAcknowledgement || unknownRiskConfirmed) &&
-    capabilitiesQuery.data?.canStart === true;
-  const canSubmitWithDefault = canSubmit && researchModel.ready;
-
-  const expectedTools = {
-    portfolio: ['getPortfolio', 'getPositions', 'getRisk'],
-    account: ['getPortfolio', 'getPositions', 'getRisk', 'getJournal'],
-    position: ['getPositions', 'getRisk', 'getJournal'],
-    strategy: ['getRisk', 'getJournal'],
-  }[scope];
-  const toolLabels: Record<string, string> = {
-    getPortfolio: '组合摘要',
-    getPositions: '持仓',
-    getRisk: '风险历史',
-    getJournal: '研究日志',
-  };
-  const availableTools = new Set(
-    capabilitiesQuery.data?.providers.flatMap((provider) => provider.tools) ?? [],
-  );
-  let boundary = '正在检查可用读取范围';
-  if (capabilitiesQuery.data) {
-    const labels = expectedTools
-      .filter((tool) => availableTools.has(tool))
-      .map((tool) => toolLabels[tool] ?? tool);
-    boundary = labels.length > 0 ? labels.join('、') : '当前没有可用的只读 Tool';
-  }
-
-  let capabilityMessage = '正在检查模型提供方、工具和执行服务…';
-  if (capabilitiesQuery.isError) capabilityMessage = '能力预检失败，请先刷新后再提交研究。';
-  else if (capabilitiesQuery.data && !capabilitiesQuery.data.canStart) {
-    const unavailable = capabilitiesQuery.data.providers[0];
-    const missing = unavailable?.missing.length ? `缺少：${unavailable.missing.join('、')}。` : '';
-    const impact = unavailable?.impact[0] ?? '研究任务不会进入可执行队列。';
-    capabilityMessage = `${missing}${impact}`;
-  } else if (capabilitiesQuery.data?.providers.some((provider) => provider.state === 'demo'))
-    capabilityMessage = '当前使用演示服务，结果会标记为演示数据。';
-  else if (capabilitiesQuery.data?.canStart)
-    capabilityMessage = '模型提供方、工具和执行服务已就绪。';
-
-  const handleScopeChange = (next: string[]) => {
-    const nextScope = next[0] as AiResearchScope | undefined;
-    if (!nextScope) return;
-    setScope(nextScope);
-    setAccountId(null);
-    setSymbol(null);
-    setStrategyVersionId(null);
-    setSubmitError(null);
-    setHasAttemptedSubmit(false);
-    if (retryOfRunId) setRetryContextReselected(true);
-  };
-
-  const submit = async () => {
-    setHasAttemptedSubmit(true);
-    if (!canSubmitWithDefault) return;
-    let context = researchContextForScope({
-      scope,
-      accountId: effectiveAccountId,
-      symbol,
-      strategyVersionId,
-      mode,
-    });
-    if (retryPrefillQuery.data && !retryContextReselected) {
-      context = retryPrefillQuery.data.context;
-    }
-    setSubmitError(null);
-    try {
-      const run = await mutation.mutateAsync({
-        question: question.trim(),
-        context,
-        ...(routingSettingsQuery.data?.revision === undefined
-          ? {}
-          : { researchSettingsRevision: routingSettingsQuery.data.revision }),
-        ...(templateId ? { templateId } : {}),
-        ...(retryOfRunId
-          ? {
-              retryOfRunId,
-              retryConfirmation: {
-                contextConfirmed: true as const,
-                acknowledgeUnknownOutcomeRisk: unknownRiskConfirmed,
-              },
-            }
-          : {}),
-      });
-      onCreated(run);
-      onOpenChange(false);
-      toastManager.add({
-        title: '研究已开始',
-        description: '任务已进入列表，状态会自动更新。',
-        type: 'success',
-        timeout: 2800,
-      });
-    } catch (error) {
-      setSubmitError(errorMessage(error));
-    }
-  };
-
-  const requestClose = useDraftCloseGuard({
-    open,
-    draft: {
-      mode, scope, accountId, symbol, strategyVersionId, question, templateId,
-      retryOfRunId, retryConfirmed, retryContextReselected, unknownRiskConfirmed,
-      modelKey: researchModel.selectedKey,
-    },
-    dirty:
-      researchModel.dirty ||
-      question !== initialQuestion ||
-      scope !== 'portfolio' ||
-      Boolean(
-        accountId ||
-        symbol ||
-        strategyVersionId ||
-        templateId ||
-        retryConfirmed ||
-        unknownRiskConfirmed,
-      ),
-    busy: mutation.isPending || researchModel.saving,
-    onOpenChange,
-  });
-
-  let submitLabel = retryOfRunId ? '确认并再次生成' : '开始研究';
-  if (mutation.isPending) submitLabel = '开始中…';
-
+    handleScopeChange,
+    visibleQuestionError,
+    question,
+    setQuestion,
+    templateId,
+    setTemplateId,
+    retryPrefillQuery,
+    retryConfirmed,
+    setRetryConfirmed,
+    unknownRiskConfirmed,
+    setUnknownRiskConfirmed,
+    submitError,
+    submit,
+    canSubmitWithDefault,
+    submitLabel,
+  } = control;
   return (
     <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent side="right" size="form" className="overflow-y-auto">
@@ -320,156 +91,9 @@ export function NewResearchSheet({
               </ToggleGroup>
               <FieldDescription>账户、持仓和策略研究都会写入精确对象 ID。</FieldDescription>
             </Field>
-            {scope === 'account' && (
-              <Field invalid={Boolean(visibleEntityError)}>
-                <FieldLabel htmlFor="ai-account">研究账户</FieldLabel>
-                <Select
-                  items={accountOptions}
-                  value={effectiveAccountId ?? ''}
-                  onValueChange={(value) => {
-                    setAccountId(value || null);
-                    if (retryOfRunId) setRetryContextReselected(true);
-                  }}
-                >
-                  <SelectTrigger
-                    id="ai-account"
-                    className="w-full"
-                    aria-invalid={Boolean(visibleEntityError)}
-                  >
-                    <SelectValue placeholder="选择账户" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {accountOptions.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                {accountsQuery.isPending && <FieldDescription><Spinner aria-label="正在加载账户" /></FieldDescription>}
-                {accountsQuery.isError && <FieldError>账户读取失败，请重试后再提交。</FieldError>}
-                {!accountsQuery.isPending &&
-                  !accountsQuery.isError &&
-                  accountOptions.length === 0 && (
-                    <FieldError>暂无可用账户，请先完成账户配置。</FieldError>
-                  )}
-                {!accountsQuery.isError && accountOptions.length > 0 && (
-                  <FieldError>{visibleEntityError}</FieldError>
-                )}
-              </Field>
-            )}
-            {scope === 'position' && (
-              <>
-                <Field invalid={Boolean(visibleEntityError && !accountId)}>
-                  <FieldLabel htmlFor="ai-position-account">持仓账户</FieldLabel>
-                  <Select
-                    items={accountOptions}
-                    value={effectiveAccountId ?? ''}
-                    onValueChange={(value) => {
-                      setAccountId(value || null);
-                      setSymbol(null);
-                      if (retryOfRunId) setRetryContextReselected(true);
-                    }}
-                  >
-                    <SelectTrigger
-                      id="ai-position-account"
-                      className="w-full"
-                      aria-invalid={Boolean(visibleEntityError && !accountId)}
-                    >
-                      <SelectValue placeholder="先选择账户" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {accountOptions.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {accountsQuery.isPending && <FieldDescription><Spinner aria-label="正在加载账户" /></FieldDescription>}
-                  {accountsQuery.isError && <FieldError>账户读取失败，请重试后再提交。</FieldError>}
-                </Field>
-                <Field invalid={Boolean(visibleEntityError && Boolean(accountId))}>
-                  <FieldLabel htmlFor="ai-position-symbol">实际持仓</FieldLabel>
-                  <InstrumentOptionField
-                    label="实际持仓"
-                    id="ai-position-symbol"
-                    options={positionOptions}
-                    value={symbol ?? ''}
-                    disabled={!accountId || positionsQuery.isPending || positionsQuery.isError}
-                    invalid={Boolean(visibleEntityError && Boolean(accountId))}
-                    onChange={(value) => {
-                      setSymbol(value || null);
-                      if (retryOfRunId) setRetryContextReselected(true);
-                    }}
-                  />
-                  {positionsQuery.isLoading && (
-                    <FieldDescription><Spinner aria-label="正在读取账户持仓" /></FieldDescription>
-                  )}
-                  {positionsQuery.isError && (
-                    <FieldError>持仓读取失败，请重试后再提交。</FieldError>
-                  )}
-                  {!positionsQuery.isPending &&
-                    !positionsQuery.isError &&
-                    accountId &&
-                    positions.length === 0 && <FieldError>该账户暂无可研究的实际持仓。</FieldError>}
-                  {!positionsQuery.isError && positions.length > 0 && (
-                    <FieldError>
-                      {visibleEntityError && accountId ? visibleEntityError : undefined}
-                    </FieldError>
-                  )}
-                </Field>
-              </>
-            )}
-            {scope === 'strategy' && (
-              <Field invalid={Boolean(visibleEntityError)}>
-                <FieldLabel htmlFor="ai-strategy-version">策略版本</FieldLabel>
-                <Select
-                  items={strategyOptions}
-                  value={strategyVersionId ?? ''}
-                  onValueChange={(value) => {
-                    setStrategyVersionId(value || null);
-                    if (retryOfRunId) setRetryContextReselected(true);
-                  }}
-                >
-                  <SelectTrigger
-                    id="ai-strategy-version"
-                    className="w-full"
-                    aria-invalid={Boolean(visibleEntityError)}
-                  >
-                    <SelectValue placeholder="选择策略版本" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {strategyOptions.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                {strategiesQuery.isPending && (
-                  <FieldDescription><Spinner aria-label="正在加载策略版本" /></FieldDescription>
-                )}
-                {strategiesQuery.isError && <FieldError>策略读取失败，请重试后再提交。</FieldError>}
-                {!strategiesQuery.isPending &&
-                  !strategiesQuery.isError &&
-                  strategyVersions.length === 0 && <FieldError>暂无可用策略版本。</FieldError>}
-                {selectedStrategy && (
-                  <FieldDescription>
-                    已选择 {selectedStrategy.strategy.name} v{selectedStrategy.version.version}
-                  </FieldDescription>
-                )}
-                {!strategiesQuery.isError && strategyVersions.length > 0 && (
-                  <FieldError>{visibleEntityError}</FieldError>
-                )}
-              </Field>
-            )}
+            <NewResearchAccountField control={control} />
+            <NewResearchPositionFields control={control} />
+            <NewResearchStrategyField control={control} />
             <Field invalid={Boolean(visibleQuestionError)}>
               <FieldLabel htmlFor="ai-question">研究问题</FieldLabel>
               <Textarea
@@ -513,17 +137,7 @@ export function NewResearchSheet({
               ))}
             </div>
           </section>
-          <Alert>
-            <AlertTitle>本次预计读取</AlertTitle>
-            <AlertDescription>
-              {scope === 'strategy'
-                ? '策略版本按自身对象读取。'
-                : `当前为${mode === 'shadow' ? '模拟' : '实际'}账户范围。`}
-              {retryModeMismatch && '原任务属于另一模式，请先通过全局开关切换至原范围后再重试。'}
-              {boundary}。来源是否可用以服务端实际返回为准，缺失来源会在结果中明确标注。
-              {` ${capabilityMessage}`}
-            </AlertDescription>
-          </Alert>
+          <NewResearchReadBoundary control={control} />
           {retryOfRunId && retryPrefillQuery.isPending && (
             <Alert>
               <Spinner aria-hidden="true" />

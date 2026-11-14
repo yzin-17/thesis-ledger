@@ -92,13 +92,41 @@ it('展开和历史按钮只读取保存数据，不自动创建复核或新研�
   expect(api.observations).not.toHaveBeenCalled();
   await click('查看复核状态');
   await wait(() => expect(host.textContent).toContain('已计算方向复核'));
+  expect(host.querySelector('[data-slot="card"]')).toBeNull();
+  expect(host.querySelector('section[aria-label="研究结论复核"]')).not.toBeNull();
   expect(api.observations).toHaveBeenCalledTimes(1);
   expect(api.review).not.toHaveBeenCalled();
+  const reviewButton = [...host.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === '按需复核',
+  );
+  const historyButton = [...host.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === '查看历次复核',
+  );
+  expect(reviewButton?.parentElement).toBe(historyButton?.parentElement);
   await click('查看历次复核');
   await wait(() => expect(api.observationHistory).toHaveBeenCalledTimes(1));
-  expect(host.textContent).toContain('100 → 110 CNY');
+  const popup = document.querySelector('[data-slot="popover-content"]');
+  expect(popup).not.toBeNull();
+  expect(host.querySelector('[data-slot="popover-content"]')).toBeNull();
+  expect(popup?.textContent).toContain('历次复核记录');
+  expect(popup?.querySelectorAll('summary')).toHaveLength(1);
+  await act(async () => popup?.querySelector('summary')?.click());
+  expect(popup?.textContent).toContain('100 → 110 CNY');
   expect(api.submit).not.toHaveBeenCalled();
 });
+it('历史记录仅在点击后加载，浮窗关闭后正文不再占据原页面空间', async () => {
+  await mount();
+  await click('查看复核状态');
+  await wait(() => expect(host.textContent).toContain('已计算方向复核'));
+  expect(api.observationHistory).not.toHaveBeenCalled();
+  await click('查看历次复核');
+  await wait(() => expect(document.querySelector('[data-slot="popover-content"]')).not.toBeNull());
+  await click('查看历次复核');
+  await wait(() => expect(document.querySelector('[data-slot="popover-content"]')).toBeNull());
+  expect(host.querySelector('[aria-label="历次复核"]')).toBeNull();
+  expect(api.review).not.toHaveBeenCalled();
+});
+
 it('只有按需按钮发送明确的断言提交并刷新保存结果', async () => {
   await mount();
   await click('查看复核状态');

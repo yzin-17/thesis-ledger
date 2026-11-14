@@ -14,7 +14,11 @@ export function canSelectCandidateForTest(experiment:ExperimentPolicy,candidate:
 export function candidateAdoptionEligibility(experiment:ExperimentPolicy,candidate:CandidatePolicy) {
   if(!canRevealTestMetrics(experiment,candidate))return '封存测试结果尚未揭示';
   if(experiment.status!=='succeeded'||experiment.stage!=='completed')return '实验尚未完成封存测试';
-  if(candidate.validationStatus==='test_valid')return null;
-  if(!experiment.lockedCandidateIds?.includes(candidate.id))return '未进入封存测试';
-  return '候选未通过封存测试';
+  if(isCompletedOptimizationCandidate(candidate.validationStatus))return null;
+  return '候选评估尚未完成';
+}
+
+/** 评价结论用于审阅与评分，完成状态才决定是否可保存正式策略。 */
+export function isCompletedOptimizationCandidate(status:string) {
+  return ['valid','invalid','test_valid','test_invalid'].includes(status);
 }

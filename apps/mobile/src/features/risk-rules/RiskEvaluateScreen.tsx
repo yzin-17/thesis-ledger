@@ -18,7 +18,7 @@ import {
 } from '../../components/MobilePrimitives';
 import { useRiskRules } from './risk-queries';
 import { mobileRiskContexts } from './risk-context';
-export function RiskEvaluateScreen() {
+function useRiskEvaluateController() {
   const { params } = useRoute<RouteProp<PortfolioStackParams, 'RiskEvaluate'>>();
   const { api, scope, mode } = useMobileRuntime();
   const rules = useRiskRules();
@@ -85,6 +85,11 @@ export function RiskEvaluateScreen() {
       setFeedback(failureMessage(error));
     }
   };
+  return { trial, mode, contexts, rules, valuation, routing, mutation, feedback, blocked, submit, test, rule, scan };
+}
+
+export function RiskEvaluateScreen() {
+  const { trial, mode, contexts, rules, valuation, routing, mutation, feedback, blocked, submit, test, rule, scan } = useRiskEvaluateController();
   return (
     <Page title={trial ? '规则试算' : '风险扫描'}>
       <Copy>

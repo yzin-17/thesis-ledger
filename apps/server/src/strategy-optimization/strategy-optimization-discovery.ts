@@ -3,11 +3,15 @@ import {
   optimizationDiscoveryGenerationOutputSchema,
   optimizationDiscoveryProposalSchema,
   strategySchema,
+  projectPriceResearchStrategy,
+  STRATEGY_CROSS_SEMANTICS_PROMPT,
+  strategyCrossDescriptionIssues,
   type OptimizationDiscoveryProposal,
   type OptimizationDiscoveryScope,
   type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import type { ExperimentRow } from './strategy-optimization-common.js';
+import { usesOptimizationPriceResearch, requireOptimizationResearchStrategy } from './strategy-optimization-research.js';
 
 export const STRATEGY_SPACE_VERSION = 'strategy-space-v1' as const;
 const MAX_AST_DEPTH = 8;
@@ -38,10 +42,10 @@ const astDepth = (value: unknown, depth = 0): number => {
   }, depth);
 };
 
-export const createDiscoverySeed = (scope: OptimizationDiscoveryScope): BacktestStrategy => {
+export const createDiscoverySeed = (scope: OptimizationDiscoveryScope, research = false): BacktestStrategy => {
   const sourceId = 'discovery-primary';
   const isFund = scope.executionInstrument.assetType === 'fund';
-  return {
+  const seed: BacktestStrategy = {
     schemaVersion: '2',
     name: 'AI 探索种子（实验内）',
     description: '仅用于 AI 从零探索的隐藏 v0 种子，不是正式策略。',
@@ -72,6 +76,7 @@ export const createDiscoverySeed = (scope: OptimizationDiscoveryScope): Backtest
         },
     cost: { commissionRate: '0', slippageRate: '0' },
   };
+  return research ? projectPriceResearchStrategy(seed) : seed;
 };
 
 export const validateDiscoveryStrategy = (
@@ -85,17 +90,19 @@ export const validateDiscoveryStrategy = (
     throw new BadRequestException('探索候选不得改变执行标的、市场或资产类型');
   if (strategy.primaryTimeframe !== scope.primaryTimeframe)
     throw new BadRequestException('探索候选不得改变主周期');
-  if (strategy.signalSources.length !== 1)
-    throw new BadRequestException('首版探索只允许一个 SignalSource');
-  const source = strategy.signalSources[0]!;
-  if (
-    !sameInstrument(source.asset, scope.executionInstrument) ||
-    source.timeframe !== scope.primaryTimeframe
-  )
-    throw new BadRequestException('探索候选的 SignalSource 必须与执行标的和主周期一致');
+  const maxSources = strategy.schemaVersion === '3' ? 2 : 1;
+  if (strategy.signalSources.length > maxSources)
+    throw new BadRequestException('探索候选仅允许同标的的研究价格与实际价格来源');
+  for (const source of strategy.signalSources) {
+    if (!sameInstrument(source.asset, scope.executionInstrument) || source.timeframe !== scope.primaryTimeframe)
+      throw new BadRequestException('探索候选的 SignalSource 必须与执行标的和主周期一致');
+  }
   if (strategy.benchmark) throw new BadRequestException('探索候选不得引入额外标的');
   if (astDepth(strategy.entry) > MAX_AST_DEPTH || astDepth(strategy.exit) > MAX_AST_DEPTH)
     throw new BadRequestException(`探索候选 AST 深度不能超过 ${MAX_AST_DEPTH}`);
+  const semanticIssues = strategyCrossDescriptionIssues(strategy);
+  if (semanticIssues.length)
+    throw new BadRequestException({ code: 'STRATEGY_SIGNAL_SEMANTIC_MISMATCH', message: 'AI 策略交叉方向与说明不一致', issues: semanticIssues });
   return strategy;
 };
 
@@ -138,6 +145,7 @@ export const discoveryPrompt = (
   {
     role: 'system',
     content:
+      STRATEGY_CROSS_SEMANTICS_PROMPT +
       '你是策略探索器。只能在 strategy-space-v1 内生成完整 BacktestStrategy JSON；输出前必须先把 responseTemplate 完整复制为响应，不得省略任何 strategy 顶层字段、不得使用省略号或只返回修改片段，再仅修改允许探索的策略字段。必须复制 seed 中固定的执行标的、市场、资产类型、主周期和 execution，生成合法完整对象。策略顶层只能包含 schemaVersion/name/description/signalSources/executionInstrument/primaryTimeframe/entry/exit/sizing/risk/execution/cost/benchmark，首版禁止 benchmark；只能使用一个与执行标的和主周期一致的 SignalSource，不得生成代码、外部标的或未声明数据。entry 和 exit 必须是 BooleanExpression：只能使用 {type:all,conditions:[...]}/{type:any,conditions:[...]}/{type:not,expression:{...}}、{type:compare,operator:eq|neq|gt|gte|lt|lte,left:NumericExpression,right:NumericExpression}、{type:cross,direction:above|below,left:NumericExpression,right:NumericExpression} 或 {type:positionState,field:isOpen}；NumericExpression 只能使用 {type:constant,value:decimal string}、{type:series,sourceId,field}、{type:indicator,name,input,params,可选 MACD output} 或 {type:positionState,field:quantity|averageCost|holdingPeriods}。indicator.input 必须是完整 NumericExpression，例如 {"type":"series","sourceId":"discovery-primary","field":"close"}；周期必须放在 indicator.params，例如 {"period":20}。禁止 and/or/condition/rule 等未声明 type。sizing 必须是严格对象，例如 {"type":"percentOfEquity","percent":"0.9"}；risk 必须是数组，例如 [{"type":"fixedStop","percent":"0.05"}]，不得输出以 fixedStop/fixedTakeProfit 为键的对象。percentOfEquity.percent、targetWeight.weight、fixedStop.percent、fixedTakeProfit.percent 都必须是字符串比例，范围为 (0,1]，例如 "0.9" 而不是 90；maxHoldingPeriod.periods 只能使用正整数。响应 envelope 只能包含 strategy、reason、evidenceRefs；objective、round、priorCandidates 是输入上下文，不得复制到 strategy。只输出合法完整的 {"strategy":完整策略,"reason":说明,"evidenceRefs":[]} JSON，绩效由服务端真实回测。',
   },
   {
@@ -258,10 +266,11 @@ export const assembleDiscoveryGeneration = (
     ...(generated.reason === undefined ? {} : { reason: generated.reason }),
     evidenceRefs: generated.evidenceRefs,
   });
+  const strategy = seed.schemaVersion === '3' ? projectPriceResearchStrategy(proposal.strategy as BacktestStrategy) : proposal.strategy;
   return {
     ...proposal,
     strategy: validateDiscoveryStrategy(
-      proposal.strategy,
+      strategy,
       experiment.discoveryScope as OptimizationDiscoveryScope,
     ),
   };
@@ -276,12 +285,13 @@ export const discoveryGenerationPrompt = (
   {
     role: 'system' as const,
     content:
-      '你是策略探索器。只输出精简 JSON：strategy 仅允许 name、description、series、entry、exit、sizing、risk；envelope 仅允许 strategy、reason、evidenceRefs。先核对 outputExample 的嵌套层级：series、entry、exit、sizing、risk 是 strategy 的平级字段，不得将 sizing/risk 放入 entry/exit 表达式中。不得输出 schemaVersion、signalSources、executionInstrument、primaryTimeframe、execution、cost、benchmark 或外部标的。entry/exit 只能引用冻结 SignalSource ID 及 strategy.series 中声明的字段；不得生成代码或声称未经回测的绩效。',
+      STRATEGY_CROSS_SEMANTICS_PROMPT +
+      '你是策略探索器。只输出精简 JSON：strategy 仅允许 name、description、series、entry、exit、sizing、risk；envelope 仅允许 strategy、reason、evidenceRefs。先核对 outputExample 的嵌套层级：series、entry、exit、sizing、risk 是 strategy 的平级字段，不得将 sizing/risk 放入 entry/exit 表达式中。不得输出 schemaVersion、signalSources、executionInstrument、primaryTimeframe、execution、cost、benchmark 或外部标的。entry/exit 只能引用冻结 SignalSource ID 及 strategy.series 中声明的字段；不得生成代码或声称未经回测的绩效。' + (seed.schemaVersion === '3' ? '后复权用于指标和模拟收益，具体价格常量使用实际价格；Server 按共享研究规则装配来源，不得自行换算价格或阈值。' : ''),
   },
   {
     role: 'user' as const,
     content: `DISCOVERY_REQUEST_JSON:${JSON.stringify({
-      semanticVersion: 'strategy-discovery-v2',
+      semanticVersion: seed.schemaVersion === '3' ? 'strategy-discovery-v3' : 'strategy-discovery-v2',
       strategySpaceVersion: experiment.strategySpaceVersion,
       scope: experiment.discoveryScope,
       frozenSource: {
@@ -314,10 +324,13 @@ export const discoveryGenerationPrompt = (
 export const discoveryCandidateStrategy = (
   experiment: ExperimentRow,
   proposal: OptimizationDiscoveryProposal,
-) =>
-  validateDiscoveryStrategy(
+) => {
+  const strategy = validateDiscoveryStrategy(
     proposal.strategy,
     experiment.discoveryScope as OptimizationDiscoveryScope,
   );
+  if (usesOptimizationPriceResearch(experiment.runConfig)) requireOptimizationResearchStrategy(strategy);
+  return strategy;
+};
 
 export const discoveryCandidateDiff = () => [{ kind: 'full-strategy', sourceMode: 'discovery' }];

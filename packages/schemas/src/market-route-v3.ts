@@ -6,6 +6,7 @@ import { marketRouteTargetSchema } from './market-route-target.js';
 import { isStatusCapabilityNameV1 } from './market-status-capability-id.js';
 import { statusQuerySupportV1Schema } from './market-status-query-support-v1.js';
 import { marketAccountAccessSchema } from './market-account-access.js';
+import { marketCapabilityVerificationSchema } from './market-capability-verification.js';
 
 const text = z.string().trim().min(1);
 const market = z.enum(['CN', 'HK', 'US']);
@@ -245,6 +246,14 @@ export const marketRouteCapabilityV3Schema = z
     barQuery: marketBarQuerySemanticsV3Schema.optional(),
     querySupport: statusQuerySupportV1Schema.optional(),
     accountAccess: marketAccountAccessSchema.optional(),
+    verification: marketCapabilityVerificationSchema.optional(),
+    credentialRequired: z.boolean().optional(),
+    recommendation: z.strictObject({
+      upstreamGroup: text.optional(),
+      priority: z.number().int().nonnegative().optional(),
+      readEvidence: z.literal(true).optional(),
+      reason: text,
+    }).optional(),
   })
   .refine(
     (value) =>

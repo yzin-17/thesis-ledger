@@ -23,8 +23,7 @@ export const structuredStatusCoverageSchema = z.strictObject({
   complete: z.boolean(),
 });
 
-/** 结构化记录只证明日状态与粗 ST；公告专属精细规则仍引用原件。 */
-export function structuredStatusIssues(value: {
+type StructuredStatusInput = {
   symbol: string;
   range: { start: string; end: string };
   days: Array<{
@@ -42,10 +41,25 @@ export function structuredStatusIssues(value: {
   sourceRecords?: z.infer<typeof structuredStatusRecordSchema>[] | undefined;
   structuredCoverage?: z.infer<typeof structuredStatusCoverageSchema> | undefined;
   provenance: { providerId: string; upstreamSource: string; fetchedAt: string };
-}): string[] {
-  const issues: string[] = [];
+};
+
+/** 结构化记录只证明日状态与粗 ST；公告专属精细规则仍引用原件。 */
+export function structuredStatusIssues(value: StructuredStatusInput): string[] {
   const records = value.sourceRecords ?? [];
   const ids = new Set(records.map((record) => record.id));
+  return [
+    ...structuredSourceIssues(value, records, ids),
+    ...structuredDayIssues(value.days, ids),
+    ...structuredCoverageIssues(value, records.length),
+  ];
+}
+
+function structuredSourceIssues(
+  value: StructuredStatusInput,
+  records: NonNullable<StructuredStatusInput['sourceRecords']>,
+  ids: Set<string>,
+): string[] {
+  const issues: string[] = [];
   if (ids.size !== records.length) issues.push('结构化来源引用重复');
   for (const record of records) {
     if (
@@ -58,7 +72,12 @@ export function structuredStatusIssues(value: {
     )
       issues.push('结构化来源身份、窗口或观察时钟不符');
   }
-  for (const day of value.days) {
+  return issues;
+}
+
+function structuredDayIssues(days: StructuredStatusInput['days'], ids: Set<string>): string[] {
+  const issues: string[] = [];
+  for (const day of days) {
     if (day.sourceRecordIds?.some((id) => !ids.has(id))) issues.push('结构化日级事实引用缺失');
     if (day.sourceRecordIds && new Set(day.sourceRecordIds).size !== day.sourceRecordIds.length)
       issues.push('结构化日级来源引用重复');
@@ -71,8 +90,13 @@ export function structuredStatusIssues(value: {
       day.intradayHalts;
     if (precise && !day.sourceDocumentIds) issues.push('精细规则不能仅由结构化日级标记证明');
   }
+  return issues;
+}
+
+function structuredCoverageIssues(value: StructuredStatusInput, recordCount: number): string[] {
+  const issues: string[] = [];
   const coverage = value.structuredCoverage;
-  if (Boolean(coverage) !== Boolean(records.length))
+  if (Boolean(coverage) !== Boolean(recordCount))
     issues.push('结构化响应必须分别保留覆盖与实际来源');
   if (!coverage) return issues;
   for (const dates of [

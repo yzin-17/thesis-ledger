@@ -1,11 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { assetIdentitySourceSchema, assetIdentityStatusSchema } from '@thesis-ledger/schemas';
+import { assetIdentitySourceSchema, assetIdentityStatusSchema, currencyForMarket } from '@thesis-ledger/schemas';
 import { PrismaService } from '../../platform/prisma.service.js';
 import {
   assetTypeForInstrument,
-  CONFIRMABLE_INSTRUMENT_TYPES,
+  disabledReasonForInstrument,
   isConfirmableInstrument,
-  SUPPORTED_PORTFOLIO_MARKETS,
   symbolForInstrument,
 } from './instrument-search.js';
 
@@ -19,12 +18,14 @@ export class InstrumentAssociationService {
   async confirm(instrumentId: string) {
     const instrument = await this.prisma.instrument.findUnique({ where: { id: instrumentId } });
     if (!instrument) throw new NotFoundException('目录标的不存在');
-    if (!CONFIRMABLE_INSTRUMENT_TYPES.has(instrument.instrumentType))
+    const disabledReason = disabledReasonForInstrument(instrument.instrumentType, instrument.market);
+    if (disabledReason === 'unsupported_instrument_type')
       throw new BadRequestException('该标的类型当前不可建立 Asset 关联');
-    if (!SUPPORTED_PORTFOLIO_MARKETS.has(instrument.market))
+    if (disabledReason === 'unsupported_market')
       throw new BadRequestException('该市场当前不支持建立 Portfolio Asset');
     const symbol = symbolForInstrument(instrument);
     const assetType = assetTypeForInstrument(instrument.instrumentType);
+    const market = instrument.market === 'HK' || instrument.market === 'US' ? instrument.market : 'CN';
     const asset = await this.prisma.$transaction(async (transaction) => {
       const existingAssociation = await transaction.instrumentAssetAssociation.findUnique({
         where: { symbol },
@@ -51,7 +52,7 @@ export class InstrumentAssociationService {
               name: instrument.displayName,
               market: instrument.market,
               assetType,
-              currency: 'CNY',
+              currency: currencyForMarket[market],
               identityStatus: CONFIRMED_IDENTITY_STATUS,
               identitySource: CATALOG_IDENTITY_SOURCE,
             },

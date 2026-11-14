@@ -178,26 +178,13 @@ export const deriveBacktestRerun = (job: BacktestJob) => {
   }
   const input = asRecord(job.input);
   const runConfig = asRecord(input?.runConfig);
-  const start =
-    typeof runConfig?.startDate === 'string'
-      ? runConfig.startDate
-      : (job.period?.start ?? job.periodStart);
-  const end =
-    typeof runConfig?.endDate === 'string' ? runConfig.endDate : (job.period?.end ?? job.periodEnd);
+  const { start, end } = rerunWindow(job, runConfig);
   if (!start || !end) missing.push('回测区间');
 
-  const currency = runConfig?.baseCurrency;
-  const initialCash = asRecord(runConfig?.initialCash);
-  const cashSource =
-    currency === 'CNY' || currency === 'HKD' || currency === 'USD'
-      ? initialCash?.[currency]
-      : (input?.initialCash ?? job.initialCash);
-  const cash = backtestNumber(cashSource);
+  const { currency, cash } = rerunFunding(job, input, runConfig);
   if (cash === null) missing.push('初始资金');
 
-  const executionModel = runConfig?.executionModel ?? input?.executionModel;
-  const adjustment = asRecord(asRecord(runConfig?.executionPriceProtocol)?.priceBasis)?.adjustment;
-  const validAdjustment = adjustment === 'none' || adjustment === 'qfq' || adjustment === 'hfq';
+  const { executionModel, adjustment, validAdjustment } = rerunExecution(input, runConfig);
   if (runConfig?.schemaVersion === '3' && !validAdjustment) missing.push('价格口径');
   if (missing.length > 0 || !start || !end || cash === null) return { setup: null, missing };
   const setup: BacktestSetupInput = {
@@ -211,3 +198,39 @@ export const deriveBacktestRerun = (job: BacktestJob) => {
   };
   return { setup, missing: [] };
 };
+
+function rerunWindow(job: BacktestJob, runConfig: Record<string, unknown> | null) {
+  const start =
+    typeof runConfig?.startDate === 'string'
+      ? runConfig.startDate
+      : (job.period?.start ?? job.periodStart);
+  const end =
+    typeof runConfig?.endDate === 'string' ? runConfig.endDate : (job.period?.end ?? job.periodEnd);
+  return { start, end };
+}
+
+function rerunFunding(
+  job: BacktestJob,
+  input: Record<string, unknown> | null,
+  runConfig: Record<string, unknown> | null,
+) {
+  const currency = runConfig?.baseCurrency;
+  const initialCash = asRecord(runConfig?.initialCash);
+  const cashSource =
+    currency === 'CNY' || currency === 'HKD' || currency === 'USD'
+      ? initialCash?.[currency]
+      : (input?.initialCash ?? job.initialCash);
+  const cash = backtestNumber(cashSource);
+  return { currency, cash };
+}
+
+function rerunExecution(
+  input: Record<string, unknown> | null,
+  runConfig: Record<string, unknown> | null,
+) {
+  const executionModel = runConfig?.executionModel ?? input?.executionModel;
+  const adjustment = asRecord(asRecord(runConfig?.executionPriceProtocol)?.priceBasis)?.adjustment;
+  const validAdjustment = adjustment === 'none' || adjustment === 'qfq' || adjustment === 'hfq';
+  if (validAdjustment) return { executionModel, adjustment, validAdjustment: true } as const;
+  return { executionModel, adjustment: undefined, validAdjustment: false } as const;
+}

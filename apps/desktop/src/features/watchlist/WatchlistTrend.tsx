@@ -95,16 +95,17 @@ export function WatchlistTrend({
   const data = query.data;
   const points = data?.points ?? [];
   const cadence = cadenceFor(data);
-  const session = snap?.quoteContext ?? (snap?.price.kind === 'quote' ? snap.price.quote.sessionContext : undefined);
-  const { paths, dividers } = watchlistTrendGeometry(points, minute, session?.marketSession?.sessions);
+  const { paths, dividers } = watchlistSessionGeometry(snap, points, minute);
   let label = '日线 · 前复权';
   if (fund) label = '近20期净值';
   else if (minute) label = '分时 · 1分钟';
-  let state = '滚动到此处后读取';
-  if (query.isPending && query.isFetching) state = '正在读取走势';
-  else if (query.error) state = requestFailureMessage(query.error);
-  else if (data?.notice) state = data.notice;
-  else if (points.length < 2) state = '走势数据不足';
+  const state = watchlistTrendState(
+    query.isPending,
+    query.isFetching,
+    query.error,
+    data,
+    points.length,
+  );
   return (
     <div ref={ref} className="min-w-0 text-xs">
       <Button
@@ -116,47 +117,16 @@ export function WatchlistTrend({
         <span className="text-left text-xs font-normal text-muted-foreground">
           {data?.label ?? label}
         </span>
-        {!fund && !minute && data?.candles ? (
-          <WatchlistCandles candles={data.candles} />
-        ) : (
-          paths.length > 0 && (
-            <svg
-              viewBox="0 0 160 44"
-              className="size-full h-11 text-chart-1"
-              role="img"
-              aria-label={`${label}，${points.length}个数据点`}
-            >
-              {dividers.map((x) => (
-                <line
-                  key={x}
-                  x1={x}
-                  x2={x}
-                  y1="3"
-                  y2="41"
-                  className="stroke-muted-foreground/50"
-                  strokeWidth="1"
-                  strokeDasharray="2 2"
-                >
-                  <title>交易时段间隔</title>
-                </line>
-              ))}
-              {paths.map((d, index) => (
-                <path key={index} d={d} fill="none" stroke="currentColor" strokeWidth="1.6" />
-              ))}
-            </svg>
-          )
-        )}
-        {data?.cutoff && (
-          <span className="text-left text-xs font-normal text-muted-foreground">
-            {data.source && <>{dataSourceDisplay(data.source)} · </>}
-            {new Date(data.cutoff).toLocaleString('zh-CN', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              ...(minute ? { hour: '2-digit', minute: '2-digit' } : {}),
-            })}
-          </span>
-        )}
+        <WatchlistTrendSeries
+          data={data}
+          fund={fund}
+          minute={minute}
+          label={label}
+          paths={paths}
+          dividers={dividers}
+          pointCount={points.length}
+        />
+        <WatchlistTrendCutoff data={data} minute={minute} />
       </Button>
       {data?.source && !cadence && (
         <span className="block text-muted-foreground">自动走势检查暂停</span>
@@ -165,5 +135,101 @@ export function WatchlistTrend({
         <span className="block break-words text-muted-foreground">{state}</span>
       )}
     </div>
+  );
+}
+
+function watchlistSessionGeometry(
+  snap: WatchlistPrice | undefined,
+  points: TrendData['points'],
+  minute: boolean,
+) {
+  const session =
+    snap?.quoteContext ??
+    (snap?.price.kind === 'quote' ? snap.price.quote.sessionContext : undefined);
+  const { paths, dividers } = watchlistTrendGeometry(
+    points,
+    minute,
+    session?.marketSession?.sessions,
+  );
+  return { paths, dividers };
+}
+
+function watchlistTrendState(
+  isPending: boolean,
+  isFetching: boolean,
+  error: unknown,
+  data: TrendData | undefined,
+  pointCount: number,
+) {
+  let state = '滚动到此处后读取';
+  if (isPending && isFetching) state = '正在读取走势';
+  else if (error) state = requestFailureMessage(error);
+  else if (data?.notice) state = data.notice;
+  else if (pointCount < 2) state = '走势数据不足';
+  return state;
+}
+
+function WatchlistTrendCutoff({ data, minute }: { data: TrendData | undefined; minute: boolean }) {
+  return (
+    data?.cutoff && (
+      <span className="text-left text-xs font-normal text-muted-foreground">
+        {data.source && <>{dataSourceDisplay(data.source)} · </>}
+        {new Date(data.cutoff).toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          ...(minute ? { hour: '2-digit', minute: '2-digit' } : {}),
+        })}
+      </span>
+    )
+  );
+}
+
+function WatchlistTrendSeries({
+  data,
+  fund,
+  minute,
+  label,
+  paths,
+  dividers,
+  pointCount,
+}: {
+  data: TrendData | undefined;
+  fund: boolean;
+  minute: boolean;
+  label: string;
+  paths: string[];
+  dividers: number[];
+  pointCount: number;
+}) {
+  return !fund && !minute && data?.candles ? (
+    <WatchlistCandles candles={data.candles} />
+  ) : (
+    paths.length > 0 && (
+      <svg
+        viewBox="0 0 160 44"
+        className="size-full h-11 text-chart-1"
+        role="img"
+        aria-label={`${label}，${pointCount}个数据点`}
+      >
+        {dividers.map((x) => (
+          <line
+            key={x}
+            x1={x}
+            x2={x}
+            y1="3"
+            y2="41"
+            className="stroke-muted-foreground/50"
+            strokeWidth="1"
+            strokeDasharray="2 2"
+          >
+            <title>交易时段间隔</title>
+          </line>
+        ))}
+        {paths.map((d, index) => (
+          <path key={index} d={d} fill="none" stroke="currentColor" strokeWidth="1.6" />
+        ))}
+      </svg>
+    )
   );
 }

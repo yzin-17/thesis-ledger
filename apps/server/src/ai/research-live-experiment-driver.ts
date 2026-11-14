@@ -39,29 +39,15 @@ export async function runLiveResearchExperiment(
   continuation?: LiveRateLimitContinuation | LiveTerminalContinuation,
 ) {
   const { protocol, benchmark, evaluation } = qualifyLiveExperiment(raw, rawCases, rawEvaluation);
-  if (protocol.version !== 'research-live-experiment-v2' && !binding.history && !continuation)
-    throw new Error('固定子集筛查必须带入累计历史预算');
-  if (!liveExperimentTargetMatches(protocol, binding))
-    throw new Error('真实实验目标或鉴权与封存Provider不符');
-  if ((resume && (binding.history || continuation)) || (continuation && binding.history))
-    throw new Error('接续与另附预算不能混用');
-  if (binding.supplementalBudget && (!binding.history || resume || continuation))
-    throw new Error('独立补充预算只允许与跨协议历史一同启动');
-  let recovered: ReturnType<typeof verifyLiveExperimentResume>;
-  let supplementalBudget: LiveSupplementalBudget | null = null;
-  if (continuation && 'kind' in continuation) {
-    const terminal = verifyTerminalContinuation(protocol, benchmark, evaluation, continuation);
-    recovered = terminal;
-    supplementalBudget = terminal.supplementalBudget;
-  } else if (continuation) recovered = verifyFirstRateLimitContinuation(protocol, continuation);
-  else recovered = verifyLiveExperimentResume(protocol, benchmark, evaluation, resume);
-  const history = continuation?.historicalBudget ?? binding.history;
-  const fresh =
-    !continuation && history
-      ? verifyFreshLiveExperimentBudget(protocol, history, binding.supplementalBudget)
-      : null;
-  const initial = fresh?.initial ?? recovered.initial;
-  if (fresh) supplementalBudget = fresh.supplementalBudget;
+  assertLiveRunContext(protocol, binding, resume, continuation);
+  const { recovered, supplementalBudget, history, initial } = recoverLiveRunBudget(
+    protocol,
+    benchmark,
+    evaluation,
+    binding,
+    resume,
+    continuation,
+  );
   const budget = createLiveExperimentBudget(protocol, initial);
   const selectedCases =
     protocol.version !== 'research-live-experiment-v2'
@@ -88,14 +74,7 @@ export async function runLiveResearchExperiment(
       result.grade = score.grade;
       result.scoreChecks = score.checks;
       arms[arm] = result;
-      if (
-        protocol.version !== 'research-live-experiment-v5' &&
-        (continuation ||
-          protocol.model.id === OPENROUTER_EXPERIMENT_NEMOTRON_MODEL ||
-          protocol.version === 'research-live-experiment-v4') &&
-        result.status !== 'complete' &&
-        !budget.snapshot().stopped
-      ) {
+      if (shouldConfirmLiveArmFailure(protocol, continuation, result, budget)) {
         const confirmation = await confirmLiveSchemaFailure(
           protocol,
           result,
@@ -136,4 +115,62 @@ export async function runLiveResearchExperiment(
       0,
     ),
   };
+}
+
+function assertLiveRunContext(
+  protocol: ReturnType<typeof qualifyLiveExperiment>['protocol'],
+  binding: LiveExperimentBinding,
+  resume: LiveExperimentResume | undefined,
+  continuation: LiveRateLimitContinuation | LiveTerminalContinuation | undefined,
+) {
+  if (protocol.version !== 'research-live-experiment-v2' && !binding.history && !continuation)
+    throw new Error('固定子集筛查必须带入累计历史预算');
+  if (!liveExperimentTargetMatches(protocol, binding))
+    throw new Error('真实实验目标或鉴权与封存Provider不符');
+  if ((resume && (binding.history || continuation)) || (continuation && binding.history))
+    throw new Error('接续与另附预算不能混用');
+  if (binding.supplementalBudget && (!binding.history || resume || continuation))
+    throw new Error('独立补充预算只允许与跨协议历史一同启动');
+}
+
+function recoverLiveRunBudget(
+  protocol: ReturnType<typeof qualifyLiveExperiment>['protocol'],
+  benchmark: ReturnType<typeof qualifyLiveExperiment>['benchmark'],
+  evaluation: ReturnType<typeof qualifyLiveExperiment>['evaluation'],
+  binding: LiveExperimentBinding,
+  resume: LiveExperimentResume | undefined,
+  continuation: LiveRateLimitContinuation | LiveTerminalContinuation | undefined,
+) {
+  let recovered: ReturnType<typeof verifyLiveExperimentResume>;
+  let supplementalBudget: LiveSupplementalBudget | null = null;
+  if (continuation && 'kind' in continuation) {
+    const terminal = verifyTerminalContinuation(protocol, benchmark, evaluation, continuation);
+    recovered = terminal;
+    supplementalBudget = terminal.supplementalBudget;
+  } else if (continuation) recovered = verifyFirstRateLimitContinuation(protocol, continuation);
+  else recovered = verifyLiveExperimentResume(protocol, benchmark, evaluation, resume);
+  const history = continuation?.historicalBudget ?? binding.history;
+  const fresh =
+    !continuation && history
+      ? verifyFreshLiveExperimentBudget(protocol, history, binding.supplementalBudget)
+      : null;
+  const initial = fresh?.initial ?? recovered.initial;
+  if (fresh) supplementalBudget = fresh.supplementalBudget;
+  return { recovered, supplementalBudget, history, initial };
+}
+
+function shouldConfirmLiveArmFailure(
+  protocol: ReturnType<typeof qualifyLiveExperiment>['protocol'],
+  continuation: LiveRateLimitContinuation | LiveTerminalContinuation | undefined,
+  result: LiveArmResult,
+  budget: ReturnType<typeof createLiveExperimentBudget>,
+) {
+  return Boolean(
+    protocol.version !== 'research-live-experiment-v5' &&
+    (continuation ||
+      protocol.model.id === OPENROUTER_EXPERIMENT_NEMOTRON_MODEL ||
+      protocol.version === 'research-live-experiment-v4') &&
+    result.status !== 'complete' &&
+    !budget.snapshot().stopped,
+  );
 }

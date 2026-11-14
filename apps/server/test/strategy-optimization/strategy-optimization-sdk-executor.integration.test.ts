@@ -40,6 +40,13 @@ const writeSse = (response: ServerResponse, content: string) => {
 };
 
 describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
+  const suiteScope = sdkExecutionContext();
+  registerSdkPreparationAndOutputCases(suiteScope);
+  registerSdkFrozenMetricsAndPricingCases(suiteScope);
+  registerSdkDiscoveryAndUnknownOutcomeCases(suiteScope);
+});
+
+function sdkExecutionContext() {
   let responseContent = '';
   let requestCount = 0;
   let baseURL = '';
@@ -97,7 +104,6 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
     completedAt: null,
     createdAt: new Date(),
   };
-
   beforeAll(async () => {
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
@@ -105,19 +111,16 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
     if (!address || typeof address === 'string') throw new Error('本地 Provider fixture 启动失败');
     baseURL = `http://127.0.0.1:${address.port}`;
   });
-
   beforeEach(() => {
     requestCount = 0;
     receivedBody = '';
     vi.clearAllMocks();
     settlements.completeAndSettle.mockResolvedValue({ continuationBlockedReason: null });
   });
-
   afterAll(async () => {
     server.close();
     await once(server, 'close');
   });
-
   const resolved = (contract: { id: string; version: string }) => ({
     provider,
     execution: {
@@ -130,7 +133,6 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       readiness: { state: 'ready', reasons: [], configurationFingerprint: 'fixture-fingerprint' },
     },
   });
-
   const executor = () =>
     new StrategyOptimizationSdkExecutor(
       prisma as never,
@@ -139,7 +141,6 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       executions as never,
       settlements as never,
     );
-
   const common = (
     experiment: Record<string, unknown>,
     baseline: unknown,
@@ -155,38 +156,107 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
     route,
     modelKey: step.modelKey,
     step,
-    messages: [{ role: 'system', content: buildGenerationSchemaPrompt(experiment.sourceMode === 'discovery' ? aiGenerationContracts.strategyDiscovery.schema : aiGenerationContracts.parameterOptimization.schema) }, { role: 'user', content: 'Return JSON.' }],
+    messages: [
+      {
+        role: 'system',
+        content: buildGenerationSchemaPrompt(
+          experiment.sourceMode === 'discovery'
+            ? aiGenerationContracts.strategyDiscovery.schema
+            : aiGenerationContracts.parameterOptimization.schema,
+        ),
+      },
+      { role: 'user', content: 'Return JSON.' },
+    ],
     inputTokenReservation: 100,
     outputTokenReservation: 100,
     estimatedCost: 0.003,
     resolved: resolved(contract),
     requestTimeoutMs: 2_000,
   });
-
+  return {
+    get responseContent() {
+      return responseContent;
+    },
+    set responseContent(value: typeof responseContent) {
+      responseContent = value;
+    },
+    get requestCount() {
+      return requestCount;
+    },
+    set requestCount(value: typeof requestCount) {
+      requestCount = value;
+    },
+    get baseURL() {
+      return baseURL;
+    },
+    set baseURL(value: typeof baseURL) {
+      baseURL = value;
+    },
+    get receivedBody() {
+      return receivedBody;
+    },
+    set receivedBody(value: typeof receivedBody) {
+      receivedBody = value;
+    },
+    get server() {
+      return server;
+    },
+    get executions() {
+      return executions;
+    },
+    get settlements() {
+      return settlements;
+    },
+    get prisma() {
+      return prisma;
+    },
+    get provider() {
+      return provider;
+    },
+    get route() {
+      return route;
+    },
+    get step() {
+      return step;
+    },
+    get resolved() {
+      return resolved;
+    },
+    get executor() {
+      return executor;
+    },
+    get common() {
+      return common;
+    },
+  };
+}
+function registerSdkPreparationAndOutputCases(suiteScope: ReturnType<typeof sdkExecutionContext>) {
   it('参数优化只发一次请求，完整保存用量并在超额后阻断继续', async () => {
-    responseContent = JSON.stringify({
+    suiteScope.responseContent = JSON.stringify({
       changes: [{ parameterId: 'risk.0.percent', value: '0.07' }],
       reason: '本地 Provider 参数候选',
       evidenceRefs: [],
     });
-    settlements.completeAndSettle.mockResolvedValue({
+    suiteScope.settlements.completeAndSettle.mockResolvedValue({
       continuationBlockedReason: 'budget_exceeded',
     });
 
-    const result = await executor().completeProposal(
-      common(
-        { sourceMode: 'existing' },
-        {},
-        { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
-      ) as never,
-    );
+    const result = await suiteScope
+      .executor()
+      .completeProposal(
+        suiteScope.common(
+          { sourceMode: 'existing' },
+          {},
+          { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
+        ) as never,
+      );
 
-    expect(requestCount).toBe(1);
+    expect(suiteScope.requestCount).toBe(1);
     expect(result).toMatchObject({
       proposal: { changes: [{ parameterId: 'risk.0.percent', value: '0.07' }] },
       continuationBlockedReason: 'budget_exceeded',
     });
-    expect(settlements.completeAndSettle).toHaveBeenCalledWith(
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledWith(
       expect.objectContaining({
         revision: expect.objectContaining({
           usage: { status: 'reported', inputTokens: 11, outputTokens: 7 },
@@ -195,38 +265,69 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       }),
     );
   });
-
   it('缺失字段指令时不初始化预算、不结算、不发请求', async () => {
-    const input = common({ sourceMode: 'existing' }, {},
-      { id: 'parameter_optimization', version: 'optimization-parameter-v1' });
+    const input = suiteScope.common(
+      { sourceMode: 'existing' },
+      {},
+      { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
+    );
     input.messages = [{ role: 'user', content: '只返回JSON' }];
-    await expect(executor().completeProposal(input as never)).rejects.toMatchObject({
+    await expect(suiteScope.executor().completeProposal(input as never)).rejects.toMatchObject({
       fact: { code: 'configuration_invalid', externalResult: 'not_sent' },
     });
-    expect(executions.initialize).not.toHaveBeenCalled();
-    expect(settlements.completeAndSettle).not.toHaveBeenCalled();
-    expect(requestCount).toBe(0);
+    expect(suiteScope.executions.initialize).not.toHaveBeenCalled();
+    expect(suiteScope.settlements.completeAndSettle).not.toHaveBeenCalled();
+    expect(suiteScope.requestCount).toBe(0);
   });
-
-  it('模型返回完整但格式无效的响应时只结算一次格式失败并保留已报告用量', async () => {
-    responseContent = '{"changes": "not-an-array"}';
-
-    await expect(
-      executor().completeProposal(
-        common(
-          { sourceMode: 'existing' },
+  it.each([0, 100])('累计输出预算 %s 正确映射到真实 Provider 请求', async (maxOutputTokens) => {
+    suiteScope.responseContent = JSON.stringify({
+      changes: [{ parameterId: 'risk.0.percent', value: '0.07' }],
+      reason: '本地样本',
+      evidenceRefs: [],
+    });
+    await suiteScope
+      .executor()
+      .completeProposal(
+        suiteScope.common(
+          { sourceMode: 'existing', budget: { maxOutputTokens, maxDurationSeconds: 1800 } },
           {},
           { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
         ) as never,
-      ),
+      );
+    const body = JSON.parse(suiteScope.receivedBody);
+    if (maxOutputTokens === 0) {
+      expect(body).not.toHaveProperty('max_tokens');
+      expect(body).not.toHaveProperty('max_completion_tokens');
+    } else expect(body.max_tokens ?? body.max_completion_tokens).toBe(100);
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        revision: expect.objectContaining({
+          usage: { status: 'reported', inputTokens: 11, outputTokens: 7 },
+        }),
+      }),
+    );
+  });
+  it('模型返回完整但格式无效的响应时只结算一次格式失败并保留已报告用量', async () => {
+    suiteScope.responseContent = '{"changes": "not-an-array"}';
+
+    await expect(
+      suiteScope
+        .executor()
+        .completeProposal(
+          suiteScope.common(
+            { sourceMode: 'existing' },
+            {},
+            { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
+          ) as never,
+        ),
     ).rejects.toMatchObject({
       fact: { code: 'schema_invalid', phase: 'validation', externalResult: 'complete' },
     });
 
-    expect(requestCount).toBe(1);
-    expect(executions.markUnknown).not.toHaveBeenCalled();
-    expect(settlements.completeAndSettle).toHaveBeenCalledTimes(1);
-    expect(settlements.completeAndSettle).toHaveBeenCalledWith(
+    expect(suiteScope.requestCount).toBe(1);
+    expect(suiteScope.executions.markUnknown).not.toHaveBeenCalled();
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledTimes(1);
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledWith(
       expect.objectContaining({
         revision: expect.objectContaining({
           usage: { status: 'reported', inputTokens: 11, outputTokens: 7 },
@@ -235,8 +336,8 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
         error: expect.objectContaining({ code: 'schema_invalid', externalResult: 'complete' }),
       }),
     );
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
-    expect(prisma.aiRun.updateMany).toHaveBeenCalledWith(
+    expect(suiteScope.prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(suiteScope.prisma.aiRun.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: 'failed',
@@ -245,7 +346,10 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       }),
     );
   });
-
+}
+function registerSdkFrozenMetricsAndPricingCases(
+  suiteScope: ReturnType<typeof sdkExecutionContext>,
+) {
   it('本地HTTP实际请求只发送投影后的开发验证指标和固定快照说明', async () => {
     const { input } = await completeSnapshotFixture();
     const experiment = {
@@ -270,54 +374,53 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
           },
         ],
       } as never,
-      experiment: { id: step.experimentId, ...experiment } as never,
+      experiment: { id: suiteScope.step.experimentId, ...experiment } as never,
       strategy: input.strategy,
       descriptors: [],
-      modelKey: step.modelKey,
+      modelKey: suiteScope.step.modelKey,
       round: 2,
       useSdkContract: true,
     });
-    responseContent = JSON.stringify({
+    suiteScope.responseContent = JSON.stringify({
       changes: [{ parameterId: 'risk.0.percent', value: '0.07' }],
       reason: '本地投影测试',
       evidenceRefs: [],
     });
-    await executor().completeProposal({
-      ...common(experiment, input.strategy, {
+    await suiteScope.executor().completeProposal({
+      ...suiteScope.common(experiment, input.strategy, {
         id: 'parameter_optimization',
         version: 'optimization-parameter-v1',
       }),
       messages,
     } as never);
-    expect(requestCount).toBe(1);
-    expect(receivedBody).not.toContain('SEALED_');
-    expect(receivedBody).toContain('-0.2');
-    expect(receivedBody).toContain('不得描述为严格无前视样本外');
-    expect(JSON.parse(receivedBody).messages).toEqual(
+    expect(suiteScope.requestCount).toBe(1);
+    expect(suiteScope.receivedBody).not.toContain('SEALED_');
+    expect(suiteScope.receivedBody).toContain('-0.2');
+    expect(suiteScope.receivedBody).toContain('不得描述为严格无前视样本外');
+    expect(JSON.parse(suiteScope.receivedBody).messages).toEqual(
       expect.arrayContaining([expect.objectContaining({ role: 'user' })]),
     );
   });
-
   it('使用 Provider 用户费率估算费用并仍只发一次请求', async () => {
-    responseContent = JSON.stringify({
+    suiteScope.responseContent = JSON.stringify({
       changes: [{ parameterId: 'risk.0.percent', value: '0.07' }],
       reason: '用户费率 Provider 参数候选',
       evidenceRefs: [],
     });
-    const input = common(
+    const input = suiteScope.common(
       { sourceMode: 'existing', budget: { maxCost: '0', maxDurationSeconds: 1_800 } },
       {},
       { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
     );
-    input.resolved = resolved({
+    input.resolved = suiteScope.resolved({
       id: 'parameter_optimization',
       version: 'optimization-parameter-v1',
     });
 
-    await executor().completeProposal(input as never);
+    await suiteScope.executor().completeProposal(input as never);
 
-    expect(requestCount).toBe(1);
-    expect(executions.prepareRequest).toHaveBeenCalledWith(
+    expect(suiteScope.requestCount).toBe(1);
+    expect(suiteScope.executions.prepareRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         reservation: expect.objectContaining({
           cost: expect.objectContaining({
@@ -331,14 +434,13 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       }),
     );
   });
-
   it('策略步骤结算使用实验创建时冻结的模型价格版本', async () => {
-    responseContent = JSON.stringify({
+    suiteScope.responseContent = JSON.stringify({
       changes: [{ parameterId: 'risk.0.percent', value: '0.07' }],
       reason: '冻结费率 Provider 参数候选',
       evidenceRefs: [],
     });
-    const input = common(
+    const input = suiteScope.common(
       {
         sourceMode: 'existing',
         modelConfig: [
@@ -357,9 +459,9 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
     );
 
-    await executor().completeProposal(input as never);
+    await suiteScope.executor().completeProposal(input as never);
 
-    expect(executions.prepareRequest).toHaveBeenCalledWith(
+    expect(suiteScope.executions.prepareRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         reservation: expect.objectContaining({
           cost: expect.objectContaining({
@@ -369,7 +471,7 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
         }),
       }),
     );
-    expect(settlements.completeAndSettle).toHaveBeenCalledWith(
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledWith(
       expect.objectContaining({
         revision: expect.objectContaining({
           cost: expect.objectContaining({ pricingVersion: 'frozen-v2' }),
@@ -377,14 +479,17 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
       }),
     );
   });
-
+}
+function registerSdkDiscoveryAndUnknownOutcomeCases(
+  suiteScope: ReturnType<typeof sdkExecutionContext>,
+) {
   it('discovery 由服务端装配 seed，非法引用保存用量后失败且不重试', async () => {
     const scope = {
       executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
       primaryTimeframe: '1d',
     };
     const seed = createDiscoverySeed(scope as never);
-    responseContent = JSON.stringify({
+    suiteScope.responseContent = JSON.stringify({
       strategy: {
         name: '非法 discovery',
         series: ['close'],
@@ -402,16 +507,16 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
     });
 
     await expect(
-      executor().completeProposal(
-        common({ sourceMode: 'discovery', discoveryScope: scope }, seed, {
+      suiteScope.executor().completeProposal(
+        suiteScope.common({ sourceMode: 'discovery', discoveryScope: scope }, seed, {
           id: 'strategy_discovery',
           version: 'strategy-discovery-v2',
         }) as never,
       ),
     ).rejects.toThrow();
 
-    expect(requestCount).toBe(1);
-    expect(settlements.completeAndSettle).toHaveBeenCalledWith(
+    expect(suiteScope.requestCount).toBe(1);
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledWith(
       expect.objectContaining({
         revision: expect.objectContaining({
           usage: { status: 'reported', inputTokens: 11, outputTokens: 7 },
@@ -423,57 +528,59 @@ describe('StrategyOptimizationSdkExecutor local HTTP vertical', () => {
         }),
       }),
     );
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(suiteScope.prisma.$executeRaw).toHaveBeenCalledTimes(1);
   });
-
   it('Provider 已完成但保存失败时转 unknown_outcome，不会重复结算或再请求', async () => {
-    responseContent = JSON.stringify({
+    suiteScope.responseContent = JSON.stringify({
       changes: [{ parameterId: 'risk.0.percent', value: '0.08' }],
       reason: '保存失败样例',
       evidenceRefs: [],
     });
-    settlements.completeAndSettle.mockRejectedValueOnce(new Error('模拟事务保存失败'));
+    suiteScope.settlements.completeAndSettle.mockRejectedValueOnce(new Error('模拟事务保存失败'));
 
     await expect(
-      executor().completeProposal(
-        common(
-          { sourceMode: 'existing' },
-          {},
-          { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
-        ) as never,
-      ),
+      suiteScope
+        .executor()
+        .completeProposal(
+          suiteScope.common(
+            { sourceMode: 'existing' },
+            {},
+            { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
+          ) as never,
+        ),
     ).rejects.toMatchObject({
       fact: { code: 'persistence_failed', externalResult: 'complete' },
     });
 
-    expect(requestCount).toBe(1);
-    expect(settlements.completeAndSettle).toHaveBeenCalledTimes(1);
-    expect(executions.markUnknown).toHaveBeenCalledWith(
-      expect.objectContaining({ runId: step.aiRunId }),
+    expect(suiteScope.requestCount).toBe(1);
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledTimes(1);
+    expect(suiteScope.executions.markUnknown).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: suiteScope.step.aiRunId }),
       expect.any(String),
       expect.objectContaining({ code: 'persistence_failed', externalResult: 'complete' }),
     );
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(suiteScope.prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
-
   it('发送后连接中断保持 unknown_outcome 且单请求', async () => {
-    responseContent = '__disconnect__';
+    suiteScope.responseContent = '__disconnect__';
 
     await expect(
-      executor().completeProposal(
-        common(
-          { sourceMode: 'existing' },
-          {},
-          { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
-        ) as never,
-      ),
+      suiteScope
+        .executor()
+        .completeProposal(
+          suiteScope.common(
+            { sourceMode: 'existing' },
+            {},
+            { id: 'parameter_optimization', version: 'optimization-parameter-v1' },
+          ) as never,
+        ),
     ).rejects.toMatchObject({
       fact: { externalResult: 'unknown' },
     });
 
-    expect(requestCount).toBe(1);
-    expect(settlements.completeAndSettle).not.toHaveBeenCalled();
-    expect(executions.markUnknown).toHaveBeenCalledOnce();
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(suiteScope.requestCount).toBe(1);
+    expect(suiteScope.settlements.completeAndSettle).not.toHaveBeenCalled();
+    expect(suiteScope.executions.markUnknown).toHaveBeenCalledOnce();
+    expect(suiteScope.prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
-});
+}

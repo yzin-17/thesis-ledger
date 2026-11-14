@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { ArenaPricePoint } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import type { MarketChartBar } from '../market-detail/market-chart-types.js';
 import type { ArenaAvailability } from './useArenaEmptyToast.js';
@@ -28,27 +29,45 @@ export function useArenaPriceData(bars: MarketChartBar[], owner: string, enabled
   const initial = () => ({ key, match: readArenaOverlayPreference(key), entrant: readArenaOverlayPreference(key + ':model'), day: '' });
   const [selection, setSelection] = useState(initial);
   const state = selection.key === key ? selection : initial();
-  const api = getDesktopApiClient().modelArenas;
+  const client = getDesktopApiClient(), api = client.modelArenas;
   const root = ['desktop', origin, owner, 'arena-overlay'];
   const list = useQuery({ queryKey: [...root, 'list'], enabled, queryFn: ({ signal }) => api.list(signal) });
-  const choices = useMemo(() => enabled ? list.data?.filter((m) => m.protocol.instruments.some((i) => i.symbol === symbol)) ?? [] : [], [enabled, list.data, symbol]);
+  const live = useQuery({ queryKey: [...root, 'live-list'], enabled, queryFn: ({ signal }) => client.arenaMatches.list(signal) });
+  const choices = useMemo(() => {
+    if (!enabled) return [];
+    const old = (list.data ?? []).filter((m) => m.protocol.instruments.some((i) => i.symbol === symbol));
+    const current = (live.data ?? []).filter((m) => m.protocol.universe === 'market' || m.protocol.instruments.some((i) => i.symbol === symbol));
+    return [...current, ...old];
+  }, [enabled, list.data, live.data, symbol]);
   const active = choices.find((m) => m.id === state.match);
+  const isLive = active?.protocol.version === 2;
   const detail = useQuery({
     queryKey: [...root, 'match', state.match], enabled: enabled && Boolean(active),
-    queryFn: ({ signal }) => api.get(state.match, signal),
+    queryFn: async ({ signal }) => {
+      if (isLive) {
+        const d = await client.arenaMatches.get(state.match, signal);
+        return { entrants: d.agents.map((a) => ({ id: a.id, model: a.model })) };
+      }
+      return api.get(state.match, signal);
+    },
   });
   const matchDetail = enabled && active ? detail.data : undefined;
   const selected = matchDetail?.entrants.find((e) => e.id === state.entrant)?.id;
-  const points = useQuery({
+  const points = useQuery<ArenaPricePoint[]>({
     queryKey: [...root, state.match, symbol, range?.start, range?.end, selected],
     enabled: enabled && Boolean(active && range),
     queryFn: ({ signal }) => {
       if (!range) throw new Error('缺少模型点位的标的与图表范围');
-      return api.points(state.match, { symbol: range.symbol, start: range.start, end: range.end, ...(selected && { entrantId: selected }) }, signal);
+      const input = { symbol: range.symbol, start: range.start, end: range.end, ...(selected && { entrantId: selected }) };
+      if (isLive) return client.arenaMatches.points(state.match, input, signal);
+      return api.points(state.match, input, signal);
     },
   });
   const markers = useMemo(() => placeArenaPricePoints(bars, enabled && active ? points.data ?? [] : []), [bars, enabled, active, points.data]);
-  const availability = arenaAvailability(enabled, list, choices.length, Boolean(active && points.isError));
+  const availability = arenaAvailability(enabled, {
+    isError: list.isError || live.isError, isSuccess: list.isSuccess && live.isSuccess,
+    isFetching: list.isFetching || live.isFetching,
+  }, choices.length, Boolean(active && (points.isError || detail.isError)));
   const update = (change: Partial<typeof state>) => setSelection((current) => ({ ...(current.key === key ? current : initial()), ...change }));
   return {
     availability, choices, active, detail: matchDetail, state, markers,

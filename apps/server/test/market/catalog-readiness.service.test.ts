@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DsaError, type CatalogJob } from '../../src/integration/dsa/dsa.client.js';
 import {
-  CatalogNotReadyException,
   CatalogReadinessService,
 } from '../../src/market/catalog-readiness.service.js';
 import { MarketDataController } from '../../src/market/market-data.controller.js';
@@ -103,7 +102,7 @@ const createHarness = (initialStatus = emptyStatus()) => {
       status = { ...status, syncedAt: new Date() };
       return status;
     }),
-    search: vi.fn(async () => [{ id: 'instrument-1', canonicalCode: '159516' }]),
+    searchForPicker: vi.fn(async () => [{ id: 'instrument-1', canonicalCode: '159516' }]),
   };
   const dsa = {
     triggerCatalogJob: vi.fn(async () => succeededJob()),
@@ -163,7 +162,7 @@ describe('CatalogReadinessService', () => {
     expect(harness.getStatus().instrumentCount).toBe(1);
   });
 
-  it('lets the first instrument search obtain results after automatic initialization', async () => {
+  it('allows an instrument search without waiting for full catalog initialization', async () => {
     const harness = createHarness();
     const readiness = new CatalogReadinessService(
       harness.instruments as never,
@@ -179,7 +178,7 @@ describe('CatalogReadinessService', () => {
     await expect(controller.search('159516')).resolves.toEqual([
       { id: 'instrument-1', canonicalCode: '159516' },
     ]);
-    expect(harness.dsa.triggerCatalogJob).toHaveBeenCalledTimes(1);
+    expect(harness.dsa.triggerCatalogJob).not.toHaveBeenCalled();
   });
 
   it('shares one in-flight job and projection across concurrent readiness checks', async () => {
@@ -342,29 +341,14 @@ describe('CatalogReadinessService refresh and diagnostics', () => {
     });
   });
 
-  it('returns a distinct retryable error when a search finds an empty, unavailable catalog', async () => {
+  it('keeps catalog availability separate from on-demand search', async () => {
     const harness = createHarness();
-    harness.dsa.triggerCatalogJob = vi.fn(async () => {
-      throw new DsaError('DSA 不可用', 'unavailable');
-    });
-    const readiness = new CatalogReadinessService(
-      harness.instruments as never,
-      harness.dsa as never,
-    );
-    const controller = new MarketDataController(
-      {} as never,
-      harness.instruments as never,
-      harness.dsa as never,
-      readiness,
-    );
-
-    await expect(controller.search('159516')).rejects.toBeInstanceOf(CatalogNotReadyException);
-    await expect(controller.search('159516')).rejects.toMatchObject({ status: 503 });
-    expect(new CatalogNotReadyException().getResponse()).toMatchObject({
-      errorCode: 'catalog_not_ready',
-      retryable: true,
-    });
-    expect(harness.instruments.search).not.toHaveBeenCalled();
+    harness.dsa.triggerCatalogJob.mockRejectedValue(new DsaError('DSA 不可用', 'unavailable'));
+    const readiness = new CatalogReadinessService(harness.instruments as never, harness.dsa as never);
+    await readiness.runNow();
+    const controller = new MarketDataController({} as never, harness.instruments as never, harness.dsa as never, readiness);
+    await expect(controller.search('159516')).resolves.toEqual([{ id: 'instrument-1', canonicalCode: '159516' }]);
+    expect(harness.instruments.searchForPicker).toHaveBeenCalledWith('159516', 20, harness.dsa);
   });
 
   it('keeps a stale complete catalog searchable when its background refresh fails', async () => {

@@ -179,6 +179,9 @@ describe('风险事件与通知解耦', () => {
     expect(result.results).toEqual([{ ruleId: 'shadow-rule', eventId: 'shadow-event' }]);
   });
 
+});
+
+describe("规则持仓绑定与目标修改", () => {
   it('创建账户持仓规则时拒绝不存在的当前持仓', async () => {
     const transaction = {
       account: { findUnique: vi.fn(async () => ({ id: accountA, active: true })) },
@@ -279,6 +282,9 @@ describe('风险事件与通知解耦', () => {
     });
   });
 
+});
+
+describe("风险上下文和名称降级", () => {
   it('账户成本类事件保留 positionId 和持仓更新时间上下文', async () => {
     const rule = {
       id: 'rule-context',
@@ -415,6 +421,9 @@ describe('风险事件与通知解耦', () => {
     ).resolves.toMatchObject({ results: [{ ruleId: rule.id, eventId: 'label-fallback-event' }] });
   });
 
+});
+
+describe("目录名称与归档恢复", () => {
   it('规则列表附带目录标的名', async () => {
     const rule = {
       id: 'rule-name',

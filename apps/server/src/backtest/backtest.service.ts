@@ -6,8 +6,6 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { strategySchema } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { ResultReadPolicyService } from '../platform/result-read-policy.service.js';
 import { BacktestQueueService } from './backtest-queue.service.js';
@@ -20,6 +18,9 @@ import { assertCurrentRunForRead, isCurrentRunForRead } from './backtest-current
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
 import { visibleStrategyOwners } from './strategy-access.service.js';
 import { StrategyCreationService } from './strategy-creation.service.js';
+import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
+import { nameStrategyVersions } from './strategy-instrument-display.js';
+import { publishManualStrategyVersion } from './strategy-version-publication.js';
 
 export type { BacktestSnapshotBuilder } from './backtest-run.service.js';
 
@@ -42,41 +43,20 @@ export class BacktestService {
     private readonly runs: BacktestRunService | undefined,
     private readonly resultReadPolicy: ResultReadPolicyService,
     @Optional() private readonly creation?: StrategyCreationService,
+    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {
     if (!resultReadPolicy) throw new Error('ResultReadPolicyService is required');
   }
 
   async createStrategy(name: string, schema: unknown, description?: string, ownerId?: string | null) {
-    return (this.creation ?? new StrategyCreationService()).createInTransaction(this.prisma,
+    const strategy = await (this.creation ?? new StrategyCreationService()).createInTransaction(this.prisma,
       { name, description, definition: schema, ownerId: ownerId ?? null, source: { kind: 'manual' } });
+    return { ...strategy, versions: await nameStrategyVersions(strategy.versions, this.display) };
   }
 
   async createVersion(strategyId: string, schema: unknown) {
-    const parsed = strategySchema.parse(schema);
-    const owner = await this.prisma.strategy.findUnique({
-      where: { id: strategyId },
-      select: { schemaVersion: true },
-    });
-    if (!owner) throw new NotFoundException('策略不存在');
-    if (owner.schemaVersion !== 2) {
-      throw new ConflictException({
-        code: 'UNSUPPORTED_CONTRACT_VERSION',
-        message: '旧策略不支持创建现行版本',
-      });
-    }
-    const latest = await this.prisma.strategyVersion.aggregate({
-      where: { strategyId },
-      _max: { version: true },
-    });
-    return this.prisma.strategyVersion.create({
-      data: {
-        strategyId,
-        version: (latest._max.version ?? 0) + 1,
-        schemaVersion: 2,
-        schema: parsed as Prisma.InputJsonValue,
-        source: { kind: 'manual' },
-      },
-    });
+    const version = await publishManualStrategyVersion(this.prisma, strategyId, schema);
+    return (await nameStrategyVersions([version], this.display))[0]!;
   }
 
   async createRun(input: unknown) {
@@ -84,12 +64,15 @@ export class BacktestService {
     return this.runs.createRun(input);
   }
 
-  listStrategies(ownerId?: string | null) {
-    return this.prisma.strategy.findMany({
-      where: { schemaVersion: 2, status: { not: 'experiment-only' }, ...visibleStrategyOwners(ownerId) },
-      include: { versions: { where: { schemaVersion: 2 } } },
+  async listStrategies(ownerId?: string | null) {
+    const strategies = await this.prisma.strategy.findMany({
+      where: { schemaVersion: { in: [2, 3] }, status: { not: 'experiment-only' }, ...visibleStrategyOwners(ownerId) },
+      include: { versions: { where: { schemaVersion: { in: [2, 3] } } } },
       orderBy: { updatedAt: 'desc' },
     });
+    const versions = await nameStrategyVersions(strategies.flatMap((row) => row.versions), this.display);
+    const byId = new Map(versions.map((version) => [version.id, version]));
+    return strategies.map((row) => ({ ...row, versions: row.versions.map((version) => byId.get(version.id)!) }));
   }
 
   async listCurrentRunSummaries(ownerId?: string | null) {

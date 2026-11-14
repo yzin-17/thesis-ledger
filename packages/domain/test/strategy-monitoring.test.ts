@@ -72,4 +72,16 @@ describe('strategy monitoring compiler', () => {
       })[2],
     ).toMatchObject({ state: 'triggered', value: '20', threshold: '20' });
   });
+
+  it('returns stable codes for missing inputs and preserves an upstream reason', () => {
+    const plan = compileStrategyMonitoringPlan(strategy, 'strategy-hash');
+    expect(evaluateStrategyMonitoringPlan(plan, {})[0]).toMatchObject({ reasonCode: 'position_missing' });
+    expect(evaluateStrategyMonitoringPlan(plan, { quantity: '0' })[0]).toMatchObject({ reasonCode: 'position_empty', state: 'not_applicable' });
+    expect(evaluateStrategyMonitoringPlan(plan, { quantity: '1', price: '90' })[0]).toMatchObject({ reasonCode: 'average_cost_missing' });
+    expect(evaluateStrategyMonitoringPlan(plan, { quantity: '1', price: '90', averageCost: '0' })[0]).toMatchObject({ reasonCode: 'average_cost_invalid' });
+    expect(evaluateStrategyMonitoringPlan(plan, { quantity: '1' })[2]).toMatchObject({ reasonCode: 'holding_start_missing' });
+    expect(evaluateStrategyMonitoringPlan(plan, { quantity: '1', holdingStartKnown: false })[2]).toMatchObject({ reason: '缺少可验证的持仓开仓时间' });
+    expect(evaluateStrategyMonitoringPlan(plan, { quantity: '1', holdingStartKnown: true })[2]).toMatchObject({ reasonCode: 'holding_history_incomplete' });
+    expect(evaluateStrategyMonitoringPlan(plan, { quantity: '1', inputIssue: { code: 'calendar_unavailable', reason: '交易日历未覆盖评价时点' } })[0]).toMatchObject({ reasonCode: 'calendar_unavailable', reason: '交易日历未覆盖评价时点', state: 'unavailable' });
+  });
 });

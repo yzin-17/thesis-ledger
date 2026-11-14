@@ -44,7 +44,7 @@ export class BacktestRunPreflightService {
     const { strategyVersionId, runConfig, requestId } = request;
     const version = await this.prisma.strategyVersion.findUnique({ where: { id: strategyVersionId } });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (version.schemaVersion !== 2) throw new BadRequestException('V3预检要求schemaVersion=2的策略');
+    if (![2, 3].includes(version.schemaVersion)) throw new BadRequestException('不支持的策略版本');
     const strategy = strategySchema.parse(version.schema) as BacktestStrategy;
     const checkedAt = new Date().toISOString();
     const base = { contractVersion: 3 as const, requestId, checkedAt };

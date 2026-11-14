@@ -12,25 +12,13 @@ export const parseAcceptance = (value: string | undefined): BarReadAcceptance =>
 };
 
 export function marketChartRequest(symbol: string, query: Record<string, string | undefined>) {
-  let identity: BarSeriesIdentity;
-  try {
-    const normalizedSymbol = symbol.trim().toUpperCase();
-    const requestedAssetType = query.assetType?.trim().toLowerCase();
-    const resolvedAssetType = requestedAssetType ?? inferAssetType(normalizedSymbol);
-    const assetType =
-      resolvedAssetType === 'fund' ? 'MUTUAL_FUND' : resolvedAssetType?.toUpperCase();
-    identity = barSeriesIdentitySchema.parse({
-      symbol: normalizedSymbol,
-      assetType,
-      timeframe: requireNativeMarketTimeframe(query.timeframe, assetType),
-      adjustment: query.adjustment ?? (query.timeframe && query.timeframe !== '1d' ? 'none' : 'qfq'),
-    });
-  } catch (error) {
-    if (error instanceof HttpException) throw error;
-    throw new BadRequestException('assetType、timeframe 或 adjustment 不支持');
-  }
-  if (identity.timeframe !== '1d' && (!/\.(SH|SZ|BJ|HK|US)$/.test(identity.symbol) ||
-      !['STOCK', 'ETF'].includes(identity.assetType) || identity.adjustment !== 'none'))
+  const identity = parseChartIdentity(symbol, query);
+  if (
+    identity.timeframe !== '1d' &&
+    (!/\.(SH|SZ|BJ|HK|US)$/.test(identity.symbol) ||
+      !['STOCK', 'ETF'].includes(identity.assetType) ||
+      identity.adjustment !== 'none')
+  )
     throw new BadRequestException('分钟仅支持中港美股票/ETF不复权图表');
   const limit = query.limit === undefined ? undefined : Number(query.limit);
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 3650))
@@ -53,4 +41,26 @@ export function marketChartRequest(symbol: string, query: Record<string, string 
     refresh: query.refresh === '1',
     ...(query.asOf ? { asOf: query.asOf } : {}),
   } as const;
+}
+
+function parseChartIdentity(symbol: string, query: Record<string, string | undefined>) {
+  let identity: BarSeriesIdentity;
+  try {
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    const requestedAssetType = query.assetType?.trim().toLowerCase();
+    const resolvedAssetType = requestedAssetType ?? inferAssetType(normalizedSymbol);
+    const assetType =
+      resolvedAssetType === 'fund' ? 'MUTUAL_FUND' : resolvedAssetType?.toUpperCase();
+    identity = barSeriesIdentitySchema.parse({
+      symbol: normalizedSymbol,
+      assetType,
+      timeframe: requireNativeMarketTimeframe(query.timeframe, assetType),
+      adjustment:
+        query.adjustment ?? (query.timeframe && query.timeframe !== '1d' ? 'none' : 'qfq'),
+    });
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    throw new BadRequestException('assetType、timeframe 或 adjustment 不支持');
+  }
+  return identity;
 }

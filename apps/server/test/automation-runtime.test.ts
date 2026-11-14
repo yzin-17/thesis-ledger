@@ -384,6 +384,7 @@ describe('AutomationController run-now', () => {
       prisma as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(controller.run('missing')).rejects.toBeInstanceOf(NotFoundException);
@@ -404,6 +405,7 @@ describe('AutomationController run-now', () => {
       prisma as never,
       {} as never,
       handlers as never,
+      {} as never,
     );
 
     const error = await controller.run(stored.id).catch((caught) => caught);

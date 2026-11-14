@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { aiTimeoutDiagnosticSchema } from './ai-execution-timeout.js';
 import { aiGenerationRuntimeDiagnosticSchema } from './ai-generation-runtime-diagnostic.js';
 import { aiGenerationHttpRequestDiagnosticSchema } from './ai-generation-http-request-diagnostic.js';
+import {
+  aiOutputTokenDetailsSchema,
+  aiReasoningOutputDiagnosticSchema,
+} from './ai-generation-output-evidence.js';
 
 export const aiGenerationErrorCodeSchema = z.enum([
   'configuration_invalid',
@@ -70,6 +74,8 @@ export const aiGenerationFailureDiagnosticSchema = z.strictObject({
   truncated: z.boolean(),
   runtime: aiGenerationRuntimeDiagnosticSchema.optional(),
   httpRequest: aiGenerationHttpRequestDiagnosticSchema.optional(),
+  reasoningOutput: aiReasoningOutputDiagnosticSchema.optional(),
+  outputTokenDetails: aiOutputTokenDetailsSchema.optional(),
 });
 export type AiGenerationFailureDiagnostic = z.infer<typeof aiGenerationFailureDiagnosticSchema>;
 

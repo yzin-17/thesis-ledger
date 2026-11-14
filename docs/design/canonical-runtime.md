@@ -1,6 +1,10 @@
-# 当前 Market、Backtest 与 Ledger 运行链
+# 当前 Market、Backtest、Ledger 与 Risk 运行链
 
 本页记录现行模块与消费边界。替换要求以[Spec](../archive/specs/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)为准，运行验收以[Task](../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)及其证据为准。
+
+## 风险自动监控
+
+Risk 的自动消费器持有分布式执行锁：报价类规则消费 Market 已取得的观察流，策略应用按独立检查窗口调用应用执行器；两者复用持久化风险事件状态机和通知策略。策略上下文读取实际账户投影与已完成周期，后台行情窗口由 Market 负责来源控制、缓存与请求限频，缺数诊断由 Risk 投影给两端。行为与验收合同见[策略风险自动监控](../specs/2026-11-13-strategy-risk-automatic-monitoring.md)。
 
 ## 接口与合同所有权
 

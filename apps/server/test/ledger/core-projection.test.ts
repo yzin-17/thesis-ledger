@@ -229,6 +229,9 @@ describe('core ledger projection', () => {
     expect(client.cashBalance.create).not.toHaveBeenCalled();
   });
 
+});
+
+describe("现金结算和快照重放边界", () => {
   it('未来外部入账在结算前只进入待结算应收', () => {
     const futureDeposit: StoredCashEvent = {
       id: '11111111-1111-4111-8111-111111111111',
@@ -416,6 +419,9 @@ describe('core ledger projection', () => {
     expect(materialized.balances[0]?.settledAmount.toString()).toBe('2000');
   });
 
+});
+
+describe("历史现金时间有限兼容", () => {
   it('快照缺少 capturedAt 时回退到事件 occurredAt 作为边界', () => {
     const snapshot = storedV2Event({
       id: 'snapshot-without-captured-at',
@@ -461,6 +467,9 @@ describe('core ledger projection', () => {
     expect(materialized.balances[0]?.pendingReceivable.toString()).toBe('500');
   });
 
+});
+
+describe("持仓物化与跨币种完整性", () => {
   it('将 ACTIVE Trade 的剩余来源物化为 Position，并保存稳定的子表引用', async () => {
     const events = [
       execution({

@@ -71,50 +71,7 @@ export function executeAtArenaOpen(
       };
     nav = nav.plus(qty.times(quote.price));
   }
-  const buys: Target[] = [],
-    sells: Target[] = [];
-  for (const action of [...decision.actions].sort((a, b) => a.symbol.localeCompare(b.symbol))) {
-    if (action.action !== 'target') {
-      reasons[action.symbol] = action.action;
-      continue;
-    }
-    const fact = opening.get(action.symbol);
-    if (!fact) {
-      reasons[action.symbol] = 'opening_evidence_missing';
-      continue;
-    }
-    const owned = positions.get(action.symbol) ?? D(0);
-    const gap = nav.times(action.weightBps).div(10000).div(fact.price).minus(owned);
-    const side = gap.isNegative() ? 'sell' : 'buy';
-    const blocked = side === 'sell' ? fact.sellBlocked : fact.buyBlocked;
-    if (blocked) {
-      reasons[action.symbol] = blocked;
-      continue;
-    }
-    const maximum = side === 'sell' ? Prisma.Decimal.min(gap.abs(), owned, fact.sellable) : gap;
-    const desired = lots(maximum, fact.lot);
-    if (desired.lte(0)) {
-      reasons[action.symbol] = 'below_lot';
-      continue;
-    }
-    const adjusted = D(fact.price)
-      .times(10000 + (side === 'sell' ? -1 : 1) * protocol.fees.slippageBps)
-      .div(10000);
-    const ticks = adjusted.div(fact.tick);
-    const price = (side === 'sell' ? ticks.floor() : ticks.ceil()).times(fact.tick);
-    if (
-      (fact.upperLimit && price.gt(fact.upperLimit)) ||
-      (fact.lowerLimit && price.lt(fact.lowerLimit))
-    ) {
-      reasons[action.symbol] = 'price_limit';
-      continue;
-    }
-    if (price.lte(0)) {
-      reasons[action.symbol] = 'price_unavailable';
-      continue;
-    }
-    (side === 'sell' ? sells : buys).push({ symbol: action.symbol, fact, desired, side, price });
-  }
+  const { buys, sells } = planOpeningTargets(protocol, decision, opening, positions, nav, reasons);
   function amounts(order: Target, qty: Prisma.Decimal) {
     const gross = order.price.times(qty);
     const bps = order.side === 'buy' ? protocol.fees.buyBps : protocol.fees.sellBps;
@@ -165,4 +122,59 @@ export function executeAtArenaOpen(
   }
   for (const order of buys) fill(order, lots(order.desired.times(ratio), order.fact.lot));
   return { fills, reasons, cash: cash.toFixed() };
+}
+
+function planOpeningTargets(
+  protocol: ArenaProtocol,
+  decision: ArenaDecision,
+  opening: ReadonlyMap<string, OpeningFact>,
+  positions: ReadonlyMap<string, Prisma.Decimal>,
+  nav: Prisma.Decimal,
+  reasons: Record<string, string>,
+) {
+  const buys: Target[] = [],
+    sells: Target[] = [];
+  for (const action of [...decision.actions].sort((a, b) => a.symbol.localeCompare(b.symbol))) {
+    if (action.action !== 'target') {
+      reasons[action.symbol] = action.action;
+      continue;
+    }
+    const fact = opening.get(action.symbol);
+    if (!fact) {
+      reasons[action.symbol] = 'opening_evidence_missing';
+      continue;
+    }
+    const owned = positions.get(action.symbol) ?? D(0);
+    const gap = nav.times(action.weightBps).div(10000).div(fact.price).minus(owned);
+    const side = gap.isNegative() ? 'sell' : 'buy';
+    const blocked = side === 'sell' ? fact.sellBlocked : fact.buyBlocked;
+    if (blocked) {
+      reasons[action.symbol] = blocked;
+      continue;
+    }
+    const maximum = side === 'sell' ? Prisma.Decimal.min(gap.abs(), owned, fact.sellable) : gap;
+    const desired = lots(maximum, fact.lot);
+    if (desired.lte(0)) {
+      reasons[action.symbol] = 'below_lot';
+      continue;
+    }
+    const adjusted = D(fact.price)
+      .times(10000 + (side === 'sell' ? -1 : 1) * protocol.fees.slippageBps)
+      .div(10000);
+    const ticks = adjusted.div(fact.tick);
+    const price = (side === 'sell' ? ticks.floor() : ticks.ceil()).times(fact.tick);
+    if (
+      (fact.upperLimit && price.gt(fact.upperLimit)) ||
+      (fact.lowerLimit && price.lt(fact.lowerLimit))
+    ) {
+      reasons[action.symbol] = 'price_limit';
+      continue;
+    }
+    if (price.lte(0)) {
+      reasons[action.symbol] = 'price_unavailable';
+      continue;
+    }
+    (side === 'sell' ? sells : buys).push({ symbol: action.symbol, fact, desired, side, price });
+  }
+  return { buys, sells };
 }

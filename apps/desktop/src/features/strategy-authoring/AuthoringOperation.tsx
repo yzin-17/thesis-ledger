@@ -96,23 +96,23 @@ function OperationProposal({
     </div>
   );
 }
-export function AuthoringOperation({
-  operation,
-  proposal,
-  busy,
-  stale,
-  onAction,
-  onProposal,
-}: Props) {
-  const active = ['queued', 'running'].includes(operation.status);
-  const applicable =
-    operation.status === 'succeeded' && operation.disposition === 'unapplied' && !stale;
-  const outcome = operation.outcome;
-  const selection = operation.input.selection;
-  const resolved = operation.disposition === 'applied' || operation.disposition === 'discarded';
-  let statusLabel = statusLabels[operation.status] ?? '状态待确认';
-  if (operation.disposition === 'applied') statusLabel = '已应用';
-  else if (operation.disposition === 'discarded') statusLabel = '已放弃';
+export function AuthoringOperation(props: Props) {
+  const control = authoringOperationMaterials(props);
+  const {
+    resolved,
+    selection,
+    statusLabel,
+    operation,
+    outcome,
+    stale,
+    active,
+    busy,
+    onAction,
+    applicable,
+    proposal,
+    onProposal,
+  } = control;
+
   return (
     <section
       className={cn(
@@ -184,4 +184,38 @@ export function AuthoringOperation({
       </div>
     </section>
   );
+}
+
+function authoringOperationMaterials({
+  operation,
+  proposal,
+  busy,
+  stale,
+  onAction,
+  onProposal,
+}: Props) {
+  const active = ['queued', 'running'].includes(operation.status);
+  const applicable =
+    operation.status === 'succeeded' && operation.disposition === 'unapplied' && !stale;
+  const outcome = operation.outcome;
+  const selection = operation.input.selection;
+  const resolved = operation.disposition === 'applied' || operation.disposition === 'discarded';
+  let statusLabel = statusLabels[operation.status] ?? '状态待确认';
+  if (operation.disposition === 'applied') statusLabel = '已应用';
+  else if (operation.disposition === 'discarded') statusLabel = '已放弃';
+
+  return {
+    resolved,
+    selection,
+    statusLabel,
+    operation,
+    outcome,
+    stale,
+    active,
+    busy,
+    onAction,
+    applicable,
+    proposal,
+    onProposal,
+  };
 }

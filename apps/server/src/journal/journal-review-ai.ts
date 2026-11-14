@@ -7,9 +7,11 @@ import {
   journalSnapshotDetailQuerySchema,
   journalSnapshotIdSchema,
   researchResultSchema,
+  type IdentityPrincipal,
 } from '@thesis-ledger/schemas';
 import { AiRunService } from '../ai/ai-run.service.js';
-import { AiResearchExecutor } from '../ai/ai-research.executor.js';
+import { localIdentityPrincipal } from '../identity/local-workspace.js';
+import { JournalAiResearchV2 } from './journal-ai-research-v2.js';
 import { JournalReviewAnalysis } from './journal-review-analysis.js';
 import { journalReviewObjectFacts, journalReviewDraftKey } from './journal-review-evidence.js';
 import { journalAiSnapshotMetadataSchema } from '@thesis-ledger/schemas';
@@ -26,9 +28,9 @@ export class JournalReviewAi {
   constructor(
     private readonly analysis: JournalReviewAnalysis,
     private readonly runs: AiRunService,
-    private readonly executor: AiResearchExecutor,
+    private readonly v2: JournalAiResearchV2,
   ) {}
-  async start(raw: unknown) {
+  async start(raw: unknown, principal: IdentityPrincipal) {
     const request = journalReviewExplanationRequestSchema.parse(raw);
     const analyzed = await this.analysis.analyze(request);
     const input = analyzed.candidate.input;
@@ -42,33 +44,41 @@ export class JournalReviewAi {
       facts: journalReviewObjectFacts(input),
       result: analyzed.result,
     });
-    const run = await this.runs.startResearch(
-      {
-        question:
-          '请核对计划与实际偏差、行为证据与反事实限制，给出中文复盘解读；保留未知，不给买卖指令。',
-        context: { scope: 'account', accountId: request.accountId },
-      },
-      {
-        version: 'frozen-research-v1',
-        prompt: journalReviewPrompt,
-        source: {
-          tool: 'getJournalReview',
-          permission: 'journal:read',
-          evidence: {
-            sourceId: `journal:${input.reference.reviewObjectId}:${input.projection.evidenceFingerprint}`,
-            provider: 'thesis-ledger',
-            fetchedAt: new Date().toISOString(),
-            data,
-          },
-        },
-      },
-    );
-    this.executor.dispatch(run.id);
-    return this.get(run.id, { accountId: request.accountId, mode: request.mode });
+    const runId = await this.v2.start(principal, {
+      scope: { accountId: request.accountId, mode: request.mode },
+      question:
+        '请核对计划与实际偏差、行为证据与反事实限制，给出中文复盘解读；保留未知，不给买卖指令。',
+      prompt: journalReviewPrompt,
+      data,
+    });
+    return this.get(runId, { accountId: request.accountId, mode: request.mode }, principal);
   }
-  async get(id: string, raw: unknown) {
+  async get(id: string, raw: unknown, principal: IdentityPrincipal) {
     const scope = journalSnapshotDetailQuerySchema.parse(raw);
-    const run = await this.runs.resume(journalSnapshotIdSchema.parse(id));
+    const runId = journalSnapshotIdSchema.parse(id);
+    const fresh = await this.v2.read(principal, runId, scope);
+    if (fresh) {
+      if (!fresh.object || fresh.period) throw notFound();
+      const { row, object, result } = fresh;
+      return journalAiExplanationSchema.parse({
+        id: row.id,
+        accountId: scope.accountId,
+        mode: scope.mode,
+        reviewObjectId: object.reviewObjectId,
+        evidenceFingerprint: object.evidenceFingerprint,
+        analysisDraft: object.analysisDraft,
+        provider: row.provider,
+        model: row.model,
+        promptVersion: row.promptVersion,
+        algorithmVersion: object.result.algorithmVersion,
+        status: row.status,
+        errorCode: row.errorCode,
+        errorSummary: row.errorSummary,
+        result,
+        createdAt: row.createdAt.toISOString(),
+      });
+    }
+    const run = await this.runs.resume(runId);
     if (!run) throw notFound();
     let frozen;
     try {
@@ -109,11 +119,21 @@ export class JournalReviewAi {
       createdAt: run.createdAt.toISOString(),
     });
   }
-  async snapshotMetadata(id: string, input: JournalReviewEvidenceInput, algorithmVersion: string) {
-    const view = await this.get(id, {
-      accountId: input.trade.accountId,
-      mode: input.trade.accountMode,
-    });
+  async snapshotMetadata(
+    id: string,
+    input: JournalReviewEvidenceInput,
+    algorithmVersion: string,
+    principal: IdentityPrincipal | null = localIdentityPrincipal(),
+  ) {
+    if (!principal) throw notFound();
+    const view = await this.get(
+      id,
+      {
+        accountId: input.trade.accountId,
+        mode: input.trade.accountMode,
+      },
+      principal,
+    );
     if (
       view.reviewObjectId !== input.reference.reviewObjectId ||
       view.evidenceFingerprint !== input.projection.evidenceFingerprint ||

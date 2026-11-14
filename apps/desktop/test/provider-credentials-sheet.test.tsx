@@ -159,6 +159,9 @@ describe('凭证配置状态与更换交互', () => {
       credentialFieldsConfigured: {},
     });
     await render();
+    const remove = [...document.querySelectorAll('button')].find((button) => button.textContent === '移除页面凭证');
+    expect(remove?.closest('[data-slot="sheet-footer"]')).not.toBeNull();
+    expect(document.querySelector('[data-slot="sheet-body"]')?.textContent).not.toContain('移除页面凭证');
     await click('移除页面凭证');
     expect(document.querySelector('input')?.value).toBe('');
     expect(
@@ -195,7 +198,7 @@ describe('凭证配置状态与更换交互', () => {
   });
 });
 
-const tushare: ProviderManifest = { ...provider, providerId: 'tushare', displayName: 'Tushare', accountAccessSupported: true,
+const tushare: ProviderManifest = { ...provider, providerId: 'tushare', displayName: 'Tushare', accountAccessSupported: true, accountLevelSupported: true,
   settings: { accountLevel: { points: 120, independentApis: [] } },
   credentialMethod: 'token', credentialFieldsConfigured: { token: true },
   credentialSchema: { methods: [{ method: 'token', fields: [{ name: 'token', secret: true, required: true }] }] } };
@@ -214,6 +217,25 @@ const accountResult = (context: 'draft' | 'current', configVersion = 1) => {
 };
 
 describe('账户功能权限的草稿和保存流程', () => {
+  it('混合来源不要求积分，无 Key 也能检查免凭证功能', async () => {
+    const tickflow = { ...provider, providerId: 'tickflow', displayName: 'TickFlow',
+      accountAccessSupported: true, requiresCredential: false, credentialConfigured: false,
+      credentialSource: 'none' as const, credentialFieldsConfigured: {}, credentialMethod: null };
+    const result = accountResult('current');
+    result.accountAccess.routes = result.accountAccess.routes.map((route) => ({ ...route,
+      target: { providerId: 'tickflow', upstreamSource: 'tickflow' } }));
+    api.test.mockResolvedValue(result);
+    await render(tickflow);
+    expect(document.querySelector('input[type="number"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('当前账号积分');
+    await click('检查功能权限');
+    expect(api.test).toHaveBeenCalledTimes(1);
+    expect(api.test.mock.calls[0]![1]).toBeUndefined();
+    expect(api.test.mock.calls[0]![4]).toBe('account_access');
+    expect(api.test.mock.calls[0]![5]).toBeUndefined();
+    expect(document.body.textContent).toContain('当前账户可访问');
+    expect(api.save).not.toHaveBeenCalled();
+  });
   it('本地 JSON 键顺序变化不将当前账号刷新误判为草稿', async () => {
     api.test.mockResolvedValue(accountResult('current'));
     await render({ ...tushare, settings: { accountLevel: { independentApis: [], points: 120 } } });

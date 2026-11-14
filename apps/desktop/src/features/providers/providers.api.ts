@@ -16,6 +16,7 @@ import type {
   UpdateAutomationJobInput,
 } from './providers.types.js';
 import { fetchAiProviders } from './ai-provider.api.js';
+import { updateRuleMonitorExecutionTime } from './rule-monitor-schedule-api.js';
 
 const noStore = { cache: 'no-store' as const };
 
@@ -42,10 +43,18 @@ export const fetchProviderIssues = (client?: DesktopRequestClient) => diagnostic
 export const fetchAutomationJobs = (client?: DesktopRequestClient) => automation(client).list();
 export const fetchProviderHealthHistory = (page: number, client?: DesktopRequestClient) =>
   diagnostics(client).healthHistory(page);
-export const fetchAutomationHistory = (page: number, client?: DesktopRequestClient) =>
-  automation(client).history(page);
+export const fetchAutomationHistory = (
+  page: number,
+  client?: DesktopRequestClient,
+  jobId?: string,
+  signal?: AbortSignal,
+) => automation(client).history(page, jobId, signal);
 export const fetchNotificationFailures = (client?: DesktopRequestClient) =>
   diagnostics(client).notificationFailures();
+export const fetchProviderFailures = (page: number, signal?: AbortSignal) =>
+  diagnostics().healthFailures(page, signal);
+export const fetchAutomationFailures = (page: number, signal?: AbortSignal) =>
+  diagnostics().automationFailures(page, signal);
 
 export const testProviderConnection = (name: string, client?: DesktopRequestClient) =>
   requestDesktopJson<ProviderConnectionTestResult>(
@@ -88,7 +97,10 @@ export const updateAutomationJob = (
   id: string,
   input: UpdateAutomationJobInput,
   client?: DesktopRequestClient,
-) => automation(client).update(id, input);
+) => {
+  if (id === 'rule-source-monitor') return updateRuleMonitorExecutionTime(input, client);
+  return automation(client).update(id, input);
+};
 export const deleteAutomationJob = (id: string, client?: DesktopRequestClient) =>
   automation(client).remove(id);
 export const runAutomationJob = (id: string, client?: DesktopRequestClient) =>

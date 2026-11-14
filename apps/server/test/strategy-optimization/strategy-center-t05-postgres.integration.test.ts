@@ -54,6 +54,12 @@ const previewFor = (strategyVersionId: string, accountId: string, cycleMode: str
 });
 
 postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
+  const context = riskIdentityContext();
+  registerRiskApplicationIdentityRaces(context);
+  registerRiskApplicationRevisionAndUpgrade(context);
+});
+
+function riskIdentityContext() {
   const prisma = new PrismaService();
   const store = new StrategyRiskApplicationStoreService(prisma);
   const service = new StrategyRiskApplicationService(prisma, {} as never, store, {} as never);
@@ -63,7 +69,6 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
   let version2Id = '';
   const createdApplicationIds: string[] = [];
   const historicalApplicationIds: string[] = [];
-
   const create = async (input: {
     strategyVersionId: string;
     accountId: string;
@@ -92,7 +97,6 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
     if (!createdApplicationIds.includes(result.id)) createdApplicationIds.push(result.id);
     return result as StrategyRiskApplicationCommandResult;
   };
-
   beforeAll(async () => {
     process.env.STRATEGY_RISK_APPLICATIONS_ENABLED = 'true';
     await prisma.$connect();
@@ -143,7 +147,6 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
     vi.spyOn(store, 'createFrozenRules').mockResolvedValue(undefined);
     vi.spyOn(store, 'audit').mockResolvedValue(1);
   });
-
   afterAll(async () => {
     const applicationIds = [...createdApplicationIds, ...historicalApplicationIds];
     if (applicationIds.length > 0) {
@@ -169,8 +172,44 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
     await prisma.account.deleteMany({ where: { id: { in: accountIds } } }).catch(() => undefined);
     await prisma.$disconnect();
   });
+  return {
+    get prisma() {
+      return prisma;
+    },
+    get store() {
+      return store;
+    },
+    get service() {
+      return service;
+    },
+    get accountIds() {
+      return accountIds;
+    },
+    get strategyId() {
+      return strategyId;
+    },
+    get version1Id() {
+      return version1Id;
+    },
+    get version2Id() {
+      return version2Id;
+    },
+    get createdApplicationIds() {
+      return createdApplicationIds;
+    },
+    get historicalApplicationIds() {
+      return historicalApplicationIds;
+    },
+    get create() {
+      return create;
+    },
+  };
+}
 
+function registerRiskApplicationIdentityRaces(suiteContext: ReturnType<typeof riskIdentityContext>) {
   it('并发同身份保存只返回一个可管理目标，通知变化不改变身份', async () => {
+    const { prisma, accountIds, version1Id, create } = suiteContext;
+
     const [first, second] = await Promise.all([
       create({
         strategyVersionId: version1Id,
@@ -205,8 +244,9 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.notification).toEqual(first.notification);
   });
-
   it('不同版本和范围在同账户标的启用竞态中只允许一个成功，另一条仍可显式保存停用', async () => {
+    const { prisma, service, accountIds, version1Id, version2Id, create } = suiteContext;
+
     const [versionApplication, scopeApplication] = await Promise.all([
       create({
         strategyVersionId: version1Id,
@@ -242,8 +282,14 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
       service.update(failedApplication.id, { expectedRevision: 1, enabled: false }),
     ).resolves.toMatchObject({ enabled: false, revision: 2 });
   });
+}
 
+function registerRiskApplicationRevisionAndUpgrade(
+  suiteContext: ReturnType<typeof riskIdentityContext>,
+) {
   it('过期预览/修订被拒绝，且历史重复全部可列出并返回歧义管理入口', async () => {
+    const { prisma, service, accountIds, version1Id, historicalApplicationIds } = suiteContext;
+
     const previewInput = {
       strategyVersionId: version1Id,
       accountId: accountIds[2]!,
@@ -288,8 +334,9 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
       }),
     });
   });
-
   it('升级命中目标版本已有应用时只返回目标管理入口，不覆盖源记录', async () => {
+    const { store, service, accountIds, version1Id, version2Id, create } = suiteContext;
+
     const source = await create({
       strategyVersionId: version1Id,
       accountId: accountIds[3]!,
@@ -326,8 +373,9 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
       enabled: false,
     });
   });
-
   it('停用保存后的过期 revision 仍拒绝写入', async () => {
+    const { service, accountIds, version1Id, create } = suiteContext;
+
     const application = await create({
       strategyVersionId: version1Id,
       accountId: accountIds[4]!,
@@ -347,4 +395,4 @@ postgresDescribe('T05 策略风险应用 PostgreSQL 隔离集成', () => {
       }),
     ).rejects.toThrow('刷新后重试');
   });
-});
+}

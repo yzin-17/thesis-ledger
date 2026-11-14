@@ -13,11 +13,134 @@ import type { ResearchStackParams } from '../../app/navigation-types';
 import {
   MobileListRefreshRegion,
   Page,
-  Section,
+  ContentSection as Section,
   Copy,
   Action,
   QueryStatus,
 } from '../../components/MobilePrimitives';
+type ArenaWeekReportData = NonNullable<Awaited<ReturnType<ReturnType<typeof useMobileRuntime>['api']['modelArenas']['weekly']>>>['report'];
+
+function ArenaWeekReport({ report, title, show, onToggle, open }: {
+  report: NonNullable<ArenaWeekReportData>; title: string; show: boolean; onToggle: () => void;
+  open: (round: string, entrant?: string) => void;
+}) {
+  return (
+    <>
+      <Section title={title + ' · ' + report.week + ' 当周'}>
+        <Copy>
+          {report.comparison.start} 至 {report.comparison.end} · 已开轮{' '}
+          {report.comparison.opened} / {report.comparison.planned}
+        </Copy>
+        {report.comparison.rows.map((r) => (
+          <Copy key={r.id}>
+            {r.label} · 收益 {arenaRatio(r.metrics.returnRatio)} · 最大回撤{' '}
+            {arenaRatio(r.metrics.drawdown)} · 期末 {r.metrics.endNav ?? '资料不足'} ·
+            交易费 {r.metrics.tradeFees ?? '资料不足'}{' '}
+            {r.kind === 'model' &&
+              ' · 决策覆盖 ' +
+                (report.comparison.opened
+                  ? r.decisions + '/' + report.comparison.opened
+                  : '不适用')}
+          </Copy>
+        ))}
+      </Section>
+      <Section title="盈亏贡献">
+        {report.attribution.map((a) => (
+          <Copy key={a.entrantId}>
+            {report.comparison.rows.find((r) => r.id === a.entrantId)?.label} ·{' '}
+            {a.symbols.map((s) => s.symbol + ' ' + s.amount).join('，')} · 费用 {a.fees} ·
+            未归属 {a.residual ?? '资料不足'}
+          </Copy>
+        ))}
+      </Section>
+      <Section title="同轮仓位分歧">
+        {!report.divergences.length && <Copy>本周无可比较的仓位分歧</Copy>}
+        {report.divergences.map((d) => (
+          <Action
+            key={d.roundId + d.symbol}
+            onPress={() => open(d.roundId)}
+            label={
+              d.day +
+              ' · ' +
+              d.symbol +
+              ' · 仓位相差 ' +
+              Number(d.spreadBps) / 100 +
+              ' 个百分点'
+            }
+          />
+        ))}
+      </Section>
+      <Action
+        label={'决策后的价格观察（' + report.observations.length + '）'}
+        onPress={onToggle}
+      />
+      {show &&
+        report.observations.map((o) => (
+          <Copy key={o.roundId + o.symbol + o.window}>
+            {o.day} · {o.symbol} · {o.window} 个交易日 · {arenaObservationLabel(o)}
+          </Copy>
+        ))}
+      {show && report.laterNews.length > 0 && (
+        <Section title="决策后收录的标的资讯">
+          {report.laterNews.map((n) => (
+            <Copy key={n.roundId + n.ref}>
+              {n.publishedAt.slice(0, 10)} · {n.symbol} · {n.title}
+            </Copy>
+          ))}
+        </Section>
+      )}
+      <Section title="本周决策">
+        {report.rounds.map((r) => (
+          <Section key={r.id} title={r.day}>
+            <Action
+              label={
+                arenaStatusLabel(r.state) +
+                (r.reason ? ' · ' + arenaStatusLabel(r.reason) : '')
+              }
+              onPress={() => open(r.id)}
+            />
+            {r.entries.map((e) => (
+              <Action
+                key={e.entrantId}
+                label={
+                  e.model +
+                  ' · ' +
+                  arenaStatusLabel(e.state) +
+                  ' · 模型费用 ' +
+                  arenaCostLabel(e)
+                }
+                onPress={() => open(r.id, e.entrantId)}
+              />
+            ))}
+          </Section>
+        ))}
+      </Section>
+      <Section title="本周模拟成交">
+        {!report.fills.length && <Copy>本周无模拟成交</Copy>}
+        {report.fills.map((f) => (
+          <Action
+            key={f.id}
+            label={
+              f.symbol +
+              ' · 模拟' +
+              (f.side === 'buy' ? '买入' : '卖出') +
+              ' ' +
+              f.quantity +
+              ' 股 × ' +
+              f.price
+            }
+            onPress={() => open(f.roundId, f.entrantId)}
+          />
+        ))}
+      </Section>
+    </>
+  );
+}
+
+function arenaWeekQueryScope(owner: string | undefined, match: string | undefined, id: string | undefined) {
+  return { list: !!owner && !id, detail: !!owner && !!match && !!id };
+}
+
 export function ArenaWeekScreen({
   route,
   navigation,
@@ -27,15 +150,16 @@ export function ArenaWeekScreen({
   const identity = useMobileIdentity(),
     owner = identity.data?.principal?.id;
   const { match, id } = route.params ?? {};
+  const readable = arenaWeekQueryScope(owner, match, id);
   const root = [...scope, 'model-weeklies', owner, match];
   const list = useQuery({
     queryKey: [...root, 'list'],
-    enabled: !!owner && !id,
+    enabled: readable.list,
     queryFn: ({ signal }) => api.modelArenas.weeklies(match, signal),
   });
   const item = useQuery({
     queryKey: [...root, id],
-    enabled: !!owner && !!match && !!id,
+    enabled: readable.detail,
     queryFn: ({ signal }) => api.modelArenas.weekly(match!, id!, signal),
   });
   const query = id ? item : list,
@@ -71,115 +195,7 @@ export function ArenaWeekScreen({
                 />
               ))}
             {item.data && report && (
-              <>
-                <Section title={item.data.title + ' · ' + report.week + ' 当周'}>
-                  <Copy>
-                    {report.comparison.start} 至 {report.comparison.end} · 已开轮{' '}
-                    {report.comparison.opened} / {report.comparison.planned}
-                  </Copy>
-                  {report.comparison.rows.map((r) => (
-                    <Copy key={r.id}>
-                      {r.label} · 收益 {arenaRatio(r.metrics.returnRatio)} · 最大回撤{' '}
-                      {arenaRatio(r.metrics.drawdown)} · 期末 {r.metrics.endNav ?? '资料不足'} ·
-                      交易费 {r.metrics.tradeFees ?? '资料不足'}{' '}
-                      {r.kind === 'model' &&
-                        ' · 决策覆盖 ' +
-                          (report.comparison.opened
-                            ? r.decisions + '/' + report.comparison.opened
-                            : '不适用')}
-                    </Copy>
-                  ))}
-                </Section>
-                <Section title="盈亏贡献">
-                  {report.attribution.map((a) => (
-                    <Copy key={a.entrantId}>
-                      {report.comparison.rows.find((r) => r.id === a.entrantId)?.label} ·{' '}
-                      {a.symbols.map((s) => s.symbol + ' ' + s.amount).join('，')} · 费用 {a.fees} ·
-                      未归属 {a.residual ?? '资料不足'}
-                    </Copy>
-                  ))}
-                </Section>
-                <Section title="同轮仓位分歧">
-                  {!report.divergences.length && <Copy>本周无可比较的仓位分歧</Copy>}
-                  {report.divergences.map((d) => (
-                    <Action
-                      key={d.roundId + d.symbol}
-                      onPress={() => open(d.roundId)}
-                      label={
-                        d.day +
-                        ' · ' +
-                        d.symbol +
-                        ' · 仓位相差 ' +
-                        Number(d.spreadBps) / 100 +
-                        ' 个百分点'
-                      }
-                    />
-                  ))}
-                </Section>
-                <Action
-                  label={'决策后的价格观察（' + report.observations.length + '）'}
-                  onPress={() => setShow((v) => !v)}
-                />
-                {show &&
-                  report.observations.map((o) => (
-                    <Copy key={o.roundId + o.symbol + o.window}>
-                      {o.day} · {o.symbol} · {o.window} 个交易日 · {arenaObservationLabel(o)}
-                    </Copy>
-                  ))}
-                {show && report.laterNews.length > 0 && (
-                  <Section title="决策后收录的标的资讯">
-                    {report.laterNews.map((n) => (
-                      <Copy key={n.roundId + n.ref}>
-                        {n.publishedAt.slice(0, 10)} · {n.symbol} · {n.title}
-                      </Copy>
-                    ))}
-                  </Section>
-                )}
-                <Section title="本周决策">
-                  {report.rounds.map((r) => (
-                    <Section key={r.id} title={r.day}>
-                      <Action
-                        label={
-                          arenaStatusLabel(r.state) +
-                          (r.reason ? ' · ' + arenaStatusLabel(r.reason) : '')
-                        }
-                        onPress={() => open(r.id)}
-                      />
-                      {r.entries.map((e) => (
-                        <Action
-                          key={e.entrantId}
-                          label={
-                            e.model +
-                            ' · ' +
-                            arenaStatusLabel(e.state) +
-                            ' · 模型费用 ' +
-                            arenaCostLabel(e)
-                          }
-                          onPress={() => open(r.id, e.entrantId)}
-                        />
-                      ))}
-                    </Section>
-                  ))}
-                </Section>
-                <Section title="本周模拟成交">
-                  {!report.fills.length && <Copy>本周无模拟成交</Copy>}
-                  {report.fills.map((f) => (
-                    <Action
-                      key={f.id}
-                      label={
-                        f.symbol +
-                        ' · 模拟' +
-                        (f.side === 'buy' ? '买入' : '卖出') +
-                        ' ' +
-                        f.quantity +
-                        ' 股 × ' +
-                        f.price
-                      }
-                      onPress={() => open(f.roundId, f.entrantId)}
-                    />
-                  ))}
-                </Section>
-              </>
+              <ArenaWeekReport report={report} title={item.data.title} show={show} onToggle={() => setShow((value) => !value)} open={open} />
             )}
           </MobileListRefreshRegion>
         </>

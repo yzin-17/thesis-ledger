@@ -39,10 +39,11 @@ const protocol = {
   budgetCurrency: 'USD',
   budget,
 };
-it('赛制可冻结重读，必须有两个独立绑定和完整的单市场协议', () => {
+it('赛制可冻结重读，支持单模型并保留完整的单市场协议', () => {
   expect(arenaProtocolSchema.parse(JSON.parse(JSON.stringify(protocol)))).toEqual(protocol);
+  expect(arenaProtocolSchema.parse({ ...protocol, entrants: protocol.entrants.slice(0, 1) }).entrants).toHaveLength(1);
   for (const bad of [
-    { entrants: protocol.entrants.slice(1) },
+    { entrants: [] },
     { entrants: [protocol.entrants[0], protocol.entrants[0]] },
     { market: 'US' },
     { currency: 'HKD' },

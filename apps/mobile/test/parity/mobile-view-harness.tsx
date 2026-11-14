@@ -4,6 +4,7 @@ import { QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
 import { createMobileQueryClient } from '../../src/app/query/query-client';
+import { getMobileTheme } from '../../src/theme';
 
 const sharedView = vi.hoisted(() => ({
   params: {} as Record<string, unknown>,
@@ -16,6 +17,7 @@ const sharedView = vi.hoisted(() => ({
   document: vi.fn(),
 }));
 export const view = sharedView;
+vi.mock('react-native', async () => import('react-native-web'));
 vi.mock('../../src/app/MobileRuntime', () => ({
   useMobileRuntime: () => view.runtime,
   useDirtyForm: view.dirty,
@@ -78,6 +80,8 @@ vi.mock('../../src/components/MobilePrimitives', async () => {
     }) => e('main', {}, e('h1', {}, title), action, children),
     Section: ({ title, children }: { title?: string; children: ReactNode }) =>
       e('section', {}, title, children),
+    ContentSection: ({ title, children }: { title?: string; children: ReactNode }) =>
+      e('section', {}, title, children),
     Copy: ({ children }: { children: ReactNode }) => e('p', {}, children),
     Action: ({
       label,
@@ -93,16 +97,22 @@ vi.mock('../../src/components/MobilePrimitives', async () => {
       value,
       editable,
       onChange,
+      onFocus,
+      onBlur,
     }: {
       label: string;
       value: string;
       editable?: boolean;
       onChange: (value: string) => void;
+      onFocus?: () => void;
+      onBlur?: () => void;
     }) =>
       e('input', {
         'aria-label': label,
         value,
         disabled: editable === false,
+        onFocus,
+        onBlur,
         onChange: (event: React.ChangeEvent<HTMLInputElement>) => onChange(event.target.value),
       }),
     Choices: ({
@@ -153,6 +163,7 @@ beforeEach(() => {
     mode: 'shadow',
     scope: ['mobile-v2', 'https://ledger.test/api/v1', 'shadow', 'all'],
     accountId: null,
+    theme: getMobileTheme('light'),
     changeAccount: vi.fn().mockResolvedValue(true),
   };
   view.confirm.mockResolvedValue(true);

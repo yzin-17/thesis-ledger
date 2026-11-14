@@ -32,7 +32,11 @@
     "config": {
       "revision": 0,
       "enabled": false,
-      "sourceIds": []
+      "sourceIds": [],
+      "taskCreated": false,
+      "cron": "@every24h",
+      "timezone": "Asia/Shanghai",
+      "nextRunAt": null
     },
     "sources": [
       {
@@ -217,7 +221,11 @@
     "config": {
       "revision": 0,
       "enabled": false,
-      "sourceIds": []
+      "sourceIds": [],
+      "taskCreated": false,
+      "cron": "@every24h",
+      "timezone": "Asia/Shanghai",
+      "nextRunAt": null
     },
     "sources": [
       {
@@ -415,6 +423,286 @@
         "datasetId": null,
         "firstSeenAt": "2026-11-06T00:00:00+00:00",
         "lastSeenAt": "2026-11-06T00:00:00+00:00"
+      }
+    ]
+  },
+  "history": {
+    "version": "rule-source-monitor-v1",
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000016",
+        "status": "succeeded",
+        "attempt": 1,
+        "sourceIds": [
+          "official-hk-rules/hk-stock-public-fees"
+        ],
+        "createdAt": "2026-11-06T00:01:00+00:00",
+        "startedAt": "2026-11-06T00:01:00+00:00",
+        "finishedAt": "2026-11-06T00:01:00+00:00",
+        "counts": {
+          "documents": 5,
+          "changed": 5,
+          "unavailable": 0
+        },
+        "errorCode": null,
+        "trigger": "manual",
+        "failureDetailsAvailable": true,
+        "failures": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000015",
+        "status": "succeeded",
+        "attempt": 1,
+        "sourceIds": [
+          "official-hk-rules/hk-stock-public-fees"
+        ],
+        "createdAt": "2026-11-06T00:00:00+00:00",
+        "startedAt": "2026-11-06T00:00:00+00:00",
+        "finishedAt": "2026-11-06T00:00:00+00:00",
+        "counts": {
+          "documents": 5,
+          "changed": 0,
+          "unavailable": 0
+        },
+        "errorCode": null,
+        "trigger": "manual",
+        "failureDetailsAvailable": true,
+        "failures": []
+      }
+    ],
+    "offset": 0,
+    "limit": 20,
+    "total": 2
+  },
+  "taskRequest": {
+    "version": "rule-source-monitor-v1",
+    "expectedRevision": 0,
+    "sourceIds": [
+      "official-hk-rules/hk-stock-public-fees"
+    ]
+  },
+  "taskResponse": {
+    "version": "rule-source-monitor-v1",
+    "config": {
+      "revision": 1,
+      "enabled": true,
+      "sourceIds": [
+        "official-hk-rules/hk-stock-public-fees"
+      ],
+      "taskCreated": true,
+      "cron": "@every24h",
+      "timezone": "Asia/Shanghai",
+      "nextRunAt": "2026-11-07T00:01:00+00:00"
+    }
+  },
+  "scheduleRequest": {
+    "version": "rule-source-monitor-v1",
+    "expectedRevision": 1,
+    "cron": "0 9 * * *",
+    "timezone": "Asia/Shanghai"
+  },
+  "scheduleResponse": {
+    "version": "rule-source-monitor-v1",
+    "config": {
+      "revision": 2,
+      "enabled": true,
+      "sourceIds": [
+        "official-hk-rules/hk-stock-public-fees"
+      ],
+      "taskCreated": true,
+      "cron": "0 9 * * *",
+      "timezone": "Asia/Shanghai",
+      "nextRunAt": "2026-11-06T01:00:00+00:00"
+    }
+  },
+  "scheduledStatus": {
+    "version": "rule-source-monitor-v1",
+    "config": {
+      "revision": 2,
+      "enabled": true,
+      "sourceIds": [
+        "official-hk-rules/hk-stock-public-fees"
+      ],
+      "taskCreated": true,
+      "cron": "0 9 * * *",
+      "timezone": "Asia/Shanghai",
+      "nextRunAt": "2026-11-06T01:00:00+00:00"
+    },
+    "sources": [
+      {
+        "identity": "official-rules/cn-stock-auction-fees",
+        "market": "CN",
+        "name": "上交所股票收费主源",
+        "datasetId": "cn-xshg-stock-auction-public-fees-2023-08",
+        "packHash": "54b898f86b65bc49973676bfe93bda889c8538c7eecdc55595b0c6bf6295431d",
+        "documentCount": 6
+      },
+      {
+        "identity": "official-rules/cn-stock-auction-fees-archive",
+        "market": "CN",
+        "name": "上交所股票收费备用",
+        "datasetId": "cn-xshg-stock-auction-public-fees-archive-2023-08",
+        "packHash": "5562cf02db36943b5a1ad439c70c5753522e82595fd51cae4aad8525f27f3113",
+        "documentCount": 6
+      },
+      {
+        "identity": "official-hk-rules/hkex-trading-fee",
+        "market": "HK",
+        "name": "港股交易费",
+        "datasetId": "hk-00147-trading-fee-2025-08-v1",
+        "packHash": "1813a92052a9e3f5e783aa8d052bb4b5805539f2ad2a9bc1630f1317937a357c",
+        "documentCount": 2
+      },
+      {
+        "identity": "official-hk-rules/hk-stock-public-fees",
+        "market": "HK",
+        "name": "港股扩展公共收费",
+        "datasetId": "hk-00147-public-fees-2025-08-v1",
+        "packHash": "1869a6703f39da34b32d3bd0b80bf1643a4f69825dcc43d276b49459d1b22c6d",
+        "documentCount": 5
+      },
+      {
+        "identity": "official-us-rules/us-section31-exchange-t2",
+        "market": "US",
+        "name": "美股Section31",
+        "datasetId": "us-gme-section31-exchange-t2-2024-05-v1",
+        "packHash": "6aabce45ff3f91635b00b3858bdf8b9684db62696d245e8cb4729765ecf4608d",
+        "documentCount": 4
+      },
+      {
+        "identity": "official-us-rules/us-stock-public-fees",
+        "market": "US",
+        "name": "美股扩展公共收费",
+        "datasetId": "us-gme-section31-taf-exchange-t2-2024-05-v1",
+        "packHash": "6ae3d98e3f9cc3407e54288622558e511843c36b59dff8dc19e6b29edb98b9cc",
+        "documentCount": 6
+      },
+      {
+        "identity": "official-rules/cn-etf-handling-fee",
+        "market": "CN",
+        "name": "上交所ETF经手费",
+        "datasetId": "cn-510300-auction-handling-fee-2023-08-v1",
+        "packHash": "2a4f5d80a8144cb308a8ff83ae56490210b8dcced3e82f03827dbbf6b673d37e",
+        "documentCount": 2
+      },
+      {
+        "identity": "official-hk-rules/hk-etf-public-fees",
+        "market": "HK",
+        "name": "港股ETF公共收费",
+        "datasetId": "hk-02800-public-fees-2025-08-v1",
+        "packHash": "bf428c6a202004303014ca8d06c366d16351fe88cfa5c0663619a5da2e825dac",
+        "documentCount": 5
+      },
+      {
+        "identity": "official-us-rules/us-etf-public-fees",
+        "market": "US",
+        "name": "美股ETF公共收费",
+        "datasetId": "us-spy-section31-taf-exchange-t2-2024-05-v1",
+        "packHash": "77e596b7e0eaae56ecd0857cb332edcd1cdfbdcb3864c40ecb0ee3541955a560",
+        "documentCount": 7
+      }
+    ],
+    "latestRun": {
+      "id": "00000000-0000-4000-8000-000000000016",
+      "status": "succeeded",
+      "attempt": 1,
+      "sourceIds": [
+        "official-hk-rules/hk-stock-public-fees"
+      ],
+      "createdAt": "2026-11-06T00:01:00+00:00",
+      "startedAt": "2026-11-06T00:01:00+00:00",
+      "finishedAt": "2026-11-06T00:01:00+00:00",
+      "counts": {
+        "documents": 5,
+        "changed": 5,
+        "unavailable": 0
+      },
+      "errorCode": null
+    },
+    "observations": [
+      {
+        "kind": "document",
+        "identity": "https://www.hkex.com.hk/-/media/HKEX-Market/Services/Circulars-and-Notices/Participant-and-Members-Circulars/SEHK/2021/ce_SEHK_CT_086_2021.pdf",
+        "name": "FRC交易征费自2022-01-01按0.00015%独立计算的通告",
+        "contentHash": "37f656ca04c7c17e169d8b1da976bc9711788e6ba5d57a796d19a8573662fad2",
+        "rawHash": "37f656ca04c7c17e169d8b1da976bc9711788e6ba5d57a796d19a8573662fad2",
+        "datasetId": null,
+        "lastCheckedAt": "2026-11-06T00:01:00+00:00",
+        "lastSuccessAt": "2026-11-06T00:01:00+00:00",
+        "lastChangeAt": "2026-11-06T00:01:00+00:00",
+        "status": "changed",
+        "errorCode": null,
+        "versionCount": 2
+      },
+      {
+        "kind": "document",
+        "identity": "https://www.hkex.com.hk/-/media/HKEX-Market/Services/Circulars-and-Notices/Participant-and-Members-Circulars/SEHK/2022/086_22_SEHK_OP_Trading-Fee_e.pdf",
+        "name": "港交所交易费调整通告 LSD/086/2022",
+        "contentHash": "2b0a4bcbf1f0344d599132fa029bd1c407b19b256dc6ac91c83da1caea114e6a",
+        "rawHash": "2b0a4bcbf1f0344d599132fa029bd1c407b19b256dc6ac91c83da1caea114e6a",
+        "datasetId": null,
+        "lastCheckedAt": "2026-11-06T00:01:00+00:00",
+        "lastSuccessAt": "2026-11-06T00:01:00+00:00",
+        "lastChangeAt": "2026-11-06T00:01:00+00:00",
+        "status": "changed",
+        "errorCode": null,
+        "versionCount": 2
+      },
+      {
+        "kind": "document",
+        "identity": "https://www.hkex.com.hk/-/media/HKEX-Market/Services/Circulars-and-Notices/Participant-and-Members-Circulars/SEHK/2023/ce_SEHK_CT_158_2023.pdf",
+        "name": "港股印花税自2023-11-17降为0.1%的通告",
+        "contentHash": "f8c27ee24add1586a944c9e81c6287a7e620d69ebf94b1cfac93a1948aa5fecf",
+        "rawHash": "f8c27ee24add1586a944c9e81c6287a7e620d69ebf94b1cfac93a1948aa5fecf",
+        "datasetId": null,
+        "lastCheckedAt": "2026-11-06T00:01:00+00:00",
+        "lastSuccessAt": "2026-11-06T00:01:00+00:00",
+        "lastChangeAt": "2026-11-06T00:01:00+00:00",
+        "status": "changed",
+        "errorCode": null,
+        "versionCount": 2
+      },
+      {
+        "kind": "document",
+        "identity": "https://www.hkex.com.hk/-/media/hkex-market/services/circulars-and-notices/participant-and-members-circulars/sehk/2014/ct05314b",
+        "name": "SFC交易征费自2014-11-01降为0.0027%的通告",
+        "contentHash": "4b324d771d2e08bb041cb1e9ed20c154eae42585d29bbf398d83a1c2eced10e2",
+        "rawHash": "4b324d771d2e08bb041cb1e9ed20c154eae42585d29bbf398d83a1c2eced10e2",
+        "datasetId": null,
+        "lastCheckedAt": "2026-11-06T00:01:00+00:00",
+        "lastSuccessAt": "2026-11-06T00:01:00+00:00",
+        "lastChangeAt": "2026-11-06T00:01:00+00:00",
+        "status": "changed",
+        "errorCode": null,
+        "versionCount": 2
+      },
+      {
+        "kind": "document",
+        "identity": "https://www.hkex.com.hk/Services/Rules-and-Forms-and-Fees/Fees/Securities-(Hong-Kong)/Trading/Transaction?sc_lang=en",
+        "name": "港交所现行交易费用与通告引用",
+        "contentHash": "63fd116ebf0c8db71b2a9e10474f7010af47f53cb328f9aaf77ee7c870f62298",
+        "rawHash": "63fd116ebf0c8db71b2a9e10474f7010af47f53cb328f9aaf77ee7c870f62298",
+        "datasetId": null,
+        "lastCheckedAt": "2026-11-06T00:01:00+00:00",
+        "lastSuccessAt": "2026-11-06T00:01:00+00:00",
+        "lastChangeAt": "2026-11-06T00:01:00+00:00",
+        "status": "changed",
+        "errorCode": null,
+        "versionCount": 2
+      },
+      {
+        "kind": "pack",
+        "identity": "official-hk-rules/hk-stock-public-fees",
+        "name": "港股扩展公共收费",
+        "contentHash": "1869a6703f39da34b32d3bd0b80bf1643a4f69825dcc43d276b49459d1b22c6d",
+        "rawHash": "1869a6703f39da34b32d3bd0b80bf1643a4f69825dcc43d276b49459d1b22c6d",
+        "datasetId": "hk-00147-public-fees-2025-08-v1",
+        "lastCheckedAt": "2026-11-06T00:01:00+00:00",
+        "lastSuccessAt": "2026-11-06T00:01:00+00:00",
+        "lastChangeAt": null,
+        "status": "unchanged",
+        "errorCode": null,
+        "versionCount": 1
       }
     ]
   }

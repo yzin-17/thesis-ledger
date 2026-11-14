@@ -13,6 +13,8 @@ import {
 import { backtestRunSummaryReadSchema } from './backtest-management-wire.js';
 import { strategyRiskDiffSchema } from './strategy-risk-wire.js';
 import { aiExecutionReadModelSchema, aiUsageCompletenessSchema } from './ai-execution.js';
+import { instrumentDirectorySchema } from './market.js';
+import { optimizationRetryStateSchema } from './optimization-retry.js';
 
 const record = z.record(z.string(), z.unknown());
 const usage = z.number().nonnegative();
@@ -47,9 +49,13 @@ export const optimizationExperimentReadSchema = z
     id: z.uuid(),
     name: z.string(),
     nameSource: z.enum(['stored', 'legacy_fallback']),
+    executionSymbol: z.string().trim().min(1).nullable().optional(),
+    instrumentDirectory: instrumentDirectorySchema.optional(),
     baselineStrategyVersionId: z.string(),
     status: z.string(),
     stage: z.string(),
+    executionAttempt: z.number().int().nonnegative().default(0),
+    retryState: optimizationRetryStateSchema.optional(),
     source: optimizationExperimentSourceSchema.optional(),
     sourceMode: z.enum(['existing', 'discovery']).optional(),
     discoveryScope: optimizationDiscoveryScopeSchema.nullable().optional(),
@@ -170,32 +176,39 @@ export const strategyBacktestGroupPageSchema = z.object({
   totalCount: z.number().int().nonnegative(),
   pageInfo,
 });
-export const optimizationAdoptionReadSchema = z
-  .object({
-    strategyVersion: z.object({
-      id: z.uuid(),
-      strategyId: z.uuid(),
-      version: z.number().int().positive(),
-    }),
+const optimizationAdoptionSourceSchema = z.object({
+  experimentId: z.uuid(), candidateId: z.uuid(), candidateHash: z.string().min(1),
+});
+const optimizationAdoptionCoreSchema = z.object({
+  strategyVersion: z.object({ id: z.uuid(), strategyId: z.uuid(), version: z.number().int().positive() }),
+  riskApplicationEnabled: z.literal(false),
+});
+const optimizationAdoptionReadySchema = optimizationAdoptionCoreSchema
+  .extend({
+    detailsStatus: z.literal('ready').default('ready'),
+    source: optimizationAdoptionSourceSchema.optional(),
     adoptionContext: optimizationAdoptionContextSchema,
     monitoringPlan: monitoringPlanSchema,
-    monitoringDiff: z
-      .object({ before: monitoringPlanSchema.nullable(), after: monitoringPlanSchema })
-      .optional(),
-    riskApplicationEnabled: z.boolean(),
-    riskApplicationDiffs: z.array(
-      z.object({
-        applicationId: z.uuid(),
-        accountId: z.uuid(),
-        symbol: z.string(),
-        currentStrategyVersionId: z.uuid(),
-        currentRevision: z.number().int().positive(),
-        enabled: z.boolean(),
-        diff: z.array(strategyRiskDiffSchema),
-      }),
-    ),
+    monitoringDiff: z.object({ before: monitoringPlanSchema.nullable(), after: monitoringPlanSchema }).optional(),
+    riskApplicationDiffs: z.array(z.object({
+      applicationId: z.uuid(), accountId: z.uuid(), symbol: z.string(),
+      currentStrategyVersionId: z.uuid(), currentRevision: z.number().int().positive(), enabled: z.boolean(),
+      diff: z.array(strategyRiskDiffSchema),
+    })),
   })
   .passthrough();
+export const optimizationAdoptionReadSchema = z.union([
+  optimizationAdoptionReadySchema,
+  optimizationAdoptionCoreSchema.extend({
+    detailsStatus: z.literal('unavailable'),
+    detailsErrorCode: z.literal('ADOPTION_DETAILS_UNAVAILABLE'),
+    source: optimizationAdoptionSourceSchema,
+  }).passthrough(),
+]);
+/*
+ * 完整响应兼容既有未声明 detailsStatus 的成功结果；已提交但附加读取失败
+ * 只返回可验证的版本与来源，不把未知风险差异填成空数组。
+ */
 export const optimizationListInputSchema = z
   .object({
     limit: z.number().int().min(1).max(100).optional(),

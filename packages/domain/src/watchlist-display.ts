@@ -48,7 +48,19 @@ const reasons: Record<string, string> = {
   inactive_instrument: '目录已停用',
   request_budget_cooldown: '请求冷却中，暂无可用报价',
 };
-export function watchlistPriceDisplay(price?: Price, context?: { session: string; reason?: string | undefined }) {
+type WatchlistContext = { session: string; reason?: string | undefined };
+
+function watchlistQuoteStatus(q: Extract<Price, { kind: 'quote' }>['quote'], context?: WatchlistContext): string {
+  let status = q.stale ? '行情陈旧' : '';
+  if (context?.session === 'closed_snapshot') status = '休市 · 最近时段快照';
+  if (context?.session === 'older_snapshot' && q.stale) status = '未覆盖最近交易时段';
+  if (context?.session === 'unknown') status = '交易时段未知';
+  if (context?.reason === 'source_time_future') status = '行情时间待核实';
+  if (!q.marketTime) status = '行情时间未知';
+  return status;
+}
+
+export function watchlistPriceDisplay(price?: Price, context?: WatchlistContext) {
   if (!price || price.kind === 'unavailable') {
     const status = price ? (reasons[price.reason] ?? '行情暂不可用') : '';
     return { ...emptyFacts, value: '—', change: '—', time: '', status };
@@ -63,12 +75,7 @@ export function watchlistPriceDisplay(price?: Price, context?: { session: string
     };
   const q = price.quote;
   const currency = q.units?.priceCurrency;
-  let status = q.stale ? '行情陈旧' : '';
-  if (context?.session === 'closed_snapshot') status = '休市 · 最近时段快照';
-  if (context?.session === 'older_snapshot' && q.stale) status = '未覆盖最近交易时段';
-  if (context?.session === 'unknown') status = '交易时段未知';
-  if (context?.reason === 'source_time_future') status = '行情时间待核实';
-  if (!q.marketTime) status = '行情时间未知';
+  const status = watchlistQuoteStatus(q, context);
   let refresh = '';
   if (q.refreshFailure === 'budget_cooldown') refresh = '请求冷却中，沿用上次报价';
   else if (q.refreshFailure) refresh = '刷新失败，沿用上次报价';

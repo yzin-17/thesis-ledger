@@ -113,23 +113,7 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
       });
       expect(failure.usage).toEqual({ status: 'reported', inputTokens: 7, outputTokens: 3 });
       assertHttpRequestDiagnostic(failure, actualBody);
-      const runtime = failure.fact.diagnostic?.runtime;
-      expect(runtime).toMatchObject({
-        httpResponse: {
-          status: 200,
-          contentType: 'sse',
-          bodyComplete: true,
-          sse: { events: 5, invalidJsonEvents: 0, done: true, incompleteEvent: false },
-          error: null,
-        },
-      });
-      expect(runtime?.packages.ai).toMatch(/^\d+\.\d+\.\d+/u);
-      expect(runtime?.packages.providerVersion).toMatch(/^\d+\.\d+\.\d+/u);
-      expect(runtime?.stream?.provider?.text.sha256).toBe(failure.fact.diagnostic?.outputSha256);
-      expect(runtime?.stream?.sdk.text.sha256).toBe(failure.fact.diagnostic?.outputSha256);
-      expect(runtime?.stream?.provider?.reasoning.sha256).toBe(
-        runtime?.stream?.sdk.reasoning.sha256,
-      );
+      assertFailureRuntimeDiagnostic(failure);
 
       const now = new Date();
       const ownership = { runId: randomUUID(), executionAttempt: 1 };
@@ -218,3 +202,21 @@ describe('G3 脱敏失败诊断的本地 SDK 与账本往返', () => {
     }
   });
 });
+
+function assertFailureRuntimeDiagnostic(failure: AiSdkGenerationError) {
+  const runtime = failure.fact.diagnostic?.runtime;
+  expect(runtime).toMatchObject({
+    httpResponse: {
+      status: 200,
+      contentType: 'sse',
+      bodyComplete: true,
+      sse: { events: 5, invalidJsonEvents: 0, done: true, incompleteEvent: false },
+      error: null,
+    },
+  });
+  expect(runtime?.packages.ai).toMatch(/^\d+\.\d+\.\d+/u);
+  expect(runtime?.packages.providerVersion).toMatch(/^\d+\.\d+\.\d+/u);
+  expect(runtime?.stream?.provider?.text.sha256).toBe(failure.fact.diagnostic?.outputSha256);
+  expect(runtime?.stream?.sdk.text.sha256).toBe(failure.fact.diagnostic?.outputSha256);
+  expect(runtime?.stream?.provider?.reasoning.sha256).toBe(runtime?.stream?.sdk.reasoning.sha256);
+}

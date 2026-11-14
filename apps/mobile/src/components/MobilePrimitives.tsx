@@ -66,16 +66,19 @@ export function Section({
   title,
   children,
   testID,
+  variant = 'panel',
 }: {
   title?: string;
   children: ReactNode;
   testID?: string;
+  variant?: 'content' | 'panel';
 }) {
   const { theme } = useMobileRuntime();
   return (
     <View
       testID={testID}
-      style={[ui.section, { backgroundColor: theme.surface1, borderColor: theme.border }]}
+      style={[ui.section, { backgroundColor: theme.surface1, borderColor: theme.border },
+        variant === 'content' && { borderWidth: 0, borderRadius: 0, padding: 0, backgroundColor: 'transparent' }]}
     >
       {title ? (
         <Text accessibilityRole="header" style={[ui.sectionTitle, { color: theme.textPrimary }]}>
@@ -85,6 +88,9 @@ export function Section({
       {children}
     </View>
   );
+}
+export function ContentSection(props: Omit<Parameters<typeof Section>[0], 'variant'>) {
+  return <Section {...props} variant="content" />;
 }
 export function Action({
   label,
@@ -133,20 +139,28 @@ export function Action({
 }
 export function Field({
   label,
+  placeholder,
+  error,
   value,
   onChange,
   keyboardType,
   multiline = false,
   editable = true,
   secure = false,
+  onFocus,
+  onBlur,
 }: {
   label: string;
+  placeholder?: string | undefined;
+  error?: string | undefined;
   value: string;
   onChange: (value: string) => void;
   keyboardType?: KeyboardTypeOptions;
   multiline?: boolean;
   editable?: boolean;
   secure?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const { theme } = useMobileRuntime();
   return (
@@ -154,8 +168,14 @@ export function Field({
       <Copy>{label}</Copy>
       <TextInput
         accessibilityLabel={label}
+        accessibilityHint={error}
+        aria-invalid={Boolean(error)}
+        placeholder={placeholder}
+        placeholderTextColor={theme.textSecondary}
         value={value}
         onChangeText={onChange}
+        onFocus={onFocus}
+        onBlur={onBlur}
         autoCapitalize="none"
         autoCorrect={false}
         secureTextEntry={secure}
@@ -168,11 +188,12 @@ export function Field({
           multiline && ui.multiline,
           {
             color: theme.textPrimary,
-            borderColor: theme.borderStrong,
+            borderColor: error ? theme.error : theme.borderStrong,
             backgroundColor: theme.surface1,
           },
         ]}
       />
+      <Feedback message={error} error />
     </View>
   );
 }

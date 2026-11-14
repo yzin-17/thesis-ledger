@@ -7,6 +7,7 @@ import {
   runConfigSchemaV3,
   type BacktestSnapshotManifestV3,
   type BacktestResultV3,
+  type RunConfigV3,
 } from '@thesis-ledger/schemas';
 import { BacktestSnapshotUnavailableError, asRecord } from './backtest-v3-run-lifecycle.js';
 import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot.js';
@@ -51,37 +52,13 @@ export async function loadVerifiedBacktestV3Snapshot(
   if (!storedRunConfig.success || !inputRunConfig.success) {
     throw unavailable('V3 Run 持久化 RunConfig 无效');
   }
-  const runConfig = storedRunConfig.data;
-  const runConfigChecksum = hashCanonicalManifest(runConfig);
-  const inputRunConfigChecksum = hashCanonicalManifest(inputRunConfig.data);
-  const expectedPeriodStart = new Date(`${runConfig.startDate}T00:00:00.000Z`).getTime();
-  const expectedPeriodEnd = new Date(`${runConfig.endDate}T00:00:00.000Z`).getTime();
-  const expectedDataAsOf = new Date(runConfig.dataAsOf).getTime();
-  if (
-    job.mode !== 'V3' ||
-    job.strategyVersionId !== manifest.strategyVersionId ||
-    manifest.runId !== job.id ||
-    manifest.status !== 'finalized' ||
-    manifest.quality.completeness !== 'complete' ||
-    job.snapshotId !== contentHash ||
-    input?.contractVersion !== 3 ||
-    input.schemaVersion !== '3' ||
-    input.strategyVersionId !== manifest.strategyVersionId ||
-    input.snapshotId !== manifest.contentHash ||
-    input.snapshotVersion !== manifest.manifestVersion ||
-    runConfigChecksum !== inputRunConfigChecksum ||
-    runConfigChecksum !== manifest.runConfigChecksum ||
-    runConfig.startDate !== manifest.dateRange.startDate ||
-    runConfig.endDate !== manifest.dateRange.endDate ||
-    runConfig.dataAsOf !== manifest.dataAsOf ||
-    canonicalizeManifest(runConfig.executionPriceProtocol) !==
-      canonicalizeManifest(manifest.executionPriceProtocol) ||
-    job.periodStart.getTime() !== expectedPeriodStart ||
-    job.periodEnd.getTime() !== expectedPeriodEnd ||
-    job.dataAsOf.getTime() !== expectedDataAsOf
-  ) {
-    throw unavailable('V3 Run 持久化配置与冻结 Snapshot 不一致');
-  }
+  assertPersistedRunSnapshotIdentity(
+    job,
+    manifest,
+    input,
+    storedRunConfig.data,
+    inputRunConfig.data,
+  );
 
   let replayed: Awaited<ReturnType<LocalSnapshotStore['v3']['replay']>>;
   try {
@@ -132,24 +109,7 @@ export async function executeBacktestV3Run({
     throw badResult('V3 Runner Result 不符合严格 Schema');
   }
 
-  if (
-    parsedResult.runId !== manifest.runId ||
-    parsedResult.strategyVersionId !== manifest.strategyVersionId ||
-    parsedResult.snapshotId !== manifest.contentHash ||
-    parsedResult.snapshotVersion !== manifest.manifestVersion ||
-    parsedResult.contentHash !== manifest.contentHash ||
-    parsedResult.engineVersion !== runner.id ||
-    parsedResult.marketRuleVersion !== manifest.marketRuleVersion ||
-    parsedResult.calendarVersion !== manifest.calendarVersion ||
-    parsedResult.aggregationVersion !== manifest.aggregationVersion ||
-    canonicalizeManifest(parsedResult.executionPriceProtocol) !==
-      canonicalizeManifest(manifest.executionPriceProtocol) ||
-    canonicalizeManifest(parsedResult.actualSources) !==
-      canonicalizeManifest(manifest.actualSources) ||
-    parsedResult.comparableDataFingerprint !== manifest.comparableDataFingerprint
-  ) {
-    throw badResult('V3 Result 与冻结 Snapshot 身份不一致');
-  }
+  assertRunnerSnapshotIdentity(parsedResult, manifest, runner.id);
 
   if (manifest.executionModel) {
     const disclosure = parsedResult.executionModelDisclosure;
@@ -170,4 +130,90 @@ export async function executeBacktestV3Run({
   }
 
   return { result: parsedResult, resultChecksum };
+}
+
+function persistedRunConfigMatchesSnapshot(
+  job: BacktestJob,
+  runConfig: RunConfigV3,
+  inputRunConfig: RunConfigV3,
+  manifest: BacktestSnapshotManifestV3,
+) {
+  const runConfigChecksum = hashCanonicalManifest(runConfig);
+  const inputRunConfigChecksum = hashCanonicalManifest(inputRunConfig);
+  const expectedPeriodStart = new Date(`${runConfig.startDate}T00:00:00.000Z`).getTime();
+  const expectedPeriodEnd = new Date(`${runConfig.endDate}T00:00:00.000Z`).getTime();
+  const expectedDataAsOf = new Date(runConfig.dataAsOf).getTime();
+  return !(
+    runConfigChecksum !== inputRunConfigChecksum ||
+    runConfigChecksum !== manifest.runConfigChecksum ||
+    runConfig.startDate !== manifest.dateRange.startDate ||
+    runConfig.endDate !== manifest.dateRange.endDate ||
+    runConfig.dataAsOf !== manifest.dataAsOf ||
+    canonicalizeManifest(runConfig.executionPriceProtocol) !==
+      canonicalizeManifest(manifest.executionPriceProtocol) ||
+    job.periodStart.getTime() !== expectedPeriodStart ||
+    job.periodEnd.getTime() !== expectedPeriodEnd ||
+    job.dataAsOf.getTime() !== expectedDataAsOf
+  );
+}
+function assertPersistedRunSnapshotIdentity(
+  job: BacktestJob,
+  manifest: BacktestSnapshotManifestV3,
+  input: ReturnType<typeof asRecord>,
+  runConfig: RunConfigV3,
+  inputRunConfig: RunConfigV3,
+) {
+  if (
+    job.mode !== 'V3' ||
+    job.strategyVersionId !== manifest.strategyVersionId ||
+    manifest.runId !== job.id ||
+    manifest.status !== 'finalized' ||
+    manifest.quality.completeness !== 'complete' ||
+    job.snapshotId !== manifest.contentHash ||
+    input?.contractVersion !== 3 ||
+    input.schemaVersion !== '3' ||
+    input.strategyVersionId !== manifest.strategyVersionId ||
+    input.snapshotId !== manifest.contentHash ||
+    input.snapshotVersion !== manifest.manifestVersion ||
+    !persistedRunConfigMatchesSnapshot(job, runConfig, inputRunConfig, manifest)
+  ) {
+    throw unavailable('V3 Run 持久化配置与冻结 Snapshot 不一致');
+  }
+}
+
+function assertRunnerSnapshotIdentity(
+  parsedResult: BacktestResultV3,
+  manifest: BacktestSnapshotManifestV3,
+  runnerId: string,
+) {
+  if (
+    parsedResult.runId !== manifest.runId ||
+    parsedResult.strategyVersionId !== manifest.strategyVersionId ||
+    parsedResult.snapshotId !== manifest.contentHash ||
+    parsedResult.snapshotVersion !== manifest.manifestVersion ||
+    parsedResult.contentHash !== manifest.contentHash ||
+    parsedResult.engineVersion !== runnerId ||
+    parsedResult.marketRuleVersion !== manifest.marketRuleVersion ||
+    parsedResult.calendarVersion !== manifest.calendarVersion ||
+    parsedResult.aggregationVersion !== manifest.aggregationVersion ||
+    canonicalizeManifest(parsedResult.executionPriceProtocol) !==
+      canonicalizeManifest(manifest.executionPriceProtocol) ||
+    canonicalizeManifest(parsedResult.actualSources) !==
+      canonicalizeManifest(manifest.actualSources) ||
+    parsedResult.comparableDataFingerprint !== manifest.comparableDataFingerprint ||
+    !runnerPriceResearchMatchesSnapshot(parsedResult, manifest)
+  ) {
+    throw badResult('V3 Result 与冻结 Snapshot 身份不一致');
+  }
+}
+
+function runnerPriceResearchMatchesSnapshot(
+  parsedResult: BacktestResultV3,
+  manifest: BacktestSnapshotManifestV3,
+) {
+  return !(
+    parsedResult.priceResearch?.protocolVersion !== manifest.priceResearch?.protocolVersion ||
+    hashCanonicalManifest(parsedResult.priceResearch?.actualPriceSource ?? null) !==
+      hashCanonicalManifest(manifest.priceResearch?.actualPriceSource ?? null)
+  );
 }

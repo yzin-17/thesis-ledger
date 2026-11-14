@@ -22,15 +22,24 @@ const sameInput = (bar: MarketChartBar | undefined, point: IndicatorPoint | unde
 const provenanceCoversDate = (indicator: MarketChartIndicator, date: string) => {
   const range = indicator.inputProvenance?.inputDateRange;
   if (!range) return true;
-  if (isMarketMinuteTimeframe(indicator.timeframe)) return Date.parse(range.start) <= Date.parse(date) && Date.parse(date) <= Date.parse(range.end);
+  if (isMarketMinuteTimeframe(indicator.timeframe))
+    return Date.parse(range.start) <= Date.parse(date) && Date.parse(date) <= Date.parse(range.end);
   return range.start.slice(0, 10) <= date && date <= range.end.slice(0, 10);
 };
 
-export const buildChartPoints = (bars: MarketChartBar[], indicators: MarketChartIndicator[]): ChartPoint[] => {
+export const buildChartPoints = (
+  bars: MarketChartBar[],
+  indicators: MarketChartIndicator[],
+): ChartPoint[] => {
   const barByDate = new Map(bars.map((bar) => [chartPointKey(bar.timestamp, bar.timeframe), bar]));
   const pointsByIndicator = indicators.map((indicator) => ({
     indicator,
-    points: new Map(indicator.points?.map((point) => [chartPointKey(point.timestamp, indicator.timeframe), point])),
+    points: new Map(
+      indicator.points?.map((point) => [
+        chartPointKey(point.timestamp, indicator.timeframe),
+        point,
+      ]),
+    ),
   }));
   const indicatorsByName = new Map<string, typeof pointsByIndicator>();
   pointsByIndicator.forEach((entry) => {
@@ -49,8 +58,9 @@ export const buildChartPoints = (bars: MarketChartBar[], indicators: MarketChart
       const name = rawName as 'MA' | 'MACD' | 'RSI';
       const candidates = entries
         .map(({ indicator, points }) => ({ indicator, point: points.get(date) }))
-        .filter((candidate): candidate is { indicator: MarketChartIndicator; point: IndicatorPoint } =>
-          Boolean(candidate.point),
+        .filter(
+          (candidate): candidate is { indicator: MarketChartIndicator; point: IndicatorPoint } =>
+            Boolean(candidate.point),
         );
       const comparable = candidates.find(({ indicator, point }) => {
         const hasEvidence = Boolean(
@@ -63,10 +73,7 @@ export const buildChartPoints = (bars: MarketChartBar[], indicators: MarketChart
           indicator.symbol === bar?.symbol &&
           indicator.timeframe === bar?.timeframe &&
           indicator.provider === bar?.provider &&
-          (!bar?.providerRevision ||
-            !indicator.inputProvenance?.providerRevision ||
-            bar.providerRevision === indicator.inputProvenance.providerRevision) &&
-          (!bar?.adjustment || bar.adjustment === indicator.inputProvenance?.adjustment) &&
+          chartSourceProvenanceMatches(bar, indicator) &&
           provenanceCoversDate(indicator, date) &&
           sameInput(bar, point)
         );
@@ -145,3 +152,15 @@ export const indicatorValue = (
 };
 
 export const chartDate = (timestamp: string) => day(timestamp);
+
+function chartSourceProvenanceMatches(
+  bar: MarketChartBar | undefined,
+  indicator: MarketChartIndicator,
+) {
+  return (
+    (!bar?.providerRevision ||
+      !indicator.inputProvenance?.providerRevision ||
+      bar.providerRevision === indicator.inputProvenance.providerRevision) &&
+    (!bar?.adjustment || bar.adjustment === indicator.inputProvenance?.adjustment)
+  );
+}

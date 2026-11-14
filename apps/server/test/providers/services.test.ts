@@ -140,8 +140,7 @@ describe('Provider 健康状态', () => {
   });
 });
 
-describe('专业 Provider 配置', () => {
-  const createProviderHealthStub = () => ({
+const createProviderHealthStub = () => ({
     record: vi.fn(
       async (
         provider: string,
@@ -157,6 +156,8 @@ describe('专业 Provider 配置', () => {
       }),
     ),
   });
+
+describe("Provider 凭据与接入渠道", () => {
 
   it('保存配置时不回显密钥，连通性与额度状态可查询', async () => {
     const prisma = {
@@ -283,6 +284,9 @@ describe('专业 Provider 配置', () => {
       vi.unstubAllGlobals();
     }
   });
+});
+
+describe("通知草稿与持久凭据", () => {
 
   it('可在保存前测试飞书草稿，并在随后保存时保留成功状态', async () => {
     const fetchMock = vi.fn(async () => ({

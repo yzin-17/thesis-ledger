@@ -129,6 +129,9 @@ describe('AI Provider 页面操作', () => {
     );
   });
 
+});
+
+describe('Provider 请求竞争与单飞门', () => {
   it('后发请求或草稿变化会使旧模型目录与测试连接结果失效', () => {
     const gate = createLatestRequestGate();
     const firstRequest = gate.begin();
@@ -148,6 +151,9 @@ describe('AI Provider 页面操作', () => {
     expect(gate.tryBegin()).toBe(true);
   });
 
+});
+
+describe('Provider 表单条件字段', () => {
   it('Provider 页面使用一个统一 Sheet，AI 字段不暴露 OpenRouter 或内部 adapter', () => {
     const settingsSource = readFileSync(
       new URL('../src/features/providers/ProviderSettings.tsx', import.meta.url),
@@ -162,7 +168,7 @@ describe('AI Provider 页面操作', () => {
     expect(executionSource).not.toContain('SDK adapter');
     expect(executionSource).not.toContain('OpenRouter');
     const editorSource = readFileSync(
-      new URL('../src/features/providers/useAiProviderEditor.ts', import.meta.url),
+      new URL('../src/features/providers/ai-provider-editor-test-actions.ts', import.meta.url),
       'utf8',
     );
     const sheetSource = readFileSync(
@@ -231,6 +237,9 @@ describe('AI Provider 页面操作', () => {
     }
   });
 
+});
+
+describe('模型目录与推理信息', () => {
   it('接口模型与已有选择合并，写回时去重并限制最多 32 个', () => {
     expect(mergeModelOptions(['legacy-model', 'model-b'], ['model-a', 'model-b'])).toEqual([
       'model-a',
@@ -299,6 +308,9 @@ describe('AI Provider 页面操作', () => {
     expect(markup).toContain('data-slot="badge"');
   });
 
+});
+
+describe('Provider 列表状态与生命周期', () => {
   it('数据库 AI 服务统一提供编辑、启停和删除操作', () => {
     const markup = renderToStaticMarkup(
       <ProviderTable

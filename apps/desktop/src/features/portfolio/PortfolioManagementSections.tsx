@@ -76,9 +76,7 @@ function PositionOverview({
   onOpenReconciliation,
 }: PortfolioManagementViewProps) {
   const positionHeading = calibrationMode ? '持仓快照' : '持仓';
-  const positionDescription = calibrationMode
-    ? '记录当前持仓，成交记录单独维护。'
-    : undefined;
+  const positionDescription = calibrationMode ? '记录当前持仓，成交记录单独维护。' : undefined;
   const editPosition = (position: Position) => {
     setEditing(position);
     setEntryAccountId(position.accountId);
@@ -88,41 +86,16 @@ function PositionOverview({
     setEditing(null);
     openEntrySheet('position');
   };
-  const positionActions = calibrationMode ? (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <Button type="button" onClick={createPosition}>
-        记录持仓快照
-      </Button>
-      <PositionOverviewMenu
-        positions={positions}
-        busyAction={busyAction}
-        clearPositions={clearPositions}
-        {...(onOpenImport ? { onOpenImport } : {})}
-        {...(onOpenReconciliation ? { onOpenReconciliation } : {})}
-      />
-    </div>
-  ) : (
-    <div className="flex items-center gap-2">
-      {positions.length > 0 && (
-        <Button
-          className="text-button danger"
-          size="sm"
-          type="button"
-          variant="destructive"
-          disabled={busyAction !== null}
-          aria-busy={busyAction === 'clear-positions'}
-          onClick={() => void clearPositions()}
-        >
-          {busyAction === 'clear-positions' && (
-            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-          )}
-          {busyAction === 'clear-positions' ? '清空中…' : '清空持仓'}
-        </Button>
-      )}
-      <Button className="text-button" type="button" variant="link" onClick={createPosition}>
-        + 添加持仓
-      </Button>
-    </div>
+  const positionActions = (
+    <PositionOverviewActions
+      positions={positions}
+      busyAction={busyAction}
+      clearPositions={clearPositions}
+      calibrationMode={calibrationMode}
+      onOpenImport={onOpenImport}
+      onOpenReconciliation={onOpenReconciliation}
+      createPosition={createPosition}
+    />
   );
 
   return (
@@ -505,6 +478,63 @@ function AccountField({
           </SelectGroup>
         </SelectContent>
       </Select>
+    </div>
+  );
+}
+
+function PositionOverviewActions({
+  positions,
+  busyAction,
+  clearPositions,
+  calibrationMode,
+  onOpenImport,
+  onOpenReconciliation,
+  createPosition,
+}: {
+  [
+    K in
+      | 'positions'
+      | 'busyAction'
+      | 'clearPositions'
+      | 'calibrationMode'
+      | 'onOpenImport'
+      | 'onOpenReconciliation'
+  ]: PortfolioManagementViewProps[K];
+} & { createPosition: () => void }) {
+  return calibrationMode ? (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button type="button" onClick={createPosition}>
+        记录持仓快照
+      </Button>
+      <PositionOverviewMenu
+        positions={positions}
+        busyAction={busyAction}
+        clearPositions={clearPositions}
+        {...(onOpenImport ? { onOpenImport } : {})}
+        {...(onOpenReconciliation ? { onOpenReconciliation } : {})}
+      />
+    </div>
+  ) : (
+    <div className="flex items-center gap-2">
+      {positions.length > 0 && (
+        <Button
+          className="text-button danger"
+          size="sm"
+          type="button"
+          variant="destructive"
+          disabled={busyAction !== null}
+          aria-busy={busyAction === 'clear-positions'}
+          onClick={() => void clearPositions()}
+        >
+          {busyAction === 'clear-positions' && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {busyAction === 'clear-positions' ? '清空中…' : '清空持仓'}
+        </Button>
+      )}
+      <Button className="text-button" type="button" variant="link" onClick={createPosition}>
+        + 添加持仓
+      </Button>
     </div>
   );
 }

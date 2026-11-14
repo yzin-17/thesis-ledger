@@ -71,6 +71,7 @@ export const journalSnapshotHistoryResponseSchema = z
   .object({
     items: z.array(journalStoredSnapshotViewSchema),
     nextCursor: z.string().min(1).nullable(),
+    instrumentDirectory: instrumentDirectorySchema,
   })
   .strict();
 export const journalPeriodReviewResponseSchema = z

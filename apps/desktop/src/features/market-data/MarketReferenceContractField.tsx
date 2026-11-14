@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { formatDateTime } from '@/lib/date-display';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   referenceContractChoices,
   referenceContractSources,
@@ -70,8 +71,7 @@ export function MarketReferenceContractField({
       setError(kind === 'future' ? '请选择清单交易日。' : '请选择当前支持的沪市 ETF。');
     }
   };
-  const choices =
-    submitted && query.data && !query.isError ? referenceContractChoices(query.data) : [];
+  const choices = readyContractChoices(submitted, query);
   const needle = filter.trim().toLocaleLowerCase();
   const items = choices
     .filter((item) =>
@@ -83,14 +83,9 @@ export function MarketReferenceContractField({
       displayName: `${item.label} · ${item.description}`,
       market: '',
     }));
-  let status = '先选择来源条件，读取合约清单后搜索选择。';
-  if (query.isError) status = '合约清单读取失败，请重新读取。';
-  else if (submitted && query.isSuccess && !choices.length && query.data.items.length)
-    status = '本页来源代码不符合当前查询格式，未推断转换。';
-  else if (submitted && query.isSuccess && !items.length)
-    status = '本页没有匹配的可用合约；可翻页或保留手工代码。';
-  else if (items.length) status = '';
+  const status = contractChoiceStatus(submitted, query, choices, items);
   const label = kind === 'future' ? '期货代码' : '期权合约代码';
+  const selected = items.find((item) => item.symbol === value);
   return (
     <FieldGroup>
       <Field>
@@ -98,7 +93,8 @@ export function MarketReferenceContractField({
         <InstrumentSearchCombobox
           id="reference-symbol"
           label={label}
-          input={value}
+          input={!open && selected ? `${selected.displayName} · ${value}` : value}
+          placeholder=""
           items={items}
           busy={query.isFetching}
           status={status}
@@ -232,10 +228,40 @@ export function MarketReferenceContractField({
       {query.data && submitted && !query.isError && (
         <p className="text-xs text-muted-foreground">
           {marketReferenceCatalog[query.data.dataset].label} ·{' '}
-          {query.data.start || query.data.symbol} · 抓取于 {query.data.fetchedAt}。本页{' '}
+          {query.data.start || query.data.symbol} · 抓取于 {formatDateTime(query.data.fetchedAt)}。本页{' '}
           {choices.length} 条可选合约，清单可随来源变化。
         </p>
       )}
     </FieldGroup>
   );
+}
+
+type ReferenceResult = Awaited<
+  ReturnType<ReturnType<typeof getDesktopApiClient>['market']['getReference']>
+>;
+function readyContractChoices(
+  submitted: MarketReferenceInput | null,
+  query: UseQueryResult<ReferenceResult>,
+) {
+  const choices =
+    submitted && query.data && !query.isError ? referenceContractChoices(query.data) : [];
+
+  return choices;
+}
+
+function contractChoiceStatus(
+  submitted: MarketReferenceInput | null,
+  query: UseQueryResult<ReferenceResult>,
+  choices: ReturnType<typeof referenceContractChoices>,
+  items: readonly { symbol: string }[],
+) {
+  let status = '先选择来源条件，读取合约清单后搜索选择。';
+  if (query.isError) status = '合约清单读取失败，请重新读取。';
+  else if (submitted && query.isSuccess && !choices.length && query.data.items.length)
+    status = '本页来源代码不符合当前查询格式，未推断转换。';
+  else if (submitted && query.isSuccess && !items.length)
+    status = '本页没有匹配的可用合约；可翻页或保留手工代码。';
+  else if (items.length) status = '';
+
+  return status;
 }

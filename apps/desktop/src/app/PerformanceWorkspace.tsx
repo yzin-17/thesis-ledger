@@ -46,7 +46,6 @@ const PortfolioTradeView = createDeferredPage(() =>
   })),
 );
 
-
 type Props = Omit<ComponentProps<typeof PortfolioDashboard>, 'onRetry'> & {
   accountsReady?: boolean;
   accountsError?: boolean;
@@ -108,7 +107,7 @@ export function PerformanceWorkspace({
     queryFn: () => fetchPerformanceHistory(mode, accountId || undefined, queryOptions),
     enabled: false,
   });
-  const latest = [...(snapshots ?? [])].reverse().find((snapshot) => !snapshot.partial);
+  const metadata = workspaceMetadata(layers, summary, snapshots, portfolio);
   const changeFx = (merge: boolean, currency: Currency) => {
     const commit = () => setFxScope({ mode, merge, currency });
     if (guard)
@@ -150,8 +149,8 @@ export function PerformanceWorkspace({
         mode={mode}
         accountId={accountId}
         mixedCurrencies={mixedCurrencies}
-        latestSnapshotAt={latest?.capturedAt}
-        valuedAt={portfolio?.valuedAt ?? layers?.valuedAt}
+        latestSnapshotAt={metadata.latestSnapshotAt}
+        valuedAt={metadata.valuedAt}
         showAccountSelector={false}
         onAccountChange={onAccountChange}
         accountControl={
@@ -168,7 +167,7 @@ export function PerformanceWorkspace({
         onFxMergeChange={(merge) => changeFx(merge, baseCurrency)}
         onBaseCurrencyChange={(currency) => changeFx(fxMerge, currency)}
         onRetry={() => void refreshPerformance()}
-        fx={layers?.fx ?? summary?.fx}
+        fx={metadata.fx}
       />
       {accountsReady && accountsError && (
         <Alert>
@@ -204,12 +203,8 @@ export function PerformanceWorkspace({
                 onRetry={() => void onRetry()}
               />
             </TabsContent>
-            <TabsContent value="analysis">
-              {panel('analysis')}
-            </TabsContent>
-            <TabsContent value="allocation">
-              {panel('allocation')}
-            </TabsContent>
+            <TabsContent value="analysis">{panel('analysis')}</TabsContent>
+            <TabsContent value="allocation">{panel('allocation')}</TabsContent>
             <TabsContent value="trades">
               <PortfolioTradeView
                 accounts={accounts}
@@ -235,4 +230,18 @@ export function PerformanceWorkspace({
       </Tabs>
     </section>
   );
+}
+
+function workspaceMetadata(
+  layers: PerformanceLayersResponse | undefined,
+  summary: PerformanceSummary | undefined,
+  snapshots: SnapshotRecord[] | undefined,
+  portfolio: Props['portfolio'],
+) {
+  const latest = [...(snapshots ?? [])].reverse().find((snapshot) => !snapshot.partial);
+  return {
+    latestSnapshotAt: latest?.capturedAt,
+    valuedAt: portfolio?.valuedAt ?? layers?.valuedAt,
+    fx: layers?.fx ?? summary?.fx,
+  };
 }

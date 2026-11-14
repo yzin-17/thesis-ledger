@@ -33,7 +33,7 @@ export const marketChartBarsRequestV3Schema = marketDataBarSeriesRequestV3Schema
 export type MarketChartBarsRequestV3 = z.infer<typeof marketChartBarsRequestV3Schema>;
 
 const completeShape = marketDataBarSeriesResponseV3Schema.shape;
-export const marketChartBarsResponseV3Schema = z
+const chartResponseFields = z
   .strictObject({
     contractVersion: completeShape.contractVersion,
     purpose: z.literal('interactive-chart'),
@@ -47,17 +47,35 @@ export const marketChartBarsResponseV3Schema = z
     inputFingerprint: completeShape.inputFingerprint,
     session: z.literal('regular').optional(),
     timestampConvention: z.enum(['interval-start', 'interval-end', 'source-native']).optional(),
-  })
+  });
+
+type ChartResponse = z.infer<typeof chartResponseFields>;
+type ChartIssue = (path: (string | number)[], message: string) => void;
+
+function validateChartResponseProtocol(response: ChartResponse, issue: ChartIssue): void {
+  if (!supportedChartRoute(response.routeKey) || (response.routeKey.timeframe !== '1d' && chartSymbolMarket(response.symbol) !== response.routeKey.market)) issue(['routeKey'], '分钟图表仅支持中港美股票/ETF不复权正常时段');
+  const minute = response.routeKey.timeframe !== '1d';
+  if (minute && response.timestampConvention === 'source-native' && response.bars.some((point) => point.completionStatus !== 'unknown')) issue(['bars'], '来源时间约定未知时完成状态必须保持未知');
+  if (minute && response.session !== 'regular') issue(['session'], '分钟图表必须声明正常交易时段');
+  if (response.sourcePriceBasis.adjustment !== response.routeKey.adjustment)
+    issue(['sourcePriceBasis', 'adjustment'], '来源价格口径必须匹配路由');
+}
+
+function validateMinuteBarClock(response: ChartResponse, point: ChartResponse['bars'][number], index: number, issue: ChartIssue): void {
+  if (Date.parse(point.timestamp) % 60_000 !== 0) issue(['bars', index, 'timestamp'], '分钟时间必须对齐整分钟');
+  if (point.completionStatus === 'complete' &&
+    Date.parse(point.timestamp) + (response.timestampConvention === 'interval-end' ? 0 : Number.parseInt(response.routeKey.timeframe, 10) * 60_000) > Date.parse(response.sourcePriceBasis.observedAt))
+    issue(['bars', index, 'completionStatus'], '分钟结束晚于观察时间，不能声明完成');
+  if (Date.parse(point.timestamp) > Date.parse(response.sourcePriceBasis.observedAt))
+    issue(['bars', index, 'timestamp'], '分钟时间不能晚于来源观察时间');
+}
+
+export const marketChartBarsResponseV3Schema = chartResponseFields
   .superRefine((response, context) => {
     const issue = (path: (string | number)[], message: string) =>
       context.addIssue({ code: 'custom', path, message });
-    if (!supportedChartRoute(response.routeKey) || (response.routeKey.timeframe !== '1d' && chartSymbolMarket(response.symbol) !== response.routeKey.market)) issue(['routeKey'], '分钟图表仅支持中港美股票/ETF不复权正常时段');
+    validateChartResponseProtocol(response, issue);
     const minute = response.routeKey.timeframe !== '1d';
-    if (minute && response.timestampConvention === 'source-native' && response.bars.some((point) => point.completionStatus !== 'unknown')) issue(['bars'], '来源时间约定未知时完成状态必须保持未知');
-    if (minute && response.session !== 'regular') issue(['session'], '分钟图表必须声明正常交易时段');
-    if (response.sourcePriceBasis.adjustment !== response.routeKey.adjustment) {
-      issue(['sourcePriceBasis', 'adjustment'], '来源价格口径必须匹配路由');
-    }
     const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: marketCalendarTimezonesV3[response.routeKey.market],
       year: 'numeric',
@@ -76,14 +94,8 @@ export const marketChartBarsResponseV3Schema = z
       }
       if (!minute && date === previousDate) issue(['bars', index, 'timestamp'], '同一交易日不得重复');
       previousDate = date;
-      if (minute && Date.parse(point.timestamp) % 60_000 !== 0) issue(['bars', index, 'timestamp'], '分钟时间必须对齐整分钟');
-      if (minute && point.completionStatus === 'complete' &&
-        Date.parse(point.timestamp) + (response.timestampConvention === 'interval-end' ? 0 : Number.parseInt(response.routeKey.timeframe, 10) * 60_000) > Date.parse(response.sourcePriceBasis.observedAt)) {
-        issue(['bars', index, 'completionStatus'], '分钟结束晚于观察时间，不能声明完成');
-      }
+      if (minute) validateMinuteBarClock(response, point, index, issue);
       if (!minute && point.completionStatus === 'complete') latestComplete = date;
-      if (minute && Date.parse(point.timestamp) > Date.parse(response.sourcePriceBasis.observedAt))
-        issue(['bars', index, 'timestamp'], '分钟时间不能晚于来源观察时间');
       if (Date.parse(point.availableAt) > Date.parse(response.sourcePriceBasis.observedAt)) {
         issue(['bars', index, 'availableAt'], '可用时间不能晚于本次来源观测时间');
       }

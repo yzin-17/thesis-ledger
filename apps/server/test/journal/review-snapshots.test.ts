@@ -119,6 +119,7 @@ describe('正式复盘快照读写', () => {
       metadata.id,
       currentCandidate().input,
       'journal-decimal-1',
+      undefined,
     );
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({

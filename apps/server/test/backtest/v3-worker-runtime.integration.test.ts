@@ -1,33 +1,33 @@
-import 'reflect-metadata';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { appendFile, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
 import { PrismaClient, type Prisma } from '@prisma/client';
-import { Redis } from 'ioredis';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   backtestResultSchemaV3,
   marketDataMultiWindowResponseV3Schema,
 } from '@thesis-ledger/schemas';
-import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
+import { Redis } from 'ioredis';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { appendFile, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import 'reflect-metadata';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BacktestBullQueue } from '../../src/backtest/backtest-bull-queue.js';
 import { BacktestCreationGuardService } from '../../src/backtest/backtest-creation-guard.service.js';
+import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
+import { BacktestRunService } from '../../src/backtest/backtest-run.service.js';
 import { DsaSnapshotBuilder } from '../../src/backtest/backtest-snapshot-builder.js';
 import { LocalSnapshotStore } from '../../src/backtest/backtest-snapshot.js';
-import { BacktestRunService } from '../../src/backtest/backtest-run.service.js';
 import { LocalSnapshotV3Runner } from '../../src/backtest/backtest-v3-runner.js';
 import { BacktestService } from '../../src/backtest/backtest.service.js';
-import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
 import type { PrismaService } from '../../src/platform/prisma.service.js';
-import { preparationStampFor, preparedRevisionReader } from './v3-preparation-fixtures.js';
-import { startWorkerHttpFixture } from './worker-http-fixture.js';
-import { startWorkerDsaHttpFixture } from './worker-dsa-http-fixture.js';
-import { makeMultiWindowResponseV3 } from './v3-multi-window-fixtures.js';
-import { makeReaderResult } from './v3-snapshot-fixtures.js';
+import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
+import { verifyPersistedCurrentRunBoundary } from './current-run-persisted-boundary.fixtures.js';
 import { startIsolatedNavPostgres } from './nav-postgres.integration-harness.js';
 import { startIsolatedNavRedis } from './nav-worker-redis.integration-harness.js';
-import { verifyPersistedCurrentRunBoundary } from './current-run-persisted-boundary.fixtures.js';
+import { makeMultiWindowResponseV3 } from './v3-multi-window-fixtures.js';
+import { preparationStampFor, preparedRevisionReader } from './v3-preparation-fixtures.js';
+import { makeReaderResult } from './v3-snapshot-fixtures.js';
+import { startWorkerDsaHttpFixture } from './worker-dsa-http-fixture.js';
+import { startWorkerHttpFixture } from './worker-http-fixture.js';
 
 let databaseUrl = process.env.BACKTEST_WORKER_TEST_DATABASE_URL;
 let redisUrl = process.env.BACKTEST_WORKER_TEST_REDIS_URL;
@@ -35,6 +35,11 @@ const isolated = process.env.C04_WORKER_ISOLATED === '1';
 const enabled = isolated || Boolean(databaseUrl && redisUrl);
 
 (enabled ? describe : describe.skip)('V3 实际 Worker 进程与隔离队列', () => {
+  const suiteScope = v3WorkerContext();
+  registerV3WorkerRuntimeCase(suiteScope);
+});
+
+function v3WorkerContext() {
   let prisma: PrismaClient;
   let redis: Redis;
   let queue: BacktestBullQueue;
@@ -126,157 +131,128 @@ const enabled = isolated || Boolean(databaseUrl && redisUrl);
     await ownedRedis?.cleanup();
     await ownedDatabase?.cleanup();
   });
-
+  return {
+    get prisma() {
+      return prisma;
+    },
+    set prisma(value: typeof prisma) {
+      prisma = value;
+    },
+    get redis() {
+      return redis;
+    },
+    set redis(value: typeof redis) {
+      redis = value;
+    },
+    get queue() {
+      return queue;
+    },
+    set queue(value: typeof queue) {
+      queue = value;
+    },
+    get worker() {
+      return worker;
+    },
+    set worker(value: typeof worker) {
+      worker = value;
+    },
+    get root() {
+      return root;
+    },
+    set root(value: typeof root) {
+      root = value;
+    },
+    get http() {
+      return http;
+    },
+    set http(value: typeof http) {
+      http = value;
+    },
+    get dsaHttp() {
+      return dsaHttp;
+    },
+    set dsaHttp(value: typeof dsaHttp) {
+      dsaHttp = value;
+    },
+    get errors() {
+      return errors;
+    },
+    get ownedDatabase() {
+      return ownedDatabase;
+    },
+    set ownedDatabase(value: typeof ownedDatabase) {
+      ownedDatabase = value;
+    },
+    get ownedRedis() {
+      return ownedRedis;
+    },
+    set ownedRedis(value: typeof ownedRedis) {
+      ownedRedis = value;
+    },
+    get witness() {
+      return witness;
+    },
+  };
+}
+function registerV3WorkerRuntimeCase(suiteScope: ReturnType<typeof v3WorkerContext>) {
   it('普通创建经 BullMQ 和生产 Worker 进入数据库终态并离线重放', async () => {
-    const before = await witness();
-    dsaHttp = await startWorkerDsaHttpFixture(databaseUrl!, redisUrl!, prisma as PrismaService);
-    const { fixture } = dsaHttp;
-    const strategy = await prisma.strategy.create({
-      data: { name: 'Worker 隔离联通', schemaVersion: 2 },
-    });
-    const version = await prisma.strategyVersion.create({
-      data: {
-        strategyId: strategy.id,
-        version: 1,
-        schemaVersion: 2,
-        schema: fixture.input.strategy as unknown as Prisma.InputJsonValue,
-      },
-    });
-    const snapshots = new LocalSnapshotStore(root);
-    queue = new BacktestBullQueue();
-    const dispatch = new BacktestQueueService(prisma as PrismaService, queue, {
-      publishJob: async () => undefined,
-    });
-    const builder = new DsaSnapshotBuilder(dsaHttp.dsa, snapshots, dsaHttp.reader);
-    const service = new BacktestRunService(
-      prisma as PrismaService,
-      dispatch,
+    const {
+      before,
+      fixture,
+      version,
       snapshots,
-      builder,
-      new LocalSnapshotV3Runner(snapshots),
-      new BacktestCreationGuardService(prisma as PrismaService, preparedRevisionReader() as never),
-    );
-    const reads = new BacktestService(
-      prisma as PrismaService,
-      undefined,
       service,
-      new ResultReadPolicyService(prisma as PrismaService),
-    );
-    http = await startWorkerHttpFixture(reads);
-    const createResponse = await fetch(`${http.baseUrl}/api/v1/backtests/runs`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        contractVersion: 3,
-        strategyVersionId: version.id,
-        idempotencyKey: 'worker-runtime-fixture',
-        runConfig: fixture.input.runConfig,
-        preparationStamp: preparationStampFor(
-          fixture.input.strategy,
-          fixture.input.runConfig,
-          version.id,
-        ),
-      }),
-    });
-    expect(createResponse.status).toBe(201);
-    const created = (await createResponse.json()) as { id: string; status: string };
-    const initialJob = await prisma.backtestJob.findUniqueOrThrow({ where: { id: created.id } });
-    expect(
-      created?.status,
-      JSON.stringify({ errorCode: initialJob.errorCode, diagnostics: initialJob.diagnostics }),
-    ).toBe('queued');
-    expect(await queue.getState(created!.id)).toBe('waiting');
-    const damaged = await service.createRun({
-      contractVersion: 3,
-      strategyVersionId: version.id,
-      idempotencyKey: 'worker-runtime-damaged',
-      runConfig: fixture.input.runConfig,
-      preparationStamp: preparationStampFor(
-        fixture.input.strategy,
-        fixture.input.runConfig,
-        version.id,
-      ),
-    });
-    expect(
-      damaged?.status,
-      JSON.stringify({ errorCode: damaged?.errorCode, errorSummary: damaged?.errorSummary }),
-    ).toBe('queued');
-    const damagedManifest = await snapshots.v3.replay(damaged!.id);
-    await appendFile(resolve(root, 'artifacts', damagedManifest.artifacts[0]!.key), 'tampered');
-    const multiBaseline = await makeReaderResult({
-      market: 'CN',
-      symbol: '159516.SZ',
-      routeKey: fixture.input.executionRouteKey,
-      window: { start: '2026-04-24', end: '2026-05-20' },
-      tradabilityMode: 'assume-untradable-no-bar',
-    });
-    if (multiBaseline.status !== 'selected') throw new Error('缺少多窗口执行基线');
-    const multiResponse = makeMultiWindowResponseV3(multiBaseline.selection.response);
-    const multiConfig = structuredClone(fixture.input.runConfig);
-    multiConfig.executionPriceProtocol.priceBasis = {
-      ...multiResponse.sourcePriceBasis,
-      quantityBasis: 'normalized-units',
-    };
-    const capabilitiesBeforeMulti = dsaHttp.paths.filter(
-      (path) => path === '/api/v3/thesis-ledger/capabilities',
-    ).length;
-    dsaHttp.enableMultiWindow();
-    const multiCreateResponse = await fetch(`${http.baseUrl}/api/v1/backtests/runs`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        contractVersion: 3,
-        strategyVersionId: version.id,
-        idempotencyKey: 'worker-runtime-multi-window',
-        runConfig: multiConfig,
-        preparationStamp: preparationStampFor(fixture.input.strategy, multiConfig, version.id),
-      }),
-    });
-    expect(multiCreateResponse.status).toBe(201);
-    const multiCreated = (await multiCreateResponse.json()) as { id: string; status: string };
-    expect(multiCreated.status).toBe('queued');
-    expect(await queue.getState(multiCreated.id)).toBe('waiting');
-    const multiManifest = await snapshots.v3.replay(multiCreated.id);
-    expect(multiManifest.actualSources[0]?.windowProtocol).toBe('market-multi-window-content-v1');
-    const multiEvidence = await prisma.marketBarWindowEvidenceV3.findFirstOrThrow({
-      where: { inputFingerprint: multiResponse.inputFingerprint },
-    });
-    expect(
-      marketDataMultiWindowResponseV3Schema.parse(multiEvidence.completeResponse)
-        .windowObservations,
-    ).toHaveLength(2);
-    worker = spawn(process.execPath, [resolve('dist/src/backtest/backtest-worker.main.js')], {
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        DATABASE_URL: databaseUrl!,
-        REDIS_URL: redisUrl!,
-        BACKTEST_SNAPSHOT_ROOT: root,
-        DSA_BASE_URL: 'http://127.0.0.1:1',
-        THESIS_LEDGER_DSA_TOKEN: 'isolated-worker-fixture',
-        CREDENTIAL_ENCRYPTION_KEY: 'isolated-worker-fixture-key',
+      reads,
+      created,
+      damaged,
+      capabilitiesBeforeMulti,
+      multiCreated,
+      dsaHttp,
+      http,
+    } = await prepareV3WorkerJobs(suiteScope);
+    suiteScope.worker = spawn(
+      process.execPath,
+      [resolve('dist/src/backtest/backtest-worker.main.js')],
+      {
+        env: {
+          ...process.env,
+          NODE_ENV: 'test',
+          DATABASE_URL: databaseUrl!,
+          REDIS_URL: redisUrl!,
+          BACKTEST_SNAPSHOT_ROOT: suiteScope.root,
+          DSA_BASE_URL: 'http://127.0.0.1:1',
+          THESIS_LEDGER_DSA_TOKEN: 'isolated-worker-fixture',
+          CREDENTIAL_ENCRYPTION_KEY: 'isolated-worker-fixture-key',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+    );
+    suiteScope.worker.stderr?.on('data', (data: Buffer) => {
+      suiteScope.errors.push(data.toString().slice(0, 2000));
     });
-    worker.stderr?.on('data', (data: Buffer) => {
-      errors.push(data.toString().slice(0, 2000));
-    });
-    worker.stdout?.resume();
+    suiteScope.worker.stdout?.resume();
     await vi.waitFor(
       async () => {
-        if (worker!.exitCode !== null)
-          throw new Error(`Worker 已退出 ${worker!.exitCode}: ${errors.join('').slice(-3000)}`);
-        const job = await prisma.backtestJob.findUniqueOrThrow({ where: { id: created!.id } });
-        expect(job.status, `${job.errorCode ?? ''}: ${errors.join('').slice(-2000)}`).toBe(
-          'succeeded',
-        );
+        if (suiteScope.worker!.exitCode !== null)
+          throw new Error(
+            `Worker 已退出 ${suiteScope.worker!.exitCode}: ${suiteScope.errors.join('').slice(-3000)}`,
+          );
+        const job = await suiteScope.prisma.backtestJob.findUniqueOrThrow({
+          where: { id: created!.id },
+        });
+        expect(
+          job.status,
+          `${job.errorCode ?? ''}: ${suiteScope.errors.join('').slice(-2000)}`,
+        ).toBe('succeeded');
       },
       { timeout: 20_000, interval: 100 },
     );
-    const job = await prisma.backtestJob.findUniqueOrThrow({ where: { id: created!.id } });
+    const job = await suiteScope.prisma.backtestJob.findUniqueOrThrow({
+      where: { id: created!.id },
+    });
     const result = backtestResultSchemaV3.parse(job.result);
     expect(job.executionAttempt).toBe(1);
-    const replay = await new LocalSnapshotV3Runner(new LocalSnapshotStore(root)).run(
+    const replay = await new LocalSnapshotV3Runner(new LocalSnapshotStore(suiteScope.root)).run(
       {
         runId: job.id,
         snapshotRef: { snapshotId: result.snapshotId, contentHash: result.snapshotId },
@@ -287,22 +263,24 @@ const enabled = isolated || Boolean(databaseUrl && redisUrl);
     expect(replay.resultChecksum).toBe(result.resultChecksum);
     await vi.waitFor(
       async () => {
-        const multiJob = await prisma.backtestJob.findUniqueOrThrow({
+        const multiJob = await suiteScope.prisma.backtestJob.findUniqueOrThrow({
           where: { id: multiCreated.id },
         });
         expect(
           multiJob.status,
-          `${multiJob.errorCode ?? ''}: ${errors.join('').slice(-2000)}`,
+          `${multiJob.errorCode ?? ''}: ${suiteScope.errors.join('').slice(-2000)}`,
         ).toBe('succeeded');
       },
       { timeout: 20_000, interval: 100 },
     );
-    const multiJob = await prisma.backtestJob.findUniqueOrThrow({
+    const multiJob = await suiteScope.prisma.backtestJob.findUniqueOrThrow({
       where: { id: multiCreated.id },
     });
     const multiResult = backtestResultSchemaV3.parse(multiJob.result);
     expect(multiJob.executionAttempt).toBe(1);
-    const multiReplay = await new LocalSnapshotV3Runner(new LocalSnapshotStore(root)).run(
+    const multiReplay = await new LocalSnapshotV3Runner(
+      new LocalSnapshotStore(suiteScope.root),
+    ).run(
       {
         runId: multiJob.id,
         snapshotRef: { snapshotId: multiResult.snapshotId, contentHash: multiResult.snapshotId },
@@ -314,7 +292,7 @@ const enabled = isolated || Boolean(databaseUrl && redisUrl);
     await vi.waitFor(
       async () => {
         expect(
-          await prisma.backtestJob.findUniqueOrThrow({ where: { id: damaged!.id } }),
+          await suiteScope.prisma.backtestJob.findUniqueOrThrow({ where: { id: damaged!.id } }),
         ).toMatchObject({ status: 'failed', errorCode: 'DATA_UNAVAILABLE', result: null });
       },
       { timeout: 10_000, interval: 100 },
@@ -324,7 +302,7 @@ const enabled = isolated || Boolean(databaseUrl && redisUrl);
       status: 'failed',
       result: null,
     });
-    expect(await witness()).toEqual(before);
+    expect(await suiteScope.witness()).toEqual(before);
     expect(dsaHttp.paths).toEqual(
       expect.arrayContaining([
         '/api/v3/thesis-ledger/backtest/calendar',
@@ -364,21 +342,28 @@ const enabled = isolated || Boolean(databaseUrl && redisUrl);
     });
     await vi.waitFor(
       async () => {
-        const current = await prisma.backtestJob.findUniqueOrThrow({ where: { id: sparse.id } });
-        expect(current.status, `${current.errorCode ?? ''}: ${errors.join('').slice(-2000)}`).toBe(
-          'succeeded',
-        );
+        const current = await suiteScope.prisma.backtestJob.findUniqueOrThrow({
+          where: { id: sparse.id },
+        });
+        expect(
+          current.status,
+          `${current.errorCode ?? ''}: ${suiteScope.errors.join('').slice(-2000)}`,
+        ).toBe('succeeded');
       },
       { timeout: 20_000, interval: 100 },
     );
-    const sparseJob = await prisma.backtestJob.findUniqueOrThrow({ where: { id: sparse.id } });
+    const sparseJob = await suiteScope.prisma.backtestJob.findUniqueOrThrow({
+      where: { id: sparse.id },
+    });
     const sparseResult = backtestResultSchemaV3.parse(sparseJob.result);
     expect(
       sparseResult.simulationFills.every((fill) => fill.occurredAt.slice(0, 10) !== '2026-05-19'),
     ).toBe(true);
     expect(sparseResult.warnings).toContain('按冻结逐日状态跳过 1 个缺 Bar 交易日。');
     expect(sparseResult.equityCurve).toHaveLength(3);
-    const sparseReplay = await new LocalSnapshotV3Runner(new LocalSnapshotStore(root)).run(
+    const sparseReplay = await new LocalSnapshotV3Runner(
+      new LocalSnapshotStore(suiteScope.root),
+    ).run(
       {
         runId: sparse.id,
         snapshotRef: { snapshotId: sparseResult.snapshotId, contentHash: sparseResult.snapshotId },
@@ -387,7 +372,156 @@ const enabled = isolated || Boolean(databaseUrl && redisUrl);
       new AbortController().signal,
     );
     expect(sparseReplay.resultChecksum).toBe(sparseResult.resultChecksum);
-    await verifyPersistedCurrentRunBoundary(prisma, reads, http.baseUrl, job.id);
-    expect(await witness()).toEqual(before);
+    await verifyPersistedCurrentRunBoundary(suiteScope.prisma, reads, http.baseUrl, job.id);
+    expect(await suiteScope.witness()).toEqual(before);
   }, 30_000);
-});
+}
+
+async function prepareV3WorkerJobs(suiteScope: ReturnType<typeof v3WorkerContext>) {
+  const before = await suiteScope.witness();
+  suiteScope.dsaHttp = await startWorkerDsaHttpFixture(
+    databaseUrl!,
+    redisUrl!,
+    suiteScope.prisma as PrismaService,
+  );
+  const { fixture } = suiteScope.dsaHttp;
+  const strategy = await suiteScope.prisma.strategy.create({
+    data: { name: 'Worker 隔离联通', schemaVersion: 2 },
+  });
+  const version = await suiteScope.prisma.strategyVersion.create({
+    data: {
+      strategyId: strategy.id,
+      version: 1,
+      schemaVersion: 2,
+      schema: fixture.input.strategy as unknown as Prisma.InputJsonValue,
+    },
+  });
+  const snapshots = new LocalSnapshotStore(suiteScope.root);
+  suiteScope.queue = new BacktestBullQueue();
+  const dispatch = new BacktestQueueService(suiteScope.prisma as PrismaService, suiteScope.queue, {
+    publishJob: async () => undefined,
+  });
+  const builder = new DsaSnapshotBuilder(
+    suiteScope.dsaHttp.dsa,
+    snapshots,
+    suiteScope.dsaHttp.reader,
+  );
+  const service = new BacktestRunService(
+    suiteScope.prisma as PrismaService,
+    dispatch,
+    snapshots,
+    builder,
+    new LocalSnapshotV3Runner(snapshots),
+    new BacktestCreationGuardService(
+      suiteScope.prisma as PrismaService,
+      preparedRevisionReader() as never,
+    ),
+  );
+  const reads = new BacktestService(
+    suiteScope.prisma as PrismaService,
+    undefined,
+    service,
+    new ResultReadPolicyService(suiteScope.prisma as PrismaService),
+  );
+  suiteScope.http = await startWorkerHttpFixture(reads);
+  const createResponse = await fetch(`${suiteScope.http.baseUrl}/api/v1/backtests/runs`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contractVersion: 3,
+      strategyVersionId: version.id,
+      idempotencyKey: 'worker-runtime-fixture',
+      runConfig: fixture.input.runConfig,
+      preparationStamp: preparationStampFor(
+        fixture.input.strategy,
+        fixture.input.runConfig,
+        version.id,
+      ),
+    }),
+  });
+  expect(createResponse.status).toBe(201);
+  const created = (await createResponse.json()) as { id: string; status: string };
+  const initialJob = await suiteScope.prisma.backtestJob.findUniqueOrThrow({
+    where: { id: created.id },
+  });
+  expect(
+    created?.status,
+    JSON.stringify({ errorCode: initialJob.errorCode, diagnostics: initialJob.diagnostics }),
+  ).toBe('queued');
+  expect(await suiteScope.queue.getState(created!.id)).toBe('waiting');
+  const damaged = await service.createRun({
+    contractVersion: 3,
+    strategyVersionId: version.id,
+    idempotencyKey: 'worker-runtime-damaged',
+    runConfig: fixture.input.runConfig,
+    preparationStamp: preparationStampFor(
+      fixture.input.strategy,
+      fixture.input.runConfig,
+      version.id,
+    ),
+  });
+  expect(
+    damaged?.status,
+    JSON.stringify({ errorCode: damaged?.errorCode, errorSummary: damaged?.errorSummary }),
+  ).toBe('queued');
+  const damagedManifest = await snapshots.v3.replay(damaged!.id);
+  await appendFile(
+    resolve(suiteScope.root, 'artifacts', damagedManifest.artifacts[0]!.key),
+    'tampered',
+  );
+  const multiBaseline = await makeReaderResult({
+    market: 'CN',
+    symbol: '159516.SZ',
+    routeKey: fixture.input.executionRouteKey,
+    window: { start: '2026-04-24', end: '2026-05-20' },
+    tradabilityMode: 'assume-untradable-no-bar',
+  });
+  if (multiBaseline.status !== 'selected') throw new Error('缺少多窗口执行基线');
+  const multiResponse = makeMultiWindowResponseV3(multiBaseline.selection.response);
+  const multiConfig = structuredClone(fixture.input.runConfig);
+  multiConfig.executionPriceProtocol.priceBasis = {
+    ...multiResponse.sourcePriceBasis,
+    quantityBasis: 'normalized-units',
+  };
+  const capabilitiesBeforeMulti = suiteScope.dsaHttp.paths.filter(
+    (path) => path === '/api/v3/thesis-ledger/capabilities',
+  ).length;
+  suiteScope.dsaHttp.enableMultiWindow();
+  const multiCreateResponse = await fetch(`${suiteScope.http.baseUrl}/api/v1/backtests/runs`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contractVersion: 3,
+      strategyVersionId: version.id,
+      idempotencyKey: 'worker-runtime-multi-window',
+      runConfig: multiConfig,
+      preparationStamp: preparationStampFor(fixture.input.strategy, multiConfig, version.id),
+    }),
+  });
+  expect(multiCreateResponse.status).toBe(201);
+  const multiCreated = (await multiCreateResponse.json()) as { id: string; status: string };
+  expect(multiCreated.status).toBe('queued');
+  expect(await suiteScope.queue.getState(multiCreated.id)).toBe('waiting');
+  const multiManifest = await snapshots.v3.replay(multiCreated.id);
+  expect(multiManifest.actualSources[0]?.windowProtocol).toBe('market-multi-window-content-v1');
+  const multiEvidence = await suiteScope.prisma.marketBarWindowEvidenceV3.findFirstOrThrow({
+    where: { inputFingerprint: multiResponse.inputFingerprint },
+  });
+  expect(
+    marketDataMultiWindowResponseV3Schema.parse(multiEvidence.completeResponse).windowObservations,
+  ).toHaveLength(2);
+  return {
+    before,
+    fixture,
+    version,
+    snapshots,
+    service,
+    reads,
+    created,
+    damaged,
+    capabilitiesBeforeMulti,
+    multiCreated,
+    dsaHttp: suiteScope.dsaHttp,
+    http: suiteScope.http,
+  };
+}

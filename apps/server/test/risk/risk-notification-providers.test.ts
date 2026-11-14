@@ -41,6 +41,24 @@ const message = { title: '隔离验收', body: '不会发送真实通知', sever
 const policy = { cooldownMinutes: 30, maxAttempts: 3, criticalBypassCooldown: true };
 
 describe('风险通知提供方选择', () => {
+  it('单条配置覆盖旧全局选择，并在提供方失效后停止而不改投', async () => {
+    const f = fixture(['优先通知']);
+    await f.notifications.enqueue({ type: 'risk-event', id: 'per-rule' }, message, { ...policy, providers: ['备用通知'] });
+    expect([...f.deliveries.values()].map((row) => row.provider)).toEqual(['备用通知']);
+    expect(f.store.notificationRoutingPreference.findUnique).not.toHaveBeenCalled();
+    f.configs.splice(1, 1);
+    f.upsert.mockClear();
+    expect(await f.notifications.enqueue({ type: 'risk-event', id: 'missing' }, message, { ...policy, providers: ['备用通知'] })).toEqual([]);
+    expect(f.upsert).not.toHaveBeenCalled();
+  });
+  it('明确零冷却不预留 Redis 锁，空提供方不投递', async () => {
+    const f = fixture();
+    await f.notifications.enqueue({ type: 'risk-event', id: 'zero' }, message, { ...policy, cooldownMinutes: 0, providers: ['备用通知'] });
+    expect(f.redis.client.set).not.toHaveBeenCalled();
+    f.upsert.mockClear();
+    expect(await f.notifications.enqueue({ type: 'risk-event', id: 'empty' }, message, { ...policy, providers: [] })).toEqual([]);
+    expect(f.upsert).not.toHaveBeenCalled();
+  });
   it('默认选择最高优先级，同时完整公开同渠道候选且不泄露凭证', async () => {
     const f = fixture();
     const result = await f.routing.read();

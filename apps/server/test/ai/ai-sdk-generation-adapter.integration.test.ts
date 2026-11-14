@@ -36,14 +36,19 @@ const writeSse = (response: ServerResponse, frames: unknown[], finish = true) =>
   response.end();
 };
 
-describe('AI SDK generation adapter local HTTP/SSE', () => {
-  const adapter = new AiSdkGenerationAdapter();
-  let handler: Handler = (_request, response) => writeJson(response, 500, {});
-  let requestCount = 0;
-  let lastBody: unknown;
-  let lastUrl: string | undefined;
-  let lastHeaders: IncomingMessage['headers'];
-  const server = createServer(async (request, response) => {
+const adapter = new AiSdkGenerationAdapter();
+
+let handler: Handler = (_request, response) => writeJson(response, 500, {});
+
+let requestCount = 0;
+
+let lastBody: unknown;
+
+let lastUrl: string | undefined;
+
+let lastHeaders: IncomingMessage['headers'];
+
+const server = createServer(async (request, response) => {
     requestCount += 1;
     lastUrl = request.url;
     lastHeaders = request.headers;
@@ -53,9 +58,10 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     lastBody = text ? (JSON.parse(text) as unknown) : null;
     handler(request, response, lastBody);
   });
-  let baseURL = '';
 
-  const request = (
+let baseURL = '';
+
+const request = (
     overrides: Partial<AiSdkGenerationRequest<{ answer: string }>> = {},
   ): AiSdkGenerationRequest<{ answer: string }> => ({
     requestId: randomUUID(),
@@ -77,7 +83,7 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     ...overrides,
   });
 
-  beforeAll(async () => {
+beforeAll(async () => {
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
@@ -85,18 +91,19 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     baseURL = `http://127.0.0.1:${address.port}`;
   });
 
-  beforeEach(() => {
+beforeEach(() => {
     requestCount = 0;
     lastBody = null;
     lastUrl = undefined;
     lastHeaders = {};
   });
 
-  afterAll(async () => {
+afterAll(async () => {
     server.close();
     await once(server, 'close');
   });
 
+describe("SDK 回环协议与认证", () => {
   it('uses native schema mode with one non-streaming request and no implicit retry', async () => {
     handler = (_request, response) =>
       writeJson(
@@ -286,7 +293,9 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
       else process.env.ANTHROPIC_API_KEY = previous;
     }
   });
+});
 
+describe("SDK 结构校验及兼容范围", () => {
   it('supports explicit json_validated mode without accepting invalid domain output', async () => {
     handler = (_request, response) =>
       writeJson(
@@ -391,7 +400,9 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     });
     expect(requestCount).toBe(0);
   });
+});
 
+describe("SDK 流完成与用量", () => {
   it('consumes the complete SSE stream including a usage-only tail frame', async () => {
     const progress: string[] = [];
     handler = (_request, response) =>
@@ -577,7 +588,9 @@ describe('AI SDK generation adapter local HTTP/SSE', () => {
     expect(embedded).toBeInstanceOf(AiSdkGenerationError);
     expect(requestCount).toBe(1);
   });
+});
 
+describe("SDK 取消和输出期限", () => {
   it('combines caller cancellation with SDK timeouts and releases the request', async () => {
     handler = (_request, response) => {
       setTimeout(() => writeJson(response, 200, completion('{"answer":"late"}')), 200);

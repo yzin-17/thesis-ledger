@@ -355,13 +355,16 @@ export class AutomationService {
     }
   }
 
-  async history(jobId?: string, page?: number, pageSize?: number) {
+  async history(jobId?: string, page?: number, pageSize?: number, issuesOnly = false) {
     const requestedPage = Number.isInteger(page) && page && page > 0 ? page : 1;
     const requestedPageSize =
       Number.isInteger(pageSize) && pageSize && pageSize > 0
         ? Math.min(pageSize, MAX_AUTOMATION_HISTORY_PAGE_SIZE)
         : DEFAULT_AUTOMATION_HISTORY_PAGE_SIZE;
-    const where = jobId ? { jobId } : {};
+    const where = {
+      ...(jobId ? { jobId } : {}),
+      ...(issuesOnly ? { status: { in: ['failed', 'unknown_outcome'] } } : {}),
+    };
     const total = await this.prisma.automationRun.count({ where });
     const totalPages = Math.ceil(total / requestedPageSize);
     const currentPage = totalPages === 0 ? 1 : Math.min(requestedPage, totalPages);

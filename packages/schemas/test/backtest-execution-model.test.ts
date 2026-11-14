@@ -244,6 +244,9 @@ describe('研究模型共享契约与真实 Domain 计算', () => {
     ).toThrow('dataAsOf');
   });
 
+});
+
+describe('研究模型净值与冻结兼容', () => {
   it('NAV 必须显式提供生命周期字段和费用，股票模型不能代用', () => {
     const raw = navFixture();
     expect(backtestExecutionModelSchema.safeParse(raw).success).toBe(true);
@@ -414,6 +417,9 @@ describe('研究模型共享契约与真实 Domain 计算', () => {
     );
   });
 
+});
+
+describe('研究模型归一化记账', () => {
   it('V3 归一化执行模型只允许连续数量与价格，并与记账协议绑定', () => {
     const normalized = fixture();
     normalized.segments[0].assumptions.push('在供应商复权坐标中按连续 Decimal 数量模拟');

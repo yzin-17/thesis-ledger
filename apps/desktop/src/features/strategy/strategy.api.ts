@@ -18,6 +18,8 @@ export const fetchBacktestJobs = (client?: DesktopRequestClient): Promise<Backte
   runs(client).listRuns().then(omitUndefinedDeep);
 export const fetchBacktestJob = (id: string, client?: DesktopRequestClient): Promise<BacktestJob> =>
   runs(client).getRun(id).then(omitUndefinedDeep);
+export const fetchBacktestInstrumentSeries = (id: string, signal?: AbortSignal, client?: DesktopRequestClient) =>
+  runs(client).getInstrumentSeries(id, signal);
 export const createStrategy = (
   input: CreateStrategyInput,
   client?: DesktopRequestClient,

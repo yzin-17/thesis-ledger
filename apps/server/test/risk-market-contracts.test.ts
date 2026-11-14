@@ -174,6 +174,9 @@ describe('Risk scope and mode contracts', () => {
     expect(creates[0]).toMatchObject({ accountId, symbol: '600519.SH' });
   });
 
+});
+
+describe("跨账户峰值与集中度", () => {
   it('maintains a trailing-stop peak per account and triggers after a drawdown', async () => {
     const state = new Map<string, Record<string, unknown>>();
     const stateDelegate = {
@@ -299,6 +302,9 @@ describe('Risk scope and mode contracts', () => {
     expect(creates[0]).toMatchObject({ triggerValue: 0.8, symbol: '600519.SH' });
   });
 
+});
+
+describe("风险列表模式和数据库分页", () => {
   it('filters mode and paginates in the database', async () => {
     const findMany = vi.fn(async () => []);
     const service = new RiskService({ riskEvent: { findMany } } as never, {} as never);
@@ -317,11 +323,11 @@ describe('Risk scope and mode contracts', () => {
 });
 
 describe('Supported markets', () => {
-  it('keeps HK catalog items searchable but not confirmable', async () => {
+  it('keeps unsupported market catalog items searchable but not confirmable', async () => {
     const hk = {
       id: 'instrument-hk',
       instrumentType: 'STOCK',
-      market: 'HK',
+      market: 'JP',
       canonicalCode: '00700',
       displayName: '腾讯控股',
       pinyin: 'tengxunkonggu',

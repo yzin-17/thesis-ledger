@@ -1,5 +1,26 @@
 # 当前实施任务
 
+- [竞技场条件委托与成交保护](2026-11-13-arena-contingent-orders.md)。按整笔成交保护、部分成交和分批规则分期验收。
+
+
+- [策略定义统一与双向编辑](2026-11-13-strategy-definition-authoring.md)。双端编辑、AI 确认与历史回放的联合实施入口。
+
+
+
+
+
+
+
+
+
+
+
+- [实验重试冻结校验修复](2026-11-12-experiment-retry-catalog-revalidation.md)：代码与真实冻结复验通过；一次原实验重试确认模型地址连接失败，保留候选完整执行验收缺口。
+
+- [开发库不备份升级](2026-11-12-development-upgrade-without-backup.md)：本地与隔离验证完成；仅保留不备份分支真实目标执行缺口，原增列已由并行默认升级完成，不重复执行。
+
+- [自主交易竞技场](2026-11-12-autonomous-model-arena.md)：自主交易、独立入口、收益曲线与三市场验收。
+
 
 最近核对：2026-11-05。此页只维护阅读顺序、任务入口与接续条件；任务的具体状态、授权及证据以各 Task 为准。原阶段汇报已保存在[历史摘录](../archive/reviews/2026-11-05-task-index-history.md)。
 
@@ -17,6 +38,15 @@
 
 
 
+- [Tushare 权限真实检查与消费修正](2026-11-10-tushare-access-live.md)：时间契约兼容修正及当前账号真实检查。
+
+
+
+
+
+
+
+
 
 - [收益趋势粒度与读取反馈](2026-11-06-performance-trend-feedback.md)：代码与受控浏览器验收完成，目标运行态更新状态见 Task。
 
@@ -25,6 +55,10 @@
 <a id="priority-p1"></a>
 
 ## P1：数据基础与核心验收
+
+[11月12日上午失败口径复核](2026-11-12-provider-failed-recheck.md)独立记录追加授权、逐口径结果与停止边界，不并入原四批统计。
+
+基础行情60秒缓存已完成，见[归档任务](../archive/tasks/2026-11-11-market-base-result-cache.md)及[现行合同](../specs/2026-11-11-market-base-result-cache.md)。[精确推荐与盘中采样](2026-11-10-routing-recommendation-and-intraday-probe.md)的美股报告已交付、原计划已删除；来源失败及覆盖边界仍以原证据为准。
 
 | 唯一任务入口 | 当前验收状态 |
 | --- | --- |
@@ -35,6 +69,8 @@
 <a id="priority-p2"></a>
 
 ## P2：研究闭环
+
+- 策略收益研究的双价格输入已[结案归档](../archive/tasks/2026-11-11-backtest-return-research.md)，含原任务完整窗口和成对备用读取验收。
 
 | 唯一任务入口 | 当前验收状态 |
 | --- | --- |
@@ -58,7 +94,7 @@
 
 | 仓库 | 接续入口 |
 | --- | --- |
-| DSA | [文档入口](../../../daily-stock-analysis/docs/README.md)：本仓已无活动任务；已完成记录保留在本仓归档。主仓的研究及来源权限门禁仍由主仓 Task 负责。 |
+| DSA | [文档入口](../../../daily-stock-analysis/docs/README.md)：基础行情缓存生产者、前置门禁及腾讯修复已完成并归档；其他活动任务、研究及来源权限门禁由对应 Task 负责。 |
 | infra | [文档入口](../../../thesis-ledger-infra/docs/README.md)：既有任务已完成并归档，更新与恢复规则由当前规格和操作指南维护。 |
 
 本索引不授予部署、Provider、模型、数据写入或通知操作权限。

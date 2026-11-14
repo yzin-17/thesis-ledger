@@ -1,4 +1,5 @@
 import { InstrumentOptionField } from '../market/InstrumentOptionField';
+import { RiskRuleNotificationFields } from './RiskRuleNotificationFields';
 import { useState } from 'react';
 import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import type { AccountResponse, RiskRuleWire } from '@thesis-ledger/schemas';
@@ -11,7 +12,7 @@ import {
   Copy,
   Feedback,
   Field,
-  Section,
+  ContentSection as Section,
   failureMessage,
 } from '../../components/MobilePrimitives';
 import {
@@ -24,19 +25,21 @@ import {
   riskSeverities,
   type RiskForm,
 } from './risk-rule-form';
-export function RiskRuleForm({
-  rule,
-  accounts,
-  portfolio,
-  readable,
-  reload,
-}: {
+type RiskRuleFormProps = {
   rule?: RiskRuleWire;
   accounts: AccountResponse[];
   portfolio: PortfolioValuationResponse | undefined;
   readable: boolean;
   reload: () => Promise<RiskRuleWire[]>;
-}) {
+};
+
+function useRiskRuleFormController({
+  rule,
+  accounts,
+  portfolio,
+  readable,
+  reload,
+}: RiskRuleFormProps) {
   const { api } = useMobileRuntime();
   const [current, setCurrent] = useState(rule);
   const [form, setForm] = useState(() => riskForm(rule));
@@ -124,6 +127,49 @@ export function RiskRuleForm({
       .filter((row) => !form.accountId || row.accountId === form.accountId)
       .map((row) => [row.symbol, row.asset?.name ?? row.symbol]),
   );
+  return {
+    current,
+    form,
+    search,
+    setSearch,
+    allKinds,
+    setAllKinds,
+    mutation,
+    change,
+    dirty,
+    blocked,
+    submit,
+    reconcile,
+    kinds,
+    symbols,
+    feedback,
+    locked,
+    rule,
+    accounts,
+  };
+}
+
+export function RiskRuleForm(props: RiskRuleFormProps) {
+  const {
+    current,
+    form,
+    search,
+    setSearch,
+    allKinds,
+    setAllKinds,
+    mutation,
+    change,
+    dirty,
+    blocked,
+    submit,
+    reconcile,
+    kinds,
+    symbols,
+    feedback,
+    locked,
+    rule,
+    accounts,
+  } = useRiskRuleFormController(props);
   return (
     <Section title={current ? '编辑风险规则' : '新建风险规则'}>
       <Copy muted>版本 {current?.version ?? '新规则'} · 新规则默认停用，启用需要明确选择。</Copy>
@@ -202,11 +248,8 @@ export function RiskRuleForm({
         onChange={(value) => change({ enabled: value === 'enabled' })}
         disabled={mutation.isPending}
       />
-      <Copy muted>
-        {riskKinds.find((row) => row.value === form.kind)?.label} ·{' '}
-        {riskScopes.find((row) => row.value === form.scope)?.label} · {form.threshold || '待填写'}
-        {isRiskPercentage(form.kind) ? '%' : ''}
-      </Copy>
+      <RiskRuleNotificationFields form={form} onChange={change} disabled={blocked} />
+      <RiskFormSummary form={form} />
       {rule && current && rule.version !== current.version ? (
         <Feedback message="规则版本已变化，请重新核对；输入已保留。" error />
       ) : null}
@@ -223,5 +266,15 @@ export function RiskRuleForm({
         onPress={() => void submit()}
       />
     </Section>
+  );
+}
+
+function RiskFormSummary({ form }: { form: RiskForm }) {
+  return (
+    <Copy muted>
+      {riskKinds.find((row) => row.value === form.kind)?.label} ·{' '}
+      {riskScopes.find((row) => row.value === form.scope)?.label} · {form.threshold || '待填写'}
+      {isRiskPercentage(form.kind) ? '%' : ''}
+    </Copy>
   );
 }

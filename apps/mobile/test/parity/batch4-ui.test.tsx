@@ -122,11 +122,14 @@ describe('第 4 批手机界面失败恢复',()=>{
       if(p.endsWith('/backtests/strategies'))return respond([b4Strategy]);
       if(p.endsWith('/capabilities'))return respond({aiOptimizationEnabled:false,riskApplicationsEnabled:true,providers:[]});
       if(p.endsWith('/risk-applications/preview'))return respond(b4Preview);
+      if(p.endsWith('/notifications/routing/risk'))return respond({availableRoutes:[],selectedProviders:[],updatedAt:null});
       if(init?.method==='POST')writes.push(JSON.parse(String(init.body)));return respond([]);
     }));
     await mount(<StrategyRiskCreateScreen/>);await click(button(ledgerAccount.name));await click(button('预览策略风险计划'));
     expect(button('确认保存策略风险应用').disabled).toBe(false);
-    expect(button('保存为停用').getAttribute('aria-pressed')).toBe('true');expect(button('关闭通知').getAttribute('aria-pressed')).toBe('true');
+    expect(button('保存为停用').getAttribute('aria-pressed')).toBe('true');
+    const notificationSwitch = document.querySelector<HTMLInputElement>('input[role="switch"][aria-label="策略应用通知"]');
+    expect(notificationSwitch).not.toBeNull();expect(notificationSwitch!.checked).toBe(false);
     await input(field('风险应用标的'),'600000.SH');expect(button('确认保存策略风险应用').disabled).toBe(true);expect(writes).toHaveLength(0);
   });
   it('实验能力关闭时零准备/创建请求；风险详情不能跨当前模式修改',async()=>{

@@ -2,19 +2,15 @@ import { useState } from 'react';
 import type { ResearchReportComparison, ResearchReportSummary } from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { formatFullDateTime } from './ai.display.js';
 import { reportEvidenceLocator } from './research-report-display.js';
 import { formatResearchComparisonValue } from './research-comparison-display.js';
 import { ResearchEvidenceRead } from './ResearchEvidenceRead.js';
-import { researchComparisonState, researchStateMeta } from './research-state-display.js';
 
 type Evidence = ResearchReportComparison['evidence'][number];
 const fieldStatuses = {
   unchanged: '未变',
-  text_changed: '文字变化',
+  text_changed: '表述变化',
   value_changed: '字段变化',
 } as const;
 const descriptions = {
@@ -65,12 +61,13 @@ function EvidenceChanges({
     <div className="flex flex-col gap-3">
       {!items.length && <p className="text-sm text-muted-foreground">引用证据的指纹保持一致。</p>}
       {items.slice(0, limit).map((entry) => (
-        <section key={entry.fingerprint} className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <details key={entry.fingerprint}>
+          <summary className="cursor-pointer py-2 text-sm">
             <Badge variant="outline">{labels[entry.status]}</Badge>
-            <code className="break-all text-xs text-muted-foreground">{entry.fingerprint}</code>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
+            {' · '}核对引用
+          </summary>
+          <code className="break-all text-xs text-muted-foreground">{entry.fingerprint}</code>
+          <div className="grid gap-3 py-3 md:grid-cols-2">
             <div className="flex flex-col gap-2">
               <p className="text-sm font-medium">前一份报告</p>
               {value.previous && (
@@ -86,7 +83,7 @@ function EvidenceChanges({
               <EvidenceSide report={value.current} references={entry.after} label="当前报告" />
             </div>
           </div>
-        </section>
+        </details>
       ))}
       {items.length > limit && (
         <Button type="button" variant="outline" onClick={() => setLimit((value) => value + 20)}>
@@ -107,10 +104,15 @@ function ReportPair({ value }: { value: ResearchReportComparison }) {
           report && (
             <div key={label} className="flex min-w-0 flex-col gap-1">
               <p className="text-sm font-medium">{label}</p>
-              <p className="break-words text-sm">{report.question || '问题未记录'}</p>
               <p className="text-xs text-muted-foreground">
                 创建于 {formatFullDateTime(report.createdAt)}
               </p>
+              <details>
+                <summary className="cursor-pointer py-2 text-sm">研究背景</summary>
+                <p className="break-words whitespace-pre-wrap text-sm leading-6">
+                  {report.question || '问题未记录'}
+                </p>
+              </details>
             </div>
           ),
       )}
@@ -123,37 +125,42 @@ export function ResearchComparisonResult({ value }: { value: ResearchReportCompa
   if (value.status !== 'compared') {
     if (value.status === 'incompatible' || value.status === 'unavailable')
       return (
-        <Alert>
-          <AlertTitle>
+        <div role="status" className="flex flex-col gap-2 text-sm">
+          <h4 className="font-medium">
             {value.status === 'incompatible' ? '报告范围不具备可比性' : '暂不具备比较资料'}
-          </AlertTitle>
-          <AlertDescription>
-            <ul className="flex list-inside list-disc flex-col gap-1">
-              {value.issues.map((issue) => (
-                <li key={issue.code}>{issue.message}</li>
-              ))}
-            </ul>
-          </AlertDescription>
-        </Alert>
+          </h4>
+          <ul className="flex list-inside list-disc flex-col gap-1 text-muted-foreground">
+            {value.issues.map((issue) => (
+              <li key={issue.code}>{issue.message}</li>
+            ))}
+          </ul>
+        </div>
       );
     return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>
-            {value.status === 'no_previous' ? '没有可比前序' : '前序查找尚未完成'}
-          </EmptyTitle>
-          <EmptyDescription>
-            {value.issues.map((issue) => issue.message).join('；')}
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <div role="status" className="flex flex-col gap-1 text-sm">
+        <h4 className="font-medium">
+          {value.status === 'no_previous' ? '没有可比前序' : '前序查找尚未完成'}
+        </h4>
+        <p className="text-muted-foreground">
+          {value.issues.map((issue) => issue.message).join('；')}
+        </p>
+      </div>
     );
   }
-  const changeState = researchComparisonState(value);
+  const fields = value.groups.flatMap((group) => group.fields);
+  const valueChanges = fields.filter((field) => field.status === 'value_changed').length;
+  const textChanges = fields.filter((field) => field.status === 'text_changed').length;
+  const evidenceChanges = value.evidence.filter((entry) => entry.status !== 'unchanged').length;
   return (
     <div className="flex flex-col gap-4" aria-label="报告比较结果">
       <ReportPair value={value} />
-      {changeState && <Badge variant="secondary">{researchStateMeta[changeState].label}</Badge>}
+      <div className="flex flex-wrap gap-2">
+        {valueChanges > 0 && (
+          <Badge variant="secondary">数值与状态等字段变化 · {valueChanges}</Badge>
+        )}
+        {evidenceChanges > 0 && <Badge variant="secondary">证据引用变化 · {evidenceChanges}</Badge>}
+        {textChanges > 0 && <Badge variant="outline">表述变化 · {textChanges}</Badge>}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
@@ -165,18 +172,27 @@ export function ResearchComparisonResult({ value }: { value: ResearchReportCompa
           {showAll ? '收起未变字段' : '显示未变字段'}
         </Button>
       </div>
-      {value.groups.map((group) => (
-        <Card key={group.key} role="region" aria-label={group.label}>
-          <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2">
-              {group.label}
-              <Badge variant={group.status === 'changed' ? 'secondary' : 'outline'}>
-                {group.status === 'changed' ? '存在变化' : '未变'}
-              </Badge>
-            </CardTitle>
-            <CardDescription>{descriptions[group.key]}</CardDescription>
-          </CardHeader>
-          <CardContent>
+      {[...value.groups]
+        .sort((a, b) => {
+          const order = ['evidence', 'inputs', 'conditions', 'opinion', 'model'];
+          return order.indexOf(a.key) - order.indexOf(b.key);
+        })
+        .map((group) => (
+          <section
+            key={group.key}
+            role="region"
+            aria-label={group.label}
+            className="flex min-w-0 flex-col gap-3 border-t border-border pt-4"
+          >
+            <div className="flex flex-col gap-1">
+              <h4 className="flex flex-wrap items-center gap-2 font-semibold">
+                {group.label}
+                <Badge variant={group.status === 'changed' ? 'secondary' : 'outline'}>
+                  {group.status === 'changed' ? '存在变化' : '未变'}
+                </Badge>
+              </h4>
+              <p className="text-sm text-muted-foreground">{descriptions[group.key]}</p>
+            </div>
             {group.key === 'evidence' ? (
               <EvidenceChanges value={value} showAll={showAll} />
             ) : (
@@ -186,13 +202,18 @@ export function ResearchComparisonResult({ value }: { value: ResearchReportCompa
                 )}
                 {group.fields
                   .filter((field) => showAll || field.status !== 'unchanged')
+                  .sort(
+                    (a, b) =>
+                      Number(b.status === 'value_changed') - Number(a.status === 'value_changed'),
+                  )
                   .map((field) => (
-                    <section key={field.key} className="flex flex-col gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-sm font-medium">{field.label}</h4>
+                    <details key={field.key} className="min-w-0">
+                      <summary className="cursor-pointer py-2 text-sm font-medium">
+                        {field.label}
+                        {' · '}
                         <Badge variant="outline">{fieldStatuses[field.status]}</Badge>
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2">
+                      </summary>
+                      <div className="grid gap-3 py-3 md:grid-cols-2">
                         {[
                           { label: '前一份报告', content: field.before },
                           { label: '当前报告', content: field.after },
@@ -205,16 +226,15 @@ export function ResearchComparisonResult({ value }: { value: ResearchReportCompa
                           </div>
                         ))}
                       </div>
-                    </section>
+                    </details>
                   ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      ))}
+          </section>
+        ))}
       <Button
         type="button"
-        variant="link"
+        variant="outline"
         className="justify-start"
         onClick={() => setAudit((value) => !value)}
         aria-expanded={audit}

@@ -57,67 +57,22 @@ export const aiExecutionDisplay = (
   legacy?: { inputTokens?: number; outputTokens?: number },
 ): AiExecutionDisplay => {
   if (!execution) {
-    const hasLegacyValue = Boolean(legacy?.inputTokens || legacy?.outputTokens);
-    return {
-      completenessLabel: '历史未核对',
-      tokenText: hasLegacyValue
-        ? `历史兼容值 ${legacy?.inputTokens ?? '未知'} / ${legacy?.outputTokens ?? '未知'}（不可视为完整总量）`
-        : '历史未核对',
-      costLines: ['历史费用未核对'],
-      reservationLines: ['历史记录没有可验证的预留事实'],
-      policyLines: ['历史记录没有冻结研究策略'],
-      deadlineText: '未记录',
-      generationStatusLabel: '历史状态未核对',
-      blockedReason: null,
-    };
+    return legacyExecutionDisplay(legacy);
   }
 
-  let inputTotal = 0;
-  let outputTotal = 0;
-  let inputKnown = false;
-  let outputKnown = false;
-  const knownCosts: CurrencyTotals = new Map();
-  const estimatedCosts: CurrencyTotals = new Map();
-  const reservedCosts: CurrencyTotals = new Map();
-  let unknownCostRequests = 0;
-  let reservedInput = 0;
-  let reservedOutput = 0;
-  let reservedUnknownCost = 0;
-
-  for (const request of execution.requests) {
-    const usage = request.usage;
-    if (usage?.inputTokens !== null && usage?.inputTokens !== undefined) {
-      inputKnown = true;
-      inputTotal += usage.inputTokens;
-    }
-    if (usage?.outputTokens !== null && usage?.outputTokens !== undefined) {
-      outputKnown = true;
-      outputTotal += usage.outputTokens;
-    }
-    const cost = request.cost;
-    if (!cost || cost.status === 'unknown') unknownCostRequests += 1;
-    else if (cost.amount && cost.currency) {
-      addCurrency(
-        cost.status === 'known' ? knownCosts : estimatedCosts,
-        cost.currency,
-        cost.amount,
-      );
-    }
-
-    const reservationUnconfirmed =
-      request.state !== 'completed' ||
-      !usage ||
-      usage.status !== 'reported' ||
-      !cost ||
-      cost.status === 'unknown';
-    if (!reservationUnconfirmed) continue;
-    reservedInput += request.reservation.inputTokens;
-    reservedOutput += request.reservation.outputTokens;
-    const reservedCost = request.reservation.cost;
-    if (reservedCost.amount && reservedCost.currency)
-      addCurrency(reservedCosts, reservedCost.currency, reservedCost.amount);
-    else reservedUnknownCost += 1;
-  }
+  const {
+    inputTotal,
+    outputTotal,
+    inputKnown,
+    outputKnown,
+    knownCosts,
+    estimatedCosts,
+    reservedCosts,
+    unknownCostRequests,
+    reservedInput,
+    reservedOutput,
+    reservedUnknownCost,
+  } = executionRequestTotals(execution.requests);
 
   const costLines = [
     ...amountLines('已确认', knownCosts),
@@ -135,17 +90,7 @@ export const aiExecutionDisplay = (
   if (reservedUnknownCost > 0) reservationLines.push(`${reservedUnknownCost} 个预留金额未知`);
   if (reservationLines.length === 0) reservationLines.push('无未确认预留');
 
-  const policy = execution.frozenPolicy;
-  const policyLines: string[] = [];
-  if (policy) {
-    policyLines.push(
-      `最多 ${policy.maxAiCalls} 次请求，输入 / 输出上限 ${policy.maxInputTokens.toLocaleString('zh-CN')} / ${policy.maxOutputTokens.toLocaleString('zh-CN')} Token`,
-    );
-    policyLines.push(`最长执行 ${policy.maxDurationSeconds} 秒，首次领取开始，恢复不会重置`);
-    if (Number(policy.maxCost) === 0) policyLines.push('费用上限 0，仅允许用户填写为零费用的路由');
-    else policyLines.push(`费用上限 ${policy.costCurrency ?? '币种未知'} ${policy.maxCost}`);
-  } else policyLines.push('该流程没有研究策略预算，费用边界由实验策略管理');
-  policyLines.unshift(...aiTimeoutPolicyLines(execution.timing));
+  const policyLines = executionPolicyLines(execution);
 
   const generationStatusLabels: Record<AiExecutionReadModel['generationStatus'], string> = {
     pending: '等待生成',
@@ -168,3 +113,106 @@ export const aiExecutionDisplay = (
       : null,
   };
 };
+
+function legacyExecutionDisplay(
+  legacy: { inputTokens?: number; outputTokens?: number } | undefined,
+): AiExecutionDisplay {
+  const hasLegacyValue = Boolean(legacy?.inputTokens || legacy?.outputTokens);
+  return {
+    completenessLabel: '历史未核对',
+    tokenText: hasLegacyValue
+      ? `历史兼容值 ${legacy?.inputTokens ?? '未知'} / ${legacy?.outputTokens ?? '未知'}（不可视为完整总量）`
+      : '历史未核对',
+    costLines: ['历史费用未核对'],
+    reservationLines: ['历史记录没有可验证的预留事实'],
+    policyLines: ['历史记录没有冻结研究策略'],
+    deadlineText: '未记录',
+    generationStatusLabel: '历史状态未核对',
+    blockedReason: null,
+  };
+}
+
+function executionRequestTotals(requests: AiExecutionReadModel['requests']) {
+  let inputTotal = 0;
+  let outputTotal = 0;
+  let inputKnown = false;
+  let outputKnown = false;
+  const knownCosts: CurrencyTotals = new Map();
+  const estimatedCosts: CurrencyTotals = new Map();
+  const reservedCosts: CurrencyTotals = new Map();
+  let unknownCostRequests = 0;
+  let reservedInput = 0;
+  let reservedOutput = 0;
+  let reservedUnknownCost = 0;
+
+  for (const request of requests) {
+    const usage = request.usage;
+    if (usage?.inputTokens !== null && usage?.inputTokens !== undefined) {
+      inputKnown = true;
+      inputTotal += usage.inputTokens;
+    }
+    if (usage?.outputTokens !== null && usage?.outputTokens !== undefined) {
+      outputKnown = true;
+      outputTotal += usage.outputTokens;
+    }
+    const cost = request.cost;
+    if (!cost || cost.status === 'unknown') unknownCostRequests += 1;
+    else if (cost.amount && cost.currency) {
+      addCurrency(
+        cost.status === 'known' ? knownCosts : estimatedCosts,
+        cost.currency,
+        cost.amount,
+      );
+    }
+
+    const reservationUnconfirmed = requestHasUnconfirmedReservation(request);
+    if (!reservationUnconfirmed) continue;
+    reservedInput += request.reservation.inputTokens;
+    reservedOutput += request.reservation.outputTokens;
+    const reservedCost = request.reservation.cost;
+    if (reservedCost.amount && reservedCost.currency)
+      addCurrency(reservedCosts, reservedCost.currency, reservedCost.amount);
+    else reservedUnknownCost += 1;
+  }
+
+  return {
+    inputTotal,
+    outputTotal,
+    inputKnown,
+    outputKnown,
+    knownCosts,
+    estimatedCosts,
+    reservedCosts,
+    unknownCostRequests,
+    reservedInput,
+    reservedOutput,
+    reservedUnknownCost,
+  };
+}
+
+function requestHasUnconfirmedReservation(request: AiExecutionReadModel['requests'][number]) {
+  const { usage, cost } = request;
+  return (
+    request.state !== 'completed' ||
+    !usage ||
+    usage.status !== 'reported' ||
+    !cost ||
+    cost.status === 'unknown'
+  );
+}
+
+function executionPolicyLines(execution: AiExecutionReadModel) {
+  const policy = execution.frozenPolicy;
+  const policyLines: string[] = [];
+  if (policy) {
+    policyLines.push(
+      `最多 ${policy.maxAiCalls} 次请求，输入 / 输出上限 ${policy.maxInputTokens.toLocaleString('zh-CN')} / ${policy.maxOutputTokens.toLocaleString('zh-CN')} Token`,
+    );
+    policyLines.push(`最长执行 ${policy.maxDurationSeconds} 秒，首次领取开始，恢复不会重置`);
+    if (Number(policy.maxCost) === 0) policyLines.push('费用上限 0，仅允许用户填写为零费用的路由');
+    else policyLines.push(`费用上限 ${policy.costCurrency ?? '币种未知'} ${policy.maxCost}`);
+  } else policyLines.push('该流程没有研究策略预算，费用边界由实验策略管理');
+  policyLines.unshift(...aiTimeoutPolicyLines(execution.timing));
+
+  return policyLines;
+}

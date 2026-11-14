@@ -10,8 +10,10 @@ import type {
   AiUpstreamFormat,
   AiProviderModelCatalogConfig,
   AiProviderModelDefaultConfig,
+  ProviderHealthRecord,
 } from '@thesis-ledger/schemas';
 import type { ModelCatalogDraft } from './ai-provider-model-catalog.js';
+import { ruleMonitorDefaultSchedule } from '@thesis-ledger/schemas';
 
 export type AiProviderExecutionRouteConfig = {
   model: string;
@@ -44,25 +46,7 @@ export type AiProviderExecutionRouteDraft = {
 
 export type { AiProviderModelDefaultConfig } from '@thesis-ledger/schemas';
 
-export type ProviderHealthHistoryRecord = {
-  provider: string;
-  state: string;
-  latencyMs: number | null;
-  checkedAt: string;
-  source?: string;
-  details?: {
-    kind?: 'ai_provider_test';
-    testKind?: 'connection' | 'generation';
-    model?: string;
-    mode?: AiProviderModelExecution['mode'];
-    contract?: AiProviderModelExecution['contract'];
-    configurationFingerprint?: string;
-    usage?: AiUsageFacts;
-    cost?: AiCostFacts;
-    errorCode?: string;
-    status?: 'healthy' | 'degraded' | 'down' | 'cancelled';
-  };
-};
+export type ProviderHealthHistoryRecord = ProviderHealthRecord;
 
 export type ProviderHealthHistoryPage = {
   items: ProviderHealthHistoryRecord[];
@@ -158,6 +142,7 @@ export interface ProviderIssueRecord {
   code: string;
   status: string;
   capability?: string;
+  detectedAt?: string;
   details?: Record<string, unknown> | null;
 }
 
@@ -167,19 +152,25 @@ export interface AutomationJob {
   type: string;
   cron: string;
   timezone: string;
-  enabled: boolean;
+  enabled: boolean | null;
   nextRunAt: string | null;
   systemKey?: string | null;
   managed?: boolean;
+  source?: 'server' | 'rule-monitor';
+  readError?: string;
+  scheduleLabel?: string;
 }
 
 export interface AutomationHistoryRecord {
   id: string;
   jobId: string;
   status: string;
-  startedAt: string;
+  startedAt: string | null;
   error: string | null;
   output?: unknown;
+  createdAt?: string;
+  summary?: string;
+  jobName?: string;
 }
 
 export type AutomationHistoryPage = {
@@ -188,6 +179,7 @@ export type AutomationHistoryPage = {
   pageSize: number;
   total: number;
   totalPages: number;
+  sourceWarnings?: Array<{ source: 'rule-monitor'; code: 'rule_monitor_unavailable' }> | undefined;
 };
 
 export const AUTOMATION_HISTORY_PAGE_SIZE = 20;
@@ -203,7 +195,9 @@ export interface CreateAutomationJobInput {
   lockTtlMs: number;
 }
 
-export type UpdateAutomationJobInput = Partial<Pick<AutomationJob, 'name' | 'cron' | 'enabled'>>;
+export type UpdateAutomationJobInput = Partial<Pick<AutomationJob, 'name' | 'cron' | 'timezone'>> & {
+  enabled?: boolean;
+};
 
 export type AutomationRunNowResult = {
   skipped: boolean;
@@ -308,7 +302,9 @@ export const automationJobTypeLabels: Record<string, string> = {
 };
 
 export const automationJobTypeLabel = (type: string) =>
-  automationJobTypeLabels[type] ?? `其他（${type}）`;
+  type === 'rule-source-monitor'
+    ? '收费资料检查'
+    : (automationJobTypeLabels[type] ?? `其他（${type}）`);
 
 export const automationRunStatusLabels: Record<string, string> = {
   queued: '等待运行',
@@ -316,6 +312,8 @@ export const automationRunStatusLabels: Record<string, string> = {
   succeeded: '成功',
   failed: '失败',
   unknown_outcome: '结果待确认',
+  partial: '部分资料不可读',
+  interrupted: '已中断',
 };
 
 export const automationRunStatusLabel = (status: string) =>
@@ -373,6 +371,11 @@ export const dataQualitySeverityLabel = (severity: string) =>
   dataQualitySeverityLabels[severity] ?? `其他（${severity}）`;
 
 export const dataQualityCodeLabels: Record<string, string> = {
+  response_schema_invalid: '数据格式异常',
+  response_identity_mismatch: '标的不一致',
+  response_contract_invalid: '数据合同异常',
+  calendar_invalid: '交易日历无效',
+  calendar_incomplete: '交易日历覆盖不足',
   sync_failed: '同步失败',
 };
 
@@ -397,19 +400,25 @@ export const automationSchedulePresets = [
 export const AUTOMATION_SCHEDULE_CUSTOM = 'custom';
 
 export type AutomationSchedulePreset =
-  (typeof automationSchedulePresets)[number]['value'] | typeof AUTOMATION_SCHEDULE_CUSTOM;
+  | (typeof automationSchedulePresets)[number]['value']
+  | typeof AUTOMATION_SCHEDULE_CUSTOM
+  | typeof ruleMonitorDefaultSchedule;
 
-export const automationScheduleLabel = (preset: AutomationSchedulePreset) =>
-  automationSchedulePresets.find((item) => item.value === preset)?.label ?? '自定义';
+export const automationScheduleLabel = (preset: AutomationSchedulePreset) => {
+  if (preset === ruleMonitorDefaultSchedule) return '每24小时';
+  return automationSchedulePresets.find((item) => item.value === preset)?.label ?? '自定义';
+};
 
 export const automationJobDraftFromJob = (job: AutomationJob): AutomationJobDraft => ({
   name: job.name,
   type: job.type,
-  schedulePreset: automationSchedulePresets.some((preset) => preset.value === job.cron)
-    ? (job.cron as AutomationSchedulePreset)
-    : AUTOMATION_SCHEDULE_CUSTOM,
+  schedulePreset:
+    job.cron === ruleMonitorDefaultSchedule ||
+    automationSchedulePresets.some((preset) => preset.value === job.cron)
+      ? (job.cron as AutomationSchedulePreset)
+      : AUTOMATION_SCHEDULE_CUSTOM,
   cron: job.cron,
-  enabled: job.enabled,
+  enabled: job.enabled ?? false,
 });
 
 export const newAutomationJobDraft = (type = 'market-sync'): AutomationJobDraft => ({

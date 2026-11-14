@@ -10,7 +10,7 @@ import {
 import { useMarketPolicyWorkflow } from '../src/features/market-data/useMarketPolicyWorkflow.js';
 import { StrategyCenterLayout } from '../src/features/strategy/StrategyCenterLayout.js';
 import { strategyCenterTabForPath } from '../src/features/strategy/strategy-center.navigation.js';
-import { policy } from './market-policy-defaults.fixture.js';
+import { policy, key, target } from './market-policy-defaults.fixture.js';
 
 const api = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -107,30 +107,30 @@ afterEach(async () => {
 describe('路由与草稿恢复', () => {
   it('路由保存失败后拒绝离开仍保留草稿，确认放弃后重开使用服务端值', async () => {
     await mount();
-    await act(async () => workflow.changeDraft({ ...workflow.draft!, enabled: !policy.enabled }));
+    await act(async () => workflow.changeDraft({ ...workflow.draft!, routes: [{ key, targets: [target], enabled: true }] }));
     api.save.mockRejectedValue(new Error('503'));
     await act(async () => workflow.save());
     await navigate('/other');
     expect(router.state.location.pathname).toBe('/market-data');
     expect(workflow.dirty).toBe(true);
-    expect(workflow.draft?.enabled).toBe(!policy.enabled);
+    expect(workflow.draft?.routes[0]?.targets).toEqual([target]);
     api.confirm.mockResolvedValue(true);
     await navigate('/other');
     await navigate('/market-data');
-    expect(workflow.draft?.enabled).toBe(policy.enabled);
+    expect(workflow.draft?.routes).toEqual([]);
     expect(workflow.dirty).toBe(false);
     expect(api.save).toHaveBeenCalledTimes(1);
   });
   it('历史后退也受保护，确认后前进不恢复放弃的草稿', async () => {
     await mount();
-    await act(async () => workflow.changeDraft({ ...workflow.draft!, enabled: !policy.enabled }));
+    await act(async () => workflow.changeDraft({ ...workflow.draft!, routes: [{ key, targets: [target], enabled: true }] }));
     await navigate(-1);
     expect(router.state.location.pathname).toBe('/market-data');
     api.confirm.mockResolvedValue(true);
     await navigate(-1);
     expect(router.state.location.pathname).toBe('/other');
     await navigate(1);
-    expect(workflow.draft?.enabled).toBe(policy.enabled);
+    expect(workflow.draft?.routes).toEqual([]);
   });
   it('策略导航被拦截时选中 Tab 保持在实际路由，确认后才改变', async () => {
     await mount(true);

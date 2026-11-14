@@ -9,7 +9,10 @@ import {
   type ValuationPoint,
 } from '@thesis-ledger/domain';
 import { PrismaService } from '../platform/prisma.service.js';
-import { performanceRelationWhere, incompatibleAccountScopeSummary } from './performance-account-scope.js';
+import {
+  performanceRelationWhere,
+  incompatibleAccountScopeSummary,
+} from './performance-account-scope.js';
 import { PerformanceDataService } from './performance-data.service.js';
 import { externalPortfolioFlow, internalPortfolioTransfer } from './performance-ledger-flow.js';
 import { performanceReturnValuations } from './performance-return-valuations.js';
@@ -61,15 +64,7 @@ export class PerformanceAnalysisService {
       fxResponseFields(fx.meta),
     );
     if (incompatibleScope) return incompatibleScope;
-    const partialSnapshots = snapshots.filter(partialSnapshot);
-    if (partialSnapshots.length > 0) {
-      throw new BadRequestException({
-        code: 'PARTIAL_PORTFOLIO_SNAPSHOT',
-        message: '收益分析包含行情缺失的 partial snapshot，请补齐行情后重试',
-        snapshotIds: partialSnapshots.flatMap((snapshot) => (snapshot.id ? [snapshot.id] : [])),
-        missingSymbols: [...new Set(partialSnapshots.flatMap(snapshotMissingSymbols))],
-      });
-    }
+    assertCompleteAnalysisSnapshots(snapshots);
     const snapshotFxEvidence = snapshots
       .map(snapshotFxMeta)
       .filter((snapshotFx): snapshotFx is PerformanceFxMeta => snapshotFx !== undefined);
@@ -138,7 +133,9 @@ export class PerformanceAnalysisService {
       orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
     })) as PerformanceLedgerEvent[];
     const accountIds = new Set(accountCurrencyMap.keys());
-    const externalEvents = scopedEvents.filter((event) => accountId || !internalPortfolioTransfer(event, accountIds));
+    const externalEvents = scopedEvents.filter(
+      (event) => accountId || !internalPortfolioTransfer(event, accountIds),
+    );
     const flowCurrencies = externalEvents.map((event) => {
       const flow = externalPortfolioFlow(event);
       return (
@@ -263,9 +260,25 @@ export class PerformanceAnalysisService {
         ? calculatedAllocation.map((item) => ({ ...item, weight: null }))
         : calculatedAllocation,
       rebalance: unavailable || !targets ? [] : rebalanceGap(positions, targets),
-      rebalanceUnavailableReason: unavailable ? '估值、汇率或市值分母不完整，无法提供完整再平衡建议' : null,
+      rebalanceUnavailableReason: unavailable
+        ? '估值、汇率或市值分母不完整，无法提供完整再平衡建议'
+        : null,
       partial,
       missingSymbols,
     };
+  }
+}
+
+function assertCompleteAnalysisSnapshots(
+  snapshots: Awaited<ReturnType<PerformanceSnapshotService['history']>>,
+) {
+  const partialSnapshots = snapshots.filter(partialSnapshot);
+  if (partialSnapshots.length > 0) {
+    throw new BadRequestException({
+      code: 'PARTIAL_PORTFOLIO_SNAPSHOT',
+      message: '收益分析包含行情缺失的 partial snapshot，请补齐行情后重试',
+      snapshotIds: partialSnapshots.flatMap((snapshot) => (snapshot.id ? [snapshot.id] : [])),
+      missingSymbols: [...new Set(partialSnapshots.flatMap(snapshotMissingSymbols))],
+    });
   }
 }

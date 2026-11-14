@@ -73,6 +73,7 @@ model Account {
   targetAllocations      TargetAllocation[]
   journalEntries         JournalEntry[]
   journalReviewSnapshots JournalReviewSnapshot[]
+  journalPeriodReviewSnapshots JournalPeriodReviewSnapshot[]
   aiDecisionLogs         AiDecisionLog[]
 
   @@index([active])
@@ -1216,6 +1217,27 @@ model JournalReviewSnapshot {
   @@index([accountId, reviewObjectType, tradeId])
   @@index([tradeId, closeSliceId, createdAt])
   @@index([status, createdAt])
+}
+
+model JournalPeriodReviewSnapshot {
+  id                   String   @id @default(uuid()) @db.Uuid
+  accountId            String   @db.Uuid
+  mode                 String
+  symbol               String?
+  start                String
+  end                  String
+  ledgerRevision       BigInt
+  projectionGeneration BigInt
+  algorithmVersion     String
+  objectFingerprints   Json
+  analysisSnapshot     Json
+  aiExplanation        Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  account              Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, mode, createdAt, id])
+  @@index([accountId, start, end])
 }
 
 model ProviderConfig {

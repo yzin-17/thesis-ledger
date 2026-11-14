@@ -184,6 +184,25 @@ describe('周期日历事实投影', () => {
 });
 
 describe('周期日历读取', () => {
+  it.each([
+    ['CN', 'Asia/Shanghai', '2026-11-01T16:00:00Z'],
+    ['HK', 'Asia/Hong_Kong', '2026-11-01T16:00:00Z'],
+    ['US', 'America/New_York', '2026-11-02T05:00:00Z'],
+  ] as const)('%s 本地午夜可读取当日计划，不按 UTC 日期拒绝', async (market, timezone, evaluationAsOf) => {
+    const response = responseFixture();
+    response.coverage = { start: '2026-11-02', end: '2026-11-02', complete: true };
+    response.facts[0] = { ...response.facts[0]!, market, timezone, range: { start: '2026-11-02', end: '2026-11-02' }, holidays: [], sessionOverrides: [] };
+    const dsa = { marketCalendar: vi.fn().mockResolvedValue(response) };
+    const result = await new MarketPeriodCalendarReader(dsa as unknown as DsaClient).read({ market, start: '2026-11-02', end: '2026-11-02', evaluationAsOf });
+    expect(result.status).toBe('ready');
+    expect(dsa.marketCalendar).toHaveBeenCalledTimes(1);
+  });
+  it('美股 UTC 已跨日而市场仍在前一天时，继续拒绝未来起点', async () => {
+    const dsa = { marketCalendar: vi.fn() };
+    expect(await new MarketPeriodCalendarReader(dsa as unknown as DsaClient).read({ market: 'US', start: '2026-11-02', end: '2026-11-02', evaluationAsOf: '2026-11-02T01:00:00Z' }))
+      .toEqual({ status: 'unavailable', reason: 'calendar_invalid' });
+    expect(dsa.marketCalendar).not.toHaveBeenCalled();
+  });
   it('年初完整年度计划使用独立展示范围，不套用结算预算', async () => {
     const input = {
       market: 'CN' as const,

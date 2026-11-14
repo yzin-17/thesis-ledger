@@ -59,7 +59,7 @@ DSA 的前端依赖安装使用标准 `npm ci`，不传递 `--include=dev`、`--
 
 ### 需要新增的测试入口
 
-- `thesis-ledger-infra/scripts/update.test.sh` 覆盖首次失败后重试、首次成功和两次失败。
+- 从 infra 执行 `pnpm test scripts/build-retry.test.mjs scripts/update.test.mjs`，覆盖构建重试与正式更新编排。
 
 ## 风险与备选方案
 

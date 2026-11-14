@@ -69,17 +69,15 @@ describe('封存测试候选状态文案', () => {
     readEligibility: { state: 'readable' },
   } as unknown as OptimizationCandidate;
 
-  it('区分未进入封存测试和已进入但未通过的候选', () => {
-    expect(candidateAdoptionEligibility(completedExperiment, readableCandidate)).toBe(
-      '未进入封存测试',
-    );
+  it('完成候选可采纳，测试未完成仍阻断', () => {
+    expect(candidateAdoptionEligibility(completedExperiment, readableCandidate)).toBeNull();
     expect(
       candidateAdoptionEligibility(completedExperiment, {
         ...readableCandidate,
         id: 'selected',
         validationStatus: 'test_failed',
       }),
-    ).toBe('候选未通过封存测试');
+    ).toBe('候选评估尚未完成');
   });
 
   it('测试结果未揭示时不区分锁定批次和测试终态', () => {

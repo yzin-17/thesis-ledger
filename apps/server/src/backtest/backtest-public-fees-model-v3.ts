@@ -18,13 +18,45 @@ export const combinePublicFeesExecutionModelV3 = (
   dataAsOf?: string,
 ): BacktestExecutionModelV3 => {
   const scope = model.scope;
-  if (scope.market === 'CN' && scope.instrumentType === 'ETF' &&
-      response.segments.some((segment) => segment.charges.length !== charges.length) &&
-      !response.provenance.coverageDescription?.trim())
+  validatePublicFeePolicy(model, response);
+  validatePublicFeeDocuments(response, dataAsOf);
+  validatePublicFeeCoverage(scope, response);
+  const segments = publicFeeSegments(model, response);
+  return backtestExecutionModelSchemaV3.parse({
+    ...model,
+    scope: { ...model.scope, range: response.range },
+    version: `${model.version}:${publicFeesCompositionVersionV3}:${response.provenance.providerRevision}`,
+    segments,
+  });
+};
+
+function validatePublicFeePolicy(
+  model: BacktestExecutionModelV3,
+  response: MarketPublicFeesResponseV3,
+) {
+  const scope = model.scope;
+  if (
+    scope.market === 'CN' &&
+    scope.instrumentType === 'ETF' &&
+    response.segments.some((segment) => segment.charges.length !== charges.length) &&
+    !response.provenance.coverageDescription?.trim()
+  )
     throw new Error('ETF部分公共收费缺少覆盖说明');
-  if (response.segments.some((segment) => segment.charges.some((charge) => charge.basis === 'actualShares')) &&
-    model.segments.some((segment) => segment.execution.mode === 'exchange' && segment.execution.normalizedExecution))
+  if (
+    response.segments.some((segment) =>
+      segment.charges.some((charge) => charge.basis === 'actualShares'),
+    ) &&
+    model.segments.some(
+      (segment) => segment.execution.mode === 'exchange' && segment.execution.normalizedExecution,
+    )
+  )
     throw new Error('实际股数公共收费不能绑定归一化数量');
+}
+
+function validatePublicFeeDocuments(
+  response: MarketPublicFeesResponseV3,
+  dataAsOf: string | undefined,
+) {
   for (const document of response.sourceDocuments) {
     if (!document.sha256 && !document.observedAt) continue;
     const order =
@@ -38,6 +70,12 @@ export const combinePublicFeesExecutionModelV3 = (
     )
       throw new Error('公共收费原件摘要/观察时钟缺失或晚于冻结截点');
   }
+}
+
+function validatePublicFeeCoverage(
+  scope: BacktestExecutionModelV3['scope'],
+  response: MarketPublicFeesResponseV3,
+) {
   if (
     scope.symbol !== response.symbol ||
     scope.market !== response.routeKey.market ||
@@ -57,7 +95,9 @@ export const combinePublicFeesExecutionModelV3 = (
     }
     next = segment.range.endExclusive;
     if (
-      (scope.market === 'CN' && scope.instrumentType === 'STOCK' && segment.charges.length !== charges.length) ||
+      (scope.market === 'CN' &&
+        scope.instrumentType === 'STOCK' &&
+        segment.charges.length !== charges.length) ||
       new Set(segment.charges.map((charge) => charge.code)).size !== segment.charges.length ||
       segment.charges.some((charge) => charge.currency !== scope.currency)
     ) {
@@ -65,6 +105,9 @@ export const combinePublicFeesExecutionModelV3 = (
     }
   }
   if (next !== shiftDate(response.range.end, 1)) throw new Error('公共收费区间覆盖不足');
+}
+
+function publicFeeSegments(model: BacktestExecutionModelV3, response: MarketPublicFeesResponseV3) {
   const segments: unknown[] = [];
   for (const original of model.segments) {
     if (original.execution.mode !== 'exchange' || !original.fees) {
@@ -85,7 +128,10 @@ export const combinePublicFeesExecutionModelV3 = (
         if (selected.treatment === 'notApplicable') {
           if (!DecimalValue.from(charge.rate).isZero())
             throw new Error('已选模型缺少公共费项的金额计算设置');
-          fees[charge.code] = { ...selected, reason: `${selected.reason}；已选公共来源明确费率为0。` };
+          fees[charge.code] = {
+            ...selected,
+            reason: `${selected.reason}；已选公共来源明确费率为0。`,
+          };
           continue;
         }
         if (selected.treatment === 'charged') {
@@ -131,10 +177,5 @@ export const combinePublicFeesExecutionModelV3 = (
       });
     }
   }
-  return backtestExecutionModelSchemaV3.parse({
-    ...model,
-    scope: { ...model.scope, range: response.range },
-    version: `${model.version}:${publicFeesCompositionVersionV3}:${response.provenance.providerRevision}`,
-    segments,
-  });
-};
+  return segments;
+}

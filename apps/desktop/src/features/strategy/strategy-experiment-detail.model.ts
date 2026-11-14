@@ -4,6 +4,7 @@ import type {
   OptimizationTradingCostReadModel,
 } from '@thesis-ledger/schemas';
 import { aiExecutionDisplay } from '../ai/ai-execution-display.js';
+import { backtestMetricPercent } from './strategy-backtest-detail.model.js';
 import type {
   OptimizationAttempt,
   OptimizationCandidate,
@@ -16,7 +17,7 @@ export const experimentStageLabels: Record<string, string> = {
   baseline: '运行基线',
   development: '生成候选',
   validation: '验证候选',
-  awaiting_finalization: '等待锁定候选',
+  awaiting_finalization: '准备测试',
   testing: '封存测试中',
   completed: '已完成',
   failed: '失败',
@@ -37,9 +38,16 @@ export const candidateMetric = (candidate: OptimizationCandidate, split: 'valida
   metricRecord(metricRecord(candidate.metrics)[split]);
 
 
-export const metricValue = (metrics: Record<string, unknown>, keys: string[]) => {
+export const metricValue = (
+  metrics: Record<string, unknown>,
+  keys: string[],
+  format: 'plain' | 'percent' = 'plain',
+) => {
   for (const key of keys) {
-    if (metrics[key] !== undefined && metrics[key] !== null) return scalarText(metrics[key]);
+    if (metrics[key] !== undefined && metrics[key] !== null) {
+      if (format === 'percent') return backtestMetricPercent(metrics[key]) ?? '不可用';
+      return scalarText(metrics[key]);
+    }
   }
   return '不可用';
 };
@@ -119,3 +127,20 @@ export const findStrategyVersion = (strategies: StrategyRecord[], versionId: str
   }
   return null;
 };
+
+export function latestExperimentAdoption(
+  candidates: ReadonlyArray<Pick<OptimizationCandidate, 'adoptedStrategyVersionId'>>,
+  strategies: StrategyRecord[],
+  receipt: { id: string; strategyId: string; version: number } | null = null,
+) {
+  let latest = receipt;
+  for (const candidate of candidates) {
+    if (!candidate.adoptedStrategyVersionId) continue;
+    const found = findStrategyVersion(strategies, candidate.adoptedStrategyVersionId);
+    if (!found || found.version.version <= 0) continue;
+    if (!latest || found.version.version > latest.version) {
+      latest = { id: found.version.id, strategyId: found.strategy.id, version: found.version.version };
+    }
+  }
+  return latest;
+}

@@ -8,6 +8,7 @@ import { backtestPublicFeesSnapshotRefV3Schema } from './backtest-public-fees-v3
 import { backtestTradingStatusSnapshotRefV3Schema } from './backtest-trading-status-v3.js';
 import { backtestStatusCompositionRefV1Schema } from './backtest-status-composition-v1.js';
 import { backtestKnownCashSnapshotRefV3Schema } from './backtest-known-cash-binding-v3.js';
+import { priceResearchProtocolV1 } from './backtest-price-research.js';
 const isoDateTime = z.iso.datetime({ offset: true });
 const isoDate = z.iso.date();
 
@@ -98,6 +99,10 @@ const snapshotManifestFieldsV3 = {
     ])
     .optional(),
   executionPriceProtocol: executionPriceProtocolSchema,
+  priceResearch: z.strictObject({
+    protocolVersion: z.literal(priceResearchProtocolV1),
+    actualPriceSource: backtestSnapshotActualSourceV3Schema.optional(),
+  }).optional(),
   frozenExecutionWindow: marketFrozenWindowRefV3Schema.optional(),
   comparableDataFingerprint: snapshotSha256.optional(),
   actualSources: z.array(backtestSnapshotActualSourceV3Schema),

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { strategySchema, type BacktestStrategy } from './backtest-strategy.js';
+import { priceResearchStrategyIssues } from './backtest-price-research-strategy.js';
 
 export const AUTHORING_CAPABILITY_VERSION = 'authoring-v1' as const;
 export const AUTHORING_LIMITS = {
@@ -49,7 +50,12 @@ type AuthoringIssue = (message: string, path?: (string | number)[]) => void;
 
 function checkAuthoringSources(strategy: BacktestStrategy, fail: AuthoringIssue) {
   const instrument = strategy.executionInstrument;
-  if (strategy.signalSources.length !== 1) fail('首期仅支持一个信号源', ['signalSources']);
+  const coordinates = strategy.signalSources.map((source) => source.priceCoordinate);
+  if (strategy.schemaVersion === '3') {
+    if (strategy.signalSources.length > 2 || new Set(coordinates).size !== coordinates.length)
+      fail('同一标的每种价格口径只支持一个信号源', ['signalSources']);
+    for (const issue of priceResearchStrategyIssues(strategy)) fail(issue.message, issue.path);
+  } else if (strategy.signalSources.length !== 1) fail('首期仅支持一个信号源', ['signalSources']);
   for (const source of strategy.signalSources) {
     if (
       source.asset.symbol !== instrument.symbol ||
@@ -72,7 +78,7 @@ function checkAuthoringIndicator(
   if (node.name !== 'ATR' && node.name !== 'VWAP') return;
   if (input?.field !== 'close') fail('ATR/VWAP 必须使用收盘价序列携带的 OHLCV 事实');
   const required = node.name === 'ATR' ? ['high', 'low', 'close'] : ['close', 'volume'];
-  const source = strategy.signalSources[0];
+  const source = strategy.signalSources.find((item) => item.id === input?.sourceId);
   if (
     strategy.executionInstrument.assetType === 'fund' ||
     required.some((field) => !source?.series.includes(field as never))

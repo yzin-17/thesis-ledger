@@ -1,4 +1,5 @@
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
+import { InstrumentCatalogRow } from './InstrumentCatalogRow.js';
 import { type FormEvent, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -65,11 +66,11 @@ export function InstrumentCatalogPanel({
 
   return (
     <>
-      <Card>
-        <CardHeader>
+      <Card className="overflow-visible border-0 py-0">
+        <CardHeader className="px-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <CardTitle>标的目录</CardTitle>
+              <CardTitle className="text-xl">标的目录</CardTitle>
               <CardDescription>搜索标的、查看行情，或确认用于持仓关联。</CardDescription>
             </div>
             <Button type="button" variant="outline" onClick={onSync} disabled={disabled || syncing}>
@@ -84,7 +85,7 @@ export function InstrumentCatalogPanel({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-4 px-0">
           <p className="m-0 text-sm text-muted-foreground">
             已收录{' '}
             <strong className="font-mono text-base font-semibold text-foreground">
@@ -108,96 +109,115 @@ export function InstrumentCatalogPanel({
               </Button>
             </div>
           </form>
-          {searchBusy && !searchRefreshing && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-busy="true">
-              <Spinner aria-hidden="true" />
-              正在搜索本地标的…
-            </div>
-          )}
-          {!searchBusy && searchError && (
-            <Alert
-              variant="destructive"
-              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex flex-col gap-1">
-                <AlertTitle>标的目录搜索失败</AlertTitle>
-                <AlertDescription>{searchError}</AlertDescription>
-              </div>
-              <Button type="button" variant="outline" onClick={onRetrySearch}>
-                重试
-              </Button>
-            </Alert>
-          )}
-          {!searchBusy && !searchError && !hasSearchRequest && (
-            <Empty className="gap-2 border-0 p-4">
-              <EmptyHeader>
-                <EmptyTitle className="text-sm">尚未搜索标的</EmptyTitle>
-                <EmptyDescription>
-                  输入代码、名称或拼音首字母后，搜索已同步的本地目录。
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
-          <ListRefreshRegion refreshing={searchRefreshing} label="正在刷新标的搜索">
-            {(!searchBusy || searchRefreshing) && !searchError && hasSearchRequest && searchResults.length === 0 && (
-              <Empty className="gap-2 border-0 p-4">
-                <EmptyHeader>
-                  <EmptyTitle className="text-sm">没有找到匹配的本地标的</EmptyTitle>
-                  <EmptyDescription>请调整代码、名称或拼音首字母后重新搜索。</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
-            {searchResults.length > 0 && (
-              <div className="divide-y divide-border">
-                {searchResults.map((instrument) => (
-                  <div key={instrument.id} className="flex items-center justify-between gap-3 py-3">
-                    <div className="min-w-0">
-                      <strong className="block truncate text-sm font-medium">
-                        {instrument.displayName}
-                      </strong>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {instrument.symbol} · {instrument.instrumentType}
-                      </span>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {marketAssetTypes[instrument.instrumentType] && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          aria-label={`查看 ${instrument.symbol} 行情`}
-                          onClick={() => openMarketDetails(instrument)}
-                        >
-                          行情详情
-                        </Button>
-                      )}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={!instrument.confirmable || confirmingId !== null}
-                        onClick={() => onConfirm(instrument)}
-                      >
-                        {confirmingId === instrument.id && (
-                          <LoaderCircle
-                            data-icon="inline-start"
-                            className="animate-spin"
-                            aria-hidden="true"
-                          />
-                        )}
-                        {instrument.confirmable ? '确认标的' : '已确认'}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ListRefreshRegion>
+          <CatalogSearchResults
+            searchRefreshing={searchRefreshing}
+            searchBusy={searchBusy}
+            searchError={searchError}
+            hasSearchRequest={hasSearchRequest}
+            searchResults={searchResults}
+            confirmingId={confirmingId}
+            onRetrySearch={onRetrySearch}
+            openMarketDetails={openMarketDetails}
+            onConfirm={onConfirm}
+          />
         </CardContent>
       </Card>
       {marketSubject && (
         <MarketDetailDialog position={marketSubject} onClose={() => setMarketSubject(null)} />
       )}
     </>
+  );
+}
+
+function CatalogSearchResults({
+  searchRefreshing,
+  searchBusy,
+  searchError,
+  hasSearchRequest,
+  searchResults,
+  confirmingId,
+  onRetrySearch,
+  openMarketDetails,
+  onConfirm,
+}: {
+  searchRefreshing: boolean;
+  searchBusy: boolean;
+  searchError: string | null;
+  hasSearchRequest: boolean;
+  searchResults: InstrumentResult[];
+  confirmingId: string | null;
+  onRetrySearch: (() => void) | undefined;
+  openMarketDetails: (instrument: InstrumentResult) => void;
+  onConfirm: (instrument: InstrumentResult) => void;
+}) {
+  return (
+    <ListRefreshRegion
+      className="rounded-md border border-border"
+      refreshing={searchRefreshing}
+      label="正在刷新标的搜索"
+    >
+      {searchBusy && !searchRefreshing && (
+        <div
+          className="flex items-center gap-2 text-sm text-muted-foreground"
+          role="status"
+          aria-busy="true"
+        >
+          <Spinner aria-hidden="true" />
+          正在搜索本地标的…
+        </div>
+      )}
+      {!searchBusy && searchError && (
+        <Alert
+          variant="destructive"
+          className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex flex-col gap-1">
+            <AlertTitle>标的目录搜索失败</AlertTitle>
+            <AlertDescription>{searchError}</AlertDescription>
+          </div>
+          <Button type="button" variant="outline" onClick={onRetrySearch}>
+            重试
+          </Button>
+        </Alert>
+      )}
+      {!searchBusy && !searchError && !hasSearchRequest && (
+        <Empty className="gap-2 border-0 p-4">
+          <EmptyHeader>
+            <EmptyTitle className="text-sm">尚未搜索标的</EmptyTitle>
+            <EmptyDescription>
+              输入代码、名称或拼音首字母后，搜索已同步的本地目录。
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+      {(!searchBusy || searchRefreshing) &&
+        !searchError &&
+        hasSearchRequest &&
+        searchResults.length === 0 && (
+          <Empty className="gap-2 border-0 p-4">
+            <EmptyHeader>
+              <EmptyTitle className="text-sm">没有找到匹配的本地标的</EmptyTitle>
+              <EmptyDescription>请调整代码、名称或拼音首字母后重新搜索。</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+      {searchResults.length > 0 && (
+        <div className="divide-y divide-border px-4">
+          {searchResults.map((instrument) => (
+            <InstrumentCatalogRow
+              key={instrument.id}
+              instrument={instrument}
+              confirmingId={confirmingId}
+              onDetails={
+                marketAssetTypes[instrument.instrumentType]
+                  ? () => openMarketDetails(instrument)
+                  : undefined
+              }
+              onConfirm={() => onConfirm(instrument)}
+            />
+          ))}
+        </div>
+      )}
+    </ListRefreshRegion>
   );
 }

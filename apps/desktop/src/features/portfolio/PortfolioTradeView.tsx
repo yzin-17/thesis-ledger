@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FilterReset } from '@/components/ui/filter-bar';
 import { LoadingState, Spinner } from '@/components/ui/spinner';
 import {
   Select,
@@ -38,79 +39,33 @@ import { StickyTableActionCell, StickyTableActionHeader } from '../shared/Sticky
 const accountName = (accounts: Account[], accountId: string) =>
   accounts.find((account) => account.id === accountId)?.name ?? '账户名称暂不可用';
 
-export function PortfolioTradeView({
-  mode,
-  accounts,
-  accountScope,
-  onReview,
-}: {
+export function PortfolioTradeView(props: {
   mode: PortfolioMode;
   accounts: Account[];
   accountScope?: { accountId: string; onChange: (accountId: string) => void };
   onReview: (target: PortfolioTradeReviewTarget) => void;
 }) {
-  const managedAccountsQuery = useManagedAccountsQuery(true);
-  const displayAccounts = useMemo(
-    () => [...accounts, ...(managedAccountsQuery.data ?? [])],
-    [accounts, managedAccountsQuery.data],
-  );
-  const [localAccountId, setLocalAccountId] = useState('');
-  const accountId = accountScope?.accountId ?? localAccountId;
-  const setAccountId = accountScope?.onChange ?? setLocalAccountId;
-  const [symbolSelection, setSymbolSelection] = useState({ mode, accountId, symbol: '' });
-  const [lifecycle, setLifecycle] = useState<PortfolioTradeLifecycle>('ALL');
-  const [selectedTrade, setSelectedTrade] = useState<TradeSummaryResponse | null>(null);
-  const selectedAccount = accounts.find(
-    (account) => account.id === accountId && account.mode === mode && account.active !== false,
-  );
-  const effectiveAccountId = selectedAccount?.id ?? '';
-  const instrumentsQuery = usePortfolioTradeInstrumentsQuery(mode, effectiveAccountId);
-  const selectedInstrument = instrumentsQuery.data?.items.find((item) =>
-    symbolSelection.mode === mode && symbolSelection.accountId === effectiveAccountId && item.symbol === symbolSelection.symbol,
-  );
-  const symbol = selectedInstrument?.symbol ?? '';
-  const setSymbol = (nextSymbol: string) => setSymbolSelection({ mode, accountId: effectiveAccountId, symbol: nextSymbol });
-  useEffect(() => {
-    setSymbolSelection((current) => {
-      if (current.mode !== mode || current.accountId !== effectiveAccountId ||
-        (instrumentsQuery.data && current.symbol && !instrumentsQuery.data.items.some((item) => item.symbol === current.symbol))) {
-        return { mode, accountId: effectiveAccountId, symbol: '' };
-      }
-      return current;
-    });
-  }, [mode, effectiveAccountId, instrumentsQuery.data]);
-  const effectiveSelectedTrade =
-    selectedTrade?.accountMode === mode &&
-    (!effectiveAccountId || selectedTrade.accountId === effectiveAccountId)
-      ? selectedTrade
-      : null;
-  useEffect(() => {
-    if (accountId && !effectiveAccountId) setAccountId('');
-  }, [accountId, effectiveAccountId, setAccountId]);
-  useEffect(() => {
-    if (selectedTrade && !effectiveSelectedTrade) setSelectedTrade(null);
-  }, [effectiveSelectedTrade, selectedTrade]);
-
-  const query = usePortfolioTradesQuery({
+  const control = usePortfolioTradeView(props);
+  const {
+    query,
+    trades,
+    accountScope,
+    accounts,
     mode,
-    ...(effectiveAccountId ? { accountId: effectiveAccountId } : {}),
+    effectiveAccountId,
+    setAccountId,
+    instrumentsQuery,
     symbol,
+    setSymbol,
     lifecycle,
-  });
-  const trades = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
-  const activeCount = trades.filter((trade) => trade.lifecycle === 'ACTIVE').length;
-  const endedCount = trades.length - activeCount;
-  const reviewCount = trades.filter(
-    (trade) =>
-      trade.excludedReasons.length > 0 || trade.issues.length > 0 || trade.costIssues.length > 0,
-  ).length;
-  const hasFilters = Boolean((!accountScope && effectiveAccountId) || symbol.trim() || lifecycle !== 'ALL');
-
-  const clearFilters = () => {
-    if (!accountScope) setLocalAccountId('');
-    setSymbol('');
-    setLifecycle('ALL');
-  };
+    setLifecycle,
+    hasFilters,
+    clearFilters,
+    displayAccounts,
+    setSelectedTrade,
+    effectiveSelectedTrade,
+    onReview,
+  } = control;
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="portfolio-trades-title">
@@ -122,31 +77,16 @@ export function PortfolioTradeView({
         </div>
       </div>
 
-        <dl aria-busy={query.isPending} className="m-0 flex min-h-5 flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <div className="flex items-baseline gap-2">
-            <dt className="text-muted-foreground">已加载</dt>
-            <dd className="m-0 min-w-4 font-semibold tabular-nums">{query.isSuccess ? trades.length : '—'}</dd>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <dt className="text-muted-foreground">进行中</dt>
-            <dd className="m-0 min-w-4 font-semibold tabular-nums">{query.isSuccess ? activeCount : '—'}</dd>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <dt className="text-muted-foreground">已结束</dt>
-            <dd className="m-0 min-w-4 font-semibold tabular-nums">{query.isSuccess ? endedCount : '—'}</dd>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <dt className="text-muted-foreground">需复核</dt>
-            <dd className="m-0 min-w-4 font-semibold tabular-nums">{query.isSuccess ? reviewCount : '—'}</dd>
-          </div>
-        </dl>
+      <TradeListSummary control={control} />
 
-      <div className={cn(
-        'grid gap-3',
-        accountScope
-          ? 'md:grid-cols-[minmax(12rem,1fr)_10rem_auto]'
-          : 'md:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_10rem_auto]',
-      )}>
+      <div
+        className={cn(
+          'grid gap-3',
+          accountScope
+            ? 'md:grid-cols-[minmax(12rem,1fr)_10rem_auto]'
+            : 'md:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_10rem_auto]',
+        )}
+      >
         {!accountScope && (
           <PortfolioAccountFilter
             accounts={accounts}
@@ -178,15 +118,7 @@ export function PortfolioTradeView({
             </SelectContent>
           </Select>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          className="self-end"
-          disabled={!hasFilters}
-          onClick={clearFilters}
-        >
-          清除筛选
-        </Button>
+        <FilterReset className="self-end" hasConditions={hasFilters} onReset={clearFilters} />
       </div>
 
       {query.isError && (
@@ -206,81 +138,21 @@ export function PortfolioTradeView({
           </AlertDescription>
         </Alert>
       )}
-      {query.isPending && (
-        <LoadingState label="正在读取交易周期" />
-      )}
-      <ListRefreshRegion refreshing={query.isRefetching && query.data !== undefined} label="正在刷新交易周期">
+      {query.isPending && <LoadingState label="正在读取交易周期" />}
+      <ListRefreshRegion
+        refreshing={query.isRefetching && query.data !== undefined}
+        label="正在刷新交易周期"
+      >
         {query.isSuccess && trades.length === 0 && (
           <EmptyListState
             className="rounded-md border border-border py-8"
             title={hasFilters ? '没有匹配的交易周期' : '暂无交易周期'}
             description={
-              hasFilters ? '调整或清除筛选后再查看。' : '录入成交后，交易周期会显示在这里。'
+              hasFilters ? '调整或清空筛选后再查看。' : '录入成交后，交易周期会显示在这里。'
             }
           />
         )}
-        {trades.length > 0 && (
-          <TableContainer>
-            <table>
-              <TableHeader>
-                <tr>
-                  <TableHead>标的</TableHead>
-                  <TableHead className="text-left">账户</TableHead>
-                  <TableHead>开始 / 结束</TableHead>
-                  <TableHead className="text-right">数量</TableHead>
-                  <TableHead className="text-right">净实现盈亏</TableHead>
-                  <TableHead>状态</TableHead>
-                  <StickyTableActionHeader>操作</StickyTableActionHeader>
-                </tr>
-              </TableHeader>
-              <tbody>
-                {trades.map((trade) => (
-                  <tr key={trade.id}>
-                    <td>
-                      <strong>{trade.assetName ?? trade.symbol}</strong>
-                      <span className="text-xs text-muted-foreground">
-                        {trade.assetName ? trade.symbol : '标的名称暂不可用'}
-                      </span>
-                    </td>
-                    <td className="text-left">{accountName(displayAccounts, trade.accountId)}</td>
-                    <td>
-                      <span>{formatTradeDateTime(trade.openedAt)}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatTradeDateTime(trade.closedAt)}
-                      </span>
-                    </td>
-                    <td className="text-right">
-                      <span>{trade.sourceQuantity}</span>
-                      <span className="text-xs text-muted-foreground">
-                        剩余 {trade.remainingQuantity}
-                      </span>
-                    </td>
-                    <td className="text-right font-mono">{trade.netRealizedPnl ?? '—'}</td>
-                    <td>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary">
-                          {tradeLifecycleLabel(trade.lifecycle)} · {tradeExitProgressLabel(trade.exitProgress)}
-                        </Badge>
-                        {trade.excludedReasons.length > 0 && <Badge variant="secondary">需复核</Badge>}
-                      </div>
-                    </td>
-                    <StickyTableActionCell>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="link"
-                        className="text-button"
-                        onClick={() => setSelectedTrade(trade)}
-                      >
-                        查看详情
-                      </Button>
-                    </StickyTableActionCell>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableContainer>
-        )}
+        {trades.length > 0 && <TradeListTable control={control} />}
       </ListRefreshRegion>
       {query.hasNextPage && (
         <div className="flex justify-center">
@@ -305,5 +177,220 @@ export function PortfolioTradeView({
         onReview={onReview}
       />
     </section>
+  );
+}
+
+function usePortfolioTradeView({
+  mode,
+  accounts,
+  accountScope,
+  onReview,
+}: {
+  mode: PortfolioMode;
+  accounts: Account[];
+  accountScope?: { accountId: string; onChange: (accountId: string) => void };
+  onReview: (target: PortfolioTradeReviewTarget) => void;
+}) {
+  const managedAccountsQuery = useManagedAccountsQuery(true);
+  const displayAccounts = useMemo(
+    () => [...accounts, ...(managedAccountsQuery.data ?? [])],
+    [accounts, managedAccountsQuery.data],
+  );
+  const [localAccountId, setLocalAccountId] = useState('');
+  const accountId = accountScope?.accountId ?? localAccountId;
+  const setAccountId = accountScope?.onChange ?? setLocalAccountId;
+  const [symbolSelection, setSymbolSelection] = useState({ mode, accountId, symbol: '' });
+  const [lifecycle, setLifecycle] = useState<PortfolioTradeLifecycle>('ALL');
+  const [selectedTrade, setSelectedTrade] = useState<TradeSummaryResponse | null>(null);
+  const selectedAccount = accounts.find(
+    (account) => account.id === accountId && account.mode === mode && account.active !== false,
+  );
+  const effectiveAccountId = selectedAccount?.id ?? '';
+  const instrumentsQuery = usePortfolioTradeInstrumentsQuery(mode, effectiveAccountId);
+  const selectedInstrument = instrumentsQuery.data?.items.find(
+    (item) =>
+      symbolSelection.mode === mode &&
+      symbolSelection.accountId === effectiveAccountId &&
+      item.symbol === symbolSelection.symbol,
+  );
+  const symbol = selectedInstrument?.symbol ?? '';
+  const setSymbol = (nextSymbol: string) =>
+    setSymbolSelection({ mode, accountId: effectiveAccountId, symbol: nextSymbol });
+  useEffect(() => {
+    setSymbolSelection((current) => {
+      if (
+        current.mode !== mode ||
+        current.accountId !== effectiveAccountId ||
+        (instrumentsQuery.data &&
+          current.symbol &&
+          !instrumentsQuery.data.items.some((item) => item.symbol === current.symbol))
+      ) {
+        return { mode, accountId: effectiveAccountId, symbol: '' };
+      }
+      return current;
+    });
+  }, [mode, effectiveAccountId, instrumentsQuery.data]);
+  const effectiveSelectedTrade =
+    selectedTrade?.accountMode === mode &&
+    (!effectiveAccountId || selectedTrade.accountId === effectiveAccountId)
+      ? selectedTrade
+      : null;
+  useEffect(() => {
+    if (accountId && !effectiveAccountId) setAccountId('');
+  }, [accountId, effectiveAccountId, setAccountId]);
+  useEffect(() => {
+    if (selectedTrade && !effectiveSelectedTrade) setSelectedTrade(null);
+  }, [effectiveSelectedTrade, selectedTrade]);
+
+  const query = usePortfolioTradesQuery({
+    mode,
+    ...(effectiveAccountId ? { accountId: effectiveAccountId } : {}),
+    symbol,
+    lifecycle,
+  });
+  const trades = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
+  const activeCount = trades.filter((trade) => trade.lifecycle === 'ACTIVE').length;
+  const endedCount = trades.length - activeCount;
+  const reviewCount = trades.filter(
+    (trade) =>
+      trade.excludedReasons.length > 0 || trade.issues.length > 0 || trade.costIssues.length > 0,
+  ).length;
+  const hasFilters = Boolean(
+    (!accountScope && effectiveAccountId) || symbol.trim() || lifecycle !== 'ALL',
+  );
+
+  const clearFilters = () => {
+    if (!accountScope) setLocalAccountId('');
+    setSymbol('');
+    setLifecycle('ALL');
+  };
+
+  return {
+    query,
+    trades,
+    activeCount,
+    endedCount,
+    reviewCount,
+    accountScope,
+    accounts,
+    mode,
+    effectiveAccountId,
+    setAccountId,
+    instrumentsQuery,
+    symbol,
+    setSymbol,
+    lifecycle,
+    setLifecycle,
+    hasFilters,
+    clearFilters,
+    displayAccounts,
+    setSelectedTrade,
+    effectiveSelectedTrade,
+    onReview,
+  };
+}
+
+function TradeListSummary({ control }: { control: ReturnType<typeof usePortfolioTradeView> }) {
+  return (
+    <>
+      <dl
+        aria-busy={control.query.isPending}
+        className="m-0 flex min-h-5 flex-wrap items-center gap-x-6 gap-y-2 text-sm"
+      >
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">已加载</dt>
+          <dd className="m-0 min-w-4 font-semibold tabular-nums">
+            {control.query.isSuccess ? control.trades.length : '—'}
+          </dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">进行中</dt>
+          <dd className="m-0 min-w-4 font-semibold tabular-nums">
+            {control.query.isSuccess ? control.activeCount : '—'}
+          </dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">已结束</dt>
+          <dd className="m-0 min-w-4 font-semibold tabular-nums">
+            {control.query.isSuccess ? control.endedCount : '—'}
+          </dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="text-muted-foreground">需复核</dt>
+          <dd className="m-0 min-w-4 font-semibold tabular-nums">
+            {control.query.isSuccess ? control.reviewCount : '—'}
+          </dd>
+        </div>
+      </dl>
+    </>
+  );
+}
+function TradeListTable({ control }: { control: ReturnType<typeof usePortfolioTradeView> }) {
+  return (
+    <>
+      <TableContainer>
+        <table>
+          <TableHeader>
+            <tr>
+              <TableHead>标的</TableHead>
+              <TableHead className="text-left">账户</TableHead>
+              <TableHead>开始 / 结束</TableHead>
+              <TableHead className="text-right">数量</TableHead>
+              <TableHead className="text-right">净实现盈亏</TableHead>
+              <TableHead>状态</TableHead>
+              <StickyTableActionHeader>操作</StickyTableActionHeader>
+            </tr>
+          </TableHeader>
+          <tbody>
+            {control.trades.map((trade) => (
+              <tr key={trade.id}>
+                <td>
+                  <strong>{trade.assetName ?? trade.symbol}</strong>
+                  <span className="text-xs text-muted-foreground">
+                    {trade.assetName ? trade.symbol : '标的名称暂不可用'}
+                  </span>
+                </td>
+                <td className="text-left">
+                  {accountName(control.displayAccounts, trade.accountId)}
+                </td>
+                <td>
+                  <span>{formatTradeDateTime(trade.openedAt)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatTradeDateTime(trade.closedAt)}
+                  </span>
+                </td>
+                <td className="text-right">
+                  <span>{trade.sourceQuantity}</span>
+                  <span className="text-xs text-muted-foreground">
+                    剩余 {trade.remainingQuantity}
+                  </span>
+                </td>
+                <td className="text-right font-mono">{trade.netRealizedPnl ?? '—'}</td>
+                <td>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant="secondary">
+                      {tradeLifecycleLabel(trade.lifecycle)} ·{' '}
+                      {tradeExitProgressLabel(trade.exitProgress)}
+                    </Badge>
+                    {trade.excludedReasons.length > 0 && <Badge variant="secondary">需复核</Badge>}
+                  </div>
+                </td>
+                <StickyTableActionCell>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="link"
+                    className="text-button"
+                    onClick={() => control.setSelectedTrade(trade)}
+                  >
+                    查看详情
+                  </Button>
+                </StickyTableActionCell>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableContainer>
+    </>
   );
 }

@@ -115,7 +115,6 @@ export function DateSelectionPanel({ type, value, min, max, step, onSelect, onCl
         <Calendar
           mode="single"
           locale={zhCN}
-          autoFocus
           selected={validSelected}
           defaultMonth={validSelected ?? new Date()}
           captionLayout="label"

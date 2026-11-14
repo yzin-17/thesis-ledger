@@ -1,3 +1,8 @@
+import {
+  snapshotNativeCurrencies,
+  snapshotCaptureIdentity,
+  mergeAccountSnapshotHistory,
+} from './performance-snapshot-aggregation.js';
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import {
   aggregateCurrencyAmounts,
@@ -13,7 +18,6 @@ import { PerformanceSnapshotRevisionRepository } from './performance-snapshot-re
 import { valueSnapshotPosition } from './performance-snapshot-position-valuation.js';
 import {
   frozenSnapshotInputs,
-  officialSnapshotEvidenceVersion,
   readCurrentSnapshotInputs,
   type SnapshotEconomicInputs,
 } from './performance-snapshot-inputs.js';
@@ -25,7 +29,6 @@ import {
   snapshotNativeByCurrency,
   snapshotPayload,
   type Currency,
-  type NativeSnapshotCurrency,
   type PerformanceFxMeta,
   type PerformanceFxOptions,
   type PerformanceSnapshot,
@@ -68,16 +71,29 @@ export class PerformanceSnapshotService {
     const valuationDate = context.valuationDate ?? dateOnly(capturedAt);
     const valuationDateKey = shanghaiDate(valuationDate);
     await this.assertCurrencyScope(accountId, mode, captureOptions);
-    const inputs = frozenInputs ?? await readCurrentSnapshotInputs(
-      this.prisma, this.data, accountId, capturedAt, mode, captureOptions.baseCurrency,
-    );
+    const inputs =
+      frozenInputs ??
+      (await readCurrentSnapshotInputs(
+        this.prisma,
+        this.data,
+        accountId,
+        capturedAt,
+        mode,
+        captureOptions.baseCurrency,
+      ));
     const baseCurrency = inputs.baseCurrency;
     const resolvedCaptureOptions = { ...captureOptions, baseCurrency };
     const valued = await Promise.all(
-      inputs.positions.map((position) => valueSnapshotPosition(
-        this.market, { ...position, asset: { assetType: position.assetType } },
-        position.currency, valuationDateKey, context, this.bars,
-      )),
+      inputs.positions.map((position) =>
+        valueSnapshotPosition(
+          this.market,
+          { ...position, asset: { assetType: position.assetType } },
+          position.currency,
+          valuationDateKey,
+          context,
+          this.bars,
+        ),
+      ),
     );
     const cashAmounts = inputs.cashAmounts;
     const currencies = [
@@ -126,25 +142,7 @@ export class PerformanceSnapshotService {
       !marketAggregate.complete ||
       !costAggregate.complete ||
       !cashAggregate.complete;
-    const nativeByCurrencyMap = new Map<Currency, NativeSnapshotCurrency>();
-    const ensureNativeCurrency = (currency: Currency) => {
-      const current = nativeByCurrencyMap.get(currency) ?? {
-        currency,
-        marketValue: null,
-        costValue: 0,
-        cashValue: 0,
-      };
-      nativeByCurrencyMap.set(currency, current);
-      return current;
-    };
-    for (const position of valued) {
-      const current = ensureNativeCurrency(position.currency);
-      current.costValue += position.nativeCostValue;
-      if (position.marketValue !== null)
-        current.marketValue = (current.marketValue ?? 0) + position.marketValue;
-    }
-    for (const item of cashAmounts) ensureNativeCurrency(item.currency).cashValue += item.amount;
-    const nativeByCurrency = [...nativeByCurrencyMap.values()];
+    const nativeByCurrency = snapshotNativeCurrencies(valued, cashAmounts);
     const cashByCurrency = cashAmounts.map((item) => ({
       ...item,
       convertedAmount: this.data.convertFx(item.amount, item.currency, fx),
@@ -165,30 +163,28 @@ export class PerformanceSnapshotService {
       fx: fx.meta,
       dataQuality: { partial, missingSymbols, missingCurrencies },
     };
-    const scope = accountId ? 'account' : 'portfolio';
-    const source = context.source ?? 'DAILY_CLOSE';
-    const valuationBasis = context.valuationBasis ?? 'ESTIMATED';
-    const scopeId = accountId ?? 'all';
-    const eventSuffix =
-      source === 'DAILY_CLOSE' ? '' : `:${source}:${context.sourceRef ?? capturedAt.toISOString()}`;
-    const slotKey = `${scope}:${scopeId}:${mode}:${valuationDateKey}${eventSuffix}`;
-    const defaultKeyTime = source === 'DAILY_CLOSE' ? valuationDateKey : capturedAt.toISOString();
-    const evidenceVersion = valuationBasis === 'OFFICIAL'
-      ? officialSnapshotEvidenceVersion(inputs, valued, fx.meta.evidenceVersion) : undefined;
-    const idempotencyKey =
-      context.idempotencyKey ??
-      `${source.toLowerCase()}:${scope}:${scopeId}:${mode}:${defaultKeyTime}:${valuationBasis.toLowerCase()}${evidenceVersion ? `:${evidenceVersion}` : ''}`;
-    const pricedCoverage =
-      context.pricedCoverage ??
-      (valued.length === 0 ? 1 : (valued.length - missingSymbols.length) / valued.length);
-    const disclosureCoverage = context.disclosureCoverage ?? inputs.disclosureCoverage;
-    let valuationStatus: 'UNAVAILABLE' | 'PARTIAL' | 'COMPLETE' = 'COMPLETE';
-    if (pricedCoverage === 0 && valued.length > 0) valuationStatus = 'UNAVAILABLE';
-    else if (partial) valuationStatus = 'PARTIAL';
-    if (valuationBasis === 'OFFICIAL' && (valuationStatus !== 'COMPLETE' ||
-      !['ready', 'not_needed'].includes(fx.meta.status))) {
-      throw new Error('正式估值所需行情、净值或汇率尚未齐备');
-    }
+    const {
+      scope,
+      source,
+      valuationBasis,
+      slotKey,
+      evidenceVersion,
+      idempotencyKey,
+      pricedCoverage,
+      disclosureCoverage,
+      valuationStatus,
+    } = snapshotCaptureIdentity({
+      accountId,
+      capturedAt,
+      mode,
+      valuationDateKey,
+      context,
+      inputs,
+      valued,
+      fx: fx.meta,
+      partial,
+      missingSymbols,
+    });
     return this.revisions.appendCurrent({
       slotKey,
       idempotencyKey,
@@ -343,77 +339,7 @@ export class PerformanceSnapshotService {
       );
     }
 
-    const byAccount = new Map<string, typeof filtered>();
-    for (const id of accountCurrencyMap.keys()) {
-      if (!id.startsWith('__currency-')) byAccount.set(id, []);
-    }
-    for (const snapshot of filtered) {
-      const key = snapshot.accountId ?? '__portfolio';
-      const values = byAccount.get(key) ?? [];
-      values.push(snapshot);
-      byAccount.set(key, values);
-    }
-    const timestamps = [...new Set(filtered.map((snapshot) => snapshot.capturedAt.getTime()))].sort(
-      (left, right) => left - right,
-    );
-    const merged: PerformanceSnapshot[] = [];
-    for (const timestamp of timestamps) {
-      let marketValue = 0;
-      let costValue = 0;
-      let cashValue = 0;
-      let partial = false;
-      const missingSymbols: string[] = [];
-      const evidence: PerformanceFxMeta[] = [];
-      let included = 0;
-      for (const accountSnapshots of byAccount.values()) {
-        const point = [...accountSnapshots]
-          .reverse()
-          .find((snapshot) => snapshot.capturedAt.getTime() <= timestamp);
-        if (!point) {
-          partial = true;
-          continue;
-        }
-        const pointFx = fxByDate.get(point.capturedAt.getTime());
-        if (!pointFx) {
-          partial = true;
-          continue;
-        }
-        const converted = withFx(point, pointFx);
-        if (converted.currency !== pointFx.meta.baseCurrency) {
-          partial = true;
-          continue;
-        }
-        included += 1;
-        marketValue += Number(converted.marketValue);
-        costValue += Number(converted.costValue ?? 0);
-        cashValue += Number(converted.cashValue);
-        missingSymbols.push(...snapshotMissingSymbols(point));
-        partial ||= partialSnapshot(point);
-        evidence.push(pointFx.meta);
-      }
-      if (included === 0) continue;
-      const primaryFx = evidence[0];
-      merged.push({
-        id: `fx-${timestamp}`,
-        accountId: null,
-        capturedAt: new Date(timestamp),
-        marketValue,
-        costValue,
-        cashValue,
-        ...(primaryFx?.baseCurrency ? { currency: primaryFx.baseCurrency } : {}),
-        payload: {
-          mode,
-          accountScopePolicy: 'investment-only-v1',
-          partial,
-          missingSymbols: [...new Set(missingSymbols)],
-          dataQuality: { partial, missingSymbols: [...new Set(missingSymbols)] },
-          fx: primaryFx,
-          fxEvidence: evidence,
-        },
-        ...(primaryFx ? fxResponseFields(primaryFx) : {}),
-      });
-    }
-    return merged;
+    return mergeAccountSnapshotHistory(filtered, accountCurrencyMap, fxByDate, mode, withFx);
   }
 
   async list(filters: {

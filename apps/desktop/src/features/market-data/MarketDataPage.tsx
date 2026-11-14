@@ -1,6 +1,4 @@
 import { useMarketProviderDialogs } from './useMarketProviderDialogs.js';
-import { MarketNewsSheet } from './MarketNewsSheet.js';
-import { MarketReferenceSheet } from './MarketReferenceSheet.js';
 import { PageHeader } from '../shared/PageHeader.js';
 import { DataStateBanner } from '../shared/DesktopPrimitives.js';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
@@ -10,26 +8,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToastManager } from '@/components/ui/toast';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
-import { InstrumentCatalogPanel } from './InstrumentCatalogPanel.js';
-import { SecurityStaticInfoPanel } from './SecurityStaticInfoPanel.js';
-import { MarketPolicyPanel } from './MarketPolicyPanel.js';
+import { RoutingConfigPanel } from './RoutingConfigPanel.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { usePageRefresh } from '../shared/usePageRefresh.js';
 import { MarketProviderPanel } from './MarketProviderPanel.js';
 import { MarketDataSectionTabs } from './MarketDataSectionTabs.js';
 import { useMarketProviderEnabled } from './useMarketProviderEnabled.js';
-import {
-  useCatalogSyncMutation,
-  useConfirmInstrumentMutation,
-  useRemoveMarketProviderMutation,
-} from './market-data.mutations.js';
-import {
-  marketDataKeys,
-  useInstrumentSearchQuery,
-  useMarketDataQueries,
-} from './market-data.queries.js';
+import { useRemoveMarketProviderMutation } from './market-data.mutations.js';
+import { marketDataKeys, useMarketDataQueries } from './market-data.queries.js';
 import type { ProviderManifest } from './market-data.types.js';
-import { useCatalogJobProgress } from './useCatalogJobProgress.js';
 import { routePolicySummaryV3 } from './market-policy-status-v3.js';
 import { useMarketPolicyWorkflow } from './useMarketPolicyWorkflow.js';
 import { RuleSourceMonitorPanel } from './RuleSourceMonitorPanel.js';
@@ -41,8 +28,6 @@ export function MarketDataPage() {
   const pageRefresh = usePageRefresh([{ queryKey: marketDataKeys.root }]);
   const marketDataRefreshing = pageRefresh.refreshing;
   const removeProvider = useRemoveMarketProviderMutation();
-  const syncCatalog = useCatalogSyncMutation();
-  const confirmInstrument = useConfirmInstrumentMutation();
 
   const providerEnabled = useMarketProviderEnabled(providers.data ?? []);
   const providerDrafts = providerEnabled.providers;
@@ -58,28 +43,20 @@ export function MarketDataPage() {
     [toastManager],
   );
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [catalogJobId, setCatalogJobId] = useState<string | null>(null);
-  const [submittedSearch, setSubmittedSearch] = useState('');
 
   const marketPolicy = useMarketPolicyWorkflow({
     policy: policy.data,
     catalogComplete: routeCapabilities.data?.status === 'complete',
-    catalog: routeCapabilities.data,
-    providers: providers.data,
     setBusyAction,
     setMessage,
   });
 
-  const clearCatalogJob = useCallback(() => setCatalogJobId(null), []);
-  const catalogJob = useCatalogJobProgress(catalogJobId, clearCatalogJob, setMessage);
-
-  const instrumentSearch = useInstrumentSearchQuery(submittedSearch);
-  let loadState: 'degraded' | 'loading' | 'ready' = 'ready';
-  if (policy.isError || providers.isError || catalog.isError) loadState = 'degraded';
-  else if (policy.isPending || providers.isPending || catalog.isPending) loadState = 'loading';
-  const controlsDisabled = loadState !== 'ready' || busyAction !== null;
-  let policyStatus = routePolicySummaryV3(policy.data);
-  if (policy.isError) policyStatus = policy.data ? '旧数据，刷新失败' : '读取失败';
+  const { loadState, controlsDisabled, policyStatus } = marketDataPageStatus(
+    policy,
+    providers,
+    catalog,
+    busyAction,
+  );
   const routeProviderSummary = useMemo(() => {
     return {
       total: providerDrafts.length,
@@ -138,46 +115,6 @@ export function MarketDataPage() {
     }
   };
 
-  const handleSyncCatalog = async () => {
-    setBusyAction('catalog-sync');
-    setMessage(null);
-    try {
-      const result = await syncCatalog.mutateAsync();
-      if (result.status === 'failed' || result.status === 'timeout') {
-        setMessage({ type: 'error', text: '标的目录同步任务失败，请稍后重试。' });
-      } else if (result.acknowledged) {
-        setMessage({ type: 'success', text: '标的目录已同步。' });
-        await queryClient.invalidateQueries({ queryKey: marketDataKeys.catalog() });
-      } else if (result.id) {
-        setCatalogJobId(result.id);
-        setMessage({ type: 'success', text: '标的目录同步任务已提交，状态将自动刷新。' });
-      }
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : '标的目录同步失败。',
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleConfirmInstrument = async (instrument: { id: string; displayName: string }) => {
-    setBusyAction(`instrument-confirm:${instrument.id}`);
-    try {
-      await confirmInstrument.mutateAsync(instrument.id);
-      await instrumentSearch.refetch();
-      setMessage({ type: 'success', text: `${instrument.displayName} 已确认，可用于持仓关联。` });
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : '标的确认失败。',
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   return (
     <section className="module-page flex flex-col gap-card" aria-labelledby="market-data-title">
       <PageHeader
@@ -186,8 +123,6 @@ export function MarketDataPage() {
         title="市场数据"
         actions={
           <>
-            <MarketReferenceSheet />
-            <MarketNewsSheet />
             <RefreshIconButton
               label="刷新市场数据状态"
               refreshing={marketDataRefreshing}
@@ -201,9 +136,7 @@ export function MarketDataPage() {
       {loadState === 'degraded' && (
         <Alert variant="destructive">
           <AlertTitle>DSA Control 暂时不可用</AlertTitle>
-          <AlertDescription>
-            只读展示已加载的最后状态；保存、测试和目录同步已暂停。
-          </AlertDescription>
+          <AlertDescription>只读展示已加载的最后状态；保存和测试已暂停。</AlertDescription>
         </Alert>
       )}
       {message && (
@@ -229,6 +162,12 @@ export function MarketDataPage() {
       {providerDialogs.dialogs}
 
       <MarketDataSectionTabs
+        defaultSection={
+          typeof window !== 'undefined' &&
+          new URLSearchParams(window.location.search).get('section') === 'monitor'
+            ? 'monitor'
+            : 'routing'
+        }
         providerPanel={
           <MarketProviderPanel
             refreshing={providers.isRefetching}
@@ -243,57 +182,40 @@ export function MarketDataPage() {
             onRemove={(provider) => void handleRemoveProvider(provider)}
           />
         }
-        policyPanel={policy.isError && !marketPolicy.draft ? (
-          <DataStateBanner
-            state="error"
-            description="路由策略暂时无法读取，请重新加载。"
-            onRetry={() => void policy.refetch()}
-          />
-        ) : (
-          <MarketPolicyPanel
-            policy={marketPolicy.draft}
-            serverPolicy={policy.data ?? null}
-            catalog={routeCapabilities.data}
-            catalogPending={routeCapabilities.isPending}
-            catalogQueryFailed={routeCapabilities.isError}
-            providers={providerDrafts}
-            disabled={controlsDisabled || routeCapabilities.isPending}
-            saving={marketPolicy.saving}
-            retrying={marketPolicy.retrying}
-            dirty={marketPolicy.dirty}
-            onChange={marketPolicy.changeDraft}
-            onSave={() => void marketPolicy.save()}
-            onRetry={() => void marketPolicy.retry()}
-          />
-        )}
-        catalogPanel={
-          <div className="flex flex-col gap-4">
-          <SecurityStaticInfoPanel />
-          <InstrumentCatalogPanel
-            catalog={catalogJob.data ?? catalog.data ?? null}
-            disabled={controlsDisabled}
-            syncing={syncCatalog.isPending || Boolean(catalogJobId)}
-            searchBusy={instrumentSearch.isFetching}
-            searchRefreshing={instrumentSearch.isRefetching && instrumentSearch.data !== undefined}
-            searchRequested={Boolean(submittedSearch)}
-            searchError={
-              instrumentSearch.isError ? '本地标的目录暂时无法读取，请重试。' : null
-            }
-            searchResults={instrumentSearch.data ?? []}
-            confirmingId={
-              busyAction?.startsWith('instrument-confirm:')
-                ? busyAction.slice('instrument-confirm:'.length)
-                : null
-            }
-            onSync={() => void handleSyncCatalog()}
-            onSearch={setSubmittedSearch}
-            onRetrySearch={() => void instrumentSearch.refetch()}
-            onConfirm={(instrument) => void handleConfirmInstrument(instrument)}
-          />
-          </div>
+        policyPanel={
+          policy.isError && !marketPolicy.draft ? (
+            <DataStateBanner
+              state="error"
+              description="路由策略暂时无法读取，请重新加载。"
+              onRetry={() => void policy.refetch()}
+            />
+          ) : (
+            <RoutingConfigPanel
+              providers={providerDrafts}
+              refreshing={routeCapabilities.isFetching || providers.isFetching}
+              catalog={routeCapabilities.data?.entries ?? []}
+              disabled={controlsDisabled || routeCapabilities.isPending}
+              onRetry={() => void marketPolicy.retry()}
+            />
+          )
         }
         monitorPanel={<RuleSourceMonitorPanel />}
       />
     </section>
   );
+}
+
+function marketDataPageStatus(
+  policy: ReturnType<typeof useMarketDataQueries>['policy'],
+  providers: ReturnType<typeof useMarketDataQueries>['providers'],
+  catalog: ReturnType<typeof useMarketDataQueries>['catalog'],
+  busyAction: string | null,
+) {
+  let loadState: 'degraded' | 'loading' | 'ready' = 'ready';
+  if (policy.isError || providers.isError || catalog.isError) loadState = 'degraded';
+  else if (policy.isPending || providers.isPending || catalog.isPending) loadState = 'loading';
+  const controlsDisabled = loadState !== 'ready' || busyAction !== null;
+  let policyStatus = routePolicySummaryV3(policy.data);
+  if (policy.isError) policyStatus = policy.data ? '旧数据，刷新失败' : '读取失败';
+  return { loadState, controlsDisabled, policyStatus };
 }

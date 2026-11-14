@@ -70,32 +70,9 @@ export function verifyTerminalContinuation(
   for (const [index, entry] of source.retainedArms.entries()) {
     const key = entry.caseId + ':' + entry.arm,
       value = entry.result;
-    if (keys.has(key) || key !== sequence[index] || !value.requests.length)
-      throw new Error('保留组必须是原执行顺序的唯一连续前缀');
-    keys.add(key);
-    const stages = entry.arm === 'single' ? ['single'] : ['organize', 'challenge', 'synthesize'];
-    for (const [ordinal, request] of value.requests.entries()) {
-      z.uuid().parse(request.requestId);
-      if (ids.has(request.requestId) || request.stage !== stages[ordinal])
-        throw new Error('保留请求重复或阶段顺序不符');
-      ids.add(request.requestId);
-      requests++;
-    }
+    requests += verifyRetainedRequestOrder(entry, index, sequence, keys, ids);
     if (value.status === 'complete') continue;
-    if (
-      value.status !== 'failed' ||
-      !['provider_rejected', 'schema_invalid'].includes(value.reason ?? '') ||
-      !retainableFailedRequestCount(entry.arm, value) ||
-      value.output !== null ||
-      value.grade !== null ||
-      value.scoreChecks.length !== 0 ||
-      value.criticalViolations !== 0 ||
-      !Number.isFinite(value.durationMs) ||
-      value.durationMs < 0 ||
-      value.estimatedCost !== 0 ||
-      (value.actualCost !== null && value.actualCost !== 0)
-    )
-      throw new Error('保留失败组不符合已核对的终态');
+    assertRetainedFailedArm(entry.arm, value);
     for (const request of value.requests.slice(0, -1)) {
       const fact = verifyRetainedRequest(request, protocol, null);
       const output = stageOutputs.get(request.requestId);
@@ -115,14 +92,7 @@ export function verifyTerminalContinuation(
   if (usedStageOutputs.size !== stageOutputs.size) throw new Error('存在无对应前序请求的中间输出');
   const history = verifyLiveExperimentHistory(protocol, source.historicalBudget);
   const supplemental = verifyFreeProbeBudget(source.supplementalBudget);
-  if (
-    !Number.isInteger(source.sourceSupplementalRequests) ||
-    source.sourceSupplementalRequests < 0 ||
-    source.sourceSupplementalRequests > supplemental.requests ||
-    history.requests + requests + source.sourceSupplementalRequests !== source.sourceRequests ||
-    supplemental.budget.entries.some((entry) => ids.has(entry.requestId))
-  )
-    throw new Error('保留请求与原终态/补充预算无法对账');
+  assertTerminalRequestBudget(source, history, supplemental, requests, ids);
   return {
     completed: recovered.completed,
     initial: {
@@ -189,4 +159,65 @@ function verifyRetainedFreeCost(last: ReturnType<typeof aiInvocationFactSchema.p
     last.usage.outputTokens == null
   )
     throw new Error('免费保留请求已知费用或用量不符');
+}
+
+function verifyRetainedRequestOrder(
+  entry: LiveTerminalContinuation['retainedArms'][number],
+  index: number,
+  sequence: string[],
+  keys: Set<string>,
+  ids: Set<string>,
+) {
+  const key = entry.caseId + ':' + entry.arm;
+  const value = entry.result;
+  let requests = 0;
+  if (keys.has(key) || key !== sequence[index] || !value.requests.length)
+    throw new Error('保留组必须是原执行顺序的唯一连续前缀');
+  keys.add(key);
+  const stages = entry.arm === 'single' ? ['single'] : ['organize', 'challenge', 'synthesize'];
+  for (const [ordinal, request] of value.requests.entries()) {
+    z.uuid().parse(request.requestId);
+    if (ids.has(request.requestId) || request.stage !== stages[ordinal])
+      throw new Error('保留请求重复或阶段顺序不符');
+    ids.add(request.requestId);
+    requests++;
+  }
+  return requests;
+}
+
+function assertRetainedFailedArm(
+  arm: LiveTerminalContinuation['retainedArms'][number]['arm'],
+  value: LiveTerminalContinuation['retainedArms'][number]['result'],
+) {
+  if (
+    value.status !== 'failed' ||
+    !['provider_rejected', 'schema_invalid'].includes(value.reason ?? '') ||
+    !retainableFailedRequestCount(arm, value) ||
+    value.output !== null ||
+    value.grade !== null ||
+    value.scoreChecks.length !== 0 ||
+    value.criticalViolations !== 0 ||
+    !Number.isFinite(value.durationMs) ||
+    value.durationMs < 0 ||
+    value.estimatedCost !== 0 ||
+    (value.actualCost !== null && value.actualCost !== 0)
+  )
+    throw new Error('保留失败组不符合已核对的终态');
+}
+
+function assertTerminalRequestBudget(
+  source: LiveTerminalContinuation,
+  history: ReturnType<typeof verifyLiveExperimentHistory>,
+  supplemental: ReturnType<typeof verifyFreeProbeBudget>,
+  requests: number,
+  ids: Set<string>,
+) {
+  if (
+    !Number.isInteger(source.sourceSupplementalRequests) ||
+    source.sourceSupplementalRequests < 0 ||
+    source.sourceSupplementalRequests > supplemental.requests ||
+    history.requests + requests + source.sourceSupplementalRequests !== source.sourceRequests ||
+    supplemental.budget.entries.some((entry) => ids.has(entry.requestId))
+  )
+    throw new Error('保留请求与原终态/补充预算无法对账');
 }

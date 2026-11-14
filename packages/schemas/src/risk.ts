@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { riskRuleNotificationSchema } from './risk-notification-settings.js';
 
 const riskRuleFields = z.object({
   kind: z.enum([
@@ -27,11 +28,12 @@ const riskRuleFields = z.object({
   severity: z.enum(['info', 'warning', 'error', 'critical']),
   threshold: z.number().finite(),
   enabled: z.boolean().default(true),
+  notification: riskRuleNotificationSchema.optional(),
   symbol: z.string().optional(),
   accountId: z.uuid().optional(),
   sourcePlanId: z.uuid().optional(),
   condition: z.record(z.string(), z.unknown()).optional(),
-  parameters: z.record(z.string(), z.unknown()).optional(),
+  parameters: z.object({ notification: riskRuleNotificationSchema.optional() }).catchall(z.unknown()).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   effectiveAt: z.iso.datetime({ offset: true }).optional(),
 });

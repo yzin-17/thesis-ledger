@@ -4,20 +4,27 @@ import {
   riskRuleInputSchema,
   riskRuleStoredSchema,
   riskRuleUpdateSchema,
+  riskRuleNotificationFromParameters,
 } from '@thesis-ledger/schemas';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
+import { assertRiskNotificationSelection } from '../notifications/risk-notification-selection.js';
 
 @Injectable()
 export class RiskRuleService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
+    @Optional()
+    private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {}
 
   async createRule(input: unknown) {
     const rule = riskRuleInputSchema.parse(input);
+    await assertRiskNotificationSelection(
+      this.prisma,
+      rule.notification ?? rule.parameters?.notification,
+    );
     return this.prisma.$transaction(async (transaction) => {
       await this.assertRuleTarget(transaction, rule, true);
       const created = await transaction.riskRule.create({ data: this.ruleData(rule) });
@@ -30,7 +37,7 @@ export class RiskRuleService {
           after: this.snapshot(created),
         },
       });
-      return created;
+      return this.withNotification(created);
     });
   }
 
@@ -42,10 +49,27 @@ export class RiskRuleService {
     return this.withAssetNames(rules);
   }
 
-  private async withAssetNames<T extends { symbol: string | null }>(rules: T[]) {
-    const names = await this.display.resolve(rules.flatMap((rule) => rule.symbol ? [rule.symbol] : []));
+  private withNotification<T extends { parameters?: unknown; sourcePlanId?: string | null }>(
+    rule: T,
+  ) {
+    if (
+      rule.sourcePlanId &&
+      (!rule.parameters ||
+        typeof rule.parameters !== 'object' ||
+        !('notification' in rule.parameters))
+    )
+      return { ...rule, notification: undefined };
+    return { ...rule, notification: riskRuleNotificationFromParameters(rule.parameters) };
+  }
+
+  private async withAssetNames<
+    T extends { symbol: string | null; parameters?: unknown; sourcePlanId?: string | null },
+  >(rules: T[]) {
+    const names = await this.display.resolve(
+      rules.flatMap((rule) => (rule.symbol ? [rule.symbol] : [])),
+    );
     return rules.map((rule) => ({
-      ...rule,
+      ...this.withNotification(rule),
       assetName: rule.symbol ? names.name(rule.symbol) : null,
     }));
   }
@@ -61,34 +85,26 @@ export class RiskRuleService {
     });
   }
 
-  getRule(id: string) {
-    return this.prisma.riskRule.findUniqueOrThrow({ where: { id } });
+  async getRule(id: string) {
+    return this.withNotification(await this.prisma.riskRule.findUniqueOrThrow({ where: { id } }));
   }
 
   async updateRule(id: string, input: unknown) {
     const patch = riskRuleUpdateSchema.parse(input);
+    await assertRiskNotificationSelection(
+      this.prisma,
+      patch.notification ?? patch.parameters?.notification,
+    );
     const enableRequested =
       input !== null &&
       typeof input === 'object' &&
       (input as Record<string, unknown>).enabled === true;
     return this.prisma.$transaction(async (transaction) => {
       const stored = await transaction.riskRule.findUniqueOrThrow({ where: { id } });
+      if (stored.sourcePlanId && (patch.notification || patch.parameters?.notification))
+        throw new BadRequestException('策略生成规则请在所属策略应用中修改通知设置');
       if (stored.archivedAt) throw new BadRequestException('规则已归档，请先恢复后再编辑或启停');
-      const mergedInput = {
-        kind: stored.kind,
-        scope: stored.scope,
-        severity: stored.severity,
-        threshold: Number(stored.threshold),
-        enabled: stored.enabled,
-        ...(stored.symbol === null ? {} : { symbol: stored.symbol }),
-        ...(stored.accountId === null ? {} : { accountId: stored.accountId }),
-        ...(stored.sourcePlanId === null ? {} : { sourcePlanId: stored.sourcePlanId }),
-        ...(stored.condition === null ? {} : { condition: stored.condition }),
-        ...(stored.parameters === null ? {} : { parameters: stored.parameters }),
-        ...(stored.config === null ? {} : { config: stored.config }),
-        effectiveAt: stored.effectiveAt.toISOString(),
-        ...patch,
-      };
+      const mergedInput = riskRuleRevisionInput(stored, patch);
       const needsRepair =
         requiresRiskRuleAccount(String(mergedInput.kind), String(mergedInput.scope)) &&
         !mergedInput.accountId;
@@ -97,11 +113,7 @@ export class RiskRuleService {
       const merged = needsRepair
         ? riskRuleStoredSchema.parse({ ...mergedInput, enabled: false })
         : riskRuleInputSchema.parse(mergedInput);
-      const targetChanged =
-        (patch.kind !== undefined && patch.kind !== stored.kind) ||
-        (patch.scope !== undefined && patch.scope !== stored.scope) ||
-        (patch.symbol !== undefined && patch.symbol !== stored.symbol) ||
-        (patch.accountId !== undefined && patch.accountId !== stored.accountId);
+      const targetChanged = riskRuleTargetChanged(stored, patch);
       if (targetChanged && needsRepair)
         throw new BadRequestException('该规则需要同时补齐账户和标的后才能保存');
       if (!needsRepair && (targetChanged || enableRequested))
@@ -127,7 +139,7 @@ export class RiskRuleService {
           after: this.snapshot(updated),
         },
       });
-      return updated;
+      return this.withNotification(updated);
     });
   }
 
@@ -242,9 +254,14 @@ export class RiskRuleService {
       ...(rule.condition === undefined
         ? {}
         : { condition: rule.condition as Prisma.InputJsonValue }),
-      ...(rule.parameters === undefined
+      ...(rule.parameters === undefined && rule.notification === undefined
         ? {}
-        : { parameters: rule.parameters as Prisma.InputJsonValue }),
+        : {
+            parameters: {
+              ...rule.parameters,
+              ...(rule.notification === undefined ? {} : { notification: rule.notification }),
+            } as Prisma.InputJsonValue,
+          }),
       ...(rule.config === undefined ? {} : { config: rule.config as Prisma.InputJsonValue }),
       ...(rule.effectiveAt === undefined ? {} : { effectiveAt: new Date(rule.effectiveAt) }),
     };
@@ -253,4 +270,35 @@ export class RiskRuleService {
   private snapshot(value: object): Prisma.InputJsonValue {
     return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
   }
+}
+
+type StoredRiskRule = Awaited<ReturnType<PrismaService['riskRule']['findUniqueOrThrow']>>;
+type RiskRulePatch = ReturnType<typeof riskRuleUpdateSchema.parse>;
+function riskRuleRevisionInput(stored: StoredRiskRule, patch: RiskRulePatch) {
+  const mergedInput = {
+    kind: stored.kind,
+    scope: stored.scope,
+    severity: stored.severity,
+    threshold: Number(stored.threshold),
+    enabled: stored.enabled,
+    ...(stored.symbol === null ? {} : { symbol: stored.symbol }),
+    ...(stored.accountId === null ? {} : { accountId: stored.accountId }),
+    ...(stored.sourcePlanId === null ? {} : { sourcePlanId: stored.sourcePlanId }),
+    ...(stored.condition === null ? {} : { condition: stored.condition }),
+    ...(stored.parameters === null ? {} : { parameters: stored.parameters }),
+    ...(stored.config === null ? {} : { config: stored.config }),
+    effectiveAt: stored.effectiveAt.toISOString(),
+    ...patch,
+    parameters: { ...((stored.parameters as Record<string, unknown>) ?? {}), ...patch.parameters },
+  };
+  return mergedInput;
+}
+
+function riskRuleTargetChanged(stored: StoredRiskRule, patch: RiskRulePatch) {
+  const targetChanged =
+    (patch.kind !== undefined && patch.kind !== stored.kind) ||
+    (patch.scope !== undefined && patch.scope !== stored.scope) ||
+    (patch.symbol !== undefined && patch.symbol !== stored.symbol) ||
+    (patch.accountId !== undefined && patch.accountId !== stored.accountId);
+  return targetChanged;
 }

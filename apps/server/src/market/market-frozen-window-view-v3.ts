@@ -27,24 +27,8 @@ export function deriveFrozenMarketWindowViewV3(
   )
     throw new Error('冻结窗口引用与完整响应不一致');
   const original = frozen.response;
-  if (input.tradabilityMode && frozen.request.tradabilityMode !== input.tradabilityMode)
-    throw new Error('冻结窗口不具备请求的日级证据');
   const window = input.window;
-  if (
-    input.market !== original.routeKey.market ||
-    input.symbol !== original.symbol ||
-    marketRouteKeyIdV3(input.routeKey) !== marketRouteKeyIdV3(original.routeKey)
-  )
-    throw new Error('冻结窗口的标的或价格路由不匹配');
-  if (
-    window.start > window.end ||
-    window.start < frozen.request.start ||
-    window.end > frozen.request.end
-  )
-    throw new Error('冻结窗口未覆盖请求及预热范围');
-  const exactWindow = window.start === frozen.request.start && window.end === frozen.request.end;
-  if (!exactWindow && original.sourcePriceBasis.basisScope === 'request-window')
-    throw new Error('请求窗口价格基准不能作为其他窗口的原生基准');
+  const exactWindow = assertFrozenWindowRequest(frozen, input);
   const request = {
     ...frozen.request,
     requestId: randomUUID(),
@@ -72,9 +56,14 @@ export function deriveFrozenMarketWindowViewV3(
         ...original,
         requestId: request.requestId,
         bars,
-        ...(original.historicalTradabilityWindows ? {
-          historicalTradabilityWindows: sliceTradabilityWindowsV3(original.historicalTradabilityWindows, window),
-        } : {}),
+        ...(original.historicalTradabilityWindows
+          ? {
+              historicalTradabilityWindows: sliceTradabilityWindowsV3(
+                original.historicalTradabilityWindows,
+                window,
+              ),
+            }
+          : {}),
         coverage: {
           ...original.coverage,
           requestedStart: window.start,
@@ -116,4 +105,30 @@ export function deriveFrozenMarketWindowViewV3(
     seriesVersion: marketWindowSeriesVersionV3(request, correlatedResponse),
     exactWindow,
   };
+}
+
+function assertFrozenWindowRequest(
+  frozen: FrozenMarketWindowV3,
+  input: MarketBarWindowReadInputV3,
+) {
+  const original = frozen.response;
+  if (input.tradabilityMode && frozen.request.tradabilityMode !== input.tradabilityMode)
+    throw new Error('冻结窗口不具备请求的日级证据');
+  const window = input.window;
+  if (
+    input.market !== original.routeKey.market ||
+    input.symbol !== original.symbol ||
+    marketRouteKeyIdV3(input.routeKey) !== marketRouteKeyIdV3(original.routeKey)
+  )
+    throw new Error('冻结窗口的标的或价格路由不匹配');
+  if (
+    window.start > window.end ||
+    window.start < frozen.request.start ||
+    window.end > frozen.request.end
+  )
+    throw new Error('冻结窗口未覆盖请求及预热范围');
+  const exactWindow = window.start === frozen.request.start && window.end === frozen.request.end;
+  if (!exactWindow && original.sourcePriceBasis.basisScope === 'request-window')
+    throw new Error('请求窗口价格基准不能作为其他窗口的原生基准');
+  return exactWindow;
 }

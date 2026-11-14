@@ -53,6 +53,24 @@ export const backtestJobsReturnPath = (state: unknown) => {
   return `${strategyCenterPath.jobs}?${new URLSearchParams(search)}`;
 };
 
+export const backtestExperimentReturnState = (experimentId: string, search: string) => ({
+  backtestExperiment: { id: experimentId, search },
+});
+
+export const backtestDetailReturnTarget = (state: unknown) => {
+  const experiment = record(record(state).backtestExperiment);
+  if (typeof experiment.id === 'string' && experiment.id.trim()) {
+    const search = typeof experiment.search === 'string'
+      ? new URLSearchParams(experiment.search).toString()
+      : '';
+    return {
+      path: strategyCenterPath.experiment(experiment.id) + (search ? `?${search}` : ''),
+      label: '返回实验详情',
+    };
+  }
+  return { path: backtestJobsReturnPath(state), label: '返回回测任务' };
+};
+
 export const latestStrategyVersion = (versions: StrategyVersion[]) =>
   [...versions].sort((left, right) => right.version - left.version)[0] ?? null;
 

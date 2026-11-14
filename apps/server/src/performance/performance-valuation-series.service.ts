@@ -1,9 +1,6 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { assetMarketsByTradingMarket, type TradingMarket } from '@thesis-ledger/domain';
-import type {
-  PerformanceSeriesInterval,
-  PerformanceSeriesRange,
-} from '@thesis-ledger/schemas';
+import type { PerformanceSeriesInterval, PerformanceSeriesRange } from '@thesis-ledger/schemas';
 import { MarketService } from '../market/market.service.js';
 import { MarketBarReader } from '../market/market-bar-reader.js';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -140,7 +137,12 @@ export class PerformanceValuationSeriesService {
   async scheduledSamplingGate(at = new Date(), mode: PortfolioMode = 'actual') {
     const { markets, assetMarkets, unknown } = await this.openAssetMarkets(at);
     if (markets.length === 0) {
-      return { allowed: false, reason: unknown ? '交易日历不可用，暂不能确认开市市场' : '当前没有处于常规交易时段的支持市场' } as const;
+      return {
+        allowed: false,
+        reason: unknown
+          ? '交易日历不可用，暂不能确认开市市场'
+          : '当前没有处于常规交易时段的支持市场',
+      } as const;
     }
     const account = await this.prisma.account.findFirst({
       where: this.samplingAccountWhere(mode, assetMarkets),
@@ -184,11 +186,10 @@ export class PerformanceValuationSeriesService {
       if (!value || value.marketValue === null || value.cashValue === null) continue;
       const funds = await this.estimatedFundAdjustments(account.id, sampledAt, fundEstimates);
       const marketValue = value.marketValue + funds.marketValueAdjustment;
-      let quality: 'COMPLETE' | 'PARTIAL' | 'LOW_COVERAGE' = value.partial ? 'PARTIAL' : 'COMPLETE';
-      if (funds.hasFunds && funds.pricedCoverage < 0.5) quality = 'LOW_COVERAGE';
-      let pricedCoverage = funds.pricedCoverage;
-      if (!funds.hasFunds) pricedCoverage = value.partial ? 0 : 1;
-      const disclosureCoverage = funds.hasFunds ? funds.disclosureCoverage : 1;
+      const { quality, pricedCoverage, disclosureCoverage } = estimatedSamplingQuality(
+        value.partial,
+        funds,
+      );
       sampled.push(
         await this.prisma.accountValuationPoint.upsert({
           where: {
@@ -235,7 +236,9 @@ export class PerformanceValuationSeriesService {
     }
     const fundValuations = this.fundValuations;
     if (fundValuations) {
-      await Promise.all([...fundEstimates.keys()].map((symbol) => fundValuations.current(symbol, sampledAt)));
+      await Promise.all(
+        [...fundEstimates.keys()].map((symbol) => fundValuations.current(symbol, sampledAt)),
+      );
     }
     const disclosureCoverage =
       sampled.length > 0
@@ -408,7 +411,12 @@ export class PerformanceValuationSeriesService {
         try {
           let pending = sharedEstimates.get(position.symbol);
           if (!pending) {
-            pending = readFundNavEstimate({ symbol: position.symbol, at, market: this.market, bars: barsReader });
+            pending = readFundNavEstimate({
+              symbol: position.symbol,
+              at,
+              market: this.market,
+              bars: barsReader,
+            });
             sharedEstimates.set(position.symbol, pending);
           }
           const result = await pending;
@@ -440,4 +448,16 @@ export class PerformanceValuationSeriesService {
       evidence: estimates.map((item) => item.evidence),
     };
   }
+}
+
+function estimatedSamplingQuality(
+  partial: boolean,
+  funds: { hasFunds: boolean; pricedCoverage: number; disclosureCoverage: number },
+) {
+  let quality: 'COMPLETE' | 'PARTIAL' | 'LOW_COVERAGE' = partial ? 'PARTIAL' : 'COMPLETE';
+  if (funds.hasFunds && funds.pricedCoverage < 0.5) quality = 'LOW_COVERAGE';
+  let pricedCoverage = funds.pricedCoverage;
+  if (!funds.hasFunds) pricedCoverage = partial ? 0 : 1;
+  const disclosureCoverage = funds.hasFunds ? funds.disclosureCoverage : 1;
+  return { quality, pricedCoverage, disclosureCoverage };
 }

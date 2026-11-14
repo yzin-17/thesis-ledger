@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type {
   ResearchObservationVersion,
   ResearchReportObservations,
@@ -8,6 +9,13 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/spinner';
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { formatFullDateTime } from './ai.display.js';
 import { useResearchObservationHistoryQuery } from './research.queries.js';
 import { researchObservationState, researchStateMeta } from './research-state-display.js';
@@ -74,18 +82,24 @@ export function ResearchObservationHistory({
   const query = useResearchObservationHistoryQuery(runId, item.id, locator, open);
   if (!item.id) return null;
   return (
-    <div className="flex flex-col gap-3">
-      <Button
-        type="button"
-        variant="link"
-        className="justify-start"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger render={<Button type="button" variant="secondary" size="sm" />}>
+        查看历次复核
+        <ChevronDown aria-hidden="true" className="size-4" />
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        side="bottom"
+        className="w-96 max-w-[calc(100vw-2rem)] min-w-0 gap-3 p-3"
       >
-        {open ? '收起历次复核' : '查看历次复核'}
-      </Button>
-      {open && <ObservationHistoryRead item={item} query={query} />}
-    </div>
+        <PopoverHeader>
+          <PopoverTitle>
+            历次复核记录{query.data ? `（${query.data.versions.length}）` : ''}
+          </PopoverTitle>
+        </PopoverHeader>
+        <ObservationHistoryRead item={item} query={query} />
+      </PopoverContent>
+    </Popover>
   );
 }
 function ObservationHistoryRead({
@@ -107,25 +121,44 @@ function ObservationHistoryRead({
       </Alert>
     );
   return (
-    <div aria-label="历次复核" className="flex flex-col gap-4">
-      {query.data.versions.length === 0 && (
-        <p className="text-sm text-muted-foreground">尚无已保存的复核版本。</p>
-      )}
+    <div className="flex min-h-0 flex-col gap-2">
       {query.data.truncated && (
         <p className="text-xs text-muted-foreground">当前展示最近 100 个观察版本。</p>
       )}
-      {query.data.versions.map((version) => (
-        <section key={version.id} className="flex flex-col gap-2 rounded-md border p-3">
-          <Badge variant="outline">
-            {
-              researchStateMeta[
-                researchObservationState({ ...item, current: version }, version.inputs.visibleAt)
-              ].label
-            }
-          </Badge>
-          <ResearchObservationResult version={version} />
-        </section>
-      ))}
+      <ul
+        aria-label="历次复核"
+        className="max-h-80 min-h-0 divide-y divide-border overflow-y-auto overscroll-contain"
+      >
+        {query.data.versions.length === 0 && (
+          <li className="py-3 text-sm text-muted-foreground">尚无已保存的复核版本。</li>
+        )}
+        {query.data.versions.map((version) => {
+          const state =
+            researchStateMeta[
+              researchObservationState({ ...item, current: version }, version.inputs.visibleAt)
+            ];
+          return (
+            <li key={version.id} className="py-2">
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-3 rounded-sm p-1 outline-offset-2 focus-visible:outline focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className="text-sm font-medium">
+                      {formatFullDateTime(version.recordedAt)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{state.description}</span>
+                  </div>
+                  <Badge variant="outline" className="shrink-0">
+                    {state.label}
+                  </Badge>
+                </summary>
+                <div className="border-t border-border/70 px-1 pt-3 pb-2">
+                  <ResearchObservationResult version={version} />
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -135,7 +168,7 @@ export function ResearchObservationStatistics({
   value: ResearchReportObservations['statistics'];
 }) {
   return (
-    <section aria-label="同范围观察统计" className="flex flex-col gap-3 rounded-md border p-4">
+    <section aria-label="同范围观察统计" className="flex flex-col gap-3 py-5">
       <div className="flex flex-wrap items-center gap-2">
         <h4 className="font-semibold">同范围已存观察</h4>
         <Badge variant="outline">{observationSampleLabel(value)}</Badge>

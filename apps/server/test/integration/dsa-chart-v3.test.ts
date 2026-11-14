@@ -102,6 +102,8 @@ describe('DSA 图表 V3 传输', () => {
     ['invalidRequest', 'invalid-request', 422],
     ['permissionDenied', 'permission-denied', 403],
     ['authenticationFailed', 'source-authentication-failed', 403],
+    ['rateLimited', 'unavailable', 503],
+    ['quotaUnavailable', 'unavailable', 503],
   ] as const)('保留 %s 的标准来源分类与请求身份', async (kind, code, status) => {
     const { request, client } = setup();
     const fetchMock = vi.fn(async () => ({ ok: false, status, json: async () => ({

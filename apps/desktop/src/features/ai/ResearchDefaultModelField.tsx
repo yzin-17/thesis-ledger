@@ -16,21 +16,13 @@ export function ResearchDefaultModelField({
   model,
   disabled = false,
 }: {
-  model: ReturnType<typeof useResearchDefaultModel>;
+  model: ResearchDefaultModelFieldState;
   disabled?: boolean;
 }) {
   const { query, selected, currentDefault } = model;
-  const locked = disabled || model.saving || query.isPending || query.isError;
-  const hasError = query.isError || Boolean(model.error);
-  let selectedLabel = '尚未选择研究默认模型';
-  if (selected) selectedLabel = selected.label;
-  else if (model.selectedKey !== 'none' && currentDefault)
-    selectedLabel = `${currentDefault.providerId} / ${currentDefault.model}`;
-  let errorMessage = '研究默认模型保存失败，请重新读取后重试。';
-  if (query.isError) errorMessage = '研究默认模型读取失败，请重新读取后再提交。';
-  else if (model.error instanceof ThesisLedgerApiError)
-    errorMessage = model.error.payload?.message ?? errorMessage;
-  else if (model.error instanceof Error) errorMessage = model.error.message;
+  const { locked, hasError, canSave, canClear, canReload } = defaultModelControls(model, disabled);
+  const selectedLabel = defaultModelSelectedLabel(model);
+  const errorMessage = defaultModelErrorMessage(model);
 
   return (
     <Field>
@@ -51,7 +43,11 @@ export function ResearchDefaultModelField({
         </SelectContent>
       </Select>
       <FieldDescription>保存后用于本次及后续研究；不会按提供方列表顺序自动替换。</FieldDescription>
-      {query.isPending && <FieldDescription><Spinner aria-label="正在读取研究默认模型" /></FieldDescription>}
+      {query.isPending && (
+        <FieldDescription>
+          <Spinner aria-label="正在读取研究默认模型" />
+        </FieldDescription>
+      )}
       {!query.isPending && !query.isError && model.options.length === 0 && (
         <FieldDescription>
           暂无可选模型，请在数据与自动化的 AI 提供方中配置“研究报告”用途。
@@ -74,7 +70,7 @@ export function ResearchDefaultModelField({
           type="button"
           size="sm"
           variant="outline"
-          disabled={locked || !model.dirty || (!selected && model.selectedKey !== 'none')}
+          disabled={!canSave}
           onClick={model.save}
         >
           {model.saving && <Spinner data-icon="inline-start" aria-hidden="true" />}
@@ -84,8 +80,8 @@ export function ResearchDefaultModelField({
           <Button
             type="button"
             size="sm"
-            variant="ghost"
-            disabled={locked || model.selectedKey === 'none'}
+            variant="outline"
+            disabled={!canClear}
             onClick={() => model.choose('none')}
           >
             清除默认
@@ -96,7 +92,7 @@ export function ResearchDefaultModelField({
             type="button"
             size="sm"
             variant="outline"
-            disabled={disabled || model.saving || query.isFetching}
+            disabled={!canReload}
             onClick={model.reload}
           >
             {query.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
@@ -106,4 +102,41 @@ export function ResearchDefaultModelField({
       </div>
     </Field>
   );
+}
+
+type ModelState = ReturnType<typeof useResearchDefaultModel>;
+type ModelOption = Pick<ModelState['options'][number], 'value' | 'label' | 'priceConfigured'>;
+type ResearchDefaultModelFieldState = Pick<
+  ModelState,
+  'selectedKey' | 'currentDefault' | 'dirty' | 'saving' | 'error' | 'choose' | 'save' | 'reload'
+> & {
+  query: Pick<ModelState['query'], 'isPending' | 'isError' | 'isFetching'>;
+  options: Pick<ModelOption, 'value' | 'label'>[];
+  selected: ModelOption | undefined;
+};
+
+function defaultModelControls(model: ResearchDefaultModelFieldState, disabled: boolean) {
+  const locked = disabled || model.saving || model.query.isPending || model.query.isError;
+  return {
+    locked,
+    hasError: model.query.isError || Boolean(model.error),
+    canSave: Boolean(!locked && model.dirty && (model.selected || model.selectedKey === 'none')),
+    canClear: !locked && model.selectedKey !== 'none',
+    canReload: !disabled && !model.saving && !model.query.isFetching,
+  };
+}
+
+function defaultModelSelectedLabel(model: ResearchDefaultModelFieldState) {
+  if (model.selected) return model.selected.label;
+  if (model.selectedKey !== 'none' && model.currentDefault)
+    return model.currentDefault.providerId + ' / ' + model.currentDefault.model;
+  return '尚未选择研究默认模型';
+}
+
+function defaultModelErrorMessage(model: ResearchDefaultModelFieldState) {
+  const fallback = '研究默认模型保存失败，请重新读取后重试。';
+  if (model.query.isError) return '研究默认模型读取失败，请重新读取后再提交。';
+  if (model.error instanceof ThesisLedgerApiError) return model.error.payload?.message ?? fallback;
+  if (model.error instanceof Error) return model.error.message;
+  return fallback;
 }

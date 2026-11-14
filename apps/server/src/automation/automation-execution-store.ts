@@ -386,17 +386,7 @@ export class AutomationExecutionStore {
       if (!row || row.status !== 'running' || !row.leaseUntil || row.leaseUntil >= now) return;
       const replay = row.recoveryPolicy === 'replay-safe';
       const canRetry = replay && row.executionAttempt < AUTOMATION_MAX_RECOVERY_ATTEMPTS;
-      const status = canRetry ? 'queued' : replay ? 'failed' : 'unknown_outcome';
-      const reason = canRetry
-        ? 'lease_expired_requeue'
-        : replay
-          ? 'lease_expired_attempts_exhausted'
-          : 'lease_expired_unknown_outcome';
-      const message = canRetry
-        ? '自动化 Worker 租约过期，等待安全重放。'
-        : replay
-          ? '自动化 Worker 多次丢失租约，已停止自动重放。'
-          : '自动化 Worker 租约过期，无法确认外部副作用是否已经完成。';
+      const { status, reason, message } = expiredLeaseOutcome(canRetry, replay);
       await transaction.automationRun.updateMany({
         where: { id: runId, status: 'running' },
         data: {
@@ -522,3 +512,23 @@ export class AutomationExecutionStore {
       .map(({ runId, jobId, trigger, scheduledAt }) => ({ runId, jobId, trigger, scheduledAt }));
   }
 }
+
+
+function expiredLeaseOutcome(canRetry: boolean, replay: boolean) {
+  if (canRetry) return {
+    status: 'queued' as const,
+    reason: 'lease_expired_requeue',
+    message: '自动化 Worker 租约过期，等待安全重放。',
+  };
+  if (replay) return {
+    status: 'failed' as const,
+    reason: 'lease_expired_attempts_exhausted',
+    message: '自动化 Worker 多次丢失租约，已停止自动重放。',
+  };
+  return {
+    status: 'unknown_outcome' as const,
+    reason: 'lease_expired_unknown_outcome',
+    message: '自动化 Worker 租约过期，无法确认外部副作用是否已经完成。',
+  };
+}
+

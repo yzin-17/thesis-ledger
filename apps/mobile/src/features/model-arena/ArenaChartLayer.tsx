@@ -1,5 +1,6 @@
 import { useState, type ComponentProps } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { ArenaPricePoint } from '@thesis-ledger/schemas';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,7 +8,7 @@ import type { MarketStackParams, RootTabParams } from '../../app/navigation-type
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { useMobileIdentity } from '../../app/query/use-mobile-identity';
 import { MobileChart } from '../../platform/charts/MobileChart';
-import { Section, Action, Copy, QueryList } from '../../components/MobilePrimitives';
+import { ContentSection as Section, Action, Copy, QueryList } from '../../components/MobilePrimitives';
 type Props = ComponentProps<typeof MobileChart> & { symbol: string; timeframe: string };
 export function ArenaChartLayer({ symbol, timeframe, ...props }: Props) {
   const [enabled, setEnabled] = useState(false);
@@ -36,13 +37,24 @@ function Selection({ symbol, ...props }: Omit<Props, 'timeframe'>) {
     queryFn: ({ signal }) => api.modelArenas.list(signal),
     enabled: !!owner,
   });
+  const live = useQuery({
+    queryKey: [...key, 'live-list'], queryFn: ({ signal }) => api.arenaMatches.list(signal), enabled: !!owner,
+  });
   const choices =
-    list.data?.filter((m) => m.protocol.instruments.some((i) => i.symbol === symbol)) ?? [];
+    [...(live.data ?? []).filter((m) => m.protocol.universe === 'market' || m.protocol.instruments.some((i) => i.symbol === symbol)),
+      ...(list.data ?? []).filter((m) => m.protocol.instruments.some((i) => i.symbol === symbol))];
   const active = choices.find((m) => m.id === match);
+  const isLive = active?.protocol.version === 2;
   const detail = useQuery({
     queryKey: [...key, match],
     enabled: !!active,
-    queryFn: ({ signal }) => api.modelArenas.get(match, signal),
+    queryFn: async ({ signal }) => {
+      if (isLive) {
+        const d = await api.arenaMatches.get(match, signal);
+        return { entrants: d.agents.map((a) => ({ id: a.id, model: a.model })) };
+      }
+      return api.modelArenas.get(match, signal);
+    },
   });
   const dates = new Map(
     props.data.candles.map((c) => [
@@ -55,15 +67,14 @@ function Selection({ symbol, ...props }: Omit<Props, 'timeframe'>) {
   const days = [...dates.keys()].sort(),
     start = days[0]!,
     end = days.at(-1)!;
-  const points = useQuery({
+  const points = useQuery<ArenaPricePoint[]>({
     queryKey: [...key, match, entrant, symbol, start, end],
     enabled: !!active && !!start,
-    queryFn: ({ signal }) =>
-      api.modelArenas.points(
-        match,
-        { symbol, start, end, ...(entrant && { entrantId: entrant }) },
-        signal,
-      ),
+    queryFn: ({ signal }) => {
+      const input = { symbol, start, end, ...(entrant && { entrantId: entrant }) };
+      if (isLive) return api.arenaMatches.points(match, input, signal);
+      return api.modelArenas.points(match, input, signal);
+    },
   });
   const visible = (points.data ?? []).filter((p) => active && typeof dates.get(p.day) === 'number');
   const markers = visible.map((p) => ({
@@ -80,7 +91,8 @@ function Selection({ symbol, ...props }: Omit<Props, 'timeframe'>) {
           label="正在刷新比赛列表"
           gap={12}
         >
-          {list.isSuccess && !choices.length && <Copy>暂无包含此标的的比赛</Copy>}
+          {live.isError && <Action label="比赛列表读取失败，重试" onPress={() => void live.refetch()} />}
+          {list.isSuccess && live.isSuccess && !choices.length && <Copy>暂无包含此标的的比赛</Copy>}
           {choices.map((m) => (
             <Action
               key={m.id}
@@ -128,15 +140,19 @@ function Selection({ symbol, ...props }: Omit<Props, 'timeframe'>) {
               ' 股 × ' +
               p.price
             }
-            onPress={() =>
+            onPress={() => {
+              if (p.roundId === null) {
+                root?.navigate('Arena', { screen: 'ArenaMatch', params: { match: p.arenaId, entrant: p.entrantId } });
+                return;
+              }
               root?.navigate('Research', {
                 screen: 'Strategy',
                 params: {
                   screen: 'ModelArena',
                   params: { match: p.arenaId, round: p.roundId, entrant: p.entrantId },
                 },
-              })
-            }
+              });
+            }}
           />
         ))}
     </>

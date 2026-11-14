@@ -3,6 +3,12 @@ import { DsaV3ProtocolError, type DsaV3ErrorCode } from './dsa-v3-protocol.js';
 export class DsaError extends DsaV3ProtocolError {}
 export type HttpErrorMapper = (status: number, payload: unknown) => DsaV3ProtocolError;
 
+/** Only a strictly validated, request-correlated source error may be isolated. */
+export const isReportedSourceInvalidResponseV3 = (error: unknown): error is DsaV3ProtocolError =>
+  error instanceof DsaV3ProtocolError &&
+  error.code === 'invalid-response' &&
+  error.sourceReason === 'invalid_response';
+
 export function toDsaError(error: DsaV3ProtocolError): DsaError {
   if (error instanceof DsaError) return error;
   return new DsaError(error.message, error.code, error.status, error.sourceReason);

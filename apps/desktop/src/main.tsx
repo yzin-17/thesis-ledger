@@ -5,18 +5,20 @@ import './ui/styles.css';
 
 const requestedTheme = new URLSearchParams(window.location.search).get('theme');
 const storedTheme = window.localStorage.getItem('thesis-ledger-theme');
-const initialTheme =
-  requestedTheme === 'light' || requestedTheme === 'dark' || requestedTheme === 'system'
-    ? requestedTheme
-    : storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
-      ? storedTheme
-      : 'system';
-const initialResolvedTheme =
-  initialTheme === 'system'
-    ? window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light'
-    : initialTheme;
+let initialTheme: 'light' | 'dark' | 'system' = 'system';
+if (requestedTheme === 'light' || requestedTheme === 'dark' || requestedTheme === 'system') {
+  initialTheme = requestedTheme;
+} else if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
+  initialTheme = storedTheme;
+}
+let initialResolvedTheme: 'light' | 'dark';
+if (initialTheme === 'system') {
+  initialResolvedTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+} else {
+  initialResolvedTheme = initialTheme;
+}
 document.documentElement.dataset.theme = initialTheme;
 document.documentElement.classList.toggle('dark', initialResolvedTheme === 'dark');
 document.documentElement.style.colorScheme = initialResolvedTheme;

@@ -111,6 +111,9 @@ describe('backtest data contracts', () => {
     expect(parsed.openAvailableAt).toBe(parsed.openedAt);
   });
 
+});
+
+describe('回测事件与事实可见性合同', () => {
   it('requires the payload owned by each corporate-action type', () => {
     const base = {
       symbol: '600000.SH',

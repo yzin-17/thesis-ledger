@@ -77,7 +77,7 @@ export function AiProviderModelPricingFields({
       {models.length === 0 ? (
         <p className="text-xs text-muted-foreground">先选择至少一个模型，再填写模型价格。</p>
       ) : (
-        <div className="overflow-hidden rounded-md border">
+        <div className="flex flex-col gap-group">
           {models.map((model) => {
             const pricing = draft.modelPricing[model] ?? {
               costPer1kInput: '',
@@ -103,7 +103,7 @@ export function AiProviderModelPricingFields({
             return (
               <div
                 key={model}
-                className="grid min-w-0 gap-3 border-b p-3 last:border-b-0 sm:grid-cols-2 sm:items-end lg:grid-cols-[minmax(10rem,1.5fr)_minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(8rem,1fr)]"
+                className="grid min-w-0 gap-3 sm:grid-cols-2 sm:items-end lg:grid-cols-[minmax(10rem,1.5fr)_minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(8rem,1fr)]"
               >
                 <div className="flex min-w-0 flex-col gap-1">
                   <p className="truncate font-mono text-xs" title={model}>

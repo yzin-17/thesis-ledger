@@ -2,6 +2,11 @@ import { expect, it } from 'vitest';
 import type { AuthoringExecutionCaseContext } from './authoring-execution.case-context.js';
 
 export function registerAuthoringAnalysisCases(getContext: () => AuthoringExecutionCaseContext) {
+  registerUnsupportedAnalysisCases(getContext);
+  registerAnalysisRevisionCases(getContext);
+}
+
+function registerUnsupportedAnalysisCases(getContext: () => AuthoringExecutionCaseContext) {
   it('真实 SDK 返回误标的并行交易需求时，应用与人工确认均保持服务端不支持门禁', async () => {
     const context = getContext();
     const { request, observe, selection, alice, blank } = context;
@@ -85,6 +90,7 @@ export function registerAuthoringAnalysisCases(getContext: () => AuthoringExecut
       context.output = previous;
     }
   });
+
   it('分析伪造原文明确失败，实际收到的用量仍保留且不重发', async () => {
     const context = getContext();
     const { request, observe, selection, alice, draftId } = context;
@@ -124,6 +130,9 @@ export function registerAuthoringAnalysisCases(getContext: () => AuthoringExecut
     );
     context.output = { requirements: [], questions: [], runtimeIntents: [] };
   });
+}
+
+function registerAnalysisRevisionCases(getContext: () => AuthoringExecutionCaseContext) {
   it('双用户隔离、并发应用只追加一个修订，响应重试不覆盖之后的编辑', async () => {
     const context = getContext();
     const { request, alice, bob, draftId, operations, db, blank } = context;
@@ -174,6 +183,7 @@ export function registerAuthoringAnalysisCases(getContext: () => AuthoringExecut
     >`SELECT count(*) FROM "StrategyAuthoringRevision" WHERE "draftId"=${draftId}::uuid`;
     expect(Number(revisions[0]!.count)).toBe(3);
   });
+
   it('缺项描述补全后重新分析只审核当前条目，HTTP 与真实 SDK 请求不残留旧问题', async () => {
     const context = getContext();
     const { request, observe, selection, alice, blank, modelBodies } = context;

@@ -60,7 +60,7 @@ export class AuthoringDraftRepository {
         Array<AuthoringHeader & { cursorUpdatedAt: string }>
       >(Prisma.sql`
         SELECT *, to_char("updatedAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorUpdatedAt"
-        FROM "StrategyAuthoringDraft" WHERE "ownerId" = ${ownerId} ${cursor}
+        FROM "StrategyAuthoringDraft" WHERE "ownerId" = ${ownerId} AND state <> 'discarded' ${cursor}
         ORDER BY "updatedAt" DESC, id DESC LIMIT ${limit + 1}`);
       const selected = rows.slice(0, limit);
       const items = selected.map(({ cursorUpdatedAt, ...item }) => {

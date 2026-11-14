@@ -3,6 +3,15 @@ import type {
   RunConfigV3,
   BacktestStrategy,
 } from '@thesis-ledger/schemas';
+import {
+  priceResearchNeedsActualPrice,
+  priceResearchReferenceArtifactKey,
+  priceResearchEvidenceArtifactKey,
+} from '@thesis-ledger/schemas';
+import {
+  validatePriceResearchReference,
+  priceResearchRuleFacts,
+} from './backtest-price-research-input.js';
 import type { ArtifactRow } from './backtest-artifact-store.js';
 import { planBacktestDependencies } from './backtest-dependency-plan.js';
 import { canonicalizeManifest } from './backtest-snapshot.js';
@@ -11,7 +20,11 @@ import {
   SnapshotV3InputPlanError,
 } from './backtest-snapshot-v3-input-plan.js';
 import type { validateSnapshotDependencyArtifactsV3 } from './backtest-snapshot-v3-dependency-validation.js';
-import { publicFeesArtifactKeyV3, tradingStatusArtifactKeyV3, statusCompositionArtifactKeyV1 } from '@thesis-ledger/schemas';
+import {
+  publicFeesArtifactKeyV3,
+  tradingStatusArtifactKeyV3,
+  statusCompositionArtifactKeyV1,
+} from '@thesis-ledger/schemas';
 import { hkResearchLotForFactV3 } from './backtest-hk-research-lot-v3.js';
 import {
   knownCashMetadataKeyV3,
@@ -59,7 +72,13 @@ export const validateCompleteSnapshotSourceBindingsV3 = (
   if (!executionSource || !same(executionSource.routeKey, inputPlan.executionRouteKey)) {
     fail('V3 完整快照执行来源与依赖计划不一致');
   }
-  const purposes = [...new Set(inputPlan.priceInputs.map((alias) => alias.purpose))];
+  const purposes = [
+    ...new Set(
+      inputPlan.priceInputs
+        .filter((alias) => alias.artifactKey === 'execution/bars.parquet')
+        .map((alias) => alias.purpose),
+    ),
+  ];
   if (
     !same(
       manifest.actualSources,
@@ -79,19 +98,16 @@ export const validateCompleteSnapshotExecutionFactsV3 = (
   publicFees?: BacktestSnapshotManifestV3['publicFees'],
   tradingStatus?: BacktestSnapshotManifestV3['tradingStatus'],
   statusComposition?: BacktestSnapshotManifestV3['statusComposition'],
+  manifest?: BacktestSnapshotManifestV3,
 ): void => {
-  const expectedKeys = new Set([
-    'metadata/snapshot-metadata-v3.parquet',
-    'metadata/market-window-evidence-v3.parquet',
-    priceInputBindingsArtifactKeyV3,
-    'execution/bars.parquet',
-    ...validated.artifacts.map(({ key }) => key),
-    ...(runConfig.executionModel ? ['metadata/execution-model-v3.parquet'] : []),
-    ...(publicFees ? [publicFeesArtifactKeyV3] : []),
-    ...(tradingStatus ? [tradingStatusArtifactKeyV3] : []),
-    ...(statusComposition ? [statusCompositionArtifactKeyV1] : []),
-    ...(runConfig.knownCashPreparation ? [knownCashMetadataKeyV3, knownCashRecordsKeyV3] : []),
-  ]);
+  const expectedKeys = completeSnapshotArtifactKeys(
+    runConfig,
+    strategy,
+    validated,
+    publicFees,
+    tradingStatus,
+    statusComposition,
+  );
   if (byKey.size !== expectedKeys.size || [...byKey.keys()].some((key) => !expectedKeys.has(key))) {
     fail('V3 完整快照包含未规划或缺失的 Artifact');
   }
@@ -100,6 +116,9 @@ export const validateCompleteSnapshotExecutionFactsV3 = (
     `instrumentFacts/${strategy.executionInstrument.market}-${strategy.executionInstrument.symbol}.parquet`,
   );
   if (!executionFacts?.length) fail('V3 完整快照缺少执行标的事实');
+  const actualBasis = manifest
+    ? validatePriceResearchReference(manifest, byKey, strategy, runConfig)
+    : undefined;
   const coordinate = {
     coordinateId: 'execution-series',
     currency: runConfig.executionModel.scope.currency,
@@ -111,25 +130,57 @@ export const validateCompleteSnapshotExecutionFactsV3 = (
       strategy,
       runConfig,
       corporateActionResponses: validated.corporateActionResponses,
-      ruleCompatibilityFacts: {
-        executionCoordinate: coordinate,
-        sourceCoordinates: Object.fromEntries(
-          inputPlan.plan.signalSources.map((source) => [source.id, coordinate]),
-        ),
-        executionUnits: {
-          realLotSize: typeof fact.lotSize === 'string' ? fact.lotSize : null,
-          realTickSize: typeof fact.tickSize === 'string' ? fact.tickSize : null,
-          actualQuantityConversion: { available: false, evidenceRef: null },
-        },
-      },
+      ruleCompatibilityFacts: runConfig.priceResearch
+        ? priceResearchRuleFacts(strategy, runConfig, actualBasis)
+        : {
+            executionCoordinate: coordinate,
+            sourceCoordinates: Object.fromEntries(
+              inputPlan.plan.signalSources.map((source) => [source.id, coordinate]),
+            ),
+            executionUnits: {
+              realLotSize: typeof fact.lotSize === 'string' ? fact.lotSize : null,
+              realTickSize: typeof fact.tickSize === 'string' ? fact.tickSize : null,
+              actualQuantityConversion: { available: false, evidenceRef: null },
+            },
+          },
     });
     if (plan.status === 'blocked' || plan.ruleCompatibility.status !== 'compatible') {
       fail(
         `V3 完整快照规则不兼容: ${[
           ...plan.blockingIssues.map((issue) => issue.message),
           ...plan.ruleCompatibility.missingInputs,
+          ...plan.ruleCompatibility.issues
+            .filter((issue) => issue.severity === 'block')
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`),
         ].join('; ')}`,
       );
     }
   }
 };
+
+function completeSnapshotArtifactKeys(
+  runConfig: RunConfigV3,
+  strategy: BacktestStrategy,
+  validated: ReturnType<typeof validateSnapshotDependencyArtifactsV3>,
+  publicFees?: BacktestSnapshotManifestV3['publicFees'],
+  tradingStatus?: BacktestSnapshotManifestV3['tradingStatus'],
+  statusComposition?: BacktestSnapshotManifestV3['statusComposition'],
+) {
+  const expectedKeys = new Set([
+    'metadata/snapshot-metadata-v3.parquet',
+    'metadata/market-window-evidence-v3.parquet',
+    priceInputBindingsArtifactKeyV3,
+    'execution/bars.parquet',
+    ...(runConfig.priceResearch &&
+    (runConfig.priceResearch.actualPriceWindow || priceResearchNeedsActualPrice(strategy))
+      ? [priceResearchReferenceArtifactKey, priceResearchEvidenceArtifactKey]
+      : []),
+    ...validated.artifacts.map(({ key }) => key),
+    ...(runConfig.executionModel ? ['metadata/execution-model-v3.parquet'] : []),
+    ...(publicFees ? [publicFeesArtifactKeyV3] : []),
+    ...(tradingStatus ? [tradingStatusArtifactKeyV3] : []),
+    ...(statusComposition ? [statusCompositionArtifactKeyV1] : []),
+    ...(runConfig.knownCashPreparation ? [knownCashMetadataKeyV3, knownCashRecordsKeyV3] : []),
+  ]);
+  return expectedKeys;
+}

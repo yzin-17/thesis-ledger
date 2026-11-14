@@ -22,7 +22,7 @@ import {
   type CashForm,
 } from './cash-command';
 
-export function CashEditor() {
+function useCashEditorController() {
   const { params } = useRoute<RouteProp<AccountStackParams, 'CashEditor'>>();
   const { api } = useMobileRuntime();
   const accounts = useAccounts();
@@ -67,6 +67,11 @@ export function CashEditor() {
       setFeedback(failureMessage(error));
     }
   };
+  return { observation, account, ledger, accounts, allowed, form, change, blocked, feedback, mutation, dirty, submit };
+}
+
+export function CashEditor() {
+  const { observation, account, ledger, accounts, allowed, form, change, blocked, feedback, mutation, dirty, submit } = useCashEditorController();
   return (
     <Page title={observation ? '记录现金快照' : '现金入账'}>
       <Copy>

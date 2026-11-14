@@ -6,6 +6,7 @@ export function executionBarRowsV3(
   response: MarketDataBarSeriesResponseV3,
   symbol: string,
   protocol: ExecutionPriceProtocol | ExecutionPriceProtocol['accountingBasis'],
+  priceResearch = false,
 ): ArtifactRow[] {
   const routeKey = response.routeKey;
   const accountingBasis = typeof protocol === 'string' ? protocol : protocol.accountingBasis;
@@ -21,7 +22,7 @@ export function executionBarRowsV3(
   if (
     response.bars.some(
       (point) =>
-        point.volume === null ||
+        (!priceResearch && point.volume === null) ||
         (accountingBasis !== 'normalized-series' && !sharePriceResearch && point.amount === null),
     )
   )
@@ -40,7 +41,7 @@ export function executionBarRowsV3(
     high: String(point.high),
     low: String(point.low),
     close: String(point.close),
-    volume: String(point.volume),
+    volume: point.volume === null ? null : String(point.volume),
     amount: point.amount === null ? null : String(point.amount),
     providerId: response.provenance.providerId,
     upstreamSource: response.provenance.upstreamSource,

@@ -57,31 +57,19 @@ export function PerformanceAccountSelector({
     (account) => account.mode === mode && account.active !== false,
   );
   const selectedAccount = modeAccounts.find((account) => account.id === accountId);
-  const statusLabel = [
-    valuedAt ? `估值计算时间 ${formatDate(valuedAt)}` : undefined,
-    latestSnapshotAt && latestSnapshotAt !== valuedAt
-      ? `收益快照 ${formatDate(latestSnapshotAt)}`
-      : undefined,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  const fxDate = fx?.asOf ? formatDate(fx.asOf) : undefined;
-  let fxStatusLabel = '';
-  if (fxAvailable && !resolvedFxMerge) fxStatusLabel = '分币种显示';
-  else if (fx?.status === 'ready') fxStatusLabel = `已换算至 ${resolvedBaseCurrency}`;
-  else if (fx?.status === 'stale') fxStatusLabel = `已换算至 ${resolvedBaseCurrency} · 汇率陈旧`;
-  else if (fx?.status === 'blocked') fxStatusLabel = '汇率不可用 · 保留原币种';
-  const status = [
-    fxStatusLabel,
-    fxDate ? `汇率截至 ${fxDate}` : undefined,
-    resolvedFxMerge && fx?.estimated ? '当前汇率回算 · 估算' : undefined,
-    statusLabel,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const status = performanceScopeStatus(
+    valuedAt,
+    latestSnapshotAt,
+    fx,
+    fxAvailable,
+    resolvedFxMerge,
+    resolvedBaseCurrency,
+  );
+  // 状态信息与控制项同一行：宽屏右对齐，窄屏才换行，避免工具栏下方再留一整行空白。
+  // 页头/工具栏到页签统一沿用页面的 24px 分组间距，与账户数据、自选、市场数据页一致。
   return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
         {accountControl && <div className="min-w-0 basis-full sm:basis-auto">{accountControl}</div>}
         {showAccountSelector && (
           <div className="flex min-w-0 basis-full items-center gap-2 text-sm text-muted-foreground sm:basis-auto">
@@ -145,7 +133,7 @@ export function PerformanceAccountSelector({
           </Select>
         </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground sm:justify-end">
+      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 text-xs text-muted-foreground">
         {status && <p className="m-0">{status}</p>}
         {fxAvailable && resolvedFxMerge && fx?.status === 'blocked' && onRetry ? (
           <Button
@@ -161,4 +149,38 @@ export function PerformanceAccountSelector({
       </div>
     </div>
   );
+}
+
+function performanceScopeStatus(
+  valuedAt: string | undefined,
+  latestSnapshotAt: string | undefined,
+  fx: PerformanceFxMeta | undefined,
+  fxAvailable: boolean,
+  resolvedFxMerge: boolean,
+  resolvedBaseCurrency: 'CNY' | 'HKD' | 'USD',
+) {
+  const statusLabel = [
+    valuedAt ? `估值计算时间 ${formatDate(valuedAt)}` : undefined,
+    latestSnapshotAt && latestSnapshotAt !== valuedAt
+      ? `收益快照 ${formatDate(latestSnapshotAt)}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const fxDate = fx?.asOf ? formatDate(fx.asOf) : undefined;
+  let fxStatusLabel = '';
+  if (fxAvailable && !resolvedFxMerge) fxStatusLabel = '分币种显示';
+  else if (fx?.status === 'ready') fxStatusLabel = `已换算至 ${resolvedBaseCurrency}`;
+  else if (fx?.status === 'stale') fxStatusLabel = `已换算至 ${resolvedBaseCurrency} · 汇率陈旧`;
+  else if (fx?.status === 'blocked') fxStatusLabel = '汇率不可用 · 保留原币种';
+  const status = [
+    fxStatusLabel,
+    fxDate ? `汇率截至 ${fxDate}` : undefined,
+    resolvedFxMerge && fx?.estimated ? '当前汇率回算 · 估算' : undefined,
+    statusLabel,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return status;
 }

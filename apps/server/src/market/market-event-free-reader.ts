@@ -22,6 +22,45 @@ import type {
   MarketBarWindowReadResultV3,
 } from './market-bar-reader-v3.js';
 
+type SelectedRouteContext = Extract<
+  ReturnType<typeof marketRouteContextV3>,
+  { ok: true }
+>['context'];
+type EventFreeTarget = SelectedRouteContext['targets'][number];
+type EventFreeSource = NonNullable<
+  Awaited<ReturnType<MarketEventFreeRepository['exact']>>
+>['bundle']['source'];
+function supportsEventFreeInput(input: MarketBarWindowReadInputV3) {
+  if (
+    !input.priceResearch ||
+    input.frozenWindowRef ||
+    input.market !== 'CN' ||
+    input.routeKey.assetType !== 'STOCK' ||
+    input.routeKey.timeframe !== '1d' ||
+    input.routeKey.adjustment !== 'qfq'
+  )
+    return false;
+  return true;
+}
+function matchingEventFreePrimaries(
+  target: EventFreeTarget | undefined,
+  rawTarget: EventFreeTarget | undefined,
+  source: EventFreeSource,
+): target is EventFreeTarget {
+  if (
+    !target?.eligible ||
+    !target.catalogReady ||
+    !rawTarget?.eligible ||
+    !rawTarget.catalogReady ||
+    target.target.providerId !== source.providerId ||
+    target.target.upstreamSource !== source.upstreamSource ||
+    rawTarget.target.providerId !== source.providerId ||
+    rawTarget.target.upstreamSource !== source.upstreamSource
+  )
+    return false;
+  return true;
+}
+
 @Injectable()
 export class MarketEventFreeReader {
   constructor(
@@ -38,15 +77,7 @@ export class MarketEventFreeReader {
   }
 
   async read(input: MarketBarWindowReadInputV3): Promise<MarketBarWindowReadResultV3 | null> {
-    if (
-      !input.priceResearch ||
-      input.frozenWindowRef ||
-      input.market !== 'CN' ||
-      input.routeKey.assetType !== 'STOCK' ||
-      input.routeKey.timeframe !== '1d' ||
-      input.routeKey.adjustment !== 'qfq'
-    )
-      return null;
+    if (!supportsEventFreeInput(input)) return null;
     const prepared = await this.repository.exact(
       input.symbol,
       input.window.start,
@@ -87,17 +118,7 @@ export class MarketEventFreeReader {
     const target = context.context.targets[0],
       rawTarget = rawContext.context.targets[0];
     const source = prepared.bundle.source;
-    if (
-      !target?.eligible ||
-      !target.catalogReady ||
-      !rawTarget?.eligible ||
-      !rawTarget.catalogReady ||
-      target.target.providerId !== source.providerId ||
-      target.target.upstreamSource !== source.upstreamSource ||
-      rawTarget.target.providerId !== source.providerId ||
-      rawTarget.target.upstreamSource !== source.upstreamSource
-    )
-      return unavailable();
+    if (!matchingEventFreePrimaries(target, rawTarget, source)) return unavailable();
     const calendar = await this.calendars.read({
       market: 'CN',
       ...input.window,
@@ -178,36 +199,16 @@ export class MarketEventFreeReader {
       effectivePolicyRevision: context.context.effectivePolicyRevision,
       catalogRevision: context.context.catalogRevision,
     });
-    const after = await this.control.getPolicy();
     if (
-      after.revision !== policy.revision ||
-      after.enabled !== policy.enabled ||
-      after.syncState !== 'applied' ||
-      after.effectiveStale !== false
+      !(await this.sourceStillCurrent(
+        input,
+        policy,
+        desired,
+        context.context.catalogRevision,
+        source,
+      ))
     )
       return unavailable();
-    const [currentEffective, currentCatalog] = await Promise.all([
-      this.dsa.effectiveControlPolicyV3(),
-      this.dsa.marketRouteCatalogV3(),
-    ]);
-    for (const adjustment of ['none', 'qfq'] as const) {
-      const latest = marketRouteContextV3({
-        desired,
-        effective: currentEffective.projection?.effective,
-        catalog: currentCatalog,
-        routeKey: { ...input.routeKey, adjustment },
-      });
-      if (!latest.ok || latest.context.catalogRevision !== context.context.catalogRevision)
-        return unavailable();
-      const primary = latest.context.targets[0];
-      if (
-        !primary?.eligible ||
-        !primary.catalogReady ||
-        primary.target.providerId !== source.providerId ||
-        primary.target.upstreamSource !== source.upstreamSource
-      )
-        return unavailable();
-    }
     return {
       status: 'selected',
       request,
@@ -224,5 +225,43 @@ export class MarketEventFreeReader {
         catalogRevision: context.context.catalogRevision,
       },
     };
+  }
+  private async sourceStillCurrent(
+    input: MarketBarWindowReadInputV3,
+    policy: Awaited<ReturnType<MarketControlService['getPolicy']>>,
+    desired: ReturnType<typeof desiredProviderPolicyV3Schema.parse>,
+    catalogRevision: SelectedRouteContext['catalogRevision'],
+    source: EventFreeSource,
+  ) {
+    const after = await this.control.getPolicy();
+    if (
+      after.revision !== policy.revision ||
+      after.enabled !== policy.enabled ||
+      after.syncState !== 'applied' ||
+      after.effectiveStale !== false
+    )
+      return false;
+    const [currentEffective, currentCatalog] = await Promise.all([
+      this.dsa.effectiveControlPolicyV3(),
+      this.dsa.marketRouteCatalogV3(),
+    ]);
+    for (const adjustment of ['none', 'qfq'] as const) {
+      const latest = marketRouteContextV3({
+        desired,
+        effective: currentEffective.projection?.effective,
+        catalog: currentCatalog,
+        routeKey: { ...input.routeKey, adjustment },
+      });
+      if (!latest.ok || latest.context.catalogRevision !== catalogRevision) return false;
+      const primary = latest.context.targets[0];
+      if (
+        !primary?.eligible ||
+        !primary.catalogReady ||
+        primary.target.providerId !== source.providerId ||
+        primary.target.upstreamSource !== source.upstreamSource
+      )
+        return false;
+    }
+    return true;
   }
 }

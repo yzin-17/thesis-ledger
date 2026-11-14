@@ -10,6 +10,7 @@ import type {
 import type { MobileInstrument } from '../features/market-detail/market-model';
 import type { ResearchReportLocatorInput } from '@thesis-ledger/schemas';
 import type { StrategyStackParams } from './strategy-navigation';
+import type { ArenaStackParams } from './ArenaNavigator';
 export type AccountStackParams = {
   AccountsHome: undefined;
   AccountEditor: { account?: AccountResponse };
@@ -66,7 +67,6 @@ export type SettingsStackParams = {
   MarketProviderEditor: { providerId: string };
   ProviderOAuth: undefined;
   MarketPolicy: undefined;
-  MarketCatalog: undefined;
   Automations: undefined;
   AutomationEditor: { id?: string } | undefined;
   AutomationHistory: { id?: string } | undefined;
@@ -87,6 +87,7 @@ export type RootTabParams = {
   Accounts: NavigatorScreenParams<AccountStackParams> | undefined;
   Market: NavigatorScreenParams<MarketStackParams> | undefined;
   Research: NavigatorScreenParams<ResearchStackParams> | undefined;
+  Arena: NavigatorScreenParams<ArenaStackParams> | undefined;
   Settings: NavigatorScreenParams<SettingsStackParams> | undefined;
 };
 type JournalScope = { accountId: string; mode: 'actual' | 'shadow' };

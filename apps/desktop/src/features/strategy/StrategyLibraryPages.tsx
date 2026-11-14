@@ -32,7 +32,6 @@ import { formatDateTime } from '@/lib/date-display';
 import type {
   BacktestJobSummary,
   StrategyRecord,
-  StrategySchema,
   StrategyVersion,
 } from './strategy.types.js';
 import {
@@ -57,6 +56,7 @@ import { riskCenterApplicationPath } from './strategy-risk-application.model.js'
 import { strategyTimeframeLabel } from './strategy-display-labels.js';
 import { StrategyVersionBacktests } from './StrategyVersionBacktests.js';
 import { StrategyVersionExperiments } from './StrategyVersionExperiments.js';
+import { strategyVersionInstruments } from './strategy-instrument-display.js';
 
 const PAGE_SIZE = 20;
 
@@ -78,18 +78,11 @@ const schemaRecord = (value: unknown) =>
     ? (value as Record<string, unknown>)
     : {};
 
-const schemaSymbols = (schema: StrategySchema | undefined) => {
-  const executionInstrument = schemaRecord(schema?.executionInstrument);
-  return typeof executionInstrument.symbol === 'string' && executionInstrument.symbol.trim()
-    ? [executionInstrument.symbol]
-    : [];
-};
-
 const definitionRows = (version: StrategyVersion) => {
   const schema = schemaRecord(version.schema);
   const rows: [string, string][] = [
     ['策略说明', typeof schema.description === 'string' ? schema.description : '未填写'],
-    ['执行标的', schemaSymbols(version.schema).join('、') || '未配置'],
+    ['执行标的', strategyVersionInstruments(version).join('、') || '未配置'],
     ['主周期', typeof schema.primaryTimeframe === 'string' ? strategyTimeframeLabel(schema.primaryTimeframe) : '未配置'],
     [
       '信号来源',
@@ -123,7 +116,7 @@ export function StrategyLibraryPage({
     return [...strategies]
       .filter((strategy) => {
         if (!needle) return true;
-        const symbols = strategy.versions.flatMap((version) => schemaSymbols(version.schema));
+        const symbols = strategy.versions.flatMap(strategyVersionInstruments);
         return `${strategy.name} ${strategy.description ?? ''} ${symbols.join(' ')}`
           .toLocaleLowerCase()
           .includes(needle);
@@ -214,7 +207,7 @@ export function StrategyLibraryPage({
                           <span className="block truncate font-medium">{strategy.name}</span>
                         )}
                         <div className="mt-1 max-w-md truncate text-xs text-muted-foreground">
-                          {schemaSymbols(latest?.schema).join('、') ||
+                          {strategyVersionInstruments(latest).join('、') ||
                             strategy.description ||
                             '未填写执行范围'}
                         </div>

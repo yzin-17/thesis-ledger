@@ -35,6 +35,13 @@ const execution = (accountId: string, externalId: string) => ({
 });
 
 isolated('隔离 PostgreSQL 当前命令与投影', () => {
+  const suiteScope = ledgerCommandContext();
+  registerLedgerEconomicsAndConcurrencyCases(suiteScope);
+  registerLedgerDistributionAndRollbackCases(suiteScope);
+  registerLedgerImportAndLegacyEnvelopeCases(suiteScope);
+});
+
+function ledgerCommandContext() {
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl ?? '' });
   const repository = new LedgerV2Repository(prisma as never);
   const commands = new LedgerCommandService(repository);
@@ -77,7 +84,6 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
     prisma.$transaction((tx) =>
       rebuildCoreProjections(tx, accountId, { method: 'AVG', now: new Date(now) }),
     );
-
   beforeAll(async () => {
     const url = new URL(databaseUrl ?? '');
     if (url.hostname !== '127.0.0.1' || url.pathname !== '/ledger_current_fixture')
@@ -100,12 +106,38 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
     });
   });
   afterAll(() => prisma.$disconnect());
-
+  return {
+    get prisma() {
+      return prisma;
+    },
+    get repository() {
+      return repository;
+    },
+    get commands() {
+      return commands;
+    },
+    get cash() {
+      return cash;
+    },
+    get account() {
+      return account;
+    },
+    get snapshot() {
+      return snapshot;
+    },
+    get rebuildAt() {
+      return rebuildAt;
+    },
+  };
+}
+function registerLedgerEconomicsAndConcurrencyCases(
+  suiteScope: ReturnType<typeof ledgerCommandContext>,
+) {
   it('创建、修订、撤销和恢复只改变有效事实，持久化当前信封', async () => {
-    const { id } = await account();
+    const { id } = await suiteScope.account();
     const command = execution(id, 'create');
-    const created = await commands.createExecution(command);
-    const replaced = await commands.replaceExecution({
+    const created = await suiteScope.commands.createExecution(command);
+    const replaced = await suiteScope.commands.replaceExecution({
       ...command,
       command: 'REPLACE_EXECUTION',
       expectedLedgerRevision: '2',
@@ -115,9 +147,11 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
       payload: { ...command.payload, quantity: '20' },
     });
     expect(
-      (await prisma.position.findFirstOrThrow({ where: { accountId: id } })).quantity.toString(),
+      (
+        await suiteScope.prisma.position.findFirstOrThrow({ where: { accountId: id } })
+      ).quantity.toString(),
     ).toBe('20');
-    const voided = await commands.voidExecution({
+    const voided = await suiteScope.commands.voidExecution({
       command: 'VOID_EXECUTION',
       accountId: id,
       expectedLedgerRevision: '3',
@@ -126,9 +160,9 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
       source: source('void'),
       actorId: 'e03-b',
     });
-    expect(await prisma.position.count({ where: { accountId: id } })).toBe(0);
-    expect(await prisma.cashBalance.count({ where: { accountId: id } })).toBe(1);
-    const restored = await commands.restoreExecution({
+    expect(await suiteScope.prisma.position.count({ where: { accountId: id } })).toBe(0);
+    expect(await suiteScope.prisma.cashBalance.count({ where: { accountId: id } })).toBe(1);
+    const restored = await suiteScope.commands.restoreExecution({
       ...command,
       command: 'RESTORE_EXECUTION',
       expectedLedgerRevision: '4',
@@ -137,7 +171,7 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
       source: source('restore'),
     });
     expect(restored.factIds).toEqual(created.factIds);
-    const state = await snapshot(id);
+    const state = await suiteScope.snapshot(id);
     expect(state.events.map((event) => event.envelopeVersion)).toEqual([3, 3, 3, 3, 3]);
     expect(state.events.every((event) => event.payloadVersion === 1)).toBe(true);
     expect(state.state).toMatchObject({ ledgerRevision: 5n, projectionGeneration: 5n });
@@ -145,10 +179,9 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
     expect(state.trades).toHaveLength(1);
     expect(state.trades[0]?.projectionGeneration).toBe(5n);
   });
-
   it('经济 golden：现金、费用、税费、剩余成本与 T+1 结算保持一致', async () => {
-    const { id } = await account(false);
-    await cash.createCashFlow({
+    const { id } = await suiteScope.account(false);
+    await suiteScope.cash.createCashFlow({
       command: 'CREATE_CASH_FLOW',
       accountId: id,
       occurredAt,
@@ -159,8 +192,8 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
       actorId: 'e03-b',
       payload: { direction: 'INFLOW', category: 'DEPOSIT', amount: '1000', currency: 'CNY' },
     });
-    await commands.createExecution(execution(id, 'a1'));
-    await commands.createExecution({
+    await suiteScope.commands.createExecution(execution(id, 'a1'));
+    await suiteScope.commands.createExecution({
       ...execution(id, 'a2'),
       side: 'SELL',
       payload: {
@@ -173,8 +206,8 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
         ],
       },
     });
-    await rebuildAt(id, occurredAt);
-    const before = await snapshot(id);
+    await suiteScope.rebuildAt(id, occurredAt);
+    const before = await suiteScope.snapshot(id);
     expect(before.positions[0]?.quantity.toString()).toBe('6');
     expect(before.positions[0]?.costPrice.toString()).toBe('10');
     expect(before.trades[0]?.grossRealizedPnl?.toString()).toBe('20');
@@ -183,27 +216,26 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
     expect(before.balances[0]?.pendingPayable.toString()).toBe('102');
     expect(before.balances[0]?.pendingReceivable.toString()).toBe('56');
     expect(before.settlements.filter((row) => row.status === 'PENDING')).toHaveLength(2);
-    await rebuildAt(id, settledAt);
-    const after = await snapshot(id);
+    await suiteScope.rebuildAt(id, settledAt);
+    const after = await suiteScope.snapshot(id);
     expect(after.balances[0]?.settledAmount.toString()).toBe('954');
     expect(after.balances[0]?.pendingPayable.toString()).toBe('0');
     expect(after.balances[0]?.pendingReceivable.toString()).toBe('0');
     expect(after.settlements.every((row) => row.status === 'SETTLED')).toBe(true);
     expect(after.state).toEqual(before.state);
   });
-
   it('同账户并发幂等创建只写一条，竞争修订只允许一个链末', async () => {
-    const { id } = await account();
+    const { id } = await suiteScope.account();
     const command = execution(id, 'concurrent-create');
     const responses = await Promise.all([
-      commands.createExecution(command),
-      commands.createExecution(command),
+      suiteScope.commands.createExecution(command),
+      suiteScope.commands.createExecution(command),
     ]);
     expect(responses.map((result) => result.idempotentReplay).sort()).toEqual([false, true]);
-    expect(await prisma.ledgerEvent.count({ where: { accountId: id } })).toBe(2);
+    expect(await suiteScope.prisma.ledgerEvent.count({ where: { accountId: id } })).toBe(2);
     const corrections = await Promise.allSettled(
       ['left', 'right'].map((externalId) =>
-        commands.replaceExecution({
+        suiteScope.commands.replaceExecution({
           ...command,
           command: 'REPLACE_EXECUTION',
           expectedLedgerRevision: '2',
@@ -219,16 +251,19 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
     expect(rejected).toMatchObject({
       reason: { response: { errorCode: 'LEDGER_CORRECTION_NOT_CHAIN_TIP' } },
     });
-    expect(await prisma.ledgerEvent.count({ where: { accountId: id } })).toBe(3);
-    expect((await snapshot(id)).state).toMatchObject({
+    expect(await suiteScope.prisma.ledgerEvent.count({ where: { accountId: id } })).toBe(3);
+    expect((await suiteScope.snapshot(id)).state).toMatchObject({
       ledgerRevision: 3n,
       projectionGeneration: 3n,
     });
   });
-
+}
+function registerLedgerDistributionAndRollbackCases(
+  suiteScope: ReturnType<typeof ledgerCommandContext>,
+) {
   it('份额调整与分红沿用当前信封，分红不混入价差收益', async () => {
-    const { id } = await account();
-    await commands.createExecution(execution(id, 'a1'));
+    const { id } = await suiteScope.account();
+    await suiteScope.commands.createExecution(execution(id, 'a1'));
     const adjustments = [
       { type: 'SPLIT', payload: { symbol, fromUnits: '1', toUnits: '2' } },
       { type: 'MERGE', payload: { symbol, fromUnits: '2', toUnits: '1' } },
@@ -236,8 +271,8 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
       { type: 'DIVIDEND', payload: { symbol, amount: '5', currency: 'CNY' } },
     ];
     for (const [index, adjustment] of adjustments.entries()) {
-      await repository.withAccountWrite(id, async (context) => {
-        await repository.appendRevision(context, {
+      await suiteScope.repository.withAccountWrite(id, async (context) => {
+        await suiteScope.repository.appendRevision(context, {
           version: 3,
           eventId: randomUUID(),
           factId: randomUUID(),
@@ -262,44 +297,50 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
         return { value: null, advanceRevision: true };
       });
     }
-    const state = await snapshot(id);
+    const state = await suiteScope.snapshot(id);
     expect(state.positions[0]?.quantity.toString()).toBe('12');
     expect(state.trades[0]?.grossRealizedPnl?.toString()).toBe('0');
     expect(state.trades[0]?.netRealizedPnl?.toString()).toBe('0');
     const tradeId = state.trades[0]!.id;
-    expect(await prisma.tradeCorporateActionAdjustment.count({ where: { tradeId } })).toBe(3);
-    const dividend = await prisma.tradeDividendAttribution.findFirstOrThrow({ where: { tradeId } });
+    expect(
+      await suiteScope.prisma.tradeCorporateActionAdjustment.count({ where: { tradeId } }),
+    ).toBe(3);
+    const dividend = await suiteScope.prisma.tradeDividendAttribution.findFirstOrThrow({
+      where: { tradeId },
+    });
     expect(dividend.amount.toString()).toBe('5');
     expect(state.balances[0]?.settledAmount.toString()).toBe('903');
     expect(state.events.every((event) => event.envelopeVersion === 3)).toBe(true);
   });
-
   it('投影写入失败使新增事件、物化表和账户版本全部回滚', async () => {
-    const { id } = await account();
-    await commands.createExecution(execution(id, 'before-failure'));
-    const before = await snapshot(id);
-    await prisma.$executeRawUnsafe(
+    const { id } = await suiteScope.account();
+    await suiteScope.commands.createExecution(execution(id, 'before-failure'));
+    const before = await suiteScope.snapshot(id);
+    await suiteScope.prisma.$executeRawUnsafe(
       `CREATE FUNCTION public.e03_b_reject_cash() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."accountId" = '${id}'::uuid THEN RAISE EXCEPTION 'E03-b projection failure'; END IF; RETURN NEW; END $$`,
     );
-    await prisma.$executeRawUnsafe(
+    await suiteScope.prisma.$executeRawUnsafe(
       'CREATE TRIGGER e03_b_reject_cash BEFORE INSERT ON "CashBalance" FOR EACH ROW EXECUTE FUNCTION public.e03_b_reject_cash()',
     );
     try {
-      await expect(commands.createExecution(execution(id, 'failed-create'))).rejects.toThrow(
-        'E03-b projection failure',
-      );
-      expect(await snapshot(id)).toEqual(before);
+      await expect(
+        suiteScope.commands.createExecution(execution(id, 'failed-create')),
+      ).rejects.toThrow('E03-b projection failure');
+      expect(await suiteScope.snapshot(id)).toEqual(before);
     } finally {
-      await prisma.$executeRawUnsafe('DROP TRIGGER e03_b_reject_cash ON "CashBalance"');
-      await prisma.$executeRawUnsafe('DROP FUNCTION public.e03_b_reject_cash()');
+      await suiteScope.prisma.$executeRawUnsafe('DROP TRIGGER e03_b_reject_cash ON "CashBalance"');
+      await suiteScope.prisma.$executeRawUnsafe('DROP FUNCTION public.e03_b_reject_cash()');
     }
   });
-
+}
+function registerLedgerImportAndLegacyEnvelopeCases(
+  suiteScope: ReturnType<typeof ledgerCommandContext>,
+) {
   it('Import 回滚通过当前命令事实追加 VOID 并同步投影', async () => {
-    const { id } = await account();
+    const { id } = await suiteScope.account();
     const draftId = randomUUID();
     const command = execution(id, `draft:${draftId}:1:row-1`);
-    await commands.createExecution({
+    await suiteScope.commands.createExecution({
       ...command,
       source: {
         category: 'IMPORT',
@@ -308,7 +349,7 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
         sourceRowId: 'row-1',
       },
     });
-    await prisma.importDraft.create({
+    await suiteScope.prisma.importDraft.create({
       data: {
         id: draftId,
         accountId: id,
@@ -320,17 +361,21 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
         committedAt: new Date(),
       },
     });
-    await new ImportRollbackService(prisma as never, repository).rollback(draftId);
-    expect((await repository.readEffectiveEvents(id)).map((event) => event.type)).toEqual([
-      'CASH_FLOW',
-    ]);
-    expect(await prisma.position.count({ where: { accountId: id } })).toBe(0);
-    expect(await prisma.trade.count({ where: { accountId: id } })).toBe(0);
-    expect(await prisma.cashBalance.count({ where: { accountId: id } })).toBe(1);
-    expect(await prisma.importDraft.findUnique({ where: { id: draftId } })).toMatchObject({
+    await new ImportRollbackService(suiteScope.prisma as never, suiteScope.repository).rollback(
+      draftId,
+    );
+    expect(
+      (await suiteScope.repository.readEffectiveEvents(id)).map((event) => event.type),
+    ).toEqual(['CASH_FLOW']);
+    expect(await suiteScope.prisma.position.count({ where: { accountId: id } })).toBe(0);
+    expect(await suiteScope.prisma.trade.count({ where: { accountId: id } })).toBe(0);
+    expect(await suiteScope.prisma.cashBalance.count({ where: { accountId: id } })).toBe(1);
+    expect(
+      await suiteScope.prisma.importDraft.findUnique({ where: { id: draftId } }),
+    ).toMatchObject({
       status: 'cancelled',
     });
-    const events = await prisma.ledgerEvent.findMany({
+    const events = await suiteScope.prisma.ledgerEvent.findMany({
       where: { accountId: id },
       orderBy: { ledgerRevision: 'asc' },
     });
@@ -341,10 +386,9 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
       supersedesEventId: events[1]?.id,
     });
   });
-
   it('账户旧行阻断创建、修订、撤销及 Import 回滚且不改变原状态', async () => {
-    const { id } = await account(false);
-    const oldEvent = await prisma.ledgerEvent.create({
+    const { id } = await suiteScope.account(false);
+    const oldEvent = await suiteScope.prisma.ledgerEvent.create({
       data: {
         accountId: id,
         type: 'CASH_FLOW',
@@ -354,7 +398,7 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
         occurredAt: new Date(occurredAt),
       },
     });
-    const draft = await prisma.importDraft.create({
+    const draft = await suiteScope.prisma.importDraft.create({
       data: {
         accountId: id,
         source: 'old',
@@ -364,12 +408,12 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
         rows: [],
       },
     });
-    const before = await snapshot(id);
+    const before = await suiteScope.snapshot(id);
     const command = execution(id, 'old-reject');
     const operations = [
-      () => commands.createExecution(command),
+      () => suiteScope.commands.createExecution(command),
       () =>
-        commands.replaceExecution({
+        suiteScope.commands.replaceExecution({
           ...command,
           command: 'REPLACE_EXECUTION',
           expectedLedgerRevision: '0',
@@ -377,7 +421,7 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
           reason: '旧修订',
         }),
       () =>
-        commands.voidExecution({
+        suiteScope.commands.voidExecution({
           command: 'VOID_EXECUTION',
           accountId: id,
           expectedLedgerRevision: '0',
@@ -386,15 +430,20 @@ isolated('隔离 PostgreSQL 当前命令与投影', () => {
           actorId: 'e03-b',
           source: source('void-old'),
         }),
-      () => new ImportRollbackService(prisma as never, repository).rollback(draft.id),
+      () =>
+        new ImportRollbackService(suiteScope.prisma as never, suiteScope.repository).rollback(
+          draft.id,
+        ),
     ];
     for (const operation of operations)
       await expect(operation()).rejects.toMatchObject({
         response: { code: 'UNSUPPORTED_CONTRACT_VERSION' },
       });
-    expect(await snapshot(id)).toEqual(before);
-    expect(await prisma.importDraft.findUnique({ where: { id: draft.id } })).toMatchObject({
+    expect(await suiteScope.snapshot(id)).toEqual(before);
+    expect(
+      await suiteScope.prisma.importDraft.findUnique({ where: { id: draft.id } }),
+    ).toMatchObject({
       status: 'committed',
     });
   });
-});
+}

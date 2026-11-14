@@ -28,6 +28,7 @@ import { money, isDataLoaded } from '../shared/display.js';
 import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { schemaAsOf, schemaSymbols, latestVersion } from './strategy.schema.js';
+import { strategyInstrumentLabel } from './strategy-instrument-display.js';
 import { diagnosticText, localizeBacktestMessage } from './BacktestModelDisclosure.js';
 import type {
   BacktestJob,
@@ -171,26 +172,11 @@ export function StrategyLibrary({
             </TableHeader>
             <tbody>
               {sortedStrategies.map((strategy) => {
-                const latest = latestVersion(strategy.versions);
-                const selectedVersionId = selectedVersionIds[strategy.id] ?? latest?.id;
-                const version =
-                  strategy.versions.find((candidate) => candidate.id === selectedVersionId) ??
-                  latest;
-                const status = version?.schema?.status ?? strategy.status;
-                const recentJob = jobs.find((job) => job.strategyVersionId === version?.id);
-                const symbols = version?.schema ? schemaSymbols(version.schema) : [];
-                const symbolSummary = `${symbols[0] ?? '未配置标的'}${
-                  symbols.length > 1 ? ` 等 ${symbols.length} 个` : ''
-                }`;
-                const firstSymbol = symbols[0];
-                const description = strategy.description?.trim();
-                let strategySummary = symbolSummary;
-                if (description) {
-                  strategySummary =
-                    firstSymbol && description.startsWith(firstSymbol)
-                      ? description
-                      : `${symbolSummary} · ${description}`;
-                }
+                const { version, status, recentJob, strategySummary } = strategyLibraryRow(
+                  strategy,
+                  selectedVersionIds,
+                  jobs,
+                );
                 return (
                   <tr key={strategy.id}>
                     <td className="min-w-0">
@@ -288,7 +274,9 @@ export function StrategyLibrary({
                   </tr>
                 );
               })}
-              {loadState === 'loading' && <EmptyTableRow colSpan={6} loading label="正在加载策略…" />}
+              {loadState === 'loading' && (
+                <EmptyTableRow colSpan={6} loading label="正在加载策略…" />
+              )}
             </tbody>
           </table>
         </TableContainer>
@@ -371,8 +359,6 @@ export function StrategyJobs({
                 const progress =
                   typeof job.progress === 'number' ? Math.max(0, Math.min(100, job.progress)) : 0;
                 const terminal = ['succeeded', 'failed', 'cancelled'].includes(job.status);
-                const diagnostic = localizeBacktestMessage(diagnosticText(job.diagnostics));
-                const errorSummary = localizeBacktestMessage(job.errorSummary);
                 return (
                   <tr key={job.id}>
                     <td>
@@ -388,27 +374,7 @@ export function StrategyJobs({
                       </strong>
                       <span>{jobCash(job)}</span>
                     </td>
-                    <td>
-                      <Badge variant={jobStatusVariant(job.status)}>
-                        {jobStatusLabel(job.status, job.cancelRequestedAt)}
-                      </Badge>
-                      {errorSummary && <span>{errorSummary}</span>}
-                      {job.errorCode && <span>{job.errorCode}</span>}
-                      {job.executionModelDisclosure && (
-                        <span>
-                          已选模型：{job.executionModelDisclosure.model.id} ·{' '}
-                          {job.executionModelDisclosure.model.version}
-                        </span>
-                      )}
-                      {diagnostic && diagnostic !== errorSummary && <span>{diagnostic}</span>}
-                      {job.stage && <span>阶段：{backtestStageLabel(job.stage)}</span>}
-                      {(job.executionAttempt ?? job.attempt) !== undefined && (
-                        <span>执行次数：{job.executionAttempt ?? job.attempt}</span>
-                      )}
-                      {Array.isArray(job.warnings) && job.warnings.length > 0 && (
-                        <span>{job.warnings.length} 条提示</span>
-                      )}
-                    </td>
+                    <StrategyJobStatusCell job={job} />
                     <td>
                       {job.status === 'running' ? (
                         <Progress value={progress} className="min-w-28">
@@ -432,7 +398,11 @@ export function StrategyJobs({
                             aria-busy={busyAction === `run:${job.id}`}
                             onClick={() => onRun(job)}
                           >
-                            {busyAction === `run:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Play data-icon="inline-start" />}
+                            {busyAction === `run:${job.id}` ? (
+                              <Spinner data-icon="inline-start" aria-hidden="true" />
+                            ) : (
+                              <Play data-icon="inline-start" />
+                            )}
                             {busyAction === `run:${job.id}` ? '启动中…' : '重试运行'}
                           </Button>
                         )}
@@ -444,7 +414,11 @@ export function StrategyJobs({
                             aria-busy={busyAction === `cancel:${job.id}`}
                             onClick={() => onCancel(job)}
                           >
-                            {busyAction === `cancel:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <X data-icon="inline-start" />}
+                            {busyAction === `cancel:${job.id}` ? (
+                              <Spinner data-icon="inline-start" aria-hidden="true" />
+                            ) : (
+                              <X data-icon="inline-start" />
+                            )}
                             取消
                           </Button>
                         )}
@@ -462,7 +436,11 @@ export function StrategyJobs({
                             aria-busy={busyAction === `retry:${job.id}`}
                             onClick={() => onRetry(job.id)}
                           >
-                            {busyAction === `retry:${job.id}` ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Play data-icon="inline-start" />}
+                            {busyAction === `retry:${job.id}` ? (
+                              <Spinner data-icon="inline-start" aria-hidden="true" />
+                            ) : (
+                              <Play data-icon="inline-start" />
+                            )}
                             {busyAction === `retry:${job.id}` ? '重试中…' : '重试'}
                           </Button>
                         )}
@@ -476,5 +454,61 @@ export function StrategyJobs({
         </table>
       </TableContainer>
     </section>
+  );
+}
+
+function strategyLibraryRow(
+  strategy: StrategyRecord,
+  selectedVersionIds: Record<string, string>,
+  jobs: BacktestJobSummary[],
+) {
+  const latest = latestVersion(strategy.versions);
+  const selectedVersionId = selectedVersionIds[strategy.id] ?? latest?.id;
+  const version =
+    strategy.versions.find((candidate) => candidate.id === selectedVersionId) ?? latest;
+  const status = version?.schema?.status ?? strategy.status;
+  const recentJob = jobs.find((job) => job.strategyVersionId === version?.id);
+  const symbols = version?.schema ? schemaSymbols(version.schema) : [];
+  const symbolSummary = `${strategyInstrumentLabel(version?.instrumentDirectory, symbols[0] ?? '未配置标的')}${
+    symbols.length > 1 ? ` 等 ${symbols.length} 个` : ''
+  }`;
+  const firstSymbol = symbols[0];
+  const description = strategy.description?.trim();
+  let strategySummary = symbolSummary;
+  if (description) {
+    strategySummary =
+      firstSymbol && description.startsWith(firstSymbol)
+        ? description
+        : `${symbolSummary} · ${description}`;
+  }
+
+  return { version, status, recentJob, strategySummary };
+}
+
+function StrategyJobStatusCell({ job }: { job: BacktestJobSummary }) {
+  const diagnostic = localizeBacktestMessage(diagnosticText(job.diagnostics));
+  const errorSummary = localizeBacktestMessage(job.errorSummary);
+  return (
+    <td>
+      <Badge variant={jobStatusVariant(job.status)}>
+        {jobStatusLabel(job.status, job.cancelRequestedAt)}
+      </Badge>
+      {errorSummary && <span>{errorSummary}</span>}
+      {job.errorCode && <span>{job.errorCode}</span>}
+      {job.executionModelDisclosure && (
+        <span>
+          已选模型：{job.executionModelDisclosure.model.id} ·{' '}
+          {job.executionModelDisclosure.model.version}
+        </span>
+      )}
+      {diagnostic && diagnostic !== errorSummary && <span>{diagnostic}</span>}
+      {job.stage && <span>阶段：{backtestStageLabel(job.stage)}</span>}
+      {(job.executionAttempt ?? job.attempt) !== undefined && (
+        <span>执行次数：{job.executionAttempt ?? job.attempt}</span>
+      )}
+      {Array.isArray(job.warnings) && job.warnings.length > 0 && (
+        <span>{job.warnings.length} 条提示</span>
+      )}
+    </td>
   );
 }

@@ -44,9 +44,12 @@ describe('第 4 批冻结、归属与恢复',()=>{
     expect(backtestActionRecovered({...pending,action:'cancel'},b4Run('succeeded'))).toBe(true);
   });
   it('历史口径与执行模型不自动转换，非法研究附加字段零准备',()=>{
-    const form={...newBacktestForm('600519.SH'),start:'2024-01-02',end:'2024-03-29',cash:'10000',model:JSON.stringify(fixture('backtest-execution-model.cn-2024q1.json'))};
+    const model=fixture('backtest-execution-model.cn-2024q1.json');
+    model.segments[0].execution.price={kind:'noDailyLimit',reason:'归一化价格坐标'};
+    model.segments[0].execution.normalizedExecution={priceCoordinate:'continuous-decimal',quantityUnits:'continuous-normalized-decimal',lotSizeConstraint:'not-applied',tickSizeConstraint:'not-applied',dailyPriceLimit:'not-applied',feeBasis:'simulatedTurnover'};
+    const form={...newBacktestForm('600519.SH'),start:'2024-01-02',end:'2024-03-29',cash:'10000',model:JSON.stringify(model)};
     const intent=ordinaryPreparationIntent(form,b4VersionId,'intent-1','2026-09-11T00:00:00Z');
-    expect(intent.accountingBasis).toBe('raw-events');expect(intent.history.basis).toBe('fixed-provider-snapshot');
+    expect(intent.adjustment).toBe('hfq');expect(intent.accountingBasis).toBe('normalized-series');expect(intent.history.basis).toBe('fixed-provider-snapshot');
     expect(()=>ordinaryPreparationIntent({...form,extras:'{"strategyVersionId":"escape"}'},b4VersionId,'i','2026-09-11T00:00:00Z')).toThrow();
     expect(()=>ordinaryPreparationIntent({...form,history:'point-in-time',evidence:''},b4VersionId,'i','2026-09-11T00:00:00Z')).toThrow();
   });

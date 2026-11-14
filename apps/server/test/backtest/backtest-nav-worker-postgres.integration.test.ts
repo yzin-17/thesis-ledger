@@ -36,6 +36,12 @@ const sleep = (milliseconds: number) => new Promise((resolve) => setTimeout(reso
 type NavReaderFixture = Pick<MarketNavReaderV3, 'read' | 'currentRouteState'>;
 
 postgresDescribe('NAV 实际 BullMQ Worker 与隔离 PostgreSQL/Redis 闭环', () => {
+  const context = navWorkerContext();
+  registerNavWorkerDeliveryAndCancellation(context);
+  registerNavWorkerRetryLimit(context);
+});
+
+function navWorkerContext() {
   let fixtureDb: Awaited<ReturnType<typeof startIsolatedNavPostgres>>;
   let redisRuntime: Awaited<ReturnType<typeof startIsolatedNavRedis>>;
   let workerConnection: Redis;
@@ -46,7 +52,6 @@ postgresDescribe('NAV 实际 BullMQ Worker 与隔离 PostgreSQL/Redis 闭环', (
   let preparation: BacktestNavPreparationService;
   let backtests: BacktestService;
   let worker: Worker<BacktestQueueData>;
-
   beforeAll(async () => {
     fixtureDb = await startIsolatedNavPostgres();
     redisRuntime = await startIsolatedNavRedis();
@@ -176,12 +181,10 @@ postgresDescribe('NAV 实际 BullMQ Worker 与隔离 PostgreSQL/Redis 闭环', (
     await worker.waitUntilReady();
     await worker.pause();
   }, 240_000);
-
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
-
   afterAll(async () => {
     await worker?.close();
     await workerConnection?.quit();
@@ -190,42 +193,7 @@ postgresDescribe('NAV 实际 BullMQ Worker 与隔离 PostgreSQL/Redis 闭环', (
     await redisRuntime?.cleanup();
     vi.unstubAllEnvs();
   }, 30_000);
-
-  async function createQueuedRun() {
-    await worker.pause();
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(FIXTURE_NOW);
-    try {
-      const fixture = navPreparationFixture();
-      const strategy = await fixtureDb.prisma.strategy.create({
-        data: { name: `N3 NAV Worker 隔离验收 ${randomUUID()}`, schemaVersion: 2 },
-      });
-      const version = await fixtureDb.prisma.strategyVersion.create({
-        data: {
-          strategyId: strategy.id,
-          version: 1,
-          schemaVersion: 2,
-          schema: fixture.strategy as unknown as Prisma.InputJsonValue,
-        },
-      });
-      const request = { ...fixture.request, strategyVersionId: version.id };
-      const prepared = await preparation.prepare(request);
-      if (prepared.status !== 'prepared' || !prepared.receipt) {
-        throw new Error('NAV 隔离 fixture 未能生成准备凭证');
-      }
-      const run = await navRuns.create({
-        contractVersion: 3,
-        preparationId: prepared.receipt.preparationId,
-        preparationHash: prepared.receipt.preparationHash,
-        idempotencyKey: randomUUID(),
-      });
-      if (!run || run.status !== 'queued') throw new Error(`NAV Run 未排队: ${run?.status}`);
-      return run;
-    } finally {
-      vi.useRealTimers();
-    }
-  }
-
+  const createQueuedRun = () => createQueuedNavRun({ worker, fixtureDb, preparation, navRuns });
   async function waitForStatus(id: string, status: string, timeoutMs = 45_000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -236,8 +204,60 @@ postgresDescribe('NAV 实际 BullMQ Worker 与隔离 PostgreSQL/Redis 闭环', (
     const current = await fixtureDb.prisma.backtestJob.findUnique({ where: { id } });
     throw new Error(`NAV Worker 等待终态超时: expected=${status}, actual=${current?.status}`);
   }
+  return {
+    get fixtureDb() {
+      return fixtureDb;
+    },
+    get redisRuntime() {
+      return redisRuntime;
+    },
+    get workerConnection() {
+      return workerConnection;
+    },
+    get queueTransport() {
+      return queueTransport;
+    },
+    get queueService() {
+      return queueService;
+    },
+    get navExecution() {
+      return navExecution;
+    },
+    get navRuns() {
+      return navRuns;
+    },
+    get preparation() {
+      return preparation;
+    },
+    get backtests() {
+      return backtests;
+    },
+    get worker() {
+      return worker;
+    },
+    get createQueuedRun() {
+      return createQueuedRun;
+    },
+    get waitForStatus() {
+      return waitForStatus;
+    },
+  };
+}
 
+function registerNavWorkerDeliveryAndCancellation(
+  suiteContext: ReturnType<typeof navWorkerContext>,
+) {
   it('重复投递后由实际 Queue/Worker 执行生产入口并返回公开 NAV 成功结果', async () => {
+    const {
+      fixtureDb,
+      queueTransport,
+      navRuns,
+      backtests,
+      worker,
+      createQueuedRun,
+      waitForStatus,
+    } = suiteContext;
+
     const run = await createQueuedRun();
     const stored = await fixtureDb.prisma.backtestJob.findUniqueOrThrow({ where: { id: run.id } });
     expect(stored.status).toBe('queued');
@@ -260,8 +280,17 @@ postgresDescribe('NAV 实际 BullMQ Worker 与隔离 PostgreSQL/Redis 闭环', (
       (completed.result as { resultChecksum: string }).resultChecksum,
     );
   }, 60_000);
-
   it('真实 PostgreSQL 取消标记阻止晚到 NAV 结果 CAS 提交', async () => {
+    const {
+      fixtureDb,
+      queueService,
+      navExecution,
+      navRuns,
+      worker,
+      createQueuedRun,
+      waitForStatus,
+    } = suiteContext;
+
     const run = await createQueuedRun();
     const original = navExecution.execute.bind(navExecution);
     let markStarted: () => void = () => undefined;
@@ -302,8 +331,12 @@ postgresDescribe('NAV 实际 BullMQ Worker 与隔离 PostgreSQL/Redis 闭环', (
     expect(cancelled.result).toBeNull();
     expect(await navRuns.read(run.id)).toMatchObject({ id: run.id, status: 'cancelled' });
   }, 60_000);
+}
 
+function registerNavWorkerRetryLimit(suiteContext: ReturnType<typeof navWorkerContext>) {
   it('实际 Worker 对可重试故障执行有界三次尝试并收敛为 failed', async () => {
+    const { queueTransport, navExecution, worker, createQueuedRun, waitForStatus } = suiteContext;
+
     const run = await createQueuedRun();
     const original = navExecution.execute.bind(navExecution);
     const execute = vi.spyOn(navExecution, 'execute').mockImplementation(async (job, signal) => {
@@ -323,4 +356,46 @@ postgresDescribe('NAV 实际 BullMQ Worker 与隔离 PostgreSQL/Redis 闭环', (
     });
     expect(await queueTransport.getState(run.id)).toBe('failed');
   }, 60_000);
-});
+}
+
+async function createQueuedNavRun(input: {
+  worker: Worker<BacktestQueueData>;
+  fixtureDb: Awaited<ReturnType<typeof startIsolatedNavPostgres>>;
+  preparation: BacktestNavPreparationService;
+  navRuns: BacktestNavRunService;
+}) {
+  const { worker, fixtureDb, preparation, navRuns } = input;
+
+  await worker.pause();
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(FIXTURE_NOW);
+  try {
+    const fixture = navPreparationFixture();
+    const strategy = await fixtureDb.prisma.strategy.create({
+      data: { name: `N3 NAV Worker 隔离验收 ${randomUUID()}`, schemaVersion: 2 },
+    });
+    const version = await fixtureDb.prisma.strategyVersion.create({
+      data: {
+        strategyId: strategy.id,
+        version: 1,
+        schemaVersion: 2,
+        schema: fixture.strategy as unknown as Prisma.InputJsonValue,
+      },
+    });
+    const request = { ...fixture.request, strategyVersionId: version.id };
+    const prepared = await preparation.prepare(request);
+    if (prepared.status !== 'prepared' || !prepared.receipt) {
+      throw new Error('NAV 隔离 fixture 未能生成准备凭证');
+    }
+    const run = await navRuns.create({
+      contractVersion: 3,
+      preparationId: prepared.receipt.preparationId,
+      preparationHash: prepared.receipt.preparationHash,
+      idempotencyKey: randomUUID(),
+    });
+    if (!run || run.status !== 'queued') throw new Error(`NAV Run 未排队: ${run?.status}`);
+    return run;
+  } finally {
+    vi.useRealTimers();
+  }
+}

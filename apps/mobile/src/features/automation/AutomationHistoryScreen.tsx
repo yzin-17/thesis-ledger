@@ -3,14 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SettingsStackParams } from '../../app/navigation-types';
 import { useMobileRuntime } from '../../app/MobileRuntime';
-import {
-  Action,
-  Choices,
-  Copy,
-  Page,
-  QueryList,
-  Section,
-} from '../../components/MobilePrimitives';
+import { Action, Choices, Copy, Page, QueryList, Section } from '../../components/MobilePrimitives';
 import { automationStatusLabel } from './automation-labels';
 export function AutomationHistoryScreen({
   route,
@@ -34,12 +27,19 @@ export function AutomationHistoryScreen({
       <Choices
         label="当前页状态"
         value={status}
-        options={['all', 'queued', 'running', 'succeeded', 'failed', 'unknown_outcome'].map(
-          (value) => ({
-            value,
-            label: value === 'all' ? '全部状态' : automationStatusLabel(value),
-          }),
-        )}
+        options={[
+          'all',
+          'queued',
+          'running',
+          'succeeded',
+          'partial',
+          'failed',
+          'interrupted',
+          'unknown_outcome',
+        ].map((value) => ({
+          value,
+          label: value === 'all' ? '全部状态' : automationStatusLabel(value),
+        }))}
         onChange={setStatus}
       />
       <Action
@@ -51,6 +51,9 @@ export function AutomationHistoryScreen({
         第 {query.data?.page ?? page} 页 / {query.data?.totalPages ?? '—'} 页；共{' '}
         {query.data?.total ?? '—'} 条
       </Copy>
+      {query.data?.sourceWarnings?.length ? (
+        <Copy>收费资料检查记录暂时无法读取，当前仅显示其他任务记录。请稍后刷新。</Copy>
+      ) : null}
       <Action
         label="上一页运行历史"
         disabled={query.isFetching || !query.data || query.data.page <= 1}
@@ -68,12 +71,16 @@ export function AutomationHistoryScreen({
         label="正在刷新运行历史"
       >
         {rows?.map((item) => (
-          <Section key={item.id} title={automationStatusLabel(item.status)}>
+          <Section
+            key={item.id}
+            title={`${item.jobName ?? '自动化任务'} · ${automationStatusLabel(item.status)}`}
+          >
             <Copy>
-              任务 {item.jobId}；开始 {item.startedAt}；记录 {item.id}
+              开始 {item.startedAt ?? '尚未开始'}；结束 {item.finishedAt ?? '尚未结束'}
             </Copy>
+            {!item.startedAt && item.createdAt ? <Copy>排队时间 {item.createdAt}</Copy> : null}
             <Copy>{item.error || '无错误记录'}</Copy>
-            <Copy>{JSON.stringify(item.output ?? null, null, 2)}</Copy>
+            <Copy>{item.summary ?? JSON.stringify(item.output ?? null, null, 2)}</Copy>
           </Section>
         ))}
       </QueryList>

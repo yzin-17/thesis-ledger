@@ -35,6 +35,7 @@ export type SeriesRef = z.infer<typeof seriesRefSchema>;
 export const signalSourceSchema = z
   .object({
     id: z.string().trim().min(1),
+    priceCoordinate: z.enum(['research', 'actual']).optional(),
     asset: assetSymbolRefSchema,
     timeframe: backtestTimeframeSchema,
     series: z.array(seriesFieldSchema).min(1),

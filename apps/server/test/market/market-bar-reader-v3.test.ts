@@ -6,7 +6,7 @@ import type {
   MarketRouteCompatibilityObservationV3,
   MarketRouteCompatibilityProofV3,
 } from '@thesis-ledger/schemas';
-import type { DsaClient } from '../../src/integration/dsa/dsa.client.js';
+import { DsaError, type DsaClient } from '../../src/integration/dsa/dsa.client.js';
 import type { EffectivePolicyEnvelopeV3 } from '../../src/integration/dsa/dsa-v3-protocol.js';
 import type { MarketControlService } from '../../src/market/market-control.service.js';
 import {
@@ -163,6 +163,7 @@ const makeReader = (
     policyOverrides?: Record<string, unknown>;
     catalog?: unknown;
     read?: (request: PinnedMarketWindowRequestV3) => Promise<unknown>;
+    observe?: (input: unknown) => Promise<null>;
   } = {},
 ) => {
   const policy = readPolicy(options.withBackup, options.policyOverrides);
@@ -199,11 +200,22 @@ const makeReader = (
     marketControl as unknown as MarketControlService,
     dsa as unknown as DsaClient,
     evidenceRepository as unknown as MarketWindowEvidenceV3Repository,
+    undefined,
+    options.observe ? { observe: options.observe } as never : undefined,
   );
   return { reader, marketControl, dsa, evidenceRepository };
 };
 
 describe('MarketBarWindowReaderV3', () => {
+  it('来源合同错误进入质量日志，普通来源不可用不记质量问题', async () => {
+    for (const code of ['invalid-response', 'unavailable'] as const) {
+      const observe = vi.fn(async () => null);
+      const { reader } = makeReader({ observe, read: async () => { throw new DsaError('fixture', code); } });
+      expect((await reader.read(input)).status).toBe('unavailable');
+      if (code === 'invalid-response') expect(observe).toHaveBeenCalledWith(expect.objectContaining({ provider: primaryTarget.providerId, symbol, code: 'response_contract_invalid' }));
+      else expect(observe).not.toHaveBeenCalled();
+    }
+  });
   it('reads and records one complete primary window with exact pinned provenance', async () => {
     const { reader, dsa, evidenceRepository } = makeReader();
 

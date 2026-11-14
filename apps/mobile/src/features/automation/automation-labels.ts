@@ -11,12 +11,14 @@ export const automationTypeLabels: Record<string, string> = {
   'fund-investment-materialization': '基金定投待确认生成',
 };
 export const automationTypeLabel = (value: string) =>
-  automationTypeLabels[value] ?? `其他（${value}）`;
+  value === 'rule-source-monitor' ? '收费资料检查' : automationTypeLabels[value] ?? `其他（${value}）`;
 const statusLabels: Record<string, string> = {
   queued: '等待运行',
   running: '运行中',
   succeeded: '成功',
   failed: '失败',
   unknown_outcome: '结果待确认',
+  partial: '部分资料不可读',
+  interrupted: '已中断',
 };
 export const automationStatusLabel = (value: string) => statusLabels[value] ?? `其他（${value}）`;

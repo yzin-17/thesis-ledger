@@ -23,9 +23,19 @@ import {
   transferAccounts,
   type TransferForm,
   type TransferRead,
+  type TransferFact,
 } from './transfer-command';
 
-export function TransferEditor() {
+function initialTransferForm(event: TransferFact | undefined): TransferForm {
+  return {
+    amount: event?.payload.amount ?? '',
+    occurredAt: event?.occurredAt ?? '',
+    note: event?.payload.note ?? '',
+    reason: '',
+  };
+}
+
+function useTransferEditorController() {
   const { params } = useRoute<RouteProp<AccountStackParams, 'TransferEditor'>>();
   const { api, scope } = useMobileRuntime();
   const accounts = useAccounts();
@@ -52,12 +62,7 @@ export function TransferEditor() {
       };
     },
   });
-  const initial: TransferForm = {
-    amount: params.event?.payload.amount ?? '',
-    occurredAt: params.event?.occurredAt ?? '',
-    note: params.event?.payload.note ?? '',
-    reason: '',
-  };
+  const initial = initialTransferForm(params.event);
   const [form, setForm] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [read, setRead] = useState<TransferRead | null>(null);
@@ -137,6 +142,11 @@ export function TransferEditor() {
     }
   };
   const titles = { replace: '更正划转', void: '作废划转', restore: '恢复划转' };
+  return { params, titles, source, accounts, sourceId, targetId, setTargetId, setRead, mutation, target, query, read, form, change, feedback, refresh, blocked, saved, submit };
+}
+
+export function TransferEditor() {
+  const { params, titles, source, accounts, sourceId, targetId, setTargetId, setRead, mutation, target, query, read, form, change, feedback, refresh, blocked, saved, submit } = useTransferEditorController();
   return (
     <Page title={params.action ? titles[params.action] : '账户间划转'}>
       <Copy>转出：{source?.name ?? '账户不在当前范围'}</Copy>

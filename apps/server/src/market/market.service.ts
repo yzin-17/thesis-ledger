@@ -13,13 +13,15 @@ import {
 import { MarketObservationsService } from './market-observations.service.js';
 import { readQuoteBatch } from './market-quote-batch.js';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
-import { RedisService, redisKey } from '../platform/redis.service.js';
+import { RedisService } from '../platform/redis.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { MarketFundReader } from './market-fund-reader.js';
 import { MarketCacheControl } from './market-cache-control.js';
+import { MarketRequestCoordinator } from './market-request-coordinator.js';
 import { MarketQuoteReader, type QuoteReadOptions } from './market-quote-reader.js';
 import { MarketSessionReader } from './market-session-reader.js';
 import { MarketPeriodCalendarReader } from './market-period-calendar-reader.js';
+import { DataQualityService } from '../quality/data-quality.service.js';
 import type { TradingMarket } from '@thesis-ledger/domain';
 import {
   MARKET_CACHE_POLICIES,
@@ -32,6 +34,7 @@ export class MarketService {
   private readonly fundReader: MarketFundReader;
   private readonly control: MarketCacheControl;
   private readonly resultCache: MarketResultCache;
+  private readonly coordinator: MarketRequestCoordinator;
   private readonly sessions: MarketSessionReader;
 
   constructor(
@@ -40,76 +43,23 @@ export class MarketService {
     @Optional() private readonly prisma?: PrismaService,
     @Optional() private readonly observations?: MarketObservationsService,
     @Optional() sessions?: MarketSessionReader,
+    quality?: DataQualityService,
   ) {
-    this.sessions = sessions ?? new MarketSessionReader(new MarketPeriodCalendarReader(dsa));
-    this.quoteReader = new MarketQuoteReader(dsa, redis, this.sessions);
+    this.sessions = sessions ?? new MarketSessionReader(new MarketPeriodCalendarReader(dsa, quality));
+    this.quoteReader = new MarketQuoteReader(dsa, redis, this.sessions, quality);
     this.control = new MarketCacheControl(dsa);
+    this.coordinator = new MarketRequestCoordinator(redis, () => dsa.timeoutMs);
     this.fundReader = new MarketFundReader(dsa, redis, this.singleFlight.bind(this),
-      this.withDistributedLock.bind(this), prisma);
+      this.withDistributedLock.bind(this), prisma, quality);
     this.resultCache = new MarketResultCache(redis);
   }
 
-  private readonly flights = new Map<string, Promise<unknown>>();
-
   private singleFlight<T>(key: string, work: () => Promise<T>): Promise<T> {
-    const existing = this.flights.get(key) as Promise<T> | undefined;
-    if (existing) return existing;
-    const pending = work().finally(() => {
-      if (this.flights.get(key) === pending) this.flights.delete(key);
-    });
-    this.flights.set(key, pending);
-    return pending;
+    return this.coordinator.singleFlight(key, work);
   }
 
   private async withDistributedLock<T>(key: string, work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-    signal?.throwIfAborted();
-    if (!this.redis?.client) return work();
-    const client = this.redis.client as unknown as {
-      set?: (...args: [string, string, 'PX', number, 'NX']) => Promise<string | null>;
-      get?: (key: string) => Promise<string | null>;
-      eval?: (script: string, keyCount: number, ...args: string[]) => Promise<unknown>;
-    };
-    if (typeof client.set !== 'function') return work();
-
-    const lockKey = redisKey('lock', `market:${key}`);
-    const lockValue = crypto.randomUUID();
-    // 历史净值锁内最多三次控制复核和一次数据请求，沿用每次原 DSA deadline。
-    const configured = Number(this.dsa.timeoutMs);
-    const timeoutMs = Number.isFinite(configured) && configured > 0 ? configured : 5_000;
-    const leaseMs = timeoutMs * 4 + 5_000;
-    let acquired: string | null = null;
-    try {
-      acquired = await client.set(lockKey, lockValue, 'PX', leaseMs, 'NX');
-    } catch {
-      return work();
-    }
-    if (acquired !== 'OK') {
-      if (typeof client.get === 'function') {
-        for (let attempt = 0; attempt < Math.ceil(leaseMs / 200); attempt += 1) {
-          signal?.throwIfAborted();
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          if ((await client.get(lockKey)) === null) break;
-        }
-      }
-      return work();
-    }
-
-    try {
-      return await work();
-    } finally {
-      try {
-        if (typeof client.eval === 'function') {
-          await client.eval(
-            'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) end return 0',
-            1,
-            lockKey,
-            lockValue,
-          );
-        }
-      } catch {
-        // TTL 负责最终释放锁；释放失败不能覆盖已获得的行情结果。
-      }
-    }
+    return this.coordinator.withDistributedLock(key, work, signal);
   }
 
   async getFxRates(input: {

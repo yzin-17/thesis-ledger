@@ -5,6 +5,13 @@ import { PrismaService } from './prisma.service.js';
 export class DataExportService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readNotifications(accountId: string | undefined, events: Array<{ id: string }>) {
+    if (!accountId) return this.prisma.notificationDelivery.findMany();
+    if (events.length === 0) return Promise.resolve([]);
+    return this.prisma.notificationDelivery.findMany({
+      where: { subjectType: 'risk-event', subjectId: { in: events.map((event) => event.id) } },
+    });
+  }
   async exportAccount(accountId?: string) {
     const [accounts, ledger, positions, journal, plans, strategies, rules, events] =
       await Promise.all([
@@ -17,16 +24,7 @@ export class DataExportService {
         this.prisma.riskRule.findMany({ ...(accountId ? { where: { accountId } } : {}) }),
         this.prisma.riskEvent.findMany({ ...(accountId ? { where: { accountId } } : {}) }),
       ]);
-    const notifications = accountId
-      ? events.length === 0
-        ? []
-        : await this.prisma.notificationDelivery.findMany({
-            where: {
-              subjectType: 'risk-event',
-              subjectId: { in: events.map((event) => event.id) },
-            },
-          })
-      : await this.prisma.notificationDelivery.findMany();
+    const notifications = await this.readNotifications(accountId, events);
 
     return {
       formatVersion: 2,

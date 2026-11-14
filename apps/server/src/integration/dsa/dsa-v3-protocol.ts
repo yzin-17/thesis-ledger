@@ -253,28 +253,59 @@ export const mapDataV3HttpError = (
       return invalidResponse('DSA Data V3 错误响应无效', status);
     }
     const { error } = parsed.data;
-    switch (error.code) {
-      case marketDataErrorCodeV3.unsupportedCapability:
-      case marketDataErrorCodeV3.unsupportedDataContractVersion:
-      case marketDataErrorCodeV3.unsupportedPriceBasis:
-        return new DsaV3ProtocolError(error.message, 'unsupported-capability', status);
-      case marketDataErrorCodeV3.insufficientCoverage:
-        return new DsaV3ProtocolError(error.message, 'insufficient-coverage', status);
-      case marketDataErrorCodeV3.upstreamFailure:
-        return new DsaV3ProtocolError(error.message, 'unavailable', status);
-      case marketDataErrorCodeV3.invalidResponse:
-        return new DsaV3ProtocolError(error.message, 'invalid-response', status);
-      case marketDataErrorCodeV3.sourceSymbolUnrecognized:
-        return new DsaV3ProtocolError(error.message, 'source-symbol-unrecognized', status, error.code);
-      case marketDataErrorCodeV3.invalidRequest:
-        return new DsaV3ProtocolError(error.message, 'invalid-request', status, error.code);
-      case marketDataErrorCodeV3.permissionDenied:
-        return new DsaV3ProtocolError(error.message, 'permission-denied', status, error.code);
-      case marketDataErrorCodeV3.authenticationFailed:
-        return new DsaV3ProtocolError(error.message, 'source-authentication-failed', status, error.code);
-    }
+    const mapped = mapDataContractError(error, status, expectedRequestId);
+    if (mapped) return mapped;
   }
 
+  return mapLegacyDataHttpError(status, detail);
+};
+
+function mapDataContractError(
+  error: z.infer<typeof marketDataErrorEnvelopeV3Schema>['error'],
+  status: number,
+  expectedRequestId: string | undefined,
+) {
+  switch (error.code) {
+    case marketDataErrorCodeV3.unsupportedCapability:
+    case marketDataErrorCodeV3.unsupportedDataContractVersion:
+    case marketDataErrorCodeV3.unsupportedPriceBasis:
+      return new DsaV3ProtocolError(error.message, 'unsupported-capability', status);
+    case marketDataErrorCodeV3.insufficientCoverage:
+      return new DsaV3ProtocolError(error.message, 'insufficient-coverage', status);
+    case marketDataErrorCodeV3.upstreamFailure:
+      return new DsaV3ProtocolError(error.message, 'unavailable', status);
+    case marketDataErrorCodeV3.rateLimited:
+    case marketDataErrorCodeV3.quotaUnavailable:
+      return new DsaV3ProtocolError(error.message, 'unavailable', status, error.code);
+    case marketDataErrorCodeV3.invalidResponse:
+      return new DsaV3ProtocolError(
+        error.message,
+        'invalid-response',
+        status,
+        expectedRequestId ? error.code : undefined,
+      );
+    case marketDataErrorCodeV3.sourceSymbolUnrecognized:
+      return new DsaV3ProtocolError(
+        error.message,
+        'source-symbol-unrecognized',
+        status,
+        error.code,
+      );
+    case marketDataErrorCodeV3.invalidRequest:
+      return new DsaV3ProtocolError(error.message, 'invalid-request', status, error.code);
+    case marketDataErrorCodeV3.permissionDenied:
+      return new DsaV3ProtocolError(error.message, 'permission-denied', status, error.code);
+    case marketDataErrorCodeV3.authenticationFailed:
+      return new DsaV3ProtocolError(
+        error.message,
+        'source-authentication-failed',
+        status,
+        error.code,
+      );
+  }
+}
+
+function mapLegacyDataHttpError(status: number, detail: unknown) {
   const message = isRecord(detail) && typeof detail.message === 'string' ? detail.message : '';
   const legacyCode = isRecord(detail) ? detail.code : undefined;
   if (legacyCode === 'unauthorized' || status === 401 || status === 403) {
@@ -288,4 +319,4 @@ export const mapDataV3HttpError = (
     );
   }
   return new DsaV3ProtocolError(message || 'DSA Data V3 暂时不可用', 'unavailable', status);
-};
+}

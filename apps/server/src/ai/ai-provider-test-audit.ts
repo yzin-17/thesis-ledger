@@ -29,7 +29,8 @@ export function aiProviderTestAuditDetails(
     mode = route?.mode ?? input.mode ?? 'json_validated';
   }
   return {
-    kind: 'ai_provider_test',
+    kind: 'ai_provider_probe',
+    status: probeStatus(errorCode, status),
     testKind: input.testKind,
     model,
     ...(facts.actualModel === undefined ? {} : { actualModel: facts.actualModel }),
@@ -43,6 +44,11 @@ export function aiProviderTestAuditDetails(
     usage: facts.usage,
     cost: facts.cost,
     ...(errorCode ? { errorCode } : {}),
-    ...(status ? { status } : {}),
   };
+}
+
+function probeStatus(errorCode?: string, status?: AiProviderTestStatus) {
+  if (status === 'cancelled' || errorCode === 'cancelled') return 'cancelled';
+  if (errorCode || status === 'degraded' || status === 'down') return 'failed';
+  return 'passed';
 }

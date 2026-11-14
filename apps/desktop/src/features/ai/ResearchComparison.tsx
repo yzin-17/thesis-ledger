@@ -1,16 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import type { ResearchReportSummary } from '@thesis-ledger/schemas';
-import {
-  Card,
-  CardAction,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Field, FieldGroup, FieldLabel, FieldDescription } from '@/components/ui/field';
+import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
 import {
   Select,
   SelectTrigger,
@@ -36,8 +27,7 @@ type Props = {
   contextKey?: string;
 };
 function ComparisonReadState({ query }: { query: ReturnType<typeof useResearchComparisonQuery> }) {
-  if (query.isFetching || query.isPending)
-    return <LoadingState label="正在读取报告比较" />;
+  if (query.isFetching || query.isPending) return <LoadingState label="正在读取报告比较" />;
   if (query.isError)
     return (
       <Alert variant="destructive">
@@ -78,60 +68,51 @@ function ComparisonBody({ report, choices }: Props) {
     })),
   ];
   return (
-    <Card role="region" aria-label="报告比较">
-      <CardHeader>
-        <CardTitle>报告比较</CardTitle>
-        <CardDescription>选择另一份已存报告，核对保存的字段和证据变化。</CardDescription>
-        <CardAction>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
-          >
-            {open ? '收起比较' : '比较已存报告'}
-          </Button>
-        </CardAction>
-      </CardHeader>
+    <section role="region" aria-label="报告比较" className="flex min-w-0 flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {open ? '收起比较' : '比较已存报告'}
+        </Button>
+        <span className="text-xs text-muted-foreground">核对数值、状态与证据变化</span>
+      </div>
       {open && (
-        <>
-          <CardContent className="flex flex-col gap-4">
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor={fieldId}>对比报告</FieldLabel>
-                <Select
-                  items={items}
-                  value={beforeId ?? AUTO}
-                  onValueChange={(value) => setSelection(value === AUTO ? null : value)}
-                >
-                  <SelectTrigger id={fieldId} className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {items.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <FieldDescription>
-                  可选当前已加载列表中的 {candidates.length}{' '}
-                  份其他成功报告；默认前序由保存范围确定。
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
-            <ComparisonReadState query={query} />
-          </CardContent>
-          <CardFooter>
-            <p className="text-xs text-muted-foreground">比较使用保存版本，文字变化按原文展示。</p>
-          </CardFooter>
-        </>
+        <div className="flex min-w-0 flex-col gap-4">
+          <Field>
+            <FieldLabel htmlFor={fieldId}>对比报告</FieldLabel>
+            <Select
+              items={items}
+              value={beforeId ?? AUTO}
+              onValueChange={(value) => setSelection(value === AUTO ? null : value)}
+            >
+              <SelectTrigger id={fieldId} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {items.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <FieldDescription>
+              可选当前已加载列表中的 {candidates.length} 份其他成功报告；默认前序由保存范围确定。
+            </FieldDescription>
+          </Field>
+          <ComparisonReadState query={query} />
+          <p className="text-xs text-muted-foreground">比较使用保存版本，文字变化按原文展示。</p>
+        </div>
       )}
-    </Card>
+    </section>
   );
 }
 export function ResearchComparison(props: Props) {

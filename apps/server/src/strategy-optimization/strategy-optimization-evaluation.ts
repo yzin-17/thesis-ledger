@@ -11,7 +11,8 @@ const metricValue = (result: BacktestResultV3, aliases: string[]) => {
 };
 
 const executionDiagnostics = (result: BacktestResultV3) => {
-  const rejected = [...result.rejectedOrders, ...(result.rejectedNavRequests ?? [])];
+  const rejected = [...result.rejectedOrders, ...(result.rejectedNavRequests ?? [])]
+    .filter((order) => order.reasonCode !== 'BACKTEST_WINDOW_ENDED');
   const rejectionReasons = rejected.reduce<Record<string, number>>((counts, item) => {
     counts[item.reasonCode] = (counts[item.reasonCode] ?? 0) + 1;
     return counts;
@@ -23,6 +24,24 @@ const executionDiagnostics = (result: BacktestResultV3) => {
   };
 };
 
+/** 事实展示独立于评分资格；失败评价仍保留实际数值。 */
+export const optimizationResultFacts = (result: BacktestResultV3) => ({
+  tradeCount: result.trades.length,
+  ...executionDiagnostics(result),
+  ...Object.fromEntries(
+    ['totalReturn', 'maxDrawdown', 'turnover'].flatMap((key) => {
+      const value = metricValue(result, [key]);
+      return value === undefined ? [] : [[key, value]];
+    }),
+  ),
+});
+
+export function invalidOptimizationComparison(summary: EvaluationSummary, reason: string): EvaluationSummary {
+  const facts = { ...summary };
+  delete facts.score;
+  return { ...facts, status: 'invalid', reason, failureCategory: 'protocol-incompatible' };
+}
+
 const invalidSummary = (
   runId: string,
   result: BacktestResultV3,
@@ -32,8 +51,7 @@ const invalidSummary = (
   runId,
   status: 'invalid',
   completeness: result.completeness,
-  tradeCount: result.trades.length,
-  ...executionDiagnostics(result),
+  ...optimizationResultFacts(result),
   reason,
   failureCategory,
 });

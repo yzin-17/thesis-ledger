@@ -101,11 +101,17 @@ export function OptimizationAdoptionScreen() {
           strategyId: result.strategyVersion.strategyId,
           versionId: result.strategyVersion.id,
         });
-        await AsyncStorage.removeItem(key);
+        setRejected(false);
+        await Promise.allSettled([
+          AsyncStorage.removeItem(key),
+          cache.invalidateQueries({ queryKey: [...scope, 'strategy-library'] }),
+          cache.invalidateQueries({ queryKey: [...scope, 'optimization-detail', params.id] }),
+        ]);
         await pending.refetch();
-        await cache.invalidateQueries({ queryKey: [...scope, 'strategy-library'] });
         setMessage(
-          `正式版本 ${result.strategyVersion.version} 已保存；监控计划 ${result.monitoringPlan.planHash}，风险应用升级需另行预览确认。`,
+          result.detailsStatus === 'ready'
+            ? `正式版本 v${result.strategyVersion.version} 已保存，风险应用升级需另行预览确认。`
+            : `正式版本 v${result.strategyVersion.version} 已保存；风险规则预览暂不可用，请稍后查看。`,
         );
       } catch (error) {
         if (error instanceof ThesisLedgerApiError) {

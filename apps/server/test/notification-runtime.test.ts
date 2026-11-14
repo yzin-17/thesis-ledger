@@ -490,6 +490,9 @@ describe('Notification dispatch', () => {
     );
   });
 
+});
+
+describe("实际凭据与业务投递失败", () => {
   it('实际发送使用 ProviderConfig 中的凭证', async () => {
     const redis = redisFixture();
     const delivery = {
@@ -607,6 +610,9 @@ describe('Notification dispatch', () => {
     );
   });
 
+});
+
+describe("投递竞争及到期领取", () => {
   it('并发 dispatcher 对同一 delivery 只实际发送一次', async () => {
     const redis = redisFixture();
     const delivery = {

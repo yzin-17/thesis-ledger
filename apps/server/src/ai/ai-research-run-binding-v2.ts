@@ -60,14 +60,7 @@ export function assertResearchResultModelBindingV2(
   const request = parsed.data.requests.at(-1);
   if (
     !request ||
-    request.state !== 'completed' ||
-    request.dispatchingAt === null ||
-    request.completedAt === null ||
-    request.dispatchExecutionAttempt !== run.executionAttempt ||
-    request.reservation.provider !== run.provider ||
-    request.reservation.model !== run.model ||
-    !request.reservation.configurationFingerprint ||
-    request.error !== null ||
+    !researchRequestIdentityMatches(request, run) ||
     request.outcome?.status !== 'complete' ||
     !request.outcome.schemaAccepted ||
     request.outcome.contract.id !== 'research' ||
@@ -76,4 +69,20 @@ export function assertResearchResultModelBindingV2(
     throw new AiFrozenResearchError('V2 实际模型缺少匹配的最终成功请求审计');
   if (model.modelId !== (request.outcome.actualModel ?? run.model))
     throw new AiFrozenResearchError('V2 结果模型与最终成功请求的实际模型不一致');
+}
+
+function researchRequestIdentityMatches(
+  request: ReturnType<typeof aiExecutionSummarySchema.parse>['requests'][number],
+  run: Pick<AiRun, 'provider' | 'model' | 'executionAttempt'>,
+) {
+  return !(
+    request.state !== 'completed' ||
+    request.dispatchingAt === null ||
+    request.completedAt === null ||
+    request.dispatchExecutionAttempt !== run.executionAttempt ||
+    request.reservation.provider !== run.provider ||
+    request.reservation.model !== run.model ||
+    !request.reservation.configurationFingerprint ||
+    request.error !== null
+  );
 }

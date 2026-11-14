@@ -146,16 +146,18 @@ export class MarketControlService {
       decodeMarketPolicyRoutes(current.routes),
       providerId,
     );
+    const metadata = current.routes as { routingConfig?: { rules?: Array<{ providers: string[] }> } };
+    const removesRule = metadata.routingConfig?.rules?.some(rule => rule.providers.includes(providerId)) ?? false;
     const policy = buildMarketPolicyPayload(
       {
         contractVersion: 3,
         enabled: current.enabled,
         routes: nextRoutes,
       },
-      current.revision + (routeDiff.length > 0 ? 1 : 0),
+      current.revision + (routeDiff.length > 0 || removesRule ? 1 : 0),
     );
     let policyResponse: Record<string, unknown>;
-    if (routeDiff.length > 0) policyResponse = await this.applyPolicy(policy);
+    if (routeDiff.length > 0 || removesRule) policyResponse = await this.applyPolicy({ ...policy, expectedRevision: current.revision });
     else if (current.syncState === 'pending') policyResponse = await this.retryLatest();
     else policyResponse = marketPolicyCatalogResponse(current);
     if (policyResponse.syncState !== 'applied') {

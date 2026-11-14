@@ -121,8 +121,8 @@
 
 ### 可复用的现有测试入口
 
-- `thesis-ledger-infra/scripts/update.test.sh`
-- `thesis-ledger-infra/scripts/compose-contract.test.sh`
+- 从 infra 执行 `pnpm test scripts/update.test.mjs`。
+- 从 infra 执行 `pnpm test scripts/compose-contract.test.mjs`。
 - Docker Compose 的 `build` 与 `config` 命令。
 
 ### 需要新增的测试入口

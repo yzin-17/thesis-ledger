@@ -22,6 +22,37 @@ export function verifyFirstRateLimitContinuation(
   protocol: LiveExperimentProtocol,
   source: LiveRateLimitContinuation,
 ) {
+  assertRateLimitContinuationProtocol(protocol, source);
+  assertRateLimitArmStates(source);
+  const { single } = source;
+  assertRateLimitRequestAudit(single);
+  const initial = verifyLiveExperimentHistory(protocol, source.historicalBudget);
+  if (initial.requests + 1 !== source.realRequestsTotal)
+    throw new Error('原单链与跨协议累计请求数不符');
+  const reserved = new Prisma.Decimal(protocol.budget.maxInputTokensPerArm)
+    .mul(protocol.pricing.costPer1kInput)
+    .plus(
+      new Prisma.Decimal(protocol.budget.maxOutputTokensPerArm).mul(
+        protocol.pricing.costPer1kOutput,
+      ),
+    )
+    .div(1000);
+  return {
+    completed: new Map([[source.caseId + ':single', single]]),
+    initial: {
+      amount: new Prisma.Decimal(initial.amount).plus(reserved).toFixed(),
+      reservedUnknown: new Prisma.Decimal(initial.reservedUnknown).plus(reserved).toFixed(),
+      requests: source.realRequestsTotal,
+    },
+    unresolved: [],
+    historicalBudget: source.historicalBudget,
+  };
+}
+
+function assertRateLimitContinuationProtocol(
+  protocol: LiveExperimentProtocol,
+  source: LiveRateLimitContinuation,
+) {
   const freeProtocol =
     protocol.version === 'research-live-experiment-v3' &&
     protocol.model.id.endsWith(':free') &&
@@ -40,6 +71,9 @@ export function verifyFirstRateLimitContinuation(
     source.caseId !== protocol.caseIds[0]
   )
     throw new Error('只接续同一免费协议或获准Cloudflare五例的首例429终态');
+}
+
+function assertRateLimitArmStates(source: LiveRateLimitContinuation) {
   const { single, staged } = source;
   if (
     single.status !== 'failed' ||
@@ -62,6 +96,9 @@ export function verifyFirstRateLimitContinuation(
     staged.criticalViolations !== 0
   )
     throw new Error('原失败或未派发事实被修改');
+}
+
+function assertRateLimitRequestAudit(single: LiveRateLimitContinuation['single']) {
   const request = single.requests[0]!;
   z.uuid().parse(request.requestId);
   const facts = request.facts.map((fact) => aiInvocationFactSchema.parse(fact));
@@ -84,25 +121,4 @@ export function verifyFirstRateLimitContinuation(
     first.eventKey === last.eventKey
   )
     throw new Error('原单链请求缺少精确未知审计');
-  const initial = verifyLiveExperimentHistory(protocol, source.historicalBudget);
-  if (initial.requests + 1 !== source.realRequestsTotal)
-    throw new Error('原单链与跨协议累计请求数不符');
-  const reserved = new Prisma.Decimal(protocol.budget.maxInputTokensPerArm)
-    .mul(protocol.pricing.costPer1kInput)
-    .plus(
-      new Prisma.Decimal(protocol.budget.maxOutputTokensPerArm).mul(
-        protocol.pricing.costPer1kOutput,
-      ),
-    )
-    .div(1000);
-  return {
-    completed: new Map([[source.caseId + ':single', single]]),
-    initial: {
-      amount: new Prisma.Decimal(initial.amount).plus(reserved).toFixed(),
-      reservedUnknown: new Prisma.Decimal(initial.reservedUnknown).plus(reserved).toFixed(),
-      requests: source.realRequestsTotal,
-    },
-    unresolved: [],
-    historicalBudget: source.historicalBudget,
-  };
 }

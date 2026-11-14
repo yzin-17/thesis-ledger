@@ -20,7 +20,45 @@ import type {
 } from './performance.types.js';
 import { PerformanceAllocationSection, PerformanceMetrics } from './PerformanceSections.js';
 
-export function PerformanceDashboard({
+export function PerformanceDashboard(props: {
+  accountId: string;
+  section: 'analysis' | 'allocation';
+  fxMerge: boolean;
+  baseCurrency: Currency;
+  portfolio: Portfolio | null;
+  accounts: Account[];
+  mode: PortfolioMode;
+  onNavigate: (view: DesktopNavigationView) => void;
+}) {
+  const control = usePerformanceDashboard(props);
+  const { scopeWideError, retry, section, savedTargetsRefreshFailed } = control;
+
+  return (
+    <section className="flex min-w-0 flex-col gap-6">
+      {scopeWideError && <DataStateBanner state="error" onRetry={retry} />}
+      {section === 'analysis' && (
+        <div className="flex min-w-0 flex-col gap-group">
+          <p className="m-0 text-xs text-muted-foreground">全历史收益率</p>
+          <DashboardMetrics control={control} />
+        </div>
+      )}
+      {section === 'analysis' && (
+        <div className="flex min-w-0 flex-col gap-4">
+          <DashboardTrend control={control} />
+        </div>
+      )}
+      {section === 'allocation' && savedTargetsRefreshFailed && (
+        <DataStateBanner
+          state="error"
+          description="目标配置已保存，但比较数据刷新失败。本次保存已完成，请重新加载目标配置，无需再次提交。"
+        />
+      )}
+      {section === 'allocation' && <DashboardAllocation control={control} />}
+    </section>
+  );
+}
+
+function usePerformanceDashboard({
   accounts,
   mode,
   onNavigate,
@@ -73,75 +111,28 @@ export function PerformanceDashboard({
     setSeriesInterval(performanceQueries.series.data?.defaultInterval ?? available[0] ?? '1d');
   }, [performanceQueries.series.data, selection.interval]);
 
-  const snapshots = performanceQueries.history.data ?? [];
-  const summary = !performanceQueries.summary.isError
-    ? (performanceQueries.summary.data ?? null)
-    : null;
-  const layers = performanceQueries.layers.data;
-  const allocationResponse = performanceQueries.allocation.data;
-  const targetsUnavailable = performanceQueries.targets.isError;
-  const targetsResponse = !targetsUnavailable ? performanceQueries.targets.data : undefined;
-  const targets = targetsResponse?.targets ?? {};
-  const latestSnapshot = snapshots.at(-1);
-  const latest = [...snapshots].reverse().find((snapshot) => !snapshot.partial);
-  const scopedTotal = effectiveAccountId
-    ? layers?.account.find((record) => record.accountId === effectiveAccountId)
-    : layers?.portfolio;
-  const scopedSecurity =
-    layers?.security.filter(
-      (position) => !effectiveAccountId || position.accountId === effectiveAccountId,
-    ) ?? [];
-  const currentValue = scopedTotal ? scopedTotal.marketValue + scopedTotal.cashValue : undefined;
-  const currentValuePartial = scopedTotal?.partial ?? layers?.dataQuality.partial ?? false;
-  const currentCost = scopedSecurity.reduce((sum, position) => sum + position.costValue, 0);
-  const hasCompleteSecurity = scopedSecurity.every((position) => position.marketValue !== null);
-  const currentPnl =
-    scopedTotal && !scopedTotal.partial && hasCompleteSecurity
-      ? scopedSecurity.reduce(
-          (sum, position) => sum + (position.marketValue ?? 0) - position.costValue,
-          0,
-        )
-      : null;
-  const currentPnlRate = currentPnl !== null && currentCost > 0 ? currentPnl / currentCost : null;
-  const scopeHasData = [
-    performanceQueries.history,
-    performanceQueries.series,
-    performanceQueries.summary,
-    performanceQueries.layers,
-    performanceQueries.targets,
-  ].some((query) => query.data !== undefined);
-  const scopeWideError =
-    !scopeHasData &&
-    [
-      performanceQueries.history,
-      performanceQueries.series,
-      performanceQueries.summary,
-      performanceQueries.layers,
-      performanceQueries.targets,
-    ].every((query) => query.isError);
-  const historyState = resolveLoadState(
-    [performanceQueries.history],
-    performanceQueries.history.data !== undefined,
-    performanceQueries.history.data !== undefined && snapshots.length === 0,
-  );
-  const seriesState = resolveLoadState(
-    [performanceQueries.series],
-    performanceQueries.series.data !== undefined,
-    performanceQueries.series.data !== undefined &&
-      performanceQueries.series.data.points.length === 0,
-  );
-  const allocationState = resolveLoadState(
-    [
-      performanceQueries.layers,
-      // 目标配置单独展示“目标配置不可用”；它不应把当前估值标记为陈旧。
-      { isPending: performanceQueries.targets.isPending, isError: false },
-      performanceQueries.allocation,
-    ],
-    allocationResponse !== undefined,
-    allocationResponse !== undefined && allocationResponse.allocation.length === 0,
-  );
+  const {
+    snapshots,
+    summary,
+    layers,
+    allocationResponse,
+    targetsUnavailable,
+    targetsResponse,
+    targets,
+    latestSnapshot,
+    latest,
+    scopedTotal,
+    currentValue,
+    currentValuePartial,
+    currentPnl,
+    currentPnlRate,
+  } = currentPerformanceValuation(performanceQueries, effectiveAccountId);
+  const { scopeWideError, historyState, seriesState, allocationState } =
+    performanceRegionLoadStates(performanceQueries, snapshots, allocationResponse);
   const { refresh } = usePageRefresh([{ queryKey: performanceKeys.root }]);
-  const groupedTrend = !effectiveAccountId && mixedCurrencies &&
+  const groupedTrend =
+    !effectiveAccountId &&
+    mixedCurrencies &&
     (!effectiveFxMerge || layers?.fx?.status === 'blocked');
   const saveTargetsMutation = useSavePerformanceTargetsMutation();
   const savedTargetsRefreshFailed =
@@ -185,113 +176,272 @@ export function PerformanceDashboard({
     }
   };
 
+  return {
+    scopeWideError,
+    retry,
+    section,
+    latest,
+    summary,
+    snapshots,
+    latestSnapshot,
+    currentValue,
+    currentValuePartial,
+    currentPnl,
+    currentPnlRate,
+    scopedTotal,
+    effectiveAccountId,
+    effectiveFxMerge,
+    layers,
+    performanceQueries,
+    portfolio,
+    mode,
+    baseCurrency,
+    mixedCurrencies,
+    historyState,
+    seriesState,
+    selection,
+    setSeriesRange,
+    setSeriesInterval,
+    groupedTrend,
+    onNavigate,
+    savedTargetsRefreshFailed,
+    allocationState,
+    allocationResponse,
+    targets,
+    targetsUnavailable,
+    modeAccounts,
+    targetsResponse,
+    saveTargetsMutation,
+    targetSaveError,
+    setTargetSaveError,
+    retryAllocation,
+    saveTargets,
+  };
+}
+
+function DashboardMetrics({ control }: { control: ReturnType<typeof usePerformanceDashboard> }) {
   return (
-    <section className="flex min-w-0 flex-col gap-6">
-      {scopeWideError && <DataStateBanner state="error" onRetry={retry} />}
-      {section === 'analysis' && (
-        <div className="flex min-w-0 flex-col gap-group">
-          <p className="m-0 text-xs text-muted-foreground">全历史收益率</p>
-          <PerformanceMetrics
-            includeAssets={false}
-            latest={latest}
-            summary={summary}
-            snapshotCount={snapshots.length}
-            latestPartial={latestSnapshot?.partial === true}
-            currentValue={currentValue}
-            currentValuePartial={currentValuePartial}
-            currentPnl={currentPnl}
-            currentPnlRate={currentPnlRate}
-            currentCurrency={scopedTotal?.currency}
-            currencyTotals={
-              !effectiveAccountId && (!effectiveFxMerge || layers?.fx?.status === 'blocked')
-                ? (layers?.byCurrency ?? [])
-                : []
-            }
-            fx={layers?.fx ?? summary?.fx}
-            summaryError={
-              performanceQueries.summary.isError
-                ? '收益摘要暂不可用，请检查行情完整性后重试'
-                : undefined
-            }
-          />
-        </div>
-      )}
-      {section === 'analysis' && (
-        <div className="flex min-w-0 flex-col gap-4">
-          <PerformanceAnalysisTrend
-            portfolio={portfolio}
-            accountId={effectiveAccountId}
-            mode={mode}
-            baseCurrency={baseCurrency}
-            loadState={
-              !effectiveAccountId && mixedCurrencies && !effectiveFxMerge
-                ? historyState
-                : seriesState
-            }
-            snapshots={snapshots}
-            series={performanceQueries.series.data}
-            range={selection.range}
-            interval={selection.interval}
-            onRangeChange={(nextRange, defaultInterval) => {
-              setSeriesRange(nextRange);
-              setSeriesInterval(defaultInterval);
-            }}
-            onIntervalChange={setSeriesInterval}
-            groupedByCurrency={groupedTrend}
-            refreshing={performanceQueries.series.isFetching || (groupedTrend && performanceQueries.history.isFetching)}
-            onRetry={() =>
-              void Promise.all([
-                performanceQueries.history.refetch(),
-                performanceQueries.series.refetch(),
-              ])
-            }
-            onCompleteDataSetup={() => onNavigate('providers')}
-          />
-        </div>
-      )}
-      {section === 'allocation' && savedTargetsRefreshFailed && (
-        <DataStateBanner
-          state="error"
-          description="目标配置已保存，但比较数据刷新失败。本次保存已完成，请重新加载目标配置，无需再次提交。"
-        />
-      )}
-      {section === 'allocation' && (
-        <PerformanceAllocationSection
-          refreshing={performanceQueries.allocation.isRefetching || performanceQueries.targets.isRefetching || performanceQueries.layers.isRefetching}
-          key={`${mode}:${effectiveAccountId}:${effectiveFxMerge}:${baseCurrency}`}
-          loadState={allocationState}
-          allocationRows={allocationResponse?.allocation ?? []}
-          rebalanceRows={allocationResponse?.rebalance ?? []}
-          targets={targets}
-          dataQuality={
-            allocationResponse?.partial
-              ? {
-                  partial: true,
-                  missingSymbols: allocationResponse.missingSymbols,
-                }
-              : performanceQueries.quality
-          }
-          targetsUnavailable={targetsUnavailable}
-          portfolioScope={!effectiveAccountId}
-          targetScopeLabel={modeAccounts.find(account => account.id === effectiveAccountId)?.name ?? '全部账户'}
-          valuedAt={layers?.valuedAt}
-          fx={layers?.fx ?? summary?.fx}
-          currencyTotals={layers?.byCurrency ?? []}
-          allocationUnavailable={performanceQueries.allocationUnavailable}
-          targetVersion={targetsResponse?.version}
-          targetCreatedAt={targetsResponse?.createdAt}
-          targetSaving={saveTargetsMutation.isPending}
-          targetSaveError={targetSaveError}
-          onBeginTargetEdit={() => setTargetSaveError(null)}
-          editDisabled={
-            performanceQueries.targets.isPending ||
-            performanceQueries.allocationUnavailable ||
-            (targetsUnavailable && Boolean(effectiveAccountId))
-          }
-          onRetry={retryAllocation}
-          onSaveTargets={saveTargets}
-        />
-      )}
-    </section>
+    <>
+      <PerformanceMetrics
+        includeAssets={false}
+        latest={control.latest}
+        summary={control.summary}
+        snapshotCount={control.snapshots.length}
+        latestPartial={control.latestSnapshot?.partial === true}
+        currentValue={control.currentValue}
+        currentValuePartial={control.currentValuePartial}
+        currentPnl={control.currentPnl}
+        currentPnlRate={control.currentPnlRate}
+        currentCurrency={control.scopedTotal?.currency}
+        currencyTotals={
+          !control.effectiveAccountId &&
+          (!control.effectiveFxMerge || control.layers?.fx?.status === 'blocked')
+            ? (control.layers?.byCurrency ?? [])
+            : []
+        }
+        fx={control.layers?.fx ?? control.summary?.fx}
+        summaryError={
+          control.performanceQueries.summary.isError
+            ? '收益摘要暂不可用，请检查行情完整性后重试'
+            : undefined
+        }
+      />
+    </>
+  );
+}
+function DashboardTrend({ control }: { control: ReturnType<typeof usePerformanceDashboard> }) {
+  return (
+    <>
+      <PerformanceAnalysisTrend
+        portfolio={control.portfolio}
+        accountId={control.effectiveAccountId}
+        mode={control.mode}
+        baseCurrency={control.baseCurrency}
+        loadState={
+          !control.effectiveAccountId && control.mixedCurrencies && !control.effectiveFxMerge
+            ? control.historyState
+            : control.seriesState
+        }
+        snapshots={control.snapshots}
+        series={control.performanceQueries.series.data}
+        range={control.selection.range}
+        interval={control.selection.interval}
+        onRangeChange={(nextRange, defaultInterval) => {
+          control.setSeriesRange(nextRange);
+          control.setSeriesInterval(defaultInterval);
+        }}
+        onIntervalChange={control.setSeriesInterval}
+        groupedByCurrency={control.groupedTrend}
+        refreshing={
+          control.performanceQueries.series.isFetching ||
+          (control.groupedTrend && control.performanceQueries.history.isFetching)
+        }
+        onRetry={() =>
+          void Promise.all([
+            control.performanceQueries.history.refetch(),
+            control.performanceQueries.series.refetch(),
+          ])
+        }
+        onCompleteDataSetup={() => control.onNavigate('providers')}
+      />
+    </>
+  );
+}
+function DashboardAllocation({ control }: { control: ReturnType<typeof usePerformanceDashboard> }) {
+  return (
+    <>
+      <PerformanceAllocationSection
+        refreshing={
+          control.performanceQueries.allocation.isRefetching ||
+          control.performanceQueries.targets.isRefetching ||
+          control.performanceQueries.layers.isRefetching
+        }
+        key={`${control.mode}:${control.effectiveAccountId}:${control.effectiveFxMerge}:${control.baseCurrency}`}
+        loadState={control.allocationState}
+        allocationRows={control.allocationResponse?.allocation ?? []}
+        rebalanceRows={control.allocationResponse?.rebalance ?? []}
+        targets={control.targets}
+        dataQuality={
+          control.allocationResponse?.partial
+            ? {
+                partial: true,
+                missingSymbols: control.allocationResponse.missingSymbols,
+              }
+            : control.performanceQueries.quality
+        }
+        targetsUnavailable={control.targetsUnavailable}
+        portfolioScope={!control.effectiveAccountId}
+        targetScopeLabel={
+          control.modeAccounts.find((account) => account.id === control.effectiveAccountId)?.name ??
+          '全部账户'
+        }
+        valuedAt={control.layers?.valuedAt}
+        fx={control.layers?.fx ?? control.summary?.fx}
+        currencyTotals={control.layers?.byCurrency ?? []}
+        allocationUnavailable={control.performanceQueries.allocationUnavailable}
+        targetVersion={control.targetsResponse?.version}
+        targetCreatedAt={control.targetsResponse?.createdAt}
+        targetSaving={control.saveTargetsMutation.isPending}
+        targetSaveError={control.targetSaveError}
+        onBeginTargetEdit={() => control.setTargetSaveError(null)}
+        editDisabled={allocationEditDisabled(control)}
+        onRetry={control.retryAllocation}
+        onSaveTargets={control.saveTargets}
+      />
+    </>
+  );
+}
+
+function currentPerformanceValuation(
+  performanceQueries: ReturnType<typeof usePerformanceQueries>,
+  effectiveAccountId: string,
+) {
+  const snapshots = performanceQueries.history.data ?? [];
+  const summary = !performanceQueries.summary.isError
+    ? (performanceQueries.summary.data ?? null)
+    : null;
+  const layers = performanceQueries.layers.data;
+  const allocationResponse = performanceQueries.allocation.data;
+  const targetsUnavailable = performanceQueries.targets.isError;
+  const targetsResponse = !targetsUnavailable ? performanceQueries.targets.data : undefined;
+  const targets = targetsResponse?.targets ?? {};
+  const latestSnapshot = snapshots.at(-1);
+  const latest = [...snapshots].reverse().find((snapshot) => !snapshot.partial);
+  const { scopedTotal, currentValue, currentValuePartial, currentPnl, currentPnlRate } =
+    currentScopeValuation(layers, effectiveAccountId);
+  return {
+    snapshots,
+    summary,
+    layers,
+    allocationResponse,
+    targetsUnavailable,
+    targetsResponse,
+    targets,
+    latestSnapshot,
+    latest,
+    scopedTotal,
+    currentValue,
+    currentValuePartial,
+    currentPnl,
+    currentPnlRate,
+  };
+}
+
+function performanceRegionLoadStates(
+  performanceQueries: ReturnType<typeof usePerformanceQueries>,
+  snapshots: ReturnType<typeof currentPerformanceValuation>['snapshots'],
+  allocationResponse: ReturnType<typeof currentPerformanceValuation>['allocationResponse'],
+) {
+  const scopeHasData = [
+    performanceQueries.history,
+    performanceQueries.series,
+    performanceQueries.summary,
+    performanceQueries.layers,
+    performanceQueries.targets,
+  ].some((query) => query.data !== undefined);
+  const scopeWideError =
+    !scopeHasData &&
+    [
+      performanceQueries.history,
+      performanceQueries.series,
+      performanceQueries.summary,
+      performanceQueries.layers,
+      performanceQueries.targets,
+    ].every((query) => query.isError);
+  const historyState = resolveLoadState(
+    [performanceQueries.history],
+    performanceQueries.history.data !== undefined,
+    performanceQueries.history.data !== undefined && snapshots.length === 0,
+  );
+  const seriesState = resolveLoadState(
+    [performanceQueries.series],
+    performanceQueries.series.data !== undefined,
+    performanceQueries.series.data !== undefined &&
+      performanceQueries.series.data.points.length === 0,
+  );
+  const allocationState = resolveLoadState(
+    [
+      performanceQueries.layers,
+      // 目标配置单独展示“目标配置不可用”；它不应把当前估值标记为陈旧。
+      { isPending: performanceQueries.targets.isPending, isError: false },
+      performanceQueries.allocation,
+    ],
+    allocationResponse !== undefined,
+    allocationResponse !== undefined && allocationResponse.allocation.length === 0,
+  );
+  return { scopeWideError, historyState, seriesState, allocationState };
+}
+
+function currentScopeValuation(
+  layers: ReturnType<typeof usePerformanceQueries>['layers']['data'],
+  effectiveAccountId: string,
+) {
+  const scopedTotal = effectiveAccountId
+    ? layers?.account.find((record) => record.accountId === effectiveAccountId)
+    : layers?.portfolio;
+  const scopedSecurity =
+    layers?.security.filter(
+      (position) => !effectiveAccountId || position.accountId === effectiveAccountId,
+    ) ?? [];
+  const currentValue = scopedTotal ? scopedTotal.marketValue + scopedTotal.cashValue : undefined;
+  const currentValuePartial = scopedTotal?.partial ?? layers?.dataQuality.partial ?? false;
+  const currentCost = scopedSecurity.reduce((sum, position) => sum + position.costValue, 0);
+  const hasCompleteSecurity = scopedSecurity.every((position) => position.marketValue !== null);
+  const currentPnl =
+    scopedTotal && !scopedTotal.partial && hasCompleteSecurity
+      ? scopedSecurity.reduce(
+          (sum, position) => sum + (position.marketValue ?? 0) - position.costValue,
+          0,
+        )
+      : null;
+  const currentPnlRate = currentPnl !== null && currentCost > 0 ? currentPnl / currentCost : null;
+  return { scopedTotal, currentValue, currentValuePartial, currentPnl, currentPnlRate };
+}
+
+function allocationEditDisabled(control: ReturnType<typeof usePerformanceDashboard>) {
+  return (
+    control.performanceQueries.targets.isPending ||
+    control.performanceQueries.allocationUnavailable ||
+    (control.targetsUnavailable && Boolean(control.effectiveAccountId))
   );
 }

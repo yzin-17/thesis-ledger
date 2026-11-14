@@ -6,10 +6,16 @@ export function JournalAiExplanation({
   request,
   disabled,
   onRunSelected,
+  embedded = false,
+  autoStart = false,
+  onRunStatusChange,
 }: {
   request: JournalReviewSnapshotRequest;
   disabled: boolean;
   onRunSelected: (id: string | null) => void;
+  embedded?: boolean;
+  autoStart?: boolean;
+  onRunStatusChange?: (status: 'running' | 'succeeded' | 'failed') => void;
 }) {
   const api = getDesktopApiClient().journalReviews;
   return (
@@ -17,8 +23,10 @@ export function JournalAiExplanation({
       accountId={request.accountId}
       mode={request.mode}
       kind="object"
-      scope={request}
       disabled={disabled}
+      embedded={embedded}
+      autoStart={autoStart}
+      onRunStatusChange={onRunStatusChange}
       createRun={() => api.explain(request)}
       readRun={async (id, signal) => {
         const run = await api.explanation(
@@ -41,7 +49,7 @@ export function JournalAiExplanation({
           run.algorithmVersion !== request.expectedAlgorithmVersion ||
           draftKeys.some((key) => run.analysisDraft?.[key] !== request.analysisDraft?.[key])
         )
-          throw new Error('已保存的 AI 任务引用与本次输入不一致，请清除引用后重试');
+          throw new Error('本次 AI 解读与复盘输入不一致，请重新分析');
         return run;
       }}
       onRunSelected={onRunSelected}

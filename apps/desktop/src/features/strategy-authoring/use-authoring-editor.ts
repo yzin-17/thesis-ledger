@@ -28,82 +28,36 @@ export function useAuthoringEditor({
   onDirtyChange: (dirty: boolean) => void;
   onSaved: (strategyId: string, versionId: string) => void;
 }) {
-  const draft = useAuthoringDraft(ownerId, id);
-  const cache = useQueryClient();
-  const [modelKey, setModelKey] = useState('');
-  const [costAcknowledged, setCostAcknowledged] = useState(false);
-  const [operationId, setOperationId] = useState<string | null>(null);
-  const [proposal, setProposal] = useState<ProposalView>();
-  const [intent, setIntent] = useState('');
-  const [target, setTarget] = useState<AuthoringModificationTarget>('risk');
-  const [review, setReview] = useState<Awaited<ReturnType<typeof authoringApi.review>>>();
-  const [reviewed, setReviewed] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
-  const submission = useRef<{ body: Record<string, unknown>; key: string } | null>(null);
-  const models = useQuery({
-    queryKey: ['desktop', 'authoring-models'],
-    queryFn: fetchAuthoringModels,
-    staleTime: 60_000,
-    retry: false,
-  });
-  const selected = models.data?.find((model) => model.key === modelKey);
-  const historyKey = ['desktop', 'authoring-history', ownerId, id];
-  const history = useQuery({
-    queryKey: historyKey,
-    queryFn: () => authoringApi.history(id),
-    retry: false,
-    refetchInterval: (query) =>
-      query.state.data?.some((operation) => ['queued', 'running'].includes(operation.status))
-        ? 10_000
-        : false,
-  });
-  const selectedSummary = selectHistoryOperation(history.data, operationId);
-  const operation = useQuery({
-    queryKey: [
-      'desktop',
-      'authoring-operation',
-      ownerId,
-      selectedSummary?.id,
-      selectedSummary?.updatedAt,
-    ],
-    queryFn: () => authoringApi.operation(selectedSummary!.id),
-    enabled: Boolean(selectedSummary),
-    retry: false,
-  });
-  const existingProposal = useQuery({
-    queryKey: [
-      'desktop',
-      'authoring-proposal',
-      ownerId,
-      selectedSummary?.proposalId,
-      selectedSummary?.proposalStatus,
-    ],
-    queryFn: () => authoringApi.proposal(selectedSummary!.proposalId!),
-    enabled: Boolean(selectedSummary?.proposalId),
-    retry: false,
-  });
-  const active = history.data?.some((item) => ['queued', 'running'].includes(item.status)) ?? false;
-  const perform = useMutation({
-    mutationFn: async (action: () => Promise<unknown>) => {
-      setFailure(null);
-      return action();
-    },
-    onError: (error) => setFailure(authoringRequestFailure(error)),
-    onSuccess: () => {
-      void cache.invalidateQueries({ queryKey: historyKey });
-    },
-  });
-  const busy = perform.isPending || draft.busy;
-  useNavigationGuard({
-    dirty: draft.dirty,
+  const {
+    draft,
+    cache,
+    modelKey,
+    setModelKey,
+    costAcknowledged,
+    setCostAcknowledged,
+    setOperationId,
+    proposal,
+    setProposal,
+    intent,
+    setIntent,
+    target,
+    setTarget,
+    review,
+    setReview,
+    reviewed,
+    setReviewed,
+    failure,
+    submission,
+    models,
+    selected,
+    history,
+    operation,
+    existingProposal,
+    active,
+    perform,
     busy,
-    draft: { id, ownerId, content: draft.content, modelKey, intent, target },
-  });
-  const editing = draft.query.data?.state === 'editing';
-  useEffect(() => {
-    onDirtyChange(draft.dirty || draft.busy || perform.isPending);
-  }, [draft.dirty, draft.busy, perform.isPending, onDirtyChange]);
-  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
+    editing,
+  } = useAuthoringEditorState(id, ownerId, onDirtyChange);
   const submit = (kind: 'analyze' | 'generate' | 'modify') =>
     perform.mutate(async () => {
       const current = await draft.flush();
@@ -208,6 +162,7 @@ export function useAuthoringEditor({
       const current = await draft.flush();
       if (!current) return;
       await authoringApi.discardDraft(id, current.revision);
+      await cache.invalidateQueries({ queryKey: ['desktop', 'authoring-list', ownerId] });
       await draft.reload();
     });
   const recoverSubmission = () =>
@@ -300,5 +255,119 @@ function availableActions(
       generationReady &&
       Boolean(intent.trim()) &&
       authoringStrategySchema.safeParse(content.definitionText).success,
+  };
+}
+
+function useAuthoringEditorState(
+  id: string,
+  ownerId: string,
+  onDirtyChange: (dirty: boolean) => void,
+) {
+  const draft = useAuthoringDraft(ownerId, id);
+  const cache = useQueryClient();
+  const [modelKey, setModelKey] = useState('');
+  const [costAcknowledged, setCostAcknowledged] = useState(false);
+  const [operationId, setOperationId] = useState<string | null>(null);
+  const [proposal, setProposal] = useState<ProposalView>();
+  const [intent, setIntent] = useState('');
+  const [target, setTarget] = useState<AuthoringModificationTarget>('risk');
+  const [review, setReview] = useState<Awaited<ReturnType<typeof authoringApi.review>>>();
+  const [reviewed, setReviewed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const submission = useRef<{ body: Record<string, unknown>; key: string } | null>(null);
+  const models = useQuery({
+    queryKey: ['desktop', 'authoring-models'],
+    queryFn: fetchAuthoringModels,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const selected = models.data?.find((model) => model.key === modelKey);
+  const historyKey = ['desktop', 'authoring-history', ownerId, id];
+  const history = useQuery({
+    queryKey: historyKey,
+    queryFn: () => authoringApi.history(id),
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.some((operation) => ['queued', 'running'].includes(operation.status))
+        ? 10_000
+        : false,
+  });
+  const selectedSummary = selectHistoryOperation(history.data, operationId);
+  const operation = useQuery({
+    queryKey: [
+      'desktop',
+      'authoring-operation',
+      ownerId,
+      selectedSummary?.id,
+      selectedSummary?.updatedAt,
+    ],
+    queryFn: () => authoringApi.operation(selectedSummary!.id),
+    enabled: Boolean(selectedSummary),
+    retry: false,
+  });
+  const existingProposal = useQuery({
+    queryKey: [
+      'desktop',
+      'authoring-proposal',
+      ownerId,
+      selectedSummary?.proposalId,
+      selectedSummary?.proposalStatus,
+    ],
+    queryFn: () => authoringApi.proposal(selectedSummary!.proposalId!),
+    enabled: Boolean(selectedSummary?.proposalId),
+    retry: false,
+  });
+  const active = history.data?.some((item) => ['queued', 'running'].includes(item.status)) ?? false;
+  const perform = useMutation({
+    mutationFn: async (action: () => Promise<unknown>) => {
+      setFailure(null);
+      return action();
+    },
+    onError: (error) => setFailure(authoringRequestFailure(error)),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: historyKey });
+    },
+  });
+  const busy = perform.isPending || draft.busy;
+  useNavigationGuard({
+    dirty: draft.dirty,
+    busy,
+    draft: { id, ownerId, content: draft.content, modelKey, intent, target },
+  });
+  const editing = draft.query.data?.state === 'editing';
+  useEffect(() => {
+    onDirtyChange(draft.dirty || draft.busy || perform.isPending);
+  }, [draft.dirty, draft.busy, perform.isPending, onDirtyChange]);
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
+  return {
+    draft,
+    cache,
+    modelKey,
+    setModelKey,
+    costAcknowledged,
+    setCostAcknowledged,
+    operationId,
+    setOperationId,
+    proposal,
+    setProposal,
+    intent,
+    setIntent,
+    target,
+    setTarget,
+    review,
+    setReview,
+    reviewed,
+    setReviewed,
+    failure,
+    submission,
+    models,
+    selected,
+    history,
+    operation,
+    existingProposal,
+    active,
+    perform,
+    busy,
+    editing,
   };
 }

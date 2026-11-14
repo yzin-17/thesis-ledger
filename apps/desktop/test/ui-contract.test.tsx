@@ -121,6 +121,9 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
     expect(tabsSource).toContain('[&>div:first-child>.panel:first-child]:border-t-0');
   });
 
+});
+
+describe('首次配置与完成状态', () => {
   it('normalizes legacy health history arrays while supporting paginated responses', () => {
     const legacyPage = normalizeProviderHealthHistory(
       [
@@ -278,6 +281,9 @@ describe('Desktop UI contract - onboarding and portfolio', () => {
     ).toBe(false);
   });
 
+});
+
+describe('组合功能模块入口', () => {
   it('renders portfolio feature state directly without the App compatibility barrel', () => {
     const accountStep = renderWithToast(
       <PortfolioManagement accounts={[]} positions={[]} step="account" onSaved={vi.fn()} />,
@@ -366,7 +372,9 @@ describe('Desktop UI contract - providers and primitives', () => {
       <DateInput type="month" name="plan-start" value="2026-09" onChange={vi.fn()} />,
     );
 
-    expect(dateMarkup).toContain('>2026-09-02</span>');
+    expect(dateMarkup).toContain('type="text"');
+    expect(dateMarkup).toContain('value="2026-09-02"');
+    expect(dateMarkup).not.toContain('text-transparent');
     expect(dateMarkup).toContain('type="date"');
     expect(dateMarkup).toContain('name="review-start"');
     expect(dateMarkup).toContain('min="2026-01-01"');
@@ -374,13 +382,13 @@ describe('Desktop UI contract - providers and primitives', () => {
     expect(dateMarkup).toContain('required');
     expect(dateMarkup).toContain('data-slot="date-input"');
     expect(dateMarkup).toContain('<svg');
-    expect(dateTimeMarkup).toContain('>2026-09-02 03:04:56</span>');
+    expect(dateTimeMarkup).toContain('value="2026-09-02 03:04:56"');
     expect(dateTimeMarkup).toContain('type="datetime-local"');
     expect(dateTimeMarkup).toContain('name="review-at"');
     expect(dateTimeMarkup).toContain('step="60"');
     expect(dateTimeMarkup).toContain('aria-invalid="true"');
-    expect(emptyDateTimeMarkup).toContain('>YYYY-MM-DD HH:mm</span>');
-    expect(monthMarkup).toContain('>2026-09</span>');
+    expect(emptyDateTimeMarkup).toContain('placeholder="请选择日期"');
+    expect(monthMarkup).toContain('value="2026-09"');
     expect(monthMarkup).toContain('type="month"');
     expect(monthMarkup).toContain('name="plan-start"');
   });
@@ -412,6 +420,9 @@ describe('Desktop UI contract - providers and primitives', () => {
     expect(markup).toContain('data-checked:translate-x-5');
   });
 
+});
+
+describe('标的搜索及导入审核', () => {
   it('renders instrument search and selected instrument state directly', () => {
     const initial = renderToStaticMarkup(
       <InstrumentCombobox
@@ -496,6 +507,9 @@ describe('Desktop UI contract - providers and primitives', () => {
     expect(markup).toContain('创建账户');
   });
 
+});
+
+describe('Provider 与通知组件上下文', () => {
   it('keeps provider credential helper semantics stable', () => {
     const testedWebhook = 'https://open.feishu.cn/open-apis/bot/v2/hook/tested';
     expect(

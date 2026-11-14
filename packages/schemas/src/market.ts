@@ -13,6 +13,8 @@ import { marketQuoteSymbolSchema } from './market-quote-identity.js';
 import { fundDisclosureEvidenceSchema } from './fund-disclosure-evidence.js';
 import { marketStaleReasonSchema, quoteStaleReasonSchema } from './market-stale-reason.js';
 import { marketQuoteSessionSchema } from './market-quote-session.js';
+import { marketQuoteExecutionFactsSchema } from './market-quote-execution-facts.js';
+import { marketUsLiveRulesSchema } from './market-us-live-rules.js';
 export { marketQuoteSessionSchema, type MarketQuoteSession } from './market-quote-session.js';
 export { marketSessionSchema, type MarketSession } from './market-session.js';
 export { marketStaleReasonSchema, quoteStaleReasonSchema, type MarketStaleReason, type QuoteStaleReason } from './market-stale-reason.js';
@@ -74,6 +76,8 @@ export const quoteSchema = z
     refreshFailure: z.enum(['budget_cooldown', 'fetch_failed', 'cache_unavailable']).optional(),
     staleReason: quoteStaleReasonSchema.optional(),
     sessionContext: marketQuoteSessionSchema.optional(),
+    executionFacts: marketQuoteExecutionFactsSchema.optional(),
+    executionRules: marketUsLiveRulesSchema.optional(),
     units: z
       .object({
         priceCurrency: currencySchema,
@@ -84,14 +88,8 @@ export const quoteSchema = z
   })
   .merge(provenanceSchema.omit({ marketTime: true }))
   .extend({ marketTime: isoDate.nullable() })
-  .refine(
-    (quote) => quote.high >= Math.max(quote.open, quote.low, quote.price),
-    '最高价低于其他价格',
-  )
-  .refine(
-    (quote) => quote.low <= Math.min(quote.open, quote.high, quote.price),
-    '最低价高于其他价格',
-  );
+  .refine((quote) => quote.high >= Math.max(quote.open, quote.low, quote.price), '最高价低于其他价格')
+  .refine((quote) => quote.low <= Math.min(quote.open, quote.high, quote.price), '最低价高于其他价格');
 
 export const chipDistributionSchema = z.object({
   version: z.literal(3),
@@ -218,6 +216,7 @@ export const providerManifestSchema = z.object({
   credentialConfigured: z.boolean(),
   requiresCredential: z.boolean().optional(),
   accountAccessSupported: z.boolean().optional(),
+  accountLevelSupported: z.boolean().optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
   origin: z.enum(['dsa']).optional(),
   markets: z.array(z.string().min(1)).optional(),

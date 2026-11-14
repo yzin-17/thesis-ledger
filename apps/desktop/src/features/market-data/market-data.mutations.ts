@@ -12,6 +12,7 @@ import type {
   MarketPolicyDraftV3,
   ProviderManifest,
   ProviderCredentialDraft,
+  InstrumentResult,
 } from './market-data.types.js';
 
 export const useSaveMarketPolicyMutation = () => {
@@ -20,6 +21,7 @@ export const useSaveMarketPolicyMutation = () => {
     mutationFn: (policy: MarketPolicyDraftV3) => saveMarketPolicy(policy),
     onSuccess: async (policy) => {
       client.setQueryData(marketDataKeys.policy(), policy);
+      await client.invalidateQueries({ queryKey: [...marketDataKeys.root, 'routing-config'] });
       await client.invalidateQueries({ queryKey: marketDataKeys.routeCapabilities() });
     },
   });
@@ -31,6 +33,7 @@ export const useRetryMarketPolicyMutation = () => {
     mutationFn: retryMarketPolicy,
     onSuccess: async (policy) => {
       client.setQueryData(marketDataKeys.policy(), policy);
+      await client.invalidateQueries({ queryKey: [...marketDataKeys.root, 'routing-config'] });
       await client.invalidateQueries({ queryKey: marketDataKeys.routeCapabilities() });
     },
   });
@@ -53,6 +56,7 @@ export const useRemoveMarketProviderMutation = () => {
     mutationFn: (provider: ProviderManifest) => removeMarketProvider(provider.providerId),
     onSuccess: async (result) => {
       if (result.policy) client.setQueryData(marketDataKeys.policy(), result.policy);
+      await client.invalidateQueries({ queryKey: [...marketDataKeys.root, 'routing-config'] });
       await Promise.all([
         client.invalidateQueries({ queryKey: marketDataKeys.providers() }),
         client.invalidateQueries({ queryKey: marketDataKeys.routeCapabilities() }),
@@ -67,7 +71,12 @@ export const useConfirmInstrumentMutation = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: confirmMarketInstrument,
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: [...marketDataKeys.root, 'instruments'] }),
+    onSuccess: async (_result, instrumentId) => {
+      const queryKey = [...marketDataKeys.root, 'instruments'];
+      await client.cancelQueries({ queryKey });
+      client.setQueriesData<InstrumentResult[]>({ queryKey }, (items) => items?.map((item) =>
+        item.id === instrumentId ? { ...item, confirmed: true } : item));
+      await client.invalidateQueries({ queryKey });
+    },
   });
 };

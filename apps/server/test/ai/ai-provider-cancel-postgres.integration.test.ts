@@ -28,65 +28,9 @@ isolated('用途取消：公开 HTTP、真实 SDK、本机 SSE 与隔离 Postgre
   });
 
   it('用户取消关闭上游，不发第二用途，保留未知用量及原配置', async () => {
-    const started = deferred();
-    const disconnected = deferred();
-    const requests: Array<{
-      path: string;
-      model: string;
-      format: string;
-      stream: boolean;
-      promptHash: string;
-    }> = [];
-    const allowedOrigins = new Set<string>();
-    const blocked: string[] = [];
-    let streaming: ServerResponse | undefined;
-    const upstream = createServer(async (request, response) => {
-      let raw = '';
-      for await (const chunk of request) raw += chunk.toString();
-      const body = JSON.parse(raw);
-      requests.push({
-        path: request.url ?? '',
-        model: body.model,
-        format: body.response_format?.type,
-        stream: body.stream === true,
-        promptHash: createHash('sha256').update(JSON.stringify(body.messages)).digest('hex'),
-      });
-      response.writeHead(200, { 'content-type': 'text/event-stream' });
-      response.flushHeaders();
-      streaming = response;
-      const frame = () =>
-        response.write(
-          `data: ${JSON.stringify({
-            id: 'isolated-cancellation',
-            object: 'chat.completion.chunk',
-            created: 1,
-            model: 'model',
-            choices: [{ index: 0, delta: { content: ' ' }, finish_reason: null }],
-          })}\n\n`,
-        );
-      frame();
-      const timer = setInterval(frame, 20);
-      response.on('close', () => {
-        clearInterval(timer);
-        disconnected.resolve();
-      });
-      started.resolve();
-    });
-    upstream.listen(0, '127.0.0.1');
-    await once(upstream, 'listening');
-    const address = upstream.address();
-    if (!address || typeof address === 'string') throw new Error('隔离假上游地址缺失');
-    const upstreamOrigin = `http://127.0.0.1:${address.port}`;
-    allowedOrigins.add(upstreamOrigin);
-    const fetchOriginal = globalThis.fetch;
-    vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : String(input));
-      if (!allowedOrigins.has(url.origin)) {
-        blocked.push(url.origin);
-        throw new Error('隔离取消验收禁止访问非所属上游或 API');
-      }
-      return fetchOriginal(input, { ...init, redirect: 'error' });
-    });
+    const upstreamFixture = await cancellationUpstream();
+    const { started, disconnected, requests, allowedOrigins, blocked, upstream, upstreamOrigin } =
+      upstreamFixture;
     let running: Promise<{ status: number; body: unknown }> | undefined;
     try {
       const sdk = new AiSdkGenerationAdapter();
@@ -266,7 +210,7 @@ isolated('用途取消：公开 HTTP、真实 SDK、本机 SSE 与隔离 Postgre
           ) + '\n',
         );
     } finally {
-      streaming?.destroy();
+      upstreamFixture.streaming?.destroy();
       if (running) await running.catch(() => undefined);
       upstream.closeAllConnections();
       upstream.close();
@@ -274,3 +218,78 @@ isolated('用途取消：公开 HTTP、真实 SDK、本机 SSE 与隔离 Postgre
     }
   }, 15000);
 });
+
+async function cancellationUpstream() {
+  const started = deferred();
+  const disconnected = deferred();
+  const requests: Array<{
+    path: string;
+    model: string;
+    format: string;
+    stream: boolean;
+    promptHash: string;
+  }> = [];
+  const allowedOrigins = new Set<string>();
+  const blocked: string[] = [];
+  let streaming: ServerResponse | undefined;
+  const upstream = createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk.toString();
+    const body = JSON.parse(raw);
+    requests.push({
+      path: request.url ?? '',
+      model: body.model,
+      format: body.response_format?.type,
+      stream: body.stream === true,
+      promptHash: createHash('sha256').update(JSON.stringify(body.messages)).digest('hex'),
+    });
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.flushHeaders();
+    streaming = response;
+    const frame = () =>
+      response.write(
+        `data: ${JSON.stringify({
+          id: 'isolated-cancellation',
+          object: 'chat.completion.chunk',
+          created: 1,
+          model: 'model',
+          choices: [{ index: 0, delta: { content: ' ' }, finish_reason: null }],
+        })}\n\n`,
+      );
+    frame();
+    const timer = setInterval(frame, 20);
+    response.on('close', () => {
+      clearInterval(timer);
+      disconnected.resolve();
+    });
+    started.resolve();
+  });
+  upstream.listen(0, '127.0.0.1');
+  await once(upstream, 'listening');
+  const address = upstream.address();
+  if (!address || typeof address === 'string') throw new Error('隔离假上游地址缺失');
+  const upstreamOrigin = `http://127.0.0.1:${address.port}`;
+  allowedOrigins.add(upstreamOrigin);
+  const fetchOriginal = globalThis.fetch;
+  vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    if (!allowedOrigins.has(url.origin)) {
+      blocked.push(url.origin);
+      throw new Error('隔离取消验收禁止访问非所属上游或 API');
+    }
+    return fetchOriginal(input, { ...init, redirect: 'error' });
+  });
+
+  return {
+    started,
+    disconnected,
+    requests,
+    allowedOrigins,
+    blocked,
+    upstream,
+    upstreamOrigin,
+    get streaming() {
+      return streaming;
+    },
+  };
+}

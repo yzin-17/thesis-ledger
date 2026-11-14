@@ -172,8 +172,18 @@ export function ResearchDetailSheet(
         showCloseButton={false}
         className="max-[1023px]:w-full max-[1023px]:max-w-none"
       >
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-4 right-4"
+          aria-label="关闭研究详情"
+          onClick={props.onClose}
+        >
+          <X aria-hidden="true" />
+        </Button>
         <SheetHeader>
-          <SheetTitle className="line-clamp-2 pr-0">{props.detailTitle}</SheetTitle>
+          <SheetTitle className="line-clamp-2 pr-8">{props.detailTitle}</SheetTitle>
           <SheetDescription>
             {props.selectedIndex >= 0
               ? `已加载范围第 ${props.selectedIndex + 1} 条，共 ${props.navigationIds.length} 条`
@@ -194,15 +204,6 @@ export function ResearchDetailSheet(
               onClick={props.onRead}
             >
               <Expand aria-hidden="true" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="关闭研究详情"
-              onClick={props.onClose}
-            >
-              <X aria-hidden="true" />
             </Button>
           </div>
         </SheetHeader>

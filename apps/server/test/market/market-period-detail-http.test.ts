@@ -20,10 +20,11 @@ import {
 import { periodViewFixture, refreshSourceFingerprint } from './market-period-view.fixture.js';
 import { planMarketPeriodWindow } from '../../src/market/market-period-window.js';
 
-describe('派生详情与实际日历/口径能力 HTTP', () => {
-  let app: INestApplication | undefined;
-  let fixture = periodViewFixture();
-  const calendar = {
+let app: INestApplication | undefined;
+
+let fixture = periodViewFixture();
+
+const calendar = {
     read: vi.fn(async (input: { start: string; end: string }) => ({
       status: 'ready',
       calendar: {
@@ -36,8 +37,10 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
       },
     })),
   };
-  const native = { readChartV3: vi.fn(async () => fixture.source) };
-  const detail = {
+
+const native = { readChartV3: vi.fn(async () => fixture.source) };
+
+const detail = {
     resolveIdentity: vi.fn(async (symbol: string) => ({
       symbol,
       assetType: symbol.endsWith('.OF') ? 'MUTUAL_FUND' : 'ETF',
@@ -55,7 +58,8 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
       dependencies: {},
     })),
   };
-  const chart = {
+
+const chart = {
     options: vi.fn(async () => ({
       contractVersion: 3,
       mode: 'v3',
@@ -67,7 +71,8 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
       })),
     })),
   };
-  const dsa = {
+
+const dsa = {
     calculateIndicators: vi.fn(),
     calculatePeriodIndicators: vi.fn(
       async (input: Parameters<DsaClient['calculatePeriodIndicators']>[0]) => ({
@@ -85,18 +90,21 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
       }),
     ),
   };
-  beforeEach(() => {
+
+beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-04T00:00:00Z'));
     fixture = periodViewFixture();
   });
-  afterEach(async () => {
+
+afterEach(async () => {
     await app?.close();
     app = undefined;
     vi.useRealTimers();
     vi.clearAllMocks();
   });
-  async function request(
+
+async function request(
     endpoint: string,
     params: Record<string, string> = {},
     symbol = '510300.SH',
@@ -135,6 +143,8 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     return fetch(url);
   }
+
+describe("周期详情数据与指标降级", () => {
   it.each(['5d', '1w', '1mo', '1y'] as const)(
     '%s 详情返回派生 bars，不调用原生日线详情装配',
     async (timeframe) => {
@@ -149,6 +159,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
       expect(detail.getDetail).not.toHaveBeenCalled();
     },
   );
+
   it('bars/两种指标只获取一次真实日线，显示/计算分别绑定', async () => {
     fixture = periodViewFixture('1w', true);
     const response = await request('detail', {
@@ -166,6 +177,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     expect(native.readChartV3).toHaveBeenCalledOnce();
     expect(dsa.calculatePeriodIndicators).toHaveBeenCalledOnce();
   });
+
   it('年度指标预算不足不覆盖年线 bars，不调用 DSA', async () => {
     fixture = periodViewFixture('1y');
     const response = await request('detail', {
@@ -182,6 +194,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     expect(native.readChartV3).toHaveBeenCalledOnce();
     expect(dsa.calculatePeriodIndicators).not.toHaveBeenCalled();
   });
+
   it('DSA 故障只降级指标，bars 和 DAILY_BAR 仍 ready', async () => {
     fixture = periodViewFixture('1w', true);
     dsa.calculatePeriodIndicators.mockRejectedValueOnce(new Error('transport'));
@@ -196,6 +209,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     expect(result.sections['indicator:MA']?.status).toBe('unavailable');
     expect(native.readChartV3).toHaveBeenCalledOnce();
   });
+
   it('单一指标预热超限不阻止同周期较短预热指标', async () => {
     fixture = periodViewFixture('1mo', true);
     const plan = planMarketPeriodWindow({
@@ -220,6 +234,9 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     expect(result.sections['indicator:MACD']?.status).toBe('ready');
     expect(native.readChartV3).toHaveBeenCalledOnce();
   });
+});
+
+describe("周期详情来源及能力门禁", () => {
   it('来源故障保留非行情分段且不重试', async () => {
     native.readChartV3.mockRejectedValueOnce(new Error('transport'));
     const response = await request('detail', {
@@ -233,6 +250,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     expect(result.sections.bars?.status).toBe('unavailable');
     expect(native.readChartV3).toHaveBeenCalledOnce();
   });
+
   it('非法指标/日期仍为 400，基金派生详情为 422', async () => {
     for (const params of [{ indicatorParams: '{"period":201}' }, { start: '2026-02-30' }])
       expect(
@@ -250,6 +268,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     expect(native.readChartV3).not.toHaveBeenCalled();
     expect(detail.getDetail).not.toHaveBeenCalled();
   });
+
   it('周期能力绑定真实日历及实际基础窗口，年度指标独立不可得，不获取行情', async () => {
     const response = await request('period-options', { barsLimit: '2', adjustment: 'qfq' });
     expect(response.status).toBe(200);
@@ -267,6 +286,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     expect(native.readChartV3).not.toHaveBeenCalled();
     expect(dsa.calculatePeriodIndicators).not.toHaveBeenCalled();
   });
+
   it('所选口径无路由不声明派生，且不读取日历', async () => {
     chart.options.mockResolvedValueOnce({
       contractVersion: 3,
@@ -280,6 +300,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     ).toBe(true);
     expect(calendar.read).not.toHaveBeenCalled();
   });
+
   it('日历不可得不声明周期，基金也不声明派生', async () => {
     calendar.read.mockResolvedValueOnce({
       status: 'unavailable',
@@ -298,6 +319,7 @@ describe('派生详情与实际日历/口径能力 HTTP', () => {
     ).toBe(true);
     expect(native.readChartV3).not.toHaveBeenCalled();
   });
+
   it('周期能力的非法口径/条数/日期在日历与路由前拒绝', async () => {
     for (const params of [
       { adjustment: 'invalid' },

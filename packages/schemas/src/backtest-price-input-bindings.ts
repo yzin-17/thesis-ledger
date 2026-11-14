@@ -5,7 +5,7 @@ export const backtestPriceInputBindingsSchemaV3 = z
     signals: z.array(
       z.strictObject({
         sourceId: z.string().trim().min(1),
-        binding: z.literal('execution-series'),
+        binding: z.enum(['execution-series', 'actual-price-series']),
       }),
     ),
     benchmark: z.strictObject({ binding: z.literal('execution-series') }),

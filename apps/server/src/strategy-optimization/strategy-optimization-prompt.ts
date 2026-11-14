@@ -16,6 +16,8 @@ import {
   optimizationModelResearchNotice,
 } from './strategy-optimization-model-feedback.js';
 
+export const STRATEGY_OPTIMIZATION_PROMPT_VERSION = 'strategy-optimization-v2';
+
 const outputInstructions = (sourceMode: ExperimentRow['sourceMode'], useSdkContract: boolean) => {
   if (!useSdkContract) return '';
   const contract =

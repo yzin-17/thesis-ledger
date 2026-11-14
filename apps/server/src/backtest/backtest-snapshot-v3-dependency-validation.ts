@@ -47,17 +47,7 @@ export const validateSnapshotDependencyArtifactsV3 = (
   if (evidenceArtifact.rows.length !== requests.length) {
     fail('Snapshot V3 依赖证明行数与依赖计划不一致。');
   }
-  const evidenceByKey = new Map<string, ArtifactRow>();
-  for (const row of evidenceArtifact.rows) {
-    if (
-      row.kind !== 'snapshot-dependency-evidence-v3' ||
-      typeof row.artifactKey !== 'string' ||
-      evidenceByKey.has(row.artifactKey)
-    ) {
-      fail('Snapshot V3 依赖证明行类型、key 或唯一性无效。');
-    }
-    evidenceByKey.set(row.artifactKey, row);
-  }
+  const evidenceByKey = indexDependencyEvidenceRows(evidenceArtifact.rows);
 
   const providerRevisions: Record<string, string> = {};
   const corporateActionResponses: Record<string, BacktestCorporateActionsResponse> = {};
@@ -85,8 +75,10 @@ export const validateSnapshotDependencyArtifactsV3 = (
       corporateActionResponses[request.identity] = event.response;
       continue;
     }
-    const sourceResponse = request.purpose === 'instrumentFacts' && request.request.identityOnly
-      ? parseCanonicalJson(proof, 'sourceResponse') : serializedResponse;
+    const sourceResponse =
+      request.purpose === 'instrumentFacts' && request.request.identityOnly
+        ? parseCanonicalJson(proof, 'sourceResponse')
+        : serializedResponse;
     const validated = validateSnapshotDependencyResponseV3(input, request, sourceResponse);
     const expectedProof = snapshotDependencyEvidenceRowV3(
       request,
@@ -95,7 +87,10 @@ export const validateSnapshotDependencyArtifactsV3 = (
       validated.rows,
       sourceResponse,
     );
-    if (proof.sourceResponse === undefined && !(request.purpose === 'instrumentFacts' && request.request.identityOnly)) {
+    if (
+      proof.sourceResponse === undefined &&
+      !(request.purpose === 'instrumentFacts' && request.request.identityOnly)
+    ) {
       delete expectedProof.sourceResponse;
     }
     if (!sameCanonicalValue(proof, expectedProof)) {
@@ -112,3 +107,18 @@ export const validateSnapshotDependencyArtifactsV3 = (
   validateSnapshotCorporateActionPlanV3(input, corporateActionResponses);
   return { artifacts, providerRevisions, corporateActionResponses };
 };
+
+function indexDependencyEvidenceRows(rows: readonly ArtifactRow[]) {
+  const evidenceByKey = new Map<string, ArtifactRow>();
+  for (const row of rows) {
+    if (
+      row.kind !== 'snapshot-dependency-evidence-v3' ||
+      typeof row.artifactKey !== 'string' ||
+      evidenceByKey.has(row.artifactKey)
+    ) {
+      fail('Snapshot V3 依赖证明行类型、key 或唯一性无效。');
+    }
+    evidenceByKey.set(row.artifactKey, row);
+  }
+  return evidenceByKey;
+}

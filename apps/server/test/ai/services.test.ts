@@ -50,6 +50,9 @@ describe('AI 运行审计', () => {
     await expect(service.list()).resolves.toHaveLength(2);
   });
 
+});
+
+describe("研究创建与冻结执行归属", () => {
   it('研究启动保存问题、精确上下文和重试关系，列表支持状态筛选', async () => {
     const create = vi.fn(async ({ data }: { data: object }) => ({ id: 'run-2', ...data }));
     const findMany = vi.fn(async () => [{ id: 'run-2', status: 'queued', question: '风险？' }]);
@@ -257,6 +260,9 @@ describe('AI 运行审计', () => {
     );
   });
 
+});
+
+describe("研究列表与决策时间线", () => {
   it('列表只向客户端暴露脱敏后的 Provider fallback 摘要', async () => {
     const service = new AiRunService({
       aiRun: {

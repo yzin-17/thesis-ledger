@@ -85,8 +85,11 @@ export function verifyResearchNumericEvidenceV2(frozen: AiFrozenResearchV2, raw:
     }
     const left = actualField(claim.operands[0], evidence);
     const right = actualField(claim.operands[1], evidence);
-    if (!sameUnit(derivedIdentity(claim), claim))
-      throw new Error('派生结果单位或币种不符合运算合同');
+    const expected = derivedIdentity(claim);
+    if (!sameUnit(expected, claim))
+      throw new Error(
+        `派生结果单位或币种不符合运算合同：${claim.operation} 应为 ${expected.unit}/${expected.currency ?? 'null'}，模型返回 ${claim.unit}/${claim.currency ?? 'null'}`,
+      );
     const actual = derivedValue(claim.operation, left, right);
     const value = actual.toNumber();
     if (

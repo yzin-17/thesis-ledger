@@ -18,11 +18,15 @@ export class InstrumentDisplayService {
     private readonly directory: InstrumentDirectoryService = new InstrumentDirectoryService(prisma),
   ) {}
 
+  resolveDirectory(symbols: readonly string[], transaction?: Prisma.TransactionClient) {
+    return this.directory.resolveSymbols(symbols, transaction);
+  }
+
   async resolve(
     symbols: readonly string[],
     transaction?: Prisma.TransactionClient,
   ): Promise<InstrumentDisplayNames> {
-    const directory = await this.directory.resolveSymbols(symbols, transaction);
+    const directory = await this.resolveDirectory(symbols, transaction);
     const bySymbol = keyBy(directory.items, (item) => item.symbol);
     return {
       generation: directory.generation,

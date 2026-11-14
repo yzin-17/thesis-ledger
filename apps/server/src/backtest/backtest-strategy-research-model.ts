@@ -13,6 +13,7 @@ export function strategyResearchExecutionModel(
   request: BacktestModelResolutionRequest,
   strategy: Pick<BacktestStrategy, 'cost' | 'executionInstrument'>,
   configuredAt: string,
+  sourceReference = `strategy-version:${request.strategyVersionId}`,
 ) {
   const instrument = strategy.executionInstrument;
   const normalized = request.adjustment !== 'none';
@@ -45,7 +46,7 @@ export function strategyResearchExecutionModel(
           kind: 'researchPreset',
           configuredAt,
           description: '策略回测研究默认规则。',
-          references: [`app:${policyVersion}`, `strategy-version:${request.strategyVersionId}`],
+          references: [`app:${policyVersion}`, sourceReference],
           revision: policyVersion,
         },
         assumptions: notes,

@@ -108,7 +108,7 @@ describe('回测列表与详情往返', () => {
     expect(document.querySelector('table')).toBeNull();
     expect(document.body.textContent?.replace(/\s/g, '')).not.toContain('共0项');
     await act(async () => resolve({ ...page, items: [], totalCount: 0 }));
-    await waitFor(() => expect(document.body.textContent).toContain('没有匹配的回测任务'));
+    await waitFor(() => expect(document.body.textContent).toContain('还没有回测任务'));
     expect(document.body.textContent?.replace(/\s/g, '')).toContain('共0项');
   });
 

@@ -19,6 +19,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 const input = () => host.querySelector<HTMLInputElement>('input')!;
+const editorInput = () => host.querySelector<HTMLInputElement>('input[type="text"]')!;
 const formValue = () => new FormData(host.querySelector('form')!).get('at');
 const click = async (element: HTMLElement) => act(async () => element.click());
 const open = () => click(host.querySelector<HTMLButtonElement>('button')!);
@@ -126,12 +127,12 @@ it('非受控日期支持键盘编辑、原生校验与表单重置', async () =
   );
   await edit(input(), '2026-11-12');
   expect(formValue()).toBe('2026-11-12');
-  expect(host.textContent).toContain('2026-11-12');
+  expect(editorInput().value).toBe('2026-11-12');
   await edit(input(), '2026-12-01');
   expect(input().validity.rangeOverflow).toBe(true);
   await act(async () => host.querySelector('form')!.reset());
   expect(formValue()).toBe('2026-11-06');
-  expect(host.textContent).toContain('2026-11-06');
+  expect(editorInput().value).toBe('2026-11-06');
 });
 
 it.each([{ disabled: true }, { readOnly: true }])(
@@ -206,4 +207,122 @@ it('日期时间边界与步长由原生输入判定，非法选择可恢复', a
   await edit(panel().querySelector<HTMLInputElement>('input[type="time"]')!, '12:15');
   expect(formValue()).toBe('2026-11-06T12:15');
   expect(panel().querySelector('[role="alert"]')).toBeNull();
+});
+
+it.each([
+  ['date', '2026-11-06', '2026-11-07'],
+  ['month', '2026-11', '2026-12'],
+  ['datetime-local', '2026-11-06T12:34:56.789', '2026-11-07 08:09:10.123'],
+] as const)('文本编辑、聚焦和提交使用统一格式：%s', async (type, initial, next) => {
+  const changed = vi.fn();
+  await act(async () =>
+    root.render(
+      <form>
+        <DateInput
+          name="at"
+          type={type}
+          defaultValue={initial}
+          step="any"
+          onChange={(event) => changed(event.target.value)}
+        />
+      </form>,
+    ),
+  );
+  const visible = editorInput();
+  await act(async () => visible.focus());
+  expect(visible.value).toBe(initial.replace('T', ' '));
+  expect(visible.type).toBe('text');
+  expect(changed).not.toHaveBeenCalled();
+  await edit(visible, next);
+  expect(changed).toHaveBeenLastCalledWith(next.replace(' ', 'T'));
+  expect(formValue()).toBe(next.replace(' ', 'T'));
+  expect(new FormData(host.querySelector('form')!).getAll('at')).toHaveLength(1);
+  await act(async () => visible.blur());
+  expect(visible.value).toBe(next);
+});
+
+it('非法草稿阻止提交，Escape 恢复原值，清空和表单重置可恢复', async () => {
+  const changed = vi.fn();
+  await act(async () =>
+    root.render(
+      <form>
+        <DateInput name="at" type="date" defaultValue="2026-11-06" onChange={changed} />
+      </form>,
+    ),
+  );
+  await edit(editorInput(), '2026-02-30');
+  expect(editorInput().value).toBe('2026-02-30');
+  expect(formValue()).toBe('2026-11-06');
+  expect(input().validity.customError).toBe(true);
+  expect(host.querySelector('form')!.checkValidity()).toBe(false);
+  expect(changed).not.toHaveBeenCalled();
+  await act(async () =>
+    editorInput().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+  );
+  expect(editorInput().value).toBe('2026-11-06');
+  expect(input().validity.valid).toBe(true);
+  await edit(editorInput(), '2026-');
+  await act(async () => host.querySelector('form')!.reset());
+  expect(editorInput().value).toBe('2026-11-06');
+  expect(input().validity.valid).toBe(true);
+  await edit(editorInput(), '');
+  expect(formValue()).toBe('');
+  expect(input().validity.valid).toBe(true);
+});
+
+it('文本编辑保留原生范围与步长校验，原值 ref 聚焦可见编辑器', async () => {
+  const ref = createRef<HTMLInputElement>();
+  await act(async () =>
+    root.render(
+      <form>
+        <DateInput
+          ref={ref}
+          name="at"
+          type="datetime-local"
+          defaultValue="2026-11-06T12:00"
+          min="2026-11-06T10:00"
+          max="2026-11-06T13:00"
+          step={900}
+        />
+      </form>,
+    ),
+  );
+  await edit(editorInput(), '2026-11-06 14:00');
+  expect(ref.current!.validity.rangeOverflow).toBe(true);
+  await edit(editorInput(), '2026-11-06 12:07');
+  expect(ref.current!.validity.stepMismatch).toBe(true);
+  await edit(editorInput(), '2026-11-06 12:15');
+  expect(ref.current!.validity.valid).toBe(true);
+  await act(async () => ref.current!.focus());
+  expect(document.activeElement).toBe(editorInput());
+});
+
+it('受控文本编辑同步父状态，Escape 及其他字段更新不还原新值', async () => {
+  const changed = vi.fn();
+  function Sample() {
+    const [value, setValue] = useState('2026-11-06T12:34:56.789');
+    return (
+      <form>
+        <DateInput
+          name="at"
+          type="datetime-local"
+          value={value}
+          step="any"
+          onChange={(event) => {
+            changed(event.target.value);
+            setValue(event.target.value);
+          }}
+        />
+        <output>{value}</output>
+      </form>
+    );
+  }
+  await act(async () => root.render(<Sample />));
+  await edit(editorInput(), '2026-11-07 08:09:10.123');
+  expect(changed).toHaveBeenLastCalledWith('2026-11-07T08:09:10.123');
+  expect(host.querySelector('output')!.textContent).toBe('2026-11-07T08:09:10.123');
+  await act(async () =>
+    editorInput().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+  );
+  expect(editorInput().value).toBe('2026-11-07 08:09:10.123');
 });

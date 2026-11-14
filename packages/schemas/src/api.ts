@@ -165,6 +165,7 @@ export const instrumentSearchResultSchema = z
     displayName: z.string().min(1),
     symbol: z.string().min(1),
     confirmable: z.boolean(),
+    confirmed: z.boolean().optional(),
     disabledReason: z.string().nullable(),
     generation: z.number().int().nonnegative(),
     active: z.boolean(),

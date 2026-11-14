@@ -1,16 +1,10 @@
-import type { JournalPeriodReviewResponse } from '@thesis-ledger/schemas';
-import { getDesktopApiClient } from '@/shared/api/client';
-import { JournalAiRunPanel } from './JournalAiRunPanel.js';
+import type {
+  JournalPeriodAiExplanation,
+  JournalPeriodReviewResponse,
+} from '@thesis-ledger/schemas';
 
-export function JournalPeriodAiExplanation({
-  analysis,
-  disabled,
-}: {
-  analysis: JournalPeriodReviewResponse;
-  disabled: boolean;
-}) {
-  const api = getDesktopApiClient().journalReviews;
-  const request = {
+export function journalPeriodExplanationInput(analysis: JournalPeriodReviewResponse) {
+  return {
     accountId: analysis.accountId,
     mode: analysis.mode,
     ...(analysis.symbol ? { symbol: analysis.symbol } : {}),
@@ -26,36 +20,25 @@ export function JournalPeriodAiExplanation({
       ]),
     ),
   };
+}
+
+export function matchesCurrentPeriodExplanation(
+  run: JournalPeriodAiExplanation,
+  analysis: JournalPeriodReviewResponse,
+) {
+  const input = journalPeriodExplanationInput(analysis);
   return (
-    <JournalAiRunPanel
-      accountId={analysis.accountId}
-      mode={analysis.mode}
-      kind="period"
-      scope={request}
-      disabled={disabled}
-      createRun={() => api.explainPeriod(request)}
-      readRun={async (id, signal) => {
-        const run = await api.periodExplanation(
-          id,
-          { accountId: analysis.accountId, mode: analysis.mode },
-          signal,
-        );
-        const fingerprints = request.objectFingerprints;
-        if (
-          run.accountId !== request.accountId ||
-          run.mode !== request.mode ||
-          run.start !== request.start ||
-          run.end !== request.end ||
-          run.symbol !== (request.symbol ?? null) ||
-          run.ledgerRevision !== request.expectedLedgerRevision ||
-          run.projectionGeneration !== request.expectedProjectionGeneration ||
-          run.algorithmVersion !== request.expectedAlgorithmVersion ||
-          Object.keys(run.objectFingerprints).length !== Object.keys(fingerprints).length ||
-          Object.entries(fingerprints).some(([key, value]) => run.objectFingerprints[key] !== value)
-        )
-          throw new Error('已保存的 AI 任务引用与本次周期输入不一致，请清除引用后重试');
-        return run;
-      }}
-    />
+    run.accountId === input.accountId &&
+    run.mode === input.mode &&
+    run.start === input.start &&
+    run.end === input.end &&
+    run.symbol === (input.symbol ?? null) &&
+    run.ledgerRevision === input.expectedLedgerRevision &&
+    run.projectionGeneration === input.expectedProjectionGeneration &&
+    run.algorithmVersion === input.expectedAlgorithmVersion &&
+    Object.keys(run.objectFingerprints).length === Object.keys(input.objectFingerprints).length &&
+    Object.entries(input.objectFingerprints).every(
+      ([id, value]) => run.objectFingerprints[id] === value,
+    )
   );
 }

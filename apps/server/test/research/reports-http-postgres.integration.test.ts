@@ -6,8 +6,31 @@ import { databaseUrl } from '../ai/ai-provider-postgres.fixture.js';
 import { useResearchReportFixture, reportScope } from './research-report-postgres.fixture.js';
 
 describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保存事实', () => {
+  const context = reportReadContext();
+  registerReportFrozenIdentity(context);
+  registerReportScopeAndOwnership(context);
+  registerReportCursorAndTamperRejection(context);
+});
+
+function reportReadContext() {
   const { ctx, completed, get } = useResearchReportFixture();
+  return {
+    get ctx() {
+      return ctx;
+    },
+    get completed() {
+      return completed;
+    },
+    get get() {
+      return get;
+    },
+  };
+}
+
+function registerReportFrozenIdentity(suiteContext: ReturnType<typeof reportReadContext>) {
   it('路由实际模型由 SDK 完成事实绑定，篡改为请求模型仍隐藏正文及引用', async () => {
+    const { ctx, completed, get } = suiteContext;
+
     ctx.harness.models.setReturnedModel('resolved/model');
     const { row, result } = await completed();
     const before = await ctx.prisma.aiRun.findUniqueOrThrow({ where: { id: row.id } });
@@ -43,6 +66,8 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
     expect(ctx.harness.models.requests).toHaveLength(requestCount);
   });
   it('列表、详情和引用消费原冻结材料，读取不取数、不运行模型、不改写任务', async () => {
+    const { ctx, completed, get } = suiteContext;
+
     const { row, result } = await completed();
     const before = await ctx.prisma.aiRun.findUniqueOrThrow({ where: { id: row.id } });
     const dataCalls = ctx.harness.data.calls.length,
@@ -50,9 +75,13 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
     await ctx.prisma.instrument.updateMany({ data: { active: false, generation: 99 } });
     const listed = await get();
     expect(listed.headers.get('cache-control')).toBe('no-store');
-    expect(researchReportPageSchema.parse(await listed.json()).items).toMatchObject([
-      { id: row.id, availability: 'available' },
-    ]);
+    const page = researchReportPageSchema.parse(await listed.json());
+    expect(page.items).toMatchObject([{ id: row.id, availability: 'available' }]);
+    expect(page.instrumentDirectory?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ symbol: '600519.SH', displayName: '受控目录标的' }),
+      ]),
+    );
     const detail = researchReportDetailSchema.parse(await (await get('/' + row.id)).json());
     expect(detail.result).toEqual(result);
     expect(detail.submission).toEqual(
@@ -72,6 +101,8 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
     expect(ctx.harness.models.requests).toHaveLength(modelCalls);
   });
   it('其他模式、对象或身份不能按报告/引用标识读取', async () => {
+    const { ctx, completed, get } = suiteContext;
+
     const { row, result } = await completed();
     const ref = result.evidenceBindings[0]!.audit.evidenceId;
     for (const query of [
@@ -89,7 +120,12 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
     expect((await get(`/${row.id}/evidence/${ref}`)).status).toBe(404);
     expect(researchReportPageSchema.parse(await (await get()).json()).items).toEqual([]);
   });
+}
+
+function registerReportScopeAndOwnership(suiteContext: ReturnType<typeof reportReadContext>) {
   it('范围权限变化后列表隐藏，详情与引用拒绝；不扩展当前账户集合', async () => {
+    const { ctx, get } = suiteContext;
+
     const saved = await ctx.saved(
       await ctx.harness.post({
         ...ctx.input,
@@ -106,6 +142,8 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
     expect((await get(`/${saved.run.id}/evidence/${randomUUID()}`)).status).toBe(403);
   });
   it('同模式账户和持仓筛选只返回冻结对象；旧持仓关闭仍可读取已存报告', async () => {
+    const { ctx, get } = suiteContext;
+
     const first = await ctx.saved(
       await ctx.harness.post({
         ...ctx.input,
@@ -147,6 +185,8 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
     expect((await get('/' + position.run.id)).status).toBe(200);
   });
   it('组合和策略筛选保持原范围，策略转让后撤销读取', async () => {
+    const { ctx, get } = suiteContext;
+
     const portfolio = await ctx.saved(
       await ctx.harness.post({
         ...ctx.input,
@@ -182,7 +222,12 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
     const listed = researchReportPageSchema.parse(await (await get()).json());
     expect(listed.items.map((row) => row.id)).toEqual([portfolio.run.id]);
   });
+}
+
+function registerReportCursorAndTamperRejection(suiteContext: ReturnType<typeof reportReadContext>) {
   it('分页稳定推进；游标不能跨模式或范围重用', async () => {
+    const { ctx, get } = suiteContext;
+
     for (const account of [ctx.rows.primary, ctx.rows.second])
       await ctx.saved(
         await ctx.harness.post({
@@ -217,6 +262,8 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
   it.each(['number', 'tool', 'fingerprint', 'result-scope', 'model', 'root-question'] as const)(
     '损坏 %s 的报告不返回伪造正文或引用',
     async (kind) => {
+      const { ctx, completed, get } = suiteContext;
+
       const { row, result } = await completed();
       const metadata = structuredClone(row.modelMetadata) as Record<string, unknown>;
       if (kind === 'number') {
@@ -247,9 +294,11 @@ describe.skipIf(!databaseUrl)('研究产物读取：真实 HTTP、范围与保�
     },
   );
   it('严格身份与参数校验不扩权', async () => {
+    const { get } = suiteContext;
+
     expect((await get('', { ...reportScope, ownerId: randomUUID() })).status).toBe(400);
     expect((await get('/not-a-uuid')).status).toBe(400);
     vi.stubEnv('STRATEGY_IDENTITY_MODE', 'account');
     expect((await get()).status).toBe(401);
   });
-});
+}

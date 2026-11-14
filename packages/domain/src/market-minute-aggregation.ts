@@ -158,6 +158,12 @@ const sum = (points: readonly MarketMinuteInputPoint[], field: 'volume' | 'amoun
   return result;
 };
 
+function minuteBucketCompletion(observed: readonly MarketMinuteInputPoint[], end: number, cutoff: number): MarketPeriodCompletion {
+  if (observed.some((point) => point.completionStatus === 'unknown')) return 'unknown';
+  if (end <= cutoff && observed.every((point) => point.completionStatus === 'complete')) return 'complete';
+  return 'incomplete';
+}
+
 /** 消费区间末端分钟事实；不生成补零分钟，不跨Session合成，不读取来源。 */
 export function aggregateMarketMinutes(input: {
   calendar: MarketPeriodCalendarFact;
@@ -201,14 +207,7 @@ export function aggregateMarketMinutes(input: {
       regularMinutes++;
     }
     if (!observed.length) continue;
-    let completionStatus: MarketPeriodCompletion = 'incomplete';
-    if (observed.some((point) => point.completionStatus === 'unknown'))
-      completionStatus = 'unknown';
-    else if (
-      bucket.end <= cutoff &&
-      observed.every((point) => point.completionStatus === 'complete')
-    )
-      completionStatus = 'complete';
+    const completionStatus = minuteBucketCompletion(observed, bucket.end, cutoff);
     result.push({
       timestamp: new Date(bucket.start).toISOString(),
       availableAt: new Date(

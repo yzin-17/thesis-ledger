@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { sourceState } from '../../thesis-ledger-infra/scripts/research-dual-read.mjs';
-import { sql } from '../../thesis-ledger-infra/scripts/research-state-backup.mjs';
+import { sourceState } from '../../thesis-ledger/scripts/local-runtime/research-dual-read.mjs';
+import { sql } from '../../thesis-ledger/scripts/local-runtime/research-state-backup.mjs';
 import {
   assertFundAssetTransition,
   assertFundCaseAccount,

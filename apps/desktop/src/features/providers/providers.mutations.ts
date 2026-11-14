@@ -10,6 +10,7 @@ import {
   updateAutomationJob,
 } from './providers.api.js';
 import { providerKeys } from './providers.queries.js';
+import { ruleMonitorKey } from '../market-data/useRuleSourceMonitor.js';
 import type {
   AutomationJob,
   CreateAutomationJobInput,
@@ -86,7 +87,11 @@ export const useUpdateAutomationJobMutation = () => {
   return useMutation({
     mutationFn: ({ jobId, patch }: { jobId: string; patch: UpdateAutomationJobInput }) =>
       updateAutomationJob(jobId, patch),
-    onSuccess: () => invalidateAutomationJobs(client),
+    onSuccess: () =>
+      Promise.all([
+        invalidateAutomationJobs(client),
+        client.invalidateQueries({ queryKey: ruleMonitorKey }),
+      ]),
   });
 };
 

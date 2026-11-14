@@ -18,7 +18,7 @@ export const Metric = ({
   label: string;
   value: string;
   detail?: string;
-  tone?: MarketTone;
+  tone?: MarketTone | undefined;
 }) => (
   <Card className="gap-0 rounded-none border-0 bg-transparent py-0 shadow-none ring-0">
     <CardContent className="flex min-w-0 flex-col gap-1.5 px-0 py-2">

@@ -29,7 +29,13 @@ export class ResearchObservationService {
     @Inject(ResearchObservationStore) private readonly store: ResearchObservationStore,
     @Inject(ResearchObservationMaterials) private readonly materials: ResearchObservationMaterials,
   ) {}
-  async submit(ownerId: string, rawId: unknown, rawLocator: unknown, raw: unknown, retainedOnly = false) {
+  async submit(
+    ownerId: string,
+    rawId: unknown,
+    rawLocator: unknown,
+    raw: unknown,
+    retainedOnly = false,
+  ) {
     const id = researchReportIdSchema.parse(rawId),
       locator = researchReportLocatorSchema.parse(rawLocator);
     const input = researchObservationSubmissionSchema.parse(raw);
@@ -42,11 +48,7 @@ export class ResearchObservationService {
       throw new BadRequestException('这份报告缺少可自动复核的可信 V2 字段');
     const result = report.result,
       snapshot = report.historicalScope.snapshot;
-    if (
-      !observationEvidenceVisibleAt(input.asOf, new Date().toISOString()) ||
-      !observationEvidenceVisibleAt(result.createdAt, input.asOf)
-    )
-      throw new BadRequestException('复核截止时点必须介于报告生成与当前时间之间');
+    assertObservationWindow(input.asOf, result.createdAt);
     const claim = result.inference.claims.find((entry) => entry.id === input.claimId);
     if (!claim) throw new NotFoundException('研究断言不存在或不可访问');
     let instrument;
@@ -124,4 +126,12 @@ export class ResearchObservationService {
       return response(failed);
     }
   }
+}
+
+function assertObservationWindow(asOf: string, createdAt: string) {
+  if (
+    !observationEvidenceVisibleAt(asOf, new Date().toISOString()) ||
+    !observationEvidenceVisibleAt(createdAt, asOf)
+  )
+    throw new BadRequestException('复核截止时点必须介于报告生成与当前时间之间');
 }

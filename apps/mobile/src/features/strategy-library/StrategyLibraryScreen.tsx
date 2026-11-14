@@ -13,6 +13,7 @@ import {
 } from '../../components/MobilePrimitives';
 import {StrategySubmissions} from './StrategySubmissions';
 import { useStrategyLibrary } from './useStrategyLibrary';
+import { strategyInstrumentLabel } from './strategy-instrument-display';
 export function StrategyLibraryScreen() {
   const query = useStrategyLibrary();
   const navigation = useNavigation<NativeStackNavigationProp<StrategyStackParams>>();
@@ -40,7 +41,6 @@ export function StrategyLibraryScreen() {
         label="净值回测任务"
         onPress={() => navigation.navigate('BacktestJobs', { kind: 'nav' })}
       />
-      <Action label="模型竞技场" onPress={()=>navigation.navigate('ModelArena')} />
       <Action label="优化实验" onPress={() => navigation.navigate('OptimizationResults')} />
       <Action label="策略风险应用" onPress={() => navigation.navigate('StrategyRisk')} />
       <Field
@@ -70,6 +70,7 @@ export function StrategyLibraryScreen() {
       >
         {rows.slice(0, limit).map((row) => (
           <Section key={row.id} title={row.name}>
+            <Copy>{strategyInstrumentLabel([...row.versions].sort((a, b) => b.version - a.version)[0])}</Copy>
             <Copy>{row.description ?? '暂无说明'}</Copy>
             <Copy muted>策略 {row.id}</Copy>
             {[...row.versions]

@@ -170,6 +170,9 @@ describe('AI Provider 接入就绪门禁', () => {
     expect(snapshots.map((snapshot) => snapshot.route.contract.id)).toEqual(['research']);
   });
 
+});
+
+describe("服务端就绪证据与费用授权", () => {
   it('管理 API 只读取服务端计算的就绪结果', () => {
     const readiness = vi.fn(() => [{ model: 'model-a' }]);
     const controller = new AiProviderController({ readiness } as never);
@@ -262,6 +265,9 @@ describe('AI Provider 接入就绪门禁', () => {
     expect(blocked.readiness.reasons).toContain('configuration_invalid');
   });
 
+});
+
+describe("健康隔离、配置变更与能力撤销", () => {
   it('health=down 只阻断对应 Provider，混合模型各自保留原因', () => {
     const registry = new AiProviderRegistry();
     registry.replace([

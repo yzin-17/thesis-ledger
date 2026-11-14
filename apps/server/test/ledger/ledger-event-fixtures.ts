@@ -26,6 +26,9 @@ type StoredV2EventInput = {
   sourceRowId?: string | null;
 };
 
+const fixtureLedgerRevision = (revision: StoredV2EventInput['ledgerRevision']) =>
+  typeof revision === 'bigint' ? revision : BigInt(revision ?? 1);
+
 export const storedV2Event = ({
   id,
   accountId = 'account-a',
@@ -54,8 +57,7 @@ export const storedV2Event = ({
     externalId,
     sourceRowId,
     factId: factId === null ? null : fixtureUuid(factId ?? id),
-    ledgerRevision:
-      typeof ledgerRevision === 'bigint' ? ledgerRevision : BigInt(ledgerRevision ?? 1),
+    ledgerRevision: fixtureLedgerRevision(ledgerRevision),
     timePrecision: 'INSTANT',
     sourceTimezone: 'UTC',
     economicOrderKey,

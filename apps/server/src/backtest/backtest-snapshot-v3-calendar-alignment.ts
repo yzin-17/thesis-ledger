@@ -34,14 +34,7 @@ export const validateSnapshotCalendarAlignmentV3 = (
   const evidence = artifacts.get('metadata/market-window-evidence-v3.parquet')?.[0];
   if (typeof evidence?.coverageProof !== 'string') fail('V3 完整快照缺少行情覆盖证明');
   const proof = marketCoverageProofV3Schema.parse(JSON.parse(evidence.coverageProof) as unknown);
-  const expectedDates: string[] = [];
-  const cursor = new Date(`${input.plan.warmup.startDate}T12:00:00.000Z`);
-  const last = new Date(`${input.plan.runWindow.endDate}T12:00:00.000Z`);
-  for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-    const status = calendar.status(cursor);
-    if (status.open && !isBeforeKnownListingDateV3(proof.listing, status.date))
-      expectedDates.push(status.date);
-  }
+  const expectedDates = expectedCalendarDates(input, calendar, proof);
   const bars = artifacts.get('execution/bars.parquet');
   if (!bars?.length) fail('V3 完整快照缺少执行行情');
   const dates = bars.map((bar) => {
@@ -49,12 +42,24 @@ export const validateSnapshotCalendarAlignmentV3 = (
     dailyBarSessionTimes(bar, calendar);
     return calendar.status(bar.occurredAt).date;
   });
-  const instrumentFacts = artifacts.get(`instrumentFacts/${input.executionRouteKey.market}-${proof.listing.symbol}.parquet`) ?? [];
-  if (canonicalizeManifest(dates) !== canonicalizeManifest(tradabilityExpectedBarDatesV3(instrumentFacts, expectedDates))) {
+  const instrumentFacts =
+    artifacts.get(
+      `instrumentFacts/${input.executionRouteKey.market}-${proof.listing.symbol}.parquet`,
+    ) ?? [];
+  if (
+    canonicalizeManifest(dates) !==
+    canonicalizeManifest(tradabilityExpectedBarDatesV3(instrumentFacts, expectedDates))
+  ) {
     fail('V3 冻结日历与行情覆盖证明的交易日不一致');
   }
-  const analysisStart = settlementConfig?.lifecyclePreparation?.signalStartDate ?? input.plan.runWindow.startDate;
-  if (settlementConfig?.lifecyclePreparation) assertLifecyclePreparationV3(settlementConfig, bars.map(bar => ({ timestamp: String(bar.occurredAt) })), input.plan.warmup.lookbackPeriods);
+  const analysisStart =
+    settlementConfig?.lifecyclePreparation?.signalStartDate ?? input.plan.runWindow.startDate;
+  if (settlementConfig?.lifecyclePreparation)
+    assertLifecyclePreparationV3(
+      settlementConfig,
+      bars.map((bar) => ({ timestamp: String(bar.occurredAt) })),
+      input.plan.warmup.lookbackPeriods,
+    );
   const preceding = dates.filter((date) => date < analysisStart);
   if (preceding.length < input.plan.warmup.lookbackPeriods) {
     fail('V3 冻结行情不足以满足策略预热周期');
@@ -67,7 +72,40 @@ export const validateSnapshotCalendarAlignmentV3 = (
       executionDates.at(-1)!,
       settlementCalendarRequirement(settlementConfig),
     );
-  const firstBar = bars[dates.indexOf(executionDates[0]!)];
+  assertOpeningInstrumentFacts(
+    input,
+    artifacts,
+    calendar,
+    bars[dates.indexOf(executionDates[0]!)],
+    proof,
+    settlementConfig,
+  );
+};
+
+function expectedCalendarDates(
+  input: SnapshotInputPlanV3,
+  calendar: ReturnType<typeof tradingCalendarFromFact>,
+  proof: ReturnType<typeof marketCoverageProofV3Schema.parse>,
+) {
+  const expectedDates: string[] = [];
+  const cursor = new Date(`${input.plan.warmup.startDate}T12:00:00.000Z`);
+  const last = new Date(`${input.plan.runWindow.endDate}T12:00:00.000Z`);
+  for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const status = calendar.status(cursor);
+    if (status.open && !isBeforeKnownListingDateV3(proof.listing, status.date))
+      expectedDates.push(status.date);
+  }
+  return expectedDates;
+}
+
+function assertOpeningInstrumentFacts(
+  input: SnapshotInputPlanV3,
+  artifacts: ReadonlyMap<string, readonly ArtifactRow[]>,
+  calendar: ReturnType<typeof tradingCalendarFromFact>,
+  firstBar: ArtifactRow | undefined,
+  proof: ReturnType<typeof marketCoverageProofV3Schema.parse>,
+  settlementConfig: RunConfigV3 | undefined,
+) {
   if (!firstBar) fail('V3 运行区间缺少首个交易日');
   const openedAt = dailyBarSessionTimes(firstBar, calendar).openedAt;
   const facts = [...artifacts.entries()]
@@ -75,10 +113,17 @@ export const validateSnapshotCalendarAlignmentV3 = (
     .flatMap(([, value]) => value);
   if (
     !openedAt ||
-    !facts.some((fact) => applicableInstrumentObservationV3(fact, openedAt, settlementConfig,
-      proof.listing.symbol, input.executionRouteKey.market,
-      artifacts.get('metadata/dependency-evidence-v3.parquet') ?? []))
+    !facts.some((fact) =>
+      applicableInstrumentObservationV3(
+        fact,
+        openedAt,
+        settlementConfig,
+        proof.listing.symbol,
+        input.executionRouteKey.market,
+        artifacts.get('metadata/dependency-evidence-v3.parquet') ?? [],
+      ),
+    )
   ) {
     fail('V3 完整快照缺少期初适用的标的历史事实');
   }
-};
+}

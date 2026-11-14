@@ -185,7 +185,7 @@ export function StrategyRiskApplicationsSection({ accounts }: { accounts: Accoun
   }
   if (applications.isError) {
     return (
-      <div className="space-y-2 rounded-md border p-4">
+      <div className="space-y-2">
         <p className="text-sm text-muted-foreground">策略来源风险应用读取失败。</p>
         <Button size="sm" variant="outline" onClick={() => void applications.refetch()}>
           重试
@@ -195,7 +195,7 @@ export function StrategyRiskApplicationsSection({ accounts }: { accounts: Accoun
   }
   if ((applications.data?.length ?? 0) === 0) {
     return (
-      <div className="space-y-2 rounded-md border p-4">
+      <div className="space-y-2">
         <div className="font-medium">暂无策略来源风险应用</div>
         <p className="text-sm text-muted-foreground">
           从策略库的具体正式版本进入“生成风险规则”，预览并确认后会在这里管理。
@@ -224,11 +224,7 @@ export function StrategyRiskApplicationsSection({ accounts }: { accounts: Accoun
             <div
               id={`strategy-risk-application-${application.id}`}
               key={application.id}
-              className={
-                selected
-                  ? 'space-y-4 rounded-md border border-primary/50 bg-card p-4 ring-2 ring-primary/10'
-                  : 'space-y-4 rounded-md border bg-card p-4'
-              }
+              className="space-y-4 rounded-md border border-border bg-card p-4"
             >
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
                 <div className="min-w-0 space-y-2">

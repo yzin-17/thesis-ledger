@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog.js';
+import { MemoryRouter } from 'react-router';
 import { RiskOverview } from '../src/features/risk/RiskOverview.js';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -27,6 +28,7 @@ const props: ComponentProps<typeof RiskOverview> = {
   scanning: false,
   onScan: vi.fn(),
   onSelectTab: select,
+  onSelectCriticalEvents: vi.fn(),
 };
 async function render(changes: Partial<typeof props>) {
   if (!host) {
@@ -37,7 +39,7 @@ async function render(changes: Partial<typeof props>) {
   await act(async () =>
     root.render(
       <QueryClientProvider client={client}><ConfirmDialogProvider>
-        <RiskOverview {...props} {...changes} />
+        <MemoryRouter><RiskOverview {...props} {...changes} /></MemoryRouter>
       </ConfirmDialogProvider></QueryClientProvider>,
     ),
   );
@@ -81,6 +83,17 @@ describe('风险指标独立读取状态', () => {
     expect(metric('启用规则').disabled).toBe(false);
     await act(async () => metric('启用规则').click());
     expect(select).toHaveBeenCalledWith('rules');
+  });
+
+  it('严重事件直接筛选总览内列表，页面只保留一份事件入口', async () => {
+    const onSelectCriticalEvents = vi.fn();
+    await render({ onSelectCriticalEvents });
+    await act(async () => metric('严重事件').click());
+    expect(onSelectCriticalEvents).toHaveBeenCalledOnce();
+    expect(select).not.toHaveBeenCalled();
+    expect(host.querySelectorAll('#risk-events')).toHaveLength(1);
+    expect(host.textContent).not.toContain('最近风险事件');
+    expect(host.textContent).not.toContain('查看全部');
   });
 
   it('刷新失败保留上次有效计数并标记旧数据，其他指标不受影响', async () => {

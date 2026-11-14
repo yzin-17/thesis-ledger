@@ -202,6 +202,9 @@ describe('Market Data Wire V3', () => {
     ).toBe(false);
   });
 
+});
+
+describe('Market Data Wire V3 交易日覆盖', () => {
   it('校验窗口次序、Bar 顺序与 coverage 边界，并要求源口径匹配 RouteKey', () => {
     const request = marketDataBarSeriesRequestV3Schema.parse(requestFixture());
     const response = marketDataBarSeriesResponseV3Schema.parse(responseFixture());
@@ -379,6 +382,9 @@ describe('Market Data Wire V3', () => {
     expect(marketDataBarSeriesResponseV3Schema.safeParse(preListingWindow).success).toBe(false);
   });
 
+});
+
+describe('Market Data Wire V3 指纹与错误信封', () => {
   it('以固定字段顺序编码证明，输入对象键顺序不会改变缓存身份', () => {
     const response = marketDataBarSeriesResponseV3Schema.parse(responseFixture());
     const proof = response.coverageProof;

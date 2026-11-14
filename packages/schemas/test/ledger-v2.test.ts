@@ -166,6 +166,9 @@ describe('Ledger 当前事件信封', () => {
     expect(() => ledgerEventEnvelopeSchema.parse(event)).toThrow();
   });
 
+});
+
+describe('账本事件更正、对账与恢复', () => {
   it('要求替代版本引用链末端并填写原因', () => {
     const replacement = {
       ...baseEnvelope,

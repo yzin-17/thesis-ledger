@@ -79,12 +79,7 @@ export class AiGenerationStreamDiagnostics {
   observeProviderChunk(value: unknown) {
     const frame = asRecord(value);
     this.frames += 1;
-    const choices = frame?.choices;
-    const choice = Array.isArray(choices) ? asRecord(choices[0]) : null;
-    const delta = asRecord(choice?.delta);
-    const content = typeof delta?.content === 'string' ? delta.content : null;
-    const rawReasoning = delta?.reasoning_content ?? delta?.reasoning;
-    const reasoning = typeof rawReasoning === 'string' ? rawReasoning : null;
+    const { choice, delta, content, reasoning } = providerFramePayload(frame);
     if (content !== null) this.providerText.add(content);
     else if (delta?.content !== null && delta?.content !== undefined)
       this.nonTextContentFrames += 1;
@@ -106,18 +101,7 @@ export class AiGenerationStreamDiagnostics {
         reasoningTokens: tokenCount(asRecord(usage.completion_tokens_details)?.reasoning_tokens),
       };
     }
-    this.sample({
-      frame: this.frames,
-      contentCharacters: content?.length ?? null,
-      contentSha256: content === null ? null : createHash('sha256').update(content).digest('hex'),
-      contentStructure:
-        content === null ? null : generationStructuralPreview(content, 192, 96).structuralPreview,
-      reasoningCharacters: reasoning?.length ?? null,
-      reasoningSha256:
-        reasoning === null ? null : createHash('sha256').update(reasoning).digest('hex'),
-      finishReason,
-      usage: usage !== null,
-    });
+    this.sample(providerFrameSample(this.frames, content, reasoning, finishReason, usage));
   }
 
   observeSdkPart(part: { type: string; text?: unknown }) {
@@ -167,4 +151,36 @@ export class AiGenerationStreamDiagnostics {
       if (this.tail.length > 12) this.tail.shift();
     }
   }
+}
+
+function providerFramePayload(frame: Record<string, unknown> | null) {
+  const choices = frame?.choices;
+  const choice = Array.isArray(choices) ? asRecord(choices[0]) : null;
+  const delta = asRecord(choice?.delta);
+  const content = typeof delta?.content === 'string' ? delta.content : null;
+  const rawReasoning = delta?.reasoning_content ?? delta?.reasoning;
+  const reasoning = typeof rawReasoning === 'string' ? rawReasoning : null;
+
+  return { choice, delta, content, reasoning };
+}
+
+function providerFrameSample(
+  frame: number,
+  content: string | null,
+  reasoning: string | null,
+  finishReason: Sample['finishReason'],
+  usage: Record<string, unknown> | null,
+): Sample {
+  return {
+    frame,
+    contentCharacters: content?.length ?? null,
+    contentSha256: content === null ? null : createHash('sha256').update(content).digest('hex'),
+    contentStructure:
+      content === null ? null : generationStructuralPreview(content, 192, 96).structuralPreview,
+    reasoningCharacters: reasoning?.length ?? null,
+    reasoningSha256:
+      reasoning === null ? null : createHash('sha256').update(reasoning).digest('hex'),
+    finishReason,
+    usage: usage !== null,
+  };
 }

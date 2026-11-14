@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException } from '@nestjs/common';
 import {
   optimizationRunPreparationRequestSchema,
   optimizationRunPreparationResultSchema,
@@ -15,10 +15,12 @@ export class OptimizationPreparation {
 
   async prepare(body: unknown) {
     const { target, intent } = optimizationRunPreparationRequestSchema.parse(body);
+    if (!intent.priceResearch || intent.priceResearchReference !== 'freeze')
+      throw new BadRequestException('新实验统一使用后复权研究，请重新准备研究配置。');
     const result =
       target.sourceMode === 'existing'
         ? await this.preparation.prepare({ ...intent, strategyVersionId: target.strategyVersionId })
-        : await this.preparation.prepareDraft(intent, createDiscoverySeed(target.discoveryScope));
+        : await this.preparation.prepareDraft(intent, createDiscoverySeed(target.discoveryScope, true));
     const base = {
       contractVersion: 3,
       requestId: result.requestId,
@@ -45,6 +47,7 @@ export class OptimizationPreparation {
       status: 'prepared',
       runConfig: result.runConfig,
       actualSource: result.actualSource,
+      ...(result.actualPriceSource ? { actualPriceSource: result.actualPriceSource } : {}),
       ...('announcementPreparation' in result ? { announcementPreparation: result.announcementPreparation } : {}),
       strategyContentHash,
       routeRevisions: revisions && {

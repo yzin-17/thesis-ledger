@@ -125,5 +125,6 @@ export const validateCompleteSnapshotInputsV3 = (
     manifest.publicFees,
     manifest.tradingStatus,
     manifest.statusComposition,
+    manifest,
   );
 };

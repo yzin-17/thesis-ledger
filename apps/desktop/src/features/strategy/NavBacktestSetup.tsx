@@ -1,6 +1,4 @@
 import { createClientRequestId } from '../../lib/client-request-id';
-import {Button} from '@/components/ui/button';
-import {useStrategySubmission} from './use-strategy-submission.js';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import type { BacktestExecutionModelV3 } from '@thesis-ledger/schemas';
@@ -110,7 +108,6 @@ export function NavBacktestSetupPage({
         onChange={setup.changeModelText}
         onConfirm={setup.confirmModel}
       />
-      <Button type="button" disabled={!setup.canPrepare||setup.automatic.isPending} onClick={()=>void setup.prepare(true)}>后台准备净值回测，完成后核对凭证</Button>
       <NavSetupActions
         canPrepare={setup.canPrepare}
         preparing={setup.prepareMutation.isPending}
@@ -148,7 +145,6 @@ function useNavBacktestSetupState({
   symbol: string | null;
   navigate: ReturnType<typeof useNavigate>;
 }) {
-  const automatic=useStrategySubmission();
   const prepareMutation = usePrepareNavBacktestMutation();
   const createMutation = useCreateNavBacktestMutation();
   const [fundType, setFundType] = useState<FundType | null>(null);
@@ -226,7 +222,7 @@ function useNavBacktestSetupState({
     invalidatePreparation();
     setter(value);
   };
-  const prepare = async (continuous=false) => {
+  const prepare = async () => {
     if (!symbol || !versionId || !fundType || !model) return;
     const validationError = validatePreparationInput({
       fundType,
@@ -261,7 +257,6 @@ function useNavBacktestSetupState({
             domesticRuleRange,
             model,
           }));
-      if(continuous){await automatic.mutateAsync({signature:setupKey,input:{kind:'nav',preparation:request}});void navigate(strategyCenterPath.jobs);return;}
       await prepareMutation.mutateAsync(request);
     } catch (error) {
       setFormError(errorText(error, 'NAV 配置准备失败，请检查输入后重试。'));
@@ -305,7 +300,7 @@ function useNavBacktestSetupState({
     reviewed,
     canPrepare,
     formError,
-    prepareMutation, automatic,
+    prepareMutation,
     createMutation,
     prepare,
     createRun,

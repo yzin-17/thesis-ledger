@@ -26,11 +26,44 @@ const tables = [
     ),
   },
   {
-    title: '开放数据质量问题',
+    title: '未关闭的数据质量问题',
     render: (state: LoadState) => <DataQualityIssuesTable loadState={state} issues={[]} />,
   },
 ];
 describe('只读诊断表状态', () => {
+  it('自动质量日志显示最近发生时间和合并次数，兼容旧记录的发现时间', () => {
+    const detectedAt = '2026-11-09T01:00:00Z';
+    const lastSeenAt = '2026-11-09T02:00:00Z';
+    const issue = {
+      id: 'quality',
+      provider: 'dsa',
+      symbol: '600519.SH',
+      severity: 'error',
+      code: 'response_schema_invalid',
+      status: 'open',
+      detectedAt,
+    };
+    const html = renderToStaticMarkup(
+      <DataQualityIssuesTable
+        loadState="ready"
+        issues={[
+          {
+            ...issue,
+            details: { occurrences: 3, lastSeenAt, message: '来源返回的数据格式或数值未通过校验' },
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain('未关闭的数据质量问题');
+    expect(html).toContain('数据格式异常');
+    expect(html).toContain(new Date(lastSeenAt).toLocaleString('zh-CN'));
+    expect(html).toContain('>3</td>');
+    const legacy = renderToStaticMarkup(
+      <DataQualityIssuesTable loadState="ready" issues={[issue]} />,
+    );
+    expect(legacy).toContain(new Date(detectedAt).toLocaleString('zh-CN'));
+    expect(legacy).toContain('>1</td>');
+  });
   it.each(tables)('$title 加载和失败不能表示没有记录', ({ render }) => {
     const loading = renderToStaticMarkup(render('loading'));
     const error = renderToStaticMarkup(render('error'));

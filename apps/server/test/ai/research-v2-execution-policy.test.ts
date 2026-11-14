@@ -1,6 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { aiGenerationContracts, researchGenerationV2Contract } from '@thesis-ledger/schemas';
 import { researchSdkProtocol } from '../../src/ai/ai-research-sdk-contract.js';
+import { buildFrozenResearchMessagesV2 } from '../../src/ai/ai-research-messages-v2.js';
+import {
+  assertGenerationSchemaPrompt,
+  buildGenerationSchemaPrompt,
+} from '../../src/ai/ai-generation-schema-prompt.js';
 import { assertResearchV2WritesEnabled } from '../../src/ai/ai-research-v2-write-policy.js';
 import { sealAiFrozenResearchV2 } from '../../src/ai/ai-research-frozen-integrity-v2.js';
 import { evaluateAiProviderReadiness } from '../../src/ai/ai-provider-readiness.js';
@@ -73,6 +78,27 @@ it('V1/V2 输入与保存的合同版本必须一致', () => {
   input.run.modelMetadata.sdkExecution.contract = aiGenerationContracts.research.ref;
   expect(() => researchSdkProtocol(input)).toThrow('冻结版本不一致');
 });
+it('反证研究冻结模板决定收窄输出 Schema，SDK 与提示词使用相同合同', () => {
+  const input = protocolInput();
+  const source = input.run.modelMetadata.frozenResearch;
+  const frozen = sealAiFrozenResearchV2({
+    ...source,
+    prompt: { ...source.prompt, version: 'research-v2-counter-evidence' },
+  });
+  input.run.modelMetadata.frozenResearch = frozen;
+  const protocol = researchSdkProtocol(input);
+  const messages = buildFrozenResearchMessagesV2(frozen);
+  expect(protocol.contract.ref).toEqual(researchGenerationV2Contract.ref);
+  expect(() => assertGenerationSchemaPrompt(protocol.contract.schema, messages)).not.toThrow();
+  expect(() => assertGenerationSchemaPrompt(researchGenerationV2Contract.schema, messages)).toThrow(
+    '缺少当前输出合同',
+  );
+  const output = JSON.parse(
+    buildGenerationSchemaPrompt(protocol.contract.schema).split('OUTPUT_JSON_SCHEMA:')[1]!,
+  ) as { properties: { numericClaims: { maxItems: number } } };
+  expect(output.properties.numericClaims.maxItems).toBe(0);
+});
+
 it('readiness 显式识别 V2，V1 默认合同保持原版本且没有实时验证事实', () => {
   const result = evaluateAiProviderReadiness(
     {

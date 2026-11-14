@@ -2,6 +2,7 @@ import {
   ArenaWeekPage, WatchlistPage, AccountDataPage, AiChat, JournalReviewWorkspace,
   PerformanceWorkspace, ProviderSettings, RiskCenter, StrategyDashboard, MarketDataPage,
 } from './deferred-pages.js';
+import { ArenaLivePage, LegacyArenaRedirect } from '../features/model-arena/ArenaLivePage.js';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useEffect } from 'react';
 import { desktopPathForView, type DesktopNavigationView } from '../views.js';
@@ -172,6 +173,8 @@ export function AppRoutes() {
         />
         <Route path="/journal/model-weeklies/:match?/:id?" element={<ArenaWeekPage/>}/>
         <Route path="/strategy/*" element={<StrategyDashboard />} />
+        <Route path="/strategy/arena/*" element={<LegacyArenaRedirect />} />
+        <Route path="/arena/*" element={<ArenaLivePage />} />
         <Route
           path="/journal"
           element={

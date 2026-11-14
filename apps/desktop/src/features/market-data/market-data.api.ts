@@ -99,8 +99,8 @@ export const removeMarketProvider = (providerId: string) => api().market.removeP
 
 export const startCatalogSync = async () => api().market.startCatalogSync();
 
-export const searchMarketInstruments = (query: string) =>
-  api().market.searchInstruments({ q: query, limit: 50 });
+export const searchMarketInstruments = (query: string, signal?: AbortSignal) =>
+  api().market.searchInstruments({ q: query, limit: 50 }, signal);
 
 export const confirmMarketInstrument = (instrumentId: string) =>
   api().market.confirmInstrument(instrumentId);

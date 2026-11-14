@@ -4,7 +4,7 @@ export function ResearchBody({
   report,
   evidence,
 }: {
-  report: ResearchReportDetail;
+  report: Pick<ResearchReportDetail, 'result' | 'errorCode' | 'errorSummary'>;
   evidence: (id: string) => void;
 }) {
   const result = report.result;

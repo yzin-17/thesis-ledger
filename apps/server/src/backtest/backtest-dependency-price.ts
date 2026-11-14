@@ -147,14 +147,13 @@ const planRuleCompatibility = (
     return { result: missingRuleCompatibility(uniqueSorted(missing)) };
   }
 
-  const mismatchPath: readonly (string | number)[] | undefined = !priceBasisMatches(
-    facts.executionCoordinate,
-    runConfig,
+  let mismatchPath: readonly (string | number)[] | undefined;
+  if (!priceBasisMatches(facts.executionCoordinate, runConfig))
+    mismatchPath = ['ruleCompatibilityFacts', 'executionCoordinate', 'priceBasis'];
+  else if (
+    facts.executionCoordinate.currency !== currencyByMarket[strategy.executionInstrument.market]
   )
-    ? ['ruleCompatibilityFacts', 'executionCoordinate', 'priceBasis']
-    : facts.executionCoordinate.currency !== currencyByMarket[strategy.executionInstrument.market]
-      ? ['ruleCompatibilityFacts', 'executionCoordinate', 'currency']
-      : undefined;
+    mismatchPath = ['ruleCompatibilityFacts', 'executionCoordinate', 'currency'];
   if (mismatchPath) {
     return {
       result: missingRuleCompatibility([]),
@@ -240,8 +239,11 @@ export const planBacktestPriceInputs = (
     options.marketRuleResearch ?? runConfig.executionPriceProtocol?.marketRuleResearch,
   );
   const priceWarmupPolicy = options.priceWarmupPolicy ?? runConfig.frozenPriceWarmupPolicy;
-  let calendarBufferDays = options.cashEventResearch ? 0 : warmupPolicy.calendarBufferDays;
-  if (priceWarmupPolicy === 'cash-reference-calendar-buffer-v1') calendarBufferDays = 7;
+  const calendarBufferDays = priceWarmupCalendarBufferDays(
+    options.cashEventResearch,
+    priceWarmupPolicy,
+    warmupPolicy.calendarBufferDays,
+  );
   const warmupStartDate = subtractUtcDays(
     runConfig.startDate,
     requiredSessions * 2 + calendarBufferDays,
@@ -414,3 +416,13 @@ export const derivePriceDependencyPlan = (
     ruleCompatibility: rulePlan.result,
   };
 };
+
+function priceWarmupCalendarBufferDays(
+  cashEventResearch: RunConfigV3['executionPriceProtocol']['cashEventResearch'] | undefined,
+  priceWarmupPolicy: RunConfigV3['frozenPriceWarmupPolicy'],
+  defaultBufferDays: number,
+) {
+  let calendarBufferDays = cashEventResearch ? 0 : defaultBufferDays;
+  if (priceWarmupPolicy === 'cash-reference-calendar-buffer-v1') calendarBufferDays = 7;
+  return calendarBufferDays;
+}

@@ -112,6 +112,23 @@ describe('正式复盘传输范围', () => {
         ThesisLedgerContractError,
       );
   });
+  it('历史快照分页响应携带标的名称目录，缺失目录拒绝解析', async () => {
+    const query = { accountId: candidate().input.trade.accountId, mode: 'actual' as const };
+    const instrumentDirectory = {
+      generation: 1,
+      items: [{
+        symbol: '510300.SH', canonicalCode: '510300', instrumentType: 'ETF',
+        market: 'SH', displayName: '沪深300ETF', active: true,
+      }],
+      unresolvedSymbols: [],
+    };
+    const response = { items: [], nextCursor: null, instrumentDirectory };
+    const result = await setup(response).api.history(query);
+    expect(result.instrumentDirectory.items[0]?.displayName).toBe('沪深300ETF');
+    await expect(setup({ items: [], nextCursor: null }).api.history(query)).rejects.toBeInstanceOf(
+      ThesisLedgerContractError,
+    );
+  });
   it('旧深链按原始引用传输，错误父周期响应被拒绝', async () => {
     const row = candidate();
     const query = {
@@ -142,6 +159,9 @@ describe('正式复盘传输范围', () => {
     expect(() => api.analyze({ ...request, inputSnapshot: row.input } as never)).toThrow();
     expect(fetcher).not.toHaveBeenCalled();
   });
+});
+
+describe('复盘分析响应身份绑定', () => {
   it('分析与保存拒绝另一算法或草稿的晚到响应', async () => {
     const row = candidate();
     row.input.analysisDraft = { stopLoss: '8' };

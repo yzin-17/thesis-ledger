@@ -136,6 +136,16 @@ export const aiProviderExecutionRouteInputSchema = z.preprocess(
 
 export type AiProviderExecutionRouteInput = z.infer<typeof aiProviderExecutionRouteInputSchema>;
 
+function validateProviderCredentials(
+  value: { apiKey?: string | undefined; credentialsRef?: string | undefined; authMode: string },
+  context: z.RefinementCtx,
+): void {
+  if (value.apiKey && value.credentialsRef)
+    context.addIssue({ code: 'custom', path: ['apiKey'], message: 'API Key 只能填写一个字段' });
+  if (value.authMode === 'none' && (value.apiKey || value.credentialsRef))
+    context.addIssue({ code: 'custom', path: ['authMode'], message: '无需认证模式不能提交 API Key' });
+}
+
 export const aiProviderInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
@@ -193,14 +203,7 @@ export const aiProviderInputSchema = z
     const models = value.models.map((model) => model.trim());
     if (new Set(models).size !== models.length)
       context.addIssue({ code: 'custom', path: ['models'], message: '模型不得重复' });
-    if (value.apiKey && value.credentialsRef)
-      context.addIssue({ code: 'custom', path: ['apiKey'], message: 'API Key 只能填写一个字段' });
-    if (value.authMode === 'none' && (value.apiKey || value.credentialsRef))
-      context.addIssue({
-        code: 'custom',
-        path: ['authMode'],
-        message: '无需认证模式不能提交 API Key',
-      });
+    validateProviderCredentials(value, context);
     const reasoningModels = Object.keys(value.modelReasoning ?? {});
     const selectedModels = new Set(models);
     if (reasoningModels.some((model) => !selectedModels.has(model)))
@@ -260,6 +263,7 @@ export const aiProviderTestPurposeSchema = z.enum([
   'parameter_optimization',
   'strategy_discovery',
   'arena_decision',
+  'arena_live_research',
 ]);
 export type AiProviderTestPurpose = z.infer<typeof aiProviderTestPurposeSchema>;
 

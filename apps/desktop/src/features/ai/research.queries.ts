@@ -53,7 +53,14 @@ export function useResearchReportsQuery(input: ResearchReportListInput) {
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     select: (data) => ({
       ...data,
-      pages: data.pages.map((page) => ({ ...page, items: page.items.map(reportToAiRun) })),
+      pages: data.pages.map((page) => {
+        const names = new Map(
+          (page.instrumentDirectory?.items ?? []).map(
+            (item) => [item.symbol.toUpperCase(), item.displayName] as const,
+          ),
+        );
+        return { ...page, items: page.items.map((report) => reportToAiRun(report, names)) };
+      }),
     }),
     staleTime: 5_000,
     refetchInterval: (state) =>

@@ -19,6 +19,7 @@ import { backtestSnapshotActualSourceV3Schema } from './backtest-data.js';
 import { marketAnnouncementPreparationSchema } from './market-announcement-preparation.js';
 import { backtestKnownCashResearchPolicyV3Schema } from './backtest-known-cash-research-policy-v3.js';
 import { marketFrozenWindowRefV3Schema } from './market-frozen-window.js';
+import { priceResearchProtocolV1 } from './backtest-price-research.js';
 
 const preparationConfigSchema = z
   .strictObject(runConfigSchemaV3.shape)
@@ -31,6 +32,7 @@ const preparationConfigSchema = z
     frozenPriceWarmupPolicy: true,
     lifecyclePreparation: true,
     knownCashPreparation: true,
+    priceResearch: true,
   })
   .extend({ executionModel: backtestExecutionModelSchemaV3 })
   .superRefine((config, context) => {
@@ -51,6 +53,8 @@ const preparationIntentFields = z.strictObject({
   runConfig: preparationConfigSchema,
   adjustment: priceAdjustmentSchema,
   accountingBasis: accountingBasisSchema,
+  priceResearch: z.literal(priceResearchProtocolV1).optional(),
+  priceResearchReference: z.literal('freeze').optional(),
   history: historyInputSchema,
   cashEventResearch: z.literal('ex-date-entitlement-payment-date-cash-v1').optional(),
   knownCashResearch: backtestKnownCashResearchPolicyV3Schema.optional(),
@@ -66,10 +70,21 @@ const preparationIntentFields = z.strictObject({
   freezeTimePolicy: z.enum(['requested-time', 'after-acquisition']).optional(),
 });
 
-const validatePreparationIntent = (
-  request: z.infer<typeof preparationIntentFields>,
-  context: z.RefinementCtx,
-) => {
+type PreparationIntent = z.infer<typeof preparationIntentFields>;
+
+function validatePriceResearchIntent(request: PreparationIntent, context: z.RefinementCtx): void {
+  const raw = request.accountingBasis === 'raw-events';
+  if (request.priceResearchReference && !request.priceResearch)
+    context.addIssue({ code: 'custom', path: ['priceResearchReference'], message: '额外原价参考冻结仅适用于价格研究' });
+  if (request.priceResearch && (request.adjustment !== 'hfq' || raw ||
+      request.history.basis !== 'fixed-provider-snapshot' || request.cashEventResearch ||
+      request.knownCashResearch || request.marketRuleResearch || request.lifecycleResearch)) {
+    context.addIssue({ code: 'custom', path: ['priceResearch'],
+      message: '价格研究需要后复权固定快照和归一化记账' });
+  }
+}
+
+function validateKnownCashResearchIntent(request: PreparationIntent, context: z.RefinementCtx): void {
   const raw = request.accountingBasis === 'raw-events';
   if (
     request.reuseResearchData &&
@@ -97,6 +112,12 @@ const validatePreparationIntent = (
       message: '已知方案研究需要全部显式假设、境内ETF/CNY原价固定快照和现金时序',
     });
   }
+}
+
+const validatePreparationIntent = (request: PreparationIntent, context: z.RefinementCtx) => {
+  const raw = request.accountingBasis === 'raw-events';
+  validatePriceResearchIntent(request, context);
+  validateKnownCashResearchIntent(request, context);
   if (
     request.lifecycleResearch &&
     (request.history.basis !== 'fixed-provider-snapshot' ||
@@ -186,6 +207,7 @@ export const backtestRunPreparationTerminalResultV3Schema = z.discriminatedUnion
       status: z.literal('prepared'),
       runConfig: runConfigSchemaV3,
       actualSource: backtestSnapshotActualSourceV3Schema,
+      actualPriceSource: backtestSnapshotActualSourceV3Schema.optional(),
       executionPreflight: backtestPreflightResultV3Schema,
       announcementPreparation: marketAnnouncementPreparationSchema.optional(),
     })
@@ -211,6 +233,10 @@ export const backtestRunPreparationTerminalResultV3Schema = z.discriminatedUnion
           message: '准备结果必须披露实际执行来源',
         });
       }
+      const reference = result.actualPriceSource;
+      if (reference && (reference.purpose !== 'execution' || reference.routeKey.kind !== 'bar' || reference.routeKey.adjustment !== 'none' ||
+          reference.symbol !== result.actualSource.symbol || !result.runConfig.priceResearch?.actualPriceWindow))
+        context.addIssue({ code: 'custom', path: ['actualPriceSource'], message: '不复权来源必须对应已冻结的原价参考窗口与同一标的' });
     }),
   z
     .strictObject({

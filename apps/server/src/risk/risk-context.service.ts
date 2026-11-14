@@ -7,7 +7,11 @@ import {
   riskScanEnvelopeSchema,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
-import { concentrationGroups, deriveAccountContexts, derivePortfolioContext } from './risk-context-aggregation.js';
+import {
+  concentrationGroups,
+  deriveAccountContexts,
+  derivePortfolioContext,
+} from './risk-context-aggregation.js';
 import type {
   AccountContext,
   EvaluationCandidate,
@@ -89,15 +93,20 @@ const toDomainPositions = (
   }));
 
 const isRiskPeakObservation = (context: SecurityContext) =>
-  Boolean(context.accountId && context.price !== undefined && context.price > 0 &&
+  Boolean(
+    context.accountId &&
+    context.price !== undefined &&
+    context.price > 0 &&
     context.dataQuality.marketData !== 'unavailable' &&
-    !Object.values(context.dataQuality).some((value) => value === 'stale'));
+    !Object.values(context.dataQuality).some((value) => value === 'stale'),
+  );
 
 @Injectable()
 export class RiskContextService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
+    @Optional()
+    private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {}
 
   async prepare(input: unknown, persistHoldingPeaks: boolean): Promise<ParsedScan> {
@@ -107,10 +116,13 @@ export class RiskContextService {
     if (!persistHoldingPeaks || typeof this.prisma.$executeRaw !== 'function')
       return this.enrichHoldingPeaks(parsed, persistHoldingPeaks, this.prisma);
     // Legacy schedules and data-driven scans share one atomic peak projection.
-    return this.prisma.$transaction(async (client) => {
-      await client.$executeRaw`SELECT pg_advisory_xact_lock(72411, 3)`;
-      return this.enrichHoldingPeaks(parsed, true, client);
-    }, { timeout: 20_000 });
+    return this.prisma.$transaction(
+      async (client) => {
+        await client.$executeRaw`SELECT pg_advisory_xact_lock(72411, 3)`;
+        return this.enrichHoldingPeaks(parsed, true, client);
+      },
+      { timeout: 20_000 },
+    );
   }
 
   candidatesForRule(rule: RiskRule, scan: ParsedScan): EvaluationCandidate[] {
@@ -126,18 +138,23 @@ export class RiskContextService {
         (!rule.symbol || context.symbol === rule.symbol) &&
         (!rule.accountId || context.accountId === rule.accountId),
     );
-    const accountSpecific = Boolean(rule.accountId) || requiresRiskRuleAccount(rule.kind, rule.scope);
+    const accountSpecific =
+      Boolean(rule.accountId) || requiresRiskRuleAccount(rule.kind, rule.scope);
     if (rule.kind === 'position-concentration' && !accountSpecific) {
-      return concentrationGroups(this.latestSecurityContexts(matching)).map(({ context, weight, affectedAccountIds }) => {
-        return this.securityCandidate(
-          this.globalSecurityContext(context),
-          weight,
-          affectedAccountIds,
-        );
-      });
+      return concentrationGroups(this.latestSecurityContexts(matching)).map(
+        ({ context, weight, affectedAccountIds }) => {
+          return this.securityCandidate(
+            this.globalSecurityContext(context),
+            weight,
+            affectedAccountIds,
+          );
+        },
+      );
     }
     if (accountSpecific)
-      return this.latestSecurityContexts(matching).map((context) => this.securityCandidate(context));
+      return this.latestSecurityContexts(matching).map((context) =>
+        this.securityCandidate(context),
+      );
     return this.latestSecurityContextsBySymbol(matching).map((context) => {
       const affectedAccountIds = [
         ...new Set(
@@ -225,7 +242,9 @@ export class RiskContextService {
       throw new BadRequestException('行情陈旧，Risk 默认拒绝评估；请在允许陈旧数据后重试');
   }
 
-  private riskPositionStateDelegate(prisma: Pick<PrismaService, 'riskPositionState'> = this.prisma): RiskPositionStateDelegate | null {
+  private riskPositionStateDelegate(
+    prisma: Pick<PrismaService, 'riskPositionState'> = this.prisma,
+  ): RiskPositionStateDelegate | null {
     const delegate = (prisma as { riskPositionState?: unknown }).riskPositionState;
     if (!delegate || typeof delegate !== 'object') return null;
     const candidate = delegate as { findMany?: unknown; upsert?: unknown };
@@ -234,7 +253,11 @@ export class RiskContextService {
     return candidate as unknown as RiskPositionStateDelegate;
   }
 
-  private async enrichHoldingPeaks(scan: ParsedScan, persist: boolean, client: Pick<PrismaService, 'riskPositionState'>): Promise<ParsedScan> {
+  private async enrichHoldingPeaks(
+    scan: ParsedScan,
+    persist: boolean,
+    client: Pick<PrismaService, 'riskPositionState'>,
+  ): Promise<ParsedScan> {
     const contexts = scan.security.filter(isRiskPeakObservation);
     if (contexts.length === 0) return scan;
     const delegate = this.riskPositionStateDelegate(client);
@@ -262,30 +285,10 @@ export class RiskContextService {
     const peaksByKey = new Map<string, number>();
     for (const [key, context] of latestByKey) {
       const state = statesByKey.get(key);
-      const positionUpdatedAt = context.positionUpdatedAt
-        ? new Date(context.positionUpdatedAt)
-        : undefined;
-      let positionChanged = false;
-      if (state && context.positionId !== undefined) {
-        positionChanged = state.positionId !== context.positionId;
-      } else if (
-        state &&
-        state.positionId === null &&
-        state.positionUpdatedAt !== null &&
-        state.positionUpdatedAt !== undefined &&
-        positionUpdatedAt !== undefined
-      ) {
-        positionChanged = state.positionUpdatedAt.getTime() !== positionUpdatedAt.getTime();
-      }
-      const currentPrice = context.price!;
-      const firstObservation = state === undefined;
-      const previousPeak = firstObservation || positionChanged ? 0 : Number(state?.holdingPeak ?? 0);
-      const suppliedPeak = firstObservation || positionChanged ? 0 : (context.holdingPeak ?? 0);
-      const holdingPeak = Math.max(currentPrice, previousPeak, suppliedPeak);
-      const peakAt =
-        state && Number(state.holdingPeak) >= holdingPeak
-          ? state.peakAt
-          : new Date(context.marketTime);
+      const { positionUpdatedAt, currentPrice, holdingPeak, peakAt } = riskHoldingPeak(
+        context,
+        state,
+      );
       peaksByKey.set(key, holdingPeak);
 
       if (persist) {
@@ -333,11 +336,7 @@ export class RiskContextService {
   }
 
   private async enrichRiskLabels(scan: ParsedScan): Promise<ParsedScan> {
-    const symbols = [
-      ...new Set(
-        scan.security.map((context) => context.symbol),
-      ),
-    ];
+    const symbols = [...new Set(scan.security.map((context) => context.symbol))];
     const accountIds = [
       ...new Set([
         ...scan.security
@@ -397,19 +396,7 @@ export class RiskContextService {
     affectedAccountIds?: string[],
   ): EvaluationCandidate {
     const positions = toDomainPositions(context.positions);
-    const chip =
-      context.chip === undefined
-        ? undefined
-        : {
-            profitRatio: context.chip.profitRatio,
-            concentration: context.chip.concentration,
-            engineVersion: context.chip.engineVersion,
-            calculatedAt: context.chip.calculatedAt,
-            ...(context.chip.mainPeak === undefined ? {} : { mainPeak: context.chip.mainPeak }),
-            ...(context.chip.previousMainPeaks === undefined
-              ? {}
-              : { previousMainPeaks: context.chip.previousMainPeaks }),
-          };
+    const chip = riskCandidateChip(context);
     return {
       scope: 'security',
       mode: context.mode,
@@ -523,4 +510,56 @@ export class RiskContextService {
   private positionStateKey(accountId: string, symbol: string, mode: string) {
     return `${accountId}:${symbol}:${mode}`;
   }
+}
+
+function riskHoldingPeak(context: SecurityContext, state: RiskPositionStateRecord | undefined) {
+  const positionUpdatedAt = context.positionUpdatedAt
+    ? new Date(context.positionUpdatedAt)
+    : undefined;
+  const positionChanged = riskPositionChanged(context, state, positionUpdatedAt);
+  const currentPrice = context.price!;
+  const firstObservation = state === undefined;
+  const previousPeak = firstObservation || positionChanged ? 0 : Number(state?.holdingPeak ?? 0);
+  const suppliedPeak = firstObservation || positionChanged ? 0 : (context.holdingPeak ?? 0);
+  const holdingPeak = Math.max(currentPrice, previousPeak, suppliedPeak);
+  const peakAt =
+    state && Number(state.holdingPeak) >= holdingPeak ? state.peakAt : new Date(context.marketTime);
+  return { positionUpdatedAt, currentPrice, holdingPeak, peakAt };
+}
+
+function riskPositionChanged(
+  context: SecurityContext,
+  state: RiskPositionStateRecord | undefined,
+  positionUpdatedAt: Date | undefined,
+) {
+  let positionChanged = false;
+  if (state && context.positionId !== undefined) {
+    positionChanged = state.positionId !== context.positionId;
+  } else if (
+    state &&
+    state.positionId === null &&
+    state.positionUpdatedAt !== null &&
+    state.positionUpdatedAt !== undefined &&
+    positionUpdatedAt !== undefined
+  ) {
+    positionChanged = state.positionUpdatedAt.getTime() !== positionUpdatedAt.getTime();
+  }
+  return positionChanged;
+}
+
+function riskCandidateChip(context: SecurityContext) {
+  const chip =
+    context.chip === undefined
+      ? undefined
+      : {
+          profitRatio: context.chip.profitRatio,
+          concentration: context.chip.concentration,
+          engineVersion: context.chip.engineVersion,
+          calculatedAt: context.chip.calculatedAt,
+          ...(context.chip.mainPeak === undefined ? {} : { mainPeak: context.chip.mainPeak }),
+          ...(context.chip.previousMainPeaks === undefined
+            ? {}
+            : { previousMainPeaks: context.chip.previousMainPeaks }),
+        };
+  return chip;
 }

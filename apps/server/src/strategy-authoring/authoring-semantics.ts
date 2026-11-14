@@ -3,6 +3,8 @@ import { isEqual } from 'es-toolkit';
 import {
   authoringStrategySchema,
   authoringGenerationOutputSchema,
+  strategyCrossDescriptionIssues,
+  strategyCrossSummaryIssue,
   type AuthoringContent,
 } from '@thesis-ledger/schemas';
 import { authoringSources, matchesAuthoringSource } from './authoring-source-text.js';
@@ -77,6 +79,13 @@ export function validateAuthoringGeneration(content: AuthoringContent, raw: unkn
   const confirmation = requireAuthoringGeneration(content);
   const output = authoringGenerationOutputSchema.parse(raw);
   const definition = authoringStrategySchema.parse(JSON.stringify(output.definition));
+  const signalIssues = strategyCrossDescriptionIssues(definition).map((issue) => issue.message);
+  for (const path of ['entry', 'exit'] as const) {
+    const issue = strategyCrossSummaryIssue(definition[path], confirmation[`${path}Summary`]);
+    if (issue) signalIssues.push(`${path}：${issue}`);
+  }
+  if (signalIssues.length)
+    reject('AUTHORING_SEMANTIC_MISMATCH', '生成定义的交叉方向与确认规则或说明不一致', signalIssues);
   const constraints = {
     executionInstrument: confirmation.instrument,
     primaryTimeframe: confirmation.timeframe,

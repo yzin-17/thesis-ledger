@@ -13,6 +13,40 @@ const fixture = () =>
 const controller = (control: ReturnType<typeof vi.fn>) =>
   new MarketRuleMonitorController({ control } as unknown as DsaClient);
 describe('收费资料监测边界代理', () => {
+  it('正文与基准必须属于请求版本；非法输入零发送，缺失版本保留404', async () => {
+    const sample = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../../../packages/schemas/fixtures/rule-source-monitor-version.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    const control = vi.fn(async () => sample.detail);
+    const reader = controller(control);
+    const { kind, identity, contentHash, baseHash } = sample.request;
+    expect(await reader.versionDetail(kind, identity, contentHash, baseHash)).toEqual(
+      sample.detail,
+    );
+    await expect(reader.versionDetail(kind, identity, '../bad', baseHash)).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(control).toHaveBeenCalledTimes(1);
+    await expect(reader.versionDetail(kind, identity, baseHash, contentHash)).rejects.toMatchObject(
+      { status: 502 },
+    );
+    await expect(
+      reader.versionDetail(kind, identity + 'other', contentHash, baseHash),
+    ).rejects.toMatchObject({ status: 502 });
+    await expect(reader.versionDetail(kind, identity, contentHash)).rejects.toMatchObject({
+      status: 502,
+    });
+    control.mockRejectedValueOnce(new DsaError('受控缺失', 'unavailable', 404));
+    await expect(reader.versionDetail(kind, identity, contentHash, baseHash)).rejects.toMatchObject(
+      { status: 404, response: { code: 'rule_monitor_version_not_found' } },
+    );
+  });
   it('只使用Control与单次传输，保留真实持久状态', async () => {
     const sample = fixture();
     const control = vi.fn(async () => sample.status);

@@ -8,6 +8,7 @@ import { planDatabaseUpgrade } from './database-upgrade-plan.js';
 import { backupDatabaseForUpgrade } from './database-upgrade-backup.js';
 import { runDatabaseUpgradeRehearsal } from './database-upgrade-run-rehearsal.js';
 import { buildDatabaseUpgradeSql } from './database-upgrade-sql.js';
+import { prepareNoBackupUpgrade, verifyNoBackupUpgrade, type NoBackupUpgradeEvidence } from './database-upgrade-no-backup.js';
 
 const run = promisify(execFile);
 let stage = '配置校验';
@@ -17,7 +18,7 @@ const required = (key: string) => {
   return value;
 };
 
-/** 仅由官方更新入口调用；只读取源库和生成备份/演练证据，不执行源库升级。 */
+/** 仅由官方更新入口调用；准备和核验只读取源库，不执行源库升级。 */
 async function main() {
   const directory = required('DATABASE_UPGRADE_RUN_DIR');
   const container = required('DATABASE_UPGRADE_CONTAINER');
@@ -43,15 +44,38 @@ async function main() {
   const appRole = (await run('docker', ['exec', container, 'printenv', 'POSTGRES_APP_USER'],
     { timeout: 30_000, maxBuffer: 4096 })).stdout.trim();
   const source = await discoverDatabaseStructure();
+  const permissionsSql = await readFile(required('DEV_DATABASE_PERMISSIONS_SQL'), 'utf8');
+  const noBackup = process.env.DEV_DATABASE_UPGRADE_NO_BACKUP;
+  if (noBackup && noBackup !== 'true' && noBackup !== 'false') throw new Error('不备份选项无效');
+  if (noBackup === 'true') {
+    const options = { source, fromHead, target, container, permissionsSql, appRole,
+      project: required('DEV_DATABASE_PROJECT'), approvedSha256: required('DEV_DATABASE_UPGRADE_MIGRATION_SHA256') };
+    if (await query('SELECT current_database() || \'/\' || current_user;') !== `${target.databaseName}/${target.ownerName}`)
+      throw new Error('不备份升级实际数据库身份不匹配');
+    if (process.env.DATABASE_UPGRADE_PHASE === 'verify-no-backup') {
+      stage = '不备份升级旧数据核验';
+      const evidence = JSON.parse(await readFile(join(directory, 'no-backup.json'), 'utf8')) as NoBackupUpgradeEvidence;
+      const verified = await verifyNoBackupUpgrade({ ...options, evidence, currentHead: fromHead });
+      await writeFile(join(directory, 'no-backup-verified.json'), JSON.stringify(verified, null, 2), { flag: 'wx', mode: 0o600 });
+      process.stdout.write('不备份升级旧列数据核验通过。\n'); return;
+    }
+  }
   const imageInput = JSON.parse(await readFile(join(directory, 'image-input.json'), 'utf8')) as DatabaseStructureInput;
   const plan = planDatabaseUpgrade(source, fromHead, target);
   if (planDatabaseUpgrade(imageInput, fromHead, target).fingerprint !== plan.fingerprint)
     throw new Error('本地与待部署镜像的结构输入不一致');
-  const permissionsSql = await readFile(required('DEV_DATABASE_PERMISSIONS_SQL'), 'utf8');
-  stage = '源库备份';
-  const backup = await backupDatabaseForUpgrade(container, target, join(directory, 'backup.dump'));
-  stage = '隔离演练';
-  const evidence = await runDatabaseUpgradeRehearsal({ source, fromHead, backup, consumersStoppedAt, permissionsSql, appRole });
+  let evidence;
+  if (noBackup === 'true') {
+    stage = '不备份结构演练';
+    evidence = await prepareNoBackupUpgrade({ source, fromHead, target, container, permissionsSql, appRole,
+      project: required('DEV_DATABASE_PROJECT'), approvedSha256: required('DEV_DATABASE_UPGRADE_MIGRATION_SHA256') });
+    await writeFile(join(directory, 'no-backup.json'), JSON.stringify(evidence, null, 2), { flag: 'wx', mode: 0o600 });
+  } else {
+    stage = '源库备份';
+    const backup = await backupDatabaseForUpgrade(container, target, join(directory, 'backup.dump'));
+    stage = '隔离演练';
+    evidence = await runDatabaseUpgradeRehearsal({ source, fromHead, backup, consumersStoppedAt, permissionsSql, appRole });
+  }
   stage = '演练后源库与输入复核';
   await assertStopped();
   if (await query('SELECT version FROM "SchemaVersion" WHERE id=1;') !== fromHead)
@@ -70,6 +94,6 @@ main().catch((error: unknown) => {
   // 子进程异常可能包含环境参数；详细业务数据及凭据不得写入更新日志。
   const detail = error instanceof Error && /^隔离演练阶段失败：[\u4e00-\u9fa5]+$/.test(error.message)
     ? `（${error.message}）` : '';
-  process.stderr.write(`保留数据升级准备失败：${stage}${detail}；备份与已有证据保留，消费者必须保持停止。\n`);
+  process.stderr.write(`保留数据升级准备失败：${stage}${detail}；已有证据保留，消费者必须保持停止。\n`);
   process.exitCode = 1;
 });

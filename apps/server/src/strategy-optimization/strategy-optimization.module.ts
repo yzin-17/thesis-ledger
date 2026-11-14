@@ -9,6 +9,7 @@ import { StrategySubmissionsController } from './strategy-submissions.controller
 import { StrategySubmissions } from './strategy-submissions.js';
 import { StrategySubmissionExecution } from './strategy-submission-execution.js';
 import { OptimizationPreparation } from './optimization-preparation.js';
+import { OptimizationModelResolution } from './optimization-model-resolution.js';
 import { PlatformModule } from '../platform/platform.module.js';
 import { StrategyOptimizationCandidateService } from './strategy-optimization-candidate.service.js';
 import { StrategyOptimizationAiSettlementStore } from './strategy-optimization-ai-settlement.store.js';
@@ -26,6 +27,7 @@ import { StrategyRiskApplicationService } from './strategy-risk-application.serv
   imports: [AiModule, BacktestModule, IdentityModule, RiskModule, PlatformModule, MarketModule],
   controllers: [StrategyOptimizationController, StrategyOptimizationPreparationController, StrategySubmissionsController],
   providers: [
+    OptimizationModelResolution,
     StrategyIdentityGuard, OptimizationPreparation, StrategySubmissionExecution, StrategySubmissions,
     StrategyOptimizationReadService,
     StrategyOptimizationRunService,

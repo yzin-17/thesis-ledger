@@ -7,6 +7,7 @@ import {
   marketInstrumentFactSchema,
   type ArenaComparison,
   type ArenaPeriod,
+  type ArenaProtocol,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { arenaMetrics, benchmarkNav, equalWeightEntry } from './arena-performance.js';
@@ -27,17 +28,7 @@ export class ArenaComparisons {
     });
     if (!arena) throw new NotFoundException('比赛不存在');
     const p = arenaProtocolSchema.parse(arena.protocol);
-    const civil = new Intl.DateTimeFormat('en-CA', {
-      timeZone: p.timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const start = period.start ?? p.startsOn;
-    const lastDay = civil.format(asOf);
-    const end = period.end ?? (lastDay < p.startsOn ? p.startsOn : [p.endsOn, lastDay].sort()[0]!);
-    if (start > end || start < p.startsOn || end > p.endsOn)
-      throw new BadRequestException('区间超出比赛赛期');
+    const { civil, start, end } = comparisonPeriodWindow(p, period, asOf);
     const [slots, rounds, allFills] = await Promise.all([
       this.db.arenaOccurrence.findMany({
         where: { arenaId: id, tradingDate: { lte: end }, dueAt: { lte: asOf } },
@@ -177,4 +168,19 @@ export class ArenaComparisons {
       rows,
     });
   }
+}
+
+function comparisonPeriodWindow(p: ArenaProtocol, period: ArenaPeriod, asOf: Date) {
+  const civil = new Intl.DateTimeFormat('en-CA', {
+    timeZone: p.timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const start = period.start ?? p.startsOn;
+  const lastDay = civil.format(asOf);
+  const end = period.end ?? (lastDay < p.startsOn ? p.startsOn : [p.endsOn, lastDay].sort()[0]!);
+  if (start > end || start < p.startsOn || end > p.endsOn)
+    throw new BadRequestException('区间超出比赛赛期');
+  return { civil, start, end };
 }

@@ -17,6 +17,7 @@ import {
 import { executionPriceProtocolSchema } from './market-price-protocol.js';
 import { backtestPriceInputBindingsSchemaV3 } from './backtest-price-input-bindings.js';
 import { marketFrozenWindowRefV3Schema } from './market-frozen-window.js';
+import { backtestPriceResearchSchema } from './backtest-price-research.js';
 import { backtestSnapshotManifestV3Schema } from './backtest-data.js';
 import { backtestKnownCashPreparationV3Schema } from './backtest-known-cash-preparation-v3.js';
 import { knownCashRunBindingIssuesV3 } from './backtest-known-cash-binding-v3.js';
@@ -81,9 +82,10 @@ export const validateRunConfig = (
 };
 
 /** 当前配置冻结明确的价格坐标与历史可见性语义。 */
-export const runConfigSchemaV3 = z
+const runConfigV3Fields = z
   .strictObject({
     schemaVersion: z.literal('3'),
+    priceResearch: backtestPriceResearchSchema.optional(),
     ...runConfigFields,
     executionModel: backtestExecutionModelSchemaV3.optional(),
     executionPriceProtocol: executionPriceProtocolSchema,
@@ -93,9 +95,27 @@ export const runConfigSchemaV3 = z
     knownCashPreparation: backtestKnownCashPreparationV3Schema.optional(),
     frozenWarmupBudgetSessions: z.number().int().min(0).max(504).optional(),
     frozenPriceWarmupPolicy: z.literal('cash-reference-calendar-buffer-v1').optional(),
-  })
+  });
+
+function validateRunPriceResearch(value: z.infer<typeof runConfigV3Fields>, context: z.RefinementCtx): void {
+    if (value.priceResearch) {
+      const protocol = value.executionPriceProtocol;
+      if (protocol.accountingBasis !== 'normalized-series' ||
+          protocol.priceBasis.adjustment !== 'hfq' ||
+          protocol.history.basis !== 'fixed-provider-snapshot' ||
+          protocol.cashEventResearch || protocol.marketRuleResearch || value.knownCashPreparation ||
+          value.lifecyclePreparation) {
+        issue(context, ['priceResearch'], '价格研究需要后复权、归一化单位和固定供应商快照');
+      }
+    } else if (value.priceInputBindings?.signals.some((source) => source.binding === 'actual-price-series')) {
+      issue(context, ['priceInputBindings'], '实际参考行情绑定必须携带价格研究协议');
+    }
+}
+
+export const runConfigSchemaV3 = runConfigV3Fields
   .superRefine((value, context) => {
     validateRunConfig(value, context);
+    validateRunPriceResearch(value, context);
     for (const message of knownCashRunBindingIssuesV3(value))
       issue(context, ['knownCashPreparation'], message);
     if (value.frozenPriceWarmupPolicy && !value.knownCashPreparation)

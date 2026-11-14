@@ -196,6 +196,9 @@ describe('ThesisLedgerApiClient', () => {
     );
   });
 
+});
+
+describe('共享客户端账本与成交命令', () => {
   it('typed ledger endpoint validates reconciliation preview and posts confirmation', async () => {
     const response = {
       eventIds: ['00000000-0000-4000-8000-000000000003'],
@@ -354,6 +357,9 @@ describe('ThesisLedgerApiClient', () => {
     );
   });
 
+});
+
+describe('共享客户端行情及错误响应', () => {
   it('通过共享 API Client 请求行情详情并保留 AbortSignal', async () => {
     const barSeries = {
       contractVersion: 3,

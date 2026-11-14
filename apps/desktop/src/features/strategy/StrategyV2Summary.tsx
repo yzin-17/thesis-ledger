@@ -8,6 +8,9 @@ import {
   strategyTimeframeLabel,
 } from './strategy-display-labels.js';
 import type { StrategySchema } from './strategy.types.js';
+import type { InstrumentDirectory } from '@thesis-ledger/schemas';
+import { strategyInstrumentLabel } from './strategy-instrument-display.js';
+import { strategySchema, priceResearchStrategySummary, type BacktestStrategy } from '@thesis-ledger/schemas';
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -19,10 +22,12 @@ const text = (value: unknown, fallback = '未配置') =>
 
 export function StrategyV2Summary({
   schema,
+  instrumentDirectory,
   strategyName,
   version,
 }: {
   schema: StrategySchema;
+  instrumentDirectory?: InstrumentDirectory | undefined;
   strategyName?: string;
   version?: number;
 }) {
@@ -30,6 +35,9 @@ export function StrategyV2Summary({
   const sizing = asRecord(schema.sizing);
   const sources = Array.isArray(schema.signalSources) ? schema.signalSources : [];
   const risks = Array.isArray(schema.risk) ? schema.risk : [];
+  const parsed = strategySchema.safeParse(schema);
+  const research = schema.schemaVersion === '3' && parsed.success
+    ? priceResearchStrategySummary(parsed.data as BacktestStrategy) : null;
   return (
     <Card size="sm" className="bg-muted/20">
       <CardHeader className="gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:grid-rows-none">
@@ -38,7 +46,7 @@ export function StrategyV2Summary({
             {strategyName ?? text(schema.name, '未知策略')}
           </CardTitle>
           <CardDescription className="mt-1">
-            {text(instrument.symbol)} / {strategyMarketLabel(instrument.market, '未配置')} /{' '}
+            {strategyInstrumentLabel(instrumentDirectory, text(instrument.symbol))} / {strategyMarketLabel(instrument.market, '未配置')} /{' '}
             {strategyAssetTypeLabel(instrument.assetType, '未配置')}
           </CardDescription>
         </div>
@@ -50,6 +58,9 @@ export function StrategyV2Summary({
         </div>
       </CardHeader>
       <CardContent>
+        {research && <div className="mb-3 flex flex-col gap-1 text-sm">
+          <p>入场：{research.entry}</p><p>退出：{research.exit}</p><p>投入：{research.sizing}</p>
+        </div>}
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <p className="text-xs text-muted-foreground">信号来源</p>
@@ -58,7 +69,7 @@ export function StrategyV2Summary({
           <div>
             <p className="text-xs text-muted-foreground">仓位</p>
             <p className="mt-0.5 text-sm">
-              {strategySizingTypeLabel(sizing.type)}{' '}
+              {research && sizing.type === 'fixedQuantity' ? '投入参考份数' : strategySizingTypeLabel(sizing.type)}{' '}
               {text(sizing.amount ?? sizing.percent ?? sizing.quantity ?? sizing.weight)}
             </p>
           </div>

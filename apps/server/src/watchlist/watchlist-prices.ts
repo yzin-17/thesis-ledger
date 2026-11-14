@@ -48,7 +48,7 @@ export class WatchlistPrices {
     );
     const values = new Map<string, WatchlistPrice['price']>();
     const quotes: MarketQuoteIdentity[] = items.flatMap((i) =>
-      i.active && (i.type === 'ETF' || i.type === 'STOCK')
+      i.type === 'ETF' || i.type === 'STOCK'
         ? [{ symbol: i.symbol, assetType: i.type }]
         : [],
     );
@@ -86,7 +86,7 @@ export class WatchlistPrices {
       items.map(async (i) => {
         const price = values.get(i.type + ':' + i.symbol) ?? {
           kind: 'unavailable' as const,
-          reason: i.active ? 'unavailable' : 'inactive_instrument',
+          reason: i.type === 'MUTUAL_FUND' && !i.active ? 'inactive_instrument' : 'unavailable',
         };
         const quoteContext =
           price.kind === 'quote' ? price.quote.sessionContext ?? await this.quoteContext.read(price.quote) : undefined;

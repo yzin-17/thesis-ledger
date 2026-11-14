@@ -6,8 +6,10 @@ import {
 import { marketProviderControlClient } from './market-provider-control-client.js';
 import type { ParsedRequest } from './parsed-request.js';
 import { ruleSourceMonitorClient } from './rule-source-monitor-client.js';
+import { marketRoutingClient } from './market-routing-client.js';
 export function marketControlClient(request: ParsedRequest) {
   return {
+    ...marketRoutingClient(request),
     ...ruleSourceMonitorClient(request),
     ...marketProviderControlClient(request),
     getPolicy: (signal?: AbortSignal) =>

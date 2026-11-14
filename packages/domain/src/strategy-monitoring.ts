@@ -47,6 +47,7 @@ export type StrategyMonitoringEvaluation = {
   value?: string;
   threshold: string;
   reason?: string;
+  reasonCode?: string;
   occurredAt?: string;
   availableAt?: string;
 };
@@ -201,6 +202,8 @@ export const compileStrategyMonitoringPlan = (
 };
 
 export type StrategyMonitoringContext = {
+  inputIssue?: { code: string; reason: string };
+  holdingStartKnown?: boolean;
   quantity?: string;
   price?: string;
   averageCost?: string;
@@ -225,37 +228,44 @@ export const evaluateStrategyMonitoringRule = (
 ): StrategyMonitoringEvaluation => {
   const base = evaluationBase(rule, context);
   if (context.quantity === undefined) {
-    return { ...base, state: 'unavailable', reason: '缺少实际持仓数量' };
+    return { ...base, state: 'unavailable', reasonCode: 'position_missing', reason: '缺少实际持仓数量' };
   }
   let quantity: DecimalValue;
   try {
     quantity = DecimalValue.from(context.quantity);
   } catch {
-    return { ...base, state: 'unavailable', reason: '实际持仓数量无效' };
+    return { ...base, state: 'unavailable', reasonCode: 'quantity_invalid', reason: '实际持仓数量无效' };
   }
-  if (!quantity.isPositive()) return { ...base, state: 'not_applicable', reason: '当前无有效持仓' };
+  if (!quantity.isPositive()) return { ...base, state: 'not_applicable', reasonCode: 'position_empty', reason: '当前无有效持仓' };
+
+  if (rule.metric === 'holdingPeriods' && context.holdingStartKnown === false)
+    return { ...base, state: 'unavailable', reasonCode: 'holding_start_missing', reason: '缺少可验证的持仓开仓时间' };
+
+  if (context.inputIssue) return { ...base, state: 'unavailable', reasonCode: context.inputIssue.code, reason: context.inputIssue.reason };
 
   if (rule.metric === 'holdingPeriods') {
     if (context.holdingPeriods === undefined || !Number.isInteger(context.holdingPeriods)) {
-      return { ...base, state: 'unavailable', reason: '缺少可验证的持有周期起点' };
+      if (context.holdingStartKnown === true)
+        return { ...base, state: 'unavailable', reasonCode: 'holding_history_incomplete', reason: '开仓至今的已完成行情记录不足，无法计算持有周期' };
+      return { ...base, state: 'unavailable', reasonCode: 'holding_start_missing', reason: '缺少可验证的持有周期起点' };
     }
     const value = String(context.holdingPeriods);
     const triggered = DecimalValue.from(value).compareTo(rule.threshold) >= 0;
     return { ...base, state: triggered ? 'triggered' : 'not_triggered', value };
   }
 
-  if (context.price === undefined) return { ...base, state: 'unavailable', reason: '缺少已完成评价时点价格' };
+  if (context.price === undefined) return { ...base, state: 'unavailable', reasonCode: 'completed_price_missing', reason: '缺少已完成评价时点价格' };
   if (context.averageCost === undefined)
-    return { ...base, state: 'unavailable', reason: '缺少账户投影平均成本' };
+    return { ...base, state: 'unavailable', reasonCode: 'average_cost_missing', reason: '缺少账户投影平均成本' };
   let price: DecimalValue;
   let averageCost: DecimalValue;
   try {
     price = DecimalValue.from(context.price);
     averageCost = DecimalValue.from(context.averageCost);
   } catch {
-    return { ...base, state: 'unavailable', reason: '价格或平均成本无效' };
+    return { ...base, state: 'unavailable', reasonCode: 'price_or_cost_invalid', reason: '价格或平均成本无效' };
   }
-  if (!averageCost.isPositive()) return { ...base, state: 'unavailable', reason: '平均成本必须大于零' };
+  if (!averageCost.isPositive()) return { ...base, state: 'unavailable', reasonCode: 'average_cost_invalid', reason: '平均成本必须大于零' };
   const value = price.dividedBy(averageCost).minus('1').toString();
   const comparison = DecimalValue.from(value).compareTo(rule.threshold);
   const triggered = rule.operator === 'lte' ? comparison <= 0 : comparison >= 0;

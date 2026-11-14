@@ -80,34 +80,9 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
   const executionRoutes = parseExecutionRoutes(record.executionRoutes, models);
   const modelDefaults = parseModelDefaults(record.modelDefaults, models);
   const capabilityRevocations = parseCapabilityRevocations(record.capabilityRevocations);
-  const explicitSelection = aiUpstreamSelectionSchema.safeParse({
-    upstreamFormat: record.upstreamFormat,
-    ...(record.chatImplementation === undefined
-      ? {}
-      : { chatImplementation: record.chatImplementation }),
-  });
-  if (
-    !explicitSelection.success &&
-    (record.upstreamFormat !== undefined || record.chatImplementation !== undefined)
-  )
-    return null;
-  if (!explicitSelection.success && !legacyAdapter.success) return null;
-  const selection = explicitSelection.success
-    ? explicitSelection.data
-    : selectionFromLegacyAdapter(legacyAdapter.data!);
-  const storedProfile =
-    record.compatibilityExtensionProfile === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
-      ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
-      : undefined;
-  const migratedProfile =
-    !explicitSelection.success &&
-    legacyAdapter.success &&
-    legacyAdapter.data === 'openrouter' &&
-    Boolean(executionRoutes?.length)
-      ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
-      : undefined;
-  const compatibilityExtensionProfile = storedProfile ?? migratedProfile;
-  const adapter = runtimeAdapterForSelection(selection, compatibilityExtensionProfile);
+  const upstream = storedProviderUpstream(record, legacyAdapter, executionRoutes);
+  if (!upstream) return null;
+  const { selection, compatibilityExtensionProfile, adapter } = upstream;
   return {
     baseUrl,
     models,
@@ -124,19 +99,7 @@ export const parseAiProviderSettings = (value: unknown): ParsedAiProviderSetting
     ...(capabilityRevocations ? { capabilityRevocations } : {}),
     ...(modelPricing ? { modelPricing } : {}),
     ...(modelReasoning ? { modelReasoning } : {}),
-    ...(typeof record.timeoutMs === 'number' ? { timeoutMs: record.timeoutMs } : {}),
-    ...(typeof record.firstOutputTimeoutMs === 'number'
-      ? { firstOutputTimeoutMs: record.firstOutputTimeoutMs }
-      : {}),
-    ...(typeof record.outputIdleTimeoutMs === 'number'
-      ? { outputIdleTimeoutMs: record.outputIdleTimeoutMs }
-      : {}),
-    ...(typeof record.costPer1kInput === 'number' ? { costPer1kInput: record.costPer1kInput } : {}),
-    ...(typeof record.costPer1kOutput === 'number'
-      ? { costPer1kOutput: record.costPer1kOutput }
-      : {}),
-    ...(typeof record.costCurrency === 'string' ? { costCurrency: record.costCurrency } : {}),
-    ...(typeof record.pricingVersion === 'string' ? { pricingVersion: record.pricingVersion } : {}),
+    ...storedProviderDefaults(record),
   };
 };
 
@@ -239,19 +202,8 @@ const settingsSummary = (settings: ParsedAiProviderSettings | null) => {
     ...(settings?.modelDefaults === undefined ? {} : { modelDefaults: settings.modelDefaults }),
     ...(modelPricing ? { modelPricing } : {}),
     ...(settings?.modelReasoning === undefined ? {} : { modelReasoning: settings.modelReasoning }),
-    ...(settings?.timeoutMs === undefined ? {} : { timeoutMs: settings.timeoutMs }),
-    ...(settings?.firstOutputTimeoutMs === undefined
-      ? {}
-      : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
-    ...(settings?.outputIdleTimeoutMs === undefined
-      ? {}
-      : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
-    ...(settings?.costPer1kInput === undefined ? {} : { costPer1kInput: settings.costPer1kInput }),
-    ...(settings?.costPer1kOutput === undefined
-      ? {}
-      : { costPer1kOutput: settings.costPer1kOutput }),
-    ...(settings?.costCurrency === undefined ? {} : { costCurrency: settings.costCurrency }),
-    ...(settings?.pricingVersion === undefined ? {} : { pricingVersion: settings.pricingVersion }),
+    ...providerTimeoutSummary(settings),
+    ...providerLegacyPriceSummary(settings),
   };
 };
 
@@ -297,12 +249,95 @@ export const aiProviderSummaryFromRow = (
   ...settingsSummary(settings),
   ...(legacyModelPricing(settings) ? { modelPricing: legacyModelPricing(settings) } : {}),
   credentialConfigured: Boolean(row.encryptedCredentials),
-  health: health?.state ?? row.health ?? 'unknown',
-  updatedAt: row.updatedAt?.toISOString?.() ?? null,
-  checkedAt: health?.checkedAt?.toISOString?.() ?? null,
-  latencyMs: health?.latencyMs ?? null,
-  errorCode: health?.errorCode ?? null,
+  ...providerHealthSummary(row, health),
   ...(settings ? {} : { configError: '保存的 AI Provider 配置无效' }),
 });
 
 export { healthValue };
+
+function storedProviderUpstream(
+  record: Record<string, unknown>,
+  legacyAdapter: ReturnType<typeof aiLegacyAdapterSchema.safeParse>,
+  executionRoutes: AiProviderExecutionRouteInput[] | null,
+) {
+  const explicitSelection = aiUpstreamSelectionSchema.safeParse({
+    upstreamFormat: record.upstreamFormat,
+    ...(record.chatImplementation === undefined
+      ? {}
+      : { chatImplementation: record.chatImplementation }),
+  });
+  if (
+    !explicitSelection.success &&
+    (record.upstreamFormat !== undefined || record.chatImplementation !== undefined)
+  )
+    return null;
+  if (!explicitSelection.success && !legacyAdapter.success) return null;
+  const selection = explicitSelection.success
+    ? explicitSelection.data
+    : selectionFromLegacyAdapter(legacyAdapter.data!);
+  const storedProfile =
+    record.compatibilityExtensionProfile === AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+      ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+      : undefined;
+  const migratedProfile =
+    !explicitSelection.success &&
+    legacyAdapter.success &&
+    legacyAdapter.data === 'openrouter' &&
+    Boolean(executionRoutes?.length)
+      ? AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1
+      : undefined;
+  const compatibilityExtensionProfile = storedProfile ?? migratedProfile;
+  const adapter = runtimeAdapterForSelection(selection, compatibilityExtensionProfile);
+  return { selection, compatibilityExtensionProfile, adapter };
+}
+
+function storedProviderDefaults(record: Record<string, unknown>) {
+  return {
+    ...(typeof record.timeoutMs === 'number' ? { timeoutMs: record.timeoutMs } : {}),
+    ...(typeof record.firstOutputTimeoutMs === 'number'
+      ? { firstOutputTimeoutMs: record.firstOutputTimeoutMs }
+      : {}),
+    ...(typeof record.outputIdleTimeoutMs === 'number'
+      ? { outputIdleTimeoutMs: record.outputIdleTimeoutMs }
+      : {}),
+    ...(typeof record.costPer1kInput === 'number' ? { costPer1kInput: record.costPer1kInput } : {}),
+    ...(typeof record.costPer1kOutput === 'number'
+      ? { costPer1kOutput: record.costPer1kOutput }
+      : {}),
+    ...(typeof record.costCurrency === 'string' ? { costCurrency: record.costCurrency } : {}),
+    ...(typeof record.pricingVersion === 'string' ? { pricingVersion: record.pricingVersion } : {}),
+  };
+}
+
+function providerTimeoutSummary(settings: ParsedAiProviderSettings | null) {
+  return {
+    ...(settings?.timeoutMs === undefined ? {} : { timeoutMs: settings.timeoutMs }),
+    ...(settings?.firstOutputTimeoutMs === undefined
+      ? {}
+      : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
+    ...(settings?.outputIdleTimeoutMs === undefined
+      ? {}
+      : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
+  };
+}
+
+function providerLegacyPriceSummary(settings: ParsedAiProviderSettings | null) {
+  return {
+    ...(settings?.costPer1kInput === undefined ? {} : { costPer1kInput: settings.costPer1kInput }),
+    ...(settings?.costPer1kOutput === undefined
+      ? {}
+      : { costPer1kOutput: settings.costPer1kOutput }),
+    ...(settings?.costCurrency === undefined ? {} : { costCurrency: settings.costCurrency }),
+    ...(settings?.pricingVersion === undefined ? {} : { pricingVersion: settings.pricingVersion }),
+  };
+}
+
+function providerHealthSummary(row: ProviderConfig, health: HealthSnapshot) {
+  return {
+    health: health?.state ?? row.health ?? 'unknown',
+    updatedAt: row.updatedAt?.toISOString?.() ?? null,
+    checkedAt: health?.checkedAt?.toISOString?.() ?? null,
+    latencyMs: health?.latencyMs ?? null,
+    errorCode: health?.errorCode ?? null,
+  };
+}

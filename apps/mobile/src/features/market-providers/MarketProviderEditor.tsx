@@ -42,6 +42,7 @@ function ProviderForm({
     [],
   );
   const fields = credentialFields(provider, method);
+  const levelSupported = provider.accountLevelSupported ?? (provider.accountAccessSupported === true && provider.providerId === 'tushare');
   const clearSensitive = () =>
     setValues((previous) =>
       Object.fromEntries(
@@ -105,7 +106,7 @@ function ProviderForm({
         if (kind === 'test' || kind === 'account') {
           const result = await api.market.testProvider(
             provider.providerId,
-            providerProbeInput(kind, probeDraft, credentials),
+            providerProbeInput(kind, probeDraft, credentials, levelSupported),
             controller.signal,
           );
           setProbe(result);
@@ -188,6 +189,7 @@ function ProviderForm({
         change={(patch) => setProbeDraft((value) => ({ ...value, ...patch }))}
         pending={command.pending || !readable}
         accountSupported={provider.accountAccessSupported === true}
+        accountLevelSupported={levelSupported}
         run={(kind) => void operate(kind)}
         result={probe}
       />

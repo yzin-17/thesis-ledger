@@ -5,6 +5,7 @@ import { InstrumentAssociationService } from './instruments/instrument-associati
 import { InstrumentSearchService } from './instruments/instrument-search.service.js';
 import { CatalogSyncService } from './instruments/catalog-sync.service.js';
 import { currencyForMarket, marketNewsRequestV3Schema, type MarketNewsRequestV3 } from '@thesis-ledger/schemas';
+import type { DsaClient } from '../integration/dsa/dsa.client.js';
 import type { Prisma } from '@prisma/client';
 import { InstrumentDirectoryService } from './instruments/instrument-directory.service.js';
 
@@ -40,8 +41,12 @@ export class InstrumentService {
     return this.catalog().applyCatalogDelta(raw);
   }
 
-  search(query: string, limit = 20) {
-    return this.searcher().search(query, limit);
+  search(query: string, limit = 20, scope?: { markets: readonly string[]; types: readonly string[] }) {
+    return this.searcher().search(query, limit, scope);
+  }
+
+  searchForPicker(query: string, limit: number, dsa: DsaClient) {
+    return this.searcher().searchForPicker(query, limit, dsa);
   }
 
   async locate(symbol: string, instrumentType: string) {

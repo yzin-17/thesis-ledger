@@ -52,13 +52,7 @@ export class ProviderHealthService {
       where: { provider: providerKey },
     });
     const consecutiveFailures = success ? 0 : (previous?.consecutiveFailures ?? 0) + 1;
-    const state: ProviderState = success
-      ? latencyMs > slowAfterMs
-        ? 'degraded'
-        : 'healthy'
-      : consecutiveFailures >= 3
-        ? 'down'
-        : 'degraded';
+    const state = observedProviderState(success, latencyMs, slowAfterMs, consecutiveFailures);
     const result = await this.prisma.providerHealth.upsert({
       where: { provider: providerKey },
       update: {
@@ -142,14 +136,25 @@ export class ProviderHealthService {
     return [await this.checkDsa(source)];
   }
 
-  async history(provider?: string, page?: number, pageSize?: number) {
+  async history(provider?: string, page?: number, pageSize?: number, issuesOnly = false) {
     const providerKey = provider ? normalizeProviderName(provider) : undefined;
     const requestedPage = Number.isInteger(page) && page && page > 0 ? page : 1;
     const requestedPageSize =
       Number.isInteger(pageSize) && pageSize && pageSize > 0
         ? Math.min(pageSize, MAX_HISTORY_PAGE_SIZE)
         : DEFAULT_HISTORY_PAGE_SIZE;
-    const where = providerKey ? { provider: providerKey } : {};
+    const where: Prisma.ProviderHealthCheckWhereInput = {
+      ...(providerKey ? { provider: providerKey } : {}),
+      ...(issuesOnly
+        ? {
+            state: { in: ['degraded', 'down'] },
+            OR: [
+              { errorCode: null },
+              { errorCode: { notIn: ['pending', 'operation_authorized', 'validation_cancelled'] } },
+            ],
+          }
+        : {}),
+    };
     const total = await this.prisma.providerHealthCheck.count({ where });
     const totalPages = Math.ceil(total / requestedPageSize);
     const currentPage = totalPages === 0 ? 1 : Math.min(requestedPage, totalPages);
@@ -168,3 +173,10 @@ export class ProviderHealthService {
     };
   }
 }
+
+
+function observedProviderState(success: boolean, latencyMs: number, slowAfterMs: number, consecutiveFailures: number): ProviderState {
+  if (success) return latencyMs > slowAfterMs ? 'degraded' : 'healthy';
+  return consecutiveFailures >= 3 ? 'down' : 'degraded';
+}
+

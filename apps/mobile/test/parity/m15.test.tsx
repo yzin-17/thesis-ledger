@@ -62,11 +62,14 @@ describe('M15 风险规则与试算输入', () => {
     expect(contexts[0]?.dataQuality).toEqual({ portfolio: 'partial', marketData: 'stale' });
   });
   it('保存冲突保留阈值并锁住重复提交', async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({ error: 'Conflict', message: '风险规则版本冲突' }, { status: 409 }),
-      );
+    const fetcher = vi.fn<typeof fetch>((url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === '/api/v1/notifications/routing/risk' && !init?.method)
+        return Promise.resolve(Response.json({ availableRoutes: [], selectedProviders: [], updatedAt: null }));
+      if (path === '/api/v1/risk/rules' && init?.method === 'POST')
+        return Promise.resolve(Response.json({ error: 'Conflict', message: '风险规则版本冲突' }, { status: 409 }));
+      throw new Error(`意外风险规则请求：${init?.method ?? 'GET'} ${path}`);
+    });
     setApi(fetcher);
     await mount(
       <RiskRuleForm accounts={[ledgerAccount]} portfolio={portfolio} readable reload={vi.fn()} />,
@@ -76,8 +79,10 @@ describe('M15 风险规则与试算输入', () => {
     await click(button('保存风险规则'));
     expect(field('风险阈值（数值）').value).toBe('3.5');
     expect(button('保存风险规则').disabled).toBe(true);
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetcher.mock.calls[0]![1].body).enabled).toBe(false);
+    expect(fetcher.mock.calls.map(([url, init]) => [new URL(String(url)).pathname, init?.method ?? 'GET']))
+      .toEqual([['/api/v1/notifications/routing/risk', 'GET'], ['/api/v1/risk/rules', 'POST']]);
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    expect(JSON.parse(fetcher.mock.calls[1]![1]!.body as string).enabled).toBe(false);
   });
   it.each([1 / 3, 0.26645084677376735, 1e-9, Number.MIN_VALUE])(
     '修改其他字段时保留阈值 %s',

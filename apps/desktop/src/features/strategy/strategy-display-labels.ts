@@ -166,8 +166,11 @@ export const strategyIndicatorLabel = (value: unknown, fallback = '技术指标'
 export const strategyComparisonOperatorLabel = (value: unknown, fallback = '进行比较') =>
   displayLabel(value, comparisonOperatorLabels, fallback);
 
-export const strategyCrossDirectionLabel = (value: unknown) =>
-  value === 'above' ? '上穿' : value === 'below' ? '下穿' : '交叉';
+export const strategyCrossDirectionLabel = (value: unknown) => {
+  if (value === 'above') return '上穿';
+  if (value === 'below') return '下穿';
+  return '交叉';
+};
 
 export const strategySignalIndicatorLabel = (value: unknown) => {
   if (value === 'price') return seriesFieldLabels.close;

@@ -115,17 +115,9 @@ export function createLiveExperimentBudget(
               usage.inputTokens,
               usage.outputTokens,
             );
-      let reported: Prisma.Decimal | null = null;
-      if (value.providerCost !== null) {
-        try {
-          const parsed = new Prisma.Decimal(value.providerCost);
-          if (value.providerCostCurrency === 'USD' && parsed.isFinite() && parsed.gte(0))
-            reported = parsed;
-          else stopped = 'cost_currency_or_value_invalid';
-        } catch {
-          stopped = 'cost_currency_or_value_invalid';
-        }
-      }
+      const parsedCost = parseReportedLiveCost(value);
+      const reported = parsedCost.reported;
+      if (parsedCost.invalid) stopped = 'cost_currency_or_value_invalid';
       const amount = reported ?? (estimate?.amount ? new Prisma.Decimal(estimate.amount) : null);
       if (amount === null) {
         incomplete = 'cost_unknown';
@@ -174,4 +166,22 @@ export function createLiveExperimentBudget(
       });
     },
   };
+}
+
+function parseReportedLiveCost(
+  value: Pick<AiSdkGenerationResult<unknown>, 'providerCost' | 'providerCostCurrency'>,
+) {
+  let invalid = false;
+  let reported: Prisma.Decimal | null = null;
+  if (value.providerCost !== null) {
+    try {
+      const parsed = new Prisma.Decimal(value.providerCost);
+      if (value.providerCostCurrency === 'USD' && parsed.isFinite() && parsed.gte(0))
+        reported = parsed;
+      else invalid = true;
+    } catch {
+      invalid = true;
+    }
+  }
+  return { reported, invalid };
 }

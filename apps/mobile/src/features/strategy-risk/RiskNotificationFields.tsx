@@ -1,5 +1,7 @@
-import { Choices, Field } from '../../components/MobilePrimitives';
+import { Choices, Field, Copy } from '../../components/MobilePrimitives';
+import { Switch } from 'react-native';
 import type { RiskNotificationForm } from './risk-notification-model';
+import { RiskNotificationProviderChoices } from '../risk-rules/RiskNotificationProviderChoices';
 export function RiskNotificationFields({
   value,
   onChange,
@@ -12,45 +14,29 @@ export function RiskNotificationFields({
   const patch = (part: Partial<RiskNotificationForm>) => onChange({ ...value, ...part });
   return (
     <>
-      <Choices
-        label="策略应用通知"
-        value={value.enabled ? 'yes' : 'no'}
-        disabled={disabled}
-        onChange={(v) => patch({ enabled: v === 'yes' })}
-        options={[
-          { value: 'no', label: '关闭通知' },
-          { value: 'yes', label: '启用通知' },
-        ]}
-      />
+      <Copy>策略应用通知</Copy>
+      <Switch accessibilityLabel="策略应用通知" value={value.enabled} disabled={disabled} onValueChange={(enabled) => patch({ enabled })} />
       <Field
-        label="通知冷却分钟"
+        label="默认冷却时间（分钟）"
         value={value.cooldown}
         editable={!disabled}
         keyboardType="number-pad"
         onChange={(cooldown) => patch({ cooldown })}
       />
       <Choices
-        label="通知级别"
+        label="默认严重级别"
         value={value.severity}
         disabled={disabled}
         onChange={(severity) => patch({ severity })}
         options={[
           { value: 'info', label: '提示' },
           { value: 'warning', label: '警告' },
-          { value: 'error', label: '错误' },
-          { value: 'critical', label: '严重' },
+          { value: 'error', label: '严重' },
+          { value: 'critical', label: '关键' },
         ]}
       />
-      <Choices
-        label="飞书通知渠道"
-        value={value.feishu ? 'yes' : 'no'}
-        disabled={disabled}
-        onChange={(v) => patch({ feishu: v === 'yes' })}
-        options={[
-          { value: 'no', label: '不使用飞书' },
-          { value: 'yes', label: '使用飞书' },
-        ]}
-      />
+      <RiskNotificationProviderChoices value={value.providers} disabled={disabled} onChange={(providers) => patch({ providers })} />
+      <Copy muted>冷却时间为 0 表示不等待；关键级提醒不受冷却限制。</Copy>
     </>
   );
 }

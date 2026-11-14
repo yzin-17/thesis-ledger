@@ -10,7 +10,6 @@ import { ImportDraftReviewSheet } from '../src/features/import/ImportDraftReview
 import { ImportReview } from '../src/features/import/ImportReview.js';
 import { RawEvidenceSheet } from '../src/features/journal/JournalReviewResults.js';
 import { JournalDraftSheet } from '../src/features/journal/review/JournalDraftSheet.js';
-import { JournalLegacyJsonReview } from '../src/features/journal/review/JournalLegacyJsonReview.js';
 import { MarketReferenceSheet } from '../src/features/market-data/MarketReferenceSheet.js';
 import { MarketNewsSheet } from '../src/features/market-data/MarketNewsSheet.js';
 import { LocalHistoryDocumentsSheet } from '../src/features/market-data/LocalHistoryDocumentsSheet.js';
@@ -131,7 +130,6 @@ export function DrawerContentCases({ scenario }: { scenario: string }) {
         onApply={() => {}}
       />
     );
-  if (scenario === 'journal-legacy') return <JournalLegacyJsonReview />;
   if (scenario === 'market-reference') return <MarketReferenceSheet />;
   if (scenario === 'market-news') return <MarketNewsSheet />;
   if (scenario === 'market-documents')

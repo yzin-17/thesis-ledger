@@ -5,6 +5,7 @@ import {
   buildDatabaseRebuildSql,
   buildDatabaseStructureCheckSql,
   discoverDatabaseStructure,
+  resolvePrismaRoot,
 } from './database-structure.js';
 
 const databaseName = () => {
@@ -36,7 +37,10 @@ const executionTarget = () => {
 
 const permissionsPath = () =>
   process.env.DEV_DATABASE_PERMISSIONS_SQL ??
-  resolve(process.cwd(), '../thesis-ledger-infra/scripts/bootstrap-app-role.sql');
+  resolve(
+    resolvePrismaRoot(process.env.THESIS_LEDGER_SCHEMA_INPUT_ROOT),
+    '../../../infra/docker/bootstrap-app-role.sql',
+  );
 
 const main = async () => {
   const mode = process.env.DEV_DATABASE_MODE ?? 'check';

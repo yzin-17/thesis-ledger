@@ -47,7 +47,13 @@ export async function selectChartWindowV3(input: {
   } catch (primaryError) {
     if (primaryError instanceof ChartPolicyChangedError) throw primaryError;
     if (!backup || !backup.eligible || !backup.catalogReady) throw primaryError;
-    if (supportsBasicPriceFallback(input.request.routeKey, [primary.target, backup.target], input.context.catalog)) {
+    if (
+      supportsBasicPriceFallback(
+        input.request.routeKey,
+        [primary.target, backup.target],
+        input.context.catalog,
+      )
+    ) {
       return acquire(backup);
     }
     const compatibility = input.resolveCompatibility
@@ -100,19 +106,27 @@ export async function selectChartWindowV3(input: {
     if (!assessment.eligible) throw new Error(`图表 V3 备用基准不可用：${assessment.reason}`);
     if (input.resolveCompatibility) {
       const refreshed = await input.resolveCompatibility();
-      const refreshedProof = marketRouteCompatibilityProofV3Schema.safeParse(refreshed?.proof);
-      const refreshedObservation = marketRouteCompatibilityObservationV3Schema.safeParse(
-        refreshed?.observation,
-      );
-      if (
-        !refreshedProof.success ||
-        !refreshedObservation.success ||
-        JSON.stringify(refreshedProof.data) !== JSON.stringify(proof.data) ||
-        JSON.stringify(refreshedObservation.data) !== JSON.stringify(observed.data)
-      ) {
-        throw new Error('图表 V3 备用证明已撤销或发生变化');
-      }
+      assertChartCompatibilityUnchanged(refreshed, proof.data, observed.data);
     }
     return response;
+  }
+}
+
+function assertChartCompatibilityUnchanged(
+  refreshed: MarketWindowSelectionInputV3['compatibility'] | null,
+  proof: ReturnType<typeof marketRouteCompatibilityProofV3Schema.parse>,
+  observed: ReturnType<typeof marketRouteCompatibilityObservationV3Schema.parse>,
+) {
+  const refreshedProof = marketRouteCompatibilityProofV3Schema.safeParse(refreshed?.proof);
+  const refreshedObservation = marketRouteCompatibilityObservationV3Schema.safeParse(
+    refreshed?.observation,
+  );
+  if (
+    !refreshedProof.success ||
+    !refreshedObservation.success ||
+    JSON.stringify(refreshedProof.data) !== JSON.stringify(proof) ||
+    JSON.stringify(refreshedObservation.data) !== JSON.stringify(observed)
+  ) {
+    throw new Error('图表 V3 备用证明已撤销或发生变化');
   }
 }

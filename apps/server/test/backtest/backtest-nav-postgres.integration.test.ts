@@ -48,18 +48,53 @@ type Scenario = {
 };
 
 postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
+  const context = navPersistenceContext();
+  registerNavPreparationIdentity(context);
+  registerNavConsumptionFailures(context);
+  registerNavPersistenceRecovery(context);
+});
+
+async function post(url: string, body: unknown) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { status: response.status, body: await readBody(response) };
+}
+
+async function get(url: string) {
+  const response = await fetch(url);
+  return { status: response.status, body: await readBody(response) };
+}
+
+async function readBody(response: Response): Promise<Record<string, unknown>> {
+  return (await response.json()) as Record<string, unknown>;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('预期 JSON 对象');
+  }
+  return value as Record<string, unknown>;
+}
+
+function requireString(value: Record<string, unknown>, key: string): string {
+  const result = value[key];
+  if (typeof result !== 'string') throw new Error(`响应缺少字符串字段 ${key}`);
+  return result;
+}
+
+function navPersistenceContext() {
   let fixtureDb: Awaited<ReturnType<typeof startIsolatedNavPostgres>>;
   let active: Scenario[] = [];
-
   beforeAll(async () => {
     fixtureDb = await startIsolatedNavPostgres();
   }, 240_000);
-
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-30T15:02:30.000Z'));
   });
-
   afterEach(async () => {
     try {
       await Promise.all(active.map((current) => current.close()));
@@ -68,11 +103,9 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
       vi.useRealTimers();
     }
   });
-
   afterAll(async () => {
     await fixtureDb?.cleanup();
   }, 30_000);
-
   async function scenario(options: { freezeFailure?: boolean } = {}): Promise<Scenario> {
     const f = navPreparationFixture();
     const strategy = await fixtureDb.prisma.strategy.create({
@@ -182,7 +215,6 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
     active.push(current);
     return current;
   }
-
   async function persistedPreparation(current: Scenario) {
     const result = await current.prepare();
     expect(result.status).toBe(200);
@@ -197,8 +229,26 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
     });
     return { result: result.body, receipt, row };
   }
+  return {
+    get fixtureDb() {
+      return fixtureDb;
+    },
+    get active() {
+      return active;
+    },
+    get scenario() {
+      return scenario;
+    },
+    get persistedPreparation() {
+      return persistedPreparation;
+    },
+  };
+}
 
+function registerNavPreparationIdentity(suiteContext: ReturnType<typeof navPersistenceContext>) {
   it('准备 API 持久化完整请求与来源证据，Run 冻结并以失败终态关联同一凭证', async () => {
+    const { fixtureDb, scenario, persistedPreparation } = suiteContext;
+
     const current = await scenario();
     const { result: prepared, receipt, row } = await persistedPreparation(current);
     expect(row.strategyVersionId).toBe(current.strategyVersionId);
@@ -246,10 +296,11 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
     );
     expect((await current.read(job.id)).body).toEqual(created.body);
   }, 30_000);
-
   it.each(['facts', 'context', 'route'])(
     '即使重算数据库校验和，也拒绝被篡改的 %s 证据且不创建 Run',
     async (field) => {
+      const { fixtureDb, scenario, persistedPreparation } = suiteContext;
+
       const current = await scenario();
       const { receipt, row } = await persistedPreparation(current);
       const request = asRecord(structuredClone(row.request));
@@ -294,8 +345,9 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
       ).toBeNull();
     },
   );
-
   it('拒绝策略版本、当前路由或有效期失效的凭证，均不落 Run', async () => {
+    const { fixtureDb, scenario, persistedPreparation } = suiteContext;
+
     const staleStrategy = await scenario();
     const strategyReceipt = await persistedPreparation(staleStrategy);
     const version = await fixtureDb.prisma.strategyVersion.findUniqueOrThrow({
@@ -373,8 +425,12 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
       ).consumedRunId,
     ).toBeNull();
   }, 30_000);
+}
 
+function registerNavConsumptionFailures(suiteContext: ReturnType<typeof navPersistenceContext>) {
   it('来源凭证与请求交叉绑定、或同一幂等键绑定第二张凭证时拒绝', async () => {
+    const { fixtureDb, scenario, persistedPreparation } = suiteContext;
+
     const current = await scenario();
     const first = await persistedPreparation(current);
     const firstRun = await current.create(first.receipt, 'same-key-different-receipt');
@@ -399,8 +455,9 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
       }),
     ).toBe(1);
   }, 30_000);
-
   it('冻结失败写入明确终态并消费凭证，但没有最终 Manifest', async () => {
+    const { fixtureDb, scenario, persistedPreparation } = suiteContext;
+
     const current = await scenario({ freezeFailure: true });
     const { receipt } = await persistedPreparation(current);
     const created = await current.create(receipt, 'n2-6-freeze-failure');
@@ -430,8 +487,9 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
       new LocalNavSnapshotStore(current.snapshotRoot).replay(runId),
     ).rejects.toBeDefined();
   }, 30_000);
-
   it('同一凭证并发使用同一幂等键只消费一次；不同键并发只允许一个 Run', async () => {
+    const { fixtureDb, scenario, persistedPreparation } = suiteContext;
+
     const sameKey = await scenario();
     const sameReceipt = await persistedPreparation(sameKey);
     const sameResults = await Promise.all([
@@ -466,8 +524,12 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
       }),
     ).toBe(1);
   }, 60_000);
+}
 
+function registerNavPersistenceRecovery(suiteContext: ReturnType<typeof navPersistenceContext>) {
   it('事务消费失败回滚 Run 与凭证，已冻结孤儿文件不能经 DB 读取成为 Run', async () => {
+    const { fixtureDb, scenario, persistedPreparation } = suiteContext;
+
     const current = await scenario();
     const { receipt } = await persistedPreparation(current);
     const triggerName = `nav_n2_6_fail_${randomUUID().replaceAll('-', '')}`;
@@ -525,8 +587,9 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
       }),
     ).toBe(1);
   }, 45_000);
-
   it('数据库断连后新 Prisma 与 Run Service 读回准备证据及已冻结 Run', async () => {
+    const { fixtureDb, scenario, persistedPreparation } = suiteContext;
+
     const current = await scenario();
     const { receipt, row } = await persistedPreparation(current);
     const created = await current.create(receipt, 'n2-6-restart-read');
@@ -565,35 +628,4 @@ postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
       await reopened.onModuleDestroy();
     }
   }, 30_000);
-});
-
-async function post(url: string, body: unknown) {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  return { status: response.status, body: await readBody(response) };
-}
-
-async function get(url: string) {
-  const response = await fetch(url);
-  return { status: response.status, body: await readBody(response) };
-}
-
-async function readBody(response: Response): Promise<Record<string, unknown>> {
-  return (await response.json()) as Record<string, unknown>;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error('预期 JSON 对象');
-  }
-  return value as Record<string, unknown>;
-}
-
-function requireString(value: Record<string, unknown>, key: string): string {
-  const result = value[key];
-  if (typeof result !== 'string') throw new Error(`响应缺少字符串字段 ${key}`);
-  return result;
 }

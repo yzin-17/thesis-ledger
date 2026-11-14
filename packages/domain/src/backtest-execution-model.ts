@@ -24,6 +24,7 @@ export interface ExecutionModelPriceBasisFacts {
 
 /** Real instrument facts that a rule may depend on; these are not normalized units. */
 export interface ExecutionModelRuleUnitFacts {
+  researchQuantity?: 'reference-notional-v1';
   realLotSize: string | null;
   realTickSize: string | null;
   actualQuantityConversion: ExecutionModelUnitConversion;
@@ -364,6 +365,11 @@ export const calculateNavExecutionModelFee = (
   return calculateChargedFee(fee, { ...input, decimalPlaces: fee.rounding.decimalPlaces });
 };
 
+function validateLegacyCommissionDisabled(commission: FrozenExecutionModelFees['commission']): void {
+  if (commission.rate !== '0' || commission.minimum.kind !== 'none' || commission.side !== 'both')
+    fail('券商成本与旧佣金重复或口径冲突');
+}
+
 export const calculateExecutionModelFees = (
   fees: FrozenExecutionModelFees,
   input: { side: 'buy' | 'sell'; turnover: string; currency: ExecutionModelCurrency;
@@ -383,8 +389,7 @@ export const calculateExecutionModelFees = (
     return fail('AFRC费项须为港元双侧收费');
   const charges: { code: string; amount: string; currency: ExecutionModelCurrency }[] = [];
   if (fees.brokerCommission) {
-    if (fees.commission.rate !== '0' || fees.commission.minimum.kind !== 'none' || fees.commission.side !== 'both')
-      return fail('券商成本与旧佣金重复或口径冲突');
+    validateLegacyCommissionDisabled(fees.commission);
     charges.push(...calculateBrokerCommission(fees.brokerCommission, input));
   }
   for (const key of [

@@ -5,6 +5,7 @@ import {
   assetIdentitySourceSchema,
   assetIdentityStatusSchema,
   currencySchema,
+  currencyForMarket,
   nonNegativeDecimalStringSchema,
   type Currency,
 } from '@thesis-ledger/schemas';
@@ -18,8 +19,7 @@ import { requireCurrentLedgerEnvelope } from './ledger-stored-envelope-version.j
 const CONFIRMED_IDENTITY_STATUS = assetIdentityStatusSchema.enum.confirmed;
 const MANUAL_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.manual;
 const SCREENSHOT_IDENTITY_SOURCE = assetIdentitySourceSchema.enum.screenshot;
-const isZeroQuantity = (value: unknown) =>
-  typeof value === 'string' && /^0(?:\.0+)?$/.test(value);
+const isZeroQuantity = (value: unknown) => typeof value === 'string' && /^0(?:\.0+)?$/.test(value);
 
 type LedgerTransactionClient = Prisma.TransactionClient;
 
@@ -61,8 +61,9 @@ const sourceCategory = (source: 'manual' | 'migration' | 'screenshot') => {
   return 'MANUAL' as const;
 };
 
-const assetMarket = (symbol: string) => {
+const assetMarket = (symbol: string): 'CN' | 'HK' | 'US' => {
   if (symbol.endsWith('.HK')) return 'HK';
+  if (symbol.endsWith('.US')) return 'US';
   return 'CN';
 };
 
@@ -125,7 +126,7 @@ export class LedgerService {
         name: assetName ?? symbol,
         market: assetMarket(symbol),
         assetType,
-        currency: 'CNY',
+        currency: currencyForMarket[assetMarket(symbol)],
         identityStatus: CONFIRMED_IDENTITY_STATUS,
         identitySource,
       },
@@ -186,20 +187,16 @@ export class LedgerService {
     economicOrderKey = `baseline:${batchId}:000000`,
   ) {
     const assetType = inferAssetType(symbol, options?.assetType);
-    const timePrecision = options?.temporal?.timePrecision ?? 'INSTANT';
-    const unknownSourceTime = timePrecision === 'UNKNOWN';
-    const observedAt = unknownSourceTime ? null : (options?.temporal?.observedAt ?? recordedAt);
-    const capturedAt = unknownSourceTime
-      ? options?.temporal?.capturedAt
-      : (options?.temporal?.capturedAt ?? recordedAt);
-    const sourceTimezone =
-      options?.temporal?.sourceTimezone ?? (unknownSourceTime ? 'UNKNOWN' : 'UTC');
+    const { timePrecision, observedAt, capturedAt, sourceTimezone } = positionBaselineTime(
+      options,
+      recordedAt,
+    );
     const contentHash = createHash('sha256')
       .update(JSON.stringify({ accountId, symbol, quantity, costPrice, source, reason }))
       .digest('hex');
 
     await this.assertAccountWithClient(context.transaction, accountId, assetType);
-    await this.upsertAssetWithClient(
+    const asset = await this.upsertAssetWithClient(
       context.transaction,
       symbol,
       options?.assetName,
@@ -250,7 +247,7 @@ export class LedgerService {
         batchScope: 'PARTIAL',
         quantity,
         averageCost: costPrice,
-        currency: 'CNY',
+        currency: currencySchema.parse(asset.currency),
         costIncludesFees: 'UNKNOWN',
         ...(capturedAt ? { capturedAt } : {}),
       },
@@ -355,19 +352,22 @@ export class LedgerService {
     };
 
     if (input.fromAccountId === input.toAccountId) {
-      const result = await this.repository.withAccountWrite(input.fromAccountId, async (context) => {
-        await mutate(context, context);
-        await this.rebuildWithClient(
-          context.transaction,
-          input.fromAccountId,
-          'AVG',
-          context.nextProjectionGeneration,
-        );
-        return {
-          value: { fromAccountId: input.fromAccountId, toAccountId: input.toAccountId },
-          advanceRevision: true,
-        };
-      });
+      const result = await this.repository.withAccountWrite(
+        input.fromAccountId,
+        async (context) => {
+          await mutate(context, context);
+          await this.rebuildWithClient(
+            context.transaction,
+            input.fromAccountId,
+            'AVG',
+            context.nextProjectionGeneration,
+          );
+          return {
+            value: { fromAccountId: input.fromAccountId, toAccountId: input.toAccountId },
+            advanceRevision: true,
+          };
+        },
+      );
       return result.value;
     }
 
@@ -583,4 +583,16 @@ export class LedgerService {
     events.forEach((event) => requireCurrentLedgerEnvelope(event.envelopeVersion));
     return events;
   }
+}
+
+function positionBaselineTime(options: SetPositionOptions | undefined, recordedAt: string) {
+  const timePrecision = options?.temporal?.timePrecision ?? 'INSTANT';
+  const unknownSourceTime = timePrecision === 'UNKNOWN';
+  const observedAt = unknownSourceTime ? null : (options?.temporal?.observedAt ?? recordedAt);
+  const capturedAt = unknownSourceTime
+    ? options?.temporal?.capturedAt
+    : (options?.temporal?.capturedAt ?? recordedAt);
+  const sourceTimezone =
+    options?.temporal?.sourceTimezone ?? (unknownSourceTime ? 'UNKNOWN' : 'UTC');
+  return { timePrecision, observedAt, capturedAt, sourceTimezone };
 }

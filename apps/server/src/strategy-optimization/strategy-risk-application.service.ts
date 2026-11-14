@@ -15,7 +15,6 @@ import {
 import {
   riskApplicationArchiveSchema,
   riskApplicationCreateSchema,
-  riskApplicationNotificationSchema,
   riskApplicationPreviewInputSchema,
   riskApplicationUpdateSchema,
   riskApplicationUpgradeSchema,
@@ -23,6 +22,8 @@ import {
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
 import { RiskService } from '../risk/risk.service.js';
+import { strategyRiskNotification, strategyRiskNotificationForPlan } from '../risk/strategy-risk-notification.js';
+import { assertRiskNotificationSelection } from '../notifications/risk-notification-selection.js';
 import { StrategyRiskApplicationStoreService } from './strategy-risk-application-store.service.js';
 import { strategyRiskApplicationManagementEntry } from './strategy-risk-application.types.js';
 import type {
@@ -33,7 +34,7 @@ import type {
   StrategyRiskApplicationResolution,
 } from './strategy-risk-application.types.js';
 import { StrategyRiskContextService } from './strategy-risk-context.service.js';
-import { compileRiskApplicationPlan, validatedRiskStrategy } from './strategy-risk-plan.js';
+import { compileRiskApplicationPlan, diffRiskApplicationPlans, validatedRiskStrategy, validateRiskRuleOverrides } from './strategy-risk-plan.js';
 
 type StrategyVersionRecord = {
   id: string;
@@ -83,10 +84,6 @@ export class StrategyRiskApplicationService {
 
   private assertEnabled() {
     if (!featureEnabled()) throw new BadRequestException('策略来源风险监控当前已关闭');
-  }
-
-  private notification(value: unknown) {
-    return riskApplicationNotificationSchema.parse(value ?? {});
   }
 
   private async strategyVersion(
@@ -220,13 +217,6 @@ export class StrategyRiskApplicationService {
     });
   }
 
-  private planDiff(beforePlan: StrategyMonitoringPlan, afterPlan: StrategyMonitoringPlan) {
-    const before = new Map(beforePlan.rules.map((rule) => [rule.sourceKey, rule]));
-    const after = new Map(afterPlan.rules.map((rule) => [rule.sourceKey, rule]));
-    const keys = new Set([...before.keys(), ...after.keys()]);
-    return [...keys].map((sourceKey) => this.ruleDiff(sourceKey, before, after));
-  }
-
   async planDiffsForTargetVersion(targetStrategyVersionId: string) {
     const [targetVersion, targetPlan] = await Promise.all([
       this.strategyVersion(targetStrategyVersionId),
@@ -248,7 +238,7 @@ export class StrategyRiskApplicationService {
       currentStrategyVersionId: application.strategyVersionId,
       currentRevision: application.revision,
       enabled: application.enabled,
-      diff: this.planDiff(application.plan as StrategyMonitoringPlan, targetPlan),
+      diff: diffRiskApplicationPlans(application.plan as StrategyMonitoringPlan, targetPlan),
     }));
   }
 
@@ -305,7 +295,7 @@ export class StrategyRiskApplicationService {
         symbol: parsed.symbol,
         revision: 1,
         enabled: parsed.enabled,
-        severity: parsed.notification.severity,
+        notification: parsed.notification,
         plan: preview.plan,
       });
       await this.store.audit(transaction, {
@@ -337,6 +327,8 @@ export class StrategyRiskApplicationService {
       cycleMode: parsed.cycleMode,
     });
     this.validatePreview(preview, parsed.previewHash);
+    validateRiskRuleOverrides(parsed.notification, preview.plan);
+    await assertRiskNotificationSelection(this.prisma, parsed.notification);
     try {
       return await this.createTransaction(randomUUID(), parsed, preview);
     } catch (error) {
@@ -357,7 +349,9 @@ export class StrategyRiskApplicationService {
     input: ReturnType<typeof riskApplicationUpdateSchema.parse>,
   ) {
     const enabled = input.enabled ?? current.enabled;
-    const notification = input.notification ?? this.notification(current.notification);
+    const notification = input.notification ?? strategyRiskNotification(current.notification);
+    await assertRiskNotificationSelection(this.prisma, notification);
+    if (input.notification) validateRiskRuleOverrides(notification, current.plan as StrategyMonitoringPlan);
     const enabledChanged = enabled !== current.enabled;
     return this.prisma.$transaction(async (transaction) => {
       if (enabled && !current.enabled)
@@ -375,7 +369,8 @@ export class StrategyRiskApplicationService {
       });
       await this.store.syncFrozenRuleState(transaction, id, {
         enabled,
-        severity: notification.severity,
+        notification,
+        plan: current.plan as StrategyMonitoringPlan,
         revision: updated.revision,
         enabledChanged,
       });
@@ -463,26 +458,9 @@ export class StrategyRiskApplicationService {
     return {
       ...preview,
       currentRevision: current.revision,
-      diff: this.planDiff(current.plan as StrategyMonitoringPlan, preview.plan),
+      diff: diffRiskApplicationPlans(current.plan as StrategyMonitoringPlan, preview.plan),
       targetApplication: targetApplications[0] ? this.management(targetApplications[0]) : null,
     };
-  }
-
-  private ruleDiff(
-    sourceKey: string,
-    before: Map<string, StrategyMonitoringPlan['rules'][number]>,
-    after: Map<string, StrategyMonitoringPlan['rules'][number]>,
-  ) {
-    const left = before.get(sourceKey);
-    const right = after.get(sourceKey);
-    const change = !left
-      ? 'added'
-      : !right
-        ? 'removed'
-        : canonicalStrategyMonitoringJson(left) === canonicalStrategyMonitoringJson(right)
-          ? 'unchanged'
-          : 'changed';
-    return { sourceKey, before: left ?? null, after: right ?? null, change };
   }
 
   private async upgradeAlreadyApplied(id: string, idempotencyKey: string) {
@@ -543,13 +521,14 @@ export class StrategyRiskApplicationService {
           lockedCurrent.symbol,
           id,
         );
-      const notification = this.notification(lockedCurrent.notification);
+      const notification = strategyRiskNotificationForPlan(lockedCurrent.notification, preview.plan.rules);
       await this.store.archiveFrozenRules(transaction, id);
       const updated = await this.store.replacePlan(transaction, {
         id,
         expectedRevision: input.expectedRevision,
         strategyVersionId: input.targetStrategyVersionId,
         plan: preview.plan,
+        notification,
       });
       await this.store.createFrozenRules(transaction, {
         applicationId: id,
@@ -557,7 +536,7 @@ export class StrategyRiskApplicationService {
         symbol: lockedCurrent.symbol,
         revision: updated.revision,
         enabled: lockedCurrent.enabled,
-        severity: notification.severity,
+        notification,
         plan: preview.plan,
       });
       await this.store.audit(transaction, {

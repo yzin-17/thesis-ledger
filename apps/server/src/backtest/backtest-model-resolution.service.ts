@@ -26,7 +26,7 @@ export class BacktestModelResolutionService {
     if (!version) throw new NotFoundException('策略版本不存在');
     const parsed = strategySchema.safeParse(version.schema);
     if (
-      version.schemaVersion !== 2 ||
+      ![2, 3].includes(version.schemaVersion) ||
       !parsed.success ||
       !exchangeExecutionConfigSchema.safeParse(parsed.data.execution).success ||
       parsed.data.executionInstrument.assetType === 'fund'

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES, riskNotificationProvidersSchema, riskNotificationCooldownSchema } from './risk-notification-settings.js';
+import { optimizationBudgetLimits as budgetLimits } from './optimization-budget-limits.js';
 import {
   assetSymbolRefSchema,
   backtestMetricSchema,
@@ -112,6 +114,7 @@ export const monitoringEvaluationSchema = z
     value: decimalStringSchema.optional(),
     threshold: decimalStringSchema,
     reason: z.string().trim().min(1).optional(),
+    reasonCode: z.string().trim().min(1).optional(),
     occurredAt: z.iso.datetime({ offset: true }).optional(),
     availableAt: z.iso.datetime({ offset: true }).optional(),
   })
@@ -130,8 +133,13 @@ export const riskApplicationPreviewInputSchema = z
 export const riskApplicationNotificationSchema = z
   .object({
     enabled: z.boolean().default(true),
-    cooldownMinutes: z.number().int().min(0).max(10_080).default(60),
+    cooldownMinutes: riskNotificationCooldownSchema.default(DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES),
+    providers: riskNotificationProvidersSchema.optional(),
     severity: z.enum(['info', 'warning', 'error', 'critical']).default('warning'),
+    ruleOverrides: z.record(z.string().min(1), z.object({
+      severity: z.enum(['info', 'warning', 'error', 'critical']).optional(),
+      cooldownMinutes: z.number().int().min(0).max(10_080).optional(),
+    }).strict()).optional(),
     channels: z
       .array(z.enum(['feishu']))
       .max(1)
@@ -146,7 +154,7 @@ export const riskApplicationCreateSchema = riskApplicationPreviewInputSchema
     enabled: z.boolean().default(false),
     notification: riskApplicationNotificationSchema.default({
       enabled: true,
-      cooldownMinutes: 60,
+      cooldownMinutes: DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES,
       severity: 'warning',
       channels: [],
     }),
@@ -258,12 +266,12 @@ export const optimizationSplitSchema = z
 
 export const optimizationBudgetSchema = z
   .object({
-    maxAiCalls: z.number().int().min(1).max(30),
-    maxBacktestRuns: z.number().int().min(2).max(100),
-    maxInputTokens: z.number().int().min(1).max(10_000_000).default(100_000),
-    maxOutputTokens: z.number().int().min(1).max(2_000_000).default(20_000),
+    maxAiCalls: z.union([z.literal(budgetLimits.maxAiCalls.unlimited), z.number().int().min(budgetLimits.maxAiCalls.min).max(budgetLimits.maxAiCalls.max)]),
+    maxBacktestRuns: z.union([z.literal(budgetLimits.maxBacktestRuns.unlimited), z.number().int().min(budgetLimits.maxBacktestRuns.min).max(budgetLimits.maxBacktestRuns.max)]),
+    maxInputTokens: z.union([z.literal(budgetLimits.maxInputTokens.unlimited), z.number().int().min(budgetLimits.maxInputTokens.min).max(budgetLimits.maxInputTokens.max)]).default(100_000),
+    maxOutputTokens: z.union([z.literal(budgetLimits.maxOutputTokens.unlimited), z.number().int().min(budgetLimits.maxOutputTokens.min).max(budgetLimits.maxOutputTokens.max)]).default(20_000),
     maxCost: nonNegativeDecimalStringSchema.optional(),
-    maxDurationSeconds: z.number().int().min(30).max(86_400).default(1_800),
+    maxDurationSeconds: z.number().int().min(budgetLimits.maxDurationSeconds.min).max(budgetLimits.maxDurationSeconds.max).default(1_800),
   })
   .strict();
 
@@ -453,7 +461,7 @@ type OptimizationExperimentCreateInput = {
   idempotencyKey: string;
 };
 
-export const validateOptimizationExperimentCreate = (
+const validateOptimizationSource = (
   value: OptimizationExperimentCreateInput,
   ctx: z.RefinementCtx,
 ) => {
@@ -489,6 +497,10 @@ export const validateOptimizationExperimentCreate = (
       message: 'NAV 基金探索只支持 CN 日频',
     });
   }
+};
+
+export const validateOptimizationExperimentCreate = (value: OptimizationExperimentCreateInput, ctx: z.RefinementCtx) => {
+  validateOptimizationSource(value, ctx);
   const modelKeys = value.models.map((item) => JSON.stringify([item.provider, item.model]));
   if (new Set(modelKeys).size !== modelKeys.length)
     ctx.addIssue({ code: 'custom', path: ['models'], message: 'Provider + model 必须唯一' });
@@ -498,14 +510,14 @@ export const validateOptimizationExperimentCreate = (
   )
     ctx.addIssue({ code: 'custom', path: ['allowedParameterIds'], message: '参数授权不得重复' });
   const plannedAiCalls = value.models.length * value.maxRounds;
-  const plannedBacktestRuns = 3 + value.models.length * (value.maxRounds * 2 + 1);
-  if (value.budget.maxAiCalls < plannedAiCalls)
+  const plannedBacktestRuns = 3 + plannedAiCalls * 3;
+  if (value.budget.maxAiCalls !== budgetLimits.maxAiCalls.unlimited && value.budget.maxAiCalls < plannedAiCalls)
     ctx.addIssue({
       code: 'custom',
       path: ['budget', 'maxAiCalls'],
       message: `AI 调用预算至少需要 ${plannedAiCalls} 次以保证各模型同额度`,
     });
-  if (value.budget.maxBacktestRuns < plannedBacktestRuns)
+  if (value.budget.maxBacktestRuns !== budgetLimits.maxBacktestRuns.unlimited && value.budget.maxBacktestRuns < plannedBacktestRuns)
     ctx.addIssue({
       code: 'custom',
       path: ['budget', 'maxBacktestRuns'],
@@ -656,12 +668,12 @@ export const optimizationExperimentRenameSchema = z
 export const optimizationFinalizeSchema = z
   .object({
     candidateIds: z.array(z.uuid()).min(1).max(3),
-    selectedCandidateId: z.uuid(),
+    selectedCandidateId: z.uuid().nullable().default(null),
     expectedStage: z.literal('awaiting_finalization'),
   })
   .strict()
   .superRefine((value, ctx) => {
-    if (!value.candidateIds.includes(value.selectedCandidateId))
+    if (value.selectedCandidateId !== null && !value.candidateIds.includes(value.selectedCandidateId))
       ctx.addIssue({
         code: 'custom',
         path: ['selectedCandidateId'],
@@ -706,10 +718,13 @@ export type OptimizationAdoptionVersionSnapshot = z.infer<
 export const optimizationAdoptionDiffEntrySchema = z
   .object({
     path: z.string().min(1),
-    before: z.unknown(),
-    after: z.unknown(),
+    before: z.unknown().optional(),
+    after: z.unknown().optional(),
   })
-  .strict();
+  .strict()
+  .refine((entry) => entry.before !== undefined || entry.after !== undefined, {
+    message: '策略差异必须包含变更前或变更后的实际值',
+  });
 export type OptimizationAdoptionDiffEntry = z.infer<typeof optimizationAdoptionDiffEntrySchema>;
 
 export const optimizationAdoptionContextSchema = z

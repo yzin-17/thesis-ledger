@@ -1,3 +1,4 @@
+import type { ParsedAiProviderSettings } from './ai-provider-summary.js';
 import { createHash } from 'node:crypto';
 import type { ProviderConfig } from '@prisma/client';
 import type { ProviderConfigService } from '../providers/provider-config.service.js';
@@ -33,35 +34,43 @@ export const createStoredAiProvider = async (
       ...(settings.costCurrency ? { costCurrency: settings.costCurrency } : {}),
       ...(settings.pricingVersion ? { pricingVersion: settings.pricingVersion } : {}),
     },
-    {
-      priority: row.priority,
-      ...(settings.modelCatalog ? { modelCatalog: settings.modelCatalog } : {}),
-      capabilities: aiProviderCapabilities(row.capabilities),
-      health: healthValue(row.health),
-      source: 'database',
-      authMode: settings.authMode,
-      ...(settings.firstOutputTimeoutMs === undefined
-        ? {}
-        : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
-      ...(settings.outputIdleTimeoutMs === undefined
-        ? {}
-        : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
-      ...(settings.modelReasoning ? { modelReasoning: settings.modelReasoning } : {}),
-      upstreamFormat: settings.upstreamFormat,
-      ...(settings.chatImplementation ? { chatImplementation: settings.chatImplementation } : {}),
-      ...(settings.compatibilityExtensionProfile
-        ? { compatibilityExtensionProfile: settings.compatibilityExtensionProfile }
-        : {}),
-      ...(settings.adapter ? { adapter: settings.adapter } : {}),
-      ...(settings.executionRoutes ? { executionRoutes: settings.executionRoutes } : {}),
-      ...(settings.modelPricing ? { modelPricing: settings.modelPricing } : {}),
-      ...(settings.modelDefaults ? { modelDefaults: settings.modelDefaults } : {}),
-      ...(settings.capabilityRevocations
-        ? { capabilityRevocations: settings.capabilityRevocations }
-        : {}),
-      ...(credential
-        ? { credentialFingerprint: createHash('sha256').update(credential, 'utf8').digest('hex') }
-        : {}),
-    },
+    storedProviderRuntimeOptions(row, settings, credential),
   );
 };
+
+function storedProviderRuntimeOptions(
+  row: ProviderConfig,
+  settings: ParsedAiProviderSettings,
+  credential: string,
+): NonNullable<ConstructorParameters<typeof OpenAiCompatibleProvider>[6]> {
+  return {
+    priority: row.priority,
+    ...(settings.modelCatalog ? { modelCatalog: settings.modelCatalog } : {}),
+    capabilities: aiProviderCapabilities(row.capabilities),
+    health: healthValue(row.health),
+    source: 'database',
+    authMode: settings.authMode,
+    ...(settings.firstOutputTimeoutMs === undefined
+      ? {}
+      : { firstOutputTimeoutMs: settings.firstOutputTimeoutMs }),
+    ...(settings.outputIdleTimeoutMs === undefined
+      ? {}
+      : { outputIdleTimeoutMs: settings.outputIdleTimeoutMs }),
+    ...(settings.modelReasoning ? { modelReasoning: settings.modelReasoning } : {}),
+    upstreamFormat: settings.upstreamFormat,
+    ...(settings.chatImplementation ? { chatImplementation: settings.chatImplementation } : {}),
+    ...(settings.compatibilityExtensionProfile
+      ? { compatibilityExtensionProfile: settings.compatibilityExtensionProfile }
+      : {}),
+    ...(settings.adapter ? { adapter: settings.adapter } : {}),
+    ...(settings.executionRoutes ? { executionRoutes: settings.executionRoutes } : {}),
+    ...(settings.modelPricing ? { modelPricing: settings.modelPricing } : {}),
+    ...(settings.modelDefaults ? { modelDefaults: settings.modelDefaults } : {}),
+    ...(settings.capabilityRevocations
+      ? { capabilityRevocations: settings.capabilityRevocations }
+      : {}),
+    ...(credential
+      ? { credentialFingerprint: createHash('sha256').update(credential, 'utf8').digest('hex') }
+      : {}),
+  };
+}

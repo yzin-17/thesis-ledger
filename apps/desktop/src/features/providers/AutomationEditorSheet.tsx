@@ -23,13 +23,9 @@ import {
 } from '@/components/ui/select';
 import { LoaderCircle } from 'lucide-react';
 import { automationJobTypes } from '@thesis-ledger/schemas';
+import { automationScheduleOptions } from './automation-schedule-options.js';
 
-import {
-  AUTOMATION_SCHEDULE_CUSTOM,
-  automationJobTypeLabel,
-  automationScheduleLabel,
-  automationSchedulePresets,
-} from './providers.types.js';
+import { AUTOMATION_SCHEDULE_CUSTOM, automationJobTypeLabel } from './providers.types.js';
 import type { AutomationJob, AutomationJobDraft } from './providers.types.js';
 
 const managedValuationTypes = new Set([
@@ -84,6 +80,8 @@ export const AutomationEditorSheet = ({
     onOpenChange: (nextOpen) => (nextOpen ? onOpenChange(true) : onClose()),
   });
   const customCron = draft.schedulePreset === AUTOMATION_SCHEDULE_CUSTOM;
+  const scheduleOnly = editingJob?.source === 'rule-monitor';
+  const schedules = automationScheduleOptions(scheduleOnly);
   return (
     <Sheet open={open} onOpenChange={(nextOpen) => void requestClose(nextOpen)}>
       <SheetContent
@@ -96,7 +94,9 @@ export const AutomationEditorSheet = ({
           <SheetHeader>
             <SheetTitle>{editingJob ? '编辑自动化任务' : '新建自动化任务'}</SheetTitle>
             <SheetDescription id="automation-form-description">
-              任务类型创建后不可修改；有运行历史的任务无法删除，可改用停用。
+              {scheduleOnly
+                ? editingJob.name
+                : '任务类型创建后不可修改；有运行历史的任务无法删除，可改用停用。'}
             </SheetDescription>
           </SheetHeader>
           <form
@@ -106,47 +106,53 @@ export const AutomationEditorSheet = ({
           >
             <SheetBody>
               <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="automation-job-type">任务类型</FieldLabel>
-                  <Select
-                    value={draft.type}
-                    disabled={Boolean(editingJob)}
-                    onValueChange={(value) =>
-                      value &&
-                      onUpdateDraft((current) =>
-                        applyTypeChange(current, value, Boolean(editingJob)),
-                      )
-                    }
-                  >
-                    <SelectTrigger id="automation-job-type" className="w-full">
-                      <SelectValue>{automationJobTypeLabel(draft.type)}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {automationJobTypes
-                          .filter((type) => Boolean(editingJob) || !managedValuationTypes.has(type))
-                          .map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {automationJobTypeLabel(type)}
-                            </SelectItem>
-                          ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="automation-job-name">名称</FieldLabel>
-                  <Input
-                    id="automation-job-name"
-                    value={draft.name}
-                    disabled={editingJob?.managed === true}
-                    onChange={(event) =>
-                      onUpdateDraft((current) => ({ ...current, name: event.target.value }))
-                    }
-                    required
-                    maxLength={80}
-                  />
-                </Field>
+                {!scheduleOnly && (
+                  <Field>
+                    <FieldLabel htmlFor="automation-job-type">任务类型</FieldLabel>
+                    <Select
+                      value={draft.type}
+                      disabled={Boolean(editingJob)}
+                      onValueChange={(value) =>
+                        value &&
+                        onUpdateDraft((current) =>
+                          applyTypeChange(current, value, Boolean(editingJob)),
+                        )
+                      }
+                    >
+                      <SelectTrigger id="automation-job-type" className="w-full">
+                        <SelectValue>{automationJobTypeLabel(draft.type)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {automationJobTypes
+                            .filter(
+                              (type) => Boolean(editingJob) || !managedValuationTypes.has(type),
+                            )
+                            .map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {automationJobTypeLabel(type)}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
+                {!scheduleOnly && (
+                  <Field>
+                    <FieldLabel htmlFor="automation-job-name">名称</FieldLabel>
+                    <Input
+                      id="automation-job-name"
+                      value={draft.name}
+                      disabled={editingJob?.managed === true}
+                      onChange={(event) =>
+                        onUpdateDraft((current) => ({ ...current, name: event.target.value }))
+                      }
+                      required
+                      maxLength={80}
+                    />
+                  </Field>
+                )}
                 <Field>
                   <FieldLabel htmlFor="automation-job-schedule">执行时间</FieldLabel>
                   <Select
@@ -161,11 +167,14 @@ export const AutomationEditorSheet = ({
                     }
                   >
                     <SelectTrigger id="automation-job-schedule" className="w-full">
-                      <SelectValue>{automationScheduleLabel(draft.schedulePreset)}</SelectValue>
+                      <SelectValue>
+                        {schedules.find((item) => item.value === draft.schedulePreset)?.label ??
+                          '自定义'}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {automationSchedulePresets.map((preset) => (
+                        {schedules.map((preset) => (
                           <SelectItem key={preset.value} value={preset.value}>
                             {preset.label}
                           </SelectItem>
@@ -190,22 +199,24 @@ export const AutomationEditorSheet = ({
                     />
                   </Field>
                 )}
-                <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
-                  <div>
-                    <p className="m-0 text-sm font-medium">启用任务</p>
-                    <p className="field-hint">停用后不再按计划自动执行，可随时重新启用。</p>
+                {!scheduleOnly && (
+                  <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+                    <div>
+                      <p className="m-0 text-sm font-medium">启用任务</p>
+                      <p className="field-hint">停用后不再按计划自动执行，可随时重新启用。</p>
+                    </div>
+                    <Switch
+                      variant="risk"
+                      aria-label="启用任务"
+                      checked={draft.enabled}
+                      onCheckedChange={(checked) =>
+                        onUpdateDraft((current) => ({ ...current, enabled: checked }))
+                      }
+                    >
+                      <SwitchThumb variant="risk" aria-hidden="true" />
+                    </Switch>
                   </div>
-                  <Switch
-                    variant="risk"
-                    aria-label="启用任务"
-                    checked={draft.enabled}
-                    onCheckedChange={(checked) =>
-                      onUpdateDraft((current) => ({ ...current, enabled: checked }))
-                    }
-                  >
-                    <SwitchThumb variant="risk" aria-hidden="true" />
-                  </Switch>
-                </div>
+                )}
               </FieldGroup>
             </SheetBody>
             <SheetFooter>

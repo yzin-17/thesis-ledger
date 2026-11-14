@@ -50,8 +50,13 @@ export const marketProviderAccountAccessReportSchema = z.strictObject({
   routes: z.array(marketProviderProbeRouteSchema.extend({ access: marketAccountAccessSchema })).min(1).max(64),
 }).superRefine((value, context) => {
   for (const route of value.routes) {
-    if (route.access.configVersion !== value.configVersion || route.access.checkedAt !== value.checkedAt || route.access.validUntil !== value.validUntil || route.access.persisted !== value.persisted)
-      context.addIssue({ code: 'custom', message: '逐功能访问结论必须绑定同一配置代次和检查时间' });
+    const checkedAt = Date.parse(route.access.checkedAt ?? '');
+    const validUntil = route.access.validUntil === undefined ? undefined : Date.parse(route.access.validUntil);
+    const expiryMatches = value.validUntil === undefined
+      ? validUntil === undefined
+      : validUntil !== undefined && validUntil <= Date.parse(value.validUntil);
+    if (route.access.configVersion !== value.configVersion || !Number.isFinite(checkedAt) || checkedAt > Date.parse(value.checkedAt) || !expiryMatches || route.access.persisted !== value.persisted)
+      context.addIssue({ code: 'custom', message: '逐功能结论必须绑定同一配置代次及持久化状态，检查和到期时间不得晚于报告' });
   }
   if (value.persisted && value.credentialContext !== 'current') context.addIssue({ code: 'custom', message: '草稿不能作为本地权限记录' });
 }).refine((value) => value.persisted || !!value.validUntil && Date.parse(value.checkedAt) < Date.parse(value.validUntil), '账户检查有效时间必须有序');

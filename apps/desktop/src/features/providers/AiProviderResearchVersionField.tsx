@@ -22,7 +22,7 @@ export function AiProviderResearchVersionField({
   onChange: (update: Partial<AiProviderExecutionRouteDraft>) => void;
 }) {
   if (route.contractId !== 'research') return null;
-  const value = route.contractVersion ?? 'research-generation-v1';
+  const value = route.contractVersion ?? 'research-generation-v2';
   return (
     <Field>
       <FieldLabel>研究合同版本</FieldLabel>

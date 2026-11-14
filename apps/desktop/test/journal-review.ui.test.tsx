@@ -108,6 +108,8 @@ describe('投资复盘工作台 UI 契约', () => {
     expect(markup).not.toContain('sm:w-80');
     expect(markup).not.toContain('选择一笔已平仓交易');
     expect(markup).not.toContain('CompletedTrade JSON');
+    expect(markup).not.toContain('高级分析');
+    expect(markup).not.toContain('高级 JSON 兼容分析');
     expect(markup).not.toContain('AI Behavior Review');
   });
 

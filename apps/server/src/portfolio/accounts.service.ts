@@ -78,13 +78,7 @@ export class AccountsService {
       if (hasCashBalance(balances.get(id) ?? new Map<string, Prisma.Decimal>()))
         throw new BadRequestException('账户仍有现金余额，清空后才能修改本位币');
     }
-    const update: Prisma.AccountUpdateInput = {
-      ...(data.name === undefined ? {} : { name: data.name }),
-      ...(data.institution === undefined ? {} : { institution: data.institution }),
-      ...(data.type === undefined ? {} : { type: data.type }),
-      ...(data.mode === undefined ? {} : { mode: data.mode }),
-      ...(data.currency === undefined ? {} : { currency: data.currency }),
-    };
+    const update = accountUpdateData(data);
     return this.prisma.account.update({ where: { id }, data: update });
   }
 
@@ -116,4 +110,19 @@ export class AccountsService {
     if (!account) throw new NotFoundException('账户不存在');
     return this.prisma.account.update({ where: { id }, data: { active: true } });
   }
+}
+
+function accountUpdateData(data: {
+  [Key in keyof ReturnType<typeof accountInputSchema.parse>]?:
+    | ReturnType<typeof accountInputSchema.parse>[Key]
+    | undefined;
+}) {
+  const update: Prisma.AccountUpdateInput = {
+    ...(data.name === undefined ? {} : { name: data.name }),
+    ...(data.institution === undefined ? {} : { institution: data.institution }),
+    ...(data.type === undefined ? {} : { type: data.type }),
+    ...(data.mode === undefined ? {} : { mode: data.mode }),
+    ...(data.currency === undefined ? {} : { currency: data.currency }),
+  };
+  return update;
 }

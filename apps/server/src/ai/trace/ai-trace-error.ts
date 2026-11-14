@@ -37,6 +37,27 @@ export function traceSdkErrorSnapshot(error: unknown, schema: z.ZodType) {
     current = asRecord(current)?.cause;
   }
   const text = output?.text;
+  const independentContractCheck = checkSdkErrorOutput(text, schema);
+  return {
+    ...traceErrorSnapshot(error),
+    usage: asRecord(error)?.usage ?? null,
+    completion: asRecord(error)?.completion ?? null,
+    causes,
+    ...(typeof text === 'string'
+      ? {
+          sdkOutputText: text,
+          sdkOutputCharacters: text.length,
+          sdkOutputSha256: createHash('sha256').update(text).digest('hex'),
+        }
+      : {}),
+    ...(output?.response
+      ? { response: { id: output.response.id, modelId: output.response.modelId } }
+      : {}),
+    independentContractCheck,
+  };
+}
+
+function checkSdkErrorOutput(text: string | undefined, schema: z.ZodType): unknown {
   let independentContractCheck: unknown = { status: 'missing' };
   if (typeof text === 'string') {
     try {
@@ -62,21 +83,5 @@ export function traceSdkErrorSnapshot(error: unknown, schema: z.ZodType) {
       };
     }
   }
-  return {
-    ...traceErrorSnapshot(error),
-    usage: asRecord(error)?.usage ?? null,
-    completion: asRecord(error)?.completion ?? null,
-    causes,
-    ...(typeof text === 'string'
-      ? {
-          sdkOutputText: text,
-          sdkOutputCharacters: text.length,
-          sdkOutputSha256: createHash('sha256').update(text).digest('hex'),
-        }
-      : {}),
-    ...(output?.response
-      ? { response: { id: output.response.id, modelId: output.response.modelId } }
-      : {}),
-    independentContractCheck,
-  };
+  return independentContractCheck;
 }

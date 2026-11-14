@@ -31,64 +31,8 @@ export class AiTraceResponseBody {
     const text = Buffer.concat(this.chunks).toString('utf8');
     const truncated = this.bytes > this.retained;
     const raw = { bytes: this.bytes, sha256: this.digest.digest('hex'), truncated };
-    const payloads: unknown[] = [];
-    let invalidJson = 0;
-    let done = false;
-    if (this.contentType.includes('text/event-stream')) {
-      for (const frame of text.replace(/\r\n/g, '\n').split('\n\n')) {
-        const data = frame
-          .split('\n')
-          .filter((line) => line.startsWith('data:'))
-          .map((line) => line.slice(5).trimStart())
-          .join('\n');
-        if (!data) continue;
-        if (data.trim() === '[DONE]') {
-          done = true;
-          continue;
-        }
-        try {
-          payloads.push(JSON.parse(data) as unknown);
-        } catch {
-          invalidJson++;
-        }
-      }
-    } else if (text) {
-      try {
-        payloads.push(JSON.parse(text) as unknown);
-      } catch {
-        invalidJson++;
-      }
-    }
-    let content = '';
-    const upstreamErrors: unknown[] = [];
-    const models = new Set<string>();
-    const generationIds = new Set<string>();
-    for (const payload of payloads) {
-      const value = record(payload);
-      if (!value) continue;
-      if (value.error) upstreamErrors.push(value.error);
-      if (typeof value.model === 'string') models.add(value.model);
-      if (typeof value.id === 'string') generationIds.add(value.id);
-      if (Array.isArray(value.choices)) {
-        for (const choice of value.choices) {
-          const entry = record(choice);
-          const message = record(entry?.delta) ?? record(entry?.message);
-          if (typeof message?.content === 'string') content += message.content;
-          if (entry?.error) upstreamErrors.push(entry.error);
-        }
-      }
-      // OpenAI Responses 与 Anthropic 的文本增量；reasoning 增量不会进入正文。
-      if (value.type === 'response.output_text.delta' && typeof value.delta === 'string')
-        content += value.delta;
-      const delta = record(value.delta);
-      if (delta?.type === 'text_delta' && typeof delta.text === 'string') content += delta.text;
-      if (Array.isArray(value.content)) {
-        for (const part of value.content) {
-          const block = record(part);
-          if (block?.type === 'text' && typeof block.text === 'string') content += block.text;
-        }
-      }
-    }
+    const { payloads, invalidJson, done } = parseResponsePayloads(text, this.contentType);
+    const { content, upstreamErrors, models, generationIds } = collectResponseFacts(payloads);
     // 无法解析的正文保留类型、大小与摘要，避免把未知 reasoning 或 HTML 凭据写入文件。
     return {
       raw,
@@ -108,4 +52,76 @@ export class AiTraceResponseBody {
       },
     };
   }
+}
+
+function parseResponsePayloads(text: string, contentType: string) {
+  const payloads: unknown[] = [];
+  let invalidJson = 0;
+  let done = false;
+  if (contentType.includes('text/event-stream')) {
+    for (const frame of text.replace(/\r\n/g, '\n').split('\n\n')) {
+      const data = frame
+        .split('\n')
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice(5).trimStart())
+        .join('\n');
+      if (!data) continue;
+      if (data.trim() === '[DONE]') {
+        done = true;
+        continue;
+      }
+      try {
+        payloads.push(JSON.parse(data) as unknown);
+      } catch {
+        invalidJson++;
+      }
+    }
+  } else if (text) {
+    try {
+      payloads.push(JSON.parse(text) as unknown);
+    } catch {
+      invalidJson++;
+    }
+  }
+  return { payloads, invalidJson, done };
+}
+
+function collectResponseFacts(payloads: unknown[]) {
+  let content = '';
+  const upstreamErrors: unknown[] = [];
+  const models = new Set<string>();
+  const generationIds = new Set<string>();
+  for (const payload of payloads) {
+    const value = record(payload);
+    if (!value) continue;
+    if (value.error) upstreamErrors.push(value.error);
+    if (typeof value.model === 'string') models.add(value.model);
+    if (typeof value.id === 'string') generationIds.add(value.id);
+    if (Array.isArray(value.choices)) {
+      for (const choice of value.choices) {
+        const entry = record(choice);
+        const message = record(entry?.delta) ?? record(entry?.message);
+        if (typeof message?.content === 'string') content += message.content;
+        if (entry?.error) upstreamErrors.push(entry.error);
+      }
+    }
+    content += responseTextIncrement(value);
+  }
+  return { content, upstreamErrors, models, generationIds };
+}
+
+function responseTextIncrement(value: Record<string, unknown>) {
+  let content = '';
+  // OpenAI Responses 与 Anthropic 的文本增量；reasoning 增量不会进入正文。
+  if (value.type === 'response.output_text.delta' && typeof value.delta === 'string')
+    content += value.delta;
+  const delta = record(value.delta);
+  if (delta?.type === 'text_delta' && typeof delta.text === 'string') content += delta.text;
+  if (Array.isArray(value.content)) {
+    for (const part of value.content) {
+      const block = record(part);
+      if (block?.type === 'text' && typeof block.text === 'string') content += block.text;
+    }
+  }
+  return content;
 }

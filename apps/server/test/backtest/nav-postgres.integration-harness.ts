@@ -117,7 +117,7 @@ WHERE to_regclass(format('public.%I', expected.name)) IS NOT NULL;`,
 async function initializeApplicationRole(containerName: string) {
   const permissionsSql = await import('node:fs/promises').then(({ readFile }) =>
     readFile(
-      new URL('../../../../../thesis-ledger-infra/scripts/bootstrap-app-role.sql', import.meta.url),
+      new URL('../../../../infra/docker/bootstrap-app-role.sql', import.meta.url),
       'utf8',
     ),
   );

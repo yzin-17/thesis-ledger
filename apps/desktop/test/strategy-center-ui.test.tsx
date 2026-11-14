@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import ts from 'typescript';
 
 const strategyCenterLayout = readFileSync(
   new URL('../src/features/strategy/StrategyCenterLayout.tsx', import.meta.url),
@@ -39,6 +40,14 @@ const riskApplicationSource = readFileSync(
   new URL('../src/features/strategy/StrategyRiskApplicationPage.tsx', import.meta.url),
   'utf8',
 );
+const riskConfigurationSource = readFileSync(
+  new URL('../src/features/strategy/StrategyRiskConfiguration.tsx', import.meta.url),
+  'utf8',
+);
+const riskPreviewSource = readFileSync(
+  new URL('../src/features/strategy/StrategyRiskPreview.tsx', import.meta.url),
+  'utf8',
+);
 const editorSource = readFileSync(
   new URL('../src/features/strategy/StrategyEditorPage.tsx', import.meta.url),
   'utf8',
@@ -69,6 +78,14 @@ const riskApplicationEditorsSource = readFileSync(
 );
 const notificationRouteSelectSource = readFileSync(
   new URL('../src/features/risk/NotificationRouteSelect.tsx', import.meta.url),
+  'utf8',
+);
+const draftCloseGuardSource = readFileSync(
+  new URL('../src/features/shared/useDraftCloseGuard.ts', import.meta.url),
+  'utf8',
+);
+const notificationProviderSelectSource = readFileSync(
+  new URL('../src/features/risk/NotificationProviderSelect.tsx', import.meta.url),
   'utf8',
 );
 
@@ -124,11 +141,6 @@ describe('策略中心界面契约', () => {
     expect(backtestJobs).toContain('>结果摘要<');
     expect(backtestJobs).toContain("searchParams.get('expanded')");
     expect(backtestJobs).toContain('backtestStatusSummary(group.jobs)');
-    expect(backtestJobs).toContain(
-      'lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)_max-content] lg:items-center',
-    );
-    expect(backtestJobs.match(/w-auto shrink-0 flex-row items-center gap-2/g)).toHaveLength(2);
-    expect(backtestJobs.match(/className="w-fit"/g)).toHaveLength(2);
     expect(
       backtestJobs.match(/w-max min-w-\(--anchor-width\) max-w-\(--available-width\)/g),
     ).toHaveLength(2);
@@ -148,8 +160,8 @@ describe('策略中心界面契约', () => {
     expect(buttonSource).toContain('font-normal hover:bg-primary/80');
     expect(buttonSource).not.toContain('font-semibold hover:bg-primary/80');
     expect(listPresentation).toContain('className={`${buttonVariants()} ml-auto`}');
-    expect(experimentDetailSource.match(/nativeButton=\{false\}/g)).toHaveLength(4);
-    expect(experimentDetailSectionsSource.match(/nativeButton=\{false\}/g)).toHaveLength(1);
+    assertLinkButtonsAreSemantic(experimentDetailSource);
+    assertLinkButtonsAreSemantic(experimentDetailSectionsSource);
   });
 
   it('筛选器的回显与选项复用同一份中文标签', () => {
@@ -158,10 +170,13 @@ describe('策略中心界面契约', () => {
     expect(experimentList).toContain('sourceModeOptions.find');
     expect(experimentList).toContain('statusOptions.find');
     expect(experimentList).toContain(
-      'lg:grid-cols-[minmax(12rem,1fr)_max-content_max-content_auto] lg:items-center',
+      'lg:grid-cols-[minmax(12rem,1fr)_max-content_max-content_max-content_auto] lg:items-center',
     );
-    expect(experimentList.match(/w-auto shrink-0 flex-row items-center gap-2/g)).toHaveLength(2);
-    expect(experimentList.match(/<SelectTrigger\b[^>]*className="w-fit"/g)).toHaveLength(2);
+    // 筛选控件统一为「无可见标签 + 同宽同高」，标签只在无障碍属性里。
+    expect(experimentList.match(/<SelectTrigger\b[^>]*className="w-36 shrink-0"/g)).toHaveLength(2);
+    expect(backtestJobs.match(/<SelectTrigger\b[^>]*className="w-(32|52) shrink-0"/g)).toHaveLength(
+      2,
+    );
     expect(
       experimentList.match(/w-max min-w-\(--anchor-width\) max-w-\(--available-width\)/g),
     ).toHaveLength(2);
@@ -181,20 +196,24 @@ describe('策略中心界面契约', () => {
     expect(riskApplicationSource).toMatch(/<Sheet\s+open/);
     expect(riskApplicationSource).toContain('<SheetFooter');
     expect(riskApplicationSource).not.toContain('<AlertDialog');
-    expect(riskApplicationSource).toContain('放弃并关闭');
+    expect(riskApplicationSource).toContain('const requestClose = useDraftCloseGuard({');
+    expect(draftCloseGuardSource).toContain("confirmLabel: '放弃修改并关闭'");
+    expect(draftCloseGuardSource).toContain('latest.onOpenChange(nextOpen)');
     expect(riskApplicationSource).not.toContain(
       '<Button variant="outline" onClick={requestClose}>',
     );
-    expect(riskApplicationSource).toContain('accountDisplayLabel(selectedAccount)');
-    expect(riskApplicationSource.match(/nativeButton=\{false\}/g)).toHaveLength(4);
-    expect(riskApplicationSource).toContain('strategyRiskCycleModeLabel(cycleMode)');
-    expect(riskApplicationSource).toContain('strategyMonitoringMetricLabel(rule.metric)');
-    expect(riskApplicationSource).toContain('strategyComparisonOperatorLabel(rule.operator)');
-    expect(riskApplicationSource).toContain('md:grid-cols-[minmax(0,3fr)_minmax(260px,2fr)]');
-    expect(riskApplicationSource).toContain('aria-label="实际证券账户" className="w-full"');
-    expect(riskApplicationSource).toContain('<FieldLabel>通知渠道</FieldLabel>');
-    expect(riskApplicationSource).toContain('<NotificationRouteSelect');
-    expect(riskApplicationSource).toContain('useNotificationRoutingQuery()');
+    expect(riskConfigurationSource).toContain('accountDisplayLabel(selectedAccount)');
+    assertLinkButtonsAreSemantic(riskApplicationSource);
+    expect(riskConfigurationSource).toContain('strategyRiskCycleModeLabel(cycleMode)');
+    expect(riskPreviewSource).toContain('strategyMonitoringMetricLabel(rule.metric)');
+    expect(riskPreviewSource).toContain('strategyComparisonOperatorLabel(rule.operator)');
+    expect(riskConfigurationSource).toContain('sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]');
+    expect(riskConfigurationSource).toContain('aria-label="实际证券账户" className="w-full"');
+    expect(riskConfigurationSource).toContain('<NotificationProviderSelect');
+    expect(notificationProviderSelectSource).toContain('label="通知提供方"');
+    expect(notificationProviderSelectSource).toContain('label: notificationRouteLabel(route)');
+    expect(notificationProviderSelectSource).toContain('value: route.provider');
+    expect(riskApplicationSource).toContain('useRiskNotificationRoutingQuery()');
     expect(notificationRouteSelectSource).toContain('aria-label={ariaLabel} className="w-full"');
     expect(notificationRouteSelectSource).toContain('routes.map((route)');
     expect(notificationRouteSelectSource).not.toContain('value="feishu"');
@@ -217,10 +236,14 @@ describe('策略中心界面契约', () => {
     expect(riskApplicationsSource).not.toContain('定位此应用');
     expect(riskApplicationsSource).not.toContain('复制为独立规则');
     expect(riskApplicationEditorsSource).toContain('strategyRiskNotificationSeverityLabel');
-    expect(riskApplicationEditorsSource).toContain('<NotificationRouteSelect');
-    expect(riskApplicationEditorsSource).toContain('useNotificationRoutingQuery()');
+    expect(riskApplicationEditorsSource).toContain('<NotificationProviderSelect');
+    expect(riskApplicationEditorsSource).toContain('useRiskNotificationRoutingQuery()');
     expect(riskApplicationEditorsSource).not.toContain('strategyRiskNotificationChannelOptions');
-    expect(riskApplicationEditorsSource).toContain('ariaLabel="策略应用通知渠道"');
+    expect(riskApplicationEditorsSource).toContain('value={selectedProviders}');
+    expect(riskApplicationEditorsSource).toContain('onChange={setProviders}');
+    expect(riskApplicationEditorsSource).toContain(
+      'onRetry={() => void notificationRouting.refetch()}',
+    );
     expect(riskApplicationEditorsSource).not.toContain('aria-label="策略应用飞书通知"');
   });
 
@@ -249,3 +272,32 @@ describe('策略中心界面契约', () => {
     expect(strategyLibrary).toContain('strategyCenterFocusTarget(location.state)');
   });
 });
+
+function assertLinkButtonsAreSemantic(source: string) {
+  const file = ts.createSourceFile(
+    'component.tsx',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const buttons: ts.JsxSelfClosingElement[] = [];
+  function visit(node: ts.Node) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(file) === 'Button') {
+      const render = node.attributes.properties.find(
+        (attribute) => ts.isJsxAttribute(attribute) && attribute.name.getText(file) === 'render',
+      );
+      if (render?.getText(file).includes('<Link')) buttons.push(node);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  expect(buttons.length).toBeGreaterThan(0);
+  for (const button of buttons) {
+    const nativeButton = button.attributes.properties.find(
+      (attribute) =>
+        ts.isJsxAttribute(attribute) && attribute.name.getText(file) === 'nativeButton',
+    );
+    expect(nativeButton?.getText(file), button.getText(file)).toBe('nativeButton={false}');
+  }
+}

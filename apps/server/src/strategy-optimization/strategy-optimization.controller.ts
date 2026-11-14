@@ -53,6 +53,11 @@ export class StrategyOptimizationController {
     return this.reads.capabilities();
   }
 
+  @Post('experiments/:id/retry')
+  retry(@Param('id') id: string, @Body() body: unknown) {
+    return this.optimization.retry(id, body);
+  }
+
   @Get('strategies/:strategyVersionId/parameters')
   parameters(@Param('strategyVersionId') strategyVersionId: string) {
     return this.reads.parameters(strategyVersionId);
@@ -162,13 +167,18 @@ export class StrategyOptimizationController {
     return this.optimization.finalize(id, body);
   }
 
+  @Post('experiments/:id/complete')
+  complete(@Param('id') id: string) {
+    return this.optimization.complete(id);
+  }
+
   @Post('experiments/:id/adopt')
-  async adopt(@Param('id') id: string, @Body() body: unknown) {
-    const result = await this.optimization.adopt(id, body);
-    const strategyVersionId = result.strategyVersion?.id;
-    const riskApplicationDiffs = strategyVersionId
-      ? await this.riskApplications.planDiffsForTargetVersion(strategyVersionId)
-      : [];
-    return { ...result, riskApplicationDiffs };
+  adopt(@Param('id') id: string, @Body() body: unknown) {
+    return this.optimization.adopt(id, body);
+  }
+
+  @Get('experiments/:id/candidates/:candidateId/adoption')
+  adoptionStatus(@Param('id') id: string, @Param('candidateId') candidateId: string) {
+    return this.optimization.adoptionStatus(z.uuid().parse(id), z.uuid().parse(candidateId));
   }
 }

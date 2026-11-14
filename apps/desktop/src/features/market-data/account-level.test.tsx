@@ -32,17 +32,18 @@ describe('保存的账号等级与功能范围', () => {
     expect(parseAccountLevelDraft({ points: '-1', independentApis: [] })).toBeNull();
     expect(parseAccountLevelDraft({ points: '120', independentApis: ['rt_k', 'hk_daily'] })?.independentApis).toEqual(['hk_daily', 'rt_k']);
   });
-  it('功能说明只展示已确认可用的项目', () => {
-    expect(providerExactCapabilities(provider, catalog)).toHaveLength(1);
+  it('功能说明区分可用与等级未包含的项目', () => {
+    expect(providerExactCapabilities(provider, catalog)).toHaveLength(2);
     const html = renderToStaticMarkup(<ProviderAccountAccessPanel provider={provider} catalog={catalog} report={report} dirty={false} />);
     expect(html).toContain('当前等级未包含 1 项功能');
-    expect(html).toContain('权限记录已保存在本地');
-    expect(html).not.toContain('现金分红');
+    expect(html).toContain('检查结果长期保留');
+    expect(html).toContain('现金分红');
+    expect(html).toContain('已确认可用 1 / 2 项');
   });
-  it('持久记录不受旧短缓存限制，配置变化后不再允许新选择', () => {
-    expect(accountAccessSelectable(report.routes[0]?.access, Date.now(), 2, true)).toBe(true);
-    expect(accountAccessSelectable(report.routes[0]?.access, Date.now(), 3, true)).toBe(false);
-    expect(accountAccessSelectable(undefined, Date.now(), 2, true)).toBe(false);
-    expect(accountAccessSelectable(report.routes[1]?.access, Date.now(), 2, true)).toBe(false);
+  it('持久记录可用，配置变化或缺少记录后允许首次尝试，等级明确拒绝仍保留', () => {
+    expect(accountAccessSelectable(report.routes[0]?.access, Date.now(), 2)).toBe(true);
+    expect(accountAccessSelectable(report.routes[0]?.access, Date.now(), 3)).toBe(true);
+    expect(accountAccessSelectable(undefined, Date.now(), 2)).toBe(true);
+    expect(accountAccessSelectable(report.routes[1]?.access, Date.now(), 2)).toBe(false);
   });
 });

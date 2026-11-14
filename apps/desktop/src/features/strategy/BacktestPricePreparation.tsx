@@ -1,4 +1,5 @@
 import { createClientRequestId } from '../../lib/client-request-id';
+import { PreparedPriceSources } from './PreparedPriceSources.js';
 import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useRef, useState } from 'react';
 import { formatDateTime } from '@/lib/date-display';
@@ -20,21 +21,19 @@ import { BacktestPreflightDiagnostics } from './BacktestPreflightDiagnostics.js'
 import { BacktestLifecycleResearchChoice } from './BacktestLifecycleResearchChoice.js';
 import { BacktestLifecyclePreparationDisclosure } from './BacktestLifecyclePreparationDisclosure.js';
 import { AnnouncementPreparationStatus } from './AnnouncementPreparationStatus.js';
+import { BacktestHistoryChoice, backtestHistoryLabels as histories } from './BacktestHistoryChoice.js';
 import {
   BacktestKnownCashResearchChoice,
   useKnownCashResearchChoice,
 } from './BacktestKnownCashResearchChoice.js';
 export type PreparedBacktest = Extract<BacktestRunPreparationResultV3, { status: 'prepared' }>;
-const histories = {
-  'fixed-provider-snapshot': '固定供应商快照',
-  'point-in-time': '严格历史时点',
-} as const;
 const ruleModes = {
   'require-events': '要求完整公司行动',
   'rules-only': '只研究原价与规则',
 } as const;
 
 import {useStrategySubmission} from './use-strategy-submission.js';
+import { BacktestSubmissionFeedback } from './BacktestSubmissionFeedback.js';
 export function BacktestPricePreparation({
   strategyVersionId,
   adjustment,
@@ -46,6 +45,8 @@ export function BacktestPricePreparation({
   onDirtyChange, onSubmitted,
   formId,
   onReadyChange,
+  onBusyChange,
+  priceResearch = false,
 }: {
   strategyVersionId: string;
   adjustment: 'none' | 'qfq' | 'hfq';
@@ -58,10 +59,15 @@ export function BacktestPricePreparation({
   onDirtyChange?: (dirty: boolean) => void;
   formId?: string;
   onReadyChange?: (ready: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
+  priceResearch?: boolean;
 }) {
   const resolution = useBacktestExecutionModel({ strategyVersionId, period, currency, adjustment, initialModel });
   const model = resolution.model;
-  const automatic=useStrategySubmission();
+  const automatic = useStrategySubmission(onSubmitted);
+  useEffect(() => {
+    onBusyChange?.(automatic.isPending);
+  }, [automatic.isPending, onBusyChange]);
   useEffect(() => {
     onReadyChange?.(Boolean(model) && !resolution.loading && !automatic.isPending);
   }, [model, resolution.loading, automatic.isPending, onReadyChange]);
@@ -87,6 +93,7 @@ export function BacktestPricePreparation({
     ruleMode,
     lifecycleResearch,
     knownCashResearch: cashChoice.fingerprint,
+    priceResearch,
   });
   const query = useBacktestPreparation(key, submitted);
   const draftKey = JSON.stringify({ strategyVersionId, adjustment, period, initialCash, currency,
@@ -110,6 +117,8 @@ export function BacktestPricePreparation({
     history === 'fixed-provider-snapshot' &&
     model?.scope.instrumentType === 'STOCK';
   const ruleResearch = ruleEligible && ruleMode === 'rules-only';
+  const priceLabels = { none: '不复权 · 原始份额', qfq: '前复权 · 归一化份额', hfq: '后复权 · 归一化份额' };
+  const priceLabel = priceResearch ? '后复权 · 策略收益研究' : priceLabels[adjustment];
   useEffect(() => {
     onPrepared(result?.status === 'prepared' ? result : null);
   }, [result, onPrepared]);
@@ -133,6 +142,7 @@ export function BacktestPricePreparation({
         history === 'fixed-provider-snapshot' ? 'after-acquisition' : 'requested-time',
       strategyVersionId,
       adjustment,
+      ...(priceResearch ? { priceResearch: 'price-research-v1' } : {}),
       ...(lifecycleEligible && lifecycleResearch
         ? { lifecycleResearch: 'listed-bars-warmup-v1' }
         : {}),
@@ -167,20 +177,23 @@ export function BacktestPricePreparation({
     }
     setError(null);
     onPrepared(null);
-    if(run){automatic.mutate({signature:key,input:{kind:'ordinary',preparation:parsed.data}},{onSuccess:onSubmitted??(()=>{})});return;}
+    if(run){automatic.mutate({signature:key,input:{kind:'ordinary',preparation:parsed.data}});return;}
     setSubmitted({ key, request: parsed.data });
   };
 
   return (
     <form id={formId} onSubmit={(event) => { event.preventDefault(); prepare(true); }}>
+    <fieldset disabled={automatic.isPending} className="min-w-0">
     <FieldGroup>
       <Field>
         <FieldLabel>回测执行设置</FieldLabel>
         {resolution.loading && <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status"><Spinner aria-hidden="true" />正在准备回测执行设置…</p>}
         {model && <FieldDescription>{resolution.retained ? '沿用本次记录的回测执行设置。' : '费用与成交方式沿用当前策略，执行设置已自动准备。'}</FieldDescription>}
         {resolution.policy === 'research-defaults' && <p className="text-sm font-medium">研究默认规则</p>}
-        {resolution.notes.length > 0 && <ul className="flex flex-col gap-1 text-xs text-muted-foreground">{resolution.notes.map((note) => <li key={note}>{note}</li>)}</ul>}
-        <FieldDescription>历史数据：{histories[history]}；准备完成时冻结。</FieldDescription>
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-xs text-muted-foreground">
+          {resolution.notes.map((note) => <li key={note}>{note}</li>)}
+          <li>历史数据：{histories[history]}；准备完成时冻结。</li>
+        </ul>
         {resolution.message && (
           <Alert variant="destructive">
             <AlertTitle>回测设置暂不可用</AlertTitle>
@@ -193,34 +206,15 @@ export function BacktestPricePreparation({
           </Alert>
         )}
       </Field>
-      <details className="rounded-md border border-border p-3">
+      {!priceResearch && <details className="rounded-md border border-border p-3">
         <summary className="cursor-pointer text-sm font-medium">高级回测选项</summary>
         <div className="mt-4 flex flex-col gap-4">
-      <Field>
-        <FieldLabel>历史输入性质</FieldLabel>
-        <ToggleGroup
-          value={[history]}
-          aria-label="历史输入性质"
-          onValueChange={(values) => {
-            const value = values[0];
-            if (value === 'fixed-provider-snapshot' || value === 'point-in-time') setHistory(value);
-          }}
-        >
-          {Object.entries(histories).map(([value, label]) => (
-            <ToggleGroupItem key={value} value={value}>
-              {label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <p className="text-sm text-muted-foreground">
-          固定复权序列可能包含后来事件的影响；严格历史时点需要可验证的重建证据。
-        </p>
+      <BacktestHistoryChoice value={history} onChange={setHistory} />
         {cashResearch && !cashChoice.controls.selected && (
-          <FieldDescription>
+          <p className="text-xs text-muted-foreground">
             按已核验公告计算现金分红：除息日确认权益，发放日按开盘到账模型结算；拆分未纳入。
-          </FieldDescription>
+          </p>
         )}
-      </Field>
       {cashResearch && currency === 'CNY' && (
         <BacktestKnownCashResearchChoice {...cashChoice.controls} />
       )}
@@ -268,9 +262,8 @@ export function BacktestPricePreparation({
         </p>
       )}
         </div>
-      </details>
-      {!formId && <Button type="button" disabled={!model || resolution.loading || automatic.isPending || query.isFetching} onClick={()=>prepare(true)}>准备并开始回测</Button>}
-      {automatic.isError && <Field invalid><FieldError>{automatic.error.message}</FieldError></Field>}
+      </details>}
+      {!formId && <Button type="button" aria-busy={automatic.isPending} disabled={!model || resolution.loading || automatic.isPending || query.isFetching} onClick={()=>prepare(true)}>{automatic.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}{automatic.isPending ? '正在提交…' : '准备并开始回测'}</Button>}
       {!formId && <Button
         aria-busy={query.isFetching}
         type="button"
@@ -300,15 +293,9 @@ export function BacktestPricePreparation({
           <AlertTitle>配置已准备，运行预检通过</AlertTitle>
           <AlertDescription>
             <p>冻结时间：{formatDateTime(result.runConfig.dataAsOf)}</p>
+            <PreparedPriceSources value={result} />
             <p>
-              实际来源：{result.actualSource.provenance.providerId} /{' '}
-              {result.actualSource.provenance.upstreamSource}（
-              {result.actualSource.provenance.routeIndex === 0 ? '主源' : '备用源'}）
-            </p>
-            <p>
-              {adjustment === 'none'
-                ? '不复权 · 原始份额'
-                : `${adjustment === 'qfq' ? '前复权' : '后复权'} · 归一化份额`}{' '}
+              {priceLabel}{' '}
               · {histories[result.runConfig.executionPriceProtocol.history.basis]}
             </p>
             <p>已检查执行行情和所需依赖。创建时仍会重新校验，预检通过不代表回测已完成。</p>
@@ -326,6 +313,8 @@ export function BacktestPricePreparation({
         </Alert>
       )}
     </FieldGroup>
+    </fieldset>
+    <BacktestSubmissionFeedback receipt={automatic.receipt} error={automatic.error ?? automatic.confirm.error} onRetry={automatic.retry} onConfirm={() => automatic.confirm.mutate()} confirming={automatic.confirm.isPending} />
     </form>
   );
 }

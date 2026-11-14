@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Copy, Download } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { formatDateOnly, formatDateTime } from '@/lib/date-display';
 import {
   buildBacktestDiagnosticExport,
@@ -9,6 +10,7 @@ import {
   type BacktestDiagnosticExport,
 } from './strategy-backtest-diagnostics.model.js';
 import type { BacktestJob, BacktestJobResult } from './strategy.types.js';
+import { BacktestAssumptionField } from './BacktestAssumptionLayout.js';
 
 type DiagnosticField = { label: string; value: unknown };
 
@@ -96,6 +98,7 @@ const diagnosticGroups = (payload: BacktestDiagnosticExport) => [
       { label: '警告与缺口说明', value: payload.outcome.warnings },
       { label: '失败信息', value: payload.outcome.failure },
       { label: '引擎版本', value: payload.traceability.engineVersion },
+      { label: '快照协议版本', value: payload.traceability.snapshotVersion },
       { label: '内容哈希', value: payload.traceability.contentHash },
       { label: '结果校验和', value: payload.traceability.resultChecksum },
     ],
@@ -114,12 +117,13 @@ function DiagnosticValue({
   const fullValue = valueText(field.value);
   const canExpand = fullValue.length > 32 || fullValue.includes('\n');
   return (
-    <div className="min-w-0 rounded-md border bg-muted/10 p-3">
+    <div className="min-w-0">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{field.label}</p>
-          <p className="break-all font-mono text-xs">{compactValue(field.value)}</p>
-        </div>
+        <dl className="min-w-0">
+          <BacktestAssumptionField label={field.label}>
+            <span className="break-all font-mono text-xs">{compactValue(field.value)}</span>
+          </BacktestAssumptionField>
+        </dl>
         <Button
           type="button"
           size="sm"
@@ -179,50 +183,52 @@ export function StrategyBacktestDiagnostics({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h3 className="font-medium">诊断与复现</h3>
-        <p className="text-sm text-muted-foreground">
-          技术字段用于核对任务身份、冻结配置与结果一致性；哈希存在不代表历史事实充分或一定可复现。
+    <div className="flex min-w-0 flex-col gap-6">
+      <div className="flex flex-col gap-4">
+        <div className="space-y-1">
+          <h3 className="text-xl font-medium">诊断与复现</h3>
+          <p className="text-sm text-muted-foreground">
+            技术字段用于核对任务身份、冻结配置与结果一致性；哈希存在不代表历史事实充分或一定可复现。
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void copyValue('诊断摘要', buildBacktestDiagnosticSummary(payload))}
+          >
+            <Copy />
+            {copiedLabel === '诊断摘要' ? '诊断摘要已复制' : '复制诊断摘要'}
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={download}>
+            <Download />
+            导出诊断 JSON
+          </Button>
+        </div>
+        <p className="sr-only" aria-live="polite">
+          {copyMessage}
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => void copyValue('诊断摘要', buildBacktestDiagnosticSummary(payload))}
-        >
-          <Copy />
-          {copiedLabel === '诊断摘要' ? '诊断摘要已复制' : '复制诊断摘要'}
-        </Button>
-        <Button type="button" size="sm" variant="outline" onClick={download}>
-          <Download />
-          导出诊断 JSON
-        </Button>
-      </div>
-      <p className="sr-only" aria-live="polite">
-        {copyMessage}
-      </p>
       {groups.map((group) => (
-        <details
-          key={group.title}
-          className="rounded-lg border"
-          open={group.title === '策略与任务'}
-        >
-          <summary className="cursor-pointer px-4 py-3 font-medium">{group.title}</summary>
-          <div className="grid gap-2 border-t p-4 sm:grid-cols-2">
-            {group.fields.map((field) => (
-              <DiagnosticValue
-                key={field.label}
-                field={field}
-                copiedLabel={copiedLabel}
-                onCopy={(label, value) => void copyValue(label, value)}
-              />
-            ))}
-          </div>
-        </details>
+        <Fragment key={group.title}>
+          <Separator />
+          <details className="min-w-0" open={group.title === '策略与任务'}>
+            <summary className="cursor-pointer text-xl font-medium">{group.title}</summary>
+            <div className="mt-4 grid min-w-0 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+              {group.fields.map((field) => (
+                <DiagnosticValue
+                  key={field.label}
+                  field={field}
+                  copiedLabel={copiedLabel}
+                  onCopy={(label, value) => void copyValue(label, value)}
+                />
+              ))}
+            </div>
+          </details>
+        </Fragment>
       ))}
+      <Separator />
       <Alert>
         <AlertTitle>此导出不是完整复现包</AlertTitle>
         <AlertDescription>

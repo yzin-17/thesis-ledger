@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Optional,
   HttpException,
   NotFoundException,
   BadRequestException,
@@ -23,6 +24,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { researchReportIdSchema } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
+import { InstrumentDisplayService } from '../market/instruments/instrument-display.service.js';
 import type { AiResearchSubmissionV2Access } from './ai-research-submission-v2.store.js';
 import { researchReportWhere } from './ai-research-report-where.js';
 import { readResearchReportTools } from './ai-research-report-tools.js';
@@ -89,7 +91,10 @@ const inaccessible = (error: unknown) =>
 
 @Injectable()
 export class AiResearchReportsQuery {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Optional() private readonly display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
+  ) {}
 
   async list(ownerId: string, raw: unknown, access: AiResearchReportAccess) {
     const query = researchReportListQuerySchema.parse(raw);
@@ -133,11 +138,24 @@ export class AiResearchReportsQuery {
           const projection = await projectResearchReport(transaction, row, scope);
           items.push(researchReportSummarySchema.strip().parse(projection.detail));
         }
+        // 仅补充页面展示名称，不改变已冻结的标的身份和研究报告。
+        const symbols = items.flatMap((report) => {
+          const historical = report.historicalScope;
+          if (historical.status !== 'known') return [];
+          const snapshot = historical.snapshot;
+          return snapshot.scope === 'instrument' || snapshot.scope === 'position'
+            ? [snapshot.instrument.symbol]
+            : [];
+        });
+        const instrumentDirectory = symbols.length
+          ? await this.display.resolveDirectory(symbols, transaction)
+          : undefined;
         const tail = visible.at(-1);
         return researchReportPageSchema.parse({
           items,
           hasMore,
           nextCursor: hasMore && tail ? encodeResearchReportCursor(ownerId, query, tail) : null,
+          ...(instrumentDirectory ? { instrumentDirectory } : {}),
         });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
@@ -270,6 +288,30 @@ export class AiResearchReportsQuery {
         output.searchStatus = 'truncated';
         return output;
       },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+  /** Journal 内部读：携带已授权的冻结证据供确定性复盘关联，不对外暴露原始材料。 */
+  journalDetail(
+    ownerId: string,
+    id: string,
+    scope: { accountId: string; mode: 'actual' | 'shadow' },
+    access: AiResearchReportAccess,
+  ) {
+    return this.prisma.$transaction(
+      (transaction) =>
+        this.read(
+          transaction,
+          ownerId,
+          id,
+          {
+            view: 'scoped',
+            mode: scope.mode,
+            scope: 'account',
+            accountId: scope.accountId,
+          },
+          access,
+        ),
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }

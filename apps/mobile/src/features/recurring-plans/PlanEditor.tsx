@@ -19,19 +19,30 @@ import { InstrumentPicker } from '../market/InstrumentPicker';
 import { isFundInvestmentInstrument } from '../recurring-funds/fund-plan';
 import { monthlyClient, saveMonthlyPlan, type MonthlyPlanDraft } from './plan-api';
 
-export function PlanEditor() {
-  const { params } = useRoute<RouteProp<AccountStackParams, 'PlanEditor'>>();
-  const { api, scope } = useMobileRuntime();
-  const accounts = useAccounts();
-  const account = accounts.data?.find((row) => row.id === params.accountId);
-  const [plan, setPlan] = useState(params.plan);
-  const initial: MonthlyPlanDraft = {
+function monthlyPlanDraft(plan: AccountStackParams['PlanEditor']['plan']): MonthlyPlanDraft {
+  return {
     name: plan?.name ?? '',
     amount: plan?.expectedAmount ?? '',
     day: String(plan?.dayOfMonth ?? 1),
     startPeriod: plan?.startPeriod ?? '',
     symbol: plan && 'symbol' in plan ? plan.symbol : '',
   };
+}
+
+function isWritablePlanAccount(
+  account: NonNullable<ReturnType<typeof useAccounts>['data']>[number] | undefined,
+  kind: AccountStackParams['PlanEditor']['kind'],
+): account is NonNullable<typeof account> {
+  return Boolean(account?.active && account.mode === 'actual' && account.type === kind);
+}
+
+function usePlanEditorController() {
+  const { params } = useRoute<RouteProp<AccountStackParams, 'PlanEditor'>>();
+  const { api, scope } = useMobileRuntime();
+  const accounts = useAccounts();
+  const account = accounts.data?.find((row) => row.id === params.accountId);
+  const [plan, setPlan] = useState(params.plan);
+  const initial = monthlyPlanDraft(plan);
   const [form, setForm] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [uncertain, setUncertain] = useState(false);
@@ -53,9 +64,7 @@ export function PlanEditor() {
     mutation.isPending ||
     uncertain ||
     conflict ||
-    !account?.active ||
-    account.mode !== 'actual' ||
-    account.type !== params.kind ||
+    !isWritablePlanAccount(account, params.kind) ||
     !canUseReadForWrite(accounts) ||
     !canUseReadForWrite(query) ||
     Boolean(plan && (plan.accountId !== account.id || plan.status === 'ENDED'));
@@ -108,6 +117,43 @@ export function PlanEditor() {
     setConflict(false);
     setFeedback('已重新读取，请核对输入后保存。');
   };
+  return {
+    plan,
+    account,
+    params,
+    accounts,
+    query,
+    form,
+    mutation,
+    setFeedback,
+    change,
+    uncertain,
+    feedback,
+    reconcile,
+    blocked,
+    dirty,
+    submit,
+  };
+}
+
+export function PlanEditor() {
+  const {
+    plan,
+    account,
+    params,
+    accounts,
+    query,
+    form,
+    mutation,
+    setFeedback,
+    change,
+    uncertain,
+    feedback,
+    reconcile,
+    blocked,
+    dirty,
+    submit,
+  } = usePlanEditorController();
   return (
     <Page title={plan ? '编辑月度计划' : '新建月度计划'}>
       <Copy>
@@ -118,7 +164,9 @@ export function PlanEditor() {
       <QueryStatus query={accounts} retry={() => void accounts.refetch()} />
       <QueryStatus query={query} retry={() => void query.refetch()} />
       {params.kind === 'fund' && !plan ? (
-        <InstrumentPicker markets={['OF']} instrumentTypes={['MUTUAL_FUND']}
+        <InstrumentPicker
+          markets={['OF']}
+          instrumentTypes={['MUTUAL_FUND']}
           onConfirmed={(item) => {
             if (!isFundInvestmentInstrument(item)) {
               setFeedback('请选择场外基金（000000.OF）。');
@@ -156,7 +204,11 @@ export function PlanEditor() {
         onChange={(startPeriod) => change({ startPeriod })}
         editable={!mutation.isPending && !plan}
       />
-      <Feedback busy={mutation.isPending} message={feedback} error={mutation.isError || uncertain} />
+      <Feedback
+        busy={mutation.isPending}
+        message={feedback}
+        error={mutation.isError || uncertain}
+      />
       <Action
         label="重新核对计划"
         disabled={mutation.isPending || query.isFetching}

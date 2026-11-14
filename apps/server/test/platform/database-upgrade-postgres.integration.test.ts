@@ -66,6 +66,12 @@ function upgrade(source: DatabaseStructureInput, start: string, permissions: str
 }
 
 isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
+  const suiteScope = databaseUpgradeContext();
+  registerDatabaseUpgradePreparationAndDataCases(suiteScope);
+  registerDatabaseUpgradePermissionsAndRollbackCases(suiteScope);
+});
+
+function databaseUpgradeContext() {
   let source: DatabaseStructureInput;
   beforeAll(async () => {
     source = await discoverDatabaseStructure();
@@ -80,7 +86,18 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
       INSERT INTO "SchemaVersion" (id, version) VALUES (1, '${fromHead}')
       ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version;`);
   });
-
+  return {
+    get source() {
+      return source;
+    },
+    set source(value: typeof source) {
+      source = value;
+    },
+  };
+}
+function registerDatabaseUpgradePreparationAndDataCases(
+  suiteScope: ReturnType<typeof databaseUpgradeContext>,
+) {
   it('从真实备份自动恢复演练并产生记录，源库仍保持旧 head', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'upgrade-rehearsal-'));
     try {
@@ -91,14 +108,11 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
         join(directory, 'backup.dump'),
       );
       const permissionsSql = readFileSync(
-        new URL(
-          '../../../../../thesis-ledger-infra/scripts/bootstrap-app-role.sql',
-          import.meta.url,
-        ),
+        new URL('../../../../infra/docker/bootstrap-app-role.sql', import.meta.url),
         'utf8',
       );
       const result = await runDatabaseUpgradeRehearsal({
-        source,
+        source: suiteScope.source,
         fromHead,
         backup,
         consumersStoppedAt,
@@ -107,7 +121,7 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
       });
       expect(result.checks).toEqual({
         restoredSourceHead: fromHead,
-        upgradedHead: source.currentHead,
+        upgradedHead: suiteScope.source.currentHead,
         structureComplete: true,
         appRolePermissions: true,
         preservedData: true,
@@ -119,7 +133,6 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
       await rm(directory, { recursive: true, force: true });
     }
   }, 60_000);
-
   it('官方准备命令绑定镜像输入并生成 SQL，拒绝运行中的消费者', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'upgrade-prepare-'));
     const fixtureContainers: string[] = [];
@@ -132,7 +145,7 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
         fixtureContainers.push(
           docker(['create', '--network', 'none', '--entrypoint', '/bin/true', image]),
         );
-      await writeFile(join(directory, 'image-input.json'), JSON.stringify(source));
+      await writeFile(join(directory, 'image-input.json'), JSON.stringify(suiteScope.source));
       const env = {
         ...process.env,
         DATABASE_UPGRADE_RUN_DIR: directory,
@@ -141,10 +154,7 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
         DEV_DATABASE_EXPECTED_DATABASE: target.databaseName,
         DEV_DATABASE_EXPECTED_OWNER: target.ownerName,
         DEV_DATABASE_PERMISSIONS_SQL: fileURLToPath(
-          new URL(
-            '../../../../../thesis-ledger-infra/scripts/bootstrap-app-role.sql',
-            import.meta.url,
-          ),
+          new URL('../../../../infra/docker/bootstrap-app-role.sql', import.meta.url),
         ),
       };
       const entry = fileURLToPath(
@@ -159,7 +169,7 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
       expect(() => invoke([sourceId, fixtureContainers[0]!])).toThrow();
       invoke(fixtureContainers);
       const evidence = JSON.parse(await readFile(join(directory, 'rehearsal.json'), 'utf8'));
-      expect(evidence.checks.upgradedHead).toBe(source.currentHead);
+      expect(evidence.checks.upgradedHead).toBe(suiteScope.source.currentHead);
       expect(evidence.appRole).toBe('rehearsal_app');
       expect(await readFile(join(directory, 'upgrade.sql'), 'utf8')).toContain(
         'upgrade_role_matches',
@@ -170,12 +180,11 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
       await rm(directory, { recursive: true, force: true });
     }
   }, 60_000);
-
   it('真实四项增量保留旧数据、建立新表并初始化应用角色权限', async () => {
     const before = await captureUpgradeDataWitness(container!, target);
     execute(
       upgrade(
-        source,
+        suiteScope.source,
         fromHead,
         `CREATE ROLE upgrade_fixture_reader;
       GRANT USAGE ON SCHEMA public TO upgrade_fixture_reader;
@@ -183,7 +192,9 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
       ),
     );
     expect(execute('SELECT value FROM "UpgradeSentinel" WHERE id=1;')).toBe('preserve-fixture');
-    expect(execute('SELECT version FROM "SchemaVersion" WHERE id=1;')).toBe(source.currentHead);
+    expect(execute('SELECT version FROM "SchemaVersion" WHERE id=1;')).toBe(
+      suiteScope.source.currentHead,
+    );
     expect(execute('SELECT count(*) FROM "MarketBarSeriesFactArchive";')).toBe('0');
     expect(execute('SELECT count(*) FROM "MarketBarSeriesCoverageArchive";')).toBe('0');
     expect(
@@ -195,7 +206,9 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
       container!,
       target,
       before,
-      upgradeArchiveNamesFor(planDatabaseUpgrade(source, fromHead, target).pendingMigrations),
+      upgradeArchiveNamesFor(
+        planDatabaseUpgrade(suiteScope.source, fromHead, target).pendingMigrations,
+      ),
     );
     assertUpgradeDataPreserved(before, after);
     const sentinel = { tables: before.tables.filter((entry) => entry.table === 'UpgradeSentinel') };
@@ -209,15 +222,17 @@ isolatedDescribe('隔离 PostgreSQL 保留数据升级', () => {
     expect(() => assertUpgradeDataPreserved(sentinel, changed)).toThrow();
     execute('UPDATE "UpgradeSentinel" SET value=\'preserve-fixture\' WHERE id=1;');
   }, 30_000);
-
   it('旧 head 重复执行拒绝并保持数据', () => {
-    expect(() => execute(upgrade(source, fromHead, 'SELECT 1;'))).toThrow();
+    expect(() => execute(upgrade(suiteScope.source, fromHead, 'SELECT 1;'))).toThrow();
     expect(execute('SELECT value FROM "UpgradeSentinel" WHERE id=1;')).toBe('preserve-fixture');
   });
-
+}
+function registerDatabaseUpgradePermissionsAndRollbackCases(
+  suiteScope: ReturnType<typeof databaseUpgradeContext>,
+) {
   it('实际权限脚本满足逐项权限；缺失 INSERT 和越权均拒绝', () => {
     const permissions = readFileSync(
-      new URL('../../../../../thesis-ledger-infra/scripts/bootstrap-app-role.sql', import.meta.url),
+      new URL('../../../../infra/docker/bootstrap-app-role.sql', import.meta.url),
       'utf8',
     );
     execute(`\\setenv POSTGRES_OWNER_USER postgres
@@ -238,14 +253,13 @@ ${permissions}`);
     execute('ALTER ROLE upgrade_verified_app NOCREATEDB;');
     expect(execute(check)).toBe('t');
   });
-
   it('权限阶段失败回滚新增结构、数据及 marker', () => {
     const failing: DatabaseStructureInput = {
-      ...source,
+      ...suiteScope.source,
       currentHead: '20990101000000_failure_fixture',
-      expectedTables: [...source.expectedTables, 'ShouldRollback'],
+      expectedTables: [...suiteScope.source.expectedTables, 'ShouldRollback'],
       migrations: [
-        ...source.migrations,
+        ...suiteScope.source.migrations,
         {
           name: '20990101000000_failure_fixture',
           sqlPath: '',
@@ -253,12 +267,15 @@ ${permissions}`);
         },
       ],
     };
-    expect(() => execute(upgrade(failing, source.currentHead, 'SELECT 1 / 0;'))).toThrow();
+    expect(() =>
+      execute(upgrade(failing, suiteScope.source.currentHead, 'SELECT 1 / 0;')),
+    ).toThrow();
     expect(execute(`SELECT to_regclass('public."ShouldRollback"') IS NULL;`)).toBe('t');
     expect(execute('SELECT count(*) FROM "UpgradeSentinel";')).toBe('1');
-    expect(execute('SELECT version FROM "SchemaVersion" WHERE id=1;')).toBe(source.currentHead);
+    expect(execute('SELECT version FROM "SchemaVersion" WHERE id=1;')).toBe(
+      suiteScope.source.currentHead,
+    );
   });
-
   it('已完成归档且当前 Policy 非空时，仅新增 NAV 表仍逐表保留数据', async () => {
     const priorHead = '20260930100000_rebase_legacy_market_policy';
     const fixture = await createUpgradeIsolation(container!, target);
@@ -267,7 +284,7 @@ ${permissions}`);
       runUpgradeIsolationSql(fixture.container, target, sql, fixture.isolationToken);
     try {
       await query(
-        source.migrations
+        suiteScope.source.migrations
           .filter((item) => item.name <= priorHead)
           .map((item) => item.sql)
           .join('\n'),
@@ -285,14 +302,11 @@ ${permissions}`);
         join(directory, 'backup.dump'),
       );
       const permissionsSql = readFileSync(
-        new URL(
-          '../../../../../thesis-ledger-infra/scripts/bootstrap-app-role.sql',
-          import.meta.url,
-        ),
+        new URL('../../../../infra/docker/bootstrap-app-role.sql', import.meta.url),
         'utf8',
       );
       const evidence = await runDatabaseUpgradeRehearsal({
-        source,
+        source: suiteScope.source,
         fromHead: priorHead,
         backup,
         consumersStoppedAt,
@@ -300,7 +314,7 @@ ${permissions}`);
         appRole: 'rehearsal_app',
       });
       expect(evidence.checks.preservedData).toBe(true);
-      expect(evidence.checks.upgradedHead).toBe(source.currentHead);
+      expect(evidence.checks.upgradedHead).toBe(suiteScope.source.currentHead);
       expect(await query('SELECT version FROM "SchemaVersion" WHERE id=1;')).toBe(priorHead);
       expect(await query('SELECT revision FROM "DesiredProviderPolicy";')).toBe('31');
     } finally {
@@ -308,4 +322,4 @@ ${permissions}`);
       await rm(directory, { recursive: true, force: true });
     }
   }, 60_000);
-});
+}

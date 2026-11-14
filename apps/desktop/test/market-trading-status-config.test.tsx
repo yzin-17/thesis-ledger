@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { MarketPolicyRoutes } from '../src/features/market-data/MarketPolicyRoutes.js';
+import { MarketPolicyRouteTable as MarketPolicyRoutes } from '../src/features/market-data/MarketPolicyRouteTable.js';
 import {
   marketPolicyRouteRowsV3,
   readyRouteTargetsV3,
@@ -61,15 +61,16 @@ const render = (input = catalog, draft = policy) =>
       catalog={input}
       providers={[provider]}
       disabled={false}
-      dirty={false}
+      rows={marketPolicyRouteRowsV3(input, draft)}
+      changedIds={new Set()}
       onChange={vi.fn()}
     />,
   );
 
 describe('历史停复牌配置消费', () => {
-  it('目录中的真实能力复用中文分组和主备选择器', () => {
+  it('目录中的真实能力复用中文主备选择器', () => {
     const html = render();
-    expect(html).toContain('交易状态与风险规则');
+
     expect(html).toContain('中国内地股票 · 历史停复牌 主数据源');
     expect(html).toContain('皇台酒业日级停复牌（2023-08-16～21）');
     expect(html.match(/role="combobox"/g)).toHaveLength(2);

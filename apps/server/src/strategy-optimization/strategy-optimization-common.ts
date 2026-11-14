@@ -9,6 +9,7 @@ import type {
   OptimizationExperimentSource,
   OptimizationTradingCostReadModel,
   ResultReadEligibility,
+  InstrumentDirectory,
 } from '@thesis-ledger/schemas';
 
 export type ExperimentRow = {
@@ -34,6 +35,7 @@ export type ExperimentRow = {
   inputTokensUsed: number;
   outputTokensUsed: number;
   pausedDurationMs: number;
+  retryState?: unknown;
   costUsed: Prisma.Decimal;
   baselineRunRefs: unknown;
   baselineMetrics: unknown;
@@ -64,6 +66,8 @@ export type CandidateReadRow = CandidateRow & {
 };
 
 export type EnrichedExperiment = Omit<ExperimentRow, 'costUsed'> & {
+  executionSymbol?: string | null;
+  instrumentDirectory?: InstrumentDirectory;
   costUsed: Prisma.Decimal | null;
   costSummary: OptimizationCostSummary;
   nameSource: 'stored' | 'legacy_fallback';

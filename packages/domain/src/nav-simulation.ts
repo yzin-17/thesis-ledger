@@ -176,36 +176,7 @@ export class CnNavSimulation {
     return result;
   }
 
-  private applyRequest(request: CnNavRequest, evaluationAt: string): CnNavEventResult {
-    const timing = navEventTimeReason(request, evaluationAt);
-    if (timing) return this.reject(request.eventId, timing.code, timing.reason, request.requestId);
-    if (navTime(request.requestAt) !== navTime(request.occurredAt)) {
-      return this.reject(
-        request.eventId,
-        'INVALID_TIME',
-        'requestAt 必须与 request occurredAt 一致',
-        request.requestId,
-      );
-    }
-    if (this.requests.has(request.requestId)) {
-      return this.reject(
-        request.eventId,
-        'DUPLICATE_REQUEST',
-        'requestId 已经提交',
-        request.requestId,
-      );
-    }
-    if (request.executionSymbol !== this.config.executionInstrument.symbol) {
-      return this.reject(
-        request.eventId,
-        'INSTRUMENT_MISMATCH',
-        'NAV 请求标的不是执行标的',
-        request.requestId,
-      );
-    }
-    let requested: DecimalValue;
-    let fee: DecimalValue;
-    let executionModelSegment: FrozenNavExecutionModelSegment | undefined;
+  private resolveNavRequestModel(request: CnNavRequest): FrozenNavExecutionModelSegment | CnNavRejectedEvent | undefined {
     if (this.config.executionModel) {
       if (!this.config.dataAsOf) {
         return this.reject(
@@ -246,7 +217,7 @@ export class CnNavSimulation {
             request.requestId,
           );
         }
-        executionModelSegment = segment;
+        return segment;
       } catch (error) {
         if (error instanceof ExecutionModelUnavailableError) {
           return this.reject(request.eventId, 'RULE_REJECTED', error.message, request.requestId);
@@ -254,42 +225,10 @@ export class CnNavSimulation {
         throw error;
       }
     }
-    try {
-      requested = requestAmount(request);
-      if (executionModelSegment && request.requestType === 'subscribe') {
-        fee = DecimalValue.from(
-          calculateNavExecutionModelFee(executionModelSegment.execution.subscriptionFee, {
-            code: 'subscriptionFee',
-            side: 'buy',
-            basis: 'subscriptionApplicationAmount',
-            gross: requested.toString(),
-            currency: 'CNY',
-          }).amount,
-        );
-      } else if (executionModelSegment) {
-        fee = DecimalValue.from('0');
-      } else {
-        fee = parse(request.fee ?? '0', 'NAV 费用');
-      }
-    } catch (error) {
-      if (error instanceof ExecutionModelUnavailableError) {
-        return this.reject(request.eventId, 'RULE_REJECTED', error.message, request.requestId);
-      }
-      return this.reject(
-        request.eventId,
-        'INVALID_AMOUNT',
-        error instanceof Error ? error.message : 'NAV 金额无效',
-        request.requestId,
-      );
-    }
-    if (!requested.isPositive() || fee.isNegative()) {
-      return this.reject(
-        request.eventId,
-        'INVALID_AMOUNT',
-        'NAV 金额/份额必须为正数，费用不能为负数',
-        request.requestId,
-      );
-    }
+    return undefined;
+  }
+
+  private reserveNavRequest(request: CnNavRequest, requested: DecimalValue, fee: DecimalValue, executionModelSegment: FrozenNavExecutionModelSegment | undefined): CnNavRejectedEvent | undefined {
     if (request.requestType === 'subscribe') {
       const cashNeeded = requested.plus(fee);
       if (executionModelSegment) {
@@ -334,6 +273,79 @@ export class CnNavSimulation {
       }
       this.reservedRedeemShares = this.reservedRedeemShares.plus(requested);
     }
+    return undefined;
+  }
+
+  private applyRequest(request: CnNavRequest, evaluationAt: string): CnNavEventResult {
+    const timing = navEventTimeReason(request, evaluationAt);
+    if (timing) return this.reject(request.eventId, timing.code, timing.reason, request.requestId);
+    if (navTime(request.requestAt) !== navTime(request.occurredAt)) {
+      return this.reject(
+        request.eventId,
+        'INVALID_TIME',
+        'requestAt 必须与 request occurredAt 一致',
+        request.requestId,
+      );
+    }
+    if (this.requests.has(request.requestId)) {
+      return this.reject(
+        request.eventId,
+        'DUPLICATE_REQUEST',
+        'requestId 已经提交',
+        request.requestId,
+      );
+    }
+    if (request.executionSymbol !== this.config.executionInstrument.symbol) {
+      return this.reject(
+        request.eventId,
+        'INSTRUMENT_MISMATCH',
+        'NAV 请求标的不是执行标的',
+        request.requestId,
+      );
+    }
+    let requested: DecimalValue;
+    let fee: DecimalValue;
+    const resolvedModel = this.resolveNavRequestModel(request);
+    if (resolvedModel && 'applied' in resolvedModel) return resolvedModel;
+    const executionModelSegment = resolvedModel;
+    try {
+      requested = requestAmount(request);
+      if (executionModelSegment && request.requestType === 'subscribe') {
+        fee = DecimalValue.from(
+          calculateNavExecutionModelFee(executionModelSegment.execution.subscriptionFee, {
+            code: 'subscriptionFee',
+            side: 'buy',
+            basis: 'subscriptionApplicationAmount',
+            gross: requested.toString(),
+            currency: 'CNY',
+          }).amount,
+        );
+      } else if (executionModelSegment) {
+        fee = DecimalValue.from('0');
+      } else {
+        fee = parse(request.fee ?? '0', 'NAV 费用');
+      }
+    } catch (error) {
+      if (error instanceof ExecutionModelUnavailableError) {
+        return this.reject(request.eventId, 'RULE_REJECTED', error.message, request.requestId);
+      }
+      return this.reject(
+        request.eventId,
+        'INVALID_AMOUNT',
+        error instanceof Error ? error.message : 'NAV 金额无效',
+        request.requestId,
+      );
+    }
+    if (!requested.isPositive() || fee.isNegative()) {
+      return this.reject(
+        request.eventId,
+        'INVALID_AMOUNT',
+        'NAV 金额/份额必须为正数，费用不能为负数',
+        request.requestId,
+      );
+    }
+    const reservation = this.reserveNavRequest(request, requested, fee, executionModelSegment);
+    if (reservation) return reservation;
     this.requests.set(request.requestId, {
       requestId: request.requestId,
       requestEventId: request.eventId,
@@ -449,48 +461,7 @@ export class CnNavSimulation {
     return this.applied(event.eventId, event.requestId);
   }
 
-  private applyConfirmation(event: CnNavConfirmationEvent, evaluationAt: string): CnNavEventResult {
-    const timing = navEventTimeReason(event, evaluationAt);
-    if (timing) return this.reject(event.eventId, timing.code, timing.reason, event.requestId);
-    const request = this.requests.get(event.requestId);
-    if (!request)
-      return this.reject(event.eventId, 'REQUEST_NOT_FOUND', 'NAV 请求不存在', event.requestId);
-    if (request.status === 'cancelled')
-      return this.reject(event.eventId, 'REQUEST_CANCELLED', 'NAV 请求已取消', event.requestId);
-    if (!request.nav || !request.navEventId)
-      return this.reject(event.eventId, 'NAV_DELAYED', 'NAV 尚未 available', event.requestId);
-    if (request.fillId)
-      return this.reject(
-        event.eventId,
-        'DUPLICATE_EVENT',
-        'NAV confirmation 已应用',
-        event.requestId,
-      );
-    if (
-      request.navOccurredAt === undefined ||
-      request.navAvailableAt === undefined ||
-      navTime(event.occurredAt) < navTime(request.navOccurredAt) ||
-      navTime(event.occurredAt) < navTime(request.navAvailableAt) ||
-      navTime(event.availableAt) < navTime(request.navAvailableAt)
-    ) {
-      return this.reject(
-        event.eventId,
-        'NAV_DELAYED',
-        '确认不能早于 NAV availableAt',
-        event.requestId,
-      );
-    }
-    const fillId = `nav-fill:${request.requestId}`;
-    const nav = DecimalValue.from(request.nav);
-    const quantity =
-      request.requestType === 'subscribe'
-        ? DecimalValue.from(request.requestedAmount!).dividedBy(nav)
-        : DecimalValue.from(request.requestedShares!);
-    const confirmationDate =
-      event.confirmationDate ?? navLocalDate(event.occurredAt, this.timezone);
-    if (!confirmationDate) {
-      return this.reject(event.eventId, 'INVALID_TIME', '确认日期无效', event.requestId);
-    }
+  private checkNavConfirmationDate(event: CnNavConfirmationEvent, request: InternalRequest, confirmationDate: string): CnNavRejectedEvent | undefined {
     if (request.executionModelSegment) {
       const valuationDate = request.valuationDate;
       const earliestDate = valuationDate
@@ -509,26 +480,11 @@ export class CnNavSimulation {
         );
       }
     }
-    let fee = DecimalValue.from(request.fee);
-    if (request.executionModelSegment && request.requestType === 'redeem') {
-      try {
-        fee = DecimalValue.from(
-          calculateNavExecutionModelFee(request.executionModelSegment.execution.redemptionFee, {
-            code: 'redemptionFee',
-            side: 'sell',
-            basis: 'redemptionGrossProceeds',
-            gross: quantity.times(nav).toString(),
-            currency: 'CNY',
-          }).amount,
-        );
-      } catch (error) {
-        if (error instanceof ExecutionModelUnavailableError) {
-          return this.reject(event.eventId, 'RULE_REJECTED', error.message, event.requestId);
-        }
-        throw error;
-      }
-      request.fee = fee.toString();
-    }
+    return undefined;
+  }
+
+  private applyNavConfirmationFill(event: CnNavConfirmationEvent, evaluationAt: string, request: InternalRequest, nav: DecimalValue, quantity: DecimalValue, fee: DecimalValue): CnNavEventResult {
+    const fillId = "nav-fill:" + request.requestId;
     const fillResult = this.ledger.applyFill(
       {
         eventId: fillId,
@@ -539,7 +495,7 @@ export class CnNavSimulation {
         price: nav.toString(),
         charges: [{ amount: fee.toString(), currency: 'CNY' }],
         currency: 'CNY',
-        occurredAt: request.navOccurredAt,
+        occurredAt: request.navOccurredAt!,
         availableAt: event.availableAt,
         ...(request.requestType === 'subscribe'
           ? { cashDebit: request.requestedAmount! }
@@ -587,6 +543,95 @@ export class CnNavSimulation {
     return this.applied(event.eventId, event.requestId);
   }
 
+  private applyConfirmation(event: CnNavConfirmationEvent, evaluationAt: string): CnNavEventResult {
+    const timing = navEventTimeReason(event, evaluationAt);
+    if (timing) return this.reject(event.eventId, timing.code, timing.reason, event.requestId);
+    const request = this.requests.get(event.requestId);
+    if (!request)
+      return this.reject(event.eventId, 'REQUEST_NOT_FOUND', 'NAV 请求不存在', event.requestId);
+    if (request.status === 'cancelled')
+      return this.reject(event.eventId, 'REQUEST_CANCELLED', 'NAV 请求已取消', event.requestId);
+    if (!request.nav || !request.navEventId)
+      return this.reject(event.eventId, 'NAV_DELAYED', 'NAV 尚未 available', event.requestId);
+    if (request.fillId)
+      return this.reject(
+        event.eventId,
+        'DUPLICATE_EVENT',
+        'NAV confirmation 已应用',
+        event.requestId,
+      );
+    if (
+      request.navOccurredAt === undefined ||
+      request.navAvailableAt === undefined ||
+      navTime(event.occurredAt) < navTime(request.navOccurredAt) ||
+      navTime(event.occurredAt) < navTime(request.navAvailableAt) ||
+      navTime(event.availableAt) < navTime(request.navAvailableAt)
+    ) {
+      return this.reject(
+        event.eventId,
+        'NAV_DELAYED',
+        '确认不能早于 NAV availableAt',
+        event.requestId,
+      );
+    }
+    const nav = DecimalValue.from(request.nav);
+    const quantity =
+      request.requestType === 'subscribe'
+        ? DecimalValue.from(request.requestedAmount!).dividedBy(nav)
+        : DecimalValue.from(request.requestedShares!);
+    const confirmationDate =
+      event.confirmationDate ?? navLocalDate(event.occurredAt, this.timezone);
+    if (!confirmationDate) {
+      return this.reject(event.eventId, 'INVALID_TIME', '确认日期无效', event.requestId);
+    }
+    const confirmationDelay = this.checkNavConfirmationDate(event, request, confirmationDate);
+    if (confirmationDelay) return confirmationDelay;
+    let fee = DecimalValue.from(request.fee);
+    if (request.executionModelSegment && request.requestType === 'redeem') {
+      try {
+        fee = DecimalValue.from(
+          calculateNavExecutionModelFee(request.executionModelSegment.execution.redemptionFee, {
+            code: 'redemptionFee',
+            side: 'sell',
+            basis: 'redemptionGrossProceeds',
+            gross: quantity.times(nav).toString(),
+            currency: 'CNY',
+          }).amount,
+        );
+      } catch (error) {
+        if (error instanceof ExecutionModelUnavailableError) {
+          return this.reject(event.eventId, 'RULE_REJECTED', error.message, event.requestId);
+        }
+        throw error;
+      }
+      request.fee = fee.toString();
+    }
+    return this.applyNavConfirmationFill(event, evaluationAt, request, nav, quantity, fee);
+  }
+
+  private checkPostConfirmationAvailability(
+    event: CnNavShareAvailabilityEvent | CnNavCashSettlementEvent,
+    request: InternalRequest,
+    phase: 'shares' | 'redemption-cash',
+  ): CnNavRejectedEvent | undefined {
+    if (!request.executionModelSegment) return undefined;
+    const confirmationDate = request.confirmationAt
+      ? navLocalDate(request.confirmationAt, this.timezone) : undefined;
+    const delay = phase === 'shares'
+      ? request.executionModelSegment.execution.sellableAfterConfirmationTradingDays
+      : request.executionModelSegment.execution.redemptionReinvestableAfterConfirmationTradingDays;
+    const earliestDate = confirmationDate
+      ? tradingDateAfter(this.config.calendar, confirmationDate, delay) : undefined;
+    const eventDate = navLocalDate(event.occurredAt, this.timezone);
+    if (!earliestDate || !eventDate || eventDate < earliestDate) {
+      const reason = phase === 'shares'
+        ? `份额不得早于 ${earliestDate ?? '模型规定日期'} 可用`
+        : `赎回款不得早于 ${earliestDate ?? '模型规定日期'} 可再投资`;
+      return this.reject(event.eventId, 'NAV_DELAYED', reason, event.requestId);
+    }
+    return undefined;
+  }
+
   private applyShareAvailable(
     event: CnNavShareAvailabilityEvent,
     evaluationAt: string,
@@ -612,27 +657,8 @@ export class CnNavSimulation {
     ) {
       return this.reject(event.eventId, 'NAV_DELAYED', '份额可用不能早于确认', event.requestId);
     }
-    if (request.executionModelSegment) {
-      const confirmationDate = request.confirmationAt
-        ? navLocalDate(request.confirmationAt, this.timezone)
-        : undefined;
-      const earliestDate = confirmationDate
-        ? tradingDateAfter(
-            this.config.calendar,
-            confirmationDate,
-            request.executionModelSegment.execution.sellableAfterConfirmationTradingDays,
-          )
-        : undefined;
-      const eventDate = navLocalDate(event.occurredAt, this.timezone);
-      if (!earliestDate || !eventDate || eventDate < earliestDate) {
-        return this.reject(
-          event.eventId,
-          'NAV_DELAYED',
-          `份额不得早于 ${earliestDate ?? '模型规定日期'} 可用`,
-          event.requestId,
-        );
-      }
-    }
+    const shareDelay = this.checkPostConfirmationAvailability(event, request, 'shares');
+    if (shareDelay) return shareDelay;
     if (request.sharesAvailable)
       return this.reject(event.eventId, 'DUPLICATE_EVENT', '份额可用事件已经应用', event.requestId);
     if (
@@ -701,27 +727,9 @@ export class CnNavSimulation {
     ) {
       return this.reject(event.eventId, 'NAV_DELAYED', '现金结算不能早于确认', event.requestId);
     }
-    if (request.executionModelSegment && redemption) {
-      const confirmationDate = request.confirmationAt
-        ? navLocalDate(request.confirmationAt, this.timezone)
-        : undefined;
-      const earliestDate = confirmationDate
-        ? tradingDateAfter(
-            this.config.calendar,
-            confirmationDate,
-            request.executionModelSegment.execution
-              .redemptionReinvestableAfterConfirmationTradingDays,
-          )
-        : undefined;
-      const eventDate = navLocalDate(event.occurredAt, this.timezone);
-      if (!earliestDate || !eventDate || eventDate < earliestDate) {
-        return this.reject(
-          event.eventId,
-          'NAV_DELAYED',
-          `赎回款不得早于 ${earliestDate ?? '模型规定日期'} 可再投资`,
-          event.requestId,
-        );
-      }
+    if (redemption) {
+      const cashDelay = this.checkPostConfirmationAvailability(event, request, 'redemption-cash');
+      if (cashDelay) return cashDelay;
     }
     if (request.cashSettled)
       return this.reject(event.eventId, 'DUPLICATE_EVENT', '现金结算事件已经应用', event.requestId);

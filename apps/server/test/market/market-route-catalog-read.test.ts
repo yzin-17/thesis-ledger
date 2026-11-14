@@ -85,6 +85,14 @@ describe('MarketRouteCatalogReadV3', () => {
     });
   });
 
+  it('保留首次真实使用形成的精确能力验证记录', async () => {
+    const verification = { state: 'verified' as const, verifiedAt: '2026-11-11T09:00:00Z',
+      configVersion: 1, evidenceHash: 'a'.repeat(64) };
+    const dsa = { marketRouteCatalogV3: vi.fn(async () => catalog('complete', [{ ...readyEntry, verification }])) };
+    const result = await new MarketControlService({} as never, dsa as never).routeCapabilitiesV3();
+    expect(result.entries[0]?.verification).toEqual(verification);
+  });
+
   it('maps unavailable failures to safe reasons and never returns DSA exception text', async () => {
     const dsa = {
       marketRouteCatalogV3: vi.fn(async () => {

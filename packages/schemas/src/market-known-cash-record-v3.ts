@@ -17,7 +17,7 @@ export const marketKnownCashQueryIdentityV3Schema = z.strictObject({
 });
 
 /** 通用方案观察；原始进度字段为不透明来源元数据。金额为税前现金。 */
-export const marketKnownCashRecordV3Schema = z
+const knownCashRecordFields = z
   .strictObject({
     symbol: text,
     announcementDate: z.iso.date().nullable(),
@@ -43,30 +43,40 @@ export const marketKnownCashRecordV3Schema = z
       value: positiveDecimalStringSchema,
       unit: z.enum(['per-ten-fund-units', 'per-fund-unit']),
     }),
-  })
+  });
+
+type KnownCashRecord = z.infer<typeof knownCashRecordFields>;
+
+function validateKnownCashStatus(record: KnownCashRecord, ctx: z.RefinementCtx): void {
+  if (
+    (record.planStatus === 'unknown' ||
+      record.statusBasis === 'unverified' ||
+      record.statusBasis === 'event-reconciled') &&
+    record.sourceStatus === undefined
+  )
+    ctx.addIssue({ code: 'custom', message: '新标准记录缺少原状态及标准状态' });
+  if (record.sourceStatus !== undefined && inconsistentKnownCashStatus(record))
+    ctx.addIssue({ code: 'custom', message: '标准分红状态或事件核对依据不一致' });
+}
+
+function inconsistentKnownCashStatus(record: KnownCashRecord): boolean {
+  return (
+    record.sourceStatus !== record.sourcePlanStatus ||
+    record.normalizedStatus === undefined ||
+    record.issues === undefined ||
+    record.statusBasis === 'research-assumption' ||
+    (record.sourceStatus === null &&
+      (record.normalizedStatus !== 'unknown' ||
+        !record.issues?.includes('MISSING_DIVIDEND_STATUS'))) ||
+    (record.statusBasis === 'event-reconciled' && !record.reconciliationReference) ||
+    (record.normalizedStatus === 'unknown' && record.planStatus !== 'unknown') ||
+    (record.statusBasis === 'source-defined' && record.normalizedStatus !== 'implemented')
+  );
+}
+
+export const marketKnownCashRecordV3Schema = knownCashRecordFields
   .superRefine((record, ctx) => {
-    if (
-      (record.planStatus === 'unknown' ||
-        record.statusBasis === 'unverified' ||
-        record.statusBasis === 'event-reconciled') &&
-      record.sourceStatus === undefined
-    )
-      ctx.addIssue({ code: 'custom', message: '新标准记录缺少原状态及标准状态' });
-    if (record.sourceStatus !== undefined) {
-      if (
-        record.sourceStatus !== record.sourcePlanStatus ||
-        record.normalizedStatus === undefined ||
-        record.issues === undefined ||
-        record.statusBasis === 'research-assumption' ||
-        (record.sourceStatus === null &&
-          (record.normalizedStatus !== 'unknown' ||
-            !record.issues?.includes('MISSING_DIVIDEND_STATUS'))) ||
-        (record.statusBasis === 'event-reconciled' && !record.reconciliationReference) ||
-        (record.normalizedStatus === 'unknown' && record.planStatus !== 'unknown') ||
-        (record.statusBasis === 'source-defined' && record.normalizedStatus !== 'implemented')
-      )
-        ctx.addIssue({ code: 'custom', message: '标准分红状态或事件核对依据不一致' });
-    }
+    validateKnownCashStatus(record, ctx);
     if (
       (record.announcementDate !== null && record.announcementDate > record.recordDate) ||
       record.recordDate >= record.effectiveDate ||

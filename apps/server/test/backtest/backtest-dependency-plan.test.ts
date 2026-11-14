@@ -323,6 +323,9 @@ describe('backtest dependency plan', () => {
     expect(plan.datasets.some((dataset) => dataset.purpose === 'corporateActions')).toBe(false);
   });
 
+});
+
+describe("公司行动与事件可见性", () => {
   it('requires effectiveDate for raw accounting facts but does not require strategy visibility', () => {
     const plan = planBacktestDependencies({
       strategy: strategyValue(),
@@ -423,6 +426,9 @@ describe('backtest dependency plan', () => {
     expect(plan.blockingIssues.map(({ code }) => code)).toContain('EVENT_COVERAGE_INCOMPLETE');
   });
 
+});
+
+describe("单位、坐标及基准依赖", () => {
   it('marks missing B01 facts pending and carries verified unit conversions from the helper', () => {
     const strategy = strategyValue({
       entry: {

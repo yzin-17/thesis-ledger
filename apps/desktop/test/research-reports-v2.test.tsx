@@ -47,13 +47,44 @@ const markup = (report: ReturnType<typeof detail>) =>
       />
     </QueryClientProvider>,
   );
+it('列表以名称和代码标识研究对象，模式与研究类型仅在来源出现一次', () => {
+  const projected = reportToAiRun(detail('shadow'), new Map([['600519.SH', '贵州茅台']]));
+  const html = renderToStaticMarkup(
+    <AiRunList
+      runs={[projected]}
+      selectedId={null}
+      status="all"
+      source="all"
+      includeInternal={false}
+      search=""
+      loadState="ready"
+      refreshing={false}
+      onStatusChange={() => undefined}
+      onSourceChange={() => undefined}
+      onIncludeInternalChange={() => undefined}
+      onSearchChange={() => undefined}
+      onSelect={() => undefined}
+      onOpenSource={() => undefined}
+      onRefresh={() => undefined}
+      onClearFilters={() => undefined}
+    />,
+  );
+  expect(projected.display?.object).toMatchObject({
+    label: '标的研究',
+    name: '贵州茅台',
+    code: '600519.SH',
+  });
+  expect(projected.display?.source.label).toBe('模拟 · 标的研究');
+  expect(html).toContain('贵州茅台 · 600519.SH · 模拟 · 标的研究');
+  expect(html).not.toContain('标的研究 · 贵州茅台');
+});
+
 it('V2正文保留原研究问题，超长问题可展开且不改写原文', () => {
   const report = detail();
   expect(markup(report)).toContain(report.question);
   report.question = '逐项核对冻结材料与原始来源，不省略这段完整研究问题。'.repeat(40);
   const html = markup(report);
-  expect(html).toContain('研究问题与背景');
-  expect(html).toContain('展开完整研究问题');
+  expect(html).toContain('研究背景');
   expect(html).toContain(report.question);
   expect(html).not.toContain('<details open');
 });
@@ -64,11 +95,10 @@ it('V2 保留数值、失效条件、质量、材料和模型字段；模型文�
   const html = markup(report);
   for (const text of [
     '失效条件',
-    '推理依据',
+    '关键依据',
     '数值与假设',
-    '未知项',
     '置信依据',
-    '证据与来源',
+    '全部材料与来源',
     '材料截止时间',
   ])
     expect(html).toContain(text);
@@ -91,7 +121,8 @@ it('资料缺口用中文说明，未识别原因保留缺口状态而不冒充�
   expect(html).toContain('资料不完整');
   expect(html).toContain('本次新闻资料不可用');
   expect(html).toContain('部分资料或来源信息尚不完整');
-  expect(html).not.toContain('unrecognized_quality_code');
+  expect(html.split('<pre')[0]).not.toContain('unrecognized_quality_code');
+  expect(html).toContain('unrecognized_quality_code');
 });
 it('另一全局模式不能显示已缓存正文或引用', () => {
   const report = detail('shadow');
@@ -99,6 +130,26 @@ it('另一全局模式不能显示已缓存正文或引用', () => {
   expect(html).toContain('报告属于另一账户模式');
   expect(html).not.toContain(report.summary!);
   expect(html).not.toContain('材料截止时间');
+});
+it('正文先于背景和工具，风险与缺口先于依据，空栏目不出现', () => {
+  const report = detail();
+  if (report.result?.version !== 2) throw new Error('V2 合同缺失');
+  report.result.inference.conclusion = '先呈现的研究结论';
+  report.result.inference.risks = ['影响判断的重要风险'];
+  report.result.inference.unknowns = ['缺少关键依据，无法确认计划可行性'];
+  report.result.inference.rationale = ['先呈现的研究结论', '可核验的关键依据'];
+  const html = markup(report);
+  const conclusion = html.indexOf('先呈现的研究结论');
+  const risk = html.indexOf('影响判断的重要风险');
+  const gap = html.indexOf('缺少关键依据，无法确认计划可行性');
+  const rationale = html.indexOf('可核验的关键依据');
+  expect(conclusion).toBeLessThan(risk);
+  expect(risk).toBeLessThan(gap);
+  expect(gap).toBeLessThan(rationale);
+  expect(rationale).toBeLessThan(html.indexOf('比较已存报告'));
+  expect(rationale).toBeLessThan(html.indexOf('查看复核状态'));
+  expect(html).not.toContain('本报告未列出此项');
+  expect(html.split('<details')[0]?.match(/先呈现的研究结论/g)).toHaveLength(1);
 });
 it('旧正文保留待核验标签，不补模式、费用或引用资格', () => {
   const old = researchResultSchema.parse({

@@ -115,9 +115,15 @@ it('selects the real directory result with market/type limits and preserves the 
   expect(options()[0]!.textContent).toContain('目录名称fund');
   await act(async () => options()[0]!.click());
   expect(host.querySelector('output')!.textContent).toBe('000001.OF');
+  expect(input().value).toBe('目录名称fund · 000001.OF');
+  expect(input().placeholder).toBe('');
   expect(selected).toHaveBeenCalledWith(fund);
   expect(api.confirm).not.toHaveBeenCalled();
   expect(api.search.mock.calls[0]![1]).toBeInstanceOf(AbortSignal);
+  await act(async () => input().focus());
+  expect(host.querySelector('output')!.textContent).toBe('000001.OF');
+  await act(async () => input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(input().value).toBe('目录名称fund · 000001.OF');
 });
 it('does not expose a late result for a different input and cancels the obsolete query', async () => {
   let finish!: (items: InstrumentSearchResult[]) => void;

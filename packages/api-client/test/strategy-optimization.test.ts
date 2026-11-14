@@ -11,6 +11,33 @@ function setup(value: unknown) {
   };
 }
 describe('实验共享管理合同', () => {
+  it('原实验失败重试绑定原身份、幂等键与执行 attempt，并拒绝错配响应', async () => {
+    const { api, fetcher } = setup(experiment);
+    const body = { idempotencyKey: 'same-retry', expectedExecutionAttempt: 2 };
+    await api.retry(id, body);
+    await api.retry(id, body);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(`/experiments/${id}/retry`);
+    expect(fetcher.mock.calls.map(call => JSON.parse(String(call[1]?.body)))).toEqual([body, body]);
+    await expect(setup({ ...experiment, id: other }).api.retry(id, body)).rejects.toBeInstanceOf(ThesisLedgerContractError);
+    expect(() => api.retry(id, { ...body, expectedExecutionAttempt: -1 })).toThrow();
+  });
+  it('按实验身份接续和重试，不发送客户端候选选择', async () => {
+    const { api, fetcher } = setup({ experiment, candidates: [], attempts: [],
+      baseline: { runRefs: {}, metrics: {} }, note: '受控自动完成' });
+    await api.complete(id);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(`/experiments/${id}/complete`);
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({});
+    await expect(setup({ experiment: { ...experiment, id: other }, candidates: [], attempts: [],
+      baseline: { runRefs: {}, metrics: {} }, note: '' }).api.complete(id)).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  });
+  it.each([{}, { selectedCandidateId: null }])('无预选时提交规范空值并保持测试集合', async (selection) => {
+    const { api, fetcher } = setup({ experiment, candidates: [], attempts: [],
+      baseline: { runRefs: {}, metrics: {} }, note: '受控测试' });
+    await api.finalize(id, { candidateIds: [id], expectedStage: 'awaiting_finalization', ...selection });
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+      candidateIds: [id], selectedCandidateId: null, expectedStage: 'awaiting_finalization',
+    });
+  });
   it('分页保留范围、游标和信号，未知费用及读取限制不改写', async () => {
     const { api, fetcher } = setup({
       items: [experiment],

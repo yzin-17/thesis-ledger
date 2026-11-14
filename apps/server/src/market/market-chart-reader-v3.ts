@@ -9,6 +9,8 @@ import {
   type MarketChartOptionsWindowV3,
 } from '@thesis-ledger/schemas';
 import { DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
+import { DataQualityService } from '../quality/data-quality.service.js';
+import { readWithDataQuality } from './market-data-quality.js';
 import { MarketControlService } from './market-control.service.js';
 import {
   marketRouteContextV3,
@@ -22,6 +24,7 @@ import { sliceBarSeries } from './market-bar-window.js';
 import type { BarReadInput } from './market-bar-reader.js';
 import { resolveChartOptionsV3, unavailableChartOptions } from './market-chart-options-v3.js';
 import { marketRouteMarket } from './market-symbol-identity.js';
+import { MarketChartResultCache } from './market-chart-result-cache.js';
 
 /** Interactive observations never enter the frozen-window repository. */
 @Injectable()
@@ -30,10 +33,16 @@ export class MarketChartReaderV3 {
     private readonly control: MarketControlService,
     private readonly dsa: DsaClient,
     @Optional() private readonly proofs?: MarketChartProofRepository,
+    private readonly quality?: DataQualityService,
+    @Optional() private readonly results?: MarketChartResultCache,
   ) {}
 
   async options(
-    identity: { symbol: string; assetType: string; timeframe?: '1m' | '5m' | '15m' | '30m' | '60m' | '1d' },
+    identity: {
+      symbol: string;
+      assetType: string;
+      timeframe?: '1m' | '5m' | '15m' | '30m' | '60m' | '1d';
+    },
     window?: MarketChartOptionsWindowV3,
   ) {
     if (window) marketChartOptionsWindowV3Schema.parse(window);
@@ -41,18 +50,42 @@ export class MarketChartReaderV3 {
       !/\.(SH|SZ|BJ|HK|US)$/.test(identity.symbol) ||
       (identity.assetType !== 'STOCK' && identity.assetType !== 'ETF')
     ) {
-      return unavailableChartOptions(identity.symbol, 'legacy', 'not_adapted', window, identity.timeframe);
+      return unavailableChartOptions(
+        identity.symbol,
+        'legacy',
+        'not_adapted',
+        window,
+        identity.timeframe,
+      );
     }
     let policy;
     try {
       policy = await this.control.getPolicy();
     } catch {
-      return unavailableChartOptions(identity.symbol, 'unknown', 'policy_not_applied', window, identity.timeframe);
+      return unavailableChartOptions(
+        identity.symbol,
+        'unknown',
+        'policy_not_applied',
+        window,
+        identity.timeframe,
+      );
     }
     if (policy.contractVersion !== 3)
-      return unavailableChartOptions(identity.symbol, 'legacy', 'policy_not_applied', window, identity.timeframe);
+      return unavailableChartOptions(
+        identity.symbol,
+        'legacy',
+        'policy_not_applied',
+        window,
+        identity.timeframe,
+      );
     if (policy.syncState !== 'applied' || policy.effectiveStale !== false) {
-      return unavailableChartOptions(identity.symbol, 'v3', 'policy_not_applied', window, identity.timeframe);
+      return unavailableChartOptions(
+        identity.symbol,
+        'v3',
+        'policy_not_applied',
+        window,
+        identity.timeframe,
+      );
     }
     try {
       const [envelope, catalog] = await Promise.all([
@@ -77,15 +110,24 @@ export class MarketChartReaderV3 {
           proofs: this.proofs,
         });
       const options = resolveChartOptionsV3(
-        { symbol: identity.symbol, assetType: identity.assetType,
-          ...(identity.timeframe ? { timeframe: identity.timeframe } : {}) },
+        {
+          symbol: identity.symbol,
+          assetType: identity.assetType,
+          ...(identity.timeframe ? { timeframe: identity.timeframe } : {}),
+        },
         desired,
         envelope.projection?.effective,
         catalog,
       );
       return { ...options, ...(window ? { window } : {}) };
     } catch {
-      return unavailableChartOptions(identity.symbol, 'v3', 'catalog_unavailable', window, identity.timeframe);
+      return unavailableChartOptions(
+        identity.symbol,
+        'v3',
+        'catalog_unavailable',
+        window,
+        identity.timeframe,
+      );
     }
   }
 
@@ -93,15 +135,7 @@ export class MarketChartReaderV3 {
     input: BarReadInput,
     compatibility?: MarketWindowSelectionInputV3['compatibility'],
   ): Promise<BarSeries> {
-    if (
-      input.acceptance !== 'interactive' ||
-      input.history ||
-      input.asOf ||
-      !['1d', '1m', '5m', '15m', '30m', '60m'].includes(input.identity.timeframe) ||
-      !/\.(SH|SZ|BJ|HK|US)$/.test(input.identity.symbol)
-    ) {
-      throw new Error('交互 V3 只支持已接入的日线/分钟图表，不提供回测或历史可见性验收');
-    }
+    assertInteractiveChartRead(input);
     const { start, end } = planMarketChartWindow(input.window, input.identity);
     const routeKey: MarketDataBarRouteKeyV3 = {
       kind: 'bar',
@@ -147,6 +181,7 @@ export class MarketChartReaderV3 {
         catalogRevision: result.context.catalogRevision,
       });
     };
+    let cacheMeta: { cached: boolean; freshUntil?: string } | undefined;
     const response = await selectChartWindowV3({
       request: {
         contractVersion: 3,
@@ -160,7 +195,30 @@ export class MarketChartReaderV3 {
       context: result.context,
       ...(compatibility ? { compatibility } : {}),
       ...(!compatibility && this.proofs ? { resolveCompatibility } : {}),
-      read: (request) => this.dsa.marketChartBarsV3(request),
+      read: async (request) => {
+        const load = () =>
+          readWithDataQuality(
+            this.quality,
+            {
+              capability: request.routeKey.capability,
+              provider: request.routeTarget.providerId,
+              symbol: request.symbol,
+              scope: `${request.routeTarget.upstreamSource}:${request.routeKey.timeframe}:${request.routeKey.adjustment}`,
+            },
+            () => this.dsa.marketChartBarsV3(request),
+          );
+        if (!this.results) return load();
+        const acquired = await this.results.resolve(
+          request,
+          {
+            limit: input.window.limit ?? 90,
+            ...(input.refresh !== undefined ? { refresh: input.refresh } : {}),
+          },
+          load,
+        );
+        cacheMeta = acquired;
+        return acquired.response;
+      },
     });
     const fetchedAt = response.sourcePriceBasis.observedAt;
     const acquisitionFingerprint = createHash('sha256')
@@ -185,9 +243,9 @@ export class MarketChartReaderV3 {
         ...response.provenance,
         providerRevision: acquisitionFingerprint,
         fetchedAt,
-        freshUntil: fetchedAt,
-        servedFromCache: false,
-        cacheStatus: 'miss',
+        freshUntil: cacheMeta?.freshUntil ?? fetchedAt,
+        servedFromCache: cacheMeta?.cached ?? false,
+        cacheStatus: cacheMeta?.cached ? 'redis' : 'miss',
       },
       inputFingerprint: response.inputFingerprint,
       chartContextV3: {
@@ -197,9 +255,23 @@ export class MarketChartReaderV3 {
         requestedEnd: end,
         acquisitionFingerprint,
         ...(response.session ? { session: response.session } : {}),
-        ...(response.timestampConvention ? { timestampConvention: response.timestampConvention } : {}),
+        ...(response.timestampConvention
+          ? { timestampConvention: response.timestampConvention }
+          : {}),
       },
     });
     return sliceBarSeries(series, input.window);
+  }
+}
+
+function assertInteractiveChartRead(input: BarReadInput) {
+  if (
+    input.acceptance !== 'interactive' ||
+    input.history ||
+    input.asOf ||
+    !['1d', '1m', '5m', '15m', '30m', '60m'].includes(input.identity.timeframe) ||
+    !/\.(SH|SZ|BJ|HK|US)$/.test(input.identity.symbol)
+  ) {
+    throw new Error('交互 V3 只支持已接入的日线/分钟图表，不提供回测或历史可见性验收');
   }
 }

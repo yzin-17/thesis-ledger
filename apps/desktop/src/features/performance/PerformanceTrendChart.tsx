@@ -30,51 +30,30 @@ const performanceSeriesQualityLabel = (quality: PerformanceSeriesPoint['dataQual
   return '数据完整';
 };
 
-export function PerformanceTrendChart({
-  seriesPoints,
-  interval,
-  pnlPoints,
-  pnlCurrency = 'CNY',
-}: {
+export function PerformanceTrendChart(props: {
   seriesPoints: PerformanceSeriesPoint[];
   interval: PerformanceSeriesInterval;
   pnlPoints?: PnlChartPoint[] | undefined;
   pnlCurrency?: Currency | undefined;
 }) {
-  const container = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(720);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  useEffect(() => {
-    const element = container.current;
-    if (!element || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(280, entry.contentRect.width));
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-  useEffect(() => setActiveIndex(null), [seriesPoints, pnlPoints]);
-  const geometry = performanceTrendGeometry(seriesPoints, pnlPoints ?? [], width);
-  const active = activeIndex === null ? undefined : geometry.timeline[activeIndex];
-  const currency = seriesPoints[0]?.currency ?? pnlCurrency;
-  const combined = pnlPoints !== undefined;
-  const axisMoney = (value: number, unit: Currency) =>
-    new Intl.NumberFormat('zh-CN', {
-      style: 'currency',
-      currency: unit,
-      notation: 'compact',
-      maximumFractionDigits: 1,
-    }).format(value);
-  const pickPoint = (clientX: number, svg: SVGSVGElement) => {
-    const bounds = svg.getBoundingClientRect();
-    if (!bounds.width || !geometry.timeline.length) return;
-    const x = ((clientX - bounds.left) / bounds.width) * width;
-    let nearest = 0;
-    geometry.timeline.forEach((point, index) => {
-      if (Math.abs(point.x - x) < Math.abs(geometry.timeline[nearest]!.x - x)) nearest = index;
-    });
-    setActiveIndex(nearest);
-  };
+  const control = usePerformanceTrendChart(props);
+  const {
+    container,
+    combined,
+    currency,
+    pnlCurrency,
+    width,
+    geometry,
+    setActiveIndex,
+    pickPoint,
+    activeIndex,
+    seriesPoints,
+    axisMoney,
+    interval,
+    pnlPoints,
+    active,
+  } = control;
+
   return (
     <div
       ref={container}
@@ -237,65 +216,139 @@ export function PerformanceTrendChart({
             : ''}
         </text>
       </svg>
-      {active && (
-        <div
-          className="pointer-events-none absolute top-9 right-3 max-w-[calc(100%-1.5rem)] rounded-lg border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
-          role="status"
-          aria-live="polite"
-        >
-          <p className="m-0 font-medium">{formatDate(active.at)}</p>
-          <p className="m-0 mt-2 font-semibold">
-            资产总值{' '}
-            {active.asset ? formatMoney(active.asset.value, active.asset.currency) : '该时点无记录'}
-          </p>
-          {active.asset && (
-            <>
-              <p className="m-0 mt-1 text-muted-foreground">
-                {active.asset.valuationBasis === 'OFFICIAL' ? '正式估值' : '估算值'} ·{' '}
-                {performanceSeriesQualityLabel(active.asset.dataQuality)}
-              </p>
-              <p className="m-0 text-muted-foreground">
-                披露覆盖 {formatCoverage(active.asset.disclosureCoverage)} · 可定价覆盖{' '}
-                {formatCoverage(active.asset.pricedCoverage)}
-              </p>
-            </>
-          )}
-          {combined && (
-            <>
-              <p className="m-0 mt-2 font-semibold">
-                累计盈亏{' '}
-                {active.pnl?.value !== null && active.pnl?.value !== undefined
-                  ? formatMoney(active.pnl.value, pnlCurrency)
-                  : '—'}
-              </p>
-              {!active.pnl && <p className="m-0 text-muted-foreground">该时点无盈亏记录</p>}
-              {active.pnl && (
-                <>
-                  <p className="m-0 text-muted-foreground">
-                    {active.pnl.current ? '当前估值' : '历史收盘记录'}
-                  </p>
-                  {active.pnl.reason ? (
-                    <p className="m-0 text-muted-foreground">
-                      {pnlReasonLabels[active.pnl.reason]}
-                    </p>
-                  ) : (
-                    <p className="m-0 text-muted-foreground">
-                      已实现{' '}
-                      {active.pnl.realizedPnl === null
-                        ? '—'
-                        : formatMoney(active.pnl.realizedPnl, pnlCurrency)}{' '}
-                      · 未实现{' '}
-                      {active.pnl.unrealizedPnl === null
-                        ? '—'
-                        : formatMoney(active.pnl.unrealizedPnl, pnlCurrency)}
-                    </p>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      {active && <TrendPointReadout control={control} active={active} />}
     </div>
+  );
+}
+
+function usePerformanceTrendChart({
+  seriesPoints,
+  interval,
+  pnlPoints,
+  pnlCurrency = 'CNY',
+}: {
+  seriesPoints: PerformanceSeriesPoint[];
+  interval: PerformanceSeriesInterval;
+  pnlPoints?: PnlChartPoint[] | undefined;
+  pnlCurrency?: Currency | undefined;
+}) {
+  const container = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(720);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  useEffect(() => {
+    const element = container.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setWidth(Math.max(280, entry.contentRect.width));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => setActiveIndex(null), [seriesPoints, pnlPoints]);
+  const geometry = performanceTrendGeometry(seriesPoints, pnlPoints ?? [], width);
+  const active = activeIndex === null ? undefined : geometry.timeline[activeIndex];
+  const currency = seriesPoints[0]?.currency ?? pnlCurrency;
+  const combined = pnlPoints !== undefined;
+  const axisMoney = (value: number, unit: Currency) =>
+    new Intl.NumberFormat('zh-CN', {
+      style: 'currency',
+      currency: unit,
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(value);
+  const pickPoint = (clientX: number, svg: SVGSVGElement) => {
+    const bounds = svg.getBoundingClientRect();
+    if (!bounds.width || !geometry.timeline.length) return;
+    const x = ((clientX - bounds.left) / bounds.width) * width;
+    let nearest = 0;
+    geometry.timeline.forEach((point, index) => {
+      if (Math.abs(point.x - x) < Math.abs(geometry.timeline[nearest]!.x - x)) nearest = index;
+    });
+    setActiveIndex(nearest);
+  };
+
+  return {
+    container,
+    combined,
+    currency,
+    pnlCurrency,
+    width,
+    geometry,
+    setActiveIndex,
+    pickPoint,
+    activeIndex,
+    seriesPoints,
+    axisMoney,
+    interval,
+    pnlPoints,
+    active,
+  };
+}
+
+function TrendPointReadout({
+  control,
+  active,
+}: {
+  control: ReturnType<typeof usePerformanceTrendChart>;
+  active: NonNullable<ReturnType<typeof usePerformanceTrendChart>['active']>;
+}) {
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute top-9 right-3 max-w-[calc(100%-1.5rem)] rounded-lg border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+        role="status"
+        aria-live="polite"
+      >
+        <p className="m-0 font-medium">{formatDate(active.at)}</p>
+        <p className="m-0 mt-2 font-semibold">
+          资产总值{' '}
+          {active.asset ? formatMoney(active.asset.value, active.asset.currency) : '该时点无记录'}
+        </p>
+        {active.asset && (
+          <>
+            <p className="m-0 mt-1 text-muted-foreground">
+              {active.asset.valuationBasis === 'OFFICIAL' ? '正式估值' : '估算值'} ·{' '}
+              {performanceSeriesQualityLabel(active.asset.dataQuality)}
+            </p>
+            <p className="m-0 text-muted-foreground">
+              披露覆盖 {formatCoverage(active.asset.disclosureCoverage)} · 可定价覆盖{' '}
+              {formatCoverage(active.asset.pricedCoverage)}
+            </p>
+          </>
+        )}
+        {control.combined && (
+          <>
+            <p className="m-0 mt-2 font-semibold">
+              累计盈亏{' '}
+              {active.pnl?.value !== null && active.pnl?.value !== undefined
+                ? formatMoney(active.pnl.value, control.pnlCurrency)
+                : '—'}
+            </p>
+            {!active.pnl && <p className="m-0 text-muted-foreground">该时点无盈亏记录</p>}
+            {active.pnl && (
+              <>
+                <p className="m-0 text-muted-foreground">
+                  {active.pnl.current ? '当前估值' : '历史收盘记录'}
+                </p>
+                {active.pnl.reason ? (
+                  <p className="m-0 text-muted-foreground">{pnlReasonLabels[active.pnl.reason]}</p>
+                ) : (
+                  <p className="m-0 text-muted-foreground">
+                    已实现{' '}
+                    {active.pnl.realizedPnl === null
+                      ? '—'
+                      : formatMoney(active.pnl.realizedPnl, control.pnlCurrency)}{' '}
+                    · 未实现{' '}
+                    {active.pnl.unrealizedPnl === null
+                      ? '—'
+                      : formatMoney(active.pnl.unrealizedPnl, control.pnlCurrency)}
+                  </p>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </>
   );
 }

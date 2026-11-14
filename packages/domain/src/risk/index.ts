@@ -11,36 +11,33 @@ export * from './indicator-rules.js';
 export * from './chip-rules.js';
 export * from './portfolio-rules.js';
 
+const ruleEvaluators: Partial<Record<RiskRule['kind'], (rule: RiskRule, context: CompleteRiskContext) => RiskEvent | null>> = {
+  'fixed-stop': evaluatePriceRule,
+  'cost-stop': evaluatePriceRule,
+  'take-profit': evaluatePriceRule,
+  'price-above': evaluatePriceRule,
+  'price-below': evaluatePriceRule,
+  'position-concentration': evaluatePriceRule,
+  'trailing-stop': evaluatePriceRule,
+  ma: evaluateIndicatorRule,
+  rsi: evaluateIndicatorRule,
+  macd: evaluateIndicatorRule,
+  atr: evaluateIndicatorRule,
+  volume: evaluateIndicatorRule,
+  'chip-peak': evaluateChipRule,
+  'chip-ratio': evaluateChipRule,
+  'chip-migration': evaluateChipRule,
+  drawdown: evaluatePortfolioRule,
+  'sector-concentration': evaluatePortfolioRule,
+  'asset-concentration': evaluatePortfolioRule,
+  'volatility-exposure': evaluatePortfolioRule,
+  correlation: evaluatePortfolioRule,
+};
+
 export const evaluateCompleteRule = (
   rule: RiskRule,
   context: CompleteRiskContext,
 ): RiskEvent | null => {
-  switch (rule.kind) {
-    case 'fixed-stop':
-    case 'cost-stop':
-    case 'take-profit':
-    case 'price-above':
-    case 'price-below':
-    case 'position-concentration':
-    case 'trailing-stop':
-      return evaluatePriceRule(rule, context);
-    case 'ma':
-    case 'rsi':
-    case 'macd':
-    case 'atr':
-    case 'volume':
-      return evaluateIndicatorRule(rule, context);
-    case 'chip-peak':
-    case 'chip-ratio':
-    case 'chip-migration':
-      return evaluateChipRule(rule, context);
-    case 'drawdown':
-    case 'sector-concentration':
-    case 'asset-concentration':
-    case 'volatility-exposure':
-    case 'correlation':
-      return evaluatePortfolioRule(rule, context);
-    default:
-      return null;
-  }
+  if (!Object.hasOwn(ruleEvaluators, rule.kind)) return null;
+  return ruleEvaluators[rule.kind]?.(rule, context) ?? null;
 };

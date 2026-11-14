@@ -5,6 +5,52 @@ import { useAccounts, useLedger, useValuation } from '../../app/query/mobile-que
 import { Action, Copy, Page, QueryList, QueryStatus, Section } from '../../components/MobilePrimitives';
 import type { AccountStackParams } from '../../app/navigation-types';
 
+function AccountWorkspaceActions({ account, writable, navigation, params }: {
+  account: NonNullable<ReturnType<typeof useAccounts>['data']>[number];
+  writable: boolean;
+  navigation: NativeStackNavigationProp<AccountStackParams>;
+  params: AccountStackParams['AccountWorkspace'];
+}) {
+  return (
+    <>
+      <Section title="持仓与导入">
+        <Action
+          label="人工录入持仓"
+          disabled={!writable || account.type === 'cash'}
+          onPress={() => navigation.navigate('Baseline', params)}
+        />
+        <Action label="持仓草稿与截图" onPress={() => navigation.navigate('Drafts', params)} />
+        <Action
+          label="确定性对账"
+          onPress={() => navigation.navigate('Reconciliation', params)}
+        />
+      </Section>
+      <Section title="成交与审计">
+        <Action label="现金与结算" onPress={() => navigation.navigate('Cash', params)} />
+        {account.type === 'cash' ? (
+          <Action
+            label="定期入账"
+            onPress={() => navigation.navigate('Plans', { ...params, kind: 'cash' })}
+          />
+        ) : null}
+        {account.type === 'fund' ? (
+          <Action
+            label="基金定投"
+            onPress={() => navigation.navigate('Plans', { ...params, kind: 'fund' })}
+          />
+        ) : null}
+        <Action label="成交记录" onPress={() => navigation.navigate('Executions', params)} />
+        <Action
+          label="新增成交"
+          disabled={!writable || account.type === 'cash'}
+          onPress={() => navigation.navigate('ExecutionEditor', params)}
+        />
+        <Action label="账本审计" onPress={() => navigation.navigate('Audit', params)} />
+      </Section>
+    </>
+  );
+}
+
 export function AccountWorkspace() {
   const { params } = useRoute<RouteProp<AccountStackParams, 'AccountWorkspace'>>();
   const navigation = useNavigation<NativeStackNavigationProp<AccountStackParams>>();
@@ -26,40 +72,7 @@ export function AccountWorkspace() {
             {ledger.data?.ledgerRevision ?? '读取中'}
           </Copy>
           {!writable ? <Copy muted>当前账户尚不可写，请确认启用状态并重新读取。</Copy> : null}
-          <Section title="持仓与导入">
-            <Action
-              label="人工录入持仓"
-              disabled={!writable || account.type === 'cash'}
-              onPress={() => navigation.navigate('Baseline', params)}
-            />
-            <Action label="持仓草稿与截图" onPress={() => navigation.navigate('Drafts', params)} />
-            <Action
-              label="确定性对账"
-              onPress={() => navigation.navigate('Reconciliation', params)}
-            />
-          </Section>
-          <Section title="成交与审计">
-            <Action label="现金与结算" onPress={() => navigation.navigate('Cash', params)} />
-            {account.type === 'cash' ? (
-              <Action
-                label="定期入账"
-                onPress={() => navigation.navigate('Plans', { ...params, kind: 'cash' })}
-              />
-            ) : null}
-            {account.type === 'fund' ? (
-              <Action
-                label="基金定投"
-                onPress={() => navigation.navigate('Plans', { ...params, kind: 'fund' })}
-              />
-            ) : null}
-            <Action label="成交记录" onPress={() => navigation.navigate('Executions', params)} />
-            <Action
-              label="新增成交"
-              disabled={!writable || account.type === 'cash'}
-              onPress={() => navigation.navigate('ExecutionEditor', params)}
-            />
-            <Action label="账本审计" onPress={() => navigation.navigate('Audit', params)} />
-          </Section>
+          <AccountWorkspaceActions account={account} writable={writable} navigation={navigation} params={params} />
           <QueryList
             query={valuation}
             retry={() => void valuation.refetch()}

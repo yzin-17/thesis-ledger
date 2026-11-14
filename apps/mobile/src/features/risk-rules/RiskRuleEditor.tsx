@@ -1,12 +1,18 @@
-import { useRoute, type RouteProp } from '@react-navigation/native';
-import type { PortfolioStackParams } from '../../app/navigation-types';
+import {
+  useRoute,
+  useNavigation,
+  type RouteProp,
+  type NavigationProp,
+} from '@react-navigation/native';
+import type { PortfolioStackParams, RootTabParams } from '../../app/navigation-types';
 import { useAccounts, useValuation } from '../../app/query/mobile-queries';
 import { canUseReadForWrite } from '../../app/query/query-state';
-import { Copy, Page, QueryStatus } from '../../components/MobilePrimitives';
+import { Action, Copy, Page, QueryStatus } from '../../components/MobilePrimitives';
 import { useRiskRules } from './risk-queries';
 import { RiskRuleForm } from './RiskRuleForm';
 import { riskKinds } from './risk-rule-form';
-export function RiskRuleEditor() {
+function useRiskRuleEditorController() {
+  const navigation = useNavigation<NavigationProp<RootTabParams>>();
   const { params } = useRoute<RouteProp<PortfolioStackParams, 'RiskRuleEditor'>>();
   const accounts = useAccounts();
   const valuation = useValuation();
@@ -15,6 +21,12 @@ export function RiskRuleEditor() {
   const present = !params.ruleId || Boolean(rule);
   const supported = !rule || riskKinds.some((row) => row.value === rule.kind);
   const inScope = !rule?.accountId || accounts.data?.some((row) => row.id === rule.accountId);
+  return { navigation, accounts, valuation, rules, rule, present, supported, inScope };
+}
+
+export function RiskRuleEditor() {
+  const { navigation, accounts, valuation, rules, rule, present, supported, inScope } =
+    useRiskRuleEditorController();
   return (
     <Page title="风险规则编辑">
       <QueryStatus query={accounts} retry={() => void accounts.refetch()} />
@@ -22,7 +34,18 @@ export function RiskRuleEditor() {
       <QueryStatus query={rules} retry={() => void rules.refetch()} />
       {!present ? <Copy>规则不可读取，请返回列表。</Copy> : null}
       {!supported ? <Copy>当前规则类型尚无法编辑，请保留原规则并核对版本。</Copy> : null}
-      {present && supported && rules.data && accounts.data ? (
+      {rule?.sourcePlanId && inScope ? (
+        <Action
+          label="编辑所属策略应用"
+          onPress={() =>
+            navigation.navigate('Research', {
+              screen: 'Strategy',
+              params: { screen: 'StrategyRiskEditor', params: { id: rule.sourcePlanId! } },
+            })
+          }
+        />
+      ) : null}
+      {present && supported && rules.data && accounts.data && !rule?.sourcePlanId ? (
         <RiskRuleForm
           {...(rule ? { rule } : {})}
           accounts={accounts.data}

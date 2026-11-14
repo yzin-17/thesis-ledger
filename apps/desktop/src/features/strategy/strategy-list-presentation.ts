@@ -1,4 +1,4 @@
-import type { OptimizationExperimentSource } from '@thesis-ledger/schemas';
+import { optimizationExperimentInstrumentLabel } from '@thesis-ledger/schemas';
 import { formatDateOnly } from '@/lib/date-display';
 import type { OptimizationExperimentSummary } from './strategy-optimization.api.js';
 import { backtestMetricNumber, backtestMetricPercent } from './strategy-backtest-detail.model.js';
@@ -61,7 +61,7 @@ export const backtestResultSummary = (job: BacktestJobSummary) => {
 const experimentStatusLabels: Record<string, string> = {
   queued: '排队中',
   running: '运行中',
-  awaiting_finalization: '等待锁定候选',
+  awaiting_finalization: '准备测试',
   testing: '封存测试中',
   succeeded: '已完成',
   failed: '失败',
@@ -73,7 +73,7 @@ const experimentStageLabels: Record<string, string> = {
   baseline: '基线回测',
   proposing: '候选生成',
   evaluating: '候选验证',
-  awaiting_finalization: '等待锁定候选',
+  awaiting_finalization: '准备测试',
   testing: '封存测试',
   completed: '实验完成',
   failed: '执行失败',
@@ -94,24 +94,16 @@ export const experimentStatusVariant = (
 
 export const experimentStageLabel = (stage: string) => experimentStageLabels[stage] ?? '阶段未识别';
 
-const sourceLabel = (source: OptimizationExperimentSource | undefined) => {
+export const experimentSourceLabel = (experiment: OptimizationExperimentSummary) => {
+  const instrument = optimizationExperimentInstrumentLabel(experiment);
+  const source = experiment.source;
   if (source?.kind === 'existing') {
     const name = source.strategyName?.trim() || '来源策略';
-    return `基于「${name}」v${source.version}`;
+    return [instrument, `基于「${name}」v${source.version}`].filter(Boolean).join(' · ');
   }
-  if (source?.kind === 'discovery') {
-    const symbol = source.discoveryScope?.executionInstrument.symbol;
-    return symbol ? `${symbol} · 从零探索` : '从零探索';
-  }
-  return null;
-};
-
-export const experimentSourceLabel = (experiment: OptimizationExperimentSummary) => {
-  const source = sourceLabel(experiment.source);
-  if (source) return source;
-  const symbol = experiment.discoveryScope?.executionInstrument.symbol;
-  if (experiment.sourceMode === 'discovery') return symbol ? `${symbol} · 从零探索` : '从零探索';
-  return '来源策略未记录';
+  if (source?.kind === 'discovery' || experiment.sourceMode === 'discovery')
+    return [instrument, '从零探索'].filter(Boolean).join(' · ');
+  return [instrument, '来源策略未记录'].filter(Boolean).join(' · ');
 };
 
 export const experimentProgressLabel = (experiment: OptimizationExperimentSummary) => {

@@ -7,6 +7,8 @@ import {
   strategyCenterFocusTarget,
   strategyCenterPath,
   strategyCenterTabForPath,
+  backtestDetailReturnTarget,
+  backtestExperimentReturnState,
 } from '../src/features/strategy/strategy-center.navigation.js';
 import { nextExperimentDay } from '../src/features/strategy/StrategyExperimentCreatePage.js';
 
@@ -22,6 +24,20 @@ const strategies = [
 ];
 
 describe('策略中心导航与实验创建契约', () => {
+  it('回测详情按进入来源返回，并保留实验页签及任务列表筛选', () => {
+    expect(backtestDetailReturnTarget(backtestExperimentReturnState('experiment/a', '?view=runtime'))).toEqual({
+      path: '/strategy/experiments/experiment%2Fa?view=runtime',
+      label: '返回实验详情',
+    });
+    expect(backtestDetailReturnTarget({ backtestJobsSearch: '?status=succeeded&page=2' })).toEqual({
+      path: '/strategy/jobs?status=succeeded&page=2',
+      label: '返回回测任务',
+    });
+    for (const state of [null, undefined, { backtestExperiment: { id: '' } }, { backtestExperiment: { id: 1 } }]) {
+      expect(backtestDetailReturnTarget(state)).toEqual({ path: '/strategy/jobs', label: '返回回测任务' });
+    }
+  });
+
   it('旧入口只迁移列表类型，不推测对象版本', () => {
     expect(legacyStrategyDestination('?tab=library')).toBe('/strategy/library');
     expect(legacyStrategyDestination('?tab=jobs')).toBe('/strategy/jobs');

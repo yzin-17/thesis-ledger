@@ -22,8 +22,10 @@ import type {
   StrategyRiskNotification,
 } from '../strategy/strategy-optimization.api.js';
 import type { StrategyVersion } from '../strategy/strategy.types.js';
-import { NotificationRouteSelect } from './NotificationRouteSelect.js';
-import { useNotificationRoutingQuery } from './risk.queries.js';
+import { NotificationProviderSelect } from './NotificationProviderSelect.js';
+import { useRiskNotificationRoutingQuery } from './risk.queries.js';
+import { StrategyRiskRuleSettings } from '../strategy/StrategyRiskRuleSettings.js';
+import { buildRiskNotification, ruleNotificationDrafts } from '../strategy/strategy-risk-notification-form.js';
 
 const riskRuleChangeLabel = (change: RiskApplicationUpgradePreview['diff'][number]['change']) => {
   if (change === 'added') return '新增规则';
@@ -43,31 +45,35 @@ export function RiskApplicationNotificationEditor({
   const [enabled, setEnabled] = useState(application.notification.enabled);
   const [severity, setSeverity] = useState(application.notification.severity);
   const [cooldown, setCooldown] = useState(String(application.notification.cooldownMinutes));
-  const [channel, setChannel] = useState<string>(application.notification.channels[0] ?? '');
-  const notificationRouting = useNotificationRoutingQuery();
-  const routes = notificationRouting.data?.routes ?? [];
+  const [providers, setProviders] = useState<string[] | undefined>(application.notification.providers);
+  const [ruleDrafts, setRuleDrafts] = useState(() => ruleNotificationDrafts(application.notification));
+  const notificationRouting = useRiskNotificationRoutingQuery();
+  const routes = notificationRouting.data?.availableRoutes ?? [];
+  const selectedProviders = providers ?? notificationRouting.data?.selectedProviders ?? [];
   let routingState: 'loading' | 'ready' | 'error' = 'ready';
   if (notificationRouting.isPending) routingState = 'loading';
   else if (notificationRouting.isError) routingState = 'error';
-  const selectedRoute = routes.find((route) => route.channel === channel);
+  const selectedRoute = selectedProviders.length > 0 && selectedProviders.every((name) => routes.some((route) => route.provider === name));
   useEffect(() => {
     setEnabled(application.notification.enabled);
     setSeverity(application.notification.severity);
     setCooldown(String(application.notification.cooldownMinutes));
-    setChannel(application.notification.channels[0] ?? '');
+    setProviders(application.notification.providers);
+    setRuleDrafts(ruleNotificationDrafts(application.notification));
   }, [application.notification, application.revision]);
-  const cooldownValue = Number(cooldown);
-  const validCooldown =
-    Number.isInteger(cooldownValue) && cooldownValue >= 0 && cooldownValue <= 10_080;
+  let notification: StrategyRiskNotification | null = null;
+  try { notification = buildRiskNotification({ enabled, severity, cooldownMinutes: cooldown, channel: '', providers: selectedProviders }, ruleDrafts); } catch { /* 字段错误保留输入。 */ }
+  const validCooldown = notification !== null;
   const dirty =
     enabled !== application.notification.enabled ||
     severity !== application.notification.severity ||
     cooldown !== String(application.notification.cooldownMinutes) ||
-    channel !== application.notification.channels[0];
+    JSON.stringify(providers) !== JSON.stringify(application.notification.providers) ||
+    JSON.stringify(ruleDrafts) !== JSON.stringify(ruleNotificationDrafts(application.notification));
   const notificationValid = !enabled || Boolean(selectedRoute);
 
   return (
-    <div className="space-y-4 rounded-md border bg-background p-4">
+    <div className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium">通知配置</div>
@@ -76,7 +82,7 @@ export function RiskApplicationNotificationEditor({
         <Switch
           checked={enabled}
           onCheckedChange={setEnabled}
-          disabled={!enabled && !selectedRoute}
+          disabled={pending || (!enabled && !selectedRoute)}
           variant="risk"
           aria-label="策略风险应用通知"
         >
@@ -85,8 +91,8 @@ export function RiskApplicationNotificationEditor({
       </div>
       <div className="grid gap-4 md:grid-cols-[minmax(10rem,0.75fr)_minmax(13rem,1fr)_minmax(13rem,1fr)]">
         <Field>
-          <FieldLabel>严重级别</FieldLabel>
-          <Select value={severity} onValueChange={(value) => value && setSeverity(value)}>
+          <FieldLabel>默认严重级别</FieldLabel>
+          <Select value={severity} disabled={pending} onValueChange={(value) => value && setSeverity(value)}>
             <SelectTrigger aria-label="策略应用通知严重级别" className="w-full">
               <SelectValue>{strategyRiskNotificationSeverityLabel(severity)}</SelectValue>
             </SelectTrigger>
@@ -102,25 +108,25 @@ export function RiskApplicationNotificationEditor({
           </Select>
         </Field>
         <Field>
-          <FieldLabel>冷却时间（分钟）</FieldLabel>
+          <FieldLabel>默认冷却时间（分钟）</FieldLabel>
           <Input
             type="number"
             min="0"
             max="10080"
             value={cooldown}
+            disabled={pending}
             onChange={(event) => setCooldown(event.target.value)}
           />
         </Field>
-        <Field>
-          <FieldLabel>通知渠道</FieldLabel>
-          <NotificationRouteSelect
-            routes={routes}
-            routingState={routingState}
-            value={channel}
-            onValueChange={setChannel}
-            ariaLabel="策略应用通知渠道"
-          />
-        </Field>
+        <NotificationProviderSelect routes={routes} state={routingState} value={selectedProviders} onChange={setProviders} disabled={pending} onRetry={() => void notificationRouting.refetch()} />
+      </div>
+      <p className="text-xs text-muted-foreground">单条规则可覆盖默认值；冷却时间留空时继承默认值，0 表示不等待。</p>
+      <div className="flex min-w-0 flex-col divide-y divide-border">
+        {application.plan.rules.map((rule) => <section key={rule.sourceKey} aria-label={`${rule.label}通知设置`} className="flex min-w-0 flex-col gap-3 py-4">
+          <h4 className="text-sm font-medium">{rule.label}</h4>
+          <StrategyRiskRuleSettings rule={rule} value={ruleDrafts[rule.sourceKey]} defaults={{ severity, cooldownMinutes: cooldown }} disabled={pending}
+            onChange={(value) => setRuleDrafts((current) => ({ ...current, [rule.sourceKey]: value }))} />
+        </section>)}
       </div>
       {!validCooldown ? (
         <p className="text-xs text-destructive">冷却时间必须是 0 到 10080 的整数。</p>
@@ -130,17 +136,7 @@ export function RiskApplicationNotificationEditor({
           aria-busy={pending}
           size="sm"
           disabled={!dirty || !validCooldown || !notificationValid || pending}
-          onClick={() =>
-            onSave({
-              enabled,
-              severity,
-              cooldownMinutes: cooldownValue,
-              channels:
-                enabled && selectedRoute
-                  ? [selectedRoute.channel as StrategyRiskNotification['channels'][number]]
-                  : [],
-            })
-          }
+          onClick={() => notification && onSave(notification)}
         >
           {pending && <Spinner data-icon="inline-start" aria-hidden="true" />}
           保存通知配置

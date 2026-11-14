@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AutomationRecord } from '@thesis-ledger/schemas';
+import { ruleMonitorDefaultSchedule } from '@thesis-ledger/schemas';
 import { confirmAction, useMobileRuntime } from '../../app/MobileRuntime';
 import type { SettingsStackParams } from '../../app/navigation-types';
 import {
@@ -14,6 +15,21 @@ import {
 } from '../../components/MobilePrimitives';
 import { useConfigCommand } from '../configuration/use-config-command';
 import { automationTypeLabel } from './automation-labels';
+
+const enabledLabel = (row: AutomationRecord) => {
+  if (row.enabled === null) return '读取失败';
+  return row.enabled ? '已启用' : '已停用';
+};
+const nextRunLabel = (row: AutomationRecord) => {
+  if (row.readError) return '暂不可读取';
+  if (row.nextRunAt) return row.nextRunAt;
+  if (row.enabled && row.source === 'rule-monitor') return '等待调度';
+  return '未安排';
+};
+const scheduleLabel = (row: AutomationRecord) => {
+  if (row.cron === ruleMonitorDefaultSchedule) return '每24小时';
+  return row.scheduleLabel ?? `${row.cron} / ${row.timezone}`;
+};
 export function AutomationsScreen({
   navigation,
 }: NativeStackScreenProps<SettingsStackParams, 'Automations'>) {
@@ -82,36 +98,46 @@ export function AutomationsScreen({
         {query.data?.map((row) => (
           <Section key={row.id} title={row.name}>
             <Copy>
-              {automationTypeLabel(row.type)} · {row.enabled ? '已启用' : '已停用'} ·{' '}
+              {automationTypeLabel(row.type)} · {enabledLabel(row)} ·{' '}
               {row.managed ? '系统托管任务' : '自建任务'}
             </Copy>
             <Copy>
-              {row.cron} / {row.timezone}；下次运行 {row.nextRunAt ?? '未安排'}
+              {scheduleLabel(row)}；下次运行 {nextRunLabel(row)}
             </Copy>
-            <Action
-              label={`编辑任务 ${row.name}`}
-              onPress={() => navigation.navigate('AutomationEditor', { id: row.id })}
-            />
+            {row.source === 'rule-monitor' ? (
+              <Copy>检查来源由规则检测任务确定，执行时间可在桌面端自动化中调整。</Copy>
+            ) : (
+              <>
+                <Action
+                  label={`编辑任务 ${row.name}`}
+                  onPress={() => navigation.navigate('AutomationEditor', { id: row.id })}
+                />
+              </>
+            )}
             <Action
               label={`查看历史 ${row.name}`}
               onPress={() => navigation.navigate('AutomationHistory', { id: row.id })}
             />
-            <Action
-              label={`${row.enabled ? '停用任务' : '启用任务'} ${row.name}`}
-              disabled={command.pending || query.isError}
-              onPress={() => void act(row, 'toggle')}
-            />
-            <Action
-              label={`立即执行 ${row.name}`}
-              disabled={command.pending || query.isError}
-              onPress={() => void act(row, 'run')}
-            />
-            <Action
-              label={`删除任务 ${row.name}`}
-              disabled={command.pending || query.isError || row.managed === true}
-              destructive
-              onPress={() => void act(row, 'remove')}
-            />
+            {row.source !== 'rule-monitor' ? (
+              <>
+                <Action
+                  label={`${row.enabled ? '停用任务' : '启用任务'} ${row.name}`}
+                  disabled={command.pending || query.isError}
+                  onPress={() => void act(row, 'toggle')}
+                />
+                <Action
+                  label={`立即执行 ${row.name}`}
+                  disabled={command.pending || query.isError}
+                  onPress={() => void act(row, 'run')}
+                />
+                <Action
+                  label={`删除任务 ${row.name}`}
+                  disabled={command.pending || query.isError || row.managed === true}
+                  destructive
+                  onPress={() => void act(row, 'remove')}
+                />
+              </>
+            ) : null}
           </Section>
         ))}
       </QueryList>

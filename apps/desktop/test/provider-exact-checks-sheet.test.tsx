@@ -70,7 +70,7 @@ describe('全部来源精确能力检查入口', () => {
     expect(document.body.textContent).not.toContain('DAILY_BAR');
     await click('检查所选能力');
     expect(api.test).toHaveBeenCalledWith(provider, undefined, undefined, { key, target });
-    expect(document.body.textContent).toContain('所选能力读取检查通过');
+    expect(document.body.textContent).toContain('所选能力验证通过，结果已保存。');
     expect(document.body.textContent).toContain('510300.SH');
   });
   it('事件证据缺失明确说明，不显示成功', async () => {
@@ -92,7 +92,7 @@ describe('全部来源精确能力检查入口', () => {
     await render();
     await click('检查所选能力');
     expect(document.body.textContent).toContain('来源尚未准入');
-    expect(document.body.textContent).not.toContain('读取检查通过');
+    expect(document.body.textContent).not.toContain('验证通过');
   });
   it('目录未完整时禁止提交检查请求', async () => {
     await render({ ...catalog, status: 'partial', entries: [], reason: 'catalog_partial' });

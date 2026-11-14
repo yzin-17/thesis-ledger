@@ -12,7 +12,7 @@ import {
   Field,
   Page,
   QueryStatus,
-  Section,
+  ContentSection as Section,
 } from '../../components/MobilePrimitives';
 import { useConfigCommand } from '../configuration/use-config-command';
 import { aiProviderDraft, buildAiProviderInput } from './ai-provider-draft';
@@ -165,6 +165,7 @@ function EditorForm({
         }}
         editing={Boolean(saved)}
         disabled={blocked}
+        availableModels={models}
       />
       <Section title="凭证与验证">
         <Copy muted>
@@ -181,19 +182,6 @@ function EditorForm({
           editable={!blocked && draft.authMode === 'api_key'}
         />
         <Action label="读取模型目录" disabled={blocked} onPress={() => void act('models')} />
-        {models.map((model) => (
-          <Action
-            key={model}
-            label={`加入模型 ${model}`}
-            disabled={blocked || draft.models.split('\n').includes(model)}
-            onPress={() =>
-              setDraft((value) => ({
-                ...value,
-                models: [value.models, model].filter(Boolean).join('\n'),
-              }))
-            }
-          />
-        ))}
         <Action label="检查连接" disabled={blocked} onPress={() => void act('test')} />
         <Action
           busy={command.pending}

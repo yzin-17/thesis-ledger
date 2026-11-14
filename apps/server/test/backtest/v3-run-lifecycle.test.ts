@@ -210,6 +210,9 @@ describe('V3 Run lifecycle boundary', () => {
     expect(state.create).not.toHaveBeenCalled();
   });
 
+});
+
+describe("冻结快照与入队资格", () => {
   it('persists the V3 contract and partial manifest as failed without enqueueing', async () => {
     const state = prismaHarness();
     const builder = {
@@ -341,6 +344,9 @@ describe('V3 Run lifecycle boundary', () => {
     },
   );
 
+});
+
+describe("执行依赖缺失的失败收敛", () => {
   it('keeps a complete V3 Snapshot failed when the runner is missing', async () => {
     const state = prismaHarness();
     const builder = {
@@ -384,6 +390,9 @@ describe('V3 Run lifecycle boundary', () => {
     });
   });
 
+});
+
+describe("幂等身份与 attempt CAS", () => {
   it('returns an idempotent V3 job only for the same contract and RunConfig', async () => {
     const existing = {
       mode: 'V3',

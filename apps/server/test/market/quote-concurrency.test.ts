@@ -79,9 +79,11 @@ const createDsa = (implementation: () => Promise<unknown>) => ({
   get: vi.fn(implementation),
 });
 
-describe('Quote 分布式锁并发保护', () => {
-  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-14T01:00:02Z')); });
-  afterEach(() => vi.restoreAllMocks());
+beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-14T01:00:02Z')); });
+
+afterEach(() => vi.restoreAllMocks());
+
+describe("报价来源时钟与租约", () => {
   it.each([
     ['600519.SH', 'a-share-prices-snapshot'],
     ['510300.SH', 'fund-market-snapshot'],
@@ -182,7 +184,9 @@ describe('Quote 分布式锁并发保护', () => {
       vi.useRealTimers();
     }
   });
+});
 
+describe("报价所有者失败及刷新等待", () => {
   it('owner 失败时 waiter 只读 last-valid，且不会再次调用 DSA', async () => {
     const redis = createSharedRedis();
     const lastValidKey = `thesis-ledger:cache:v1:${quoteControlCacheKey('600519.SH')}:last-valid`;
@@ -257,7 +261,9 @@ describe('Quote 分布式锁并发保护', () => {
     expect(dsa.get).toHaveBeenCalledTimes(1);
     expect(waiterResult).toMatchObject({ servedFromCache: true, stale: false });
   });
+});
 
+describe("报价缓存故障与可观测性", () => {
   it('锁设施异常时只返回 last-valid，不以异常扩大为 DSA 请求', async () => {
     const values = new Map([
       [`thesis-ledger:cache:v1:${quoteControlCacheKey('600519.SH')}:last-valid`, JSON.stringify(quote)],

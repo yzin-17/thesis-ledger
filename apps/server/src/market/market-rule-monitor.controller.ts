@@ -20,6 +20,10 @@ import {
   ruleMonitorCheckSchema,
   ruleMonitorVersionsSchema,
   ruleMonitorJobIdSchema,
+  ruleMonitorTaskSchema,
+  ruleMonitorScheduleSchema,
+  ruleMonitorVersionRequestSchema,
+  ruleMonitorVersionDetailSchema,
 } from '@thesis-ledger/schemas';
 import { DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
 
@@ -42,12 +46,20 @@ export class MarketRuleMonitorController {
         );
       if (error instanceof DsaError && error.status === 404)
         throw new HttpException(
-          { code: 'rule_monitor_job_not_found', message: '未找到监测任务。' },
+          path.startsWith('/version?')
+            ? { code: 'rule_monitor_version_not_found', message: '未找到资料版本。' }
+            : { code: 'rule_monitor_job_not_found', message: '未找到监测任务。' },
           404,
         );
       if (error instanceof DsaError && error.status === 422)
         throw new HttpException(
-          { code: 'rule_monitor_input_invalid', message: '监测来源已变化，请重新选择。' },
+          {
+            code: 'rule_monitor_input_invalid',
+            message:
+              path === '/schedule'
+                ? '执行时间或时区无效，请检查后重试。'
+                : '监测来源已变化，请重新选择。',
+          },
           422,
         );
       throw new ServiceUnavailableException('收费资料监测暂时不可用');
@@ -73,6 +85,36 @@ export class MarketRuleMonitorController {
       JSON.stringify(result.config.sourceIds) !== JSON.stringify(input.data.sourceIds)
     )
       throw new BadGatewayException('监测配置响应与请求不一致');
+    return result;
+  }
+  @Post('task') async createTask(@Body() body: unknown) {
+    const input = ruleMonitorTaskSchema.safeParse(body);
+    if (!input.success) throw new BadRequestException('请提供有效的检查来源和配置修订');
+    const result = await this.forward('/task', ruleMonitorConfigResponseSchema, {
+      method: 'POST',
+      body: JSON.stringify(input.data),
+    });
+    if (
+      !result.config.taskCreated ||
+      result.config.revision !== input.data.expectedRevision + 1 ||
+      JSON.stringify(result.config.sourceIds) !== JSON.stringify(input.data.sourceIds)
+    )
+      throw new BadGatewayException('监测任务响应与请求不一致');
+    return result;
+  }
+  @Put('schedule') async schedule(@Body() body: unknown) {
+    const input = ruleMonitorScheduleSchema.safeParse(body);
+    if (!input.success) throw new BadRequestException('请提供有效的执行时间、时区和配置修订');
+    const result = await this.forward('/schedule', ruleMonitorConfigResponseSchema, {
+      method: 'PUT',
+      body: JSON.stringify(input.data),
+    });
+    if (
+      result.config.revision !== input.data.expectedRevision + 1 ||
+      result.config.cron !== input.data.cron ||
+      result.config.timezone !== input.data.timezone
+    )
+      throw new BadGatewayException('监测执行时间响应与请求不一致');
     return result;
   }
   @Post('checks') async check(@Body() body: unknown) {
@@ -113,6 +155,31 @@ export class MarketRuleMonitorController {
     );
     if (result.kind !== kind || result.identity !== identity)
       throw new BadGatewayException('监测版本资料身份不一致');
+    return result;
+  }
+  @Get('version') @Header('Cache-Control', 'no-store') async versionDetail(
+    @Query('kind') kind: string,
+    @Query('identity') identity: string,
+    @Query('contentHash') contentHash: string,
+    @Query('baseHash') baseHash?: string,
+  ) {
+    const input = ruleMonitorVersionRequestSchema.safeParse({
+      kind,
+      identity,
+      contentHash,
+      baseHash,
+    });
+    if (!input.success) throw new BadRequestException('请选择有效的资料版本与比较基准');
+    const params = new URLSearchParams({ kind, identity, contentHash });
+    if (baseHash) params.set('baseHash', baseHash);
+    const result = await this.forward(`/version?${params}`, ruleMonitorVersionDetailSchema);
+    if (
+      result.kind !== kind ||
+      result.identity !== identity ||
+      result.contentHash !== contentHash ||
+      (result.comparison?.baseHash ?? undefined) !== baseHash
+    )
+      throw new BadGatewayException('正文或比较版本身份不一致');
     return result;
   }
 }

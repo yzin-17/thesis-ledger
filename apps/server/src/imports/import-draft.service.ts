@@ -60,20 +60,13 @@ export class ImportDraftService {
     });
     const imageHash = createHash('sha256').update(image).digest('hex');
     const temporalPrecision = temporal?.timePrecision ?? inferTimePrecision(temporal?.observedAt);
-    const idempotencyKey = createHash('sha256')
-      .update(
-        JSON.stringify({
-          accountId,
-          imageHash,
-          source,
-          scope: temporal?.scope ?? 'FULL',
-          observedAt: temporal?.observedAt ?? null,
-          capturedAt: temporal?.capturedAt ?? null,
-          timePrecision: temporalPrecision ?? null,
-          sourceTimezone: temporal?.sourceTimezone ?? null,
-        }),
-      )
-      .digest('hex');
+    const idempotencyKey = importImageIdempotencyKey(
+      accountId,
+      imageHash,
+      source,
+      temporal,
+      temporalPrecision,
+    );
     const existing = await this.prisma.importDraft.findUnique({ where: { idempotencyKey } });
     if (existing) return existing;
     const rows = await Promise.all(
@@ -224,4 +217,28 @@ export class ImportDraftService {
   reviewHistory(accountId: string) {
     return readImportDraftReviews(this.prisma, accountId);
   }
+}
+
+function importImageIdempotencyKey(
+  accountId: string,
+  imageHash: string,
+  source: ScreenshotSource,
+  temporal: ImportDraftOptions | undefined,
+  temporalPrecision: ReturnType<typeof inferTimePrecision> | ImportDraftOptions['timePrecision'],
+) {
+  const idempotencyKey = createHash('sha256')
+    .update(
+      JSON.stringify({
+        accountId,
+        imageHash,
+        source,
+        scope: temporal?.scope ?? 'FULL',
+        observedAt: temporal?.observedAt ?? null,
+        capturedAt: temporal?.capturedAt ?? null,
+        timePrecision: temporalPrecision ?? null,
+        sourceTimezone: temporal?.sourceTimezone ?? null,
+      }),
+    )
+    .digest('hex');
+  return idempotencyKey;
 }

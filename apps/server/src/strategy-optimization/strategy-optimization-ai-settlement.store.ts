@@ -105,8 +105,8 @@ export class StrategyOptimizationAiSettlementStore {
     const latest = request.usageRevisions[revision - 1];
     let blocked: AiExecutionSummary['continuationBlockedReason'] = null;
     if (
-      (maxInput !== null && nextInput > maxInput) ||
-      (maxOutput !== null && nextOutput > maxOutput) ||
+      (maxInput !== null && maxInput !== 0 && nextInput > maxInput) ||
+      (maxOutput !== null && maxOutput !== 0 && nextOutput > maxOutput) ||
       (maxCost !== null && nextCost.greaterThan(maxCost))
     )
       blocked = 'budget_exceeded';

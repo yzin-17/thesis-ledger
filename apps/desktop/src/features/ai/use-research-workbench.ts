@@ -1,9 +1,10 @@
-import {instrumentSearchResultSchema} from '@thesis-ledger/schemas';
+import { instrumentSearchResultSchema } from '@thesis-ledger/schemas';
 import type { InstrumentLookup } from '../portfolio/portfolio.types.js';
 import { researchComparisonChoices } from './research-comparison-display.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { debounce } from 'es-toolkit';
+import { FILTER_DEBOUNCE_MS } from '@/lib/use-debounced-value';
 import { parseAiResearchPageState, serializeAiResearchPageState } from './ai.navigation.js';
 import { findAiRun, resolveAiRunsLoadState, useAiCapabilitiesQuery } from './ai.queries.js';
 import {
@@ -13,12 +14,27 @@ import {
 } from './research.queries.js';
 import { useOptionalPortfolioMode } from '../portfolio/portfolio-mode-context.js';
 import type { AiCapabilitiesResponse, AiRunRecord, AiRunResult } from './ai.types.js';
-const seedInstrument=instrumentSearchResultSchema.pick({id:true,symbol:true,canonicalCode:true,instrumentType:true,market:true,displayName:true,confirmable:true});
-function readResearchSeed(state:unknown,owner:string){
- if(!state||typeof state!=='object'||!('instrumentResearch' in state))return null;
- const seed=state.instrumentResearch;
- if(!seed||typeof seed!=='object'||!('owner' in seed)||seed.owner!==owner||!('instrument' in seed))return null;
- return seedInstrument.safeParse(seed.instrument).data;
+const seedInstrument = instrumentSearchResultSchema.pick({
+  id: true,
+  symbol: true,
+  canonicalCode: true,
+  instrumentType: true,
+  market: true,
+  displayName: true,
+  confirmable: true,
+});
+function readResearchSeed(state: unknown, owner: string) {
+  if (!state || typeof state !== 'object' || !('instrumentResearch' in state)) return null;
+  const seed = state.instrumentResearch;
+  if (
+    !seed ||
+    typeof seed !== 'object' ||
+    !('owner' in seed) ||
+    seed.owner !== owner ||
+    !('instrument' in seed)
+  )
+    return null;
+  return seedInstrument.safeParse(seed.instrument).data;
 }
 const uniqueRuns = (pages: Array<{ items: AiRunRecord[] }> | undefined) => {
   const runs = new Map<string, AiRunRecord>();
@@ -52,8 +68,14 @@ const providerDisplay = (data: AiCapabilitiesResponse | undefined, isError: bool
   return { label: '服务检查中', variant: 'secondary' as const, action: null };
 };
 
-const researchTitle = (selected: AiRunRecord | null, listed: AiRunRecord | null) =>
-  selected?.question?.trim() || listed?.question?.trim() || '研究详情';
+const researchTitle = (selected: AiRunRecord | null, listed: AiRunRecord | null) => {
+  const object = listed?.display?.object ?? selected?.display?.object;
+  if (object?.name) return `${object.name} · ${object.label}`;
+  if (object?.code) return `${object.code} · ${object.label}`;
+  const question = selected?.question?.trim() || listed?.question?.trim();
+  if (!question) return '研究详情';
+  return question.length > 48 ? `${question.slice(0, 48)}…` : question;
+};
 
 function useResearchPageSearch(
   search: string,
@@ -70,7 +92,7 @@ function useResearchPageSearch(
       (value: string) => {
         if (current.current.scopeKey === scopeKey) current.current.onSearch(value.trim());
       },
-      250,
+      FILTER_DEBOUNCE_MS,
       { signal: controller.signal },
     );
     if (input !== search) update(input);
@@ -91,13 +113,13 @@ export function useResearchWorkbench() {
   const [initialQuestion, setInitialQuestion] = useState('');
   const [initialInstrument, setInitialInstrument] = useState<InstrumentLookup | null>(null);
   useEffect(() => {
-    const seed=readResearchSeed(location.state,owner);
-    if(!seed)return;
+    const seed = readResearchSeed(location.state, owner);
+    if (!seed) return;
     setInitialInstrument(seed);
     setRetryOfRunId(undefined);
     setInitialQuestion('');
     setNewResearchOpen(true);
-    void navigate(location.pathname + location.search, {replace:true, state:null});
+    void navigate(location.pathname + location.search, { replace: true, state: null });
   }, [location.state, location.pathname, location.search, owner, navigate]);
   const [retryOfRunId, setRetryOfRunId] = useState<string | undefined>();
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
@@ -137,24 +159,7 @@ export function useResearchWorkbench() {
   );
 
   const listFilter = useMemo(
-    () => ({
-      ...(historical
-        ? { view: 'legacy' as const }
-        : {
-            view: 'scoped' as const,
-            mode: accountMode,
-            ...(['instrument', 'portfolio', 'account', 'position', 'strategy'].includes(
-              pageState.source,
-            )
-              ? {
-                  kind: pageState.source as
-                    'instrument' | 'portfolio' | 'account' | 'position' | 'strategy',
-                }
-              : {}),
-          }),
-      ...(pageState.status === 'all' ? {} : { status: pageState.status }),
-      ...(pageState.search ? { search: pageState.search } : {}),
-    }),
+    () => researchWorkbenchListFilter(pageState, historical, accountMode),
     [
       pageState.includeInternal,
       pageState.search,
@@ -221,7 +226,10 @@ export function useResearchWorkbench() {
   const switchRun = (id: string) => updatePageState({ selectedRunId: id, mode: pageState.mode });
 
   const closeDetail = () => {
-    const state = location.state as { aiListOrigin?: boolean; instrumentDetailOrigin?: boolean } | null;
+    const state = location.state as {
+      aiListOrigin?: boolean;
+      instrumentDetailOrigin?: boolean;
+    } | null;
     if (state?.aiListOrigin || state?.instrumentDetailOrigin) {
       void navigate(-1);
       return;
@@ -322,5 +330,30 @@ export function useResearchWorkbench() {
     updatePageState,
     handleCreated,
     changeNewResearchOpen,
+  };
+}
+
+function researchWorkbenchListFilter(
+  pageState: ReturnType<typeof parseAiResearchPageState>,
+  historical: boolean,
+  accountMode: 'actual' | 'shadow',
+) {
+  return {
+    ...(historical
+      ? { view: 'legacy' as const }
+      : {
+          view: 'scoped' as const,
+          mode: accountMode,
+          ...(['instrument', 'portfolio', 'account', 'position', 'strategy'].includes(
+            pageState.source,
+          )
+            ? {
+                kind: pageState.source as
+                  'instrument' | 'portfolio' | 'account' | 'position' | 'strategy',
+              }
+            : {}),
+        }),
+    ...(pageState.status === 'all' ? {} : { status: pageState.status }),
+    ...(pageState.search ? { search: pageState.search } : {}),
   };
 }

@@ -26,15 +26,19 @@ import {
   useScanRiskMutation,
   useTestRiskRuleMutation,
 } from './risk.mutations.js';
-import { riskKeys, useRiskNotificationRoutingQuery, useRiskAuditQuery, useRiskQueries } from './risk.queries.js';
+import {
+  riskKeys,
+  useRiskNotificationRoutingQuery,
+  useRiskAuditQuery,
+  useRiskQueries,
+} from './risk.queries.js';
 import { RiskOverview } from './RiskOverview.js';
 import { RiskRuleWorkbench } from './RiskRuleWorkbench.js';
-import { RiskNotificationProviderPicker } from './RiskNotificationProviderPicker.js';
 import { StrategyRiskApplicationsSection } from './StrategyRiskApplicationsSection.js';
+import { riskCenterApplicationPath } from '../strategy/strategy-risk-application.model.js';
 import {
   NotificationProviderNotice,
   RiskAuditDialog,
-  RiskEventTable,
   RiskNotificationTable,
 } from './RiskSections.js';
 import type {
@@ -44,214 +48,55 @@ import type {
   RiskTestResult,
 } from './risk.types.js';
 
-type RiskTab = 'overview' | 'rules' | 'strategy-applications' | 'events' | 'notifications';
+type RiskTab = 'overview' | 'rules' | 'strategy-applications' | 'notifications';
 
-export function RiskCenter({
-  accounts,
-  portfolio,
-  portfolioState,
-  mode,
-}: {
+export function RiskCenter(props: {
   accounts: Account[];
   portfolio: Portfolio | null;
   portfolioState: LoadState;
   mode: PortfolioMode;
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = searchParams.get('tab');
-  const initialTab: RiskTab =
-    requestedTab === 'rules' ||
-    requestedTab === 'strategy-applications' ||
-    requestedTab === 'events' ||
-    requestedTab === 'notifications'
-      ? requestedTab
-      : 'overview';
-  const [tab, setTab] = useState<RiskTab>(initialTab);
-  const [eventSeverityFilter, setEventSeverityFilter] = useState<string | null>(null);
-  const [notificationStatusFilter, setNotificationStatusFilter] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const failureToastRef = useRef<string | null>(null);
-  useNavigationGuard({
-    dirty: false,
-    busy: busyAction !== null && !busyAction.startsWith('audit:'),
-  });
-  const [auditRule, setAuditRule] = useState<RiskRuleRecord | null>(null);
-  const [auditVisible, setAuditVisible] = useState(false);
-  const [testRecords, setTestRecords] = useState<Record<string, RiskTestRecord>>({});
-  const navigate = useNavigate();
-  const toastManager = useToastManager();
-  const riskQueries = useRiskQueries(mode);
-  const { refreshing: riskRefreshing, refresh: refreshRisk } = usePageRefresh([
-    { queryKey: riskKeys.root }, { queryKey: portfolioKeys.root }, { queryKey: strategyKeys.root },
-  ]);
-  const notificationRoutingQuery = useRiskNotificationRoutingQuery();
-  const auditQuery = useRiskAuditQuery(auditVisible ? (auditRule?.id ?? null) : null);
-  const createRuleMutation = useCreateRiskRuleMutation();
-  const patchRuleMutation = usePatchRiskRuleMutation();
-  const deleteRuleMutation = useDeleteRiskRuleMutation();
-  const restoreRuleMutation = useRestoreRiskRuleMutation();
-  const testRuleMutation = useTestRiskRuleMutation();
-  const scanRiskMutation = useScanRiskMutation();
-  const rules = riskQueries.rules.data ?? [];
-  const rulesReadOnly = riskQueries.rules.isError || riskQueries.rules.isPending;
-  const rulesReadState = resolveLoadState(
-    [riskQueries.rules],
-    riskQueries.rules.data !== undefined,
-    rules.length === 0,
-  );
-  const confirmedRuleWrite = [
-    createRuleMutation,
-    patchRuleMutation,
-    deleteRuleMutation,
-    restoreRuleMutation,
-  ].some((mutation) => mutation.data !== undefined);
-  const scanReadUnconfirmed =
-    scanRiskMutation.data !== undefined &&
-    (riskQueries.rules.isError || riskQueries.events.isError || riskQueries.notifications.isError);
-  const events = riskQueries.events.data ?? [];
-  const deliveries = riskQueries.notifications.data ?? [];
-  const eventReadState = resolveLoadState(
-    [riskQueries.events],
-    riskQueries.events.data !== undefined,
-    events.length === 0,
-  );
-  const notificationReadState = resolveLoadState(
-    [riskQueries.notifications],
-    riskQueries.notifications.data !== undefined,
-    deliveries.length === 0,
-  );
-  let notificationRoutingState: 'loading' | 'ready' | 'error' = 'ready';
-  if (notificationRoutingQuery.isError) notificationRoutingState = 'error';
-  else if (notificationRoutingQuery.isPending) notificationRoutingState = 'loading';
-  let notificationAvailability: 'available' | 'unconfigured' | 'unknown' = 'available';
-  if (notificationRoutingState !== 'ready') notificationAvailability = 'unknown';
-  else if ((notificationRoutingQuery.data?.availableRoutes.length ?? 0) === 0) {
-    notificationAvailability = 'unconfigured';
-  } else if (!notificationRoutingQuery.data?.availableRoutes.some((route) => notificationRoutingQuery.data.selectedProviders.includes(route.provider))) {
-    notificationAvailability = 'unknown';
-  }
-  const hasRiskData = Object.values(riskQueries).some((query) => query.data !== undefined);
-  const loadState = resolveLoadState(
-    Object.values(riskQueries),
-    hasRiskData,
-    hasRiskData && rules.length === 0 && events.length === 0 && deliveries.length === 0,
-  );
-  const riskUpdatedAt = useMemo(() => {
-    const timestamp = Math.max(
-      riskQueries.rules.dataUpdatedAt,
-      riskQueries.events.dataUpdatedAt,
-      riskQueries.notifications.dataUpdatedAt,
-    );
-    return timestamp > 0 ? new Date(timestamp).toISOString() : null;
-  }, [
-    riskQueries.events.dataUpdatedAt,
-    riskQueries.notifications.dataUpdatedAt,
-    riskQueries.rules.dataUpdatedAt,
-  ]);
-  const actions = createRiskActionHandlers({
-    portfolio,
-    mode,
+  const control = useRiskCenter(props);
+  const {
+    tab,
+    riskRefreshing,
     busyAction,
-    setBusyAction,
-    toastManager,
-    failureToastRef,
-    createRuleMutation,
-    patchRuleMutation,
-    deleteRuleMutation,
-    restoreRuleMutation,
-    testRuleMutation,
-    scanRiskMutation,
+    refreshRisk,
+    mode,
+    loadState,
+    confirmedRuleWrite,
+    riskQueries,
+    scanReadUnconfirmed,
+    actions,
+    selectTab,
     notificationAvailability,
-    refetchRules: riskQueries.rules.refetch,
-    refetchEvents: riskQueries.events.refetch,
-    refetchNotifications: riskQueries.notifications.refetch,
-  });
-  useEffect(() => {
-    if (!auditVisible) {
-      if (busyAction?.startsWith('audit:')) setBusyAction(null);
-      return;
-    }
-    if (!auditRule || busyAction !== `audit:${auditRule.id}`) return;
-    if (!auditQuery.isPending && !auditQuery.isFetching) setBusyAction(null);
-  }, [auditQuery.isFetching, auditQuery.isPending, auditRule, auditVisible, busyAction]);
-
-  const selectTab = (nextTab: RiskTab, filter?: string) => {
-    setTab(nextTab);
-    const next = new URLSearchParams(searchParams);
-    if (nextTab === 'overview') next.delete('tab');
-    else next.set('tab', nextTab);
-    if (nextTab !== 'strategy-applications') next.delete('applicationId');
-    setSearchParams(next, { replace: true });
-    if (nextTab === 'events') {
-      setEventSeverityFilter(filter ?? null);
-      setNotificationStatusFilter(null);
-    } else if (nextTab === 'notifications') {
-      setNotificationStatusFilter(filter ?? null);
-      setEventSeverityFilter(null);
-    } else {
-      setEventSeverityFilter(null);
-      setNotificationStatusFilter(null);
-    }
-  };
-
-  const openAudit = (rule: RiskRuleRecord) => {
-    if (busyAction) return;
-    setBusyAction(`audit:${rule.id}`);
-    setAuditRule(rule);
-    setAuditVisible(true);
-  };
-
-  const closeAudit = (open: boolean) => {
-    setAuditVisible(open);
-    if (!open) {
-      setAuditRule(null);
-      if (busyAction?.startsWith('audit:')) setBusyAction(null);
-    }
-  };
-
-  const auditAccountName = auditRule?.accountId
-    ? accounts.find((account) => account.id === auditRule.accountId)?.name
-    : undefined;
-
-  const createRule = (input: CreateRiskRuleInput) => actions.createRule(input);
-  const invalidateTestRecord = (ruleId: string) => {
-    setTestRecords((current) => {
-      if (!current[ruleId]) return current;
-      const next = { ...current };
-      delete next[ruleId];
-      return next;
-    });
-  };
-  const updateRule = async (ruleId: string, input: CreateRiskRuleInput) => {
-    const updated = await actions.patchRule(ruleId, input);
-    if (updated) invalidateTestRecord(ruleId);
-    return updated;
-  };
-  const toggleRule = async (rule: RiskRuleRecord) => {
-    if (rule.needsRepair && !rule.enabled) {
-      toastManager.add({
-        title: '规则待修复',
-        description: '请先补齐账户和标的后再启用这条旧规则。',
-        type: 'error',
-        timeout: 0,
-        priority: 'high',
-      });
-      return false;
-    }
-    const updated = await actions.patchRule(rule.id, { enabled: !rule.enabled });
-    if (updated) invalidateTestRecord(rule.id);
-    return updated;
-  };
-  const saveTestRecord = (rule: RiskRuleRecord, results: RiskTestResult[]) => {
-    setTestRecords((current) => ({
-      ...current,
-      [rule.id]: {
-        ruleVersion: rule.version,
-        results,
-        testedAt: new Date().toISOString(),
-      },
-    }));
-  };
+    notificationRoutingState,
+    navigate,
+    portfolio,
+    portfolioState,
+    eventReadState,
+    rulesReadState,
+    notificationReadState,
+    rules,
+    events,
+    deliveries,
+    riskUpdatedAt,
+    rulesReadOnly,
+    selectCriticalEvents,
+    accounts,
+    testRecords,
+    createRule,
+    updateRule,
+    toggleRule,
+    saveTestRecord,
+    openAudit,
+    notificationStatusFilter,
+    auditVisible,
+    auditRule,
+    auditAccountName,
+    auditQuery,
+    closeAudit,
+  } = control;
 
   return (
     <section
@@ -297,7 +142,9 @@ export function RiskCenter({
             disabled={riskQueries.rules.isFetching}
             onClick={() => void riskQueries.rules.refetch()}
           >
-            {riskQueries.rules.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
+            {riskQueries.rules.isFetching && (
+              <Spinner data-icon="inline-start" aria-hidden="true" />
+            )}
             重新读取规则
           </Button>
         </Alert>
@@ -326,7 +173,6 @@ export function RiskCenter({
           <TabsTrigger value="overview">总览</TabsTrigger>
           <TabsTrigger value="rules">规则</TabsTrigger>
           <TabsTrigger value="strategy-applications">策略应用</TabsTrigger>
-          <TabsTrigger value="events">事件</TabsTrigger>
           <TabsTrigger value="notifications">通知</TabsTrigger>
         </TabsList>
         <NotificationProviderNotice
@@ -351,11 +197,13 @@ export function RiskCenter({
             scanDisabled={rulesReadOnly || busyAction !== null || scanReadUnconfirmed}
             onScan={() => void actions.scanRisk()}
             onSelectTab={selectTab}
+            onSelectCriticalEvents={selectCriticalEvents}
             onRetryEvents={() => void riskQueries.events.refetch()}
           />
         </TabsContent>
         <TabsContent value="rules" className="lg:grid">
           <RiskRuleWorkbench
+            onEditApplication={(id) => void navigate(riskCenterApplicationPath(id))}
             refreshing={riskQueries.rules.isRefetching}
             rules={rules}
             accounts={accounts}
@@ -377,22 +225,13 @@ export function RiskCenter({
         <TabsContent value="strategy-applications">
           <StrategyRiskApplicationsSection accounts={accounts} />
         </TabsContent>
-        <TabsContent value="events">
-          <RiskEventTable
-            refreshing={riskQueries.events.isRefetching}
-            loadState={eventReadState}
-            events={events}
-            severityFilter={eventSeverityFilter}
-            onRetry={() => void riskQueries.events.refetch()}
-          />
-        </TabsContent>
         <TabsContent value="notifications">
           <RiskNotificationTable
             refreshing={riskQueries.notifications.isRefetching}
             loadState={notificationReadState}
             deliveries={deliveries}
             statusFilter={notificationStatusFilter}
-            headerControls={<RiskNotificationProviderPicker />}
+            onClearStatusFilter={() => selectTab('notifications')}
             onRetry={() => void riskQueries.notifications.refetch()}
           />
         </TabsContent>
@@ -410,4 +249,335 @@ export function RiskCenter({
       />
     </section>
   );
+}
+
+function useRiskCenter({
+  accounts,
+  portfolio,
+  portfolioState,
+  mode,
+}: {
+  accounts: Account[];
+  portfolio: Portfolio | null;
+  portfolioState: LoadState;
+  mode: PortfolioMode;
+}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const tab: RiskTab =
+    requestedTab === 'rules' ||
+    requestedTab === 'strategy-applications' ||
+    requestedTab === 'notifications'
+      ? requestedTab
+      : 'overview';
+  // 进 URL：从总览点「通知失败」跳进来时，刷新与后退都能还原同一份筛选。
+  const notificationStatusFilter = searchParams.get('notifyStatus');
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const failureToastRef = useRef<string | null>(null);
+  useNavigationGuard({
+    dirty: false,
+    busy: busyAction !== null && !busyAction.startsWith('audit:'),
+  });
+  const [auditRule, setAuditRule] = useState<RiskRuleRecord | null>(null);
+  const [auditVisible, setAuditVisible] = useState(false);
+  const [testRecords, setTestRecords] = useState<Record<string, RiskTestRecord>>({});
+  const navigate = useNavigate();
+  const toastManager = useToastManager();
+  const riskQueries = useRiskQueries(mode);
+  const { refreshing: riskRefreshing, refresh: refreshRisk } = usePageRefresh([
+    { queryKey: riskKeys.root },
+    { queryKey: portfolioKeys.root },
+    { queryKey: strategyKeys.root },
+  ]);
+  const notificationRoutingQuery = useRiskNotificationRoutingQuery();
+  const auditQuery = useRiskAuditQuery(auditVisible ? (auditRule?.id ?? null) : null);
+  const createRuleMutation = useCreateRiskRuleMutation();
+  const patchRuleMutation = usePatchRiskRuleMutation();
+  const deleteRuleMutation = useDeleteRiskRuleMutation();
+  const restoreRuleMutation = useRestoreRiskRuleMutation();
+  const testRuleMutation = useTestRiskRuleMutation();
+  const scanRiskMutation = useScanRiskMutation();
+  const {
+    rules,
+    rulesReadOnly,
+    rulesReadState,
+    confirmedRuleWrite,
+    scanReadUnconfirmed,
+    events,
+    deliveries,
+    eventReadState,
+    notificationReadState,
+    notificationRoutingState,
+    notificationAvailability,
+    loadState,
+  } = riskCenterReadModels({
+    riskQueries,
+    notificationRoutingQuery,
+    createRuleMutation,
+    patchRuleMutation,
+    deleteRuleMutation,
+    restoreRuleMutation,
+    scanRiskMutation,
+  });
+  const riskUpdatedAt = useMemo(() => {
+    const timestamp = Math.max(
+      riskQueries.rules.dataUpdatedAt,
+      riskQueries.events.dataUpdatedAt,
+      riskQueries.notifications.dataUpdatedAt,
+    );
+    return timestamp > 0 ? new Date(timestamp).toISOString() : null;
+  }, [
+    riskQueries.events.dataUpdatedAt,
+    riskQueries.notifications.dataUpdatedAt,
+    riskQueries.rules.dataUpdatedAt,
+  ]);
+  const actions = createRiskActionHandlers({
+    portfolio,
+    mode,
+    busyAction,
+    setBusyAction,
+    toastManager,
+    failureToastRef,
+    createRuleMutation,
+    patchRuleMutation,
+    deleteRuleMutation,
+    restoreRuleMutation,
+    testRuleMutation,
+    scanRiskMutation,
+    notificationAvailability,
+    refetchRules: riskQueries.rules.refetch,
+    refetchEvents: riskQueries.events.refetch,
+    refetchNotifications: riskQueries.notifications.refetch,
+  });
+  useEffect(() => {
+    if (!auditVisible) {
+      if (busyAction?.startsWith('audit:')) setBusyAction(null);
+      return;
+    }
+    if (!auditRule || busyAction !== `audit:${auditRule.id}`) return;
+    if (!auditQuery.isPending && !auditQuery.isFetching) setBusyAction(null);
+  }, [auditQuery.isFetching, auditQuery.isPending, auditRule, auditVisible, busyAction]);
+
+  const selectTab = (nextTab: RiskTab, filter?: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (nextTab === 'overview') next.delete('tab');
+    else next.set('tab', nextTab);
+    if (nextTab !== 'strategy-applications') next.delete('applicationId');
+    if (nextTab === 'notifications' && filter) next.set('notifyStatus', filter);
+    else next.delete('notifyStatus');
+    setSearchParams(next);
+  };
+
+  useEffect(() => {
+    if (requestedTab !== 'events') return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('tab');
+    setSearchParams(next, { replace: true });
+    window.requestAnimationFrame(() => document.getElementById('risk-events')?.scrollIntoView?.());
+  }, [requestedTab, searchParams, setSearchParams]);
+
+  const selectCriticalEvents = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('tab');
+    next.set('eventSeverity', 'critical');
+    next.delete('eventSearch');
+    next.delete('eventPage');
+    setSearchParams(next);
+    window.requestAnimationFrame(() => document.getElementById('risk-events')?.scrollIntoView?.());
+  };
+
+  const { openAudit, closeAudit } = createRiskAuditActions({
+    busyAction,
+    setBusyAction,
+    setAuditRule,
+    setAuditVisible,
+  });
+
+  const auditAccountName = auditRule?.accountId
+    ? accounts.find((account) => account.id === auditRule.accountId)?.name
+    : undefined;
+
+  const createRule = (input: CreateRiskRuleInput) => actions.createRule(input);
+  const invalidateTestRecord = (ruleId: string) => {
+    setTestRecords((current) => {
+      if (!current[ruleId]) return current;
+      const next = { ...current };
+      delete next[ruleId];
+      return next;
+    });
+  };
+  const updateRule = async (ruleId: string, input: CreateRiskRuleInput) => {
+    const updated = await actions.patchRule(ruleId, input);
+    if (updated) invalidateTestRecord(ruleId);
+    return updated;
+  };
+  const toggleRule = async (rule: RiskRuleRecord) => {
+    if (rule.needsRepair && !rule.enabled) {
+      toastManager.add({
+        title: '规则待修复',
+        description: '请先补齐账户和标的后再启用这条旧规则。',
+        type: 'error',
+        timeout: 0,
+        priority: 'high',
+      });
+      return false;
+    }
+    const updated = await actions.patchRule(rule.id, { enabled: !rule.enabled });
+    if (updated) invalidateTestRecord(rule.id);
+    return updated;
+  };
+  const saveTestRecord = (rule: RiskRuleRecord, results: RiskTestResult[]) => {
+    setTestRecords((current) => ({
+      ...current,
+      [rule.id]: {
+        ruleVersion: rule.version,
+        results,
+        testedAt: new Date().toISOString(),
+      },
+    }));
+  };
+
+  return {
+    tab,
+    riskRefreshing,
+    busyAction,
+    refreshRisk,
+    mode,
+    loadState,
+    confirmedRuleWrite,
+    riskQueries,
+    scanReadUnconfirmed,
+    actions,
+    selectTab,
+    notificationAvailability,
+    notificationRoutingState,
+    navigate,
+    portfolio,
+    portfolioState,
+    eventReadState,
+    rulesReadState,
+    notificationReadState,
+    rules,
+    events,
+    deliveries,
+    riskUpdatedAt,
+    rulesReadOnly,
+    selectCriticalEvents,
+    accounts,
+    testRecords,
+    createRule,
+    updateRule,
+    toggleRule,
+    saveTestRecord,
+    openAudit,
+    notificationStatusFilter,
+    auditVisible,
+    auditRule,
+    auditAccountName,
+    auditQuery,
+    closeAudit,
+  };
+}
+
+function riskCenterReadModels({
+  riskQueries,
+  notificationRoutingQuery,
+  createRuleMutation,
+  patchRuleMutation,
+  deleteRuleMutation,
+  restoreRuleMutation,
+  scanRiskMutation,
+}: {
+  riskQueries: ReturnType<typeof useRiskQueries>;
+  notificationRoutingQuery: ReturnType<typeof useRiskNotificationRoutingQuery>;
+  createRuleMutation: ReturnType<typeof useCreateRiskRuleMutation>;
+  patchRuleMutation: ReturnType<typeof usePatchRiskRuleMutation>;
+  deleteRuleMutation: ReturnType<typeof useDeleteRiskRuleMutation>;
+  restoreRuleMutation: ReturnType<typeof useRestoreRiskRuleMutation>;
+  scanRiskMutation: ReturnType<typeof useScanRiskMutation>;
+}) {
+  const rules = riskQueries.rules.data ?? [];
+  const rulesReadOnly = riskQueries.rules.isError || riskQueries.rules.isPending;
+  const rulesReadState = resolveLoadState(
+    [riskQueries.rules],
+    riskQueries.rules.data !== undefined,
+    rules.length === 0,
+  );
+  const confirmedRuleWrite = [
+    createRuleMutation,
+    patchRuleMutation,
+    deleteRuleMutation,
+    restoreRuleMutation,
+  ].some((mutation) => mutation.data !== undefined);
+  const scanReadUnconfirmed =
+    scanRiskMutation.data !== undefined &&
+    (riskQueries.rules.isError || riskQueries.events.isError || riskQueries.notifications.isError);
+  const events = riskQueries.events.data ?? [];
+  const deliveries = riskQueries.notifications.data ?? [];
+  const eventReadState = resolveLoadState(
+    [riskQueries.events],
+    riskQueries.events.data !== undefined,
+    events.length === 0,
+  );
+  const notificationReadState = resolveLoadState(
+    [riskQueries.notifications],
+    riskQueries.notifications.data !== undefined,
+    deliveries.length === 0,
+  );
+  let notificationRoutingState: 'loading' | 'ready' | 'error' = 'ready';
+  if (notificationRoutingQuery.isError) notificationRoutingState = 'error';
+  else if (notificationRoutingQuery.isPending) notificationRoutingState = 'loading';
+  let notificationAvailability: 'available' | 'unconfigured' | 'unknown' = 'available';
+  if (notificationRoutingState !== 'ready') notificationAvailability = 'unknown';
+  else if ((notificationRoutingQuery.data?.availableRoutes.length ?? 0) === 0) {
+    notificationAvailability = 'unconfigured';
+  }
+  const hasRiskData = Object.values(riskQueries).some((query) => query.data !== undefined);
+  const loadState = resolveLoadState(
+    Object.values(riskQueries),
+    hasRiskData,
+    hasRiskData && rules.length === 0 && events.length === 0 && deliveries.length === 0,
+  );
+  return {
+    rules,
+    rulesReadOnly,
+    rulesReadState,
+    confirmedRuleWrite,
+    scanReadUnconfirmed,
+    events,
+    deliveries,
+    eventReadState,
+    notificationReadState,
+    notificationRoutingState,
+    notificationAvailability,
+    loadState,
+  };
+}
+
+function createRiskAuditActions({
+  busyAction,
+  setBusyAction,
+  setAuditRule,
+  setAuditVisible,
+}: {
+  busyAction: string | null;
+  setBusyAction: (value: string | null) => void;
+  setAuditRule: (value: RiskRuleRecord | null) => void;
+  setAuditVisible: (value: boolean) => void;
+}) {
+  const openAudit = (rule: RiskRuleRecord) => {
+    if (busyAction) return;
+    setBusyAction(`audit:${rule.id}`);
+    setAuditRule(rule);
+    setAuditVisible(true);
+  };
+
+  const closeAudit = (open: boolean) => {
+    setAuditVisible(open);
+    if (!open) {
+      setAuditRule(null);
+      if (busyAction?.startsWith('audit:')) setBusyAction(null);
+    }
+  };
+  return { openAudit, closeAudit };
 }

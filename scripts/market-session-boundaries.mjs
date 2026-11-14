@@ -1,6 +1,8 @@
 /** 当前市场状态只允许消费事实驱动的共享入口；历史回测保留独立日历输入。 */
 export function marketSessionBoundaryViolation(file, source) {
-  const liveServer = /^apps\/server\/src\/(?:market|automation|performance|risk|portfolio|watchlist)\//u.test(file);
+  if (file === 'apps/server/src/market/market-us-live-execution.ts' && /\b(?:backtestInstrumentFacts|readComposition)\s*\(/u.test(source))
+    return '美国当前执行证据不得回退到历史身份或股票日状态合同';
+  const liveServer = /^apps\/server\/src\/(?:market|automation|performance|risk|portfolio|watchlist|model-arena\/live)\//u.test(file);
   const client = /^apps\/(?:desktop|mobile)\/src\/features\//u.test(file);
   const projection = file === 'packages/domain/src/market-session.ts' || file === 'packages/domain/src/market-quote-session.ts';
   if (!liveServer && !client && !projection) return null;

@@ -382,6 +382,11 @@ const hasTradeCurrencyMismatch = (allocations: readonly SourceAllocation[], curr
 const combine = (current: DecimalValue | null, next: DecimalValue | null) =>
   current === null || next === null ? null : current.plus(next);
 
+function calculateRealizedNetReturnRate(net: DecimalValue | null, denominator: DecimalValue | null): DecimalValue | null {
+  if (net === null || denominator === null || denominator.isZero()) return null;
+  return net.dividedBy(denominator);
+}
+
 const processSell = (
   event: Extract<EffectiveLedgerEvent, { type: 'SELL_EXECUTION' }>,
   trade: TradeProjection,
@@ -413,10 +418,7 @@ const processSell = (
       : grossRealizedPnl.minus(buyFees).minus(sellFees);
   const returnDenominator =
     rawCost === null || tradeCurrencyMismatch || feeCurrencyMismatch ? null : rawCost.plus(buyFees);
-  const realizedNetReturnRate =
-    netRealizedPnl === null || returnDenominator === null || returnDenominator.isZero()
-      ? null
-      : netRealizedPnl.dividedBy(returnDenominator);
+  const realizedNetReturnRate = calculateRealizedNetReturnRate(netRealizedPnl, returnDenominator);
   state.grossRealizedPnl = combine(state.grossRealizedPnl, grossRealizedPnl);
   state.netRealizedPnl = combine(state.netRealizedPnl, netRealizedPnl);
   state.returnDenominator = combine(state.returnDenominator, returnDenominator);

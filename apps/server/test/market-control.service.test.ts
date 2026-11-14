@@ -236,6 +236,9 @@ describe('MarketControlService', () => {
     expect(dsa.applyControlPolicyV3).toHaveBeenCalledOnce();
   });
 
+});
+
+describe("路由回滚与 Provider 删除", () => {
   it('回滚只读取当前格式的历史修订，并产生新的修订', async () => {
     const store = makeStore();
     store.prisma.desiredProviderPolicyRevision.findUnique.mockResolvedValue({
@@ -286,6 +289,9 @@ describe('MarketControlService', () => {
     expect(dsa.removeControlProvider).not.toHaveBeenCalled();
   });
 
+});
+
+describe("凭据结构与输入拒绝", () => {
   it('保留 Provider 配置的原始凭据结构', async () => {
     const dsa = { saveControlProvider: vi.fn(async () => ({})) };
     await new MarketControlService({} as never, dsa as never).saveProvider('tushare', {

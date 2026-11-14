@@ -375,6 +375,8 @@ export const marketDataErrorCodeV3 = {
   invalidRequest: 'invalid_request',
   permissionDenied: 'permission_denied',
   authenticationFailed: 'authentication_failed',
+  rateLimited: 'rate_limited',
+  quotaUnavailable: 'quota_unavailable',
 } as const;
 
 export const marketDataErrorMessageV3 = {
@@ -388,9 +390,13 @@ export const marketDataErrorMessageV3 = {
   invalidRequest: '来源拒绝请求参数',
   permissionDenied: '来源权限不足',
   authenticationFailed: '来源凭据未通过认证',
+  rateLimited: '来源请求频率受限，请稍后重试',
+  quotaUnavailable: '来源调用额度暂不可用',
 } as const;
 
 export const marketDataErrorDetailV3Schema = z.discriminatedUnion('code', [
+  z.strictObject({ code: z.literal(marketDataErrorCodeV3.rateLimited), message: z.literal(marketDataErrorMessageV3.rateLimited) }),
+  z.strictObject({ code: z.literal(marketDataErrorCodeV3.quotaUnavailable), message: z.literal(marketDataErrorMessageV3.quotaUnavailable) }),
   z.strictObject({
     code: z.literal(marketDataErrorCodeV3.unsupportedCapability),
     message: z.literal(marketDataErrorMessageV3.unsupportedCapability),

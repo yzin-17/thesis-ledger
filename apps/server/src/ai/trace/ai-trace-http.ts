@@ -126,18 +126,7 @@ export async function fetchWithAiTrace(
   });
   let dispatched = false;
   try {
-    // 当前 SDK 使用序列化 JSON 字符串；不支持的 body 在派发前失败，避免先消费 Request 流。
-    if (init?.body !== undefined && typeof init.body !== 'string')
-      throw new AiTraceUnavailableError('unsupported_request_body');
-    if (input instanceof Request && input.body && init?.body === undefined)
-      throw new AiTraceUnavailableError('unsupported_request_body');
-    const body = init?.body ?? '';
-    let parsed: unknown = body;
-    try {
-      parsed = JSON.parse(body) as unknown;
-    } catch {
-      /* 非 JSON 请求保留脱敏字符串。 */
-    }
+    const { body, parsed } = traceRequestBody(input, init);
     const artifact = await trace.artifact(node, 'request-body', parsed);
     trace.beforeDispatch(sdkRequestId);
     dispatched = true;
@@ -166,4 +155,20 @@ export async function fetchWithAiTrace(
     await trace.end(node, 'failed', traceErrorSnapshot(failure));
     throw failure;
   }
+}
+
+function traceRequestBody(input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1]) {
+  // 当前 SDK 使用序列化 JSON 字符串；不支持的 body 在派发前失败，避免先消费 Request 流。
+  if (init?.body !== undefined && typeof init.body !== 'string')
+    throw new AiTraceUnavailableError('unsupported_request_body');
+  if (input instanceof Request && input.body && init?.body === undefined)
+    throw new AiTraceUnavailableError('unsupported_request_body');
+  const body = init?.body ?? '';
+  let parsed: unknown = body;
+  try {
+    parsed = JSON.parse(body) as unknown;
+  } catch {
+    /* 非 JSON 请求保留脱敏字符串。 */
+  }
+  return { body, parsed };
 }

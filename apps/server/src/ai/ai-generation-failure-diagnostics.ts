@@ -11,7 +11,11 @@ import {
   type AiUsageFacts,
 } from '@thesis-ledger/schemas';
 import { generationStructuralPreview as structuralPreview } from './ai-generation-structural-preview.js';
-import { AiSdkGenerationError, sanitize, type AiGenerationCompletion } from './ai-sdk-generation-facts.js';
+import {
+  AiSdkGenerationError,
+  sanitize,
+  type AiGenerationCompletion,
+} from './ai-sdk-generation-facts.js';
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
@@ -51,21 +55,13 @@ export const generationFailureDiagnostic = (
   runtime?: AiGenerationRuntimeDiagnostic,
   httpRequest?: AiGenerationHttpRequestDiagnostic,
   completion?: AiGenerationCompletion,
+  responseText?: string,
 ): AiGenerationFailureDiagnostic => {
   const source = outputError(error);
-  const text = source?.text;
+  const text = source?.text ?? responseText;
   const model = source?.response?.modelId ?? completion?.actualModel;
-  const safeModel =
-    typeof model === 'string' &&
-    /^[A-Za-z0-9_.:/-]{1,200}$/u.test(model) &&
-    !/(?:sk-|bearer|api[_-]?key)/iu.test(model)
-      ? model
-      : null;
-  let errorClass: AiGenerationFailureDiagnostic['errorClass'] = 'unknown';
-  if (source) errorClass = 'no_object';
-  else if (NoOutputGeneratedError.isInstance(error)) errorClass = 'no_output';
-  else if (error instanceof SyntaxError) errorClass = 'syntax';
-  else if (error instanceof Error && error.name === 'ZodError') errorClass = 'schema';
+  const safeModel = safeActualModel(model);
+  const errorClass = generationErrorClass(error, Boolean(source));
   return aiGenerationFailureDiagnosticSchema.parse({
     version: 'ai-failure-diagnostic-v1',
     ...(runtime ? { runtime } : {}),
@@ -100,7 +96,15 @@ export const schemaGenerationFailure = (
       requestId: input.requestId,
       summary: researchV2 ? '结构化响应未通过解析或契约校验' : sanitize(error),
       ...(researchV2 || completion
-        ? { diagnostic: generationFailureDiagnostic(error, input.mode, runtime, httpRequest, completion) }
+        ? {
+            diagnostic: generationFailureDiagnostic(
+              error,
+              input.mode,
+              runtime,
+              httpRequest,
+              completion,
+            ),
+          }
         : {}),
     }),
     usage,
@@ -121,7 +125,8 @@ export const withGenerationRuntimeDiagnostic = (
     aiGenerationErrorSchema.parse({
       ...error.fact,
       diagnostic: {
-        ...(error.fact.diagnostic ?? generationFailureDiagnostic(error, mode, undefined, undefined, completion)),
+        ...(error.fact.diagnostic ??
+          generationFailureDiagnostic(error, mode, undefined, undefined, completion)),
         ...(runtime ? { runtime } : {}),
         ...(httpRequest ? { httpRequest } : {}),
       },
@@ -130,3 +135,22 @@ export const withGenerationRuntimeDiagnostic = (
     { cause: error, completion },
   );
 };
+
+function safeActualModel(model: unknown) {
+  return typeof model === 'string' &&
+    /^[A-Za-z0-9_.:/-]{1,200}$/u.test(model) &&
+    !/(?:sk-|bearer|api[_-]?key)/iu.test(model)
+    ? model
+    : null;
+}
+
+function generationErrorClass(
+  error: unknown,
+  hasOutputError: boolean,
+): AiGenerationFailureDiagnostic['errorClass'] {
+  if (hasOutputError) return 'no_object';
+  if (NoOutputGeneratedError.isInstance(error)) return 'no_output';
+  if (error instanceof SyntaxError) return 'syntax';
+  if (error instanceof Error && error.name === 'ZodError') return 'schema';
+  return 'unknown';
+}

@@ -8,6 +8,7 @@ import {
   backtestNavPreparationResultV3Schema,
   optimizationRunPreparationResultSchema,
   type StrategySubmissionInput,
+  type StrategySubmissionReceipt,
 } from '@thesis-ledger/schemas';
 import type { StrategyStackParams } from '../../app/strategy-navigation';
 import { useMobileRuntime, confirmAction } from '../../app/MobileRuntime';
@@ -45,6 +46,22 @@ const labels = {
   submitted: '已提交',
   blocked: '已阻塞',
 };
+function submissionPreparation(row: StrategySubmissionReceipt) {
+  const out =
+    row.outcome && typeof row.outcome === 'object' && !Array.isArray(row.outcome)
+      ? row.outcome
+      : null;
+  const target = typeof out?.id === 'string' ? out.id : null;
+  const p =
+    row.kind === 'nav'
+      ? backtestNavPreparationResultV3Schema.safeParse(row.prepared)
+      : backtestRunPreparationResultV3Schema.safeParse(row.prepared);
+  const opt = optimizationRunPreparationResultSchema.safeParse(row.prepared);
+  const diagnostics=(p.success && p.data.status==='blocked' && p.data.diagnostics) ||
+    (opt.success && opt.data.status==='blocked' && opt.data.diagnostics) || [];
+  return { out, target, p, opt, diagnostics };
+}
+
 export function StrategySubmissions() {
   const { api, scope } = useMobileRuntime();
   const navigation = useNavigation<NativeStackNavigationProp<StrategyStackParams>>();
@@ -68,18 +85,7 @@ export function StrategySubmissions() {
       <QueryStatus query={list} retry={() => void list.refetch()} />
       {confirm.isError && <Copy>{failureMessage(confirm.error)}</Copy>}
       {list.data?.map((row) => {
-        const out =
-          row.outcome && typeof row.outcome === 'object' && !Array.isArray(row.outcome)
-            ? row.outcome
-            : null;
-        const target = typeof out?.id === 'string' ? out.id : null;
-        const p =
-          row.kind === 'nav'
-            ? backtestNavPreparationResultV3Schema.safeParse(row.prepared)
-            : backtestRunPreparationResultV3Schema.safeParse(row.prepared);
-        const opt = optimizationRunPreparationResultSchema.safeParse(row.prepared);
-        const diagnostics=(p.success && p.data.status==='blocked' && p.data.diagnostics) ||
-          (opt.success && opt.data.status==='blocked' && opt.data.diagnostics) || [];
+        const { out, target, p, opt, diagnostics } = submissionPreparation(row);
         return (
           <Section key={row.id} title={labels[row.state]}>
             <Copy>

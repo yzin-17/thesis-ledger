@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Button } from '../src/components/ui/button';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog';
 import { Toaster } from '../src/components/ui/toast';
@@ -66,9 +67,11 @@ function Harness() {
   );
 }
 createRoot(document.getElementById('root')!).render(
-  <Toaster>
-    <ConfirmDialogProvider>
-      <Harness />
-    </ConfirmDialogProvider>
-  </Toaster>,
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <Toaster>
+      <ConfirmDialogProvider>
+        <Harness />
+      </ConfirmDialogProvider>
+    </Toaster>
+  </QueryClientProvider>,
 );

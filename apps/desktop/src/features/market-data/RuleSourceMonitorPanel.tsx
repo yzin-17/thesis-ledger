@@ -1,12 +1,14 @@
-import { LoadingState, Spinner } from '@/components/ui/spinner';
+import { LoadingState } from '@/components/ui/spinner';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { providerKeys } from '../providers/providers.queries.js';
 import { Button } from '@/components/ui/button';
-import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
+import { TableCell, TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { StickyTableActionCell, StickyTableActionHeader } from '../shared/StickyTableActions.js';
 import { useRuleSourceMonitor } from './useRuleSourceMonitor.js';
 import { RuleSourceMonitorVersions } from './RuleSourceMonitorVersions.js';
+import { RuleSourceMonitorSettings } from './RuleSourceMonitorSettings.js';
 
-const marketLabels = { CN: '内地', HK: '香港', US: '美国' };
 const runLabels = {
   queued: '等待检查',
   running: '正在检查',
@@ -16,198 +18,120 @@ const runLabels = {
   interrupted: '检查已中止',
 };
 const observationLabels = {
-  baseline: '首次观察',
+  baseline: '首次记录',
   unchanged: '无变化',
   changed: '材料有变化',
   unavailable: '暂不可读',
 };
-type Selected = { kind: 'pack' | 'document'; identity: string; name: string };
+type Selected = { kind: 'pack' | 'document'; identity: string; name: string; trigger: HTMLElement };
 
 export function RuleSourceMonitorPanel() {
-  const monitor = useRuleSourceMonitor();
+  const client = useQueryClient();
+  const monitor = useRuleSourceMonitor({
+    onTaskSaved: () => {
+      void client.invalidateQueries({ queryKey: providerKeys.jobs() });
+    },
+  });
   const [selected, setSelected] = useState<Selected | null>(null);
   const data = monitor.status.data;
   const selection = monitor.selection;
   const active = data?.latestRun;
   return (
-    <section className="grid gap-4" aria-label="收费资料更新监测">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">收费资料更新</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            检查已有公开资料的内容与版本变化，保留历史记录。变化需复核后再采纳。
-          </p>
-        </div>
-        <Button
-          aria-busy={monitor.status.isFetching}
-          size="sm"
-          variant="outline"
-          onClick={monitor.reload}
-          disabled={monitor.save.isPending || monitor.status.isFetching}
-        >
-          {monitor.status.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
-          重新载入配置
-        </Button>
-      </div>
-      {monitor.status.isPending ? (
-        <LoadingState label="正在读取监测配置" />
-      ) : null}
+    <section className="grid gap-6" aria-label="收费资料更新监测">
+      <p className="text-sm text-muted-foreground">
+        检查公开收费资料的变化，保留历史版本。发现变化后需人工复核，不会自动修改已冻结的收费规则。
+      </p>
+      {monitor.status.isPending ? <LoadingState label="正在读取监测配置" /> : null}
       {monitor.status.isError ? (
         <p role="alert" className="text-sm text-destructive">
-          监测状态暂时无法读取，请重新载入配置。
+          监测状态暂时无法读取，请刷新页面后重试。
         </p>
       ) : null}
       {data && selection ? (
         <>
-          <div
-            className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
-            role="group"
-            aria-label="选择监测来源"
-          >
-            {data.sources.map((source) => {
-              const pressed = selection.sourceIds.includes(source.identity);
-              return (
-                <Button
-                  key={source.identity}
-                  type="button"
-                  variant={pressed ? 'secondary' : 'outline'}
-                  className="h-auto justify-start whitespace-normal p-3 text-left"
-                  aria-pressed={pressed}
-                  disabled={monitor.save.isPending}
-                  onClick={() =>
-                    monitor.update({
-                      sourceIds: pressed
-                        ? selection.sourceIds.filter((id) => id !== source.identity)
-                        : [...selection.sourceIds, source.identity],
-                    })
-                  }
-                >
-                  <span className="grid gap-1">
-                    <span>{source.name}</span>
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {marketLabels[source.market]} · {source.documentCount}份公开资料
-                    </span>
-                  </span>
-                </Button>
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={selection.enabled ? 'secondary' : 'outline'}
-              aria-pressed={selection.enabled}
-              disabled={monitor.save.isPending}
-              onClick={() => monitor.update({ enabled: !selection.enabled })}
-            >
-              定期检查：{selection.enabled ? '开启' : '关闭'}
-            </Button>
-            <Button
-              aria-busy={monitor.save.isPending}
-              size="sm"
-              disabled={
-                !monitor.dirty ||
-                monitor.save.isPending ||
-                (selection.enabled && !selection.sourceIds.length)
-              }
-              onClick={monitor.saveConfig}
-            >
-              {monitor.save.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-              {monitor.save.isPending ? '正在保存…' : '保存监测配置'}
-            </Button>
-            <Button
-              aria-busy={monitor.check.isPending}
-              size="sm"
-              variant="outline"
-              disabled={monitor.busy || !selection.sourceIds.length || monitor.status.isError}
-              onClick={monitor.run}
-            >
-              {monitor.check.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-              {monitor.check.isPending ? '正在提交…' : '手动检查'}
-            </Button>
-            {monitor.dirty ? (
-              <span className="text-xs text-muted-foreground">配置尚未保存</span>
+          <RuleSourceMonitorSettings monitor={monitor} />
+          <section className="grid gap-4" aria-label="检查结果">
+            <h2 className="text-xl font-semibold">检查结果</h2>
+            {active ? (
+              <p role="status" className="text-sm">
+                {runLabels[active.status]}：已检查{active.counts.documents}份资料，
+                {active.counts.changed}条变化，{active.counts.unavailable}条暂不可读。
+                {active.status === 'partial' ? '最后成功摘要已保留。' : null}
+              </p>
             ) : null}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            定期检查保存开启后每24小时执行一次；手动检查使用当前所选来源。材料变化不会自动修改已冻结规则。
-          </p>
-          {monitor.save.isError ? (
-            <p role="alert" className="text-sm text-destructive">
-              配置保存失败。请重新载入后核对来源再保存。
-            </p>
-          ) : null}
-          {monitor.check.isError ? (
-            <p role="alert" className="text-sm text-destructive">
-              检查结果暂未确认。重试会核对这次检查。
-            </p>
-          ) : null}
-          {active ? (
-            <p role="status" className="text-sm">
-              {runLabels[active.status]}：已检查{active.counts.documents}份资料，
-              {active.counts.changed}条变化，{active.counts.unavailable}条暂不可读。
-              {active.status === 'partial' ? '最后成功摘要已保留。' : null}
-            </p>
-          ) : null}
-          {data.observations.length ? (
-            <TableContainer refreshing={monitor.status.isRefetching} refreshLabel="正在刷新监测记录">
-              <table className="w-full text-left text-sm">
-                <TableHeader>
-                  <tr className="border-b text-muted-foreground">
-                    <TableHead>资料</TableHead>
-                    <TableHead>检查状态</TableHead>
-                    <TableHead>最后成功观察</TableHead>
-                    <StickyTableActionHeader>版本</StickyTableActionHeader>
-                  </tr>
-                </TableHeader>
-                <tbody>
-                  {data.observations.map((item) => (
-                    <tr key={`${item.kind}:${item.identity}`} className="border-b last:border-0">
-                      <td className="max-w-80 p-3">
-                        <span>{item.name}</span>
-                        {item.lastChangeAt ? (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            曾发现材料变化，需复核适用性。
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="whitespace-nowrap p-3">{observationLabels[item.status]}</td>
-                      <td className="whitespace-nowrap p-3 text-muted-foreground">
-                        {item.lastSuccessAt
-                          ? new Date(item.lastSuccessAt).toLocaleString('zh-CN', { hour12: false })
-                          : '尚无成功观察'}
-                      </td>
-                      <StickyTableActionCell className="p-3">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={!item.versionCount}
-                          onClick={() =>
-                            setSelected({
-                              kind: item.kind,
-                              identity: item.identity,
-                              name: item.name,
-                            })
-                          }
-                        >
-                          {item.versionCount}个版本
-                        </Button>
-                      </StickyTableActionCell>
+            {data.observations.length ? (
+              <TableContainer
+                refreshing={monitor.status.isRefetching}
+                refreshLabel="正在刷新监测记录"
+              >
+                <table className="w-full text-left text-sm">
+                  <TableHeader>
+                    <tr className="border-b text-muted-foreground">
+                      <TableHead>资料</TableHead>
+                      <TableHead>检查状态</TableHead>
+                      <TableHead>最后成功读取</TableHead>
+                      <StickyTableActionHeader>版本记录</StickyTableActionHeader>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableContainer>
-          ) : (
-            <p className="text-sm text-muted-foreground">尚无检查记录。选择来源后可手动检查。</p>
-          )}
-          {selected ? (
-            <RuleSourceMonitorVersions
-              key={`${selected.kind}:${selected.identity}`}
-              {...selected}
-            />
-          ) : null}
+                  </TableHeader>
+                  <tbody>
+                    {data.observations.map((item) => (
+                      <tr key={`${item.kind}:${item.identity}`} className="border-b last:border-0">
+                        <TableCell className="max-w-80 p-3">
+                          <span className="text-foreground">{item.name}</span>
+                          {item.lastChangeAt ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              曾发现材料变化，需复核适用性。
+                            </p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="p-3">{observationLabels[item.status]}</TableCell>
+                        <TableCell className="p-3">
+                          {item.lastSuccessAt
+                            ? new Date(item.lastSuccessAt).toLocaleString('zh-CN', {
+                                hour12: false,
+                              })
+                            : '尚无成功读取'}
+                        </TableCell>
+                        <StickyTableActionCell className="p-3 text-foreground">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!item.versionCount}
+                            onClick={(event) =>
+                              setSelected({
+                                kind: item.kind,
+                                identity: item.identity,
+                                name: item.name,
+                                trigger: event.currentTarget,
+                              })
+                            }
+                          >
+                            查看版本（{item.versionCount}）
+                          </Button>
+                        </StickyTableActionCell>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                尚无检查记录。创建任务后，可在自动化中查看执行记录。
+              </p>
+            )}
+            {data.observations.length ? (
+              <p className="text-xs text-muted-foreground">
+                首次记录用于建立比较基准；最后成功读取时间不代表规则生效日期。历史检查记录不随当前勾选范围筛选。
+              </p>
+            ) : null}
+            {selected ? (
+              <RuleSourceMonitorVersions
+                key={`${selected.kind}:${selected.identity}`}
+                {...selected}
+                onClose={() => setSelected(null)}
+              />
+            ) : null}
+          </section>
         </>
       ) : null}
     </section>

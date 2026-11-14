@@ -53,6 +53,9 @@ describe('截图导入', () => {
         confidence: 1,
       }),
     ).toEqual(['市值与数量、市场价不一致', '盈亏与数量、成本价、市场价不一致', '盈亏比例不一致']));
+});
+
+describe("图片格式、Vision 草稿与资产匹配", () => {
   it('根据文件内容识别 PNG、JPEG、WebP 并拒绝伪装内容', () => {
     expect(matchesSignature(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), 'image/png')).toBe(
       true,
@@ -126,6 +129,9 @@ describe('截图导入', () => {
       status: 'unmatched',
     });
   });
+});
+
+describe("导入幂等及原子提交", () => {
   it('同一账户重复截图返回已有草稿且不写持仓', async () => {
     const existing = { id: 'existing', status: 'pending' };
     const prisma = {
@@ -179,6 +185,9 @@ describe('截图导入', () => {
       undefined,
     );
   });
+});
+
+describe("回滚与外部修正", () => {
   it('回滚恢复导入前持仓并保留历史状态', async () => {
     const draftId = '11111111-1111-4111-8111-111111111113';
     const submittedEvent = storedV2Event({

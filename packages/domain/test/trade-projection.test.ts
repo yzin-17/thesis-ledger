@@ -257,6 +257,9 @@ describe('Trade Projection 领域引擎', () => {
     ]);
   });
 
+});
+
+describe("Trade 基线、建仓证据与账户模式", () => {
   it('为基线建立独立 Component，已知成交只解释差额且不重复计入', () => {
     const events = [
       buy('buy-before-baseline', '50', '2026-01-01'),

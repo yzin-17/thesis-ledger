@@ -244,6 +244,9 @@ describe('账户现金操作', () => {
     expect(markup).toContain('查看全部');
   });
 
+});
+
+describe('跨账户划转修正链', () => {
   it('手动划转提交前读取两端最新 Revision，并生成关联命令', async () => {
     const getEvents = vi
       .fn()
@@ -427,6 +430,9 @@ describe('账户现金操作', () => {
     );
   });
 
+});
+
+describe('现金与划转表单关闭及提交区', () => {
   it('划转 Sheet 保留完整表单与底部提交区', () => {
     const source = readFileSync(
       new URL('../src/features/account-data/AccountDataCashTransferSheet.tsx', import.meta.url),
@@ -499,10 +505,9 @@ describe('账户现金操作', () => {
       new URL('../src/features/account-data/AccountDataCashObservationSheet.tsx', import.meta.url),
       'utf8',
     );
-    const recurringSource = readFileSync(
-      new URL('../src/features/account-data/AccountDataRecurringCashDeposits.tsx', import.meta.url),
-      'utf8',
-    );
+    const recurringSource = ['AccountDataRecurringCashDeposits.tsx', 'AccountDataCashDepositEditors.tsx']
+      .map(file => readFileSync(new URL('../src/features/account-data/' + file, import.meta.url), 'utf8'))
+      .join('\n');
 
     expect(observationSource).toContain('<SheetFooter');
     expect(observationSource).toContain('overflow-y-auto');
@@ -513,6 +518,9 @@ describe('账户现金操作', () => {
     expect(recurringSource).toContain('保存计划');
   });
 
+});
+
+describe('现金来源备注与刷新范围', () => {
   it('待结算现金流和现金入账来源使用用户显示名', () => {
     const sectionsSource = readFileSync(
       new URL('../src/features/account-data/AccountDataCashSections.tsx', import.meta.url),
@@ -561,6 +569,9 @@ describe('账户现金操作', () => {
     expect(source).not.toContain("portfolioKeys.valuation(mode)");
   });
 
+});
+
+describe('划转错误的业务反馈', () => {
   it('划转反馈不暴露 API 文案，并将余额不足解释为可操作提示', () => {
     const source = readFileSync(
       new URL('../src/features/account-data/AccountDataCashTransferSheet.tsx', import.meta.url),
@@ -585,6 +596,9 @@ describe('账户现金操作', () => {
     );
   });
 
+});
+
+describe('定期入账待确认与计划管理', () => {
   it('定期入账突出待确认实例，并把破坏性计划操作放进上下文菜单', () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(cashDepositKeys.plans(cashAccount.id), [

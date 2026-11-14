@@ -37,25 +37,27 @@ export const aiFrozenResearchV2Schema = z
       value.request.researchSettingsRevision !== value.researchSettingsRevision
     )
       reject('冻结提交与服务端范围或研究设置修订不一致');
-    const prepared = newsTimeMicrosV3(value.preparedAt);
-    const cutoff = newsTimeMicrosV3(value.dataCutoffAt);
-    const confirmed = newsTimeMicrosV3(value.scopeSnapshot.confirmedAt);
-    if (
-      prepared === null ||
-      cutoff === null ||
-      confirmed === null ||
-      cutoff > prepared ||
-      confirmed > prepared
-    )
-      reject('冻结确认/截止时间必须有效且不晚于准备完成时间');
+    const cutoff = validateFrozenResearchClock(
+      value.preparedAt,
+      value.dataCutoffAt,
+      value.scopeSnapshot.confirmedAt,
+      reject,
+    );
     if (
       new Set(value.evidence.map((entry) => entry.audit.evidenceId)).size !== value.evidence.length
     )
       reject('冻结证据身份重复');
     if (!value.evidence.some((entry) => entry.usable)) reject('没有可用证据时不能形成执行输入');
     for (const entry of value.evidence) {
-      if (entry.usable && (entry.audit.kind === 'portfolio' || entry.audit.kind === 'strategy') && !researchPrivateMaterialMatchesScopeV2(entry.data, value.scopeSnapshot, entry.audit.kind)) reject('私人证据与冻结的账户、持仓或策略范围不一致');
+      if (privateEvidenceMismatchesScope(entry, value.scopeSnapshot))
+        reject('私人证据与冻结的账户、持仓或策略范围不一致');
       if (entry.required && !entry.usable) reject('必需证据不可用时不能形成执行输入');
+      if (
+        entry.usable &&
+        entry.audit.kind === 'journal' &&
+        !journalEvidenceMatchesScope(entry.data, value.scopeSnapshot)
+      )
+        reject('Journal 冻结证据必须是当前账户、模式下已核对的复盘事实');
       if (entry.usable && cutoff !== null) validateEvidenceClock(entry.audit, cutoff, reject);
       if (
         value.scopeSnapshot.scope === 'instrument' &&
@@ -69,6 +71,26 @@ export const aiFrozenResearchV2Schema = z
     if (incomplete && value.quality.status !== 'partial') reject('冻结质量不能掩盖不完整证据');
   });
 type Audit = z.infer<typeof researchFrozenEvidenceV2Schema>['audit'];
+function validateFrozenResearchClock(
+  preparedAt: string,
+  dataCutoffAt: string,
+  confirmedAt: string,
+  reject: (message: string) => void,
+): bigint | null {
+  const prepared = newsTimeMicrosV3(preparedAt);
+  const cutoff = newsTimeMicrosV3(dataCutoffAt);
+  const confirmed = newsTimeMicrosV3(confirmedAt);
+  if (
+    prepared === null ||
+    cutoff === null ||
+    confirmed === null ||
+    cutoff > prepared ||
+    confirmed > prepared
+  )
+    reject('冻结确认/截止时间必须有效且不晚于准备完成时间');
+  return cutoff;
+}
+
 function validateEvidenceClock(audit: Audit, cutoff: bigint, reject: (message: string) => void) {
   for (const name of ['publishedAt', 'availableAt', 'fetchedAt'] as const) {
     const raw = audit[name];
@@ -78,3 +100,39 @@ function validateEvidenceClock(audit: Audit, cutoff: bigint, reject: (message: s
   }
 }
 export type AiFrozenResearchV2 = z.infer<typeof aiFrozenResearchV2Schema>;
+
+function journalEvidenceMatchesScope(
+  data: z.infer<typeof researchFrozenEvidenceV2Schema>['data'],
+  scopeSnapshot: z.infer<typeof researchScopeSnapshotV2Schema>,
+) {
+  const payload = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  const periodRequest =
+    'request' in payload &&
+    payload.request &&
+    typeof payload.request === 'object' &&
+    !Array.isArray(payload.request)
+      ? payload.request
+      : {};
+  let journalScope: { accountId: unknown; mode: unknown } | null = null;
+  if (payload.version === 'journal-review-ai-v1')
+    journalScope = { accountId: payload.accountId, mode: payload.mode };
+  else if (payload.version === 'journal-period-ai-v1')
+    journalScope = { accountId: periodRequest.accountId, mode: periodRequest.mode };
+  return Boolean(
+    journalScope &&
+    scopeSnapshot.scope === 'account' &&
+    scopeSnapshot.accountId === journalScope.accountId &&
+    scopeSnapshot.mode === journalScope.mode,
+  );
+}
+
+function privateEvidenceMismatchesScope(
+  entry: z.infer<typeof researchFrozenEvidenceV2Schema>,
+  scopeSnapshot: z.infer<typeof researchScopeSnapshotV2Schema>,
+) {
+  return (
+    entry.usable &&
+    (entry.audit.kind === 'portfolio' || entry.audit.kind === 'strategy') &&
+    !researchPrivateMaterialMatchesScopeV2(entry.data, scopeSnapshot, entry.audit.kind)
+  );
+}

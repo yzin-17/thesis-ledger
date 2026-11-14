@@ -6,6 +6,7 @@ import {
   parseBacktestModelConfiguration,
 } from '../src/features/strategy/BacktestModelConfiguration.js';
 import { BacktestRunDisclosure } from '../src/features/strategy/BacktestModelDisclosure.js';
+import { buildBacktestDiagnosticExport } from '../src/features/strategy/strategy-backtest-diagnostics.model.js';
 import { createStrategyActionHandlers } from '../src/features/strategy/strategy.actions.js';
 import type { BacktestJob } from '../src/features/strategy/strategy.types.js';
 const fixture = (name: string) =>
@@ -71,12 +72,20 @@ describe('策略回测模型披露', () => {
       status: 'succeeded',
       result: {
         completeness: 'partial',
+        engineVersion: 'test-engine-version',
+        snapshotVersion: 'test-snapshot-version',
         executionModelDisclosure: { model, contentHash: 'frozen-model-hash' },
       },
     } as BacktestJob;
     const markup = renderToStaticMarkup(<BacktestRunDisclosure job={job} />);
     expect(markup).toContain('部分完整');
-    expect(markup).toContain('frozen-model-hash');
+    expect(markup).not.toContain('frozen-model-hash');
+    expect(markup).not.toContain('test-engine-version');
+    expect(buildBacktestDiagnosticExport(job, job.result!).traceability).toMatchObject({
+      executionModelHash: 'frozen-model-hash',
+      engineVersion: 'test-engine-version',
+      snapshotVersion: 'test-snapshot-version',
+    });
     expect(markup).toContain('已冻结的执行模型');
     const failed = renderToStaticMarkup(
       <BacktestRunDisclosure

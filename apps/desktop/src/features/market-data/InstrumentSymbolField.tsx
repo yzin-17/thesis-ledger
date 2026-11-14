@@ -5,6 +5,7 @@ import { useInstrumentPickerSearch } from './instrument-picker.queries.js';
 
 export type InstrumentSymbolFieldProps = {
   value: string;
+  displayName?: string | undefined;
   onChange: (symbol: string) => void;
   onSelect?: (item: InstrumentSearchResult) => void;
   markets?: readonly string[];
@@ -19,6 +20,7 @@ export type InstrumentSymbolFieldProps = {
 /** Editable code plus real directory suggestions; business validation stays with the consumer. */
 export function InstrumentSymbolField({
   value,
+  displayName,
   onChange,
   onSelect,
   markets,
@@ -39,14 +41,19 @@ export function InstrumentSymbolField({
       (!instrumentTypes || instrumentTypes.includes(item.instrumentType)) &&
       (!accepts || accepts(item)),
   );
-  let status = '';
-  if (!value.trim()) status = '输入代码或名称搜索';
-  else if (search.current && search.isError) status = '标的目录暂时无法读取，请重试';
-  else if (!search.busy && search.isSuccess && !items.length) status = '未找到符合当前条件的标的';
+  const status = instrumentSearchStatus(value, search, items.length);
+  const selection =
+    selected?.symbol === value ? selected : items.find((item) => item.symbol === value);
+  const name = selection?.displayName ?? displayName;
+  let display = value;
+  if (!open && name && name !== value) {
+    display = `${name} · ${value}`;
+  }
   return (
     <div className="grid min-w-0 flex-1 gap-1">
       <InstrumentSearchCombobox
-        input={value}
+        input={display}
+        placeholder=""
         items={items}
         busy={search.busy}
         status={status}
@@ -68,9 +75,21 @@ export function InstrumentSymbolField({
           setOpen(false);
         }}
       />
-      {selected?.symbol === value && (
-        <span className="text-xs text-muted-foreground">{selected.displayName}</span>
-      )}
     </div>
   );
+}
+
+function instrumentSearchStatus(
+  value: string,
+  search: Pick<
+    ReturnType<typeof useInstrumentPickerSearch>,
+    'current' | 'isError' | 'busy' | 'isSuccess'
+  >,
+  itemCount: number,
+) {
+  let status = '';
+  if (value.trim() && search.current && search.isError) status = '标的目录暂时无法读取，请重试';
+  else if (value.trim() && !search.busy && search.isSuccess && !itemCount)
+    status = '未找到符合当前条件的标的';
+  return status;
 }

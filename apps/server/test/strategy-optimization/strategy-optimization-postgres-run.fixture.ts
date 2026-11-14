@@ -23,12 +23,13 @@ const template = backtestSnapshotManifestV3Schema.parse(
 );
 
 /** 回测边界提供现行冻结合同；优化服务、数据库和读取门禁均实际执行。 */
-function completedRun(input: {
+export function completedOptimizationRun(input: {
+  id?: string;
   strategyVersionId: string;
   idempotencyKey: string;
   runConfig: unknown;
 }) {
-  const id = randomUUID();
+  const id = input.id ?? randomUUID();
   const config = runConfigSchemaV3.parse(input.runConfig);
   const model = config.executionModel!;
   const modelHash = hashCanonicalManifest(model);
@@ -110,13 +111,13 @@ function completedRun(input: {
 }
 
 export function createPostgresOptimizationBacktests(prisma: PrismaService) {
-  const jobs = new Map<string, ReturnType<typeof completedRun>>();
+  const jobs = new Map<string, ReturnType<typeof completedOptimizationRun>>();
   const read = async (id: string) => [...jobs.values()].find((job) => job.id === id) ?? null;
   return {
-    createRun: async (input: Parameters<typeof completedRun>[0]) => {
+    createRun: async (input: Parameters<typeof completedOptimizationRun>[0]) => {
       const previous = jobs.get(input.idempotencyKey);
       if (previous) return previous;
-      const job = completedRun(input);
+      const job = completedOptimizationRun(input);
       await prisma.backtestJob.create({
         data: {
           ...job,

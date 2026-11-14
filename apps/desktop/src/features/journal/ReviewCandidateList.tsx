@@ -151,7 +151,7 @@ export function ReviewCandidateList({
             </div>
             <Badge variant="outline">{candidates.length} 笔</Badge>
           </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(12rem,1fr)_minmax(10rem,14rem)_minmax(10rem,14rem)] lg:items-end">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] items-end gap-3">
             <div className="relative block">
               <span className="sr-only">按标的筛选</span>
               <InstrumentSymbolField

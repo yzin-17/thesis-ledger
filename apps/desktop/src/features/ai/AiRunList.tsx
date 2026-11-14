@@ -2,6 +2,7 @@ import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { researchStateMeta } from './research-state-display.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FilterReset } from '@/components/ui/filter-bar';
 import {
   Empty,
   EmptyContent,
@@ -68,7 +69,7 @@ const displayObject = (run: AiRunRecord) => {
   const object = run.display?.object;
   if (!object) return '研究对象未提供';
   const identity = [object.name, object.code, object.version].filter(Boolean).join(' · ');
-  return identity ? `${object.label} · ${identity}` : `${object.label} · 对象未提供`;
+  return identity || object.label;
 };
 
 const displaySource = (run: AiRunRecord) => {
@@ -463,9 +464,7 @@ function ResearchListResults(
           </EmptyHeader>
           {hasConditions && (
             <EmptyContent>
-              <Button type="button" variant="outline" size="sm" onClick={props.onClearFilters}>
-                清除条件
-              </Button>
+              <FilterReset size="sm" onReset={props.onClearFilters} />
             </EmptyContent>
           )}
         </Empty>

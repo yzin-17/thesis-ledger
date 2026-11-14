@@ -1,7 +1,7 @@
 import { Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { requestFailureMessage } from '../../shared/api/request-error.js';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { MarketProviderProbeRoute } from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ import {
   SelectGroup,
 } from '@/components/ui/select';
 import { testMarketProvider } from './market-data.api.js';
+import { marketDataKeys } from './market-data.queries.js';
 import { providerProbeErrorLabel } from './provider-credentials.js';
 import { accountAccessSelectable } from './provider-account-access.js';
 import { routeKeyLabelV3, routeAvailabilityLabelV3 } from './market-data-routes-v3.js';
@@ -33,46 +34,28 @@ import {
 
 const identity = (route: MarketProviderProbeRoute) => JSON.stringify([route.key, route.target]);
 
-export function ProviderExactChecksSheet({
-  provider,
-  catalog,
-  onClose,
-  onConfigure,
-}: {
+export function ProviderExactChecksSheet(props: {
   provider: ProviderManifest;
   catalog: MarketRouteCatalogReadV3 | undefined;
   onClose: () => void;
   onConfigure: () => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const entries =
-    catalog?.status === 'complete'
-      ? catalog.entries.filter((entry) => entry.target.providerId === provider.providerId &&
-        accountAccessSelectable(entry.accountAccess, Date.now(), provider.configVersion, provider.accountAccessSupported))
-      : [];
-  const selected = entries.find((entry) => identity(entry) === selectedId) ?? entries[0];
-  const options = entries.map((entry) => ({
-    value: identity(entry),
-    label: `${routeKeyLabelV3(entry.key)} · ${dataSourceDisplay(entry.target.providerId, entry.target.upstreamSource, [provider])}`,
-  }));
-  const test = useMutation({
-    mutationFn: (route: MarketProviderProbeRoute) =>
-      testMarketProvider(provider, undefined, undefined, route),
-    retry: false,
-  });
-  const checked =
-    selected && test.data?.routeResults?.find((entry) => identity(entry) === identity(selected));
-  const state = checked?.state ?? selected?.state;
-  const credentialMissing = provider.requiresCredential === true && !provider.credentialConfigured;
-  let availability = routeAvailabilityLabelV3(state);
-  if (state === 'ready') availability = '配置与当前检查条件就绪';
-  else if (!provider.enabled && !credentialMissing) availability = '来源未启用';
-  let resultMessage = '尚未执行所选能力的读取检查。';
-  if (test.isPending) resultMessage = '正在检查所选来源…';
-  else if (test.isError)
-    resultMessage = requestFailureMessage(test.error, '检查失败，请稍后重试。');
-  else if (checked?.result.status === 'healthy') resultMessage = '所选能力读取检查通过。';
-  else if (checked) resultMessage = providerProbeErrorLabel(checked.result.errorCode);
+  const control = useProviderExactChecks(props);
+  const {
+    onClose,
+    provider,
+    entries,
+    credentialMissing,
+    options,
+    selected,
+    test,
+    setSelectedId,
+    state,
+    availability,
+    resultMessage,
+    checked,
+    onConfigure,
+  } = control;
 
   return (
     <Sheet
@@ -84,7 +67,9 @@ export function ProviderExactChecksSheet({
       <SheetContent size="compact" className="min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>{provider.displayName} 精确能力检查</SheetTitle>
-          <SheetDescription>检查结果仅对应所选市场、资产、上游和价格口径。</SheetDescription>
+          <SheetDescription>
+            成功后保存验证结果，适用于所选市场、资产、上游和价格口径。
+          </SheetDescription>
         </SheetHeader>
         <SheetBody className="flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">
@@ -106,11 +91,11 @@ export function ProviderExactChecksSheet({
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false}>
               <SelectGroup>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+                {options.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -150,4 +135,79 @@ export function ProviderExactChecksSheet({
       </SheetContent>
     </Sheet>
   );
+}
+
+function useProviderExactChecks({
+  provider,
+  catalog,
+  onClose,
+  onConfigure,
+}: {
+  provider: ProviderManifest;
+  catalog: MarketRouteCatalogReadV3 | undefined;
+  onClose: () => void;
+  onConfigure: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const entries =
+    catalog?.status === 'complete'
+      ? catalog.entries.filter(
+          (entry) =>
+            entry.target.providerId === provider.providerId &&
+            accountAccessSelectable(entry.accountAccess, Date.now(), provider.configVersion),
+        )
+      : [];
+  const selected = entries.find((entry) => identity(entry) === selectedId) ?? entries[0];
+  const options = entries.map((entry) => ({
+    value: identity(entry),
+    label: `${routeKeyLabelV3(entry.key)} · ${dataSourceDisplay(entry.target.providerId, entry.target.upstreamSource, [provider])}`,
+  }));
+  const test = useMutation({
+    mutationFn: (route: MarketProviderProbeRoute) =>
+      testMarketProvider(provider, undefined, undefined, route),
+    retry: false,
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: marketDataKeys.routeCapabilities() }),
+  });
+  const checked =
+    selected && test.data?.routeResults?.find((entry) => identity(entry) === identity(selected));
+  const state = checked?.state ?? selected?.state;
+  const { credentialMissing, availability } = exactCheckAvailability(provider, state);
+  let resultMessage =
+    selected?.verification?.state === 'verified'
+      ? '所选能力已验证。'
+      : '尚未执行所选能力的读取检查。';
+  if (test.isPending) resultMessage = '正在检查所选来源…';
+  else if (test.isError)
+    resultMessage = requestFailureMessage(test.error, '检查失败，请稍后重试。');
+  else if (checked?.result.status === 'healthy') resultMessage = '所选能力验证通过，结果已保存。';
+  else if (checked) resultMessage = providerProbeErrorLabel(checked.result.errorCode);
+
+  return {
+    onClose,
+    provider,
+    entries,
+    credentialMissing,
+    options,
+    selected,
+    test,
+    setSelectedId,
+    state,
+    availability,
+    resultMessage,
+    checked,
+    onConfigure,
+  };
+}
+
+function exactCheckAvailability(
+  provider: ProviderManifest,
+  state: Parameters<typeof routeAvailabilityLabelV3>[0],
+) {
+  const credentialMissing = provider.requiresCredential === true && !provider.credentialConfigured;
+  let availability = routeAvailabilityLabelV3(state);
+  if (state === 'ready') availability = '配置与当前检查条件就绪';
+  else if (!provider.enabled && !credentialMissing) availability = '来源未启用';
+  return { credentialMissing, availability };
 }

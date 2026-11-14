@@ -115,6 +115,9 @@ describe('Portfolio table contract', () => {
     expect(html).not.toContain('最大持仓');
   });
 
+});
+
+describe('组合表格列与接口适配', () => {
   it('keeps row cells aligned with the seven semantic headers', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },

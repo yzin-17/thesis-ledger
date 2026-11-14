@@ -100,12 +100,15 @@ describe('研究工作台 UI 契约', () => {
     );
     expect(markup).toContain('当前组合最主要的风险是什么？');
     expect(markup).toContain('组合集中度需要持续观察。');
-    expect(markup).toContain('当前投资组合 · 对象未提供');
+    expect(markup).toContain('当前投资组合');
+    expect(markup).not.toContain('当前投资组合 · 对象未提供');
     expect(markup).toContain('组合研究');
     expect(markup).toContain('已完成');
     expect(markup).toContain('data-state="selected"');
     expect(markup).toContain('研究问题');
     expect(markup).toContain('研究对象');
+    expect(markup).not.toContain('新建研究');
+    expect(markup).toContain('搜索研究问题');
     expect(markup).not.toContain('role="tablist"');
   });
 
@@ -164,7 +167,7 @@ describe('研究工作台 UI 契约', () => {
       />,
     );
     expect(listMarkup).toContain('没有匹配的研究');
-    expect(listMarkup).toContain('清除条件');
+    expect(listMarkup).toContain('清空筛选');
     expect(listMarkup).not.toContain('新建研究');
     expect(detailMarkup).toContain('没有可显示的研究详情');
     expect(detailMarkup).not.toContain('可以先问');
@@ -177,10 +180,7 @@ describe('研究工作台 UI 契约', () => {
       new URL('../src/features/ai/AiRunList.tsx', import.meta.url),
       'utf8',
     );
-    const newResearchSource = readFileSync(
-      new URL('../src/features/ai/NewResearchSheet.tsx', import.meta.url),
-      'utf8',
-    );
+    const newResearchSource = readNewResearchImplementation();
     expect(source).toContain('<RefreshIconButton');
     expect(listSource).not.toContain('<RefreshIconButton');
     expect(source).not.toContain('<RefreshCw');
@@ -190,7 +190,8 @@ describe('研究工作台 UI 契约', () => {
     expect(controllerSource).toContain("label: '服务已就绪'");
     expect(newResearchSource).toContain('模型提供方、工具和执行服务已就绪。');
     expect(controllerSource).not.toContain("label: 'Provider 已就绪'");
-    expect(source).toContain('<Button type="button" size="sm"');
+    expect(source).toContain('onClick={() => openNewResearch()}');
+    expect(listSource).not.toContain('onCreateResearch');
     expect(controllerSource).toContain('trigger ?? listFallbackRef.current');
     expect(source).toContain('tabIndex={-1}');
     expect(source).not.toContain('<Settings2');
@@ -199,10 +200,7 @@ describe('研究工作台 UI 契约', () => {
   });
 
   it('再次生成表单由服务端预填并区分普通失败与未知结果风险', () => {
-    const source = readFileSync(
-      new URL('../src/features/ai/NewResearchSheet.tsx', import.meta.url),
-      'utf8',
-    );
+    const source = readNewResearchImplementation();
     expect(source).toContain('useAiResearchRetryPrefillQuery');
     expect(source).toContain('原研究对象已失效，请显式重新选择研究范围或对象');
     expect(source).toContain('我已核对预填的问题、研究对象和问题模板');
@@ -210,6 +208,9 @@ describe('研究工作台 UI 契约', () => {
     expect(source).toContain('acknowledgeUnknownOutcomeRisk: unknownRiskConfirmed');
   });
 
+});
+
+describe('研究报告及引用证据', () => {
   it('共享报告正文按问题、结论、风险、证据、免责声明和折叠运行详情排序', () => {
     const markup = renderToStaticMarkup(<ResearchReportContent run={detail} />);
     expect(markup.indexOf('研究问题与背景')).toBeLessThan(markup.indexOf('核心结论与适用条件'));
@@ -296,6 +297,9 @@ describe('研究工作台 UI 契约', () => {
     expect(markup).not.toContain('核心结论与适用条件');
   });
 
+});
+
+describe('研究详情和失败恢复', () => {
   it('详情按结论、风险、证据和未知项顺序展示', () => {
     const detailMarkup = renderToStaticMarkup(
       <AiRunDetail
@@ -346,3 +350,7 @@ describe('研究工作台 UI 契约', () => {
     expect(findCitationToolCall('missing', toolCall ? [toolCall] : [])).toBeUndefined();
   });
 });
+
+function readNewResearchImplementation() {
+return ["NewResearchSheet.tsx", "use-new-research-sheet.ts", "new-research-readiness.ts", "NewResearchObjectFields.tsx"].map(file => readFileSync(new URL("../src/features/ai/" + file, import.meta.url), "utf8")).join("\n");
+}

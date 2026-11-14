@@ -1,26 +1,235 @@
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { LoadingState } from '@/components/ui/spinner';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { ArenaSetup } from './ArenaSetup.js';
-import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useLocation, useParams } from 'react-router';
+import { ArenaDetailHeader } from './ArenaDetailShell.js';
+import { ArenaDailyMatch } from './ArenaDailyMatch.js';
+import { ArenaDailyActivity } from './ArenaDailyActivity.js';
 import {
-  arenaCostLabel,
-  arenaRatio,
-  arenaActionLabel,
-  arenaStatusLabel,
-} from '@thesis-ledger/domain';
+  readArenaDailyNavigation,
+  updateArenaDailyNavigation,
+  arenaDailyLegacyTarget,
+  type ArenaDailyView,
+} from './arena-daily-navigation.js';
+import { RefreshIconButton } from '../shared/RefreshIconButton.js';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router';
+import { arenaStatusLabel } from '@thesis-ledger/domain';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 import {
   currentIdentitySession,
   subscribeIdentitySession,
 } from '../../shared/api/identity-session.js';
 
-export function ArenaPage() {
+export function ArenaPage(props: { basePath?: string; listPath?: string }) {
+  const control = useArenaPage(props);
+  const { selected, transition, active, match, basePath, owner, legacyRound, location } = control;
+  if (match === 'new') return <ArenaSetup key={owner} owner={owner} />;
+  if (legacyRound && match)
+    return (
+      <Navigate
+        replace
+        to={arenaDailyLegacyTarget(
+          basePath + '/' + match,
+          location.search,
+          legacyRound,
+          location.hash,
+        )}
+        state={location.state as unknown}
+      />
+    );
+  return (
+    <section className="grid min-w-0 gap-group">
+      <DailyMatchHeader control={control} />
+      {selected && (selected.state === 'draft' || selected.state === 'paused') && (
+        <p className="text-xs text-muted-foreground">
+          启动后会调用模型并消耗设定额度。剩余 {selected.remaining.requests} 次请求、
+          {selected.remaining.costMicros / 1000000} {selected.protocol.budgetCurrency}
+          ；完整预算见比赛设置。
+        </p>
+      )}
+      {transition.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {transition.error.message}
+        </p>
+      )}
+      {active.isError && (
+        <Button variant="outline" className="w-fit" onClick={() => void active.refetch()}>
+          读取失败，重新读取
+        </Button>
+      )}
+      {active.isPending && <LoadingState label="正在读取比赛" />}
+      <DailyMatchContent control={control} />
+    </section>
+  );
+}
+
+function useArenaPage({
+  basePath = '/strategy/arena',
+  listPath = basePath,
+}: {
+  basePath?: string;
+  listPath?: string;
+}) {
   const location = useLocation();
-  const historyState: unknown = location.state;
+  const { origin } = arenaPageOrigin(location.state);
+  const { match, round: legacyRound } = useParams();
+  const [params, setParams] = useSearchParams();
+  const navigation = readArenaDailyNavigation(params);
+  const activity = navigation.view === 'activity';
+  const changeNavigation = (changes: Parameters<typeof updateArenaDailyNavigation>[1]) =>
+    setParams((current) => updateArenaDailyNavigation(current, changes), {
+      state: location.state as unknown,
+    });
+  const changeView = (view: ArenaDailyView) => changeNavigation({ view });
+  const api = getDesktopApiClient().modelArenas;
+  const owner = useSyncExternalStore(
+    subscribeIdentitySession,
+    () => currentIdentitySession()?.principal.id ?? 'local-workspace',
+  );
+  const client = useQueryClient();
+  const scope = ['desktop', window.location.origin, owner, 'model-arenas'];
+  const { list, detail, roundId, invalid, report, comparison } = useArenaReadQueries(
+    scope,
+    match,
+    legacyRound,
+    activity,
+    navigation,
+    api,
+  );
+  const transition = useMutation({
+    mutationFn: (action: 'start' | 'pause' | 'end') => api.transition(match!, action),
+    onSettled: () => client.invalidateQueries({ queryKey: scope }),
+  });
+  const latestRoundId = detail.data?.rounds[0]?.id;
+  useEffect(() => {
+    if (!legacyRound && activity && !params.has('round') && latestRoundId)
+      setParams((current) => updateArenaDailyNavigation(current, { roundId: latestRoundId }), {
+        replace: true,
+        state: location.state as unknown,
+      });
+  }, [legacyRound, activity, params, latestRoundId, setParams, location.state]);
+
+  const selected = detail.data;
+
+  const active = match ? detail : list;
+  const comparisonFetching = !activity && comparison.isFetching;
+  const fetching = active.isFetching || comparisonFetching || (activity && report.isFetching);
+  const refreshing =
+    Boolean(active.data) &&
+    (active.isFetching ||
+      comparisonFetching ||
+      (activity && report.isFetching && Boolean(report.data)));
+  let refreshLabel = '正在刷新比赛列表';
+  if (match) refreshLabel = activity ? '正在刷新决策与成交' : '正在刷新比赛详情';
+  const catalogOrigin = origin === '/arena' || Boolean(origin?.startsWith('/arena?'));
+  const backPath = origin ?? listPath;
+  const clearRecords = () => changeNavigation({ view: 'activity', roundId: null, modelId: null });
+  const openLatest = (modelId: string) =>
+    changeNavigation({ view: 'activity', roundId: selected?.rounds[0]?.id ?? null, modelId });
+
+  return {
+    selected,
+    backPath,
+    origin,
+    catalogOrigin,
+    transition,
+    fetching,
+    active,
+    match,
+    activity,
+    comparison,
+    roundId,
+    invalid,
+    report,
+    refreshing,
+    refreshLabel,
+    list,
+    basePath,
+    navigation,
+    changeView,
+    openLatest,
+    changeNavigation,
+    clearRecords,
+    owner,
+    legacyRound,
+    location,
+  };
+}
+
+function DailyMatchHeader({ control }: { control: ReturnType<typeof useArenaPage> }) {
+  return (
+    <>
+      <ArenaDetailHeader
+        title={control.selected?.protocol.title ?? '模型竞技场'}
+        backPath={control.backPath}
+        backLabel={control.origin && !control.catalogOrigin ? '返回来源页' : '返回比赛列表'}
+        backState={control.catalogOrigin ? { arenaReturn: control.origin } : undefined}
+        actions={
+          <>
+            {control.selected && (
+              <>
+                {(control.selected.state === 'draft' || control.selected.state === 'paused') && (
+                  <Button
+                    disabled={control.transition.isPending}
+                    onClick={() => control.transition.mutate('start')}
+                  >
+                    {control.selected.state === 'draft' ? '启动比赛' : '恢复比赛'}
+                  </Button>
+                )}
+                {control.selected.state === 'running' && (
+                  <Button
+                    variant="outline"
+                    disabled={control.transition.isPending}
+                    onClick={() => control.transition.mutate('pause')}
+                  >
+                    暂停比赛
+                  </Button>
+                )}
+                {control.selected.state === 'paused' && (
+                  <Button
+                    variant="outline"
+                    disabled={control.transition.isPending}
+                    onClick={() => control.transition.mutate('end')}
+                  >
+                    结束比赛
+                  </Button>
+                )}
+              </>
+            )}
+            <RefreshIconButton
+              label="刷新比赛详情"
+              refreshing={control.fetching}
+              onClick={() => {
+                void control.active.refetch();
+                if (control.match && !control.activity) void control.comparison.refetch();
+                if (control.activity && control.roundId && !control.invalid)
+                  void control.report.refetch();
+              }}
+            />
+          </>
+        }
+      >
+        {control.selected && (
+          <>
+            <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
+              {arenaStatusLabel(control.selected.state)}
+            </span>
+            <span>
+              日频比赛 · {{ CN: 'A股', HK: '港股', US: '美股' }[control.selected.protocol.market]}
+            </span>
+            <span>
+              {control.selected.protocol.startsOn + ' 至 ' + control.selected.protocol.endsOn}
+            </span>
+          </>
+        )}
+      </ArenaDetailHeader>
+    </>
+  );
+}
+
+function arenaPageOrigin(historyState: unknown) {
   let origin: string | undefined;
   if (
     historyState &&
@@ -31,15 +240,17 @@ export function ArenaPage() {
     !historyState.arenaReturn.includes('\\')
   )
     origin = historyState.arenaReturn;
-  const entrant = location.hash.startsWith('#model-') ? location.hash.slice(7) : null;
-  const { match, round } = useParams();
-  const api = getDesktopApiClient().modelArenas;
-  const owner = useSyncExternalStore(
-    subscribeIdentitySession,
-    () => currentIdentitySession()?.principal.id ?? 'local-workspace',
-  );
-  const client = useQueryClient();
-  const scope = ['desktop', window.location.origin, owner, 'model-arenas'];
+  return { origin };
+}
+
+function useArenaReadQueries(
+  scope: string[],
+  match: string | undefined,
+  legacyRound: string | undefined,
+  activity: boolean,
+  navigation: ReturnType<typeof readArenaDailyNavigation>,
+  api: ReturnType<typeof getDesktopApiClient>['modelArenas'],
+) {
   const list = useQuery({
     queryKey: [...scope, 'list'],
     queryFn: ({ signal }) => api.list(signal),
@@ -48,217 +259,67 @@ export function ArenaPage() {
   const detail = useQuery({
     queryKey: [...scope, match],
     queryFn: ({ signal }) => api.get(match!, signal),
-    enabled: !!match && match !== 'new',
+    enabled: !!match && match !== 'new' && !legacyRound,
   });
+  const roundId = navigation.invalidRound
+    ? null
+    : (navigation.roundId ?? detail.data?.rounds[0]?.id ?? null);
+  const invalid = navigation.invalidRound || navigation.invalidModel;
   const report = useQuery({
-    queryKey: [...scope, match, round],
-    queryFn: ({ signal }) => api.round(match!, round!, signal),
-    enabled: !!match && !!round,
+    queryKey: [...scope, match, 'round', roundId],
+    queryFn: ({ signal }) => api.round(match!, roundId!, signal),
+    enabled: !!match && !legacyRound && activity && !!roundId && !invalid,
   });
   const comparison = useQuery({
     queryKey: [...scope, match, 'comparison'],
-    enabled: !!match && match !== 'new' && !round,
+    enabled: !!match && match !== 'new' && !legacyRound && !activity,
     queryFn: ({ signal }) => api.compare(match!, {}, signal),
   });
-  const transition = useMutation({
-    mutationFn: (action: 'start' | 'pause' | 'end') => api.transition(match!, action),
-    onSettled: () => client.invalidateQueries({ queryKey: scope }),
-  });
-  if (match === 'new') return <ArenaSetup key={owner} owner={owner} />;
-  const selected = detail.data;
-  let active: typeof list | typeof detail | typeof report = list;
-  if (round) active = report;
-  else if (match) active = detail;
-  let refreshLabel = '正在刷新比赛列表';
-  if (round) refreshLabel = '正在刷新比赛轮次';
-  else if (match) refreshLabel = '正在刷新比赛详情';
-  const path = '/strategy/arena';
-  const defaultBackLabel = round ? '返回比赛' : '返回比赛列表';
+  return { list, detail, roundId, invalid, report, comparison };
+}
+function DailyMatchContent({ control }: { control: ReturnType<typeof useArenaPage> }) {
   return (
-    <section className="grid gap-3">
-      {match && (
-        <Link to={origin ?? (round ? path + '/' + match : path)}>
-          {origin ? '返回来源页' : defaultBackLabel}
-        </Link>
-      )}
-      <h2 className="text-xl font-semibold">{selected?.protocol.title ?? '模型竞技场'}</h2>
-      {!match && <Link to={path + '/new'}>新建模拟比赛</Link>}
-      {active.isError && (
-        <button type="button" onClick={() => void active.refetch()}>
-          读取失败，重新读取
-        </button>
-      )}
-      {active.isPending && <LoadingState label="正在读取比赛" />}
+    <>
       <ListRefreshRegion
-        refreshing={
-          Boolean(active.data) && (active.isFetching || detail.isFetching || comparison.isFetching)
-        }
-        label={refreshLabel}
-        className={match ? 'grid min-h-8 gap-3' : 'grid min-h-8 gap-2'}
+        refreshing={control.refreshing}
+        label={control.refreshLabel}
+        className="grid min-w-0 min-h-8 gap-group"
       >
-        {!match && list.data?.length === 0 && <p>暂无比赛</p>}
-        {!match &&
-          list.data?.map((m) => (
-            <Link key={m.id} to={path + '/' + m.id}>
+        {!control.match && control.list.data?.length === 0 && <p>暂无比赛</p>}
+        {!control.match &&
+          control.list.data?.map((m) => (
+            <Link key={m.id} to={control.basePath + '/' + m.id}>
               {m.protocol.title} · {arenaStatusLabel(m.state)} · {m.protocol.startsOn} 至{' '}
               {m.protocol.endsOn}
             </Link>
           ))}
-        {match && !round && selected && (
-          <>
-            <p>
-              {arenaStatusLabel(selected.state)} · 总额度剩余 {selected.remaining.requests} 次请求 ·{' '}
-              {selected.remaining.tokens} 个模型词元
-            </p>
-            {selected.entrants.map((e) => (
-              <p key={e.id}>
-                {e.providerId} / {e.model} · 模拟现金 {e.cash} {selected.protocol.currency} · 剩余{' '}
-                {e.remaining.requests} 次请求
-              </p>
-            ))}
-            <p>
-              模型费用总额度 {selected.protocol.budget.costMicros / 1000000}{' '}
-              {selected.protocol.budgetCurrency} · 剩余 {selected.remaining.costMicros / 1000000}{' '}
-              {selected.protocol.budgetCurrency}
-            </p>
-            <div className="flex gap-2">
-              {(selected.state === 'draft' || selected.state === 'paused') && (
-                <Button disabled={transition.isPending} onClick={() => transition.mutate('start')}>
-                  按上述预算启动自动比赛
-                </Button>
-              )}
-              {selected.state === 'running' && (
-                <Button disabled={transition.isPending} onClick={() => transition.mutate('pause')}>
-                  暂停比赛
-                </Button>
-              )}
-              {selected.state === 'paused' && (
-                <Button disabled={transition.isPending} onClick={() => transition.mutate('end')}>
-                  结束本场比赛
-                </Button>
-              )}
-            </div>
-            {transition.error && <p role="alert">{transition.error.message}</p>}
-            <Link to={'/journal/model-weeklies/' + match}>模型周报</Link>
-            <h3>比赛表现</h3>
-            {comparison.isError && (
-              <button onClick={() => void comparison.refetch()}>比较数据读取失败，重试</button>
-            )}
-            {comparison.data && (
-              <>
-                <p>
-                  {comparison.data.start} 至 {comparison.data.end} · 已开轮 {comparison.data.opened}{' '}
-                  / {comparison.data.planned}
-                </p>
-                <TableContainer>
-                  <table>
-                    <TableHeader>
-                      <tr>
-                        {[
-                          '参赛模型或基准',
-                          '名次',
-                          '收盘净值',
-                          '收益',
-                          '最大回撤',
-                          '换手',
-                          '交易费',
-                        ].map((s) => (
-                          <TableHead key={s} className="text-start">
-                            {s}
-                          </TableHead>
-                        ))}
-                      </tr>
-                    </TableHeader>
-                    <tbody>
-                      {comparison.data.rows.map((r) => (
-                        <tr key={r.id}>
-                          {[
-                            r.label,
-                            r.rank ?? '—',
-                            r.metrics.endNav ?? '资料不足',
-                            arenaRatio(r.metrics.returnRatio),
-                            arenaRatio(r.metrics.drawdown),
-                            arenaRatio(r.metrics.turnover),
-                            r.metrics.tradeFees ?? '资料不足',
-                          ].map((s, i) => (
-                            <td key={i} className="px-2">
-                              {s}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </TableContainer>
-              </>
-            )}
-            <h3>最近轮次</h3>
-            {!selected.rounds.length && <p>暂无轮次</p>}
-            {selected.rounds.map((r) => (
-              <Link key={r.id} to={path + '/' + match + '/' + r.id}>
-                {r.tradingDate} · {arenaStatusLabel(r.outcome.state)}{' '}
-                {r.outcome.state === 'unopened' && arenaStatusLabel(r.outcome.reason)}
-              </Link>
-            ))}
-          </>
-        )}
-        {round && report.data && (
-          <>
-            <h3>{report.data.tradingDate} 轮次</h3>
-            {report.data.entries.length === 0 && <p>该轮没有模型决策。</p>}
-            {report.data.entries
-              .filter((e) => !entrant || e.entrantId === entrant)
-              .map((e) => (
-                <article
-                  id={'model-' + e.entrantId}
-                  key={e.entrantId}
-                  className="grid gap-1 border-b py-2"
-                >
-                  <h4>
-                    {e.providerId} / {e.model} · {arenaStatusLabel(e.state)}
-                  </h4>
-                  {e.decision?.actions.map((a) => (
-                    <div key={a.symbol}>
-                      <strong>
-                        {a.symbol} · {arenaActionLabel(a)}
-                      </strong>
-                      <p>{a.reason}</p>
-                      <p>失效条件 · {a.invalidatedBy}</p>
-                      {a.references.map((ref) => {
-                        const fact = report.data.facts.find((f) => f.ref === ref);
-                        return (
-                          fact && (
-                            <p key={ref}>
-                              {fact.symbol} · {fact.date} ·{' '}
-                              {fact.kind === 'daily_bar' ? '收盘 ' + fact.close : fact.title}
-                            </p>
-                          )
-                        );
-                      })}
-                    </div>
-                  ))}
-                  {e.requestId && (
-                    <p>
-                      模型费用 {arenaCostLabel(e)} · 请求 {e.requestId}
-                    </p>
-                  )}
-                  {Object.entries(e.executionReasons).map(([symbol, reason]) => (
-                    <p key={symbol}>
-                      {symbol} · {arenaStatusLabel(reason)}
-                    </p>
-                  ))}
-                  {e.fills.map((f) => (
-                    <p key={f.symbol}>
-                      {f.executedAt.slice(0, 10)} · {f.symbol} · 模拟
-                      {f.side === 'buy' ? '买入' : '卖出'} {f.quantity} 股 × {f.price} · 费用{' '}
-                      {f.fee}
-                    </p>
-                  ))}
-                </article>
-              ))}
-          </>
+        {control.match && control.selected && (
+          <ArenaDailyMatch
+            detail={control.selected}
+            comparison={control.comparison.data}
+            comparisonError={control.comparison.isError}
+            retryComparison={() => void control.comparison.refetch()}
+            view={control.navigation.view}
+            onViewChange={control.changeView}
+            onOpenLatest={control.openLatest}
+            activity={
+              <ArenaDailyActivity
+                detail={control.selected}
+                roundId={control.roundId}
+                modelId={control.navigation.modelId}
+                report={control.report.data}
+                loading={control.report.isPending && !control.refreshing}
+                error={control.report.isError}
+                invalid={control.invalid}
+                onRoundChange={(id) => control.changeNavigation({ view: 'activity', roundId: id })}
+                onModelChange={(id) => control.changeNavigation({ modelId: id })}
+                onClear={control.clearRecords}
+                onRetry={() => void control.report.refetch()}
+              />
+            }
+          />
         )}
       </ListRefreshRegion>
-    </section>
+    </>
   );
 }

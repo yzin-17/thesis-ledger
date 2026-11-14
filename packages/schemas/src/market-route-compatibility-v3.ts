@@ -312,6 +312,18 @@ const differingDimensions = (primary: MarketRoutePriceFactsV3, backup: MarketRou
   return dimensions;
 };
 
+function compatibilityIdentityMatches(
+  proof: z.infer<typeof marketRouteCompatibilityProofV3Schema>,
+  observation: z.infer<typeof marketRouteCompatibilityObservationV3Schema>,
+): boolean {
+  return !(
+    marketRouteKeyIdV3(proof.routeKey) !== marketRouteKeyIdV3(observation.routeKey) ||
+    targetId(proof.targets.primary) !== targetId(observation.targets.primary) ||
+    targetId(proof.targets.backup) !== targetId(observation.targets.backup) ||
+    proof.symbol !== observation.symbol
+  );
+}
+
 /** Pure fail-closed decision; proof creation and evidence authentication belong to producers. */
 export const assessMarketRouteCompatibilityV3 = (input: {
   proof: unknown;
@@ -332,12 +344,7 @@ export const assessMarketRouteCompatibilityV3 = (input: {
   if (now < Date.parse(proof.validFrom) || now >= Date.parse(proof.validUntil))
     return blocked('expired');
 
-  if (
-    marketRouteKeyIdV3(proof.routeKey) !== marketRouteKeyIdV3(observation.routeKey) ||
-    targetId(proof.targets.primary) !== targetId(observation.targets.primary) ||
-    targetId(proof.targets.backup) !== targetId(observation.targets.backup) ||
-    proof.symbol !== observation.symbol
-  )
+  if (!compatibilityIdentityMatches(proof, observation))
     return blocked('identity_mismatch');
 
   if (

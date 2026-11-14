@@ -290,24 +290,7 @@ export function qualifyLiveExperiment(raw: unknown, rawCases: unknown, rawEvalua
     evaluation.cases.some((entry) => !ids.has(entry.caseId))
   )
     throw new Error('封存评价必须精确覆盖固定集');
-  for (const entry of benchmark.cases) {
-    verifyAiFrozenResearchV2(entry.frozen);
-    if (entry.assumptions.start >= entry.assumptions.end) throw new Error('实验窗口无效');
-    const usable = entry.frozen.evidence.filter((item) => item.usable);
-    if (
-      entry.bindings.length !== usable.length ||
-      new Set(entry.ownedToolCallIds).size !== entry.ownedToolCallIds.length ||
-      new Set(entry.bindings.map((binding) => binding.audit.evidenceId)).size !== usable.length ||
-      entry.bindings.some(
-        (binding) =>
-          !entry.ownedToolCallIds.includes(binding.toolCallId) ||
-          !usable.some(
-            (item) => experimentFingerprint(item.audit) === experimentFingerprint(binding.audit),
-          ),
-      )
-    )
-      throw new Error('案例引用与成功工具绑定不一致');
-  }
+  verifyLiveBenchmarkBindings(benchmark);
   return { protocol, benchmark, evaluation };
 }
 
@@ -326,4 +309,25 @@ function verifyLiveScreeningCases(protocol: LiveExperimentProtocol, benchmark: L
   }
   if (protocol.caseIds.some((id) => !benchmark.cases.some((entry) => entry.id === id)))
     throw new Error('筛查案例不属于封存原基准');
+}
+
+function verifyLiveBenchmarkBindings(benchmark: LiveBenchmark) {
+  for (const entry of benchmark.cases) {
+    verifyAiFrozenResearchV2(entry.frozen);
+    if (entry.assumptions.start >= entry.assumptions.end) throw new Error('实验窗口无效');
+    const usable = entry.frozen.evidence.filter((item) => item.usable);
+    if (
+      entry.bindings.length !== usable.length ||
+      new Set(entry.ownedToolCallIds).size !== entry.ownedToolCallIds.length ||
+      new Set(entry.bindings.map((binding) => binding.audit.evidenceId)).size !== usable.length ||
+      entry.bindings.some(
+        (binding) =>
+          !entry.ownedToolCallIds.includes(binding.toolCallId) ||
+          !usable.some(
+            (item) => experimentFingerprint(item.audit) === experimentFingerprint(binding.audit),
+          ),
+      )
+    )
+      throw new Error('案例引用与成功工具绑定不一致');
+  }
 }

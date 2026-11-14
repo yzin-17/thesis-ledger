@@ -168,6 +168,20 @@ export const calculateBacktestV3BenchmarkReturn = (input: {
   }
 };
 
+type ExecutionModelBenchmarkCostVersion =
+  | typeof benchmarkExecutionModelCostVersionV3
+  | typeof wholeShareWindowBenchmarkCostVersionV3
+  | typeof researchLotShareWindowBenchmarkCostVersionV3;
+const isExecutionModelBenchmarkCostVersion = (
+  version: BacktestSnapshotManifestV3['benchmarkCostVersion'],
+): version is ExecutionModelBenchmarkCostVersion =>
+  version === benchmarkExecutionModelCostVersionV3 ||
+  version === wholeShareWindowBenchmarkCostVersionV3 ||
+  version === researchLotShareWindowBenchmarkCostVersionV3;
+const isSupportedBenchmarkCostVersion = (
+  version: BacktestSnapshotManifestV3['benchmarkCostVersion'],
+) => version === undefined || isExecutionModelBenchmarkCostVersion(version);
+
 export const resolveBacktestV3BenchmarkCost = (input: {
   runConfig: RunConfigV3;
   strategy: BacktestStrategy;
@@ -177,11 +191,7 @@ export const resolveBacktestV3BenchmarkCost = (input: {
   lastOccurredAt: string;
   costVersion?: BacktestSnapshotManifestV3['benchmarkCostVersion'];
 }): BacktestV3BenchmarkCostResolution => {
-  if (
-    input.costVersion !== undefined &&
-    input.costVersion !== benchmarkExecutionModelCostVersionV3 && input.costVersion !== wholeShareWindowBenchmarkCostVersionV3 &&
-    input.costVersion !== researchLotShareWindowBenchmarkCostVersionV3
-  ) {
+  if (!isSupportedBenchmarkCostVersion(input.costVersion)) {
     return unavailable('BENCHMARK_COST_VERSION_UNSUPPORTED');
   }
   const modelInput = input.runConfig.executionModel;
@@ -223,8 +233,7 @@ export const resolveBacktestV3BenchmarkCost = (input: {
 
   let assumption: BenchmarkCostReport;
   let identityAssumption: BacktestBenchmarkCostAssumption | undefined;
-  if (input.costVersion === benchmarkExecutionModelCostVersionV3 || input.costVersion === wholeShareWindowBenchmarkCostVersionV3 ||
-    input.costVersion === researchLotShareWindowBenchmarkCostVersionV3) {
+  if (isExecutionModelBenchmarkCostVersion(input.costVersion)) {
     assumption = {
       kind: 'execution-model',
       version: input.costVersion,
@@ -232,7 +241,9 @@ export const resolveBacktestV3BenchmarkCost = (input: {
         scope: model.scope,
         accountingBasis: input.runConfig.executionPriceProtocol.accountingBasis,
         slippageRate: input.strategy.cost.slippageRate,
-        ...(input.costVersion === researchLotShareWindowBenchmarkCostVersionV3 ? { researchLotSize: modelInput.researchLotSize } : {}),
+        ...(input.costVersion === researchLotShareWindowBenchmarkCostVersionV3
+          ? { researchLotSize: modelInput.researchLotSize }
+          : {}),
         segments: model.segments.map((segment) => ({
           range: segment.range,
           mode: segment.execution.mode,
@@ -271,12 +282,22 @@ export const resolveBacktestV3BenchmarkCost = (input: {
   }
 
   let calculate = calculateBacktestV3BenchmarkReturn;
-  if (input.costVersion === wholeShareWindowBenchmarkCostVersionV3) calculate = calculateWholeShareBenchmarkReturnV3;
+  if (input.costVersion === wholeShareWindowBenchmarkCostVersionV3)
+    calculate = calculateWholeShareBenchmarkReturnV3;
   if (input.costVersion === researchLotShareWindowBenchmarkCostVersionV3) {
     const lot = modelInput.researchLotSize;
-    if (!lot || currency !== 'HKD') return unavailable('BENCHMARK_LOT_RESEARCH_PRESET_UNAVAILABLE', assumption, identityAssumption);
-    calculate = values => calculateWholeShareBenchmarkReturnV3(values,
-      { sharesPerLot: lot.sharesPerLot, currency: 'HKD', priceScale: '1000' });
+    if (!lot || currency !== 'HKD')
+      return unavailable(
+        'BENCHMARK_LOT_RESEARCH_PRESET_UNAVAILABLE',
+        assumption,
+        identityAssumption,
+      );
+    calculate = (values) =>
+      calculateWholeShareBenchmarkReturnV3(values, {
+        sharesPerLot: lot.sharesPerLot,
+        currency: 'HKD',
+        priceScale: '1000',
+      });
   }
   const result = calculate({
     initialCash,

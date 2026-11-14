@@ -118,7 +118,7 @@ async function initializeApplicationRole(containerName: string) {
   const permissionsSql = await import('node:fs/promises').then(({ readFile }) =>
     readFile(
       process.env.BACKTEST_RECOVERY_APP_ROLE_SQL ??
-        '/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra/scripts/bootstrap-app-role.sql',
+        new URL('../../../../infra/docker/bootstrap-app-role.sql', import.meta.url),
       'utf8',
     ),
   );

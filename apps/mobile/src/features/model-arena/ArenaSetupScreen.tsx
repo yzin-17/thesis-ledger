@@ -9,6 +9,7 @@ import {
   arenaChoice,
   copyArenaGroup,
   saveArenaSetup,
+  validateArenaSetup,
   type ArenaChoice,
   type ArenaBinding,
 } from '@thesis-ledger/api-client';
@@ -16,8 +17,10 @@ import type { ArenaProtocol } from '@thesis-ledger/schemas';
 import type { StrategyStackParams } from '../../app/strategy-navigation';
 import { useMobileRuntime } from '../../app/MobileRuntime';
 import { useMobileIdentity } from '../../app/query/use-mobile-identity';
-import { Page, Section, Copy, Action, Field, QueryStatus } from '../../components/MobilePrimitives';
+import { Page, ContentSection as Section, Copy, Action, Field, Feedback, QueryStatus, failureMessage } from '../../components/MobilePrimitives';
 import { InstrumentPicker } from '../market/InstrumentPicker';
+import { ArenaModelSelector } from './ArenaModelSelector';
+import { useArenaSetupFeedback } from './useArenaSetupFeedback';
 type Props = NativeStackScreenProps<StrategyStackParams, 'ArenaSetup'>;
 export function ArenaSetupScreen({ navigation }: Props) {
   const identity = useMobileIdentity(),
@@ -36,6 +39,7 @@ function Setup({ owner, navigation }: { owner: string; navigation: Props['naviga
   const [form, setForm] = useState(arenaInitialForm),
     [currency, setCurrency] = useState<ArenaProtocol['budgetCurrency']>('USD'),
     [pool, setPool] = useState<ArenaChoice[]>([]),
+    [names, setNames] = useState<Record<string, string>>({}),
     [models, setModels] = useState<ArenaBinding[]>([]),
     [error, setError] = useState('');
   const root = [...scope, 'arena', owner];
@@ -51,33 +55,45 @@ function Setup({ owner, navigation }: { owner: string; navigation: Props['naviga
     try {
       setPool(arenaMerge(pool, items));
       setError('');
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     }
   };
   const group = useMutation({
-    mutationFn: (id: string) => copyArenaGroup(api, id),
+    mutationFn: (id: string) => copyArenaGroup(api, id, (symbol, name) => setNames((previous) => ({ ...previous, [symbol]: name }))),
     onSuccess: add,
   });
+  const input = { form, pool, models, currency }, signature = JSON.stringify(input);
+  const validation = validateArenaSetup(form, pool, models, currency);
   const save = useMutation({
-    mutationFn: () => saveArenaSetup(api, form, pool, models, currency),
+    mutationFn: (value: typeof input & { signature: string }) => saveArenaSetup(api, value.form, value.pool, value.models, value.currency),
     onSuccess: async (r) => {
       await client.invalidateQueries({ queryKey: root });
       navigation.replace('ModelArena', { match: r.id });
     },
   });
+  const feedback = useArenaSetupFeedback(signature, validation.errors, save.error, save.variables?.signature, false), errors = feedback.errors;
   const choices = arenaModels(providers.data ?? []);
   return (
     <Page title="新建模拟比赛">
       <InstrumentPicker
         purpose="browse"
+        accepts={(item) => Boolean(arenaChoice(item))}
+        selection={{
+          items: pool.map((item) => ({ id: item.instrumentId, symbol: item.symbol, displayName: names[item.symbol] ?? item.symbol })),
+          onRemove: (id) => setPool(pool.filter((item) => item.instrumentId !== id)),
+        }}
         onConfirmed={(i) => {
           const c = arenaChoice(i);
-          if (c) add([c]);
-          else setError('请选择股票或 ETF');
+          if (!c || !add([c])) return false;
+          setNames((previous) => ({ ...previous, [i.symbol]: i.displayName }));
+          return true;
         }}
       />
       <Section title="标的池">
+        <Feedback error message={errors.instruments || error || (group.error ? failureMessage(group.error) : null)} />
         {groups.data?.groups.map((g) => (
           <Action
             key={g.id}
@@ -86,34 +102,12 @@ function Setup({ owner, navigation }: { owner: string; navigation: Props['naviga
             onPress={() => group.mutate(g.id)}
           />
         ))}
-        {pool.map((i) => (
-          <Action
-            key={i.instrumentId}
-            label={'移除 ' + i.symbol}
-            onPress={() => setPool(pool.filter((s) => s.instrumentId !== i.instrumentId))}
-          />
-        ))}
       </Section>
       <Section title="参赛模型">
         <QueryStatus query={providers} retry={() => void providers.refetch()} />
         {providers.isSuccess && !choices.length && <Copy>请先验证模拟交易决策路由。</Copy>}
-        {choices.map((m) => {
-          const has = models.some((s) => s.model === m.model && s.providerId === m.providerId);
-          return (
-            <Action
-              key={JSON.stringify(m)}
-              primary={has}
-              label={m.providerId + ' / ' + m.model}
-              onPress={() =>
-                setModels(
-                  has
-                    ? models.filter((s) => s.model !== m.model || s.providerId !== m.providerId)
-                    : [...models, m],
-                )
-              }
-            />
-          );
-        })}
+        {(choices.length > 0 || models.length > 0) && <ArenaModelSelector choices={choices} value={models} onChange={setModels} />}
+        <Feedback error message={errors.models} />
       </Section>
       <Section title="赛制与额度">
         {(['USD', 'CNY', 'HKD'] as const).map((c) => (
@@ -124,22 +118,22 @@ function Setup({ owner, navigation }: { owner: string; navigation: Props['naviga
             onPress={() => setCurrency(c)}
           />
         ))}
+        <Feedback error message={errors.budgetCurrency} />
         {arenaSetupFields.map(([key, label]) => (
           <Field
             key={key}
             label={label}
+            error={errors[key]}
             value={form[key]}
             onChange={(v) => setForm({ ...form, [key]: v })}
           />
         ))}
       </Section>
-      {(error || group.error || save.error) && (
-        <Copy>{error || group.error?.message || save.error?.message}</Copy>
-      )}
+      <Feedback error message={errors.form || (feedback.requestError ? failureMessage(feedback.requestError) : null)} />
       <Action
         label="保存比赛草稿"
         disabled={save.isPending || group.isPending}
-        onPress={() => save.mutate()}
+        onPress={() => { if (feedback.beginSubmit()) save.mutate({ ...input, signature }); }}
       />
     </Page>
   );

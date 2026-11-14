@@ -63,7 +63,8 @@ describe('StrategyRiskApplicationService update', () => {
 
     expect(store.syncFrozenRuleState).toHaveBeenCalledWith(expect.anything(), applicationId, {
       enabled: true,
-      severity: 'warning',
+      notification: { enabled: false, cooldownMinutes: 30, severity: 'warning', channels: [] },
+      plan: current.plan,
       revision: 2,
       enabledChanged: false,
     });

@@ -29,6 +29,7 @@ import { TradesScreen } from '../features/portfolio/TradesScreen';
 import { TradeDetailScreen } from '../features/portfolio/TradeDetailScreen';
 import { MarketNavigator } from './MarketNavigator';
 import { ResearchNavigator } from './ResearchNavigator';
+import { ArenaNavigator } from './ArenaNavigator';
 import { SettingsNavigator } from './SettingsNavigator';
 import { Choices, ui } from '../components/MobilePrimitives';
 const Tabs = createBottomTabNavigator<RootTabParams>();
@@ -155,6 +156,7 @@ function NavigationFrame() {
               },
               Market: 'market',
               Research: { screens: { ResearchHome: 'research', Journal: 'review' } },
+              Arena: { screens: { ArenaHome: 'arena', ArenaMatch: 'arena/:match' } },
               Settings: { screens: { SettingsHome: 'settings' } },
             },
           },
@@ -168,6 +170,7 @@ function NavigationFrame() {
           <Tabs.Screen name="Accounts" component={AccountNavigator} />
           <Tabs.Screen name="Market" component={MarketNavigator} />
           <Tabs.Screen name="Research" component={ResearchNavigator} />
+          <Tabs.Screen name="Arena" component={ArenaNavigator} />
           <Tabs.Screen name="Settings" component={SettingsNavigator} />
         </Tabs.Navigator>
       </NavigationContainer>

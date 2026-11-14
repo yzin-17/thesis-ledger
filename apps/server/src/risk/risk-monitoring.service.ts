@@ -1,4 +1,11 @@
-import { Injectable, Logger, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Optional,
+  type OnModuleInit,
+  type OnModuleDestroy,
+} from '@nestjs/common';
+import { StrategyRiskMonitoringService } from './strategy-risk-monitoring.service.js';
 import {
   MarketObservationsService,
   observationStream,
@@ -27,12 +34,12 @@ export class RiskMonitoringService implements OnModuleInit, OnModuleDestroy {
     private readonly rules: RiskRuleService,
     private readonly risk: RiskService,
     private readonly valuation: RiskValuationContextService,
+    @Optional() private readonly strategyMonitoring?: StrategyRiskMonitoringService,
   ) {}
 
   onModuleInit() {
     if (loadConfig().environment === 'test') return;
-    // This drains an existing-data journal and reconciles rule lifecycle only.
-    // It never fetches/polls a quote and never repeatedly scans unchanged data.
+    // 普通规则消费已有观察流；策略应用由独立检查窗口调度。
     this.timer = setInterval(() => void this.runNow(), 1000);
     this.timer.unref();
     void this.runNow();
@@ -55,23 +62,13 @@ export class RiskMonitoringService implements OnModuleInit, OnModuleDestroy {
       let state: ConsumerState;
       if (raw) state = JSON.parse(raw) as ConsumerState;
       else {
-        const tail = await this.redis.client.xrevrange(observationStream, '+', '-', 'COUNT', 1);
-        state = {
-          cursor: tail[0]?.[0] ?? '0-0',
-          rules: '',
-          rows: await this.observations.snapshots(),
-        };
+        state = await this.snapshotCheckpoint();
       }
       const first = await this.redis.client.xrange(observationStream, '-', '+', 'COUNT', 1);
       if (state.cursor !== '0-0' && first[0] && this.checkpointTrimmed(first[0][0], state.cursor)) {
         // The bounded journal no longer contains the checkpoint. Resume from
         // current snapshots and disclose that unobserved crossings cannot replay.
-        const tail = await this.redis.client.xrevrange(observationStream, '+', '-', 'COUNT', 1);
-        state = {
-          cursor: tail[0]?.[0] ?? '0-0',
-          rules: '',
-          rows: await this.observations.snapshots(),
-        };
+        state = await this.snapshotCheckpoint();
         await this.redis.client.hset(
           redisKey('cache', 'risk-monitoring-health'),
           'gapAt',
@@ -79,6 +76,7 @@ export class RiskMonitoringService implements OnModuleInit, OnModuleDestroy {
         );
       }
       const enabled = await this.rules.listEnabledRules();
+      await this.strategyMonitoring?.runNow(enabled, evaluationTime());
       const signature = enabled
         .map((r) => `${r.id}:${r.version}`)
         .sort()
@@ -127,6 +125,15 @@ export class RiskMonitoringService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async snapshotCheckpoint(): Promise<ConsumerState> {
+    const tail = await this.redis.client.xrevrange(observationStream, '+', '-', 'COUNT', 1);
+    return {
+      cursor: tail[0]?.[0] ?? '0-0',
+      rules: '',
+      rows: await this.observations.snapshots(),
+    };
+  }
+
   private checkpointTrimmed(first: string, cursor: string) {
     const [firstTime = 0n, firstSequence = 0n] = first.split('-').map(BigInt);
     const [lastTime = 0n, lastSequence = 0n] = cursor.split('-').map(BigInt);
@@ -146,7 +153,20 @@ export class RiskMonitoringService implements OnModuleInit, OnModuleDestroy {
     const ruleIds = rules
       .filter((r) => !r.sourcePlanId && observedDataRuleKinds.has(r.kind))
       .map((r) => r.id);
-    if (!ruleIds.length) return;
+    if (!ruleIds.length) {
+      await this.redis.client.hset(
+        redisKey('cache', 'risk-monitoring-health'),
+        'missingPrices',
+        '0',
+        'delayedPrices',
+        '0',
+        'inputUnavailable',
+        '0',
+        'inputReason',
+        '',
+      );
+      return;
+    }
     const source = riskObservedSource(rows, now);
     for (const mode of ['actual', 'shadow'] as const) {
       const { contexts } = await this.valuation.build(mode, now.toISOString(), source);

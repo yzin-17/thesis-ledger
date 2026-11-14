@@ -1,4 +1,4 @@
-import { aiGenerationContracts } from '@thesis-ledger/schemas';
+import { aiGenerationContracts, optimizationRetryStateSchema } from '@thesis-ledger/schemas';
 import { assertGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
@@ -15,13 +15,13 @@ import { PrismaService } from '../platform/prisma.service.js';
 import {
   asJson,
   optimizationSha256,
-  toRecord,
   type CandidateRow,
   type ExperimentRow,
   type StrategyVersionRecord,
 } from './strategy-optimization-common.js';
 import { applyOptimizationProposal, proposalDiff } from './strategy-optimization-parameters.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
+import { evaluateOptimizationCandidate } from './strategy-optimization-candidate-evaluation.js';
 import type { OptimizationModelRoute } from './strategy-optimization-model-routing.js';
 import {
   discoveryCandidateDiff,
@@ -38,7 +38,7 @@ import {
   type OptimizationStepRow,
 } from './strategy-optimization-attempt-lifecycle.js';
 import { StrategyOptimizationSdkExecutor } from './strategy-optimization-sdk-executor.js';
-import { strategyOptimizationPrompt } from './strategy-optimization-prompt.js';
+import { strategyOptimizationPrompt, STRATEGY_OPTIMIZATION_PROMPT_VERSION } from './strategy-optimization-prompt.js';
 import {
   reusableOptimizationSdkCache,
   type OptimizationSdkCacheIdentity,
@@ -73,10 +73,12 @@ export class StrategyOptimizationCandidateService {
     return rows[0] ?? null;
   }
 
-  private async assertNoUnknownOutcome(experimentId: string, modelKey: string) {
+  private async assertNoUnknownOutcome(experiment: ExperimentRow, modelKey: string) {
+    const allowed = optimizationRetryStateSchema.parse(experiment.retryState ?? {}).allowedUnknownAttemptIds;
     const rows = await this.prisma.$queryRaw<Array<{ id: string; attempt: number }>>(Prisma.sql`
       SELECT "id", "attempt" FROM "OptimizationAttempt"
-      WHERE "experimentId"=${experimentId}::uuid AND "modelKey"=${modelKey} AND "status"='unknown_outcome'
+      WHERE "experimentId"=${experiment.id}::uuid AND "modelKey"=${modelKey} AND "status"='unknown_outcome'
+        AND NOT ("id"::text = ANY(${allowed}::text[]))
       ORDER BY "attempt" ASC LIMIT 1
     `);
     const blocked = rows[0];
@@ -86,8 +88,9 @@ export class StrategyOptimizationCandidateService {
       );
   }
 
-  private async reserveStep(experimentId: string, modelKey: string, round: number) {
-    await this.assertNoUnknownOutcome(experimentId, modelKey);
+  private async reserveStep(experiment: ExperimentRow, modelKey: string, round: number) {
+    const experimentId = experiment.id;
+    await this.assertNoUnknownOutcome(experiment, modelKey);
     await this.prisma.$executeRaw(Prisma.sql`
       INSERT INTO "OptimizationAttempt" ("experimentId", "modelKey", "attempt", "status")
       VALUES (${experimentId}::uuid, ${modelKey}, ${round}, 'reserved')
@@ -144,6 +147,7 @@ export class StrategyOptimizationCandidateService {
           inputTokens: input.inputTokenReservation,
           outputTokens: input.outputTokenReservation,
           estimatedCost: input.estimatedCost,
+          executionAttempt: input.experiment.executionAttempt,
         },
         transaction,
       );
@@ -151,7 +155,7 @@ export class StrategyOptimizationCandidateService {
         data: {
           provider: input.route.provider,
           model: input.route.model,
-          promptVersion: 'strategy-optimization-v1',
+          promptVersion: STRATEGY_OPTIMIZATION_PROMPT_VERSION,
           status: 'running',
           startedAt: now,
           claimedAt: now,
@@ -189,7 +193,7 @@ export class StrategyOptimizationCandidateService {
     estimatedCost: number;
     sdkCacheIdentity: OptimizationSdkCacheIdentity | null;
   }) {
-    let current = await this.reserveStep(input.experiment.id, input.modelKey, input.round);
+    let current = await this.reserveStep(input.experiment, input.modelKey, input.round);
     if (current.status === 'succeeded') {
       if (!current.aiRunId) throw stepError('已完成优化步骤缺少 AiRun');
       const continuationBlockedReason = await reusableOptimizationSdkCache(
@@ -338,7 +342,7 @@ export class StrategyOptimizationCandidateService {
       data: {
         strategyId: baseline.strategyId,
         version: await this.nextNegativeVersion(baseline.strategyId),
-        schemaVersion: 2,
+        schemaVersion: Number(strategy.schemaVersion),
         schema: asJson(strategy),
       },
     });
@@ -384,46 +388,6 @@ export class StrategyOptimizationCandidateService {
     return rows[0]!;
   }
 
-  private async persistEvaluation(
-    candidate: CandidateRow,
-    runRefs: Record<string, string>,
-    metrics: Record<string, unknown>,
-  ) {
-    const development = toRecord(metrics.development);
-    const validation = toRecord(metrics.validation);
-    const valid = development.status === 'valid' && validation.status === 'valid';
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE "OptimizationCandidate"
-      SET "runRefs"=${JSON.stringify(runRefs)}::jsonb, "metrics"=${JSON.stringify(metrics)}::jsonb,
-          "validationStatus"=${valid ? 'valid' : 'invalid'}
-      WHERE "id"=${candidate.id}::uuid
-    `);
-    return { ...candidate, runRefs, metrics, validationStatus: valid ? 'valid' : 'invalid' };
-  }
-
-  private async evaluateCandidate(experiment: ExperimentRow, candidate: CandidateRow) {
-    const fingerprints = toRecord(experiment.frozenDataFingerprints);
-    const development = await this.runs.evaluateCandidateSplit(
-      experiment,
-      candidate.candidateStrategyVersionId,
-      candidate.id,
-      'development',
-      fingerprints.development,
-    );
-    const validation = await this.runs.evaluateCandidateSplit(
-      experiment,
-      candidate.candidateStrategyVersionId,
-      candidate.id,
-      'validation',
-      fingerprints.validation,
-    );
-    return this.persistEvaluation(
-      candidate,
-      { development: development.run.id, validation: validation.run.id },
-      { development: development.summary, validation: validation.summary },
-    );
-  }
-
   async createAndEvaluateCandidate(
     experiment: ExperimentRow,
     baseline: StrategyVersionRecord & { strategy: BacktestStrategy },
@@ -453,7 +417,7 @@ export class StrategyOptimizationCandidateService {
       executionHash,
     );
     return {
-      candidate: await this.evaluateCandidate(experiment, candidate),
+      candidate: await evaluateOptimizationCandidate(this.prisma, this.runs, experiment, candidate),
       duplicate: false,
     };
   }

@@ -3,7 +3,11 @@ import { cn } from '@/lib/utils';
 import { ListRefreshRegion } from './list-refresh-region';
 
 type TableFrame = 'outlined' | 'plain';
-type RefreshProps = { refreshing?: boolean | undefined; refreshLabel?: string | undefined; refreshAvoidText?: boolean | undefined };
+type RefreshProps = {
+  refreshing?: boolean | undefined;
+  refreshLabel?: string | undefined;
+  refreshAvoidText?: boolean | undefined;
+};
 
 function TableContainer({
   className,
@@ -64,7 +68,13 @@ function Table({
 }
 
 function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
-  return <thead data-slot="table-header" className={cn('bg-muted [&_tr]:border-b', className)} {...props} />;
+  return (
+    <thead
+      data-slot="table-header"
+      className={cn('bg-muted [&_tr]:border-b', className)}
+      {...props}
+    />
+  );
 }
 
 function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
@@ -117,7 +127,10 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
   return (
     <td
       data-slot="table-cell"
-      className={cn('px-3 py-2 text-left align-middle whitespace-nowrap', className)}
+      className={cn(
+        'px-3 py-2 text-left align-middle whitespace-nowrap text-foreground',
+        className,
+      )}
       {...props}
     />
   );

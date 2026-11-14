@@ -298,6 +298,9 @@ importers:
       '@nestjs/cli':
         specifier: ^11.0.10
         version: 11.0.24(@types/node@24.13.3)(lightningcss@1.33.0)(prettier@3.9.6)
+      '@thesis-ledger/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
       '@types/express':
         specifier: ^5.0.3
         version: 5.0.6

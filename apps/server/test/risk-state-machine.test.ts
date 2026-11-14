@@ -281,6 +281,9 @@ describe('风险扫描状态机', () => {
     ).toEqual([accountA, accountB]);
   });
 
+});
+
+describe("峰值、生命周期与下穿状态", () => {
   it('首次观察只建立峰值；下穿只触发一次，恢复后允许下一次下穿', async () => {
     const { service, prisma } = createService([trailingRule(ruleA, 0.1)]);
 
@@ -331,6 +334,9 @@ describe('风险扫描状态机', () => {
     ).toEqual([ruleA, ruleB]);
   });
 
+});
+
+describe("并发去重及受影响账户", () => {
   it('并发扫描和重复 scanId 只创建一个风险事件', async () => {
     const { service, prisma } = createService([trailingRule(ruleA, 0.1)]);
     await service.scan([context(120, positionA, 1)]);
@@ -366,6 +372,9 @@ describe('风险扫描状态机', () => {
     expect((data.context as StoredState).affectedAccountIds).toEqual([accountA, accountB]);
   });
 
+});
+
+describe("陈旧、缺价与持续越界", () => {
   it('允许陈旧数据时跳过价格规则，严格模式仍拒绝', async () => {
     const rule = {
       id: ruleA,
@@ -417,6 +426,9 @@ describe('风险扫描状态机', () => {
     expect(prisma.riskEvent.create).toHaveBeenCalledTimes(1);
   });
 
+});
+
+describe("通知失败的原事件重试", () => {
   it('通知失败后复用原事件重试，不创建第二条事件', async () => {
     const rule = {
       id: ruleA,

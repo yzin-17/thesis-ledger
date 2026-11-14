@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
+    "@thesis-ledger/api-client": "workspace:*",
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.1.0",
