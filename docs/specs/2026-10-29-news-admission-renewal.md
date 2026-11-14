@@ -6,7 +6,7 @@
 
 ## 合同
 
-- AC1：沿用infra的nvidia-news-admission.mjs，新增互斥的显式renew-existing模式；仅hithink-timeline／600519.SH／CN.STOCK.NEWS_SEARCH，valid-hours必须为1，必须提供旧版本和整行摘要。
+- AC1：使用 DSA 的 `scripts/local-runtime/news-admission.mjs --source=hithink-timeline`，提供互斥的显式 `--renew-existing` 模式；仅 `hithink-timeline / 600519.SH / CN.STOCK.NEWS_SEARCH`，`--valid-hours` 必须为 1，必须提供旧版本和整行摘要。
 - AC2：仅续验原admitted且未撤销、已经到期的记录；适配器／来源／凭据版本一致，来源仍启用。新日期窗口为最近七日且不得超出原审阅日期范围。新来源证据须在十五分钟内实读、摘要及元数据解析通过。
 - AC3：独立SQLite事务内持锁复核旧记录与来源／凭据，版本原子递增。仅更改日期范围、有效时间和证据审计字段；旧证据原样保留，新证据绑定旧整行与摘要。其他准入、政策、凭据和业务表不变。
 - AC4：默认只生成计划；apply显式写入，verify只读反验且文件不变。旧首次登记与日期扩展行为保持，目标身份、持久卷与正式更新锁校验保持。

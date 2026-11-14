@@ -4,7 +4,7 @@
 
 按用户授权，将已验证的 `yfinance.Search.news` 接入现有新闻 V3、Market 和 Web，补充 DG3 的真实消费证据。复用 [HiThink 与 Yahoo 验证](../archive/reviews/2026-10-22-hithink-yahoo-news-final-review.md)及原 DG3 证据；当前执行状态由[配套任务](../archive/tasks/2026-10-22-yahoo-news-dg3.md)持有。
 
-仅增加既有 `yfinance` 来源的 US/STOCK/NEWS_SEARCH 绑定 `yahoo-search-news`。本次首次准入限定已经核验的 `NVDA.US` 和近期日期窗口，最多七天，不自动扩大或续期。US 新闻路线以 Yahoo 为首源，保留原 NVIDIA 官方订阅备用；其余路线及 HiThink、AKShare、Tushare 配置不变。AAPL 的既有 SDK 验证继续有效，但不据此自动登记其他标的准入。
+仅增加既有 `yfinance` 来源的 US/STOCK/NEWS_SEARCH 绑定 `yahoo-search-news`。本次首次准入限定已经核验的 `NVDA.US` 和近期日期窗口，最多七天，不自动扩大或续期。US 新闻路线以 Yahoo 为首源；其余路线及 HiThink、AKShare、Tushare 配置不变。AAPL 的既有 SDK 验证继续有效，但不据此自动登记其他标的准入。
 
 不调用 `Ticker.get_news`，不获取文章正文，不调用模型或开启研究写入；研究 G3 仍由原任务和预算授权控制。依赖、数据库结构、凭据及镜像输入不变，使用正式代码同步入口，保留全部现有数据。
 
@@ -28,4 +28,4 @@
 
 ## 回退与证据复用
 
-通过现有政策编辑移除 Yahoo 新闻目标即可停止选择该来源；源码回退仍使用正式入口，不删除准入审计或业务数据。原 HiThink/AKShare/NVIDIA 实源、共享合同及未改 Server 的验收按实际输入复用，本次补 Yahoo 适配、受影响门禁、目标联通和保全差集；不以健康状态替代部署或业务验收。
+通过现有政策编辑移除 Yahoo 新闻目标即可停止选择该来源；源码回退仍使用正式入口，不删除准入审计或业务数据。原 HiThink/AKShare 实源、共享合同及未改 Server 的验收按实际输入复用，本次补 Yahoo 适配、受影响门禁、目标联通和保全差集；不以健康状态替代部署或业务验收。

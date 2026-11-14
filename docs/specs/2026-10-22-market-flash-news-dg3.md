@@ -8,7 +8,7 @@
 
 ## 稳定合同与边界
 
-- 两个接口是市场快讯流：财联社保留全市场电报，华尔街见闻保留 A 股频道；`market: CN` 表示消费路由范围，不表示逐条内容均为 A 股新闻。原文未提供可靠的逐条证券关联，因此新增 `NEWS_FEED` / `news-feed-v1`，响应不伪造个股关联。现有 `NEWS_SEARCH` / `news-search-v1`、HiThink、东方财富、Yahoo Finance 和 NVIDIA 个股路径保持兼容。
+- 两个接口是市场快讯流：财联社保留全市场电报，华尔街见闻保留 A 股频道；`market: CN` 表示消费路由范围，不表示逐条内容均为 A 股新闻。原文未提供可靠的逐条证券关联，因此新增 `NEWS_FEED` / `news-feed-v1`，响应不伪造个股关联。现有 `NEWS_SEARCH` / `news-search-v1`、HiThink、东方财富和 Yahoo Finance 个股路径保持兼容。
 - DSA 认证入口为 `/api/v3/thesis-ledger/market/news-feed`，Server 入口为 `/api/market-data/news-feed`。市场范围内部使用 `CN.STOCK` 作为准入作用域标识，公开 DTO 使用 `market: CN`；该标识不是证券代码。
 - 两个独立 Provider 为 `cls` / `cls-roll`、`wallstreetcn` / `wallstreetcn-a-stock`。精确键为 `CN/STOCK/NEWS_FEED`。保持最多两个路由目标；可按已配置 Provider 明确选择来源，不能绕过当前策略、启停、版本或准入。
 - 新来源默认关闭。本轮经正式配置入口启用两个来源，只新增上述快讯路由；当前其他路由、已有账号、Tushare 120 分、AI 暂停、研究写入及预算边界保持。

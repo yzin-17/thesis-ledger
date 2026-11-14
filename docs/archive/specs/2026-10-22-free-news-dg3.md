@@ -1,6 +1,8 @@
 # 免费官方新闻与 DG3 接入规格
 
-本规格承接 [DSA 新闻合同](../../../daily-stock-analysis/docs/specs/2026-10-18-data-only-service.md)，实施见[已完成任务](../archive/tasks/2026-10-22-free-news-dg3.md)与[最终复核](../archive/reviews/2026-10-22-free-news-dg3-final-review.md)。DG3 的完成记录由 DSA 原 Task 持有，研究 G3 的模型与发布门禁保持独立。
+本规格记录 2026-10-22 的历史接入，所述来源已退役，不能作为当前实现或准入依据。退役结果见[来源删除](2026-11-09-remove-nvidia-news.md)，宿主工具收敛见[清理合同](../../../../daily-stock-analysis/docs/specs/2026-11-14-news-admission-cleanup.md)。
+
+本规格承接 [DSA 新闻合同](../../../../daily-stock-analysis/docs/specs/2026-10-18-data-only-service.md)，实施见[已完成任务](../tasks/2026-10-22-free-news-dg3.md)与[最终复核](../reviews/2026-10-22-free-news-dg3-final-review.md)。DG3 的完成记录由 DSA 原 Task 持有，研究 G3 的模型与发布门禁保持独立。
 
 ## 来源与范围
 

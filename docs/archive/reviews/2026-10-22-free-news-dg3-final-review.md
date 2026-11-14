@@ -1,6 +1,6 @@
 # 免费官方新闻与 DG3 最终复核
 
-2026-10-22，主线程完成[现行规格](../../specs/2026-10-22-free-news-dg3.md)的七项断言。实施及独立目标结果见[完整新闻证据](../../../../daily-stock-analysis/docs/evidence/2026-10-18-data-only-service-news-contract.md#dg3-free-news-20261022)，[本次任务](../tasks/2026-10-22-free-news-dg3.md)和 [DSA 任务](../../../../daily-stock-analysis/docs/archive/tasks/2026-10-18-data-only-service.md#dg3-free-news-complete)完成后归档。
+2026-10-22，主线程完成[历史规格](../specs/2026-10-22-free-news-dg3.md)的七项断言。实施及独立目标结果见[完整新闻证据](../../../../daily-stock-analysis/docs/evidence/2026-10-18-data-only-service-news-contract.md#dg3-free-news-20261022)，[本次任务](../tasks/2026-10-22-free-news-dg3.md)和 [DSA 任务](../../../../daily-stock-analysis/docs/archive/tasks/2026-10-18-data-only-service.md#dg3-free-news-complete)完成后归档。
 
 | 断言             | 复核结论与证据层级                                                                                                                                                                                                                                                                                                                                     |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

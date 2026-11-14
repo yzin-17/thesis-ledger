@@ -2,7 +2,7 @@
 
 > 状态：2026-10-22，F1～F4 与七项 AC 均完成，最终复核后归档。
 
-关联[现行规格](../../specs/2026-10-22-free-news-dg3.md)、[最终复核](../reviews/2026-10-22-free-news-dg3-final-review.md)及 [DSA 完成记录](../../../../daily-stock-analysis/docs/archive/tasks/2026-10-18-data-only-service.md#dg3-free-news-complete)。主线程保留既有修改和数据，未提交、推送或调用模型。
+关联[历史规格](../specs/2026-10-22-free-news-dg3.md)、[最终复核](../reviews/2026-10-22-free-news-dg3-final-review.md)及 [DSA 完成记录](../../../../daily-stock-analysis/docs/archive/tasks/2026-10-18-data-only-service.md#dg3-free-news-complete)。主线程保留既有修改和数据，未提交、推送或调用模型。
 
 ## 完成记录
 

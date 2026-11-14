@@ -10,7 +10,7 @@
 
 ## 范围与设计
 
-1. 原 `nvidia-news-admission.mjs --renew-existing` 的默认行为不变。新增 `--roll-recent-window`，仅能与原同花顺配置档、`--renew-existing`、一小时及旧版本/摘要确认同时使用。
+1. DSA 的 `scripts/local-runtime/news-admission.mjs --source=hithink-timeline --renew-existing` 保持原续验行为。`--roll-recent-window` 仅能与原同花顺配置档、`--renew-existing`、一小时及旧版本/摘要确认同时使用。
 2. Python 校验仍要求目标准入已过期、未撤销、同一来源/凭据修订、同一证券及完整旧证据链。新实读证据须在十五分钟内，日期仍须为执行 UTC 当日及此前七日。
 3. 显式滚动只接受原范围恰为七日，开始与结束同时向前一天；不接受任意扩展、跨两天跳跃或更宽窗口。没有该选项时继续要求新范围落在原范围内。
 4. 仍在 SQLite 写锁内按旧版本和摘要执行单条 CAS，只改原允许的日期、有效期、证据、记录人、版本与记录时间字段。新证据明确记录滚动选择，并嵌入旧记录和摘要；旧证据保留。
