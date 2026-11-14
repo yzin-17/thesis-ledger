@@ -10,7 +10,7 @@ ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY} \
     npm_config_disturl=${NODE_DIST_URL}
 RUN sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${ALPINE_MIRROR}|g" /etc/apk/repositories \
     && apk add --no-cache g++ make python3
-RUN corepack enable
+RUN npm install --global pnpm@latest
 WORKDIR /workspace
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/server/package.json apps/server/package.json

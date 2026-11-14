@@ -18,7 +18,7 @@ ThesisLedger 是一个本地优先的个人投资研究与风险管理系统。�
 
 ## 快速开始
 
-要求 Node.js 22、pnpm 10 和 Docker Desktop。
+要求 Node.js 22、已安装的 pnpm 和 Docker Desktop。项目不固定 pnpm 版本；CI 与镜像构建使用最新版 pnpm，依赖版本由 `pnpm-lock.yaml` 管理。
 
 ```bash
 pnpm install --frozen-lockfile

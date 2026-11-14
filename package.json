@@ -2,7 +2,6 @@
   "name": "thesis-ledger",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "build": "pnpm db:generate && pnpm -r build",
     "typecheck": "pnpm build && pnpm -r typecheck",
