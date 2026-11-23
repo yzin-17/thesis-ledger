@@ -5,6 +5,7 @@ import type { ArenaHistoryMinutes, ArenaHistoryInstruments, ArenaLiveProtocol, B
 import { DsaClient, DSA_MARKET_INDICATOR_ENGINE_VERSION } from '../integration/dsa/dsa.client.js';
 import { selectIndicatorParameters } from './market-indicator-request.js';
 import { InstrumentService } from './instrument.service.js';
+import { barSeriesInputFingerprint } from './market-bar-window.js';
 
 type ReplayInstrument = { instrumentId: string; symbol: string; name: string; assetType: 'STOCK' | 'ETF';
   identityEvidence?: Pick<ArenaHistoryInstruments, 'kind' | 'observedAt' | 'archiveRef' | 'responseSha256' | 'providerVersion' | 'historicalEligibility'> };
@@ -88,7 +89,7 @@ export class MarketArenaHistorySource {
     const points = series.points.slice(-input.limit);
     if (!points.length) throw new Error('replay_prices_unavailable');
     const identity: BarSeriesIdentity = { symbol: input.symbol, assetType: instrument.assetType, timeframe, adjustment: 'none' };
-    const inputFingerprint = createHash('sha256').update(JSON.stringify({ identity, points })).digest('hex');
+    const inputFingerprint = barSeriesInputFingerprint(identity, points);
     if (!input.indicator) return { asOf: at, identity, points, evidence: series.evidence, inputFingerprint };
     if (!this.dsa.calculateIndicators) throw new Error('replay_tools_unavailable');
     const calculated = await this.dsa.calculateIndicators({ identity, points, inputFingerprint,

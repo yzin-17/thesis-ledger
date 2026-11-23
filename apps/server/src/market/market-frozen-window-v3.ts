@@ -23,10 +23,10 @@ export const marketFrozenWindowHashV3 = (response: unknown) => {
 };
 
 export const marketWindowSeriesVersionV3 = (
-  request: Pick<MarketDataBarSeriesRequestV3, 'start' | 'end'>,
+  request: Pick<MarketDataBarSeriesRequestV3, 'start' | 'end' | 'dailyObservationVersion'>,
   response: MarketDataBarSeriesResponseV3,
-) =>
-  createMarketSeriesIdentity({
+) => {
+  const legacy = createMarketSeriesIdentity({
     identity: {
       symbol: response.symbol,
       assetType: response.routeKey.assetType,
@@ -39,3 +39,6 @@ export const marketWindowSeriesVersionV3 = (
     basisWindow: { start: request.start, end: request.end },
     points: response.bars,
   }).seriesVersion;
+  return request.dailyObservationVersion === 2 ? createHash('sha256')
+    .update(JSON.stringify(['market-series-daily-observation-v2', legacy])).digest('hex') : legacy;
+};

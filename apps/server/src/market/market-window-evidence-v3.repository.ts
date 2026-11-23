@@ -123,6 +123,7 @@ const identityFingerprint = (identity: NormalizedIdentity): string => {
         identity.inputFingerprint,
         [identity.desiredRevision, identity.effectivePolicyRevision, identity.catalogRevision],
         ...(identity.request.tradabilityMode ? [identity.request.tradabilityMode] : []),
+        ...(identity.request.dailyObservationVersion === 2 ? [['dailyObservationVersion', 2]] : []),
       ]),
     )
     .digest('hex');
@@ -369,8 +370,9 @@ export class MarketWindowEvidenceV3Repository {
       },
       start: dateOnly(row.requestedStart),
       end: dateOnly(row.requestedEnd),
+      ...(response.historicalTradabilityWindows?.[0]?.contractVersion === 2 ? { dailyObservationVersion: 2 } : {}),
       ...(row.completeResponse && typeof row.completeResponse === 'object' && 'historicalTradabilityWindows' in row.completeResponse
-        ? { tradabilityMode: 'assume-untradable-no-bar' } : {}),
+        ? { tradabilityMode: row.timeframe === '1d' ? 'assume-untradable-no-bar' : 'observed-bars-only' } : {}),
       routeTarget: {
         providerId: row.providerId,
         upstreamSource: row.upstreamSource,

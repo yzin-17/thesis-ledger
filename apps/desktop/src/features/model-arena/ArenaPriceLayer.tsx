@@ -54,7 +54,7 @@ export function ArenaPriceLayer({ renderControls, ...props }: Props & {
     </Button>{hint}</span>
   ) : null;
   return (
-    <div ref={notice.anchor} className="grid min-w-0 gap-3" data-market-chart-reference-region>
+    <div ref={notice.anchor} className="grid min-w-0 grid-cols-1 gap-3" data-market-chart-reference-region>
       <ArenaEmptyToast notice={notice} />
       {renderControls ? renderControls(modelToggle) : modelToggle}
       <ArenaSelection data={data} enabled={active} />
@@ -71,7 +71,7 @@ function ArenaSelection({ data, enabled }: { data: ArenaPriceData; enabled: bool
   const matches = data.choices.map(match => ({ value: match.id, label: match.protocol.title }));
   const models = [{ value: 'all', label: '全部模型' }, ...(data.detail?.entrants ?? []).map(entrant => ({ value: entrant.id, label: entrant.model }))];
   const selected = models.some(model => model.value === data.state.entrant) ? data.state.entrant : 'all';
-  return <div className="flex flex-wrap items-center gap-2 empty:hidden" data-arena-selection>
+  return <div className="flex min-w-0 flex-wrap items-center gap-2 empty:hidden" data-arena-selection>
     {matches.length > 0 && <Select items={matches} value={data.active?.id ?? null} onValueChange={value => { if (value) data.selectMatch(value); }}>
       <SelectTrigger size="sm" aria-label="模型比赛" className="w-full sm:w-80"><SelectValue placeholder="选择比赛" /></SelectTrigger>
       <SelectContent align="start" alignItemWithTrigger={false}><SelectGroup>

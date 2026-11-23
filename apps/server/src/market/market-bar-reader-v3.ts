@@ -7,6 +7,7 @@ import {
   type MarketDataBarRouteKeyV3,
   type MarketDataBarSeriesRequestV3,
   type MarketFrozenWindowRefV3,
+  type MarketDataContractCapabilitiesV3,
 } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { DataQualityService } from '../quality/data-quality.service.js';
@@ -34,8 +35,9 @@ export type MarketBarWindowReadInputV3 = {
   compatibility?: MarketWindowSelectionInputV3['compatibility'];
   warmup?: MarketWindowSelectionInputV3['warmup'];
   frozenWindowRef?: MarketFrozenWindowRefV3;
-  tradabilityMode?: 'assume-untradable-no-bar';
+  tradabilityMode?: 'assume-untradable-no-bar' | 'observed-bars-only';
   priceResearch?: boolean;
+  dailyObservationVersion?: 1 | 2;
   requiredSource?: MarketWindowSelectionInputV3['requiredSource'];
 };
 
@@ -99,7 +101,7 @@ export class MarketBarWindowReaderV3 {
   ) {}
 
   async read(input: MarketBarWindowReadInputV3): Promise<MarketBarWindowReadResultV3> {
-    if (input.requiredSource && !input.priceResearch) return unavailable('invalid_input');
+    if ((input.requiredSource || input.dailyObservationVersion === 2) && !input.priceResearch) return unavailable('invalid_input');
     if (input.frozenWindowRef)
       return this.frozenReader?.read(input) ?? unavailable('invalid_input');
     const routeKey = marketDataBarRouteKeyV3Schema.safeParse(input.routeKey);
@@ -114,6 +116,7 @@ export class MarketBarWindowReaderV3 {
       start: input.window.start,
       end: input.window.end,
       ...(input.tradabilityMode ? { tradabilityMode: input.tradabilityMode } : {}),
+      ...(input.dailyObservationVersion !== undefined ? { dailyObservationVersion: input.dailyObservationVersion } : {}),
     });
     if (!validatedRequest.success) return unavailable('invalid_input');
     if (routeKey.data.capability !== 'DAILY_BAR' || routeKey.data.timeframe !== '1d') {
@@ -138,6 +141,12 @@ export class MarketBarWindowReaderV3 {
     const effectiveEnvelope: EffectivePolicyEnvelopeV3 = effectiveResult.value;
     const effective = effectiveEnvelope.projection?.effective ?? null;
     const catalog = catalogResult.value;
+    let capabilities: MarketDataContractCapabilitiesV3 | undefined;
+    if (input.dailyObservationVersion === 2) {
+      try { capabilities = await this.dsa.marketDataCapabilitiesV3(); }
+      catch { return unavailable('catalog_unavailable'); }
+      if (!capabilities.dailyObservationVersions?.includes(2)) return unavailable('unsupported_daily_observation_version');
+    }
 
     const requests = new Map<number, PinnedMarketWindowRequestV3>();
     const selection = await selectMarketWindowV3({
@@ -150,7 +159,7 @@ export class MarketBarWindowReaderV3 {
       requestId: randomUUID(),
       now: new Date().toISOString(),
       ...marketReadResearchConstraints(input),
-      readCapabilities: () => this.dsa.marketDataCapabilitiesV3(),
+      readCapabilities: () => capabilities ? Promise.resolve(capabilities) : this.dsa.marketDataCapabilitiesV3(),
       ...marketReadWindowRequirements(input),
       read: async ({ request, target, routeIndex }) => {
         const pinnedRequest = createPinnedRequest(request, target, routeIndex);
@@ -191,6 +200,7 @@ function marketReadResearchConstraints(input: MarketBarWindowReadInputV3) {
     ...(input.priceResearch ? { priceResearch: true } : {}),
     ...(input.requiredSource ? { requiredSource: input.requiredSource } : {}),
     ...(input.tradabilityMode ? { tradabilityMode: input.tradabilityMode } : {}),
+    ...(input.dailyObservationVersion !== undefined ? { dailyObservationVersion: input.dailyObservationVersion } : {}),
   };
 }
 

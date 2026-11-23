@@ -72,6 +72,7 @@ it('实时估值接受最大年龄边界，保留证据和双重会话读取', a
   expect(f.actions.read).toHaveBeenCalledWith(
     expect.objectContaining({ symbol: 'AAPL.US', previousDay: '2026-11-11' }),
     '2026-11-12',
+    undefined,
   );
 });
 

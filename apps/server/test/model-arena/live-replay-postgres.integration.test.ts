@@ -147,7 +147,48 @@ describe.skipIf(!url)('自主比赛持久化回放', () => {
   registerReplayHistoricalSourceCases();
   registerReplayClockFailureAndOwnershipCases();
   registerReplayFrozenDetailAndPauseCases();
+  registerReplayProtectionCases();
 });
+
+function registerReplayProtectionCases() {
+  it('正式提交后在父单成交事务激活保护；预算耗尽不阻止后续行情止损，重建运行时不重复成交', async () => {
+    const id = await create();
+    await runtime.reconcile(id);
+    const [cycle] = await db.$queryRaw<LiveCycleRow[]>`SELECT * FROM "ArenaLiveCycle" WHERE "matchId"=${id}::uuid AND state='pending'`;
+    await cycles.claim(cycle!.id, 1, new Date(), undefined, first);
+    await db.$executeRaw`UPDATE "ArenaLiveCycle" SET "requestId"=${randomUUID()}::uuid WHERE id=${cycle!.id}::uuid`;
+    await orders.submit(cycle!.id, 1, { summary: '模拟父单保护', orders: [{ clientId: 'entry', symbol: 'AAPL.US', side: 'buy', kind: 'limit',
+      quantity: '27', price: '359.50', expiresOn: null, exitGroup: null,
+      onFill: { activation: 'on_full_fill', activateOrders: [{ clientId: 'stop', side: 'sell', kind: 'stop_loss', price: '355',
+        quantity: { basis: 'parent_open_quantity' }, reduceOnly: true, validUntil: { kind: 'activation_session_close' } }] },
+    }], cancelOrderIds: [], watchedSymbols: ['AAPL.US'], wakeups: [{ kind: 'price', symbol: 'AAPL.US', operator: 'lte', price: '1' }] });
+    const third = '2026-11-02T14:33:00.000Z';
+    let entered: ReturnType<typeof arenaLiveAccountSchema.parse> | undefined;
+    const reader = { next: async (_p: unknown, after: string, target: string) => {
+      if (after < second) return second;
+      if (after < third) return third;
+      return target;
+    },
+      observe: async (_p: unknown, at: string) => {
+      if (at === third) entered = arenaLiveAccountSchema.parse((await liveAgents(db, id))[0]!.account);
+      const value = observation(at); const price = at === second ? '354' : '350';
+      value.prices.set('AAPL.US', price); value.context.quotes[0]!.price = price; return value;
+    } };
+    const protectedRuntime = new LiveReplayRuntime(db, reader, matches);
+    await db.$executeRaw`UPDATE "ArenaLiveAgent" SET state='budget_exhausted',reason='participant_budget' WHERE "matchId"=${id}::uuid`;
+    await protectedRuntime.reconcile(id, new Date(second));
+    // 重启使用持久化账户和时钟；下一条有效观察才允许退出。
+    const recovered = new LiveReplayRuntime(db, reader, matches);
+    const now = new Date('2026-11-02T14:35:00.000Z');
+    await Promise.all([recovered.reconcile(id, now), recovered.reconcile(id, now)]);
+    expect(entered!.fills.map((f) => f.side)).toEqual(['buy']);
+    expect(entered!.orders[1]).toMatchObject({ state: 'active', parentOrderId: entered!.orders[0]!.id, quantity: '27', activeSince: second });
+    const exited = arenaLiveAccountSchema.parse((await liveAgents(db, id))[0]!.account);
+    expect(exited.fills.map((f) => [f.side, f.quantity, f.price])).toEqual([['buy', '27', '354'], ['sell', '27', '350']]);
+    expect(exited.positions).toEqual([]);
+    expect(await db.$queryRaw`SELECT id FROM "ArenaLiveCycle" WHERE "matchId"=${id}::uuid`).toHaveLength(1);
+  });
+}
 
 function liveReplayDatabaseLifecycle() {
   afterAll(async () => {

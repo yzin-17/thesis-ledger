@@ -14,8 +14,22 @@ export const arenaLiveOrderSchema = z.strictObject({
   createdAt: z.iso.datetime(),
   activeSince: z.iso.datetime(),
   expiresAt: z.iso.datetime(),
-  state: z.enum(['active', 'filled', 'cancelled', 'expired', 'rejected']),
+  state: z.enum(['waiting_parent', 'waiting_entry', 'active', 'filled', 'cancelled', 'expired', 'rejected']),
+  parentOrderId: z.uuid().nullable().optional(),
+  activationOrderId: z.uuid().optional(),
+  quantityLot: arenaPositiveDecimalSchema.optional(),
+  exitQuantity: arenaOrderInputSchema.shape.onFill.unwrap().unwrap().shape.activateOrders.element.shape.quantity.optional(),
+  trailing: arenaOrderInputSchema.shape.onFill.unwrap().unwrap().shape.activateOrders.element.shape.trailing,
+  trailingState: z.strictObject({ highWater: arenaPositiveDecimalSchema, entryPrice: arenaPositiveDecimalSchema,
+    triggerPrice: arenaDecimalSchema, marketTime: z.iso.datetime(), triggered: z.boolean() }).optional(),
+  triggeredAt: z.iso.datetime().optional(),
+  validUntil: z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('activation_session_close') }),
+    z.strictObject({ kind: z.literal('date'), expiresOn: z.iso.date() }),
+  ]).nullable().optional(),
   reservedCash: arenaDecimalSchema,
+  filledQuantity: arenaDecimalSchema.optional(),
+  remainingQuantity: arenaDecimalSchema.optional(),
   reason: z.string().nullable(),
 });
 export const arenaLiveWakeupSchema = z.strictObject({
@@ -35,6 +49,7 @@ export const arenaLiveAccountSchema = z.strictObject({
   positions: z.array(z.strictObject({
     symbol: z.string(), quantity: arenaPositiveDecimalSchema,
     acquiredOn: z.iso.date(), availableOn: z.iso.date(),
+    entryOrderId: z.uuid().nullable().optional(),
   })),
   cashSettlements: z.array(z.strictObject({ amount: arenaPositiveDecimalSchema, availableOn: z.iso.date() })),
   orders: z.array(arenaLiveOrderSchema),

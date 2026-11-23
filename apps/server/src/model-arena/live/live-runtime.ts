@@ -118,12 +118,13 @@ export class LiveRuntime implements OnModuleInit, OnModuleDestroy {
     if (replayAt && (session.state !== 'open' || session.date !== localDay)) return;
     const active = currentLiveExecutionSession(session, businessNow);
     if (replayAt && !active) return;
+    const sessionDeadline = !replayAt && active ? new Date(active.endAt) : undefined;
     if (
       !(await this.cycles.claim(
         id,
         attempt,
         now,
-        active ? new Date(active.endAt) : undefined,
+        sessionDeadline,
         replayAt,
         { state: session.state, date: session.date ?? null, reason: session.reason ?? null },
       ))

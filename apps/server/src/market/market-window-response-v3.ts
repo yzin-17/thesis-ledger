@@ -26,7 +26,9 @@ export const parseMarketWindowEvidenceResponseV3 = (
     routeKey: response.routeKey,
     start: response.coverage.requestedStart,
     end: response.coverage.requestedEnd,
-    ...(response.historicalTradabilityWindows ? { tradabilityMode: 'assume-untradable-no-bar' as const } : {}),
+    ...(response.historicalTradabilityWindows?.[0]?.contractVersion === 2 ? { dailyObservationVersion: 2 as const } : {}),
+    ...(response.historicalTradabilityWindows ? { tradabilityMode: response.routeKey.timeframe === '1d'
+      ? 'assume-untradable-no-bar' as const : 'observed-bars-only' as const } : {}),
   }, multiWindow ? 'market-multi-window-content-v1' : undefined);
 };
 

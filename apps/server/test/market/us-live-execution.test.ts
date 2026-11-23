@@ -31,7 +31,8 @@ function setup(assetType: 'STOCK' | 'ETF' = 'STOCK') {
     { tradingDate: day, startAt: '2026-11-13T14:30:00Z', endAt: '2026-11-13T21:00:00Z' },
     { tradingDate: '2026-11-16', startAt: '2026-11-16T14:30:00Z', endAt: '2026-11-16T21:00:00Z' },
   ] } }) };
-  const status = { readComposition: vi.fn() }, dsa = { backtestInstrumentFacts: vi.fn() };
+  const status = { readComposition: vi.fn() }, dsa = { get: vi.fn(), post: vi.fn(), backtestInstrumentFacts: vi.fn(),
+    effectiveControlPolicyV3:vi.fn(),marketPublicFeesV3:vi.fn() };
   const actions = { read: vi.fn().mockResolvedValue(['controlled-action-proof']) };
   const reader = new MarketLiveExecutionReader(market, calendars, status, actions, dsa);
   const input = { symbol, assetType, market: 'US' as const, currency: 'USD' as const,

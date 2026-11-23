@@ -43,7 +43,7 @@ export function arenaEqualWeightBook(initialCash: string, maxPositionBps: number
   for (const q of quotes) {
     if (q.buyBlocked) continue;
     const price = arenaOrderPrice(q, 'buy', fees), lot = D.from(q.lot);
-    if (q.upperLimit && price.compareTo(q.upperLimit) > 0 || q.lowerLimit && price.compareTo(q.lowerLimit) < 0) continue;
+    if (q.upperLimit && price.compareTo(q.upperLimit) >= 0 || q.lowerLimit && price.compareTo(q.lowerLimit) <= 0) continue;
     let low = 0n, high = BigInt(allocation.dividedBy(price.times(lot), 0).toString()) + 1n;
     while (low < high) {
       const middle = (low + high + 1n) / 2n;

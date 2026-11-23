@@ -4,6 +4,7 @@ import { arenaObservationLabel, arenaCostLabel, arenaRatio, arenaStatusLabel, fo
 import { buttonVariants } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { formatDateTimeInTimeZone, formatDateOnly } from '@/lib/date-display';
+import { StickyTableActionHeader, StickyTableActionCell } from '../shared/StickyTableActions.js';
 import { ArenaSections } from './ArenaSections.js';
 import { ArenaDisclosure } from './ArenaDisclosure.js';
 import { ArenaDateRange, ArenaFacts } from './ArenaDetailShell.js';
@@ -46,10 +47,10 @@ export function ArenaWeekReport({ report: r, arenaId, back }: { report: Report; 
       </div>)}
     </section>
     <section className="grid min-w-0 gap-3"><h2 className="text-xl font-semibold">本周模拟成交</h2>
-      {!r.fills.length ? <p className="text-sm text-muted-foreground">本周无模拟成交。</p> : <Table><TableHeader><TableRow>{['成交时间', '标的', '方向', '数量', '价格', '费用', '记录'].map((s, i) => <TableHead key={s} className={i >= 3 && i <= 5 ? 'text-right' : ''}>{s}</TableHead>)}</TableRow></TableHeader><TableBody>
+      {!r.fills.length ? <p className="text-sm text-muted-foreground">本周无模拟成交。</p> : <Table><TableHeader><TableRow>{['成交时间', '标的', '方向', '数量', '价格', '费用'].map((s, i) => <TableHead key={s} className={i >= 3 && i <= 5 ? 'text-right' : ''}>{s}</TableHead>)}<StickyTableActionHeader>记录</StickyTableActionHeader></TableRow></TableHeader><TableBody>
         {r.fills.map((f) => <TableRow key={f.id}><TableCell>{formatDateTimeInTimeZone(f.executedAt, r.timeZone)}</TableCell><TableCell>{f.symbol}</TableCell><TableCell>{f.side === 'buy' ? '买入' : '卖出'}</TableCell>
           {[f.quantity, f.price, f.fee].map((v, i) => <TableCell key={i} className="text-right tabular-nums">{amount(v)}</TableCell>)}
-          <TableCell><Link state={back} to={record(f.roundId, f.entrantId)} className={entryLink}>查看决策</Link></TableCell>
+          <StickyTableActionCell><Link state={back} to={record(f.roundId, f.entrantId)} className={entryLink}>查看决策</Link></StickyTableActionCell>
         </TableRow>)}
       </TableBody></Table>}
     </section>

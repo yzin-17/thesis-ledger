@@ -1,12 +1,34 @@
 {
   "commands": [
-    { "path": "scripts/local-runtime/run-arena-us-model-acceptance.mjs", "idle": true },
-    { "path": "scripts/local-runtime/arena-us-acceptance-config.mjs" },
-    { "path": "scripts/local-runtime/capture-arena-us-history.mjs" },
-    { "path": "scripts/local-runtime/arena-maintenance-queue.mjs" },
-    { "path": "scripts/local-runtime/dsa-forward-image-recovery.mjs", "idle": true },
-    { "path": "scripts/local-runtime/dsa-target-recovery.mjs" },
-    { "path": "scripts/local-runtime/dsa-target-acceptance.mjs" },
-    { "path": "scripts/local-runtime/arena-research-recovery.mjs" }
+    {
+      "path": "scripts/local-runtime/run-arena-scoped-replay.mjs",
+      "idle": true
+    },
+    {
+      "path": "scripts/local-runtime/run-arena-us-model-acceptance.mjs",
+      "idle": true
+    },
+    {
+      "path": "scripts/local-runtime/arena-us-acceptance-config.mjs"
+    },
+    {
+      "path": "scripts/local-runtime/capture-arena-us-history.mjs"
+    },
+    {
+      "path": "scripts/local-runtime/arena-maintenance-queue.mjs"
+    },
+    {
+      "path": "scripts/local-runtime/dsa-forward-image-recovery.mjs",
+      "idle": true
+    },
+    {
+      "path": "scripts/local-runtime/dsa-target-recovery.mjs"
+    },
+    {
+      "path": "scripts/local-runtime/dsa-target-acceptance.mjs"
+    },
+    {
+      "path": "scripts/local-runtime/arena-research-recovery.mjs"
+    }
   ]
 }

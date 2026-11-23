@@ -73,6 +73,7 @@ import {
   parseCatalogDelta,
 } from './dsa-catalog-v3.js';
 import { currentTraceId } from '../../platform/structured-logger.js';
+import { readHistoricalExecution } from './dsa-historical-execution.js';
 import { fetchObservedCacheRequest } from './dsa-cache-request-observation.js';
 import {
   DsaError,
@@ -90,6 +91,11 @@ const requestSignal = (timeoutMs: number, signal?: AbortSignal) => signal ? Abor
 @Injectable()
 export class DsaClient {
   private readonly config = loadConfig();
+  historicalExecution(input: Parameters<typeof readHistoricalExecution>[0]) {
+    return readHistoricalExecution(input,
+      () => this.effectiveControlPolicyV3().then(result => result.projection?.effective ?? null),
+      (path, body) => this.post(path, body, 1, (status, payload) => mapDataV3HttpError(status, payload, body.requestId)));
+  }
   get dataCapabilities() {
     return new DsaDataCapabilityReaderV3(
       (path, request, mapper, budgetMs, signal) => this.post<unknown>(path, request, 1, mapper, budgetMs, signal),

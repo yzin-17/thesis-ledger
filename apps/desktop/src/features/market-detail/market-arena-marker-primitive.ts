@@ -30,6 +30,18 @@ type Colors = {
   border: string;
   font: string;
 };
+const markerLabels = { buy: '买（模）', sell: '卖（模）' } as const;
+
+function markerLabelBounds(arrow: Arrow, width: number, paneWidth: number, fontSize: number) {
+  const middle = Math.max(arrow.tip, arrow.tail) + 1 + arrow.margin + fontSize * 0.6;
+  const left = Math.max(0, Math.min(arrow.x - width / 2, paneWidth - width));
+  return {
+    left,
+    right: left + width,
+    top: middle - fontSize / 2 - 1,
+    bottom: middle + fontSize / 2 + 1,
+  };
+}
 
 /** 对齐当前 SeriesMarkers 的奇偶像素取整；描边内缩 1px，使外轮廓与真实成交等大。 */
 function arenaArrowSize(barSpacing: number) {
@@ -105,6 +117,7 @@ export function createArenaMarkerPrimitive(
   let arrows: Arrow[] = [];
   let hovered: string | undefined;
   let fontSize = 12;
+  const labelWidths: Partial<Record<Point['side'], number>> = {};
   const hit = (x: number, y: number) =>
     arrows.find((arrow) => {
       if (
@@ -151,18 +164,13 @@ export function createArenaMarkerPrimitive(
           context.lineTo(arrow.x - arrow.half, shoulder);
           context.closePath();
           context.stroke();
-          const text = arrow.side === 'buy' ? '买（模）' : '卖（模）';
-          const textWidth = context.measureText(text).width;
-          const middle = Math.max(arrow.tip, arrow.tail) + 1 + arrow.margin + fontSize * 0.6;
-          const left = arrow.x - textWidth / 2;
-          arrow.label = {
-            left,
-            right: left + textWidth,
-            top: middle - fontSize / 2 - 1,
-            bottom: middle + fontSize / 2 + 1,
-          };
+          const text = markerLabels[arrow.side];
+          const width = context.measureText(text).width;
+          labelWidths[arrow.side] = width;
+          const label = markerLabelBounds(arrow, width, mediaSize.width, fontSize);
+          arrow.label = label;
           context.fillStyle = context.strokeStyle;
-          context.fillText(text, left, middle);
+          context.fillText(text, label.left, (label.top + label.bottom) / 2);
         }
         const active = arrows.find((arrow) => arrow.id === hovered);
         if (active) drawTooltip(context, active, mediaSize.width, mediaSize.height, colors);
@@ -187,6 +195,7 @@ export function createArenaMarkerPrimitive(
       arrows = [];
       if (!attached) return;
       const time = attached.chart.timeScale(),
+        width = time.width(),
         height = attached.series.getPane().getHeight();
       const size = arenaArrowSize(time.options().barSpacing);
       fontSize = attached.chart.options().layout.fontSize;
@@ -197,7 +206,7 @@ export function createArenaMarkerPrimitive(
           x = time.timeToCoordinate(stamp);
         const logical = x === null ? null : time.timeToIndex(stamp, false);
         const bar = logical === null ? null : attached.series.dataByIndex(logical);
-        if (!bar || x === null) continue;
+        if (!bar || x === null || x < 0 || x >= width) continue;
         const price = markerBarPrice(bar, group.side);
         if (price === undefined) continue;
         const y = attached.series.priceToCoordinate(price);
@@ -209,13 +218,18 @@ export function createArenaMarkerPrimitive(
                 size.half * 2 + 5,
                 Math.min(maximum - 1, y - size.margin * 2 - lineHeight - 1),
               );
-        arrows.push({
+        const arrow: Arrow = {
           ...group,
           ...size,
           x,
           tip,
           tail: tip + (group.side === 'buy' ? size.half * 2 : -size.half * 2),
-        });
+        };
+        // 交叉线事件可能在计算坐标后、画布重绘前到达。
+        const labelWidth = labelWidths[group.side];
+        if (labelWidth !== undefined)
+          arrow.label = markerLabelBounds(arrow, labelWidth, width, fontSize);
+        arrows.push(arrow);
       }
       const current = arrows.find((arrow) => arrow.id === hovered);
       if (!current || (previous && (current.x !== previous.x || current.tip !== previous.tip)))

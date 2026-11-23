@@ -209,6 +209,7 @@ export class StrategyRiskContextService {
         catalog_unavailable: '日线数据来源目录暂不可用',
         incompatible_backup: '备用来源不支持当前日线口径',
         unsupported_granularity: '数据来源不支持当前周期',
+        unsupported_daily_observation_version: '数据服务尚未支持所选日级观察版本',
         primary_unavailable: '日线主要来源和可用备用来源暂不可用',
       };
       throw new MarketBarUnavailableError(

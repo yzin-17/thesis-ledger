@@ -25,6 +25,7 @@ import { traceSdkGeneration } from './trace/ai-trace-sdk.js';
 import type { AiCompatibilityExtensionProfile } from './ai-provider-upstream.js';
 import { createGenerationModel } from './ai-sdk-generation-model.js';
 import { assertFinishedGeneration } from './ai-generation-finished-output.js';
+import { isGenerationOutputFailure } from './ai-generation-output-error.js';
 import {
   createGenerationDiagnostics,
   generationDiagnosticSnapshots,
@@ -45,7 +46,6 @@ import {
   assertFinishReason,
   errorFact,
   resultMetadata,
-  sanitize,
   usageFacts,
 } from './ai-sdk-generation-facts.js';
 
@@ -93,6 +93,7 @@ export type AiSdkGenerationRequest<OUTPUT> = {
 
 export type AiSdkGenerationResult<OUTPUT> = {
   output: OUTPUT;
+  rawOutputText?: string;
   finishReason: FinishReason;
   rawFinishReason: string | null;
   usage: AiUsageFacts;
@@ -106,11 +107,6 @@ export type AiSdkGenerationResult<OUTPUT> = {
 };
 
 const telemetry = { isEnabled: false, recordInputs: false, recordOutputs: false } as const;
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 
 const providerOptionsFor = <OUTPUT>(input: AiSdkGenerationRequest<OUTPUT>) => {
   if (input.reasoningEffort === undefined) return {};
@@ -222,11 +218,11 @@ export class AiSdkGenerationAdapter {
       }
       const result = await generateText({
         ...commonOptions(input, captureUsage, diagnostics),
-        output: generationOutput(input.mode, input.schema),
+        output: generationOutput(input.mode, input.schema, input.contract),
       });
       captureUsage(result.usage);
       completion = resultMetadata(result.usage, result.finishReason, result.rawFinishReason,
-        result.response, result.providerMetadata, { firstEvent: null, firstText: null });
+        result.response, result.providerMetadata, { firstEvent: null, firstText: null }, strategyV6RawOutput(input.contract, result.text));
       assertFinishedGeneration(result, input, observedUsage, completion);
       return {
         output: parseGenerationOutput(input.mode, input.schema, result.output),
@@ -261,14 +257,7 @@ export class AiSdkGenerationAdapter {
           completion,
         );
       }
-      const name = error instanceof Error ? error.name : asRecord(error)?.name;
-      const summary = sanitize(error);
-      if (
-        error instanceof SyntaxError ||
-        name === 'ZodError' ||
-        (typeof name === 'string' && name.includes('NoOutputGeneratedError')) ||
-        summary.startsWith('No object generated')
-      ) {
+      if (isGenerationOutputFailure(error)) {
         throw schemaGenerationFailure(
           error,
           input,
@@ -306,7 +295,7 @@ export class AiSdkGenerationAdapter {
     let firstText: number | null = null;
     const result = streamText({
       ...commonOptions(input, captureUsage, diagnostics),
-      output: generationOutput(input.mode, input.schema),
+      output: generationOutput(input.mode, input.schema, input.contract),
       onError: ({ error }) => {
         streamError ??= error;
       },
@@ -347,7 +336,7 @@ export class AiSdkGenerationAdapter {
     ]);
     captureUsage(usage);
     const completion = resultMetadata(usage, finishReason, rawFinishReason, response,
-      providerMetadata, { firstEvent, firstText });
+      providerMetadata, { firstEvent, firstText }, strategyV6RawOutput(input.contract, await result.text));
     onCompletion(completion);
     assertFinishReason(finishReason, input.requestId, observedUsage);
     const complete = await completedOutput;
@@ -358,4 +347,9 @@ export class AiSdkGenerationAdapter {
       ...completion,
     };
   }
+}
+
+function strategyV6RawOutput(contract: AiGenerationContractRef, text: string): string | undefined {
+  return ['authoring-generation-v6', 'authoring-modification-v6', 'strategy-discovery-v6'].includes(contract.version) &&
+    Buffer.byteLength(text, 'utf8') <= 65_536 ? text : undefined;
 }

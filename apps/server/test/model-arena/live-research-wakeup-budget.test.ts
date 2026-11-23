@@ -156,16 +156,13 @@ describe('自主研究失败周期与观察预约原子收敛', () => {
     });
     expect(mocks.saveLiveAccount).toHaveBeenCalledOnce();
   });
-  it('模型输出截断后只自动安排一次延迟观察，不立即重新调用模型', async () => {
+  it('模型输出截断后停止，不自动创建延迟观察或恢复既有预约', async () => {
     const f = fixture({ source: 'output_truncated' });
-    const before = Date.now();
+    const original = structuredClone(f.agent.account);
     await f.manager.fail(f.cycle.id, 1, 'model_output_invalid');
-    const saved = arenaLiveAccountSchema.parse(f.agent.account);
-    const next = saved.wakeups.at(-1)?.condition;
-    expect(next?.kind).toBe('time');
-    if (next?.kind === 'time') expect(Date.parse(next.at)).toBeGreaterThanOrEqual(before + 3590000);
-    expect(f.cycle.requestAudit).toMatchObject({ failure: { recovery: { source: 'fallback' } } });
-    expect(f.agent.state).toBe('waiting');
+    expect(f.agent.account).toEqual(original);
+    expect(f.agent.state).toBe('needs_attention');
+    expect(mocks.saveLiveAccount).not.toHaveBeenCalled();
   });
   it('连续第二次输出无效停止自动续接，要求用户手动恢复', async () => {
     const f = fixture({ previous: { state: 'failed', reason: 'model_output_invalid' } });

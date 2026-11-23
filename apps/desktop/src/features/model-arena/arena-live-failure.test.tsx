@@ -25,6 +25,10 @@ describe('自主竞技场模型输出失败诊断', () => {
   it('到期日期错误、截断、未知结构和其它失败均能安全降级', () => {
     expect(arenaResearchFailureDetail('model_output_invalid', { calls: [{
       error: { code: 'schema_invalid' },
+      diagnostics: { contractCheck: { issues: [{ path: ['decision', 'orders', 0, 'onFill', 'activateOrders', 0, 'validUntil', 'expiresOn'] }] } },
+    }] })).toContain('onFill.activateOrders.0.validUntil.expiresOn');
+    expect(arenaResearchFailureDetail('model_output_invalid', { calls: [{
+      error: { code: 'schema_invalid' },
       diagnostics: { contractCheck: { issues: [{ path: ['decision', 'orders', 1, 'expiresOn'] }] } },
     }] })).toContain('第 2 笔委托的 expiresOn');
     expect(arenaResearchFailureDetail('model_output_invalid', { calls: [{ error: { code: 'output_truncated' } }] })).toContain('输出被截断');

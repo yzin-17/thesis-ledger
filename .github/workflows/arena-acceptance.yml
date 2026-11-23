@@ -1,0 +1,63 @@
+name: Arena acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/arena-finalization-*']
+
+permissions:
+  contents: read
+
+jobs:
+  arena-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      COREPACK_NPM_REGISTRY: https://registry.npmmirror.com
+      pnpm_config_registry: https://registry.npmmirror.com
+      npm_config_registry: https://registry.npmmirror.com
+      npm_config_disturl: https://npmmirror.com/mirrors/node
+      DATABASE_URL: postgresql://offline:offline@127.0.0.1:1/offline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: 安装固定依赖
+        run: pnpm install --frozen-lockfile
+      - name: 准备限定入口的已提交 infra 依赖
+        run: |
+          git clone https://github.com/yzin-17/thesis-ledger-infra.git ../thesis-ledger-infra
+          git -C ../thesis-ledger-infra checkout --detach 8fdd51b51933614f019216066e1b15016d44c9dc
+      - name: 构建全部工作区
+        run: pnpm build
+      - name: 共享领域、合同与 API 客户端回归
+        run: |
+          pnpm --filter @thesis-ledger/domain test --maxWorkers=2
+          pnpm --filter @thesis-ledger/schemas test --maxWorkers=2
+          pnpm --filter @thesis-ledger/api-client test --maxWorkers=2
+      - name: 竞技场、市场及模型传输受控回归
+        run: >-
+          pnpm --filter @thesis-ledger/server exec vitest run
+          test/model-arena test/market test/ai
+          test/platform/api-rate-limit-policy.test.ts
+          --maxWorkers=2
+      - name: 两端竞技场消费者
+        run: |
+          pnpm --filter @thesis-ledger/desktop exec vitest run src/features/model-arena test/arena test/routes.test.ts --maxWorkers=2
+          pnpm --filter @thesis-ledger/mobile test --maxWorkers=2
+      - name: 限定回放入口与停止边界
+        run: node --test scripts/local-runtime/arena-scoped-replay.test.mjs
+      - name: 导入、依赖、尺寸与代码检查
+        run: |
+          node scripts/check-boundaries.mjs
+          node scripts/check-workspace-dependencies.mjs
+          node scripts/check-file-size-guardrails.mjs
+          node scripts/lint-workspace.mjs
+      - name: 凭证扫描
+        run: pnpm security:secrets

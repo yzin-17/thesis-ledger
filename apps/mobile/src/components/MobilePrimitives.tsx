@@ -19,7 +19,8 @@ export function failureMessage(error: unknown) {
   if (error instanceof ThesisLedgerContractError) return '读取数据与当前请求不一致，请重新读取。';
   if (error instanceof Error && error.name === 'AbortError')
     return '连接超时，请检查服务地址和网络后重试。';
-  if (error instanceof TypeError && /fetch|network/i.test(error.message))
+  const expoFetchFailed = error instanceof Error && error.message.startsWith('fetch failed: ');
+  if (expoFetchFailed || (error instanceof TypeError && /fetch|network/i.test(error.message)))
     return '网络连接失败，请检查服务地址和网络后重试。';
   if (error instanceof ThesisLedgerApiError)
     return error.payload?.message ?? `请求失败（${error.status}），请重试。`;

@@ -7,9 +7,6 @@ import {
   type ArenaPaperContext,
 } from '@thesis-ledger/domain';
 import {
-  dailyPriceRuleResultV1Schema,
-  dailyTradingStatusResultV1Schema,
-  statusCompositionDemandV1Schema,
   type ArenaLiveProtocol,
   type BarPoint,
 } from '@thesis-ledger/schemas';
@@ -18,6 +15,8 @@ import { MarketBarReader } from './market-bar-reader.js';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { MarketLifecycleReaderV3 } from './market-lifecycle-reader-v3.js';
 import { MarketActionCoverage } from './market-action-coverage.js';
+import { readReplayExecutionEvidence, replayResearchExecutionReason } from './market-arena-replay-execution.js';
+import { sampledCalendar } from './market-sampled-calendar.js';
 import { MarketArenaHistorySource } from './market-arena-history-source.js';
 
 export type ArenaReplayObservation = {
@@ -39,7 +38,8 @@ export class MarketArenaReplayReader {
     @Inject(MarketPeriodCalendarReader)
     private readonly calendars: Pick<MarketPeriodCalendarReader, 'read'>,
     @Inject(MarketBarReader) private readonly bars: Pick<MarketBarReader, 'readRetainedResearch'>,
-    @Inject(DsaClient) private readonly dsa: Pick<DsaClient, 'backtestInstrumentFacts'>,
+    @Inject(DsaClient) private readonly dsa: Pick<DsaClient, 'backtestInstrumentFacts'> &
+      Partial<Pick<DsaClient, 'historicalExecution'>>,
     @Inject(MarketLifecycleReaderV3)
     private readonly status: Pick<MarketLifecycleReaderV3, 'readComposition'>,
     @Inject(MarketActionCoverage) private readonly actions: Pick<MarketActionCoverage, 'read'>,
@@ -74,15 +74,37 @@ export class MarketArenaReplayReader {
     symbols: readonly string[],
     held: readonly { symbol: string; acquiredOn: string }[] = [],
     executionSymbols: readonly string[] = symbols,
+    expiryDates: readonly string[] = [],
+    buySymbols: readonly string[] = executionSymbols,
+    readPrices = true,
   ): Promise<ArenaReplayObservation> {
     const day = arenaDateAt(at, p.timeZone);
-    const end = new Date(Date.parse(day + 'T00:00:00Z') + 14 * 86400000).toISOString().slice(0, 10);
-    const start = new Date(Date.parse(day + 'T00:00:00Z') - 14 * 86400000)
+    if (!readPrices) {
+      const instruments = await this.resolve(p, symbols, at);
+      return { at, session: projectMarketSession(null, new Date(at)), prices: new Map(), evidence: {},
+        context: { at, tradingDate: day, fees: p.fees, matching: p.matching,
+          maxPositionBps: p.maxPositionBps, maxActiveSymbols: p.resources.maxActiveSymbols,
+          allowedSymbols: new Set(instruments.map(i => i.symbol)), quotes: [], newId: randomUUID,
+          expiresAt: () => { throw new Error('expiry_calendar_unavailable'); } } };
+    }
+    const defaultEnd = new Date(Date.parse(day + 'T00:00:00Z') + 14 * 86400000).toISOString().slice(0, 10);
+    const settlement = p.simulationPolicy && p.market === 'CN' && buySymbols.length
+      ? await sampledCalendar(this.calendars, p.market, day, new Date(at), true, []) : null;
+    if (p.simulationPolicy && p.market === 'CN' && buySymbols.length && !settlement)
+      throw new Error('replay_calendar_unavailable');
+    const end = [p.simulationPolicy ? settlement?.positionAvailableOn ?? day : defaultEnd, ...expiryDates].sort().at(-1)!;
+    const start = p.simulationPolicy ? day : new Date(Date.parse(day + 'T00:00:00Z') - 14 * 86400000)
       .toISOString()
       .slice(0, 10);
-    const result = await this.calendars.read({ market: p.market, start, end, evaluationAsOf: at });
+    let result = await this.calendars.read({ market: p.market, start, end, evaluationAsOf: at });
     if (result.status !== 'ready') throw new Error('replay_calendar_unavailable');
-    const session = projectMarketSession(result.calendar, new Date(at));
+    let session = projectMarketSession(result.calendar, new Date(at));
+    for (let days = 1; p.simulationPolicy && symbols.length && session.state === 'closed' && !session.latestTradingDate && days <= 31; days++) {
+      const previous = new Date(Date.parse(day + 'T00:00:00Z') - days * 86400000).toISOString().slice(0, 10);
+      result = await this.calendars.read({ market: p.market, start: previous, end, evaluationAsOf: at });
+      if (result.status !== 'ready') throw new Error('replay_calendar_unavailable');
+      session = projectMarketSession(result.calendar, new Date(at));
+    }
     const instruments = await this.resolve(p, symbols, at);
     const quotes: ArenaPaperContext['quotes'][number][] = [],
       prices = new Map<string, string>();
@@ -112,68 +134,22 @@ export class MarketArenaReplayReader {
         marketTime: point.timestamp,
         observedAt: at,
       });
-      if (!executionSymbols.includes(symbol) && !held.some((item) => item.symbol === symbol))
+      const acquiredOn = held.filter(item => item.symbol === symbol).map(item => item.acquiredOn).sort()[0];
+      const events = acquiredOn ? await this.actions.read({ symbol, assetType: instrument.assetType,
+        market: p.market, previousDay: acquiredOn, now: new Date(at) }, day, p.simulationPolicy) : [];
+      if (events === null) {
+        prices.delete(symbol);
+        evidence[symbol] = { ...evidence[symbol] as object, reason: 'corporate_action_unprocessed' };
         continue;
-      const scope = await this.dsa.backtestInstrumentFacts({
-        market: p.market,
-        symbol,
-        instrumentType: instrument.assetType,
-        start: day,
-        end: day,
-        executionStart: day,
-        executionEnd: day,
-        dataAsOf: at,
-      });
-      const { fact, rule, lot, tick } = replayExecutionInstrument(
-        scope,
-        p,
-        symbol,
-        instrument,
-        at,
-        day,
-      );
-      const status = await this.status.readComposition(
-        (['DAILY_TRADING_STATUS', 'DAILY_PRICE_RULE'] as const).map((capability) =>
-          statusCompositionDemandV1Schema.parse({
-            requirement: 'completeWindow',
-            query: {
-              contractVersion: 3,
-              capabilityVersion: 1,
-              consumer: 'thesis-ledger',
-              requestId: randomUUID(),
-              symbol,
-              range: { start: day, end: day },
-              routeKey: {
-                kind: 'data',
-                market: p.market,
-                assetType: instrument.assetType,
-                capability,
-              },
-              ...(capability === 'DAILY_PRICE_RULE' ? { representation: 'exactPrices' } : {}),
-            },
-          }),
-        ),
-      );
-      const { tradingDay, priceRule } = replayTradingLimits(status, symbol, day, at);
-      const acquiredOn = held
-        .filter((item) => item.symbol === symbol)
-        .map((item) => item.acquiredOn)
-        .sort()[0];
-      const events = acquiredOn
-        ? await this.actions.read(
-            {
-              symbol,
-              assetType: instrument.assetType,
-              market: p.market,
-              previousDay: acquiredOn,
-              now: new Date(at),
-            },
-            day,
-          )
-        : [];
-      if (!events) throw new Error('replay_rules_unavailable');
+      }
+      if (!executionSymbols.includes(symbol)) continue;
+      // 休市估值沿用已完成分钟的执行证据，保留原始时钟；新订单仍受 session 门禁约束。
+      const executionAt = session.state === 'closed' ? point.timestamp : at;
+      const { fact, rule, lot, tick, status, tradingDay, priceRule } =
+        await readReplayExecutionEvidence(this.dsa, this.status, p, instrument, at, executionAt, day);
       const dates = [...new Set(result.calendar.sessions.map((s) => s.tradingDate))].sort();
-      const sellable = dates[dates.indexOf(day) + rule.positionSettlement.sellableAfterTradingDays];
+      const sellable = p.simulationPolicy && !buySymbols.includes(symbol) ? day
+        : dates[dates.indexOf(day) + rule.positionSettlement.sellableAfterTradingDays];
       const cashDate = dates[dates.indexOf(day) + rule.cashSettlement.sellCreditAfterTradingDays];
       if (!sellable || !cashDate) throw new Error('replay_calendar_unavailable');
       const charge = (side: 'buy' | 'sell', amount: string) =>
@@ -211,7 +187,7 @@ export class MarketArenaReplayReader {
         evidence: evidence[symbol],
         buyBlocked: suspended ? 'suspended' : null,
         sellBlocked: suspended ? 'suspended' : null,
-        ...(priceRule.kind === 'exact'
+        ...(!p.simulationPolicy && priceRule.kind === 'exact'
           ? { upperLimit: priceRule.upper, lowerLimit: priceRule.lower }
           : {}),
         statutoryBuyFee: (amount) => charge('buy', amount),
@@ -228,14 +204,17 @@ export class MarketArenaReplayReader {
         at,
         tradingDate: day,
         fees: p.fees,
+        matching: p.matching,
         maxPositionBps: p.maxPositionBps,
         maxActiveSymbols: p.resources.maxActiveSymbols,
         allowedSymbols: new Set(instruments.map((item) => item.symbol)),
         quotes,
+        valuationPrices: prices,
         newId: randomUUID,
         expiresAt: (requested, kind) => {
           const date = requested ?? day;
           if (p.endsOn && date > p.endsOn) throw new Error('expiry_outside_season');
+          if (date > end) throw new Error('expiry_calendar_unavailable');
           const sessions = result.calendar.sessions.filter((s) =>
             kind === 'market'
               ? Date.parse(s.startAt) <= Date.parse(at) && Date.parse(s.endAt) > Date.parse(at)
@@ -325,7 +304,7 @@ export class MarketArenaReplayReader {
     } catch (error) {
       execution = {
         status: 'unavailable',
-        reason: error instanceof Error ? error.message : 'replay_rules_unavailable',
+        reason: replayResearchExecutionReason(error),
       };
     }
     const { point, sourceRef } = evidence as { point: BarPoint; sourceRef: string };
@@ -368,67 +347,6 @@ export function visibleReplayPoint(points: readonly BarPoint[], at: string, exac
 
 type ReplayInstrument = { symbol: string; assetType: 'STOCK' | 'ETF' };
 type ReplayCalendar = NonNullable<Parameters<typeof projectMarketSession>[0]>;
-type InstrumentScope = Awaited<ReturnType<DsaClient['backtestInstrumentFacts']>>;
-type ComposedStatus = Awaited<ReturnType<MarketLifecycleReaderV3['readComposition']>>;
-
-function replayExecutionInstrument(
-  scope: InstrumentScope,
-  p: ArenaLiveProtocol,
-  symbol: string,
-  instrument: ReplayInstrument,
-  at: string,
-  day: string,
-) {
-  const fact = scope.facts.find(
-    (item) =>
-      item.symbol === symbol &&
-      item.market === p.market &&
-      item.currency === p.currency &&
-      item.instrumentType === instrument.assetType &&
-      Date.parse(item.availableAt) <= Date.parse(at),
-  );
-  if (
-    !fact?.lotSize ||
-    !fact.tickSize ||
-    !fact.tradable ||
-    fact.executionRules.status !== 'supported' ||
-    fact.executionRules.range.start > day ||
-    fact.executionRules.range.end < day ||
-    fact.executionRules.cashSettlement.buyDebitAfterTradingDays !== 0
-  )
-    throw new Error('replay_rules_unavailable');
-  const rule = fact.executionRules;
-
-  return { fact, rule, lot: fact.lotSize, tick: fact.tickSize };
-}
-
-function replayTradingLimits(status: ComposedStatus, symbol: string, day: string, at: string) {
-  const tradingRaw = status.entries.find(
-    (e) => e.query.routeKey.capability === 'DAILY_TRADING_STATUS',
-  );
-  const priceRaw = status.entries.find((e) => e.query.routeKey.capability === 'DAILY_PRICE_RULE');
-  if (tradingRaw?.status !== 'included' || priceRaw?.status !== 'included')
-    throw new Error('replay_rules_unavailable');
-  const trading = dailyTradingStatusResultV1Schema.parse(tradingRaw.result),
-    limits = dailyPriceRuleResultV1Schema.parse(priceRaw.result);
-  const tradingDay = trading.days.find((item) => item.date === day),
-    priceRule = limits.days.find((item) => item.date === day)?.rule;
-  if (
-    trading.symbol !== symbol ||
-    limits.symbol !== symbol ||
-    !trading.coverage.complete ||
-    !limits.coverage.complete ||
-    Date.parse(trading.clock.observedAt) > Date.parse(at) ||
-    Date.parse(limits.clock.observedAt) > Date.parse(at) ||
-    !tradingDay ||
-    tradingDay.state === 'unknown' ||
-    !priceRule ||
-    (priceRule.kind !== 'exact' && priceRule.kind !== 'unlimited')
-  )
-    throw new Error('replay_rules_unavailable');
-
-  return { tradingDay, priceRule };
-}
 
 function replayPriceEvidence(
   instrument: ReplayInstrument,

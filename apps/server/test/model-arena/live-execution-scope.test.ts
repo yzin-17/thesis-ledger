@@ -64,7 +64,7 @@ function fixture() {
       .fn()
       .mockImplementation(async ({ symbol }) => ({
         status: 'available',
-        observation: { symbol, marketTime: now },
+        observation: { symbol, marketTime: now, price: '10' },
         ends: new Map([['2026-11-13', '2026-11-13T21:00:00Z']]),
       })),
   };
@@ -94,7 +94,7 @@ it('标的去重保持顺序，仅持仓、委托和额外执行标的读取报�
   ]);
   expect(f.reader.read.mock.calls[0]![0]).toMatchObject({
     previousDay: '2026-11-11',
-    expiresOn: ['2026-11-13'],
+    expiresOn: [],
   });
   expect(result.context.allowedSymbols.has('AAPL.US')).toBe(true);
   expect(result.context.quotes).toHaveLength(3);
@@ -114,6 +114,43 @@ it('固定宇宙拒绝范围外目录，既有持仓仍留在允许集合', asyn
   expect(result.context.quotes).toEqual([]);
 });
 
+it('指定远期到期日缺失时拒绝该期限，不回退成已知较早的收盘', async () => {
+  const f = fixture();
+  const result = await f.context.build(protocol, [account()], decision);
+  expect(() => result.context.expiresAt('2026-12-01', 'limit')).toThrow('expiry_calendar_unavailable');
+});
+
+it('买入只要求其他持仓估值，撤单不读取新价格和既有期限', async () => {
+  const f = fixture();
+  const valuation = { read: vi.fn().mockResolvedValue({ prices: new Map([['AAPL.US', '20']]) }) };
+  const context = new LiveExecutionContext(f.db as never, f.market, f.reader, undefined, valuation);
+  const result = await context.build(protocol, [account()], decision);
+  expect(f.reader.read.mock.calls.map(([i]) => i.symbol)).toEqual(['MSFT.US']);
+  expect(result.context.valuationPrices).toEqual(new Map([['AAPL.US', '20'], ['MSFT.US', '10']]));
+  const held = account();
+  held.orders.push({ symbol: 'MSFT.US', state: 'active', expiresOn: '2030-01-01' } as never);
+  f.reader.read.mockClear(); valuation.read.mockClear();
+  await context.build(protocol, [held], { ...decision, orders: [] });
+  expect(f.reader.read).not.toHaveBeenCalled();
+  expect(valuation.read).not.toHaveBeenCalled();
+});
+
+it('父子期限都传入实时和历史执行入口，不把跨夜保护缩短为父单期限', async () => {
+  const f = fixture();
+  const plan = structuredClone(decision);
+  plan.orders[0]!.onFill = { activation: 'on_full_fill', activateOrders: [{
+    clientId: 'protect', side: 'sell', kind: 'stop_loss', price: '9',
+    quantity: { basis: 'parent_open_quantity' }, reduceOnly: true,
+    validUntil: { kind: 'date', expiresOn: '2026-12-01' },
+  }] };
+  await f.context.build(protocol, [account()], plan);
+  expect(f.reader.read.mock.calls[0]![0].expiresOn).toEqual(['2026-11-13', '2026-12-01']);
+  const replay = { observe: vi.fn().mockResolvedValue({ context: {}, session: {} }) };
+  const context = new LiveExecutionContext(f.db as never, f.market, f.reader, replay);
+  await context.build(protocol, [account()], plan, [], now);
+  expect(replay.observe.mock.calls[0]![5]).toEqual(['2026-11-13', '2026-12-01']);
+});
+
 it('来源明确拒绝与异常分别保留原因，老报价不进入执行上下文', async () => {
   const f = fixture();
   f.reader.read.mockResolvedValueOnce({ status: 'unavailable', reason: 'calendar_unavailable' });
@@ -125,8 +162,8 @@ it('来源明确拒绝与异常分别保留原因，老报价不进入执行上�
   });
   const result = await f.context.build(protocol, [account()], decision, ['NVDA.US']);
   expect(result.missing).toEqual({
-    'AAPL.US': 'calendar_unavailable',
-    'MSFT.US': 'execution_evidence_unavailable',
+    'MSFT.US': 'calendar_unavailable',
+    'NVDA.US': 'execution_evidence_unavailable',
   });
   expect(result.context.quotes).toEqual([]);
 });

@@ -11,6 +11,7 @@ import {
   type AiUsageFacts,
 } from '@thesis-ledger/schemas';
 import { generationStructuralPreview as structuralPreview } from './ai-generation-structural-preview.js';
+import { AiGenerationOutputValidationError } from './ai-generation-output-error.js';
 import {
   AiSdkGenerationError,
   sanitize,
@@ -23,7 +24,7 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const outputError = (error: unknown) => {
   let current: unknown = error;
   for (let depth = 0; depth < 3; depth += 1) {
-    if (NoObjectGeneratedError.isInstance(current)) return current;
+    if (NoObjectGeneratedError.isInstance(current) || current instanceof AiGenerationOutputValidationError) return current;
     current = asRecord(current)?.cause;
   }
   return null;
@@ -59,7 +60,7 @@ export const generationFailureDiagnostic = (
 ): AiGenerationFailureDiagnostic => {
   const source = outputError(error);
   const text = source?.text ?? responseText;
-  const model = source?.response?.modelId ?? completion?.actualModel;
+  const model = (source instanceof AiGenerationOutputValidationError ? null : source?.response?.modelId) ?? completion?.actualModel;
   const safeModel = safeActualModel(model);
   const errorClass = generationErrorClass(error, Boolean(source));
   return aiGenerationFailureDiagnosticSchema.parse({
@@ -68,7 +69,7 @@ export const generationFailureDiagnostic = (
     ...(httpRequest ? { httpRequest } : {}),
     errorClass,
     generationMode: mode,
-    finishReason: source?.finishReason ?? completion?.finishReason ?? null,
+    finishReason: (source instanceof AiGenerationOutputValidationError ? null : source?.finishReason) ?? completion?.finishReason ?? null,
     actualModel: safeModel,
     outputCharacters: typeof text === 'string' ? text.length : null,
     outputSha256: typeof text === 'string' ? createHash('sha256').update(text).digest('hex') : null,
@@ -88,13 +89,21 @@ export const schemaGenerationFailure = (
 ) => {
   const researchV2 =
     input.contract.id === 'research' && input.contract.version === 'research-generation-v2';
+  const source = outputError(error);
+  const finish = source instanceof AiGenerationOutputValidationError ? completion?.finishReason : source?.finishReason ?? completion?.finishReason;
+  let code: 'schema_invalid' | 'output_truncated' | 'refused' | 'provider_stream_error' = 'schema_invalid';
+  if (finish === 'length') code = 'output_truncated';
+  else if (finish === 'content-filter') code = 'refused';
+  else if (finish && finish !== 'stop') code = 'provider_stream_error';
+  let summary = researchV2 ? '结构化响应未通过解析或契约校验' : sanitize(error);
+  if (code !== 'schema_invalid') summary = `Provider 结束原因为 ${finish}`;
   return new AiSdkGenerationError(
     aiGenerationErrorSchema.parse({
-      code: 'schema_invalid',
+      code,
       phase: 'validation',
       externalResult: 'complete',
       requestId: input.requestId,
-      summary: researchV2 ? '结构化响应未通过解析或契约校验' : sanitize(error),
+      summary,
       ...(researchV2 || completion
         ? {
             diagnostic: generationFailureDiagnostic(
@@ -148,6 +157,8 @@ function generationErrorClass(
   error: unknown,
   hasOutputError: boolean,
 ): AiGenerationFailureDiagnostic['errorClass'] {
+  if (error instanceof AiGenerationOutputValidationError)
+    return error.cause instanceof SyntaxError ? 'syntax' : 'schema';
   if (hasOutputError) return 'no_object';
   if (NoOutputGeneratedError.isInstance(error)) return 'no_output';
   if (error instanceof SyntaxError) return 'syntax';

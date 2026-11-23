@@ -212,3 +212,4 @@ export * from './optimization-model-resolution.js';
 export * from './optimization-budget-limits.js';
 export * from './risk-notification-settings.js';
 export * from './arena-history-source.js';
+export * from './market-historical-execution.js';

@@ -112,6 +112,9 @@ function assertFrozenWindowRequest(
   input: MarketBarWindowReadInputV3,
 ) {
   const original = frozen.response;
+  if ((input.dailyObservationVersion ?? 1) !== (frozen.request.dailyObservationVersion ?? 1) ||
+      ((frozen.request.dailyObservationVersion ?? 1) === 2 && !input.priceResearch))
+    throw new Error('冻结日级观察版本不匹配或未明确启用价格研究');
   if (input.tradabilityMode && frozen.request.tradabilityMode !== input.tradabilityMode)
     throw new Error('冻结窗口不具备请求的日级证据');
   const window = input.window;

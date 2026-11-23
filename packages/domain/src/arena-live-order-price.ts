@@ -16,6 +16,14 @@ export function arenaOrderFee(q: ArenaPaperQuote, side: 'buy' | 'sell', quantity
   const charge = side === 'buy' ? q.statutoryBuyFee : q.statutorySellFee;
   return commission.plus(charge(amount.toString(), quantity.toString(), price.toString()));
 }
+
+/** 部分成交按最小手数逐笔计费预留上界，避免后续最低手续费挤占其他批次预算。 */
+export function arenaBuyReservedCash(q: ArenaPaperQuote, quantity: D, price: D, fees: ArenaPaperFees, partial: boolean) {
+  if (quantity.isZero()) return '0';
+  const fee = partial ? arenaOrderFee(q, 'buy', D.from(q.lot), price, fees).times(quantity.dividedBy(q.lot, 0))
+    : arenaOrderFee(q, 'buy', quantity, price, fees);
+  return quantity.times(price).plus(fee).toString();
+}
 export function arenaQuoteExecutable(q: ArenaPaperQuote, at: string, after: string) {
   const market = Date.parse(q.marketTime), observed = Date.parse(q.observedAt), now = Date.parse(at);
   return Number.isFinite(market) && Number.isFinite(observed) && market > Date.parse(after) &&

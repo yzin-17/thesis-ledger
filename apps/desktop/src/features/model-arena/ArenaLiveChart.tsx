@@ -106,7 +106,7 @@ export function ArenaLiveChart({ detail, onSelectAgent }: { detail: ArenaLiveDet
     };
   }, [detail, period, nav, trades, theme, hidden, clock, start]);
   const active = frames.find((f) => Math.floor(Date.parse(f.at) / 1000) === Math.floor(Date.parse(selected?.at ?? '') / 1000));
-  return <section className="grid gap-3 min-w-0">
+  return <section className="grid min-w-0 grid-cols-1 gap-3">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">{nav ? '账户净值' : '赛季累计收益'}</h2>
       <div className="flex flex-wrap gap-1">{([['today', '今日'], ['week', '近一周'], ['month', '近一月'], ['all', '全部']] as const).map(([value, label]) =>
         <Button size="sm" key={value} variant={period === value ? 'secondary' : 'outline'} aria-pressed={period === value} onClick={() => setPeriod(value)}>{label}</Button>)}
@@ -115,8 +115,8 @@ export function ArenaLiveChart({ detail, onSelectAgent }: { detail: ArenaLiveDet
         <Button size="sm" variant="outline" onClick={() => { following.current = true; if (instance.current) restoreArenaLiveViewport(instance.current, instance.current.timeScale().getVisibleRange(), true, clock, start); }}>回到最新</Button></div></div>
     <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">{[...detail.agents.map((a, i) => ({ id: a.id, title: a.model, color: arenaSeriesColors[i % arenaSeriesColors.length]!, model: true })),
       ...detail.protocol.benchmarks.map((id, i) => ({ id, title: id === 'cash' ? '现金基准' : '固定篮子', color: i ? '#78716c' : '#94a3b8', model: false }))].map((a) => <span key={a.id} className="inline-flex min-w-0 max-w-full items-center gap-1">
-        <span className="h-0.5 w-4" style={{ backgroundColor: a.color }} />
-        {a.model ? <Button size="sm" variant="ghost" className="h-auto min-w-0 max-w-80 justify-start border-0 p-0" title={a.title} onClick={() => onSelectAgent(a.id)}><span className="truncate">{a.title}</span></Button> : <span>{a.title}</span>}
+        <span className="h-0.5 w-4 shrink-0" style={{ backgroundColor: a.color }} />
+        {a.model ? <Button size="sm" variant="ghost" className="h-auto min-w-0 max-w-80 shrink justify-start border-0 p-0" title={a.title} onClick={() => onSelectAgent(a.id)}><span className="truncate">{a.title}</span></Button> : <span>{a.title}</span>}
         <Button size="icon-sm" variant="ghost" aria-label={(hidden.includes(a.id) ? '显示 ' : '隐藏 ') + a.title} aria-pressed={!hidden.includes(a.id)}
           onClick={() => setHidden(hidden.includes(a.id) ? hidden.filter((id) => id !== a.id) : [...hidden, a.id])}>{hidden.includes(a.id) ? <EyeOff /> : <Eye />}</Button></span>)}</div>
     <div className="relative min-w-0" onMouseLeave={() => setSelected(null)}><div ref={container} className="h-[440px] w-full min-w-0 overflow-hidden sm:h-[clamp(520px,68vh,720px)] [&_table]:w-auto [&_td]:p-0" role="img" aria-label="各参赛模型的赛季累计收益和净值曲线" />

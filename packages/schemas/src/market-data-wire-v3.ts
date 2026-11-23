@@ -48,6 +48,7 @@ export const marketDataContractCapabilitiesV3Schema = z.strictObject({
   dataContractVersions: z.tuple([z.literal(3)]),
   serviceCapabilities: z.strictObject({ fundNav: z.literal(true) }),
   multiWindowProtocols: z.array(z.literal('market-multi-window-content-v1')).max(1).optional(),
+  dailyObservationVersions: z.array(z.union([z.literal(1), z.literal(2)])).max(2).optional(),
 });
 export type MarketDataContractCapabilitiesV3 = z.infer<
   typeof marketDataContractCapabilitiesV3Schema
@@ -61,16 +62,20 @@ export const marketDataBarSeriesRequestV3Schema = z
     routeKey: marketDataBarRouteKeyV3Schema,
     /** DSA must verify this target remains eligible before dispatching only to it. */
     routeTarget: marketDataRouteTargetPinV3Schema.optional(),
-    tradabilityMode: z.literal('assume-untradable-no-bar').optional(),
+    tradabilityMode: z.enum(['assume-untradable-no-bar', 'observed-bars-only']).optional(),
+    dailyObservationVersion: z.union([z.literal(1), z.literal(2)]).optional(),
     start: isoDate,
     end: isoDate,
   })
   .superRefine((request, context) => {
+    if (request.dailyObservationVersion !== undefined &&
+        (request.routeKey.timeframe !== '1d' || request.tradabilityMode !== 'assume-untradable-no-bar'))
+      context.addIssue({ code: 'custom', path: ['dailyObservationVersion'], message: '日级观察版本须显式请求日线观察证据' });
     if (request.start > request.end) {
       context.addIssue({ code: 'custom', path: ['end'], message: '请求区间 end 不得早于 start' });
     }
     if (
-      request.tradabilityMode &&
+      request.tradabilityMode === 'assume-untradable-no-bar' &&
       (!['CN', 'HK', 'US'].includes(request.routeKey.market) || request.routeKey.timeframe !== '1d')
     ) {
       context.addIssue({
@@ -79,6 +84,8 @@ export const marketDataBarSeriesRequestV3Schema = z
         message: '缺日假设仅支持已接入的 CN/HK/US 日线',
       });
     }
+    if (request.tradabilityMode === 'observed-bars-only' && request.routeKey.timeframe !== '1m')
+      context.addIssue({ code: 'custom', path: ['tradabilityMode'], message: '实际分钟观察模式仅支持原始一分钟行情' });
   });
 export type MarketDataBarSeriesRequestV3 = z.infer<typeof marketDataBarSeriesRequestV3Schema>;
 
@@ -112,6 +119,25 @@ const barsV3Schema = z
       }
     }
   });
+
+function dailyBarVolumesMatchObservations(response: {
+  routeKey: { timeframe: string; market: keyof typeof marketCalendarTimezonesV3 };
+  bars: { timestamp: string; volume: number | null }[];
+  historicalTradabilityWindows?: z.infer<typeof backtestDailyTradabilityEvidenceV3Schema>[] | undefined;
+}): boolean {
+  if (response.routeKey.timeframe !== '1d') return true;
+  const days = new Map(response.historicalTradabilityWindows?.flatMap((window) => window.days.map((day) =>
+    [day.date, { state: day.state, version: window.contractVersion }] as const)) ?? []);
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: marketCalendarTimezonesV3[response.routeKey.market],
+    year: 'numeric', month: '2-digit', day: '2-digit' });
+  return response.bars.every((bar) => {
+    const date = formatter.format(new Date(bar.timestamp));
+    const day = days.get(date);
+    return day?.state === 'observed-price-only'
+      ? day.version === 2 && bar.volume === null
+      : day?.state === 'observed-traded' && bar.volume !== null && bar.volume > 0;
+  });
+}
 
 export const marketDataBarSeriesCoverageV3Schema = z
   .strictObject({
@@ -166,6 +192,8 @@ export const marketDataBarSeriesResponseV3Schema = z
     symbol: text,
     routeKey: marketDataBarRouteKeyV3Schema,
     bars: barsV3Schema,
+    /** 分钟标签含义必须由来源证明；缺失或 source-native 不认证盘中完成时点。 */
+    timestampConvention: z.enum(['interval-start', 'interval-end', 'source-native']).optional(),
     coverage: marketDataBarSeriesCoverageV3Schema,
     coverageProof: marketCoverageProofV3Schema,
     /** DSA source facts only; Server quantity/accounting/history decisions stay out of this wire. */
@@ -229,17 +257,11 @@ export const marketDataBarSeriesResponseV3Schema = z
             routeKey: response.routeKey,
             target: response.provenance,
             coverageProof: proof,
+            allowPriceOnly: response.historicalTradabilityWindows[0]?.contractVersion === 2,
           },
         );
-        if (
-          response.bars.some(
-            (bar) =>
-              bar.volume === null ||
-              bar.volume <= 0 ||
-              Math.min(bar.open, bar.high, bar.low, bar.close) <= 0,
-          )
-        ) {
-          throw new Error('日级已交易 Bar 必须有正成交量及正 OHLC');
+        if (!dailyBarVolumesMatchObservations(response) || response.bars.some((bar) => Math.min(bar.open, bar.high, bar.low, bar.close) <= 0)) {
+          throw new Error('日级Bar的成交量须与观察版本及状态一致，并保持正OHLC');
         }
       } catch (error) {
         context.addIssue({
@@ -317,6 +339,8 @@ export const marketDataBarSeriesRequestResponseV3Schema = z
     response: marketDataBarSeriesResponseV3Schema,
   })
   .superRefine(({ request, response }, context) => {
+    if (response.historicalTradabilityWindows?.some((window) => window.contractVersion !== (request.dailyObservationVersion ?? 1)))
+      context.addIssue({ code: 'custom', path: ['response', 'historicalTradabilityWindows'], message: '日级观察版本与请求不一致' });
     if (Boolean(request.tradabilityMode) !== Boolean(response.historicalTradabilityWindows)) {
       context.addIssue({
         code: 'custom',

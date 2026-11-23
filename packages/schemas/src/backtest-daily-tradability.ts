@@ -30,8 +30,8 @@ const barSource = z.strictObject({
     kind: z.literal('bar'),
     market: z.enum(['CN', 'HK', 'US']),
     assetType: z.enum(['STOCK', 'ETF']),
-    capability: z.literal('DAILY_BAR'),
-    timeframe: z.literal('1d'),
+    capability: z.enum(['DAILY_BAR', 'MINUTE_BAR']),
+    timeframe: z.enum(['1d', '1m']),
     adjustment: z.enum(['none', 'qfq', 'hfq']),
   }),
   routeTarget: marketRouteTargetSchema.strict(),
@@ -45,7 +45,7 @@ const barSource = z.strictObject({
 const day = z
   .strictObject({
     date: isoDate,
-    state: z.enum(['observed-traded', 'assumed-untradable-no-bar']),
+    state: z.enum(['observed-traded', 'observed-price-only', 'assumed-untradable-no-bar']),
     excludedZeroVolumeObservation: z
       .strictObject({
         open: positiveDecimalStringSchema,
@@ -69,7 +69,7 @@ const day = z
  */
 const dailyTradabilityEvidenceFields = z
   .strictObject({
-    contractVersion: z.literal(1),
+    contractVersion: z.union([z.literal(1), z.literal(2)]),
     symbol: nonempty,
     market: z.enum(['CN', 'HK', 'US']),
     instrumentType: z.enum(['STOCK', 'ETF']),
@@ -100,6 +100,14 @@ export const backtestDailyTradabilityEvidenceV3Schema = dailyTradabilityEvidence
   .superRefine((value, context) => {
     const { start, end } = value.range;
     validateZeroVolumeExclusion(value, context);
+    const minute = value.barSource.routeKey.timeframe === '1m';
+    if ((value.contractVersion === 1 && value.days.some((day) => day.state === 'observed-price-only')) ||
+        (minute && value.contractVersion === 2))
+      context.addIssue({ code: 'custom', path: ['contractVersion'], message: '价格观察状态仅适用于显式日级观察版本2' });
+    if ((value.barSource.routeKey.capability === 'MINUTE_BAR') !== minute)
+      context.addIssue({ code: 'custom', path: ['barSource', 'routeKey'], message: '行情能力与周期不一致' });
+    if (minute && value.days.some((day) => day.state !== 'observed-traded' || day.excludedZeroVolumeObservation))
+      context.addIssue({ code: 'custom', path: ['days'], message: '分钟来源只接受实际观察交易日，不能把缺分钟推断为全天不可交易' });
     if (value.market !== value.barSource.routeKey.market)
       context.addIssue({
         code: 'custom',

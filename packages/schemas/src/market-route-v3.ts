@@ -90,7 +90,7 @@ const route = z
     enabled: z.boolean().optional(),
   })
   .superRefine((value, context) => {
-    if (isStatusCapabilityNameV1(value.key.capability) && value.enabled === undefined)
+    if ((isStatusCapabilityNameV1(value.key.capability) || value.key.capability === 'HISTORICAL_EXECUTION_CONTEXT') && value.enabled === undefined)
       context.addIssue({
         code: 'custom',
         path: ['enabled'],

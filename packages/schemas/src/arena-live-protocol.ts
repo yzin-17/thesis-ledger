@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { arenaProtocolSchema } from './model-arena.js';
 import { currencyForMarket } from './backtest-values.js';
 import { arenaLiveBudgetSchema } from './arena-live-budget.js';
+import { arenaExitQuantitySchema, arenaTrailingStopSchema } from './arena-live-protection-input.js';
 
 export const arenaDecimalSchema = z.string().regex(/^(?:0|[1-9]\d{0,17})(?:\.\d{1,40})?$/);
 export const arenaPositiveDecimalSchema = arenaDecimalSchema.refine((v) => /[1-9]/.test(v), '数值须大于零');
@@ -33,6 +34,11 @@ export const arenaLiveProtocolSchema = z.strictObject({
   startsOn: z.iso.date().nullable().default(null),
   endsOn: z.iso.date().nullable().default(null),
   calendarVersion: z.string().min(1).nullable().default(null),
+  simulationPolicy: z.literal('sampled-v1').optional().describe('统一研究账户规则：配置费用、内地隔日可卖、卖款当日可再投资。'),
+  matching: z.strictObject({
+    kind: z.literal('simulated_volume'),
+    maxSharesPerObservation: arenaPositiveDecimalSchema,
+  }).optional().describe('显式模拟上限：每份新行情按账户和标的共享股数额度，按手数向下取整；未设置时整笔成交。不是订单簿流动性。'),
   decisionDeadlineMinutes: arenaProtocolSchema.shape.decisionDeadlineMinutes.nullable().default(null),
   universe: z.enum(['fixed', 'market']),
   instruments: z.array(arenaProtocolSchema.shape.instruments.element).max(50).default([]),
@@ -76,7 +82,7 @@ export const arenaWakeupInputSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({ kind: z.literal('fill'), symbol: label.nullable() }),
 ]);
-export const arenaOrderInputSchema = z.strictObject({
+const arenaOrderInputBaseSchema = z.strictObject({
   clientId: label,
   symbol: label,
   side: z.enum(['buy', 'sell']),
@@ -86,7 +92,31 @@ export const arenaOrderInputSchema = z.strictObject({
   expiresOn: z.iso.date().nullable()
     .describe('委托到期交易日，按比赛市场时区填写 YYYY-MM-DD 日期或 null；市价委托必须为 null。此字段不填写时分秒或时区，具体观察时刻由 wakeups.at 指定。'),
   exitGroup: label.nullable(),
-}).superRefine((o, ctx) => {
+  entryAfter: z.strictObject({ clientId: label, activation: z.literal('on_full_fill') }).nullable().optional(),
+  onFill: z.strictObject({
+    activation: z.enum(['on_full_fill', 'on_each_fill']).describe('全成后激活或每次成交即按量激活；两者都可用于staged分档退出。'),
+    afterExit: z.enum(['cancel_entry_remainder', 'keep_entry_remainder']).optional(),
+    exitPolicy: z.enum(['single', 'oco', 'staged']).optional().describe('single为单一止损，oco为首次成交互斥两腿，staged为分档止盈后保留余仓止损；staged各子单exitGroup均为null，止盈数量使用parent_filled_fraction。'),
+    activateOrders: z.array(z.strictObject({
+      clientId: label,
+      side: z.literal('sell'),
+      kind: z.enum(['stop_loss', 'take_profit']),
+      exitGroup: label.nullable().optional(),
+      price: arenaPositiveDecimalSchema,
+      quantity: arenaExitQuantitySchema,
+      trailing: arenaTrailingStopSchema.nullable().optional(),
+      reduceOnly: z.literal(true),
+      validUntil: z.discriminatedUnion('kind', [
+        z.strictObject({ kind: z.literal('activation_session_close') }),
+        z.strictObject({ kind: z.literal('date'), expiresOn: z.iso.date() }),
+      ]),
+    })).min(1).max(11),
+  }).nullable().optional().describe('买入父单可附单一止损、同组OCO或显式staged退出；分档退出可全成或逐次激活，额度按本批累计实际成交量乘比例、按手数向下取整，再扣除本档累计已退出量；余仓由止损覆盖。逐次保护必须声明退出后如何处理入场余量。'),
+});
+export const arenaOrderInputSchema = arenaOrderInputBaseSchema.superRefine((o, ctx) => {
+  if (o.onFill && o.side !== 'buy')
+    ctx.addIssue({ code: 'custom', path: ['onFill'], message: '成交保护只能附属于买入父单' });
+  if (o.onFill) validateArenaFillProtection(o.onFill, ctx);
   if (o.kind === 'market' && o.expiresOn !== null)
     ctx.addIssue({ code: 'custom', path: ['expiresOn'], message: '市价委托只在当前会话有效，不指定到期日' });
   if (o.kind !== 'market' && o.price === null)
@@ -98,14 +128,23 @@ export const arenaOrderInputSchema = z.strictObject({
 });
 export const arenaLiveDecisionSchema = z.strictObject({
   summary: z.string().trim().min(1).max(8000),
-  orders: z.array(arenaOrderInputSchema).max(100),
-  cancelOrderIds: z.array(z.uuid()).max(100),
+  orders: z.array(arenaOrderInputSchema).max(100).describe('仅填写本次新增委托。保留账户已有委托不需要重复列出；只撤单时填写空数组。'),
+  cancelOrderIds: z.array(z.uuid()).max(100).describe('明确撤销的已有订单id；撤入场余量和撤保护分别使用对应订单id，不能通过重建整份已有计划来撤单。'),
   wakeups: z.array(arenaWakeupInputSchema).min(1).max(100),
   watchedSymbols: z.array(label).max(200),
 }).superRefine((d, ctx) => {
-  if (new Set(d.orders.map((o) => o.clientId)).size !== d.orders.length)
+  const ids = d.orders.flatMap((o) => [o.clientId, ...(o.onFill?.activateOrders.map((child) => child.clientId) ?? [])]);
+  if (new Set(ids).size !== ids.length)
     ctx.addIssue({ code: 'custom', path: ['orders'], message: '委托标识重复' });
   const groups = new Map<string, typeof d.orders>();
+  for (const [index, order] of d.orders.entries()) if (order.entryAfter) {
+    const previous = d.orders.slice(0, index).find(o => o.clientId === order.entryAfter!.clientId);
+    if (order.side !== 'buy' || previous?.side !== 'buy')
+      ctx.addIssue({ code: 'custom', path: ['orders', index, 'entryAfter'], message: '顺序建仓须引用本次决策中更早的买入委托' });
+  }
+  const attachedGroups = d.orders.flatMap(o => o.onFill?.activateOrders[0]?.exitGroup ? [o.onFill.activateOrders[0].exitGroup] : []);
+  if (new Set(attachedGroups).size !== attachedGroups.length || d.orders.some(o => o.exitGroup && attachedGroups.includes(o.exitGroup)))
+    ctx.addIssue({ code: 'custom', path: ['orders'], message: '附属退出组须独立属于一个父单' });
   for (const order of d.orders) {
     if (order.exitGroup) groups.set(order.exitGroup, [...(groups.get(order.exitGroup) ?? []), order]);
   }
@@ -119,3 +158,41 @@ export const arenaLiveDecisionSchema = z.strictObject({
 export type ArenaLiveDecision = z.infer<typeof arenaLiveDecisionSchema>;
 export type ArenaOrderInput = z.infer<typeof arenaOrderInputSchema>;
 export type ArenaWakeupInput = z.infer<typeof arenaWakeupInputSchema>;
+
+type ArenaFillProtection = NonNullable<z.infer<typeof arenaOrderInputBaseSchema>['onFill']>;
+
+function validateArenaFillProtection(protection: ArenaFillProtection, ctx: z.RefinementCtx) {
+  const legs = protection.activateOrders;
+  const validSingle = legs.length === 1 && legs[0]!.kind === 'stop_loss' && !legs[0]!.exitGroup && legs[0]!.quantity.basis === 'parent_open_quantity';
+  const validPair = isProtectionPair(legs);
+  const staged = isStagedProtection(protection);
+  const single = (!protection.exitPolicy || protection.exitPolicy === 'single') && validSingle;
+  const pair = (!protection.exitPolicy || protection.exitPolicy === 'oco') && validPair;
+  if (!(staged || single || pair))
+    ctx.addIssue({ code: 'custom', path: ['onFill', 'activateOrders'], message: '附属退出须为单一止损、同组同期限的止盈止损，或余仓止损加比例止盈档位' });
+  if (legs.some(l => l.trailing && l.kind !== 'stop_loss'))
+    ctx.addIssue({ code: 'custom', path: ['onFill', 'activateOrders'], message: '移动保护只用于止损腿' });
+  // 使用整数比例交叉相乘，避免小数舍入使累计退出比例超过一。
+  let numerator = 0n, denominator = 1n;
+  for (const leg of legs) if (leg.quantity.basis === 'parent_filled_fraction') {
+    numerator = numerator * BigInt(leg.quantity.denominator) + BigInt(leg.quantity.numerator) * denominator;
+    denominator *= BigInt(leg.quantity.denominator);
+  }
+  if (numerator > denominator)
+    ctx.addIssue({ code: 'custom', path: ['onFill', 'activateOrders'], message: '分档退出比例之和不得超过本批成交量' });
+  if (protection.activation === 'on_each_fill' && !protection.afterExit)
+    ctx.addIssue({ code: 'custom', path: ['onFill', 'afterExit'], message: '逐次保护须明确退出后如何处理入场余量' });
+}
+
+function isProtectionPair(legs: ArenaFillProtection['activateOrders']) {
+  return legs.length === 2 && new Set(legs.map((leg) => leg.kind)).size === 2 &&
+    !!legs[0]!.exitGroup && legs[0]!.exitGroup === legs[1]!.exitGroup &&
+    JSON.stringify(legs[0]!.validUntil) === JSON.stringify(legs[1]!.validUntil) && legs.every(l => l.quantity.basis === 'parent_open_quantity');
+}
+
+function isStagedProtection(protection: ArenaFillProtection) {
+  const legs = protection.activateOrders;
+  return protection.exitPolicy === 'staged' && legs.length >= 2 &&
+    legs.filter(l => l.kind === 'stop_loss').length === 1 && legs.every(l => !l.exitGroup &&
+      (l.kind === 'stop_loss' ? l.quantity.basis === 'parent_open_quantity' : l.quantity.basis === 'parent_filled_fraction'));
+}

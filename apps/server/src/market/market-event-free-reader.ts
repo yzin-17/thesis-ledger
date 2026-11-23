@@ -33,6 +33,7 @@ type EventFreeSource = NonNullable<
 function supportsEventFreeInput(input: MarketBarWindowReadInputV3) {
   if (
     !input.priceResearch ||
+    input.dailyObservationVersion === 2 ||
     input.frozenWindowRef ||
     input.market !== 'CN' ||
     input.routeKey.assetType !== 'STOCK' ||

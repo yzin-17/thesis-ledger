@@ -46,6 +46,9 @@ export async function planFailedResearchWakeup(
 ): Promise<FailedResearchWakeupPlan> {
   const stopped: FailedResearchWakeupPlan = { account: null, canContinue: false, repeatedInvalidOutput: false, recovery: null };
   if (match.state !== 'running') return stopped;
+  const calls = asRecord(audit)?.calls;
+  const latest = Array.isArray(calls) ? asRecord(calls.at(-1)) : null;
+  if (asRecord(latest?.error)?.code === 'output_truncated') return stopped;
   const [previous] = await db.$queryRaw<{ state: string; reason: string | null }[]>`SELECT state,reason
     FROM "ArenaLiveCycle" WHERE "agentId"=${agent.id}::uuid AND id<>${cycleId}::uuid
     ORDER BY "createdAt" DESC LIMIT 1`;

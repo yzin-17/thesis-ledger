@@ -1,0 +1,189 @@
+{
+  "matchId": "5a9817c2-e994-45af-896d-7e24bbc4633b",
+  "cycleId": "7dd9227b-fdbc-41cd-8479-9ada4f1b7805",
+  "requestId": "c3534c66-35d9-48b8-adf7-6a35d7927da3",
+  "asOf": "2026-11-02T02:30:00.000Z",
+  "protocol": {
+    "version": 2,
+    "title": "test · 历史回放 · 1116",
+    "market": "CN",
+    "currency": "CNY",
+    "calendarId": "CN",
+    "calendarVersion": null,
+    "timeZone": "Asia/Shanghai",
+    "startsOn": "2026-11-02",
+    "endsOn": null,
+    "instruments": [],
+    "entrants": [
+      {
+        "providerId": "lmstudio",
+        "model": "qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive@q4_k_m",
+        "budget": {
+          "requests": null,
+          "tokens": null,
+          "costMicros": null
+        },
+        "maxInputTokens": null,
+        "maxOutputTokens": null
+      }
+    ],
+    "initialCash": "100000",
+    "maxPositionBps": 10000,
+    "fees": {
+      "version": "fixed-v1",
+      "buyBps": 0,
+      "sellBps": 0,
+      "minimum": "0",
+      "slippageBps": 0
+    },
+    "benchmarks": [
+      "cash"
+    ],
+    "decisionDeadlineMinutes": null,
+    "maxInfrastructureAttempts": 3,
+    "budgetCurrency": "CNY",
+    "budget": {
+      "requests": null,
+      "tokens": null,
+      "costMicros": null
+    },
+    "universe": "market",
+    "allowWebSearch": true,
+    "resources": {
+      "maxActiveSymbols": 50,
+      "maxResearchSteps": null,
+      "maxCycleSeconds": null,
+      "quoteIntervalSeconds": 30,
+      "maxQuoteAgeSeconds": 60
+    }
+  },
+  "account": {
+    "revision": 5,
+    "cash": "79649.186",
+    "positions": [
+      {
+        "symbol": "510300.SH",
+        "quantity": "5000",
+        "acquiredOn": "2026-11-02",
+        "availableOn": "2026-11-03",
+        "entryOrderId": "dd25ec79-259e-47d6-977c-d939db38067f"
+      }
+    ],
+    "cashSettlements": [],
+    "orders": [
+      {
+        "clientId": "9332ecf3-cc70-427c-adc5-06d5a336c822:buy_510300_001",
+        "symbol": "510300.SH",
+        "side": "buy",
+        "kind": "limit",
+        "quantity": "5000",
+        "price": "4.07",
+        "expiresOn": "2026-11-02",
+        "exitGroup": null,
+        "entryAfter": null,
+        "onFill": {
+          "activation": "on_full_fill",
+          "afterExit": "cancel_entry_remainder",
+          "exitPolicy": "single",
+          "activateOrders": [
+            {
+              "clientId": "9332ecf3-cc70-427c-adc5-06d5a336c822:stop_510300_001",
+              "side": "sell",
+              "kind": "stop_loss",
+              "exitGroup": null,
+              "price": "4.065",
+              "quantity": {
+                "basis": "parent_open_quantity"
+              },
+              "reduceOnly": true,
+              "validUntil": {
+                "kind": "date",
+                "expiresOn": "2026-11-02"
+              }
+            }
+          ]
+        },
+        "id": "dd25ec79-259e-47d6-977c-d939db38067f",
+        "createdAt": "2026-11-02T01:31:00.000Z",
+        "activeSince": "2026-11-02T01:31:00.001Z",
+        "expiresAt": "2026-11-02T07:00:00.000Z",
+        "state": "filled",
+        "reservedCash": "0",
+        "filledQuantity": "5000",
+        "remainingQuantity": "0",
+        "reason": null
+      },
+      {
+        "clientId": "9332ecf3-cc70-427c-adc5-06d5a336c822:stop_510300_001",
+        "symbol": "510300.SH",
+        "side": "sell",
+        "kind": "stop_loss",
+        "quantity": "5000",
+        "price": "4.065",
+        "expiresOn": "2026-11-02",
+        "exitGroup": null,
+        "id": "aaa5dd04-526c-43c1-a3b6-40b42102996c",
+        "createdAt": "2026-11-02T01:31:00.000Z",
+        "activeSince": "2026-11-02T01:32:00.000Z",
+        "expiresAt": "2026-11-02T07:00:00.000Z",
+        "state": "cancelled",
+        "parentOrderId": "dd25ec79-259e-47d6-977c-d939db38067f",
+        "quantityLot": "100",
+        "exitQuantity": {
+          "basis": "parent_open_quantity"
+        },
+        "validUntil": {
+          "kind": "date",
+          "expiresOn": "2026-11-02"
+        },
+        "reservedCash": "0",
+        "filledQuantity": "0",
+        "remainingQuantity": "5000",
+        "reason": "model_cancelled"
+      }
+    ],
+    "wakeups": [
+      {
+        "id": "3c5fa35c-4b0f-4553-819d-393308d07aa8",
+        "condition": {
+          "kind": "time",
+          "at": "2026-11-02T02:30:00.000Z"
+        },
+        "createdAt": "2026-11-02T02:15:00.000Z",
+        "firedAt": "2026-11-02T02:30:00.000Z"
+      }
+    ],
+    "watchedSymbols": [
+      "510300.SH"
+    ],
+    "fills": [
+      {
+        "id": "8f916ae1-adde-4d64-a8fa-7bd479ea8c58",
+        "orderId": "dd25ec79-259e-47d6-977c-d939db38067f",
+        "symbol": "510300.SH",
+        "side": "buy",
+        "quantity": "5000",
+        "price": "4.07",
+        "fee": "0.814",
+        "cashDelta": "-20350.814",
+        "marketTime": "2026-11-02T01:32:00.000Z",
+        "recordedAt": "2026-11-02T01:32:00.000Z",
+        "sourceRef": "90914e5f50cfd350ace975a1302da8e2229e7c57ab29ef52a987110565a036da"
+      }
+    ]
+  },
+  "outputText": "{\"action\":\"decision\",\"decision\":{\"summary\":\"持有510300.SH 5000股，成本4.07元。当前价格4.091元，日内曾冲高至4.102元后回落，现企稳于MA5(4.09)附近。为锁定日内利润并规避后续回调风险，决定以市价卖出全部持仓止盈离场。\",\"orders\":[{\"clientId\":\"sell_510300_001\",\"symbol\":\"510300.SH\",\"side\":\"sell\",\"kind\":\"market\",\"quantity\":\"5000\",\"price\":null,\"expiresOn\":\"2026-11-02\",\"exitGroup\":null,\"entryAfter\":null,\"onFill\":{\"activation\":\"on_full_fill\",\"afterExit\":\"cancel_entry_remainder\",\"exitPolicy\":\"single\",\"activateOrders\":[{\"clientId\":\"sell_510300_001_exit\",\"side\":\"sell\",\"kind\":\"take_profit\",\"price\":\"4.12\",\"quantity\":{\"basis\":\"parent_open_quantity\"},\"reduceOnly\":true,\"validUntil\":{\"kind\":\"activation_session_close\"}}]}}],\"cancelOrderIds\":[],\"wakeups\":[{\"kind\":\"time\",\"at\":\"2026-11-02T03:00:00Z\"}],\"watchedSymbols\":[\"510300.SH\"]}}",
+  "outputSha256": "f1c614b25e08f4dd76b548e385aed997d0405cdfb0a44959ba88024ea5130128",
+  "error": {
+    "code": "schema_invalid",
+    "phase": "validation",
+    "summary": "No object generated: response did not match schema.",
+    "requestId": "c3534c66-35d9-48b8-adf7-6a35d7927da3",
+    "externalResult": "complete"
+  },
+  "usage": {
+    "status": "reported",
+    "inputTokens": 9229,
+    "outputTokens": 686
+  }
+}
