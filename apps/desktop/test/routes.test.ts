@@ -10,7 +10,6 @@ describe('Desktop routes', () => {
       ['risk-center', '/risk-center'],
       ['strategy', '/strategy'],
       ['arena', '/arena'],
-      ['arena', '/arena'],
       ['journal', '/journal'],
       ['ai-chat', '/ai-chat'],
       ['providers', '/providers'],
