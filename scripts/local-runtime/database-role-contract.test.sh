@@ -2,11 +2,11 @@
 set -euo pipefail
 app_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 if (($# > 1)) || [[ "${1:-}" != '' && "${1:-}" != --check-only ]]; then exit 2; fi
-if ! rg -q 'REVOKE UPDATE, DELETE ON TABLE %I FROM %I' "$app_dir/infra/docker/bootstrap-app-role.sql"; then
+if ! grep -Fq 'REVOKE UPDATE, DELETE ON TABLE %I FROM %I' "$app_dir/infra/docker/bootstrap-app-role.sql"; then
   printf 'app role init SQL 未收紧 LedgerEvent UPDATE/DELETE。\n' >&2
   exit 1
 fi
-if ! rg -q 'REVOKE INSERT, UPDATE, DELETE ON TABLE %I FROM %I' "$app_dir/infra/docker/bootstrap-app-role.sql"; then
+if ! grep -Fq 'REVOKE INSERT, UPDATE, DELETE ON TABLE %I FROM %I' "$app_dir/infra/docker/bootstrap-app-role.sql"; then
   printf 'app role init SQL 未保护 SchemaVersion。\n' >&2
   exit 1
 fi
