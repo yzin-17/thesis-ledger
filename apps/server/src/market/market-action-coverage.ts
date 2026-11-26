@@ -14,17 +14,19 @@ export class MarketActionCoverage {
       now: Date;
     },
     day: string,
+    simulationPolicy?: 'sampled-v1',
   ) {
+    try {
     const [policy, catalog] = await Promise.all([
       this.dsa.effectiveControlPolicyV3(),
       this.dsa.marketRouteCatalogV3(),
     ]);
     const effective = policy.projection?.effective;
-    if (!effective) return null;
+    if (!effective) return simulationPolicy ? ['corporate_actions:coverage_unverified'] : null;
     const refs: string[] = [];
     for (const capability of ['CASH_DISTRIBUTION', 'SPLIT_EVENT'] as const) {
       const scope = {
-        contractVersion: 3 as const,
+        contractVersion: 1 as const,
         requestId: randomUUID(),
         symbol: i.symbol,
         start: i.previousDay,
@@ -41,14 +43,18 @@ export class MarketActionCoverage {
         catalog,
         read: (r) => this.dsa.marketEventsV3(r),
       });
-      if (
-        read.status !== 'observed' ||
-        !read.response.coverage.complete ||
-        read.response.facts.length
-      )
-        return null;
+      if (read.status === 'observed' && read.response.facts.length) return null;
+      if (read.status !== 'observed' || !read.response.coverage.complete) {
+        if (!simulationPolicy) return null;
+        refs.push(`${capability}:coverage_unverified`);
+        continue;
+      }
       refs.push(read.response.coverage.admissionEvidenceRef);
     }
     return refs;
+    } catch (error) {
+      if (simulationPolicy) return ['corporate_actions:coverage_unverified'];
+      throw error;
+    }
   }
 }

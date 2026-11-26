@@ -9,6 +9,9 @@ import { backtestKnownCashDisclosureV3Schema } from './backtest-known-cash-discl
 import { backtestSnapshotActualSourceV3Schema } from './backtest-data.js';
 import { backtestMoneySchema } from './backtest-values.js';
 import { priceResearchSizingSchema, priceResearchProtocolV1 } from './backtest-price-research.js';
+import { researchAnalyticsVersionSchema, validateResearchAnalytics } from './backtest-research-analytics.js';
+import { backtestRuleDiagnosticsSchema } from './backtest-rule-diagnostics.js';
+export { backtestRuleDiagnosticsSchema };
 const issue = (ctx: z.RefinementCtx, path: (string | number)[], message: string) =>
   ctx.addIssue({ code: 'custom', path, message });
 export const simulationFillSchema = z
@@ -200,8 +203,11 @@ export type BacktestBenchmarkCompatibilityV3 = z.infer<
 export const backtestResultSchemaV3 = z
   .strictObject({
     ...backtestResultCoreFields,
-    schemaVersion: z.literal('3'),
-    snapshotVersion: z.literal('snapshot-manifest-v3'),
+    analyticsVersion: researchAnalyticsVersionSchema.optional(),
+    ruleDiagnostics: backtestRuleDiagnosticsSchema.optional(),
+    schemaVersion: z.literal('backtest-trade-result-v1'),
+    snapshotVersion: z.literal('backtest-trade-snapshot-manifest-v1'),
+    dailyOrders: backtestDailyOrderResultSchema.optional(),
     priceResearch: z.strictObject({ protocolVersion: z.literal(priceResearchProtocolV1),
       actualPriceSource: backtestSnapshotActualSourceV3Schema.optional(),
       fundsBalance: backtestMoneySchema,
@@ -219,6 +225,7 @@ export const backtestResultSchemaV3 = z
     benchmarkCompatibility: backtestBenchmarkCompatibilitySchemaV3.optional(),
   })
   .superRefine((result, context) => {
+    validateResearchAnalytics(result, context);
     if (
       Boolean(result.executionPriceProtocol.cashEventResearch) !==
       Boolean(result.cashDividendDisclosure || result.knownCashDividendDisclosure)
@@ -284,3 +291,4 @@ export const backtestErrorSchema = z
   .strict();
 export type BacktestError = z.infer<typeof backtestErrorSchema>;
 export type BacktestErrorCode = (typeof backtestErrorCodes)[number];
+import { backtestDailyOrderResultSchema } from './backtest-daily-order-result.js';

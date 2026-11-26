@@ -18,7 +18,7 @@ const request = () =>
   optimizationRunPreparationRequestSchema.parse({
     target,
     intent: {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'prepare-experiment',
       warmupBudgetSessions: 60,
       adjustment: 'none',
@@ -49,7 +49,7 @@ const request = () =>
     },
   });
 const blocked = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: 'prepare-experiment',
   checkedAt: '2026-09-11T00:00:00Z',
   scope: 'baseline-window',

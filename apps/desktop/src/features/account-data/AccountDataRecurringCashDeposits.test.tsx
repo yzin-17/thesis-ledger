@@ -219,7 +219,7 @@ describe('定期入账失败后的表单恢复', () => {
 });
 
 const transfer: CashTransferEvent = {
-  version: 3,
+  version: 1,
   eventId: '22222222-2222-4222-8222-222222222222',
   factId: '33333333-3333-4333-8333-333333333333',
   accountId: account.id,

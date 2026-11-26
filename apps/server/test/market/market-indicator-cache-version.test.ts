@@ -13,7 +13,7 @@ describe('现行指标缓存命名空间', () => {
     expect(await cache.get('fingerprint:engine')).toBeNull();
     expect(get).toHaveBeenCalledExactlyOnceWith(currentKey);
 
-    const response = { contractVersion: 3, engineVersion: 'dsa-indicator-v3' } as never;
+    const response = { contractVersion: 1, engineVersion: 'dsa-indicator-v3' } as never;
     await cache.set('fingerprint:engine', response, Date.now() + 10_000);
     expect(set).toHaveBeenCalledWith(currentKey, JSON.stringify(response), 'EX', expect.any(Number));
     expect(set).not.toHaveBeenCalledWith(oldKey, expect.anything(), expect.anything(), expect.anything());

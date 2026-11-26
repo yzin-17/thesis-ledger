@@ -97,7 +97,7 @@ describe('场内ETF登记截止权益与可卖/资金状态分离', () => {
     await expect(
       guard.check(
         {
-          contractVersion: 3,
+          contractVersion: 1,
           strategyVersionId: 'old',
           runConfig: legacy.runConfig,
           idempotencyKey: 'old',

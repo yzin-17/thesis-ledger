@@ -43,7 +43,7 @@ export class BacktestKnownCashAcquisitionV3 {
     }
     const prepared = await prepareKnownCashResearchV3({
       scope: {
-        contractVersion: 3,
+        contractVersion: 1,
         protocolVersion: 'known-cash-observations-v1',
         requestId: randomUUID(),
         symbol: request.runConfig.executionModel.scope.symbol,

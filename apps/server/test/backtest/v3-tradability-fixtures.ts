@@ -3,10 +3,12 @@ import type { SnapshotTradabilityWindowV3 } from '../../src/backtest/backtest-sn
 
 export const tradabilityFixtureV3 = (
   window: SnapshotTradabilityWindowV3,
+  dailyObservation?: 1 | 2 | 'market-daily-tradability-window-v1',
 ): BacktestDailyTradabilityEvidenceV3 => {
   const proof = window.coverageProof;
   return {
-    contractVersion: 1,
+    contract: 'market-daily-tradability-window-v1',
+    priceOnlyAllowed: dailyObservation === 2 || dailyObservation === 'market-daily-tradability-window-v1',
     symbol: window.symbol,
     market: 'CN',
     instrumentType: window.routeKey.assetType as 'ETF' | 'STOCK',

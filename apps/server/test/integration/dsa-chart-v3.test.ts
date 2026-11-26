@@ -25,7 +25,7 @@ const setup = () => {
   response.bars.at(-1)!.completionStatus = 'incomplete';
   response.coverage.latestCompleteTradingDate = '2026-05-19';
   const request: MarketChartBarsRequestV3 = {
-    contractVersion: 3,
+    contractVersion: 1,
     purpose: 'interactive-chart',
     requestId: response.requestId,
     symbol: response.symbol,
@@ -58,7 +58,7 @@ describe('DSA 图表 V3 传输', () => {
       'incomplete',
     );
     const [url, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
-    expect(url.pathname).toBe('/api/v3/thesis-ledger/market/chart-bars');
+    expect(url.pathname).toBe('/api/v1/thesis-ledger/market/chart-bars');
     expect(init.headers).toMatchObject({ authorization: 'Bearer test-data-token' });
     expect(JSON.parse(String(init.body))).toEqual(request);
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -85,7 +85,7 @@ describe('DSA 图表 V3 传输', () => {
       ok: false,
       status: 422,
       json: async () => ({
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: request.requestId,
         error: { code: 'unsupported_price_basis', message: '来源不支持请求的价格口径' },
       }),
@@ -107,7 +107,7 @@ describe('DSA 图表 V3 传输', () => {
   ] as const)('保留 %s 的标准来源分类与请求身份', async (kind, code, status) => {
     const { request, client } = setup();
     const fetchMock = vi.fn(async () => ({ ok: false, status, json: async () => ({
-      contractVersion: 3, requestId: request.requestId,
+      contractVersion: 1, requestId: request.requestId,
       error: { code: marketDataErrorCodeV3[kind], message: marketDataErrorMessageV3[kind] },
     }) }));
     vi.stubGlobal('fetch', fetchMock);

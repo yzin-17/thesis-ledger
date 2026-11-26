@@ -24,7 +24,7 @@ it('目录资格属于精确能力，旧目录保持原序列化', () => {
   expect(marketRouteCapabilityV3Schema.parse(entry)).toEqual(entry);
   expect(marketRouteCapabilityV3Schema.safeParse({ ...entry, querySupport: fixtures.querySupport[0] }).success).toBe(false);
   expect(marketRouteCapabilityV3Schema.safeParse({ ...entry, querySupport: fixtures.querySupport[4] }).success).toBe(true);
-  const catalog = { contractVersion: 3, consumer: 'thesis-ledger', catalogRevision: 1,
+  const catalog = { contractVersion: 1, consumer: 'thesis-ledger', catalogRevision: 1,
     generatedAt: '2026-10-10T15:00:00Z', integrity: 'complete', entries: [entry] };
   expect(marketRouteCatalogV3Schema.parse(catalog)).toEqual(catalog);
   expect(marketRouteCatalogV3Schema.safeParse({ ...catalog, entries: [{ ...entry, querySupport: fixtures.querySupport[0] }] }).success).toBe(false);

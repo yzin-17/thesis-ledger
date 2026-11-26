@@ -133,45 +133,15 @@ function JournalRunResult({
   result: NonNullable<Run['result']>;
   onEvidence: (toolCallId: string) => void;
 }) {
-  if (result.version === 2)
-    return (
-      <ResearchBody
-        report={{ result, errorCode: null, errorSummary: null }}
-        evidence={(evidenceId) => {
-          const binding = result.evidenceBindings.find(
-            (item) => item.audit.evidenceId === evidenceId,
-          );
-          if (binding) onEvidence(binding.toolCallId);
-        }}
-      />
-    );
   return (
-    <>
-      <Copy>{result.conclusion}</Copy>
-      {result.evidence.map((entry, i) => (
-        <Section key={i} title={entry.claim}>
-          {entry.citations.map((c, j) => (
-            <Section key={j}>
-              <Copy>
-                来源 {c.provider} · {c.sourceId} · {c.observedAt} · 工具 {c.tool}
-              </Copy>
-              {c.toolCallId ? (
-                <Action
-                  label={'定位解读引用 ' + c.toolCallId}
-                  onPress={() => onEvidence(c.toolCallId!)}
-                />
-              ) : null}
-            </Section>
-          ))}
-        </Section>
-      ))}
-      {result.risks.map((v, i) => (
-        <Copy key={i}>风险：{v}</Copy>
-      ))}
-      {result.unknowns.map((v, i) => (
-        <Copy key={i}>未知项：{v}</Copy>
-      ))}
-      <Copy muted>{result.disclaimer}</Copy>
-    </>
+    <ResearchBody
+      report={{ result, errorCode: null, errorSummary: null }}
+      evidence={(evidenceId) => {
+        const binding = result.evidenceBindings.find(
+          (item) => item.audit.evidenceId === evidenceId,
+        );
+        if (binding) onEvidence(binding.toolCallId);
+      }}
+    />
   );
 }

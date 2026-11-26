@@ -1,3 +1,20 @@
+export type ArenaProtectionValidity = { kind: 'activation_session_close' } | { kind: 'date'; expiresOn: string };
+export type ArenaExitQuantity = { basis: 'parent_open_quantity' } |
+  { basis: 'parent_filled_fraction'; numerator: number; denominator: number };
+export interface ArenaTrailingStop {
+  priceSource: 'executable_quote'; reference: 'highest_since_activation';
+  distance: { kind: 'amount' | 'percent'; value: string };
+  breakEven: { triggerGainPercent: string; reference: 'gross_average_entry_price' } | null;
+}
+export interface ArenaFillProtection {
+  activation: 'on_full_fill' | 'on_each_fill';
+  afterExit?: 'cancel_entry_remainder' | 'keep_entry_remainder' | undefined;
+  exitPolicy?: 'single' | 'oco' | 'staged' | undefined;
+  activateOrders: { clientId: string; side: 'sell'; kind: 'stop_loss' | 'take_profit'; price: string;
+    exitGroup?: string | null | undefined;
+    quantity: ArenaExitQuantity; trailing?: ArenaTrailingStop | null | undefined;
+    reduceOnly: true; validUntil: ArenaProtectionValidity }[];
+}
 export interface ArenaPaperOrder {
   id: string;
   clientId: string;
@@ -8,11 +25,23 @@ export interface ArenaPaperOrder {
   price: string | null;
   expiresOn: string | null;
   exitGroup: string | null;
+  entryAfter?: { clientId: string; activation: 'on_full_fill' } | null | undefined;
+  onFill?: ArenaFillProtection | null | undefined;
+  parentOrderId?: string | null | undefined;
+  activationOrderId?: string | undefined;
+  quantityLot?: string | undefined;
+  exitQuantity?: ArenaExitQuantity | undefined;
+  trailing?: ArenaTrailingStop | null | undefined;
+  trailingState?: { highWater: string; entryPrice: string; triggerPrice: string; marketTime: string; triggered: boolean } | undefined;
+  triggeredAt?: string | undefined;
+  validUntil?: ArenaProtectionValidity | null | undefined;
   createdAt: string;
   activeSince: string;
   expiresAt: string;
-  state: 'active' | 'filled' | 'cancelled' | 'expired' | 'rejected';
+  state: 'waiting_parent' | 'waiting_entry' | 'active' | 'filled' | 'cancelled' | 'expired' | 'rejected';
   reservedCash: string;
+  filledQuantity?: string | undefined;
+  remainingQuantity?: string | undefined;
   reason: string | null;
 }
 export type ArenaPaperCondition =
@@ -42,7 +71,7 @@ export interface ArenaPaperFill {
 export interface ArenaPaperAccount {
   revision: number;
   cash: string;
-  positions: { symbol: string; quantity: string; acquiredOn: string; availableOn: string }[];
+  positions: { symbol: string; quantity: string; acquiredOn: string; availableOn: string; entryOrderId?: string | null | undefined }[];
   cashSettlements: { amount: string; availableOn: string }[];
   orders: ArenaPaperOrder[];
   wakeups: ArenaPaperWakeup[];
@@ -77,7 +106,7 @@ export interface ArenaPaperFees {
 }
 export interface ArenaPaperDecision {
   summary: string;
-  orders: Omit<ArenaPaperOrder, 'id' | 'createdAt' | 'activeSince' | 'expiresAt' | 'state' | 'reservedCash' | 'reason'>[];
+  orders: Omit<ArenaPaperOrder, 'id' | 'createdAt' | 'activeSince' | 'expiresAt' | 'state' | 'reservedCash' | 'reason' | 'parentOrderId' | 'validUntil' | 'filledQuantity' | 'remainingQuantity' | 'activationOrderId' | 'quantityLot' | 'exitQuantity' | 'trailing' | 'trailingState' | 'triggeredAt'>[];
   cancelOrderIds: string[];
   wakeups: ArenaPaperCondition[];
   watchedSymbols: string[];
@@ -90,6 +119,8 @@ export interface ArenaPaperContext {
   maxActiveSymbols: number;
   allowedSymbols: ReadonlySet<string>;
   quotes: readonly ArenaPaperQuote[];
+  valuationPrices?: ReadonlyMap<string, string>;
   expiresAt: (day: string | null, kind?: ArenaPaperOrder['kind']) => string;
   newId: () => string;
+  matching?: { kind: 'simulated_volume'; maxSharesPerObservation: string } | undefined;
 }

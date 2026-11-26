@@ -18,7 +18,7 @@ const providers: ProviderManifest[] = [stateSource, notice].map((target) => ({
   version: 1, configured: true, enabled: true, credentialConfigured: false, requiresCredential: false,
   capabilities: {},
 }));
-const catalog: MarketRouteCatalogReadV3 = { contractVersion: 3, consumer: 'thesis-ledger',
+const catalog: MarketRouteCatalogReadV3 = { contractVersion: 1, consumer: 'thesis-ledger',
   status: 'complete', catalogRevision: 1, generatedAt: '2026-10-11T00:00:00Z', reason: null,
   entries: [
     { key: statusKey, target: stateSource, state: 'ready', querySupport:
@@ -28,7 +28,7 @@ const catalog: MarketRouteCatalogReadV3 = { contractVersion: 3, consumer: 'thesi
     { key: riskKey, target: notice, state: 'ready', querySupport:
       { capability: 'RISK_WARNING', detailKinds: ['riskCategories'], riskCategories: ['delisting', 'other'] } },
   ] };
-const policy: MarketPolicyDraftV3 = { contractVersion: 3, revision: 1, enabled: true, routes: [
+const policy: MarketPolicyDraftV3 = { contractVersion: 1, revision: 1, enabled: true, routes: [
   { key: statusKey, enabled: true, targets: [stateSource, notice] },
   { key: riskKey, enabled: false, targets: [notice] },
 ] };

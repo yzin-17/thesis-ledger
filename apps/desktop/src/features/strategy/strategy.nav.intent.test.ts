@@ -100,7 +100,7 @@ const executionModel = () => ({
 });
 
 const fullConfig = backtestNavRunConfigV3Schema.parse({
-  schemaVersion: '3',
+  schemaVersion: 'backtest-nav-config-v1',
   startDate: '2025-01-02',
   endDate: '2025-01-03',
   dataAsOf: '2025-01-08T00:00:00.000Z',

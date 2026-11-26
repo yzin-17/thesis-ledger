@@ -27,7 +27,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { DsaClient, DsaError } from '../integration/dsa/dsa.client.js';
 
-const root = '/api/v3/thesis-ledger/control/rule-monitor';
+const root = '/api/v1/thesis-ledger/control/rule-monitor';
 type Contract<T> = { safeParse(input: unknown): { success: true; data: T } | { success: false } };
 
 @Controller('api/market-data/rule-monitor')

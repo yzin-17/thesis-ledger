@@ -149,7 +149,7 @@ function useOptimizationSetupController() {
         )
           throw Error('实验能力或当前准备尚未通过。');
         const target = optimizationPreparationTarget(source, versionId, discovery);
-        body = optimizationExperimentCreateSchema.parse({ contractVersion:3,...target,...settings(),runConfig:prepared.runConfig,idempotencyKey:randomUUID() });
+        body = optimizationExperimentCreateSchema.parse({ contractVersion:1,...target,...settings(),runConfig:prepared.runConfig,idempotencyKey:randomUUID() });
         if (
           !(await confirmAction(
             '确认创建优化实验？',
@@ -178,7 +178,7 @@ function useOptimizationSetupController() {
     try {
       const target = optimizationPreparationTarget(source, versionId, discovery);
       const intent = ordinaryPreparationIntentBase(
-        { ...form, priceResearch: true, adjustment: 'hfq', history: 'fixed-provider-snapshot',
+        { ...form, dailyOrders: research.dailyOrders || Boolean(form.dailyOrders), priceResearch: true, adjustment: 'hfq', history: 'fixed-provider-snapshot',
           model: research.model.data?.status === 'available' ? JSON.stringify(research.model.data.model) : '',
           extras: JSON.stringify({ warmupBudgetSessions: Number(warmup) }) },
         randomUUID(),
@@ -329,6 +329,8 @@ export function OptimizationSetupScreen() {
         onChange={(v) => edit(() => setRounds(v))}
       />
       <BacktestInputFields
+        dailyOrders={state.research.dailyOrders}
+        allowDailyOrders={state.source === 'discovery'}
         priceResearch
         kind="ordinary"
         value={form}

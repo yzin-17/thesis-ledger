@@ -10,7 +10,7 @@ const digest = 'b1a4f03f94faf27acf95d2bef9d508ec06eabec1280e04c921bb677154f5fe8e
 
 function fixture() {
   const intent = {
-    contractVersion: 3 as const, requestId: 'ed92afdb-5f4b-4d6c-8f95-d8acf8dc08cf',
+    contractVersion: 1 as const, requestId: 'ed92afdb-5f4b-4d6c-8f95-d8acf8dc08cf',
     routeKey: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'SPLIT_EVENT' } as const,
     routeTarget: { providerId: 'akshare', upstreamSource: 'eastmoney', routeIndex: 0 },
     symbol: '159516.SZ', start: '2026-03-30', end: '2026-07-10',
@@ -96,7 +96,7 @@ describe('原159516拆分采集信封合同', () => {
 
   it('显式目录视图关联精确快照，默认目录和重复/未就绪记录拒绝', () => {
     const data = fixture();
-    const catalog = { contractVersion: 3, consumer: 'thesis-ledger', catalogRevision: data.intent.catalogRevision,
+    const catalog = { contractVersion: 1, consumer: 'thesis-ledger', catalogRevision: data.intent.catalogRevision,
       generatedAt: data.clock.startedAt, integrity: 'complete', entries: [{ key: data.intent.routeKey,
         target: data.exchange.response.admission.target, state: 'ready' }] };
     const view = { protocolVersion: 'event-admission-catalog-v1', catalog, admissions: [data.exchange.response.admission] };

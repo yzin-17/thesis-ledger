@@ -22,7 +22,7 @@ window.fetch = async (input, init) => {
     const body: MarketChartOptionsV3 = {
       plan,
       window,
-      contractVersion: 3,
+      contractVersion: 1,
       symbol: '159516.SZ',
       mode: 'v3',
       options: [
@@ -61,7 +61,7 @@ function Fixture() {
       </Button>
       <output aria-label="窗口大小">{barsLimit}</output>
       <output aria-label="图表选择">
-        图表：{selection.adjustment}，协议：{selection.chartContractVersion ?? '旧版'}
+        图表：{selection.adjustment}，协议：{selection.chartContractVersion ?? '当前'}
       </output>
       <output aria-label="冻结运行配置">已运行策略：qfq，固定配置</output>
       <Button

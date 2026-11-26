@@ -14,6 +14,8 @@ import { isResearchV2Contract } from './ai-research-reasoning-options.js';
 import { adapterSupportsGenerationMode } from './ai-provider-upstream.js';
 import { AiSdkGenerationError } from './ai-sdk-generation-facts.js';
 import { assertGenerationSchemaPrompt } from './ai-generation-schema-prompt.js';
+import { nativeStrategySchema } from './ai-native-strategy-schema.js';
+import { AiGenerationOutputValidationError } from './ai-generation-output-error.js';
 
 export const validateGenerationRequest = (input: {
   requestId: string;
@@ -87,10 +89,24 @@ const validateResearchReasoning = (input: {
 export const generationOutput = <OUTPUT>(
   mode: AiGenerationMode,
   schema: z.ZodType<OUTPUT>,
+  contract?: AiGenerationContractRef,
 ): Output.Output<unknown, unknown, never> => {
-  if (mode === 'native_schema') return Output.object({ schema });
+  if (mode === 'native_schema') return Output.object({ schema: nativeStrategySchema(schema, contract) });
   if (mode === 'json_mode') return Output.json();
   return Output.text();
+};
+
+/** 沿用保守字节估算；原生输出合同也属于请求输入，不能因文本去重而漏计。 */
+export const generationInputBytes = async (
+  messages: unknown[],
+  mode: AiGenerationMode,
+  schema: z.ZodType,
+  contract: AiGenerationContractRef,
+): Promise<number> => {
+  const messageBytes = Buffer.byteLength(JSON.stringify(messages), 'utf8');
+  if (mode !== 'native_schema') return messageBytes;
+  const format = await generationOutput(mode, schema, contract).responseFormat;
+  return messageBytes + Buffer.byteLength(JSON.stringify(format), 'utf8');
 };
 
 export const parseGenerationOutput = <OUTPUT>(
@@ -100,10 +116,15 @@ export const parseGenerationOutput = <OUTPUT>(
 ): OUTPUT => {
   // Output.object already validates with this schema. Do not apply transforms a second time.
   if (mode === 'native_schema') return value as OUTPUT;
-  if (mode === 'json_mode') return schema.parse(value);
-  if (typeof value !== 'string') throw new SyntaxError('Provider 未返回文本 JSON');
-  const trimmed = value.trim();
-  if (!trimmed) throw new SyntaxError('Provider 返回空内容');
-  const fenced = /^```(?:json)?[ \t]*(?:\r?\n)?([\s\S]*?)[ \t]*(?:\r?\n)?```$/u.exec(trimmed);
-  return schema.parse(JSON.parse(fenced?.[1]?.trim() ?? trimmed) as unknown);
+  try {
+    if (mode === 'json_mode') return schema.parse(value);
+    if (typeof value !== 'string') throw new SyntaxError('Provider 未返回文本 JSON');
+    const trimmed = value.trim();
+    if (!trimmed) throw new SyntaxError('Provider 返回空内容');
+    const fenced = /^```(?:json)?[ \t]*(?:\r?\n)?([\s\S]*?)[ \t]*(?:\r?\n)?```$/u.exec(trimmed);
+    return schema.parse(JSON.parse(fenced?.[1]?.trim() ?? trimmed) as unknown);
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    throw new AiGenerationOutputValidationError(typeof value === 'string' ? value : JSON.stringify(value) ?? '', error);
+  }
 };

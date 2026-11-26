@@ -61,7 +61,7 @@ const detail = {
 
 const chart = {
     options: vi.fn(async () => ({
-      contractVersion: 3,
+      contractVersion: 1,
       mode: 'v3',
       symbol: '510300.SH',
       options: ['none', 'qfq', 'hfq'].map((adjustment) => ({
@@ -76,7 +76,7 @@ const dsa = {
     calculateIndicators: vi.fn(),
     calculatePeriodIndicators: vi.fn(
       async (input: Parameters<DsaClient['calculatePeriodIndicators']>[0]) => ({
-        contractVersion: 3,
+        contractVersion: 1,
         inputFingerprint: input.inputFingerprint,
         engineVersion: DSA_MARKET_INDICATOR_ENGINE_VERSION,
         results: input.requests.map((item) => ({
@@ -289,7 +289,7 @@ describe("周期详情来源及能力门禁", () => {
 
   it('所选口径无路由不声明派生，且不读取日历', async () => {
     chart.options.mockResolvedValueOnce({
-      contractVersion: 3,
+      contractVersion: 1,
       mode: 'v3',
       symbol: '510300.SH',
       options: [{ adjustment: 'qfq', available: false, reason: 'route_not_configured' }],

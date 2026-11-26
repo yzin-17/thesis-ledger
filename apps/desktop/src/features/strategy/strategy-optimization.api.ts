@@ -4,6 +4,7 @@ import type {
   AiExecutionReadModel,
   AiUsageCompleteness,
   OptimizationAdoptionContext,
+  OptimizationAdoptionRead,
   OptimizationExperimentCreate,
   OptimizationExperimentSource,
   OptimizationCandidateSource,
@@ -314,7 +315,7 @@ export const adoptOptimizationCandidate = (
   id: string,
   input: Parameters<ReturnType<typeof optimization>['adopt']>[1],
   client?: DesktopRequestClient,
-) => optimization(client).adopt(id, input).then(omitUndefinedDeep);
+): Promise<OptimizationAdoptionRead> => optimization(client).adopt(id, input).then(omitUndefinedDeep);
 export const completeOptimizationExperiment = (
   id: string,
   client?: DesktopRequestClient,

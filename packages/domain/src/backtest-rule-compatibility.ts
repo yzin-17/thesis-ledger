@@ -1,4 +1,8 @@
-import { DecimalValue } from './decimal.js';
+import { isRecord, isProvenUniformTransform, transformsShareFactor } from './backtest-rule-coordinate.js';
+import { bindEventValue } from './backtest-event-sequence.js';
+import type { NumericExpression } from './backtest-strategy.js';
+import { tradePlanProtectionRules } from './backtest-trade-protection.js';
+import type { BacktestTradePlan } from './backtest-trade-plan-contract.js';
 import {
   hasVerifiedExecutionModelConversion,
   type FrozenExecutionModel,
@@ -37,6 +41,7 @@ export interface StrategyRuleCompatibilityInput {
   executionInstrument?: { symbol: string; market: string; assetType: string };
   entry: unknown;
   exit: unknown;
+  tradePlan?: BacktestTradePlan | undefined;
   sizing: unknown;
   risk: readonly unknown[];
   execution?: unknown;
@@ -100,7 +105,8 @@ export interface RuleCompatibilityReport<TStrategy extends StrategyRuleCompatibi
   scaleInvariance: RuleScaleInvariance;
 }
 
-type NumericUnitKind = 'constant' | 'price' | 'quantity' | 'volume' | 'ratio' | 'periods';
+type NumericUnitKind =
+  'constant' | 'price' | 'quantity' | 'volume' | 'ratio' | 'periods' | 'minutes';
 interface NumericUnit {
   kind: NumericUnitKind;
   sourceId?: string;
@@ -109,49 +115,6 @@ interface NumericUnit {
 }
 
 type UnknownRecord = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is UnknownRecord =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const asScaleTransform = (coordinate: RulePriceCoordinateFacts): RuleScaleTransform => {
-  if (coordinate.scaleTransform) return coordinate.scaleTransform;
-  if (coordinate.priceBasis.adjustment === 'none') return { kind: 'identity' };
-  return { kind: 'unknown' };
-};
-
-const isProvenUniformTransform = (coordinate: RulePriceCoordinateFacts) => {
-  const transform = asScaleTransform(coordinate);
-  if (transform.kind === 'identity') return true;
-  if (transform.kind !== 'uniform-multiplicative' || !transform.evidenceRef.trim()) return false;
-  try {
-    return DecimalValue.from(transform.factor).isPositive();
-  } catch {
-    return false;
-  }
-};
-
-const transformsShareFactor = (left: RulePriceCoordinateFacts, right: RulePriceCoordinateFacts) => {
-  const leftTransform = asScaleTransform(left);
-  const rightTransform = asScaleTransform(right);
-  if (leftTransform.kind === 'identity' && rightTransform.kind === 'identity') return true;
-  if (
-    leftTransform.kind !== 'uniform-multiplicative' ||
-    rightTransform.kind !== 'uniform-multiplicative' ||
-    !leftTransform.evidenceRef.trim() ||
-    !rightTransform.evidenceRef.trim()
-  ) {
-    return false;
-  }
-  try {
-    return (
-      DecimalValue.from(leftTransform.factor).isPositive() &&
-      DecimalValue.from(rightTransform.factor).isPositive() &&
-      DecimalValue.from(leftTransform.factor).compareTo(rightTransform.factor) === 0
-    );
-  } catch {
-    return false;
-  }
-};
 
 const volumeBasisMatchesQuantity = (coordinate: RulePriceCoordinateFacts) => {
   if (coordinate.priceBasis.quantityBasis === 'actual-units') {
@@ -204,6 +167,14 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
     this.checkExecutionModel();
     this.readBooleanRule(this.strategy.entry, ['entry']);
     this.readBooleanRule(this.strategy.exit, ['exit']);
+    for (const { expression, path } of dailyOrderPriceExpressions(this.strategy.execution)) {
+      const unit = this.readNumericUnit(expression, path);
+      if (unit.kind === 'constant') this.markScale(false, path);
+      else if (unit.kind !== 'price') this.addIssue('RULE_UNIT_MISMATCH', path, '委托价格表达式必须使用价格单位');
+      else this.comparePriceCoordinates(unit, makeUnit('price', '__execution__', this.context.executionCoordinate, isProvenUniformTransform(this.context.executionCoordinate)), path);
+    }
+    for (const { expression, path } of tradePlanProtectionRules(this.strategy.tradePlan))
+      this.readBooleanRule(expression, path);
     this.checkSizingAndRisk();
     return this.makeReport();
   }
@@ -500,7 +471,7 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
         child.scaleInvariant && volumeIsCompatible,
       );
     }
-    if (value.name === 'RSI') {
+    if (value.name === 'RSI' || value.name === 'ADX') {
       return makeUnit('ratio', child.sourceId, child.coordinate, child.scaleInvariant);
     }
     if (['MA', 'EMA', 'MACD', 'ATR', 'Highest', 'Lowest'].includes(value.name)) {
@@ -516,12 +487,25 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
       return makeUnit('constant', undefined, undefined, false);
     }
     if (value.type === 'constant') return makeUnit('constant');
+    if (value.type === 'confirmedPivot') return this.readNumericUnit(value.sample ?? value.input, [...path, value.sample ? 'sample' : 'input']);
     if (value.type === 'series') return this.readSeriesUnit(value, path);
+    if (value.type === 'sessionValue' && value.field === 'vwap')
+      return this.readIndicatorUnit(
+        { name: 'VWAP', input: { type: 'series', sourceId: value.sourceId, field: 'close' } },
+        path,
+      );
+    if (value.type === 'sessionValue' && value.field === 'elapsedMinutes') {
+      const source = this.readSeriesUnit({ ...value, field: 'close' }, path);
+      return makeUnit('minutes', source.sourceId);
+    }
     if (value.type === 'positionState') {
       const positionUnit = this.readPositionUnit(value);
       if (positionUnit) return positionUnit;
     }
     if (value.type === 'indicator') return this.readIndicatorUnit(value, path);
+    if (['lag', 'absolute', 'rolling', 'cumulative'].includes(value.type)) return this.readNumericUnit(value.input, [...path, 'input']);
+    if (value.type === 'countTrue') { this.readBooleanRule(value.condition, [...path, 'condition']); return makeUnit('periods'); }
+    if (value.type === 'arithmetic') return this.readOperationUnit(value, path);
     if (value.type === 'volumeParticipation' || value.type === 'participationRate') {
       this.addIssue(
         'VOLUME_PARTICIPATION_UNSUPPORTED',
@@ -531,6 +515,27 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
       return makeUnit('constant', undefined, undefined, false);
     }
     this.addIssue('UNSUPPORTED_RULE_NODE', path, '不支持的数值 AST 节点: ' + value.type);
+    return makeUnit('constant', undefined, undefined, false);
+  }
+
+  private readOperationUnit(value: UnknownRecord, path: readonly (string | number)[]): NumericUnit {
+    const left = this.readNumericUnit(value.left, [...path, 'left']);
+    const right = this.readNumericUnit(value.right, [...path, 'right']);
+    const scalar = (unit: NumericUnit) => unit.kind === 'constant' || unit.kind === 'ratio';
+    if (value.operator === 'multiply') {
+      if (scalar(left)) return right;
+      if (scalar(right)) return left;
+    } else if (value.operator === 'divide') {
+      if (scalar(right)) return left;
+      if (left.kind === right.kind) {
+        this.compareNumericUnits(left, right, path);
+        return makeUnit('ratio');
+      }
+    } else {
+      this.compareNumericUnits(left, right, path);
+      return left.kind === 'constant' ? right : left;
+    }
+    this.addIssue('RULE_UNIT_MISMATCH', path, '运算必须使用兼容单位；乘法须有比例项，除法须为同单位比值或除以比例');
     return makeUnit('constant', undefined, undefined, false);
   }
 
@@ -598,7 +603,12 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
       this.compatibleVolume(unit.sourceId, unit.coordinate, path, 'threshold');
       return;
     }
-    if (unit.kind === 'ratio' || unit.kind === 'periods') {
+    if (
+      unit.kind === 'constant' ||
+      unit.kind === 'ratio' ||
+      unit.kind === 'periods' ||
+      unit.kind === 'minutes'
+    ) {
       this.markNumericScale(unit, path);
       return;
     }
@@ -642,19 +652,46 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
     this.markScale(left.scaleInvariant && right.scaleInvariant, path);
   }
 
-  private isReferenceNotionalZeroComparison(value: UnknownRecord, left: NumericUnit, right: NumericUnit): boolean {
+  private isReferenceNotionalZeroComparison(
+    value: UnknownRecord,
+    left: NumericUnit,
+    right: NumericUnit,
+  ): boolean {
     if (this.context.executionUnits.researchQuantity !== 'reference-notional-v1') return false;
     const leftNode = isRecord(value.left) ? value.left : {};
     const rightNode = isRecord(value.right) ? value.right : {};
-    const zero = (node: UnknownRecord) => node.type === 'constant' &&
-      typeof node.value === 'string' && /^-?0(?:\.0+)?$/.test(node.value);
-    return (left.kind === 'price' && leftNode.type === 'indicator' && zero(rightNode)) ||
-      (right.kind === 'price' && rightNode.type === 'indicator' && zero(leftNode));
+    const zero = (node: UnknownRecord) =>
+      node.type === 'constant' &&
+      typeof node.value === 'string' &&
+      /^-?0(?:\.0+)?$/.test(node.value);
+    const homogeneous = (node: UnknownRecord): boolean => {
+      if (node.type === 'constant') return zero(node);
+      if (node.type === 'arithmetic') {
+        if (!isRecord(node.left) || !isRecord(node.right)) return false;
+        if (node.operator === 'multiply') return (node.left.type === 'constant' && homogeneous(node.right)) || (node.right.type === 'constant' && homogeneous(node.left));
+        if (node.operator === 'divide') return node.right.type === 'constant' && homogeneous(node.left);
+        return homogeneous(node.left) && homogeneous(node.right);
+      }
+      if (isRecord(node.input)) return homogeneous(node.input);
+      return node.type === 'series';
+    };
+    const derived = (node: UnknownRecord) => node.type !== 'series' && homogeneous(node);
+    return (
+      (left.kind === 'price' && derived(leftNode) && zero(rightNode)) ||
+      (right.kind === 'price' && derived(rightNode) && zero(leftNode))
+    );
   }
 
   private readBooleanRule(value: unknown, path: readonly (string | number)[]) {
     if (!isRecord(value) || typeof value.type !== 'string') {
       this.addIssue('UNSUPPORTED_RULE_NODE', path, '无法识别的布尔 AST 节点');
+      return;
+    }
+    if (value.type === 'sequence') {
+      this.readBooleanRule(value.trigger, [...path, 'trigger']);
+      if (value.capture) this.readNumericUnit(value.capture, [...path, 'capture']);
+      this.readBooleanRule(bindEventValue(value.confirm, value.capture as NumericExpression | undefined), [...path, 'confirm']);
+      this.readBooleanRule(bindEventValue(value.invalidation, value.capture as NumericExpression | undefined), [...path, 'invalidation']);
       return;
     }
     if (value.type === 'all' || value.type === 'any') {
@@ -671,6 +708,7 @@ class RuleCompatibilityAnalyzer<TStrategy extends StrategyRuleCompatibilityInput
       );
       return;
     }
+    if (value.type === 'consecutive') { this.readBooleanRule(value.condition, [...path, 'condition']); return; }
     if (value.type === 'not') {
       this.readBooleanRule(value.expression, [...path, 'expression']);
       return;
@@ -756,3 +794,4 @@ export const checkBacktestRuleCompatibility = <TStrategy extends StrategyRuleCom
   strategy: TStrategy,
   context: StrategyRuleCompatibilityContext,
 ): RuleCompatibilityReport<TStrategy> => new RuleCompatibilityAnalyzer(strategy, context).run();
+import { dailyOrderPriceExpressions } from './backtest-daily-order-expressions.js';

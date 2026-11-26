@@ -1,26 +1,24 @@
+import { futureFactForUnavailable, rememberNumericExpressions } from './backtest-expression-memory.js';
 import { type BacktestSeries } from './backtest-series.js';
-import { simulationObservationEvents } from './simulation-observation-ticks.js';
+import { tradePlanProtectionRules } from './backtest-trade-protection.js';
+import { evaluateSignalAt } from './backtest-signal-selection.js';
+import { advanceBacktestComputation, finishBacktestComputation, type BacktestComputationOptions } from './backtest-computation.js';
+export { evaluateSignalAt } from './backtest-signal-selection.js';
+import { simulationInputEvents, enqueueExecutionPhaseFills } from './backtest-simulation-input-events.js';
 import {
   scheduledCorporateActions,
   enqueueCorporateActionPayment,
 } from './backtest-corporate-scheduling.js';
 import { simulationExpressionContext } from './backtest-expression-context.js';
+import type { RuleEvaluationObserver } from './backtest-rule-diagnostics.js';
 import {
-  availabilityForDecision,
   isAvailableForDecisionAt,
   type BacktestAvailability,
 } from './backtest-observation-clock.js';
 import {
   type BooleanExpression,
-  type NumericExpression,
   type BacktestStrategy,
 } from './backtest-contract.js';
-import {
-  evaluateBooleanExpression,
-  evaluateNumericExpression,
-  getSeries,
-  numericExpressionKey,
-} from './backtest-simulation-evaluator.js';
 import {
   applyCorporateActionAt,
   type BacktestCorporateActionFact,
@@ -37,6 +35,7 @@ export const simulationPhases = [
   'SessionSettlementState',
   'CorporateAction',
   'DataAvailable',
+  'OrderMatch',
   'SeriesIndicatorUpdate',
   'RiskSignalEvaluation',
   'TargetIntent',
@@ -58,6 +57,7 @@ export type SimulationEventType =
   | 'targetIntent'
   | 'orderValidation'
   | 'simulationFill'
+  | 'executionPhase'
   | 'simulationReject'
   | 'navConfirmation'
   | 'cashSettlement'
@@ -79,6 +79,7 @@ export interface SimulationEvent<TPayload = unknown> {
 export type EvaluationStatus = 'available' | 'unavailable';
 
 export interface AvailableEvaluation<T> extends BacktestAvailability {
+  trigger?: 'fixedStop' | 'fixedTakeProfit' | 'maxHoldingPeriod';
   status: 'available';
   value: T;
   occurredAt: string;
@@ -110,6 +111,8 @@ export interface SimulationPositionState {
 }
 
 export interface SimulationExpressionContext {
+  observeRule?: RuleEvaluationObserver;
+  eventValue?: NumericEvaluation;
   tick: SimulationTick;
   corporateActionSignals?: {
     facts: readonly BacktestCorporateActionFact[];
@@ -200,7 +203,16 @@ export type SimulationMutationDecision =
       inputFacts?: readonly string[];
     };
 
+export interface SimulationExecutionPhase {
+  key: string;
+  phase: 'open' | 'range';
+  occurredAt: string;
+  availableAt: string;
+}
 export interface SimulationExecutionPort {
+  phases?: readonly SimulationExecutionPhase[];
+  matchPhase?: (point: SimulationExecutionPhase) => { fills: readonly SimulationFillRecord[]; rejects?: readonly SimulationReject[] };
+  onOrderRejected?: (orderId: string) => void;
   toOrder?: (intent: SimulationTargetIntent) => SimulationOrderRequest;
   validateOrder?: (order: SimulationOrderRequest) =>
     | { accepted: true; ruleVersion: string; inputFacts?: readonly string[] }
@@ -214,6 +226,7 @@ export interface SimulationExecutionPort {
   createFill?: (order: SimulationOrderRequest) => SimulationFillRecord | undefined;
   scheduledMutationsForFill?: (fill: SimulationFillRecord) => readonly {
     type: 'cashSettlement';
+    phase?: SimulationPhase;
     eventId: string;
     occurredAt: string;
     availableAt: string;
@@ -226,14 +239,26 @@ export interface SimulationExecutionPort {
 }
 
 export interface SimulationEngineInput {
+  observeRule?: RuleEvaluationObserver;
+  entryEligible?: (context: SimulationExpressionContext) => boolean;
+  selectSignal?: (
+    context: SimulationExpressionContext,
+    selection: SignalEvaluationResult,
+  ) => SimulationSignal | undefined;
   runId: string;
-  strategy: Pick<BacktestStrategy, 'entry' | 'exit' | 'executionInstrument' | 'primaryTimeframe'>;
+  strategy: Pick<
+    BacktestStrategy,
+    'entry' | 'exit' | 'executionInstrument' | 'primaryTimeframe' | 'tradePlan' | 'entryTrigger'
+  >;
   ticks: readonly SimulationTick[];
   sourceSeries: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   indicatorSeries?: ReadonlyMap<string, BacktestSeries> | Readonly<Record<string, BacktestSeries>>;
   positionState?: SimulationPositionState;
   positionStateAt?: (tick: SimulationTick) => SimulationPositionState | undefined;
-  positionCheckpoint?: { ticks: readonly SimulationTick[]; captureAt: (tick: SimulationTick) => void };
+  positionCheckpoint?: {
+    ticks: readonly SimulationTick[];
+    captureAt: (tick: SimulationTick) => void;
+  };
   corporateActions?: readonly BacktestCorporateActionFact[];
   corporateActionSignalFacts?: readonly BacktestCorporateActionFact[];
   corporateActionPort?: CorporateActionPort;
@@ -395,115 +420,6 @@ export interface SignalEvaluationResult {
   risk?: BooleanEvaluation;
 }
 
-const edgeSignal = (
-  kind: 'entry' | 'exit' | 'risk',
-  value: BooleanEvaluation,
-  previous: boolean | undefined,
-  strategy: SimulationEngineInput['strategy'],
-  sequence: number,
-): SimulationSignal | undefined => {
-  if (value.status !== 'available' || !value.value) return undefined;
-  if (!isAvailableForDecisionAt(value, value.occurredAt)) return undefined;
-  if (kind !== 'risk' && previous === true) return undefined;
-  return {
-    signalId: `${strategy.executionInstrument.symbol}:${kind}:${value.occurredAt}:${sequence}`,
-    source: 'BACKTEST',
-    kind,
-    occurredAt: value.occurredAt,
-    availableAt: availabilityForDecision(value)!,
-    executionSymbol: strategy.executionInstrument.symbol,
-    reason: `${kind} edge`,
-  };
-};
-
-export const evaluateSignalAt = (
-  input: SimulationEngineInput,
-  tick: SimulationTick,
-  state: EdgeState,
-  sequence: number,
-  previousNumeric?: ReadonlyMap<string, NumericEvaluation>,
-): SignalEvaluationResult => {
-  const positionState = positionStateFor(input, tick);
-  const context = simulationExpressionContext(input, tick, positionState, previousNumeric);
-  const entry = evaluateBooleanExpression(input.strategy.entry as BooleanExpression, context);
-  const exit = evaluateBooleanExpression(input.strategy.exit as BooleanExpression, context);
-  const risk = input.risk?.(context);
-  const nextState: EdgeState = { ...state };
-  const isOpen = positionState?.isOpen;
-  let signal: SimulationSignal | undefined;
-  if (isOpen === true) {
-    signal = risk ? edgeSignal('risk', risk, undefined, input.strategy, sequence) : undefined;
-    if (risk?.status === 'available' && !risk.value) signal = undefined;
-    if (!signal) signal = edgeSignal('exit', exit, state.exit, input.strategy, sequence);
-  } else if (isOpen === false) {
-    signal = edgeSignal('entry', entry, state.entry, input.strategy, sequence);
-  } else {
-    signal = risk ? edgeSignal('risk', risk, undefined, input.strategy, sequence) : undefined;
-    if (risk?.status === 'available' && !risk.value) signal = undefined;
-    if (!signal) signal = edgeSignal('exit', exit, state.exit, input.strategy, sequence);
-    if (!signal) signal = edgeSignal('entry', entry, state.entry, input.strategy, sequence);
-  }
-  if (entry.status === 'available') nextState.entry = entry.value;
-  if (exit.status === 'available') nextState.exit = exit.value;
-  return {
-    state: nextState,
-    entry,
-    exit,
-    ...(signal ? { signal } : {}),
-    ...(risk ? { risk } : {}),
-  };
-};
-
-const numericExpressionsIn = (expression: BooleanExpression): NumericExpression[] => {
-  if (expression.type === 'compare' || expression.type === 'cross') {
-    return [expression.left, expression.right];
-  }
-  if (expression.type === 'not') return numericExpressionsIn(expression.expression);
-  if (expression.type === 'all' || expression.type === 'any') {
-    return expression.conditions.flatMap(numericExpressionsIn);
-  }
-  return [];
-};
-
-const futureFactForUnavailable = (
-  expression: BooleanExpression,
-  context: SimulationExpressionContext,
-) => {
-  const facts: string[] = [];
-  for (const numeric of numericExpressionsIn(expression)) {
-    let series: BacktestSeries | undefined;
-    if (numeric.type === 'series') {
-      series = getSeries(context.sourceSeries, numeric.sourceId, numeric.field);
-    } else if (numeric.type === 'indicator') {
-      series = getSeries(context.indicatorSeries, numericExpressionKey(numeric));
-    }
-    if (!series || evaluateNumericExpression(numeric, context).status === 'available') continue;
-    const latest = [...series.points]
-      .filter((point) => instant(point.occurredAt) <= instant(context.tick.occurredAt))
-      .sort((left, right) => instant(right.occurredAt) - instant(left.occurredAt))[0];
-    if (
-      latest &&
-      latest.status !== 'unavailable' &&
-      latest.value !== undefined &&
-      !isAvailableForDecisionAt(latest, context.tick.occurredAt)
-    ) {
-      facts.push(`${series.sourceId}:${latest.occurredAt}:availableAt=${latest.availableAt}`);
-    }
-  }
-  return facts;
-};
-
-const rememberNumericExpressions = (
-  expression: BooleanExpression,
-  context: SimulationExpressionContext,
-  previousNumeric: Map<string, NumericEvaluation>,
-) => {
-  for (const numeric of numericExpressionsIn(expression)) {
-    const value = evaluateNumericExpression(numeric, context);
-    if (value.status === 'available') previousNumeric.set(numericExpressionKey(numeric), value);
-  }
-};
-
 const eventAvailableAt = (event: SimulationEvent) => simulationEventTime(event);
 
 const positionStateFor = (input: SimulationEngineInput, tick: SimulationTick) =>
@@ -554,6 +470,13 @@ const enqueueFutureDataReject = (
   );
 };
 
+function rememberSignalObservations(input: SimulationEngineInput, context: SimulationExpressionContext, previousNumeric: Map<string, NumericEvaluation>) {
+  rememberNumericExpressions(input.strategy.entry as BooleanExpression, context, previousNumeric);
+  rememberNumericExpressions(input.strategy.exit as BooleanExpression, context, previousNumeric);
+  for (const { expression } of tradePlanProtectionRules(input.strategy.tradePlan))
+    rememberNumericExpressions(expression, context, previousNumeric);
+}
+
 const processSignalEvent = (state: SimulationOrchestratorState, event: SimulationEvent) => {
   const { input } = state;
   const tick = (event.payload as { tick: SimulationTick }).tick;
@@ -571,9 +494,12 @@ const processSignalEvent = (state: SimulationOrchestratorState, event: Simulatio
     state.previousNumeric,
   );
   const delayedFacts = [
-    ...futureFactForUnavailable(input.strategy.entry as BooleanExpression, context),
-    ...futureFactForUnavailable(input.strategy.exit as BooleanExpression, context),
-    ...[evaluation.entry, evaluation.exit, evaluation.risk]
+    ...(evaluation.entry.status === 'unavailable' && positionState?.isOpen !== true
+      ? futureFactForUnavailable(input.strategy.entry as BooleanExpression, context) : []),
+    ...(evaluation.exit.status === 'unavailable' && positionState?.isOpen === true
+      ? futureFactForUnavailable(input.strategy.exit as BooleanExpression, context) : []),
+    ...[...(positionState?.isOpen !== true ? [evaluation.entry] : []),
+      ...(positionState?.isOpen === true ? [evaluation.exit, evaluation.risk] : [])]
       .filter(
         (value): value is AvailableEvaluation<boolean> =>
           value?.status === 'available' && !isAvailableForDecisionAt(value, value.occurredAt),
@@ -585,30 +511,26 @@ const processSignalEvent = (state: SimulationOrchestratorState, event: Simulatio
       ),
   ];
   if (delayedFacts.length > 0) {
+    if (input.strategy.entryTrigger) {
+      state.edgeState = evaluation.state;
+      rememberSignalObservations(input, context, state.previousNumeric);
+    }
     enqueueFutureDataReject(state, event, delayedFacts);
     return;
   }
   state.edgeState = evaluation.state;
-  rememberNumericExpressions(
-    input.strategy.entry as BooleanExpression,
-    context,
-    state.previousNumeric,
-  );
-  rememberNumericExpressions(
-    input.strategy.exit as BooleanExpression,
-    context,
-    state.previousNumeric,
-  );
-  if (!evaluation.signal) return;
-  state.signals.push(evaluation.signal);
+  const signal = input.selectSignal ? input.selectSignal(context, evaluation) : evaluation.signal;
+  rememberSignalObservations(input, context, state.previousNumeric);
+  if (!signal) return;
+  state.signals.push(signal);
   const intent: SimulationTargetIntent = {
     intentId: `${input.runId}:intent:${event.sequence}`,
-    signalId: evaluation.signal.signalId,
-    executionSymbol: evaluation.signal.executionSymbol,
-    side: evaluation.signal.kind === 'entry' ? 'buy' : 'sell',
-    reason: evaluation.signal.kind === 'risk' ? 'risk' : 'signal',
+    signalId: signal.signalId,
+    executionSymbol: signal.executionSymbol,
+    side: signal.kind === 'entry' ? 'buy' : 'sell',
+    reason: signal.kind === 'risk' ? 'risk' : 'signal',
     occurredAt: event.occurredAt,
-    availableAt: evaluation.signal.availableAt,
+    availableAt: signal.availableAt,
   };
   state.intents.push(intent);
   state.queue.enqueue(
@@ -647,6 +569,7 @@ const enqueueReject = (
   event: SimulationEvent,
   reject: SimulationReject,
 ) => {
+  if (reject.orderId) state.input.execution?.onOrderRejected?.(reject.orderId);
   state.rejects.push(reject);
   state.queue.enqueue(
     createSimulationEvent({
@@ -753,8 +676,7 @@ const processFillEvent = (state: SimulationOrchestratorState, event: SimulationE
       runId: state.input.runId,
       sequence: state.sequence++,
       type: item.type,
-      phase:
-        item.payload.kind === 'position' ? 'SessionSettlementState' : 'NavConfirmationSettlement',
+      phase: item.phase ?? (item.payload.kind === 'position' ? 'SessionSettlementState' : 'NavConfirmationSettlement'),
       occurredAt: item.occurredAt,
       availableAt: item.availableAt,
       payload: item.payload,
@@ -829,7 +751,9 @@ const processCorporateActionEvent = (
 };
 
 const processSimulationEvent = (state: SimulationOrchestratorState, event: SimulationEvent) => {
-  if (event.type === 'positionCheckpoint') return state.input.positionCheckpoint?.captureAt(event.payload as SimulationTick);
+  if (event.type === 'executionPhase') return enqueueExecutionPhaseFills(state, event, createSimulationEvent, reject => enqueueReject(state, event, reject));
+  if (event.type === 'positionCheckpoint')
+    return state.input.positionCheckpoint?.captureAt(event.payload as SimulationTick);
   if (event.type === 'corporateAction') return processCorporateActionEvent(state, event);
   if (event.type === 'signalEvaluation') return processSignalEvent(state, event);
   if (event.type === 'targetIntent') return processTargetIntentEvent(state, event);
@@ -841,6 +765,9 @@ const processSimulationEvent = (state: SimulationOrchestratorState, event: Simul
 
 export class DeterministicSimulationEngine {
   run(input: SimulationEngineInput): SimulationRunResult {
+    return finishBacktestComputation(this.steps(input));
+  }
+  *steps(input: SimulationEngineInput): Generator<void, SimulationRunResult, void> {
     const state: SimulationOrchestratorState = {
       input,
       queue: new SimulationEventQueue(),
@@ -854,30 +781,9 @@ export class DeterministicSimulationEngine {
       previousNumeric: new Map(),
       sequence: 0,
     };
-    const ticks = input.ticks
-      .map((tick, index) => ({ tick, index }))
-      .filter(({ tick }) => !tick.timeframe || tick.timeframe === input.strategy.primaryTimeframe)
-      .sort(
-        (left, right) =>
-          instant(left.tick.occurredAt) - instant(right.tick.occurredAt) ||
-          left.index - right.index,
-      );
-    for (const { tick } of ticks) {
-      state.queue.enqueue(
-        createSimulationEvent({
-          runId: input.runId,
-          sequence: state.sequence++,
-          type: 'signalEvaluation',
-          phase: 'RiskSignalEvaluation',
-          occurredAt: tick.occurredAt,
-          availableAt: tick.availableAt ?? tick.occurredAt,
-          payload: { tick },
-        }),
-      );
-    }
-    const observations = simulationObservationEvents(input, state.sequence, createSimulationEvent);
-    state.sequence += observations.length;
-    for (const event of observations) state.queue.enqueue(event);
+    const initial = simulationInputEvents(input, state.sequence, createSimulationEvent);
+    state.sequence += initial.length;
+    for (const event of initial) { state.queue.enqueue(event); yield; }
     for (const item of scheduledCorporateActions(input.corporateActions ?? [], input.runId)) {
       const event = createSimulationEvent({
         runId: input.runId,
@@ -889,6 +795,7 @@ export class DeterministicSimulationEngine {
         payload: item.fact,
       });
       state.queue.enqueue({ ...event, eventId: item.eventId });
+      yield;
     }
     const processed: SimulationEvent[] = [];
     while (state.queue.size > 0) {
@@ -896,6 +803,7 @@ export class DeterministicSimulationEngine {
       if (!event) break;
       processed.push(event);
       processSimulationEvent(state, event);
+      yield;
     }
     return {
       events: processed.sort(compareSimulationEvents),
@@ -911,3 +819,6 @@ export class DeterministicSimulationEngine {
 
 export const runDeterministicSimulation = (input: SimulationEngineInput) =>
   new DeterministicSimulationEngine().run(input);
+
+export const runDeterministicSimulationCooperatively = (input: SimulationEngineInput, options: BacktestComputationOptions) =>
+  advanceBacktestComputation(new DeterministicSimulationEngine().steps(input), options);

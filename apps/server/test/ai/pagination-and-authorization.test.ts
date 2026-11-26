@@ -71,22 +71,6 @@ describe('AI 研究分页与上下文授权', () => {
     expect(toolPage.items[0]?.tool).toBe('getRisk');
   });
 
-  it('研究启动拒绝不存在或停用的上下文实体', async () => {
-    const create = vi.fn();
-    const service = new AiRunService({
-      account: { findUnique: vi.fn(async () => null) },
-      aiRun: { create },
-    } as never);
-
-    await expect(
-      service.startResearch({
-        question: '账户风险？',
-        context: { scope: 'account', accountId: '91111111-1111-4111-8111-111111111111' },
-      }),
-    ).rejects.toThrow('账户不存在');
-    expect(create).not.toHaveBeenCalled();
-  });
-
   it('租约过期按任务类型和重试上限进入正确恢复路径', async () => {
     const updateMany = vi
       .fn()

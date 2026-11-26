@@ -8,7 +8,7 @@
 
 ## 接口与领域边界
 
-新增 `market-reference-v1` 只读表格合同及 Server `POST /api/market-data/reference`、DSA `POST /api/v3/thesis-ledger/market/reference`。每种资料拥有明确 capability、作用域、列定义和来源适配；统一表格仅为稳定的事实读取投影，不接受任意 URL、SQL、字段名或执行代码。
+新增 `market-reference-v1` 只读表格合同及 Server `POST /api/market-data/reference`、DSA `POST /api/v1/thesis-ledger/market/reference`。每种资料拥有明确 capability、作用域、列定义和来源适配；统一表格仅为稳定的事实读取投影，不接受任意 URL、SQL、字段名或执行代码。
 
 请求包含资料类型、规范证券或指数身份、可选日期筛选、分页与请求预算。市场级资料不伪造证券身份；指数参考与普通股票分开校验。来源选择遵循前端现有 Provider 配置及该能力的明确有效路由，不隐式切源。结果严格关联请求、资料类型、来源、政策代次和适配修订。
 

@@ -8,7 +8,7 @@ const resultBase = () => ({
   strategyVersionId: 'strategy',
   snapshotId: 'snapshot',
   engineVersion: 'v3',
-  schemaVersion: '3',
+  schemaVersion: 'backtest-trade-result-v1',
   marketRuleVersion: 'v1',
   calendarVersion: 'v1',
   aggregationVersion: 'v1',
@@ -37,7 +37,7 @@ const resultV3 = () => {
   );
   return {
     ...resultBase(),
-    snapshotVersion: 'snapshot-manifest-v3',
+    snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
     executionPriceProtocol: manifest.executionPriceProtocol,
     comparableDataFingerprint: manifest.comparableDataFingerprint,
     actualSources: manifest.actualSources,
@@ -47,6 +47,61 @@ const evaluate = (result: unknown) =>
   evaluateOptimizationResult({ id: 'run-1', result }, { mode: 'return', minClosedTrades: 0 });
 
 describe('优化评价的当前结果边界', () => {
+  it('新版收益目标仅要求收益指标，零波动不阻断，硬回撤约束仍要求回撤', () => {
+    const base = resultV3();
+    const result = { ...base, analyticsVersion: 'research-analytics-v2', completeness: 'partial', metrics: {
+      totalReturn: { status: 'available', value: '0' },
+      sharpe: { status: 'unavailable', reason: 'ZERO_VOLATILITY' },
+      tradedNotional: { status: 'available', value: '0' },
+      turnoverRate: { status: 'available', value: '0' },
+    } };
+    expect(evaluateOptimizationResult({ id: 'run-1', result }, { mode: 'return', minClosedTrades: 0 }))
+      .toMatchObject({ status: 'valid', score: 0, completeness: 'partial' });
+    expect(evaluateOptimizationResult({ id: 'run-1', result }, { mode: 'lowTurnover', minClosedTrades: 0 }))
+      .toMatchObject({ status: 'valid' });
+    expect(evaluateOptimizationResult({ id: 'run-1', result }, { mode: 'return', minClosedTrades: 0, maxDrawdown: '0.1' }))
+      .toMatchObject({ status: 'invalid', failureCategory: 'data-unavailable' });
+    expect(evaluateOptimizationResult({ id: 'run-1', result }, { mode: 'return', minClosedTrades: 1 }))
+      .toMatchObject({ status: 'invalid', failureCategory: 'strategy-ineligible' });
+  });
+  it('未适用退出不阻断，关键入场全程不可计算则具体指出规则', () => {
+    const base = resultV3();
+    const rule = { ruleId: 'exit', path: ['exit'], observations: 100,
+      computableObservations: 0, trueObservations: 0, applicableDecisions: 0,
+      computableDecisions: 0, warmupObservations: 0, unavailableReasons: [] };
+    const result = { ...base, analyticsVersion: 'research-analytics-v2', completeness: 'partial',
+      metrics: { ...base.metrics, tradedNotional: { status: 'available', value: '0' },
+        turnoverRate: { status: 'available', value: '0' } },
+      ruleDiagnostics: { version: 'rule-evaluation-v1', rules: [rule] },
+    };
+    expect(evaluateOptimizationResult({ id: 'run-1', result }, { mode: 'return', minClosedTrades: 0 }))
+      .toMatchObject({ status: 'valid' });
+    const invalid = evaluateOptimizationResult({ id: 'run-1', result: { ...result,
+      ruleDiagnostics: { ...result.ruleDiagnostics, rules: [{ ...rule, ruleId: 'entry', path: ['entry'], applicableDecisions: 100 }] },
+    } }, { mode: 'return', minClosedTrades: 0 });
+    expect(invalid).toMatchObject({ status: 'invalid', failureCategory: 'data-unavailable' });
+    expect(invalid.reason).toContain('entry');
+  });
+  it('新评分采用归一化周转率，旧金额不会成为新别名', () => {
+    const base = resultV3();
+    const result = { ...base, analyticsVersion: 'research-analytics-v2', metrics: {
+      ...base.metrics,
+      tradedNotional: { status: 'available', value: '1500' },
+      turnoverRate: { status: 'available', value: '1.5' },
+      turnover: { status: 'available', value: '999999' },
+    } };
+    const summary = evaluateOptimizationResult({ id: 'run-1', result },
+      { mode: 'balanced', minClosedTrades: 0 });
+    expect(summary).toMatchObject({ status: 'valid', analyticsVersion: 'research-analytics-v2',
+      scoreVersion: 'optimization-score-v2', tradedNotional: '1500', turnoverRate: '1.5' });
+    expect(summary.score).toBeCloseTo(-0.345);
+    expect(summary.turnover).toBeUndefined();
+    const missing = evaluateOptimizationResult({ id: 'run-1', result: { ...result,
+      metrics: { ...result.metrics, turnoverRate: { status: 'unavailable', reason: 'FX_UNAVAILABLE' } },
+    } }, { mode: 'balanced', minClosedTrades: 0 });
+    expect(missing).toMatchObject({ status: 'invalid', failureCategory: 'data-unavailable' });
+    expect(missing.score).toBeUndefined();
+  });
   it.each(['balanced', 'lowTurnover'])('%s缺换手率时不能按零值入榜', (mode) => {
     const summary = evaluateOptimizationResult(
       { id: 'run-1', result: resultV3() },

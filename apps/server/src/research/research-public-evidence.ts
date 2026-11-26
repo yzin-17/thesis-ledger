@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  DSA_DATA_CONTRACT,
   researchEvidenceAuditV2Schema,
   type Quote,
   type FundNav,
@@ -70,7 +71,7 @@ export function quoteResearchEvidence(
       ...audit('quote'),
       providerId: quote.provider,
       upstreamSource: quote.upstreamSource ?? null,
-      contractVersion: 'market-quote-v3',
+      contractVersion: DSA_DATA_CONTRACT,
       sourceIds: [`${instrument.symbol}@${quote.marketTime ?? quote.fetchedAt}`],
       sourceUrls: safeUrls.success ? safeUrls.data : [],
       publishedAt: quote.marketTime,
@@ -203,7 +204,7 @@ export function fundNavResearchEvidence(
     audit: {
       ...audit('quote'),
       providerId: nav.provider,
-      contractVersion: 'market-fund-nav-v3',
+      contractVersion: DSA_DATA_CONTRACT,
       sourceIds: [`${instrument.symbol}@${nav.navDate}`, `asset:${instrument.symbol}`],
       fetchedAt: nav.fetchedAt,
     },

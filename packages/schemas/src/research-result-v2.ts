@@ -84,7 +84,7 @@ const nextStep = z
 /** 模型只输出推断与引用选择，不得绑定来源、范围、权限、模型或费用。 */
 export const researchGenerationV2Schema = z
   .strictObject({
-    version: z.literal(2),
+    version: z.literal('research-report-generation-v1'),
     conclusion: text,
     rationale: z.array(text).max(50),
     claims: z.array(claims).max(100),
@@ -114,11 +114,11 @@ export const researchGenerationV2Schema = z
     }
   });
 export const researchGenerationV2Contract = {
-  ref: { id: 'research', version: 'research-generation-v2' },
+  ref: { id: 'research', version: 'research-report-generation-v1' },
   schema: researchGenerationV2Schema,
 } as const;
 const resultShape = z.strictObject({
-  version: z.literal(2),
+  version: z.literal('research-report-result-v1'),
   inputFingerprint: researchFingerprintV2Schema,
   scopeSnapshot: researchScopeSnapshotV2Schema,
   createdAt: z.iso.datetime({ offset: true }),

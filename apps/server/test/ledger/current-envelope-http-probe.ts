@@ -163,7 +163,7 @@ export async function runCurrentLedgerHttpProbe(
   assert.equal(current.projectionGeneration, '5');
   assert.equal(current.events.length, 2);
   assert.equal(audit.events.length, 5);
-  assert.ok(audit.events.every((event) => event.version === 3 && event.payloadVersion === 1));
+  assert.ok(audit.events.every((event) => event.version === 1 && event.payloadVersion === 1));
   assert.ok(replay.events.some((event) => event.eventId === created.eventIds[0]));
   return {
     accountId,

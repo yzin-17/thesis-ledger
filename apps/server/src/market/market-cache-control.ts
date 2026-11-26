@@ -10,7 +10,7 @@ export class MarketCacheControl {
 
   async read(input: CacheInput, signal?: AbortSignal) {
     signal?.throwIfAborted();
-    const request = { ...input, contractVersion: 3, consumer: 'thesis-ledger', requestId: crypto.randomUUID() } as MarketCacheContextRequestV3;
+    const request = { ...input, contractVersion: 1, consumer: 'thesis-ledger', requestId: crypto.randomUUID() } as MarketCacheContextRequestV3;
     const context = await this.dsa.marketCacheContextV3(request, signal);
     if (!context.ready) throw new DsaError('当前功能未启用或来源不可用', 'control-rejected', undefined, context.reason ?? undefined);
     return { input, context };

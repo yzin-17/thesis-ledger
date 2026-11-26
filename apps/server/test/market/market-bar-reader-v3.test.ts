@@ -18,6 +18,8 @@ import type {
   PinnedMarketWindowRequestV3,
   StoredMarketWindowEvidenceV3,
 } from '../../src/market/market-window-evidence-v3.repository.js';
+import { tradabilityFixtureV3 } from '../backtest/v3-tradability-fixtures.js';
+import { tradabilityWindowFromResponseV3 } from '../../src/backtest/backtest-snapshot-v3-tradability.js';
 
 const fixture = <T>(path: string) =>
   JSON.parse(
@@ -164,14 +166,23 @@ const makeReader = (
     catalog?: unknown;
     read?: (request: PinnedMarketWindowRequestV3) => Promise<unknown>;
     observe?: (input: unknown) => Promise<null>;
+    capabilitiesUnavailable?: boolean;
   } = {},
 ) => {
   const policy = readPolicy(options.withBackup, options.policyOverrides);
   const snapshots = policies(options.withBackup);
   const marketControl = { getPolicy: vi.fn().mockResolvedValue(policy) };
   const dsa = {
+    marketDataCapabilitiesV3: vi.fn(async () => {
+      if (options.capabilitiesUnavailable) throw new Error('能力响应无效');
+      return {
+        dataContract: 'dsa-data-v1',
+        dailyObservationContract: 'market-daily-tradability-window-v1',
+        serviceCapabilities: { fundNav: true },
+      };
+    }),
     effectiveControlPolicyV3: vi.fn().mockResolvedValue({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       projection: {
         effective: snapshots.effective as unknown as NonNullable<
@@ -207,6 +218,30 @@ const makeReader = (
 };
 
 describe('MarketBarWindowReaderV3', () => {
+  it('具名日级观察先核对服务能力，仅用于显式研究', async () => {
+    const request = { ...input, tradabilityMode: 'assume-untradable-no-bar' as const,
+      dailyObservationContract: 'market-daily-tradability-window-v1' as const, priceResearch: true };
+    const unsupported = makeReader({ capabilitiesUnavailable: true });
+    expect(await unsupported.reader.read(request)).toMatchObject({ status: 'unavailable',
+      selection: { reason: 'catalog_unavailable' } });
+    expect(unsupported.dsa.marketBarsV3).not.toHaveBeenCalled();
+    expect((await unsupported.reader.read({ ...request, priceResearch: false })).status).toBe('unavailable');
+    const current = makeReader({ read: async (wire) => {
+      const response = makeResponse(wire, wire.routeTarget, wire.routeTarget.routeIndex);
+      response.bars.forEach((bar) => { bar.volume = null; });
+      const daily = tradabilityFixtureV3(tradabilityWindowFromResponseV3(response), 'market-daily-tradability-window-v1');
+      daily.days.forEach((day) => { day.state = 'observed-price-only'; });
+      return { ...response, historicalTradabilityWindows: [daily] };
+    } });
+    const result = await current.reader.read(request);
+    expect(result.status).toBe('selected');
+    if (result.status === 'selected') expect(result.request.dailyObservationContract).toBe('market-daily-tradability-window-v1');
+    expect(current.dsa.marketDataCapabilitiesV3).toHaveBeenCalledOnce();
+    expect(current.dsa.marketBarsV3).toHaveBeenCalledOnce();
+    const wrongVersion = makeReader();
+    expect((await wrongVersion.reader.read(request)).status).toBe('unavailable');
+    expect(wrongVersion.evidenceRepository.record).not.toHaveBeenCalled();
+  });
   it('来源合同错误进入质量日志，普通来源不可用不记质量问题', async () => {
     for (const code of ['invalid-response', 'unavailable'] as const) {
       const observe = vi.fn(async () => null);

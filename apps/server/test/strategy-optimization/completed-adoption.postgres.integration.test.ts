@@ -66,14 +66,14 @@ describe.skipIf(process.env.COMPLETED_ADOPTION_POSTGRES !== "1")(
           data: {
             name: "隔离采纳样本",
             status: "experiment-only",
-            schemaVersion: 3,
+            schemaVersion: 1,
           },
         });
         const baseline = await db.prisma.strategyVersion.create({
           data: {
             strategyId: strategy.id,
             version: 0,
-            schemaVersion: 3,
+            schemaVersion: 1,
             schema: schema as Prisma.InputJsonValue,
           },
         });
@@ -81,7 +81,7 @@ describe.skipIf(process.env.COMPLETED_ADOPTION_POSTGRES !== "1")(
           data: {
             strategyId: strategy.id,
             version: -1,
-            schemaVersion: 3,
+            schemaVersion: 1,
             schema: schema as Prisma.InputJsonValue,
           },
         });
@@ -145,7 +145,7 @@ describe.skipIf(process.env.COMPLETED_ADOPTION_POSTGRES !== "1")(
           data: {
             strategyId: strategy.id,
             version: -2,
-            schemaVersion: 3,
+            schemaVersion: 1,
             schema: secondSchema as Prisma.InputJsonValue,
           },
         });
@@ -192,7 +192,7 @@ describe.skipIf(process.env.COMPLETED_ADOPTION_POSTGRES !== "1")(
         const sourceFiltered = await reads.list({ strategyVersionId: first.strategyVersion.id, sourceMode: 'existing' });
         expect(sourceFiltered.totalCount).toBe(0);
         const unrelatedVersion = await db.prisma.strategyVersion.create({ data: {
-          strategyId: strategy.id, version: 3, schemaVersion: 3, schema: schema as Prisma.InputJsonValue,
+          strategyId: strategy.id, version: 3, schemaVersion: 1, schema: schema as Prisma.InputJsonValue,
         } });
         const unrelated = await reads.list({ strategyVersionId: unrelatedVersion.id });
         expect(unrelated.items).toEqual([]);

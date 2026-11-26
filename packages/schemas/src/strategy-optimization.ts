@@ -1,15 +1,25 @@
 import { z } from 'zod';
-import { DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES, riskNotificationProvidersSchema, riskNotificationCooldownSchema } from './risk-notification-settings.js';
+export {
+  optimizationDiscoveryGeneratedStrategySchema,
+  optimizationDiscoveryGenerationOutputSchema,
+  type OptimizationDiscoveryGenerationOutput,
+} from './strategy-discovery-generation.js';
+export {
+  strategyCapabilityGapSchema,
+  isStrategyCapabilityGap,
+  type StrategyCapabilityGap,
+} from './strategy-capability-gap.js';
+import {
+  DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES,
+  riskNotificationProvidersSchema,
+  riskNotificationCooldownSchema,
+} from './risk-notification-settings.js';
 import { optimizationBudgetLimits as budgetLimits } from './optimization-budget-limits.js';
 import {
   assetSymbolRefSchema,
   backtestMetricSchema,
   backtestTimeframeSchema,
-  booleanExpressionSchema,
-  riskRuleSchema,
   runConfigSchemaV3,
-  seriesFieldSchema,
-  sizingRuleSchema,
   strategySchema,
 } from './backtest-contract.js';
 import { decimalStringSchema, nonNegativeDecimalStringSchema } from './monetary-values.js';
@@ -133,13 +143,22 @@ export const riskApplicationPreviewInputSchema = z
 export const riskApplicationNotificationSchema = z
   .object({
     enabled: z.boolean().default(true),
-    cooldownMinutes: riskNotificationCooldownSchema.default(DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES),
+    cooldownMinutes: riskNotificationCooldownSchema.default(
+      DEFAULT_RISK_NOTIFICATION_COOLDOWN_MINUTES,
+    ),
     providers: riskNotificationProvidersSchema.optional(),
     severity: z.enum(['info', 'warning', 'error', 'critical']).default('warning'),
-    ruleOverrides: z.record(z.string().min(1), z.object({
-      severity: z.enum(['info', 'warning', 'error', 'critical']).optional(),
-      cooldownMinutes: z.number().int().min(0).max(10_080).optional(),
-    }).strict()).optional(),
+    ruleOverrides: z
+      .record(
+        z.string().min(1),
+        z
+          .object({
+            severity: z.enum(['info', 'warning', 'error', 'critical']).optional(),
+            cooldownMinutes: z.number().int().min(0).max(10_080).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
     channels: z
       .array(z.enum(['feishu']))
       .max(1)
@@ -266,12 +285,37 @@ export const optimizationSplitSchema = z
 
 export const optimizationBudgetSchema = z
   .object({
-    maxAiCalls: z.union([z.literal(budgetLimits.maxAiCalls.unlimited), z.number().int().min(budgetLimits.maxAiCalls.min).max(budgetLimits.maxAiCalls.max)]),
-    maxBacktestRuns: z.union([z.literal(budgetLimits.maxBacktestRuns.unlimited), z.number().int().min(budgetLimits.maxBacktestRuns.min).max(budgetLimits.maxBacktestRuns.max)]),
-    maxInputTokens: z.union([z.literal(budgetLimits.maxInputTokens.unlimited), z.number().int().min(budgetLimits.maxInputTokens.min).max(budgetLimits.maxInputTokens.max)]).default(100_000),
-    maxOutputTokens: z.union([z.literal(budgetLimits.maxOutputTokens.unlimited), z.number().int().min(budgetLimits.maxOutputTokens.min).max(budgetLimits.maxOutputTokens.max)]).default(20_000),
+    maxAiCalls: z.union([
+      z.literal(budgetLimits.maxAiCalls.unlimited),
+      z.number().int().min(budgetLimits.maxAiCalls.min).max(budgetLimits.maxAiCalls.max),
+    ]),
+    maxBacktestRuns: z.union([
+      z.literal(budgetLimits.maxBacktestRuns.unlimited),
+      z.number().int().min(budgetLimits.maxBacktestRuns.min).max(budgetLimits.maxBacktestRuns.max),
+    ]),
+    maxInputTokens: z
+      .union([
+        z.literal(budgetLimits.maxInputTokens.unlimited),
+        z.number().int().min(budgetLimits.maxInputTokens.min).max(budgetLimits.maxInputTokens.max),
+      ])
+      .default(100_000),
+    maxOutputTokens: z
+      .union([
+        z.literal(budgetLimits.maxOutputTokens.unlimited),
+        z
+          .number()
+          .int()
+          .min(budgetLimits.maxOutputTokens.min)
+          .max(budgetLimits.maxOutputTokens.max),
+      ])
+      .default(20_000),
     maxCost: nonNegativeDecimalStringSchema.optional(),
-    maxDurationSeconds: z.number().int().min(budgetLimits.maxDurationSeconds.min).max(budgetLimits.maxDurationSeconds.max).default(1_800),
+    maxDurationSeconds: z
+      .number()
+      .int()
+      .min(budgetLimits.maxDurationSeconds.min)
+      .max(budgetLimits.maxDurationSeconds.max)
+      .default(1_800),
   })
   .strict();
 
@@ -396,30 +440,6 @@ export const optimizationCandidateSourceSchema = z
   .strict();
 export type OptimizationCandidateSource = z.infer<typeof optimizationCandidateSourceSchema>;
 
-/** 模型只生成可变策略部分；固定标的、周期、执行、成本和 SignalSource ID 由服务端装配。 */
-export const optimizationDiscoveryGeneratedStrategySchema = z
-  .object({
-    name: z.string().trim().min(1).max(200),
-    description: z.string().trim().max(2_000).optional(),
-    series: z.array(seriesFieldSchema).min(1).max(6),
-    entry: booleanExpressionSchema,
-    exit: booleanExpressionSchema,
-    sizing: sizingRuleSchema,
-    risk: z.array(riskRuleSchema).max(32),
-  })
-  .strict();
-
-export const optimizationDiscoveryGenerationOutputSchema = z
-  .object({
-    strategy: optimizationDiscoveryGeneratedStrategySchema,
-    reason: z.string().trim().min(1).max(2_000).optional(),
-    evidenceRefs: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
-  })
-  .strict();
-export type OptimizationDiscoveryGenerationOutput = z.infer<
-  typeof optimizationDiscoveryGenerationOutputSchema
->;
-
 export const optimizationDiscoveryProposalSchema = z
   .object({
     strategy: strategySchema,
@@ -444,8 +464,9 @@ const optimizationExperimentCreateFields = {
   idempotencyKey: z.string().trim().min(1).max(200),
 };
 
-export const optimizationSubmissionSettingsSchema = z.strictObject(optimizationExperimentCreateFields)
-  .omit({sourceMode:true,strategyVersionId:true,discoveryScope:true,idempotencyKey:true});
+export const optimizationSubmissionSettingsSchema = z
+  .strictObject(optimizationExperimentCreateFields)
+  .omit({ sourceMode: true, strategyVersionId: true, discoveryScope: true, idempotencyKey: true });
 type OptimizationExperimentCreateInput = {
   name?: string | undefined;
   sourceMode: z.infer<typeof optimizationSourceModeSchema>;
@@ -499,7 +520,10 @@ const validateOptimizationSource = (
   }
 };
 
-export const validateOptimizationExperimentCreate = (value: OptimizationExperimentCreateInput, ctx: z.RefinementCtx) => {
+export const validateOptimizationExperimentCreate = (
+  value: OptimizationExperimentCreateInput,
+  ctx: z.RefinementCtx,
+) => {
   validateOptimizationSource(value, ctx);
   const modelKeys = value.models.map((item) => JSON.stringify([item.provider, item.model]));
   if (new Set(modelKeys).size !== modelKeys.length)
@@ -511,13 +535,19 @@ export const validateOptimizationExperimentCreate = (value: OptimizationExperime
     ctx.addIssue({ code: 'custom', path: ['allowedParameterIds'], message: '参数授权不得重复' });
   const plannedAiCalls = value.models.length * value.maxRounds;
   const plannedBacktestRuns = 3 + plannedAiCalls * 3;
-  if (value.budget.maxAiCalls !== budgetLimits.maxAiCalls.unlimited && value.budget.maxAiCalls < plannedAiCalls)
+  if (
+    value.budget.maxAiCalls !== budgetLimits.maxAiCalls.unlimited &&
+    value.budget.maxAiCalls < plannedAiCalls
+  )
     ctx.addIssue({
       code: 'custom',
       path: ['budget', 'maxAiCalls'],
       message: `AI 调用预算至少需要 ${plannedAiCalls} 次以保证各模型同额度`,
     });
-  if (value.budget.maxBacktestRuns !== budgetLimits.maxBacktestRuns.unlimited && value.budget.maxBacktestRuns < plannedBacktestRuns)
+  if (
+    value.budget.maxBacktestRuns !== budgetLimits.maxBacktestRuns.unlimited &&
+    value.budget.maxBacktestRuns < plannedBacktestRuns
+  )
     ctx.addIssue({
       code: 'custom',
       path: ['budget', 'maxBacktestRuns'],
@@ -536,7 +566,7 @@ export const validateOptimizationExperimentCreate = (value: OptimizationExperime
 /** Current experiments pin the frozen data and execution protocol. */
 export const optimizationExperimentCreateSchemaV3 = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     ...optimizationExperimentCreateFields,
     runConfig: runConfigSchemaV3,
   })
@@ -577,6 +607,8 @@ const optimizationVisibleMetricKeysV3 = [
   'winRate',
   'profitFactor',
   'turnover',
+  'tradedNotional',
+  'turnoverRate',
   'benchmarkTotalReturn',
 ] as const;
 
@@ -610,7 +642,7 @@ const optimizationModelVisibleWindowsV3Schema = z
 
 /** Strict AI input boundary: only bounded development/validation result summaries are representable. */
 export const optimizationModelContextV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   modelKey: z.string().trim().min(1),
   round: z.number().int().positive(),
   objective: optimizationObjectiveSchema,
@@ -673,7 +705,10 @@ export const optimizationFinalizeSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    if (value.selectedCandidateId !== null && !value.candidateIds.includes(value.selectedCandidateId))
+    if (
+      value.selectedCandidateId !== null &&
+      !value.candidateIds.includes(value.selectedCandidateId)
+    )
       ctx.addIssue({
         code: 'custom',
         path: ['selectedCandidateId'],

@@ -2,7 +2,7 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ruleMonitorHistorySchema, ruleMonitorStatusSchema } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 
-const root = '/api/v3/thesis-ledger/control/rule-monitor';
+const root = '/api/v1/thesis-ledger/control/rule-monitor';
 
 /** Market拥有来源监测事实；自动化只消费只读投影。 */
 @Injectable()

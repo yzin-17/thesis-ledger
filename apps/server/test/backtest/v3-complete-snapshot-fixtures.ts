@@ -8,8 +8,18 @@ import { buildInput, makeReaderResult } from './v3-snapshot-fixtures.js';
 import { tradabilityWindowFromResponseV3 } from '../../src/backtest/backtest-snapshot-v3-tradability.js';
 import { tradabilityFixtureV3 } from './v3-tradability-fixtures.js';
 
-export const completeSnapshotFixture = async () => {
+export const completeSnapshotFixture = async (assetType: 'etf' | 'stock' = 'etf') => {
   const { input } = await buildInput();
+  if (assetType === 'stock') {
+    const asset = { symbol: '600519.SH', market: 'CN' as const, assetType };
+    input.strategy.executionInstrument = asset;
+    input.strategy.signalSources = input.strategy.signalSources.map((source) => ({ ...source, asset }));
+    input.executionRouteKey = { ...input.executionRouteKey, assetType: 'STOCK' };
+    const model = input.runConfig.executionModel;
+    if (!model) throw new Error('Fixture 缺少执行模型');
+    model.scope.symbol = asset.symbol;
+    model.scope.instrumentType = 'STOCK';
+  }
   input.runConfig.priceInputBindings = {
     signals: [{ sourceId: 'execution', binding: 'execution-series' }],
     benchmark: { binding: 'execution-series' },
@@ -30,7 +40,7 @@ export const completeSnapshotFixture = async () => {
       async (
         request: Parameters<DsaClient['backtestCalendar']>[0],
       ): Promise<BacktestCalendarResponse> => ({
-        version: 3,
+        version: 1,
         status: 'supported',
         provider: 'fixture-calendar',
         providerRevision: 'calendar-v1',
@@ -63,7 +73,7 @@ export const completeSnapshotFixture = async () => {
           routeKey: {
             kind: 'bar',
             market: request.market,
-            assetType: 'ETF',
+            assetType: assetType === 'stock' ? 'STOCK' : 'ETF',
             capability: 'DAILY_BAR',
             timeframe: '1d',
             adjustment: request.barAdjustment ?? 'qfq',
@@ -72,7 +82,7 @@ export const completeSnapshotFixture = async () => {
         });
         if (result.status !== 'selected') throw new Error('fixture 行情不可用');
         return {
-          version: 3,
+          version: 1,
           status: 'supported',
           provider: 'fixture-instrument',
           providerRevision: 'instrument-v1',

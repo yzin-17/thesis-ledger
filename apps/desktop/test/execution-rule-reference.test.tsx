@@ -15,7 +15,7 @@ let client: QueryClient;
 
 function reference(symbol = '00700.HK', ageMs = 1000): SecurityLotSizeResponse {
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'reference-test',
     symbol,

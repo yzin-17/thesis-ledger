@@ -7,6 +7,12 @@ import { join } from 'node:path';
 import type { Prisma } from '@prisma/client';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../src/platform/prisma.service.js';
+import { IdentityService } from '../../src/identity/identity.service.js';
+import { StrategyAccessService } from '../../src/backtest/strategy-access.service.js';
+import { BacktestRunService } from '../../src/backtest/backtest-run.service.js';
+import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
+import { BacktestNavRunExecution } from '../../src/backtest/backtest-nav-run-execution.js';
+import { prepareBacktestExecution } from '../../src/backtest/backtest-execution-owner.js';
 import { ApiExceptionFilter } from '../../src/platform/api-exception.filter.js';
 import { MarketNavReaderV3 } from '../../src/market/market-nav-reader-v3.js';
 import { BacktestNavPreparationController } from '../../src/backtest/backtest-nav-preparation.controller.js';
@@ -16,6 +22,7 @@ import {
   NAV_PREPARATION_TIMEOUT_MS,
 } from '../../src/backtest/backtest-nav-preparation.service.js';
 import { BacktestNavRunController } from '../../src/backtest/backtest-nav-run.controller.js';
+import { navSnapshotStoreForJob } from '../../src/backtest/backtest-nav-run-read.js';
 import { BacktestNavRunService } from '../../src/backtest/backtest-nav-run.service.js';
 import { LocalNavSnapshotStore } from '../../src/backtest/backtest-nav-snapshot-store.js';
 import {
@@ -45,6 +52,7 @@ type Scenario = {
     body: Record<string, unknown>;
   }>;
   read(id: string): Promise<{ status: number; body: Record<string, unknown> }>;
+  execute(id: string): ReturnType<BacktestRunService['runCurrent']>;
 };
 
 postgresDescribe('NAV 准备凭证与 Run 的隔离 PostgreSQL 验收', () => {
@@ -109,13 +117,13 @@ function navPersistenceContext() {
   async function scenario(options: { freezeFailure?: boolean } = {}): Promise<Scenario> {
     const f = navPreparationFixture();
     const strategy = await fixtureDb.prisma.strategy.create({
-      data: { name: `N2.6 NAV 隔离验收 ${randomUUID()}`, schemaVersion: 2 },
+      data: { name: `N2.6 NAV 隔离验收 ${randomUUID()}`, schemaVersion: 1 },
     });
     const version = await fixtureDb.prisma.strategyVersion.create({
       data: {
         strategyId: strategy.id,
         version: 1,
-        schemaVersion: 2,
+        schemaVersion: 1,
         schema: f.strategy as unknown as Prisma.InputJsonValue,
       },
     });
@@ -161,14 +169,18 @@ function navPersistenceContext() {
     };
     const snapshotRoot = join(fixtureDb.artifactRoot, randomUUID());
     const snapshots = new LocalNavSnapshotStore(snapshotRoot);
-    const injectedSnapshots = options.freezeFailure
-      ? {
-          freeze: async () => {
-            throw new SnapshotIntegrityError('隔离验收注入的冻结失败');
-          },
-          replay: snapshots.replay.bind(snapshots),
-        }
-      : snapshots;
+    if (options.freezeFailure) {
+      const attemptStore = snapshots.forAttempt.bind(snapshots);
+      vi.spyOn(snapshots, 'forAttempt').mockImplementation((runId, attempt) => {
+        const scoped = attemptStore(runId, attempt);
+        vi.spyOn(scoped, 'freeze').mockRejectedValue(new SnapshotIntegrityError('隔离验收注入的冻结失败'));
+        return scoped;
+      });
+    }
+    const navExecution = new BacktestNavRunExecution(fixtureDb.prisma, snapshots);
+    const execution = new BacktestRunService(
+      fixtureDb.prisma, undefined, undefined, undefined, undefined, undefined, navExecution,
+    );
 
     @Module({
       controllers: [BacktestNavPreparationController, BacktestNavRunController],
@@ -176,15 +188,40 @@ function navPersistenceContext() {
         BacktestNavPreparationService,
         BacktestNavPreparationRepository,
         BacktestNavRunService,
+        { provide: IdentityService, useFactory: () => new IdentityService(fixtureDb.prisma) },
+        {
+          provide: StrategyAccessService,
+          useFactory: () => new StrategyAccessService(fixtureDb.prisma),
+        },
+        {
+          provide: BacktestRunService,
+          useValue: {
+            retryRun: () => {
+              throw new Error('本组只验证准备和创建，不执行重试');
+            },
+          },
+        },
+        {
+          provide: BacktestQueueService,
+          useValue: {
+            ensureEnqueued: async () => undefined,
+            cancel: () => {
+              throw new Error('取消由隔离 Worker 套件验证');
+            },
+          },
+        },
         { provide: PrismaService, useValue: fixtureDb.prisma },
         { provide: MarketNavReaderV3, useValue: reader },
         { provide: NAV_PREPARATION_TIMEOUT_MS, useValue: 120_000 },
-        { provide: LocalNavSnapshotStore, useValue: injectedSnapshots },
+        { provide: LocalNavSnapshotStore, useValue: snapshots },
       ],
     })
     class TestModule {}
 
-    const app: INestApplication = await NestFactory.create(TestModule, { logger: false });
+    const app: INestApplication = await NestFactory.create(TestModule, {
+      logger: false,
+      abortOnError: false,
+    });
     app.useGlobalFilters(new ApiExceptionFilter());
     app.setGlobalPrefix('api/v1');
     await app.listen(0, '127.0.0.1');
@@ -198,12 +235,17 @@ function navPersistenceContext() {
       async close() {
         await app.close();
       },
+      async execute(id) {
+        const ownership = await prepareBacktestExecution(fixtureDb.prisma, id, 1);
+        if (ownership.action !== 'run') throw new Error('隔离 NAV 作业未取得执行权');
+        return execution.runCurrent(id, { attempt: ownership.ownerAttempt, maxAttempts: ownership.maxAttempts });
+      },
       async prepare() {
         return post(`${baseUrl}/api/v1/backtests/run-config/nav/prepare`, request);
       },
       async create(receipt, idempotencyKey = randomUUID()) {
         return post(`${baseUrl}/api/v1/backtests/runs/nav`, {
-          contractVersion: 3,
+          contractVersion: 1,
           ...receipt,
           idempotencyKey,
         });
@@ -246,7 +288,7 @@ function navPersistenceContext() {
 }
 
 function registerNavPreparationIdentity(suiteContext: ReturnType<typeof navPersistenceContext>) {
-  it('准备 API 持久化完整请求与来源证据，Run 冻结并以失败终态关联同一凭证', async () => {
+  it('准备 API 持久化完整来源证据，排队后使用同一凭证完成冻结和执行', async () => {
     const { fixtureDb, scenario, persistedPreparation } = suiteContext;
 
     const current = await scenario();
@@ -265,21 +307,23 @@ function registerNavPreparationIdentity(suiteContext: ReturnType<typeof navPersi
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
       inputKind: 'nav',
-      status: 'failed',
-      errorCode: 'NAV_RUNNER_UNAVAILABLE',
+      status: 'queued',
+      snapshotId: null,
       preparationId: receipt.preparationId,
       preparationHash: receipt.preparationHash,
     });
     const runId = requireString(created.body, 'id');
+    await current.execute(runId);
+    const finished = await current.read(runId);
+    expect(finished.status).toBe(200);
     const job = await fixtureDb.prisma.backtestJob.findUniqueOrThrow({ where: { id: runId } });
     const consumed = await fixtureDb.prisma.navBacktestPreparation.findUniqueOrThrow({
       where: { id: receipt.preparationId },
     });
     expect(job).toMatchObject({
-      status: 'failed',
-      errorCode: 'NAV_RUNNER_UNAVAILABLE',
-      snapshotId: created.body.snapshotId,
-      snapshotManifest: created.body.snapshotManifest,
+      status: 'succeeded',
+      snapshotId: finished.body.snapshotId,
+      snapshotManifest: finished.body.snapshotManifest,
     });
     expect(consumed.consumedRunId).toBe(job.id);
     expect(asRecord(job.input)).toMatchObject({
@@ -288,13 +332,13 @@ function registerNavPreparationIdentity(suiteContext: ReturnType<typeof navPersi
       preparationHash: receipt.preparationHash,
     });
 
-    const replay = await new LocalNavSnapshotStore(current.snapshotRoot).replay(job.id);
+    const replay = await navSnapshotStoreForJob(job, new LocalNavSnapshotStore(current.snapshotRoot)).replay(job.id);
     expect(replay.manifest).toEqual(job.snapshotManifest);
     expect(replay.manifest.contentHash).toBe(job.snapshotId);
     expect(hashCanonicalManifest(replay.manifest)).toBe(
       hashCanonicalManifest(job.snapshotManifest),
     );
-    expect((await current.read(job.id)).body).toEqual(created.body);
+    expect((await current.read(job.id)).body).toEqual(finished.body);
   }, 30_000);
   it.each(['facts', 'context', 'route'])(
     '即使重算数据库校验和，也拒绝被篡改的 %s 证据且不创建 Run',
@@ -462,14 +506,15 @@ function registerNavConsumptionFailures(suiteContext: ReturnType<typeof navPersi
     const { receipt } = await persistedPreparation(current);
     const created = await current.create(receipt, 'n2-6-freeze-failure');
     expect(created.status).toBe(201);
-    expect(created.body).toMatchObject({
+    const runId = requireString(created.body, 'id');
+    await expect(current.execute(runId)).rejects.toBeDefined();
+    expect((await current.read(runId)).body).toMatchObject({
       inputKind: 'nav',
       status: 'failed',
-      errorCode: 'NAV_SNAPSHOT_INVALID',
+      errorCode: 'SNAPSHOT_HASH_MISMATCH',
       snapshotId: null,
       snapshotManifest: null,
     });
-    const runId = requireString(created.body, 'id');
     expect(
       await fixtureDb.prisma.navBacktestPreparation.findUniqueOrThrow({
         where: { id: receipt.preparationId },
@@ -484,7 +529,7 @@ function registerNavConsumptionFailures(suiteContext: ReturnType<typeof navPersi
     });
     expect(failedJob.snapshotManifest).toBeNull();
     await expect(
-      new LocalNavSnapshotStore(current.snapshotRoot).replay(runId),
+      new LocalNavSnapshotStore(current.snapshotRoot).forAttempt(runId, failedJob.executionAttempt).replay(runId),
     ).rejects.toBeDefined();
   }, 30_000);
   it('同一凭证并发使用同一幂等键只消费一次；不同键并发只允许一个 Run', async () => {
@@ -527,7 +572,7 @@ function registerNavConsumptionFailures(suiteContext: ReturnType<typeof navPersi
 }
 
 function registerNavPersistenceRecovery(suiteContext: ReturnType<typeof navPersistenceContext>) {
-  it('事务消费失败回滚 Run 与凭证，已冻结孤儿文件不能经 DB 读取成为 Run', async () => {
+  it('事务消费失败回滚 Run 与凭证，未发布快照', async () => {
     const { fixtureDb, scenario, persistedPreparation } = suiteContext;
 
     const current = await scenario();
@@ -560,12 +605,7 @@ function registerNavPersistenceRecovery(suiteContext: ReturnType<typeof navPersi
           })
         ).consumedRunId,
       ).toBeNull();
-      const orphanIds = await readdir(join(current.snapshotRoot, 'snapshots'));
-      expect(orphanIds).toHaveLength(1);
-      expect(
-        await fixtureDb.prisma.backtestJob.findUnique({ where: { id: orphanIds[0]! } }),
-      ).toBeNull();
-      expect((await current.read(orphanIds[0]!)).status).toBe(404);
+      await expect(readdir(current.snapshotRoot)).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
       await fixtureDb.adminSql(
         `DROP TRIGGER IF EXISTS "${triggerName}" ON "NavBacktestPreparation"; DROP FUNCTION IF EXISTS "${functionName}"();`,
@@ -595,6 +635,8 @@ function registerNavPersistenceRecovery(suiteContext: ReturnType<typeof navPersi
     const created = await current.create(receipt, 'n2-6-restart-read');
     expect(created.status).toBe(201);
     const runId = requireString(created.body, 'id');
+    await current.execute(runId);
+    const finished = await current.read(runId);
     const sourceReadCount = current.reader.read.mock.calls.length;
     await fixtureDb.prisma.$disconnect();
     const reopened = new PrismaService({
@@ -619,9 +661,8 @@ function registerNavPersistenceRecovery(suiteContext: ReturnType<typeof navPersi
       expect(rereadRun).toMatchObject({
         id: runId,
         inputKind: 'nav',
-        status: 'failed',
-        errorCode: 'NAV_RUNNER_UNAVAILABLE',
-        snapshotId: created.body.snapshotId,
+        status: 'succeeded',
+        snapshotId: finished.body.snapshotId,
       });
       expect(current.reader.read).toHaveBeenCalledTimes(sourceReadCount);
     } finally {

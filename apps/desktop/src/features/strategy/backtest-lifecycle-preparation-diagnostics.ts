@@ -1,4 +1,22 @@
-import { runConfigSchemaV3 } from '@thesis-ledger/schemas';
+import { runConfigSchemaV3, type BacktestLifecycleEvidence } from '@thesis-ledger/schemas';
+
+export function lifecycleEvidenceSources(response: BacktestLifecycleEvidence) {
+  if ('composition' in response) {
+    return response.composition.entries.flatMap((entry) => {
+      if (entry.status !== 'included') return [];
+      return [{
+        capability: entry.result.routeKey.capability,
+        providerId: entry.result.routeTarget.providerId,
+        upstreamSource: entry.result.routeTarget.upstreamSource,
+      }];
+    });
+  }
+  return [{
+    capability: response.routeKey.capability,
+    providerId: response.provenance.providerId,
+    upstreamSource: response.provenance.upstreamSource,
+  }];
+}
 
 export function lifecyclePreparationDiagnosticExport(
   value: unknown,
@@ -21,15 +39,36 @@ export function lifecyclePreparationDiagnosticExport(
           reason: sanitize(life.response.basicLifecycle.reason),
         }
       : undefined,
-    lifecycleSource: {
-      providerId: sanitize(life.response.provenance.providerId),
-      upstreamSource: sanitize(life.response.provenance.upstreamSource),
-      range: life.response.range,
-      records: life.response.sourceRecords?.map((record) => ({
-        responseSha256: record.responseSha256,
-        observedAt: record.observedAt,
-        queryMethod: sanitize(record.queryMethod),
-      })),
-    },
+    ...('composition' in life.response
+      ? {
+          lifecycleRange: life.response.range,
+          lifecycleSources: life.response.composition.entries.flatMap((entry) => {
+            if (entry.status !== 'included') return [];
+            const { result } = entry;
+            return [{
+              capability: result.routeKey.capability,
+              providerId: sanitize(result.routeTarget.providerId),
+              upstreamSource: sanitize(result.routeTarget.upstreamSource),
+              observedAt: result.clock.observedAt,
+              records: result.evidence.map(({ sha256, hashScope, observedAt }) => ({
+                sha256,
+                hashScope,
+                observedAt,
+              })),
+            }];
+          }),
+        }
+      : {
+          lifecycleSource: {
+            providerId: sanitize(life.response.provenance.providerId),
+            upstreamSource: sanitize(life.response.provenance.upstreamSource),
+            range: life.response.range,
+            records: life.response.sourceRecords?.map((record) => ({
+              responseSha256: record.responseSha256,
+              observedAt: record.observedAt,
+              queryMethod: sanitize(record.queryMethod),
+            })),
+          },
+        }),
   };
 }

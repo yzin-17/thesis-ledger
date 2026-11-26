@@ -1,13 +1,14 @@
 import { z } from 'zod';
 import { nonNegativeDecimalStringSchema, positiveDecimalStringSchema } from './monetary-values.js';
 import { backtestDailyTradabilityEvidenceV3Schema } from './backtest-daily-tradability.js';
+import { corporateActionTypeSchema } from './backtest-values.js';
+export { corporateActionTypeSchema, type CorporateActionType } from './backtest-values.js';
 
 const isoDateTime = z.iso.datetime({ offset: true });
 const isoDate = z.iso.date();
 
 export const backtestMarketSchema = z.enum(['CN', 'HK', 'US']);
 export const backtestInstrumentTypeSchema = z.enum(['STOCK', 'ETF', 'NAV_FUND']);
-export const corporateActionTypeSchema = z.enum(['CASH_DIVIDEND', 'SPLIT', 'REVERSE_SPLIT']);
 export const dataCapabilityStatusSchema = z.enum(['supported', 'unavailable', 'unsupported']);
 export const dataFreshnessSchema = z.enum(['live', 'delayed', 'stale', 'unknown']);
 export const dataQualitySchema = z.enum(['complete', 'partial', 'suspended', 'stale', 'unknown']);
@@ -227,7 +228,7 @@ export const backtestDependencyCoverageSchema = z
   .strict();
 
 const dependencyResponseShape = {
-  version: z.literal(3),
+  version: z.literal(1),
   status: dataCapabilityStatusSchema,
   provider: z.string().min(1),
   providerRevision: z.string().min(1),
@@ -389,7 +390,6 @@ export type InstrumentFact = z.infer<typeof instrumentFactSchema>;
 export type ExecutionRuleSnapshot = z.infer<typeof executionRuleSnapshotSchema>;
 export type BacktestFxFact = z.infer<typeof backtestFxFactSchema>;
 export type CorporateActionFact = z.infer<typeof corporateActionFactSchema>;
-export type CorporateActionType = z.infer<typeof corporateActionTypeSchema>;
 export type CorporateActionStrategyVisibility = z.infer<
   typeof corporateActionStrategyVisibilitySchema
 >;

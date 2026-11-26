@@ -15,6 +15,8 @@ import { hashCanonicalManifest } from './backtest-snapshot.js';
 import { planBacktestDependencies } from './backtest-dependency-plan.js';
 import { planBacktestPriceInputs } from './backtest-dependency-price.js';
 import { readPriceResearchReference, PriceResearchReferenceUnavailableError } from './backtest-price-research-input.js';
+import { assertStrategyResearchScopeV3 } from './backtest-research-data-scope-v3.js';
+import { additionalSignalPricePlanV3 } from './backtest-signal-price-plan-v3.js';
 
 /** Prepare a stamp for an already fixed protocol; never replace it with newly observed facts. */
 @Injectable()
@@ -31,17 +33,20 @@ export class BacktestConfiguredRunService {
     const version = await this.prisma.strategyVersion.findUnique({ where: { id: strategyVersionId } });
     if (!version) throw new NotFoundException('策略版本不存在');
     const strategy = strategySchema.parse(version.schema) as BacktestStrategy;
+    assertStrategyResearchScopeV3(strategy, runConfig);
     const { executionRouteKey } = planSnapshotInputsV3({ strategy, runConfig });
     const plan = planBacktestPriceInputs(strategy, runConfig, {
       minimumWarmupSessions: runConfig.frozenWarmupBudgetSessions,
     });
     const blocked = () => new BadRequestException('实验冻结行情未覆盖候选预热预算，请重新准备配置后新建实验。');
-    if (!runConfig.frozenExecutionWindow || !runConfig.priceResearch.actualPriceWindow) throw blocked();
+    if (!runConfig.frozenExecutionWindow || (!runConfig.priceResearch.dataScope && !runConfig.priceResearch.actualPriceWindow)) throw blocked();
     const execution = await this.reader.readV3({
       market: executionRouteKey.market, symbol: strategy.executionInstrument.symbol,
       routeKey: executionRouteKey, window: { start: plan.warmup.startDate, end: runConfig.endDate },
       frozenWindowRef: runConfig.frozenExecutionWindow, priceResearch: true,
-      tradabilityMode: 'assume-untradable-no-bar',
+      ...(executionRouteKey.timeframe === '1d' && runConfig.priceResearch.dailyObservationContract !== undefined
+        ? { dailyObservationContract: runConfig.priceResearch.dailyObservationContract } : {}),
+      tradabilityMode: executionRouteKey.timeframe === '1d' ? 'assume-untradable-no-bar' : 'observed-bars-only',
       warmup: { analysisStart: runConfig.startDate, minimumSessions: plan.warmup.lookbackPeriods },
     });
     if (execution.status !== 'selected') {
@@ -74,9 +79,10 @@ export class BacktestConfiguredRunService {
         where: { id: strategyVersionId },
       });
       if (!version) throw new NotFoundException('策略版本不存在');
-      if (![2, 3].includes(version.schemaVersion))
-        throw new BadRequestException('V3运行要求schemaVersion=2的策略');
+      if (version.schemaVersion !== 1)
+        throw new BadRequestException('回测需要 strategy-definition-v1 策略定义');
       candidate = strategySchema.parse(version.schema) as BacktestStrategy;
+      assertStrategyResearchScopeV3(candidate, runConfig);
       const dependencies = planBacktestDependencies({ strategy: candidate, runConfig });
       runConfig = runConfigSchemaV3.parse({
         ...runConfig,
@@ -89,6 +95,11 @@ export class BacktestConfiguredRunService {
           benchmark: { binding: 'execution-series' },
         },
       });
+      if (runConfig.priceResearch?.dataScope && runConfig.signalPriceWindows) {
+        const physical = new Set(additionalSignalPricePlanV3(candidate, runConfig).map((plan) => plan.artifactKey));
+        runConfig = runConfigSchemaV3.parse({ ...runConfig,
+          signalPriceWindows: runConfig.signalPriceWindows.filter((window) => physical.has(window.artifactKey)) });
+      }
       // Validate coordinate identity and frozen warmup limits before any Market read.
       planSnapshotInputsV3({ strategy: candidate, runConfig });
     }
@@ -99,14 +110,15 @@ export class BacktestConfiguredRunService {
     );
     if (existing) return { kind: 'existing' as const, job: existing };
     const version = candidate
-      ? { schemaVersion: Number(candidate.schemaVersion), schema: candidate }
+      ? { schemaVersion: 1, schema: candidate }
       : await this.prisma.strategyVersion.findUnique({
           where: { id: strategyVersionId },
         });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (![2, 3].includes(version.schemaVersion))
-      throw new BadRequestException('V3运行要求schemaVersion=2的策略');
+    if (version.schemaVersion !== 1)
+      throw new BadRequestException('回测需要 strategy-definition-v1 策略定义');
     const strategy = strategySchema.parse(version.schema) as BacktestStrategy;
+    assertStrategyResearchScopeV3(strategy, runConfig);
     const inputPlan = planSnapshotInputsV3({ strategy, runConfig });
     const routeRevisions = await this.revisions.readCurrent(inputPlan.executionRouteKey);
     const preflight = await preflightBacktestExecutionWindowV3({
@@ -118,7 +130,7 @@ export class BacktestConfiguredRunService {
         checkedAt: new Date().toISOString(),
         routeRevisions,
         request: {
-          contractVersion: 3,
+          contractVersion: 1,
           requestId: idempotencyKey,
           strategyVersionId,
           strategyContentHash: hashCanonicalManifest(strategy),
@@ -126,7 +138,7 @@ export class BacktestConfiguredRunService {
           requirements: [
             {
               symbol: strategy.executionInstrument.symbol,
-              capability: 'DAILY_BAR',
+              capability: inputPlan.executionRouteKey.capability,
               purpose: 'execution',
               dateRange: { startDate: inputPlan.warmup.startDate, endDate: runConfig.endDate },
               routeKey: inputPlan.executionRouteKey,
@@ -144,7 +156,7 @@ export class BacktestConfiguredRunService {
     return {
       kind: 'prepared' as const,
       input: backtestRunCreateSchemaV3.parse({
-        contractVersion: 3,
+        contractVersion: 1,
         strategyVersionId,
         runConfig,
         idempotencyKey,

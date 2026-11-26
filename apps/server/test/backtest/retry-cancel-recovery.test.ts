@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BacktestQueueReconciler } from '../../src/backtest/backtest-queue.reconciler.js';
 import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
+import { runBacktestAttempt } from '../../src/backtest/backtest-run-attempt.js';
+import type { BacktestJob } from '@prisma/client';
 
 type TestJob = Record<string, unknown> & {
   id: string;
@@ -23,6 +25,7 @@ const deferred = <T>() => {
 function matchesJobStatus(expected: unknown, actual: string) {
   if (typeof expected === 'string' && expected !== actual) return false;
   const status = expected;
+  if (status && typeof status === 'object' && 'notIn' in status && Array.isArray(status.notIn) && status.notIn.includes(actual)) return false;
   if (
     status &&
     typeof status === 'object' &&
@@ -111,16 +114,45 @@ const createState = (initial: TestJob, beforeFirstFindUnique?: () => Promise<voi
 
 const testJob = (patch: Partial<TestJob> = {}): TestJob => ({
   id: runId,
-  mode: 'V3',
+  mode: 'frozen',
   status: 'running',
   stage: 'running',
   progress: 10,
   executionAttempt: 1,
   cancelRequestedAt: null,
-  input: { contractVersion: 3, schemaVersion: '3' },
+  input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1' },
   createdAt: new Date('2026-09-25T00:00:00Z'),
   dispatchedAt: new Date(),
   ...patch,
+});
+
+it('执行进程只从持久取消轮询停止，入口本地controller不共享，停止与终态独立记录', async () => {
+  const state = createState(testJob({ status: 'queued', executionAttempt: 0, engineVersion: null }));
+  const started = deferred<void>(), controllers = new Map<string, AbortController>();
+  let stoppedAt = 0;
+  const execution = runBacktestAttempt({ prisma: state.prisma as never, job: state.read() as unknown as BacktestJob,
+    runnerId: 'fixture-runner-v1', activeControllers: controllers,
+    execute: async (_job, signal) => {
+      started.resolve();
+      try {
+        while (true) {
+          signal.throwIfAborted();
+          for (let n = 0; n < 10_000; n++) Math.sqrt(n);
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
+      } finally { stoppedAt = performance.now(); }
+    }, classifyFailure: () => ({ code: 'unexpected', summary: '不应按计算失败重试', retryable: false }),
+  });
+  await started.promise;
+  const api = new BacktestQueueService(state.prisma as never, { add: vi.fn(), remove: vi.fn() } as never, { publishJob: async () => undefined } as never);
+  await api.cancel(runId);
+  const registeredAt = performance.now();
+  expect(state.read()).toMatchObject({ status: 'running', cancelRequestedAt: expect.any(Date) });
+  const result = await execution;
+  expect(stoppedAt - registeredAt).toBeLessThan(5_000);
+  expect(result?.status).toBe('cancelled');
+  expect(controllers.size).toBe(0);
+  expect(state.read().result).toBeUndefined();
 });
 
 const createServices = (
@@ -147,7 +179,7 @@ describe('retry generation and cancellation recovery', () => {
     { executionAttempt: 1, cancelRequestedAt: new Date() },
     {
       executionAttempt: 1,
-      input: { contractVersion: 3, schemaVersion: '3', retryAttemptBase: 'invalid' },
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', retryAttemptBase: 'invalid' },
     },
     { executionAttempt: 3 },
     { executionAttempt: 1 },
@@ -203,7 +235,7 @@ describe('retry generation and cancellation recovery', () => {
         expect.objectContaining({
           where: {
             id: runId,
-            mode: 'V3',
+            mode: 'frozen',
             status: 'running',
             executionAttempt: 2,
             cancelRequestedAt: { not: null },

@@ -99,7 +99,7 @@ const verificationSchema = z.discriminatedUnion('kind', [
 /** A proof is pinned to one exact route pair and one exact complete data window. */
 export const marketRouteCompatibilityProofV3Schema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     proofId: text,
     proofRevision: text,
     routeKey: marketDataBarRouteKeyV3Schema,

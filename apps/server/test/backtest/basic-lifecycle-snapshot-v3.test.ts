@@ -8,7 +8,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { LocalSnapshotV3Runner } from '../../src/backtest/backtest-v3-runner.js';
 import { basicLifecycleForbidsTradeV3 } from '../../src/backtest/backtest-basic-lifecycle-v3.js';
-import { statusExecutionFixture } from './trading-status-execution-fixtures.js';
+import { addArchivedStructuredStatus, statusExecutionFixture } from './trading-status-execution-fixtures.js';
 
 const roots: string[] = [];
 afterEach(async () =>
@@ -86,10 +86,10 @@ describe('基础日期冻结并约束真实领域 Runner，价格产物保持', 
     { ipo: '2023-08-18', out: null },
     { ipo: null, out: '2023-08-18' },
     { ipo: null, out: null },
-  ])('新快照使用 $ipo / $out，旧结果及离线重放保持', async ({ ipo, out }) => {
+  ])('冻结历史使用 $ipo / $out，保留原离线执行', async ({ ipo, out }) => {
     const root = await mkdtemp(join(tmpdir(), 'basic-lifecycle-'));
     roots.push(root);
-    const state = await statusExecutionFixture(root, { source: 'unknown' });
+    const state = await statusExecutionFixture(root, { legacy: true });
     const runner = new LocalSnapshotV3Runner(state.snapshots);
     const oldRun = {
       runId: state.input.runId,
@@ -97,20 +97,17 @@ describe('基础日期冻结并约束真实领域 Runner，价格产物保持', 
       artifactRefs: state.built.artifactRefs,
     };
     const old = await runner.run(oldRun, new AbortController().signal);
-    state.dsa.marketTradingStatusV3.mockImplementation(async (request) =>
-      source(request, ipo, out),
-    );
-    const policy = await state.dsa.effectiveControlPolicyV3();
-    Object.assign(policy.projection.effective.routes[0]!.targets[0]!, {
-      providerId: 'baostock',
-      upstreamSource: 'baostock',
-    });
-    state.dsa.effectiveControlPolicyV3.mockResolvedValue(policy);
     const input = { ...state.input, runId: `${state.input.runId}-basic` };
+    const response = source({
+      contractVersion: 1, consumer: 'thesis-ledger', requestId: 'basic-archived',
+      routeKey: { kind: 'data', market: 'CN', assetType: 'STOCK', capability: 'HISTORICAL_TRADING_STATUS' },
+      routeTarget: { providerId: 'baostock', upstreamSource: 'baostock', routeIndex: 0 },
+      symbol: input.strategy.executionInstrument.symbol,
+      range: { start: input.runConfig.startDate, end: input.runConfig.endDate },
+    }, ipo, out);
+    addArchivedStructuredStatus(state.snapshots, input.runId, input.runConfig, response);
     const built = await state.builder.buildV3(input);
     expect(built.manifest.tradingStatus?.freezeVersion).toBe('frozen-trading-status-v5');
-    state.dsa.marketTradingStatusV3.mockRejectedValue(new Error('离线禁止请求来源'));
-    state.dsa.effectiveControlPolicyV3.mockRejectedValue(new Error('离线禁止请求策略'));
     const run = {
       runId: input.runId,
       snapshotRef: built.snapshotRef,

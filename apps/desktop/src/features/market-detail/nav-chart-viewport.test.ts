@@ -3,7 +3,7 @@ import { fundNavHistorySchema } from '@thesis-ledger/schemas';
 import { navViewportChange } from './nav-chart-viewport.js';
 
 const history = fundNavHistorySchema.parse([2, 1, 1.5, 3].map((unitNav, index) => ({
-  version: 3,
+  version: 1,
   symbol: '000001.OF',
   navDate: `2026-11-0${index + 1}T00:00:00Z`,
   unitNav,

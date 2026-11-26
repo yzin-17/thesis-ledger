@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { authoringContentSchema, type AuthoringContent } from '@thesis-ledger/schemas';
+import { authoringContentSchema, type AuthoringContent, type BacktestStrategy } from '@thesis-ledger/schemas';
 import {
   authoringGenerationIssues,
   invalidateAuthoringConfirmations,
   validateAuthoringGeneration,
 } from '../../src/strategy-authoring/authoring-semantics.js';
+import { authoringProposal } from './authoring-proposal.fixture.js';
 
 const asset = { symbol: '159516.SZ', market: 'CN', assetType: 'etf' } as const;
-const definition = {
-  schemaVersion: '2',
+const definition: BacktestStrategy = {
+  schemaVersion: 'strategy-definition-v1',
   name: '明确确认样本',
   executionInstrument: asset,
   primaryTimeframe: '1d',
-  signalSources: [{ id: 'price', asset, timeframe: '1d', series: ['close'] }],
+  entryTrigger: 'rising-edge',
+  signalSources: [{ priceCoordinate: 'actual', id: 'price', asset, timeframe: '1d', series: ['close'] }],
   entry: {
     type: 'compare',
     operator: 'gt',
@@ -67,10 +69,8 @@ const complete = (): AuthoringContent =>
       periodsAreBarsConfirmed: true,
     },
   });
-const output = () => ({
-  definition: structuredClone(definition),
-  coverage: [{ requirementId: 'entry', definitionPaths: ['entry'] }],
-});
+const output = (strategy = structuredClone(definition)) =>
+  authoringProposal(strategy, [{ requirementId: 'entry', definitionPaths: ['entry'] }]);
 
 describe('编写服务端确认与语义约束', () => {
   it.each(['entry', 'exit'] as const)('拒绝与已确认 %s 摘要相反的价格交叉', (path) => {
@@ -78,11 +78,11 @@ describe('编写服务端确认与语义约束', () => {
     const price = { type: 'series', sourceId: 'price', field: 'close' } as const;
     const ema = { type: 'indicator', name: 'EMA', input: price, params: { period: 20 } } as const;
     content.confirmation![`${path}Summary`] = `价格${path === 'entry' ? '上穿' : '下穿'}均线`;
-    const result = { ...output(), definition: { ...definition,
-      [path]: { type: 'cross', direction: path === 'entry' ? 'above' : 'below', left: ema, right: price } } };
-    expect(() => validateAuthoringGeneration(content, result)).toThrow('交叉方向与确认规则或说明不一致');
-    Object.assign(result.definition, { [path]: { type: 'cross', direction: path === 'entry' ? 'above' : 'below', left: price, right: ema } });
-    expect(() => validateAuthoringGeneration(content, result)).not.toThrow();
+    const direction = path === 'entry' ? 'above' : 'below';
+    const reversed = output({ ...definition, [path]: { type: 'cross', direction, left: ema, right: price } });
+    expect(() => validateAuthoringGeneration(content, reversed)).toThrow('交叉方向与确认规则或说明不一致');
+    const matching = output({ ...definition, [path]: { type: 'cross', direction, left: price, right: ema } });
+    expect(() => validateAuthoringGeneration(content, matching)).not.toThrow();
   });
 
   it('人工确认不能绕过明确并行交易代码的门禁；明确移除保留原文后才可继续', () => {
@@ -135,7 +135,7 @@ describe('编写服务端确认与语义约束', () => {
         executionInstrument: { ...asset, symbol: '510300.SH' },
         primaryTimeframe: '5m',
       };
-      Object.assign(result.definition, { [field]: changed[field] });
+      Object.assign(result.proposal.definition, { [field]: changed[field] });
       expect(() => validateAuthoringGeneration(complete(), result)).toThrow();
     },
   );
@@ -143,13 +143,17 @@ describe('编写服务端确认与语义约束', () => {
     const content = complete();
     content.description += '；保留另一个限制';
     expect(authoringGenerationIssues(content).join()).toContain('遗漏原文');
+    const ready = complete();
+    const original = output();
     for (const coverage of [
       [],
       [{ requirementId: 'entry', definitionPaths: ['missing'] }],
       [{ requirementId: 'invented', definitionPaths: ['entry'] }],
-      [output().coverage[0], output().coverage[0]],
+      [original.proposal.coverage[0]!, original.proposal.coverage[0]!],
     ]) {
-      expect(() => validateAuthoringGeneration(complete(), { ...output(), coverage })).toThrow();
+      expect(() => validateAuthoringGeneration(ready, {
+        ...original, proposal: { ...original.proposal, coverage },
+      })).toThrow();
     }
   });
   it('不支持项、未回答问题与未经明确移除不能生成', () => {

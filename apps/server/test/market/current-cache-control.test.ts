@@ -4,11 +4,11 @@ import { quoteControlFixture } from './quote-control-fixture.js';
 import { DsaError } from '../../src/integration/dsa/dsa.client.js';
 
 const time = '2026-10-01T00:00:00Z';
-const nav = { version: 3, symbol: '000001.OF', unitNav: 1.1, navDate: time,
+const nav = { version: 1, symbol: '000001.OF', unitNav: 1.1, navDate: time,
   fetchedAt: time, provider: 'fixture', freshness: 'delayed' };
-const holdings = { version: 3, fundSymbol: nav.symbol, reportPeriod: '2026-Q3', disclosureDate: null,
+const holdings = { version: 1, fundSymbol: nav.symbol, reportPeriod: '2026-Q3', disclosureDate: null,
   fetchedAt: time, provider: 'fixture', evidenceVersion: 'fixture', holdings: [] };
-const chip = { version: 3, symbol: '600519.SH', averageCost: 10, profitRatio: 0.5,
+const chip = { version: 1, symbol: '600519.SH', averageCost: 10, profitRatio: 0.5,
   range70: [9, 11], range90: [8, 12], concentration: 0.5,
   provider: 'fixture', engineVersion: 'fixture', calculatedAt: time };
 const cases = [

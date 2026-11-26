@@ -14,7 +14,7 @@ describe('当前信封消费边界', () => {
 
   it('现金投影不忽略无 factId 的旧行', () => {
     expect(() => projectCashMaterialization([{ ...old, factId: null }])).toThrow(
-      '旧账本事件不支持读取或修订',
+      '账本事件须使用 ledger-event-envelope-v1',
     );
   });
 

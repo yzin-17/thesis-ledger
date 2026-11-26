@@ -1,30 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
-import { AiRunService } from '../../src/ai/ai-run.service.js';
+import { expect, it, vi } from 'vitest';
+import { ResearchScopePermissions } from '../../src/research/research-scope-permissions.js';
+import { localIdentityPrincipal } from '../../src/identity/local-workspace.js';
+import { submissionV2Fixture } from './research-submission-v2.fixture.js';
 
-describe('研究创建固定账户模式', () => {
-  it('跨模式账户在创建任务前被拒绝，原任务与账户均不写入', async () => {
-    const create = vi.fn();
-    const findUnique = vi.fn(async () => ({ id: 'account', active: true, mode: 'actual' }));
-    const service = new AiRunService({ account: { findUnique }, aiRun: { create } } as never);
-    await expect(
-      service.startResearch({
-        question: '模式',
-        context: { scope: 'account', accountId: 'account', mode: 'shadow' },
-      }),
-    ).rejects.toThrow('账户模式不一致');
-    expect(create).not.toHaveBeenCalled();
-  });
-  it('保存显式模式，旧 context 仍保持原内容', async () => {
-    const create = vi.fn(async ({ data }: { data: unknown }) => data);
-    const service = new AiRunService({ aiRun: { create } } as never);
-    await expect(
-      service.startResearch({ question: '模拟', context: { scope: 'portfolio', mode: 'shadow' } }),
-    ).resolves.toMatchObject({ context: { scope: 'portfolio', mode: 'shadow' } });
-    await expect(
-      service.startResearch({ question: '历史', context: { scope: 'portfolio' } }),
-    ).resolves.toMatchObject({ context: { scope: 'portfolio' } });
-    expect((create.mock.calls[1]![0].data as { context: object }).context).toEqual({
-      scope: 'portfolio',
-    });
-  });
+it.each(['actual', 'shadow'] as const)('研究提交按 %s 账户模式检查权限', async (mode) => {
+  const { input } = submissionV2Fixture();
+  const accountId = '91111111-1111-4111-8111-111111111111';
+  const count = vi.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+  const transaction = { account: { count } };
+  const permissions = new ResearchScopePermissions();
+  const owner = localIdentityPrincipal()!.id;
+  const request = { ...input, mode, scope: { scope: 'account' as const, accountId } };
+  await expect(permissions.assertSubmission(transaction as never, owner, request))
+    .rejects.toThrow('账户不存在或与提交模式不一致');
+  await expect(permissions.assertSubmission(transaction as never, owner, request)).resolves.toBeUndefined();
+  expect(count).toHaveBeenCalledTimes(2);
+  expect(count).toHaveBeenCalledWith({ where: { id: accountId, mode } });
 });

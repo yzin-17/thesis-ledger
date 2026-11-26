@@ -29,7 +29,7 @@ export class ResearchObservationAccess {
       visited.add(current.id);
       if (
         current.availability !== 'available' ||
-        current.resultVersion !== 2 ||
+        current.resultVersion !== 'research-report-result-v1' ||
         researchObservationDigest(researchComparisonIdentity(current)) !== expected
       )
         throw new BadRequestException('研究重试谱系的范围或产物不一致');

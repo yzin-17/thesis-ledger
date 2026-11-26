@@ -1,3 +1,4 @@
+import type { readAdditionalSignalPricesV3 } from './backtest-signal-price-inputs-v3.js';
 import { runConfigSchemaV3, type RunConfigV3, type BacktestStrategy } from '@thesis-ledger/schemas';
 import { priceResearchReferenceArtifactKey, priceResearchEvidenceArtifactKey } from '@thesis-ledger/schemas';
 import type { readPriceResearchReference } from './backtest-price-research-input.js';
@@ -41,6 +42,7 @@ export const writeBacktestSnapshotV3Artifacts = async (
   knownCash?: ReturnType<typeof knownCashSnapshotRowsV3>,
   statusComposition?: BacktestStatusCompositionV1,
   reference?: Awaited<ReturnType<typeof readPriceResearchReference>>,
+  additionalSignals: Awaited<ReturnType<typeof readAdditionalSignalPricesV3>> = [],
 ): Promise<ArtifactRef[]> => {
   const artifactRefs: ArtifactRef[] = [];
   const putSnapshotArtifact = (key: string, artifactRows: readonly ArtifactRow[]) =>
@@ -74,6 +76,10 @@ export const writeBacktestSnapshotV3Artifacts = async (
   if (reference) {
     artifactRefs.push(await putSnapshotArtifact(priceResearchReferenceArtifactKey, reference.rows));
     artifactRefs.push(await putSnapshotArtifact(priceResearchEvidenceArtifactKey, [reference.evidenceRow]));
+  }
+  for (const item of additionalSignals) {
+    artifactRefs.push(await putSnapshotArtifact(item.plan.artifactKey, item.rows));
+    artifactRefs.push(await putSnapshotArtifact(item.plan.evidenceKey, [item.evidenceRow]));
   }
   if (knownCash) {
     artifactRefs.push(await putSnapshotArtifact(knownCashMetadataKeyV3, knownCash.metadata));

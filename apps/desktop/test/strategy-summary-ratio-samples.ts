@@ -39,14 +39,15 @@ export function strategySummaryVersion(
   return {
     id: 'ratio-version',
     version: 3,
-    schemaVersion: 2,
+    schemaVersion: 1,
     schema: {
-      schemaVersion: '2',
+      schemaVersion: 'strategy-definition-v1',
       name: '精度验收策略',
       description: '冻结说明：仓位 0.00%',
       signalSources: [
         {
           id: 'daily',
+          priceCoordinate: 'run',
           asset: { symbol: '510300.SH', market: 'CN', assetType: 'etf' },
           timeframe: '1d',
           series: ['close'],

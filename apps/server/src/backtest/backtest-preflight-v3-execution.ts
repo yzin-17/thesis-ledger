@@ -103,7 +103,7 @@ const invalidInputResult = (
   missingFields: readonly string[],
 ): BacktestPreflightResultV3 =>
   backtestPreflightResultV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId,
     checkedAt: isoDateTime.safeParse(checkedAt).success ? checkedAt : new Date().toISOString(),
     status: 'invalid-input',
@@ -158,7 +158,7 @@ const finish = (
   diagnostics: readonly BacktestPreflightDiagnosticV3[],
 ): BacktestPreflightResultV3 =>
   backtestPreflightResultV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: input.requestId,
     checkedAt: input.checkedAt,
     status,
@@ -538,6 +538,8 @@ export const preflightBacktestExecutionWindowV3 = async (
   const correlated = safeParseMarketWindowEvidenceResponseV3(selection.response, request);
   if (
     !correlated.success ||
+    (context.routeKey.timeframe === '1d' &&
+      (request.dailyObservationContract) !== (context.runConfig.priceResearch?.dailyObservationContract)) ||
     selection.response.coverage.requestedStart !== dataset.range.startDate ||
     selection.response.coverage.requestedEnd !== dataset.range.endDate ||
     selection.response.provenance.effectivePolicyRevision !== context.stamp.effectiveRevision
@@ -699,7 +701,8 @@ function executionWindowReadInput(
     symbol: context.requirement.symbol!,
     routeKey,
     window: { start: dataset.range.startDate, end: dataset.range.endDate },
-    ...backtestResearchReadOptionsV3(routeKey.market, context.runConfig.executionPriceProtocol),
+    ...backtestResearchReadOptionsV3(routeKey.market, context.runConfig.executionPriceProtocol, routeKey.timeframe,
+      context.runConfig.priceResearch?.dailyObservationContract),
     ...(context.runConfig.frozenExecutionWindow
       ? { frozenWindowRef: context.runConfig.frozenExecutionWindow }
       : {}),

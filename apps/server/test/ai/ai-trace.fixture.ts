@@ -7,12 +7,17 @@ import { createAiTraceReference } from '../../src/ai/trace/ai-trace-contract.js'
 import { AiTraceFileStore } from '../../src/ai/trace/ai-trace-file-store.js';
 
 export const traceContent = JSON.stringify({
+  version: 'research-report-generation-v1',
   conclusion: '受控研究结果',
-  evidence: [],
+  rationale: [],
+  claims: [],
+  numericClaims: [],
+  invalidationConditions: [],
+  nextSteps: [],
   risks: [],
   unknowns: [],
   disclaimer: '离线样例',
-  signals: [],
+  confidence: { level: 'unassessed', basis: ['隔离响应'] },
 });
 export const traceSse = (content = traceContent) => {
   const common = {

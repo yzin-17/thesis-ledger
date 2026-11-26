@@ -11,7 +11,7 @@ vi.mock('../src/platform/charts/MobileChart', () => ({ MobileChart: () => null }
 
 it('移动端消费报价原因、HTTP 状态和独立时点', () => {
   const detail = marketDisplayDetailResponseSchema.parse({
-    contractVersion: 3, symbol: '600519.SH', assetType: 'STOCK',
+    contractVersion: 1, symbol: '600519.SH', assetType: 'STOCK',
     requestId: 'controlled', generatedAt: '2026-11-09T02:00:00Z',
     identity: { source: 'asset', status: 'confirmed' }, requested: ['quote'],
     capabilities: { supported: ['quote'], unsupported: [] }, limits: { bars: 90, nav: 90 },

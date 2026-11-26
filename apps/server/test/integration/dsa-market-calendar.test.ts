@@ -12,7 +12,7 @@ const client = () =>
   }) as DsaClient;
 it('展示与回测日历分别请求各自入口，并保留有界事实信封校验', async () => {
   const envelope = {
-    version: 3,
+    version: 1,
     status: 'unavailable',
     provider: 'exchange-calendars',
     providerRevision: 'unavailable',
@@ -32,8 +32,8 @@ it('展示与回测日历分别请求各自入口，并保留有界事实信封�
   expect(await client().backtestCalendar(input)).toEqual(envelope);
   const [first, firstInit] = fetcher.mock.calls[0] as unknown as [URL, RequestInit];
   const [second] = fetcher.mock.calls[1] as unknown as [URL, RequestInit];
-  expect(first.pathname).toBe('/api/v3/thesis-ledger/market/calendar');
-  expect(second.pathname).toBe('/api/v3/thesis-ledger/backtest/calendar');
+  expect(first.pathname).toBe('/api/v1/thesis-ledger/market/calendar');
+  expect(second.pathname).toBe('/api/v1/thesis-ledger/backtest/calendar');
   expect(Object.fromEntries(first.searchParams)).toEqual(input);
   expect(firstInit.headers).toMatchObject({ authorization: 'Bearer calendar-test-token' });
 });

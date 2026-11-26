@@ -39,7 +39,7 @@ describe('市场资料动态列对齐', () => {
       totalSourceRecords: 2,
       historyComplete: false,
       notes: ['本地布局回归样本'],
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       policyRevision: 1,
       routeTarget: { providerId: 'fixture', upstreamSource: 'eastmoney', routeIndex: 0 },

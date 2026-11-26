@@ -71,6 +71,7 @@ function v3IsolationContext() {
       data: {
         accountId: account.id,
         type: 'CASH_DEPOSIT',
+        envelopeVersion: 1,
         occurredAt: new Date('2026-01-01T00:00:00Z'),
         payload: { amount: '123.45', currency: 'CNY' },
       },
@@ -122,7 +123,7 @@ function v3IsolationContext() {
       new BacktestCreationGuardService(prisma as PrismaService, preparedRevisionReader() as never),
     );
     const request = {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       strategyVersionId: version.id,
       idempotencyKey: 'isolated-v3',
       runConfig: fixture.input.runConfig,
@@ -172,7 +173,7 @@ function registerV3DatabaseModeAndIdentity(suiteContext: ReturnType<typeof v3Iso
     ]) {
       const invalid = scenario.includes('invalid');
       const input = {
-        contractVersion: 3,
+        contractVersion: 1,
         schemaVersion: '3',
         retryAttemptBase: invalid ? 'invalid' : 0,
       };

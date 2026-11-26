@@ -30,7 +30,7 @@ describe('第 4 批手机自有 NAV 合同夹具', () => {
     expect(pending).toEqual({
       kind: 'nav',
       body: {
-        contractVersion: 3,
+        contractVersion: 1,
         preparationId: navPrepared.receipt.preparationId,
         preparationHash: navPrepared.receipt.preparationHash,
         idempotencyKey: 'controlled-nav-key',

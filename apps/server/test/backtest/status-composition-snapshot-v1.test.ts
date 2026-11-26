@@ -16,6 +16,7 @@ import {
   collectSnapshotStatusInputsV1,
 } from '../../src/backtest/backtest-status-composition-v1.js';
 import type { ArtifactRow } from '../../src/backtest/backtest-artifact-store.js';
+import { tradingStatusInputs } from './trading-status-fixtures.js';
 import { statusExecutionFixture } from './trading-status-execution-fixtures.js';
 import { compositionFixture } from '../market/status-composition-fixtures.js';
 import { mapDataV3HttpError } from '../../src/integration/dsa/dsa-v3-protocol.js';
@@ -41,7 +42,7 @@ async function setup(datesOnly = false, sampledClock = false, sourceInvalidRespo
           502,
           {
             detail: {
-              contractVersion: 3,
+              contractVersion: 1,
               requestId: request.requestId,
               error: { code: 'invalid_response', message: '行情上游响应格式无效' },
             },
@@ -51,20 +52,15 @@ async function setup(datesOnly = false, sampledClock = false, sourceInvalidRespo
       return post(path, request);
     });
   }
-  const old = await state.dsa.effectiveControlPolicyV3();
   if (datesOnly)
     c.policy.routes = c.policy.routes.filter(
       (route) => route.key.capability === 'SECURITY_BASIC_DATES',
     );
-  const oldRoutes = old.projection.effective.routes.map((route) => ({
-    ...route,
-    enabled: true,
-    reason: null,
-  }));
-  c.policy.routes.push(
-    ...effectiveProviderPolicyV3Schema.parse({ ...c.policy, routes: oldRoutes }).routes,
-  );
-  state.dsa.marketTradingStatusV3.mockClear();
+  const old = (await tradingStatusInputs()).response;
+  c.policy.routes.push(...effectiveProviderPolicyV3Schema.parse({ ...c.policy, routes: [
+    { key: old.routeKey, enabled: true, reason: null,
+      targets: [{ ...old.routeTarget, eligible: true, reason: null }] },
+  ] }).routes);
   let sampling = 0;
   if (sampledClock)
     c.readPolicy.mockImplementation(async () => ({
@@ -167,21 +163,19 @@ describe('新组合经现有快照产物和离线执行闭环', () => {
       message: changeAt === 2 ? '冻结前独立功能选择变化' : '冻结状态读取期间政策变化',
     });
   });
-  it('仅选择基础日期仍保留原交易状态约束，没有重复读取', async () => {
+  it('仅选择基础日期时不回退旧交易状态路由', async () => {
     const s = await setup(true);
     expect(s.built.manifest.statusComposition).toBeDefined();
-    expect(s.built.manifest.tradingStatus).toBeDefined();
-    expect(s.dsa.marketTradingStatusV3).toHaveBeenCalledOnce();
+    expect(s.built.manifest.tradingStatus).toBeUndefined();
     expect(s.c.post).toHaveBeenCalledOnce();
     const view = prepareTradingStatusExecutionV3(s.built.manifest, s.input.runConfig, s.rows);
-    expect(view.suspendedDates).toContain('2023-08-17');
+    expect(view.suspendedDates).toEqual([]);
   });
   it('分别冻结可选失败和事实，只采用已知停牌，价格与模型身份不变', async () => {
     const s = await setup();
     const key = `${s.input.runId}/${statusCompositionArtifactKeyV1}`;
     expect(s.built.manifest.statusComposition?.artifactKey).toBe(key);
     expect(s.built.manifest.tradingStatus).toBeUndefined();
-    expect(s.dsa.marketTradingStatusV3).not.toHaveBeenCalled();
     expect(s.c.post).toHaveBeenCalledTimes(5);
     const frozen = readSnapshotStatusCompositionV1(
       s.built.manifest,

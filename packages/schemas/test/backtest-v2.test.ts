@@ -12,19 +12,21 @@ import {
 } from '../src/backtest-contract.js';
 
 const exchangeStrategy = {
-  schemaVersion: '2' as const,
+  schemaVersion: 'strategy-definition-v1' as const,
   name: '多源均线策略',
   signalSources: [
     {
       id: 'execution',
       asset: { symbol: '600519.SH', market: 'CN' as const, assetType: 'stock' as const },
       timeframe: '1d' as const,
+      priceCoordinate: 'run' as const,
       series: ['close', 'volume'] as const,
     },
     {
       id: 'benchmark',
       asset: { symbol: '000300.SH', market: 'CN' as const, assetType: 'etf' as const },
       timeframe: '1d' as const,
+      priceCoordinate: 'run' as const,
       series: ['close'] as const,
     },
   ],
@@ -88,8 +90,8 @@ const createV3BacktestResult = () => {
     strategyVersionId: 'strategy-v3',
     snapshotId: 'snapshot-v3',
     engineVersion: 'engine-v3',
-    schemaVersion: '3',
-    snapshotVersion: 'snapshot-manifest-v3',
+    schemaVersion: 'backtest-trade-result-v1',
+    snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
     marketRuleVersion: 'rules-v3',
     calendarVersion: 'calendar-v3',
     aggregationVersion: 'aggregation-v3',
@@ -110,7 +112,7 @@ const createV3BacktestResult = () => {
 
 describe('BacktestStrategy', () => {
   it('accepts multi-source exchange strategy and typed AST', () => {
-    expect(strategySchema.parse(exchangeStrategy)).toMatchObject({ schemaVersion: '2' });
+    expect(strategySchema.parse(exchangeStrategy)).toMatchObject({ schemaVersion: 'strategy-definition-v1' });
   });
 
   it('accepts CN NAV Fund only through daily NavExecution', () => {
@@ -121,6 +123,7 @@ describe('BacktestStrategy', () => {
           id: 'nav',
           asset: { symbol: '110011.OF', market: 'CN' as const, assetType: 'fund' as const },
           timeframe: '1d' as const,
+          priceCoordinate: 'native-nav',
           series: ['nav' as const],
         },
       ],
@@ -321,7 +324,7 @@ describe('V2 public decimal and result contracts', () => {
   it('keeps DecimalString and Money values as strings', () => {
     expect(
       runConfigSchemaV3.parse({
-        schemaVersion: '3',
+        schemaVersion: 'backtest-trade-config-v1',
         executionPriceProtocol: {
           protocolVersion: 'execution-price-v1',
           priceBasis: {
@@ -384,7 +387,7 @@ describe('V2 public decimal and result contracts', () => {
     }
     expect(() =>
       runConfigSchemaV3.parse({
-        schemaVersion: '3',
+        schemaVersion: 'backtest-trade-config-v1',
         executionPriceProtocol: {
           protocolVersion: 'execution-price-v1',
           priceBasis: {
@@ -430,7 +433,7 @@ describe('V2 public decimal and result contracts', () => {
   it('checks execution-currency cash after parsing separate contracts', () => {
     const parsedStrategy = strategySchema.parse(exchangeStrategy);
     const parsedRunConfig = runConfigSchemaV3.parse({
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       executionPriceProtocol: {
         protocolVersion: 'execution-price-v1',
         priceBasis: {
@@ -579,7 +582,7 @@ describe('回测成交与 AST 合同', () => {
       ),
     );
     const config = {
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       startDate: '2024-01-02',
       endDate: '2024-03-29',
       dataAsOf: '2024-03-30T00:00:00.000Z',

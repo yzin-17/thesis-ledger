@@ -50,9 +50,10 @@ export type MarketWindowSelectionInputV3 = {
   window: DateWindow;
   requestId: string;
   now: string;
-  tradabilityMode?: 'assume-untradable-no-bar';
+  tradabilityMode?: 'assume-untradable-no-bar' | 'observed-bars-only';
   /** 由固定快照、归一化价格研究消费方启用。 */
   priceResearch?: boolean;
+  dailyObservationContract?: 'market-daily-tradability-window-v1';
   /** 成对价格研究约束精确来源；目标仍须属于当前有效路由。 */
   requiredSource?: { providerId: string; upstreamSource: string };
   warmup?: MarketWindowWarmupRequirementV3;
@@ -352,16 +353,17 @@ const unavailable = (
 
 const validateInput = (input: MarketWindowSelectionInputV3) => {
   const request = marketDataBarSeriesRequestV3Schema.safeParse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: input.requestId,
     symbol: input.symbol,
     routeKey: input.routeKey,
     start: input.window.start,
     end: input.window.end,
     ...(input.tradabilityMode ? { tradabilityMode: input.tradabilityMode } : {}),
+    ...(input.dailyObservationContract !== undefined ? { dailyObservationContract: input.dailyObservationContract } : {}),
   });
   if (!request.success || !Number.isFinite(Date.parse(input.now))) return null;
-  if (input.requiredSource && !input.priceResearch) return null;
+  if ((input.requiredSource || input.dailyObservationContract !== undefined) && !input.priceResearch) return null;
   if (
     input.warmup &&
     (!Number.isInteger(input.warmup.minimumSessions) ||
@@ -394,6 +396,11 @@ export const selectMarketWindowV3 = async (
 
   const primary = context.targets[0];
   if (!primary) return unavailable('route_not_configured');
+  let observationCapabilities: MarketDataContractCapabilitiesV3 | undefined;
+  if (input.dailyObservationContract !== undefined) {
+    try { observationCapabilities = await input.readCapabilities(); }
+    catch { return unavailable('catalog_unavailable'); }
+  }
 
   const readTarget = async (
     candidate: ParsedContext['targets'][number],
@@ -423,7 +430,8 @@ export const selectMarketWindowV3 = async (
     let response: MarketDataBarSeriesResponseV3;
     try {
       response = (
-        await readBarSeriesV3(request, () => Promise.resolve(raw), input.readCapabilities)
+        await readBarSeriesV3(request, () => Promise.resolve(raw), () => observationCapabilities
+          ? Promise.resolve(observationCapabilities) : input.readCapabilities())
       )();
     } catch {
       return { ok: false, reason: classifyInvalidResponse(raw, request) };

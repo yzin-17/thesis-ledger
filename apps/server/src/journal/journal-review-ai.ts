@@ -1,15 +1,12 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  aiResearchContextSchema,
   journalAiExplanationSchema,
   journalAiFrozenEvidenceSchema,
   journalReviewExplanationRequestSchema,
   journalSnapshotDetailQuerySchema,
   journalSnapshotIdSchema,
-  researchResultSchema,
   type IdentityPrincipal,
 } from '@thesis-ledger/schemas';
-import { AiRunService } from '../ai/ai-run.service.js';
 import { localIdentityPrincipal } from '../identity/local-workspace.js';
 import { JournalAiResearchV2 } from './journal-ai-research-v2.js';
 import { JournalReviewAnalysis } from './journal-review-analysis.js';
@@ -27,7 +24,6 @@ const notFound = () =>
 export class JournalReviewAi {
   constructor(
     private readonly analysis: JournalReviewAnalysis,
-    private readonly runs: AiRunService,
     private readonly v2: JournalAiResearchV2,
   ) {}
   async start(raw: unknown, principal: IdentityPrincipal) {
@@ -78,46 +74,7 @@ export class JournalReviewAi {
         createdAt: row.createdAt.toISOString(),
       });
     }
-    const run = await this.runs.resume(runId);
-    if (!run) throw notFound();
-    let frozen;
-    try {
-      frozen = await this.runs.frozenEvidence(run.id);
-    } catch {
-      throw notFound();
-    }
-    const evidence = journalAiFrozenEvidenceSchema.safeParse(frozen?.source.evidence.data);
-    const context = aiResearchContextSchema.safeParse(run.context);
-    if (
-      !evidence.success ||
-      !context.success ||
-      context.data.scope !== 'account' ||
-      context.data.accountId !== scope.accountId ||
-      evidence.data.accountId !== scope.accountId ||
-      evidence.data.mode !== scope.mode ||
-      frozen?.source.tool !== 'getJournalReview' ||
-      frozen.source.permission !== 'journal:read' ||
-      frozen.prompt.version !== run.promptVersion
-    )
-      throw notFound();
-    const result = researchResultSchema.safeParse(run.result);
-    return journalAiExplanationSchema.parse({
-      id: run.id,
-      accountId: scope.accountId,
-      mode: scope.mode,
-      reviewObjectId: evidence.data.reviewObjectId,
-      evidenceFingerprint: evidence.data.evidenceFingerprint,
-      analysisDraft: evidence.data.analysisDraft,
-      provider: run.provider,
-      model: run.model,
-      promptVersion: run.promptVersion,
-      algorithmVersion: evidence.data.result.algorithmVersion,
-      status: run.status,
-      errorCode: run.errorCode,
-      errorSummary: run.errorSummary,
-      result: result.success ? result.data : null,
-      createdAt: run.createdAt.toISOString(),
-    });
+    throw notFound();
   }
   async snapshotMetadata(
     id: string,

@@ -1,3 +1,4 @@
+import { signalPriceArtifactKeyV3 } from './backtest-signal-price-plan-v3.js';
 import {
   marketDataBarRouteKeyV3Schema,
   runConfigSchemaV3,
@@ -6,7 +7,6 @@ import {
   type BacktestStrategy,
   type RunConfigV3,
   type MarketDataBarRouteKeyV3,
-  priceResearchReferenceArtifactKey,
   priceResearchStrategyIssues,
 } from '@thesis-ledger/schemas';
 import {
@@ -23,7 +23,7 @@ export interface SnapshotPriceInputAliasV3 {
   purpose: 'execution' | 'signal' | 'benchmark';
   instrument: string;
   sourceId?: string;
-  artifactKey: 'execution/bars.parquet' | typeof priceResearchReferenceArtifactKey;
+  artifactKey: string;
 }
 
 export interface SnapshotInputPlanV3 {
@@ -49,10 +49,9 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
   const instrument = strategy.executionInstrument;
   if (
     strategy.execution.mode !== 'exchange' ||
-    instrument.assetType === 'fund' ||
-    strategy.primaryTimeframe !== '1d'
+    instrument.assetType === 'fund'
   ) {
-    unavailable('当前 V3 完整冻结仅支持股票/ETF 日线的显式同坐标输入');
+    unavailable('当前 V3 完整冻结仅支持场内股票/ETF 的显式同坐标输入');
   }
   const plan = planBacktestDependencies({ ...input, runConfig });
   if (
@@ -67,14 +66,7 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
     unavailable('基准绑定 execution-series 要求与执行标的身份完全一致');
   }
   validateSnapshotSignalBindings(strategy, runConfig, plan, bindings);
-  const executionRouteKey = marketDataBarRouteKeyV3Schema.parse({
-    kind: 'bar',
-    market: instrument.market,
-    assetType: instrument.assetType === 'stock' ? 'STOCK' : 'ETF',
-    capability: 'DAILY_BAR',
-    timeframe: '1d',
-    adjustment: runConfig.executionPriceProtocol.priceBasis.adjustment,
-  });
+  const executionRouteKey = snapshotExecutionRouteKeyV3(strategy, runConfig);
   const priceInputs: SnapshotPriceInputAliasV3[] = [
     {
       purpose: 'execution',
@@ -85,11 +77,7 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
       purpose: 'signal' as const,
       instrument: source.instrument,
       sourceId: source.id,
-      artifactKey:
-        bindings.signals.find((binding) => binding.sourceId === source.id)?.binding ===
-        'actual-price-series'
-          ? priceResearchReferenceArtifactKey
-          : ('execution/bars.parquet' as const),
+      artifactKey: signalPriceArtifactKeyV3(strategy, source.id, runConfig),
     })),
     {
       purpose: 'benchmark',
@@ -133,7 +121,6 @@ export const planSnapshotInputsV3 = (input: BacktestDependencyPlanInput): Snapsh
 
 function validateSnapshotPriceResearch(strategy: BacktestStrategy, runConfig: RunConfigV3) {
   if (runConfig.priceResearch) {
-    if (strategy.schemaVersion !== '3') unavailable('请先确认并保存策略的价格研究版本');
     const issues = priceResearchStrategyIssues(strategy);
     if (issues.length)
       unavailable(issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '));
@@ -158,13 +145,35 @@ function validateSnapshotSignalBindings(
       (candidate) => candidate.id === source.id,
     )?.priceCoordinate;
     const binding = bindings.signals.find((candidate) => candidate.sourceId === source.id)?.binding;
+    const adjustment = runConfig.executionPriceProtocol.priceBasis.adjustment;
+    if (coordinate === 'run' && binding !== 'execution-series')
+      unavailable(`信号 ${source.id} 必须绑定本次冻结执行价格`);
+    if (coordinate === 'research' && !runConfig.priceResearch && adjustment !== 'hfq')
+      unavailable(`信号 ${source.id} 要求后复权研究价格，不能使用其他运行坐标`);
+    if (coordinate === 'actual' && !runConfig.priceResearch && adjustment !== 'none')
+      unavailable(`信号 ${source.id} 要求实际价格，不能使用复权执行价格`);
+    if (coordinate === 'native-nav') unavailable(`信号 ${source.id} 必须走净值冻结与申赎入口`);
     if (
       runConfig.priceResearch &&
       (coordinate === 'actual') !== (binding === 'actual-price-series')
     )
       unavailable(`信号 ${source.id} 的价格坐标与冻结绑定不一致`);
-    if (source.instrument !== plan.executionInstrument || source.timeframe !== '1d') {
-      unavailable(`信号 ${source.id} 不能复用不同标的或周期的执行价格序列`);
+    if (source.instrument !== plan.executionInstrument) {
+      unavailable(`信号 ${source.id} 不能复用其他标的的执行价格序列`);
     }
   }
+}
+
+/** 盘中只冻结原始分钟，聚合由本地同一完成区间规则执行。 */
+export function snapshotExecutionRouteKeyV3(strategy: BacktestStrategy, runConfig: RunConfigV3) {
+  const instrument = strategy.executionInstrument;
+  if (instrument.assetType === 'fund') unavailable('场外基金没有场内行情路线');
+  const daily = strategy.primaryTimeframe === '1d';
+  return marketDataBarRouteKeyV3Schema.parse({
+    kind: 'bar', market: instrument.market,
+    assetType: instrument.assetType === 'stock' ? 'STOCK' : 'ETF',
+    capability: daily ? 'DAILY_BAR' : 'MINUTE_BAR',
+    timeframe: daily ? '1d' : '1m',
+    adjustment: runConfig.executionPriceProtocol.priceBasis.adjustment,
+  });
 }

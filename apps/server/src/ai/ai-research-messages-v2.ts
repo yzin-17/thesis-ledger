@@ -2,7 +2,7 @@ import { researchScopeInstrumentsV2, type AiFrozenResearchV2 } from '@thesis-led
 import { buildGenerationSchemaPrompt } from './ai-generation-schema-prompt.js';
 import { researchOutputSchemaV2 } from './ai-research-output-schema-v2.js';
 
-const outputInstructions = `返回 research-generation-v2 JSON，version 为 2。
+const outputInstructions = `只返回 version 为 research-report-generation-v1 的 JSON。
 必含 conclusion、rationale、claims、numericClaims、invalidationConditions、nextSteps、risks、unknowns、disclaimer、confidence。
 confidence 只含 level（low/medium/high/unassessed）和 basis 字符串数组。
 claims/条件使用稳定 id、description、evidenceIds；价格方向为 kind=price-direction、instrumentId、direction、tradingDays（5/20）、rationale。

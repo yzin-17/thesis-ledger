@@ -5,6 +5,8 @@ import { afterAll, beforeAll, vi } from 'vitest';
 import { PrismaService } from '../../src/platform/prisma.service.js';
 import { RiskService } from '../../src/risk/risk.service.js';
 import { StrategyRiskContextService } from '../../src/risk/strategy-risk-context.service.js';
+import { StrategyRiskRuntimeService } from '../../src/risk/strategy-risk-runtime.service.js';
+import { controlledMarketSession } from '../market/market-session.fixture.js';
 import {
   optimizationSha256,
   type ExperimentRow,
@@ -15,7 +17,7 @@ import { createRiskMarketFixture } from './strategy-optimization-market-fixture.
 import {
   budget,
   createNormalizedRunConfig,
-  createStrategyFixture,
+  createFormalOptimizationStrategyFixture,
   proposal,
   split,
 } from './strategy-optimization-postgres-fixtures.js';
@@ -28,7 +30,7 @@ const evaluatedAt = new Date('2026-09-11T08:00:00.000Z');
 
 const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-const strategy = createStrategyFixture(symbol, suffix);
+const strategy = createFormalOptimizationStrategyFixture(symbol, suffix);
 
 const runConfig = createNormalizedRunConfig();
 
@@ -47,11 +49,15 @@ function optimizationPostgresContext() {
     subjectDeliveryStatus: vi.fn(async () => ({ shouldRetry: false })),
   };
   const configuredRuns = {
+    assertFrozenResearchBudget: vi.fn(async () => undefined),
     resolve: async (strategyVersionId: string, config: unknown, idempotencyKey: string) => ({
       kind: 'prepared',
-      input: { contractVersion: 3, strategyVersionId, runConfig: config, idempotencyKey },
+      input: { contractVersion: 1, strategyVersionId, runConfig: config, idempotencyKey },
     }),
   };
+  const riskContext = new StrategyRiskContextService(prisma, market.reader, {
+    getSession: controlledMarketSession,
+  } as never);
   const makeRisk = () =>
     new RiskService(
       prisma,
@@ -59,8 +65,7 @@ function optimizationPostgresContext() {
       undefined,
       undefined,
       undefined,
-      undefined,
-      market.reader,
+      new StrategyRiskRuntimeService(prisma, riskContext),
     );
   const provider = {
     id: 'postgres-e2e',
@@ -137,7 +142,7 @@ function optimizationPostgresContext() {
       data: {
         strategyId,
         version,
-        schemaVersion: 2,
+        schemaVersion: Number(candidateSchema.schemaVersion),
         schema: candidateSchema as Prisma.InputJsonValue,
       },
     });
@@ -300,7 +305,7 @@ async function initializeOptimizationPostgresFixture(
       id: lifecycleScope.strategyId,
       name: `Service E2E Strategy ${suffix}`,
       status: 'active',
-      schemaVersion: 2,
+      schemaVersion: 3,
     },
   });
   const [version1, version2] = await Promise.all([
@@ -308,7 +313,7 @@ async function initializeOptimizationPostgresFixture(
       data: {
         strategyId: createdStrategy.id,
         version: 1,
-        schemaVersion: 2,
+        schemaVersion: 3,
         schema: strategy('0.08') as Prisma.InputJsonValue,
       },
     }),
@@ -316,7 +321,7 @@ async function initializeOptimizationPostgresFixture(
       data: {
         strategyId: createdStrategy.id,
         version: 2,
-        schemaVersion: 2,
+        schemaVersion: 3,
         schema: strategy('0.06', '0.20') as Prisma.InputJsonValue,
       },
     }),

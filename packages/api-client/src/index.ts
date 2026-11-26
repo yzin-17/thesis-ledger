@@ -124,11 +124,6 @@ export type {
   MarketPeriodOptions,
   MarketDetailSection,
   MarketDetailSectionStatus,
-  JournalReviewCandidate,
-  JournalReviewCandidatesQuery,
-  JournalReviewCandidatesResponse,
-  JournalReviewSnapshotInput,
-  JournalReviewSnapshotResponse,
   LedgerEvent,
   DecimalString,
   ExecutionCharge,
@@ -221,7 +216,6 @@ export type {
 
 export type {
   AccountPermanentDeletionErrorCode,
-  JournalLegacyReviewCandidate,
 } from '@thesis-ledger/schemas';
 
 export type {

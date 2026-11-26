@@ -230,7 +230,7 @@ describe('已保存策略的普通回测入口', () => {
     expect(button('创建新任务').disabled).toBe(true);
     expect(document.body.textContent).toContain('确认策略的研究口径');
     await act(async () => button('采用研究口径并保存新版本').click()); await flush();
-    expect(api.adopt).toHaveBeenCalledWith(expect.objectContaining({ schema: expect.objectContaining({ schemaVersion: '3' }) }));
+    expect(api.adopt).toHaveBeenCalledWith(expect.objectContaining({ schema: expect.objectContaining({ schemaVersion: 'strategy-definition-v1' }) }));
     expect(api.resolve).toHaveBeenCalledWith(expect.objectContaining({ adjustment: 'hfq' }), expect.any(AbortSignal));
     expect(original).toEqual(frozen);
     await act(async () => button('创建新任务').click()); await flush();

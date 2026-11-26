@@ -35,10 +35,11 @@ describe('下一交易日开盘成交', () => {
 describe('跨标的策略的风险退出时钟', () => {
   it('按执行标的时钟与价格评价跨标的信号策略的风险退出', () => {
     const crossAssetStrategy = strategySchema.parse({
-      schemaVersion: '2',
+      schemaVersion: 'strategy-definition-v1',
       name: '跨标的信号风险退出',
       signalSources: [
         {
+          priceCoordinate: 'run',
           id: 'signal-b',
           asset: { symbol: '000001.SZ', market: 'CN', assetType: 'stock' },
           timeframe: '1d',
@@ -392,7 +393,7 @@ function assertExecutionModelOpen({
   const fullCloseStrategy = strategySchema.parse({
     ...exchangeStrategy,
     exit: { type: 'positionState', field: 'isOpen' },
-    sizing: { type: 'percentOfEquity', percent: '0.5' },
+    sizing: { type: 'percentOfEquity', percent: '0.6' },
   }) as BacktestStrategy;
   const fullCloseResult = runExchangeVertical({
     ...modelInput,

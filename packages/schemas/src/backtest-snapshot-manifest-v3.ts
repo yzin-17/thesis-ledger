@@ -80,7 +80,7 @@ const snapshotArtifactRefSchema = z.strictObject({
 });
 
 const snapshotManifestFieldsV3 = {
-  manifestVersion: z.literal('snapshot-manifest-v3'),
+  manifestVersion: z.literal('backtest-trade-snapshot-manifest-v1'),
   runId: snapshotText,
   strategyVersionId: snapshotText,
   strategyVersionHash: snapshotText,
@@ -101,6 +101,7 @@ const snapshotManifestFieldsV3 = {
   executionPriceProtocol: executionPriceProtocolSchema,
   priceResearch: z.strictObject({
     protocolVersion: z.literal(priceResearchProtocolV1),
+    dailyObservationContract: z.literal('market-daily-tradability-window-v1').optional(),
     actualPriceSource: backtestSnapshotActualSourceV3Schema.optional(),
   }).optional(),
   frozenExecutionWindow: marketFrozenWindowRefV3Schema.optional(),

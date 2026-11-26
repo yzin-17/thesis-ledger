@@ -16,6 +16,7 @@ import { planBacktestPriceInputs } from './backtest-dependency-price.js';
 
 import { preparationStale } from './backtest-preparation-fence.js';
 import { BacktestKnownCashGuardV3 } from './backtest-known-cash-guard-v3.service.js';
+import { snapshotExecutionRouteKeyV3 } from './backtest-snapshot-v3-input-plan.js';
 
 @Injectable()
 export class BacktestCreationGuardService {
@@ -36,7 +37,6 @@ export class BacktestCreationGuardService {
     const instrument = strategy.executionInstrument;
     if (
       strategy.execution.mode !== 'exchange' ||
-      strategy.primaryTimeframe !== '1d' ||
       (instrument.assetType !== 'stock' && instrument.assetType !== 'etf')
     )
       preparationStale();
@@ -57,18 +57,11 @@ export class BacktestCreationGuardService {
     const plan = planBacktestPriceInputs(strategy, request.runConfig, {
       cashEventResearch: request.runConfig.executionPriceProtocol.cashEventResearch,
     });
-    const routeKey = marketDataBarRouteKeyV3Schema.parse({
-      kind: 'bar',
-      market: instrument.market,
-      assetType: instrument.assetType === 'stock' ? 'STOCK' : 'ETF',
-      capability: 'DAILY_BAR',
-      timeframe: '1d',
-      adjustment: request.runConfig.executionPriceProtocol.priceBasis.adjustment,
-    });
+    const routeKey = snapshotExecutionRouteKeyV3(strategy, request.runConfig);
     const sequence = stamp.targetSequences[0];
     const requirement = {
       symbol: instrument.symbol,
-      capability: 'DAILY_BAR',
+      capability: routeKey.capability,
       purpose: 'execution',
       dateRange: { startDate: plan.warmup.startDate, endDate: request.runConfig.endDate },
       routeKey,
@@ -130,7 +123,7 @@ export class BacktestCreationGuardService {
     life: NonNullable<BacktestRunCreateV3['runConfig']['lifecyclePreparation']>,
     symbol: string,
   ) {
-    if (!this.lifecycle || lifecycleInputHashV3(life.response) !== life.inputHash)
+    if (!this.lifecycle || !('composition' in life.response) || lifecycleInputHashV3(life.response) !== life.inputHash)
       preparationStale();
     try {
       const current = await this.lifecycle.read({
@@ -156,7 +149,7 @@ function assertPreparedStrategyIdentity(
   if (
     !current.success ||
     !version ||
-    ![2, 3].includes(version.schemaVersion) ||
+    version.schemaVersion !== 1 ||
     stamp.strategyVersionId !== request.strategyVersionId ||
     stamp.strategyContentHash !== hashCanonicalManifest(strategy) ||
     stamp.strategyContentHash !== hashCanonicalManifest(current.data) ||

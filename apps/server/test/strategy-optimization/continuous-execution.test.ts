@@ -8,8 +8,8 @@ import {priceResearchFixture} from '../backtest/price-research.fixtures.js';
 
 it('普通回测与零价优化使用原冻结输入；收费或未知模型在取价前阻断',async()=>{
   const f=await priceResearchFixture(), c=f.input.runConfig, id=randomUUID();
-  const prep=new BacktestRunPreparationService({strategyVersion:{findUnique:async()=>({schemaVersion:3,schema:f.input.strategy})}} as never,f.reader as never,f.control as never);
-  const intent={contractVersion:3,requestId:id,warmupBudgetSessions:60,adjustment:'hfq',priceResearch:'price-research-v1',priceResearchReference:'freeze',accountingBasis:'normalized-series',history:{basis:'fixed-provider-snapshot'},
+  const prep=new BacktestRunPreparationService({strategyVersion:{findUnique:async()=>({schemaVersion:1,schema:f.input.strategy})}} as never,f.reader as never,f.control as never);
+  const intent={contractVersion:1,requestId:id,warmupBudgetSessions:60,adjustment:'hfq',priceResearch:'price-research-v1',priceResearchReference:'freeze',accountingBasis:'normalized-series',history:{basis:'fixed-provider-snapshot'},
     runConfig:{startDate:c.startDate,endDate:c.endDate,dataAsOf:c.dataAsOf,baseCurrency:c.baseCurrency,initialCash:c.initialCash,valuationPolicy:c.valuationPolicy,executionModel:c.executionModel}};
   const ordinary:StrategySubmissionInput={kind:'ordinary',preparation:backtestRunPreparationRequestV3Schema.parse({...intent,strategyVersionId:id})};
   const optimization:Extract<StrategySubmissionInput,{kind:'optimization'}>={kind:'optimization',preparation:optimizationRunPreparationRequestSchema.parse({intent,target:{sourceMode:'existing',strategyVersionId:id}}),

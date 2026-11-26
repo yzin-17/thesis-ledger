@@ -52,7 +52,7 @@ describe('收费资料监测边界代理', () => {
     const control = vi.fn(async () => sample.status);
     expect(await controller(control).status()).toEqual(sample.status);
     expect(control.mock.calls[0]).toEqual([
-      '/api/v3/thesis-ledger/control/rule-monitor',
+      '/api/v1/thesis-ledger/control/rule-monitor',
       undefined,
       1,
     ]);

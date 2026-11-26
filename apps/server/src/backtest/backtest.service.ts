@@ -13,7 +13,7 @@ import { requestBacktestCancellation } from './backtest-run-cancellation.js';
 import { backtestJobSummarySelect, toBacktestJobSummary } from './backtest-summary.js';
 import { BacktestRunService } from './backtest-run.service.js';
 import type { ComparableDataFingerprintRange } from './backtest-run.service.js';
-import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { persistedRunContract } from './backtest-v3-run-lifecycle.js';
 import { assertCurrentRunForRead, isCurrentRunForRead } from './backtest-current-run-read.js';
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
 import { visibleStrategyOwners } from './strategy-access.service.js';
@@ -77,7 +77,7 @@ export class BacktestService {
 
   async listCurrentRunSummaries(ownerId?: string | null) {
     const jobs = await this.prisma.backtestJob.findMany({
-      where: { mode: 'V3', strategyVersion: { strategy: visibleStrategyOwners(ownerId) } },
+      where: { mode: 'frozen', strategyVersion: { strategy: visibleStrategyOwners(ownerId) } },
       orderBy: { createdAt: 'desc' },
       take: 100,
       select: backtestJobSummarySelect,
@@ -94,7 +94,7 @@ export class BacktestService {
   async statusForRead(id: string): Promise<ReadableBacktestJob | null> {
     const job = await this.status(id);
     if (!job) return job;
-    if (persistedContractVersion(job) !== 3) {
+    if (!persistedRunContract(job)) {
       throw new ConflictException({
         code: 'UNSUPPORTED_CONTRACT_VERSION',
         message: '旧回测记录不支持读取或操作',
@@ -113,7 +113,7 @@ export class BacktestService {
       where: { id },
     });
     if (!job) throw new NotFoundException('回测 Run 不存在');
-    if (persistedContractVersion(job) !== 3) {
+    if (!persistedRunContract(job)) {
       throw new ConflictException({
         code: 'UNSUPPORTED_CONTRACT_VERSION',
         message: '旧回测记录不支持读取或操作',
@@ -147,7 +147,7 @@ export class BacktestService {
   async runCurrent(id: string, execution?: BacktestExecutionAttempt) {
     const job = await this.prisma.backtestJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('回测 Run 不存在');
-    if (persistedContractVersion(job) !== 3) {
+    if (!persistedRunContract(job)) {
       throw new ConflictException({
         code: 'UNSUPPORTED_CONTRACT_VERSION',
         message: '旧回测记录不支持读取或操作',
@@ -179,7 +179,7 @@ export class BacktestService {
     if (this.queueService) {
       const cancelled = await this.queueService.cancel(id);
       if (
-        cancelled?.mode === 'V3' &&
+        cancelled?.mode === 'frozen' &&
         cancelled.status === 'running' &&
         cancelled.cancelRequestedAt
       ) {
@@ -190,7 +190,7 @@ export class BacktestService {
     const result = await requestBacktestCancellation(this.prisma, id);
     if (!result.job) throw new NotFoundException('回测任务不存在');
     if (result.job.status === 'running' && result.job.cancelRequestedAt) {
-      if (result.job.mode === 'V3') this.runs?.abortActiveRun(id);
+      if (result.job.mode === 'frozen') this.runs?.abortActiveRun(id);
     }
     return result.job;
   }

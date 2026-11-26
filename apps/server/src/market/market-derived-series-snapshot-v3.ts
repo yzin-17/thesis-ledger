@@ -8,7 +8,7 @@ import {
 
 const fingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const snapshotSchema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   kind: z.literal('locally-derived'),
   algorithmRevision: z.literal(MARKET_DERIVATION_ALGORITHM_V3),
   inputFingerprint: fingerprintSchema,
@@ -20,7 +20,7 @@ export function freezeMarketDerivedSeriesV3(payload: MarketDerivedSeriesInputV3)
   const input = marketDerivedSeriesInputV3Schema.parse(payload);
   const result = deriveMarketSeriesV3(input);
   return snapshotSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     kind: 'locally-derived',
     algorithmRevision: MARKET_DERIVATION_ALGORITHM_V3,
     inputFingerprint: result.derivation.inputFingerprint,

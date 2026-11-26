@@ -10,7 +10,7 @@ const identity = (number = 0): MarketQuoteIdentity => ({
 });
 const quote = (symbol: string, stale = false) =>
   quoteSchema.parse({
-    version: 3,
+    version: 1,
     symbol,
     open: 10,
     high: 12,

@@ -197,7 +197,7 @@ export function useMarketChartLatestBoundary({
               ...(chartWindowV3.timeframe ? { timeframe: chartWindowV3.timeframe } : {}),
               navLimit: 90,
               indicatorParams,
-              chartContractVersion: 3,
+              chartContractVersion: 1,
               refresh: true,
             },
             signal,

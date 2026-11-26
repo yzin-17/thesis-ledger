@@ -52,7 +52,7 @@ export const collectSnapshotPublicFeesV3 = async (
       if (!target.eligible) continue;
       try {
         const response = await dsa.marketPublicFeesV3({
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId: crypto.randomUUID(),
           routeKey: key,

@@ -78,7 +78,7 @@ const navExecutionModel = () => ({
 });
 
 const runConfig = backtestNavRunConfigV3Schema.parse({
-  schemaVersion: '3',
+  schemaVersion: 'backtest-nav-config-v1',
   startDate: '2025-01-02',
   endDate: '2025-01-03',
   dataAsOf: '2025-01-08T00:00:00.000Z',
@@ -114,8 +114,8 @@ const runConfig = backtestNavRunConfigV3Schema.parse({
 });
 
 const runResponse = {
-  contractVersion: 3 as const,
-  schemaVersion: '3' as const,
+  contractVersion: 1 as const,
+  schemaVersion: 'backtest-nav-run-v1' as const,
   inputKind: 'nav' as const,
   id: runId,
   strategyVersionId,
@@ -144,7 +144,7 @@ const runResponse = {
 };
 
 const runSummary = {
-  contractVersion: 3 as const,
+  contractVersion: 1 as const,
   inputKind: 'nav' as const,
   id: runId,
   strategyVersionId,
@@ -161,11 +161,11 @@ const runSummary = {
 };
 
 const preparationRequest: BacktestNavPreparationRequestV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: 'nav-preparation-transport',
   strategyVersionId,
   runConfig: {
-    schemaVersion: '3',
+    schemaVersion: 'backtest-nav-config-v1',
     startDate: '2025-01-02',
     endDate: '2025-01-03',
     baseCurrency: 'CNY',
@@ -196,14 +196,14 @@ const preparationRequest: BacktestNavPreparationRequestV3 = {
 };
 
 const createRequest: BacktestNavRunCreateV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   preparationId,
   preparationHash: hash,
   idempotencyKey: 'nav-run-transport',
 };
 
 const blockedPreparation = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: preparationRequest.requestId,
   checkedAt: '2025-01-08T00:00:00.000Z',
   scope: 'nav-input-plan',
@@ -212,6 +212,13 @@ const blockedPreparation = {
 };
 
 describe('NAV 回测传输客户端', () => {
+  it('NAV重试接受明确关联的新Run，取消仍拒绝串Run', async () => {
+    const linked = { ...runResponse, id: '00000000-0000-4000-8000-000000000004', replayOfRunId: runId };
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify(linked)));
+    const api = new ThesisLedgerApiClient('https://fixture.test/api/v1', fetcher).backtests;
+    await expect(api.retryNavRun(runId)).resolves.toMatchObject({ id: linked.id, replayOfRunId: runId });
+    await expect(api.cancelNavRun(runId)).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  });
   it.each(['getNavRun', 'retryNavRun', 'cancelNavRun'] as const)(
     '%s 拒绝响应串用其他 Run',
     async (operation) => {

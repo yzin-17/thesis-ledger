@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { backtestStrategyPlanReadback, parseStrategyDefinitionDraft } from '@thesis-ledger/domain';
 import { useNavigationGuard } from '../shared/navigation-guard.js';
 import { LoaderCircle } from 'lucide-react';
-import { strategySchema, projectPriceResearchStrategy, priceResearchStrategySummary, priceResearchStrategyIssues, type BacktestStrategy } from '@thesis-ledger/schemas';
+import {
+  strategySchema,
+  type BacktestStrategy,
+} from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -35,16 +39,194 @@ type EditorMode = 'create' | 'edit';
 
 const parseJson = (value: string): StrategySchema | null => {
   try {
-    const parsed: unknown = JSON.parse(value);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as StrategySchema)
-      : null;
+    return parseStrategyDefinitionDraft(value);
   } catch {
     return null;
   }
 };
 
-export function StrategyEditorSheet({
+export function StrategyEditorSheet(props: {
+  open: boolean;
+  mode: EditorMode;
+  strategy?: StrategyRecord | null;
+  version?: StrategyVersion | null;
+  busy: boolean;
+  errorMessage?: string | null;
+  presentation?: 'sheet' | 'page';
+  triggerId?: string | undefined;
+  onOpenChange: (open: boolean) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  bypassNavigation?: () => boolean;
+  onSave: (schema: StrategySchema) => void;
+}) {
+  const control = useStrategyEditorSheet(props);
+  const {
+    presentation,
+    open,
+    triggerId,
+    handleSheetOpenChange,
+    confirmCloseOpen,
+    setConfirmCloseOpen,
+    onOpenChange,
+    editorHeader,
+    errorMessage,
+    activeTab,
+    handleTabChange,
+    mode,
+    schemaError,
+    draft,
+    strategy,
+    updateDraft,
+    instrumentDisplay,
+    jsonError,
+    jsonText,
+    setJsonText,
+    setJsonError,
+    applyJson,
+    preview,
+    busy,
+    submit,
+    saveButtonLabel,
+  } = control;
+  const editorContent = (
+    <>
+      {editorHeader}
+      <SheetBody>
+        {errorMessage ? (
+          <Alert variant="destructive" className="mb-group">
+            <AlertTitle>保存失败</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        ) : null}
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList variant="line" className="w-full">
+            <TabsTrigger value="common">常用配置</TabsTrigger>
+            <TabsTrigger value="advanced">高级 JSON</TabsTrigger>
+          </TabsList>
+          <TabsContent value="common">
+            <FieldGroup className="gap-6">
+              {mode === 'create' && (
+                <Field invalid={Boolean(schemaError?.startsWith('name'))}>
+                  <FieldLabel htmlFor="strategy-name">策略名称</FieldLabel>
+                  <Input
+                    id="strategy-name"
+                    value={schemaName(draft, strategy?.name ?? '')}
+                    onChange={(event) => updateDraft({ ...draft, name: event.target.value })}
+                    placeholder="例如：均线突破"
+                  />
+                  {schemaError?.startsWith('name') && <FieldError>{schemaError}</FieldError>}
+                </Field>
+              )}
+              <Field>
+                <FieldLabel htmlFor="strategy-description">策略说明</FieldLabel>
+                <Textarea
+                  id="strategy-description"
+                  value={typeof draft.description === 'string' ? draft.description : ''}
+                  onChange={(event) => updateDraft({ ...draft, description: event.target.value })}
+                  rows={3}
+                  placeholder="记录这条策略的假设和适用范围"
+                />
+              </Field>
+              <StrategyConfigurationFields
+                schema={draft}
+                {...instrumentDisplay}
+                onChange={updateDraft}
+              />
+            </FieldGroup>
+          </TabsContent>
+          <TabsContent value="advanced">
+            <Field invalid={Boolean(jsonError)}>
+              <FieldLabel htmlFor="strategy-json">策略配置 JSON</FieldLabel>
+              <Textarea
+                id="strategy-json"
+                value={jsonText}
+                onChange={(event) => {
+                  setJsonText(event.target.value);
+                  setJsonError(null);
+                }}
+                rows={24}
+                className="font-mono text-xs"
+              />
+              <FieldDescription>
+                信号表达式、来源和风险规则可在 JSON 中编辑。点击“应用 JSON”后同步到常用配置。
+              </FieldDescription>
+              {jsonError && <FieldError>{jsonError}</FieldError>}
+              <Button type="button" variant="outline" className="self-start" onClick={applyJson}>
+                应用 JSON
+              </Button>
+            </Field>
+          </TabsContent>
+        </Tabs>
+        {preview && (
+          <div className="mt-4 space-y-2 text-sm" aria-label="保存口径预览">
+            <p className="font-medium">保存口径预览</p>
+            {preview.map((line, index) => <p key={index}>{line}</p>)}
+          </div>
+        )}
+        {schemaError && (mode === 'edit' || !schemaError.startsWith('name')) && (
+          <p className="mt-4 text-sm text-destructive" role="alert">
+            {schemaError}
+          </p>
+        )}
+      </SheetBody>
+      <SheetFooter>
+        <Button type="button" variant="outline" onClick={() => handleSheetOpenChange(false)}>
+          取消
+        </Button>
+        <Button type="button" disabled={busy} onClick={submit}>
+          {busy && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {saveButtonLabel}
+        </Button>
+      </SheetFooter>
+    </>
+  );
+  return (
+    <>
+      {presentation === 'page' ? (
+        <div className="flex min-w-0 flex-col gap-5">{editorContent}</div>
+      ) : (
+        <Sheet open={open} triggerId={triggerId} onOpenChange={handleSheetOpenChange}>
+          <SheetContent
+            side="right"
+            size="form"
+            className="overflow-hidden"
+            aria-describedby="strategy-editor-description"
+            finalFocus={triggerId ? () => document.getElementById(triggerId) : undefined}
+          >
+            {editorContent}
+          </SheetContent>
+        </Sheet>
+      )}
+      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle>
+            <AlertDialogDescription>关闭后，本次修改将丢失。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmCloseOpen(false)}>
+              继续编辑
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setConfirmCloseOpen(false);
+                onOpenChange(false);
+              }}
+            >
+              放弃修改并关闭
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function useStrategyEditorSheet({
   open,
   mode,
   strategy,
@@ -126,13 +308,7 @@ export function StrategyEditorSheet({
       setJsonError('JSON 格式无效，请检查括号、逗号和字符串引号。');
       return null;
     }
-    const validated = strategySchema.safeParse(parsed);
-    if (!validated.success) {
-      const issue = validated.error.issues[0];
-      setJsonError(`${issue?.path.join('.') || '配置'}：${issue?.message ?? '策略配置校验失败'}`);
-      return null;
-    }
-    return validated.data;
+    return parsed;
   };
 
   const applyJson = () => {
@@ -168,16 +344,76 @@ export function StrategyEditorSheet({
       setSchemaError(`${issue?.path.join('.') || '配置'}：${issue?.message ?? '策略配置校验失败'}`);
       return;
     }
-    const saved = validated.data.schemaVersion === '3'
-      ? projectPriceResearchStrategy(validated.data as BacktestStrategy) : validated.data;
-    const issue = saved.schemaVersion === '3' ? priceResearchStrategyIssues(saved as BacktestStrategy)[0] : undefined;
-    if (issue) { setSchemaError(`${issue.path.join('.')}：${issue.message}`); return; }
-    onSave(saved);
+    onSave(candidate);
   };
 
-  const previewInput = strategySchema.safeParse(activeTab === 'advanced' ? parseJson(jsonText) : draft);
-  const preview = previewInput.success && previewInput.data.schemaVersion === '3'
-    ? priceResearchStrategySummary(projectPriceResearchStrategy(previewInput.data as BacktestStrategy)) : null;
+  const { preview, saveButtonLabel, editorHeader } = strategyEditorPresentation({
+    activeTab,
+    jsonText,
+    draft,
+    busy,
+    mode,
+    strategy,
+    version,
+    presentation,
+  });
+
+  return {
+    presentation,
+    open,
+    triggerId,
+    handleSheetOpenChange,
+    confirmCloseOpen,
+    setConfirmCloseOpen,
+    onOpenChange,
+    editorHeader,
+    errorMessage,
+    activeTab,
+    handleTabChange,
+    mode,
+    schemaError,
+    draft,
+    strategy,
+    updateDraft,
+    instrumentDisplay,
+    jsonError,
+    jsonText,
+    setJsonText,
+    setJsonError,
+    applyJson,
+    preview,
+    busy,
+    submit,
+    saveButtonLabel,
+  };
+}
+
+function strategyEditorPresentation({
+  activeTab,
+  jsonText,
+  draft,
+  busy,
+  mode,
+  strategy,
+  version,
+  presentation,
+}: {
+  activeTab: string;
+  jsonText: string;
+  draft: StrategySchema;
+  busy: boolean;
+  mode: EditorMode;
+  strategy: StrategyRecord | null | undefined;
+  version: StrategyVersion | null | undefined;
+  presentation: 'sheet' | 'page';
+}) {
+  const previewInput = strategySchema.safeParse(
+    activeTab === 'advanced' ? parseJson(jsonText) : draft,
+  );
+  const preview =
+    previewInput.success
+      ? backtestStrategyPlanReadback(previewInput.data as BacktestStrategy)
+      : null;
 
   let saveButtonLabel = '保存为新版本';
   if (busy) saveButtonLabel = '保存中…';
@@ -194,140 +430,5 @@ export function StrategyEditorSheet({
       <SheetDescription id="strategy-editor-description">{editorDescription}</SheetDescription>
     </SheetHeader>
   );
-
-  const editorContent = (
-    <>
-      {editorHeader}
-      <SheetBody>
-        {errorMessage ? (
-          <Alert variant="destructive" className="mb-group">
-            <AlertTitle>保存失败</AlertTitle>
-            <AlertDescription>{errorMessage}</AlertDescription>
-          </Alert>
-        ) : null}
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList variant="line" className="w-full">
-            <TabsTrigger value="common">常用配置</TabsTrigger>
-            <TabsTrigger value="advanced">高级 JSON</TabsTrigger>
-          </TabsList>
-          <TabsContent value="common">
-            <FieldGroup className="gap-6">
-              {mode === 'create' && (
-                <Field invalid={Boolean(schemaError?.startsWith('name'))}>
-                  <FieldLabel htmlFor="strategy-name">策略名称</FieldLabel>
-                  <Input
-                    id="strategy-name"
-                    value={schemaName(draft, strategy?.name ?? '')}
-                    onChange={(event) => updateDraft({ ...draft, name: event.target.value })}
-                    placeholder="例如：均线突破"
-                  />
-                  {schemaError?.startsWith('name') && <FieldError>{schemaError}</FieldError>}
-                </Field>
-              )}
-              <Field>
-                <FieldLabel htmlFor="strategy-description">策略说明</FieldLabel>
-                <Textarea
-                  id="strategy-description"
-                  value={typeof draft.description === 'string' ? draft.description : ''}
-                  onChange={(event) => updateDraft({ ...draft, description: event.target.value })}
-                  rows={3}
-                  placeholder="记录这条策略的假设和适用范围"
-                />
-              </Field>
-              <StrategyConfigurationFields schema={draft} {...instrumentDisplay} onChange={updateDraft} />
-            </FieldGroup>
-          </TabsContent>
-          <TabsContent value="advanced">
-            <Field invalid={Boolean(jsonError)}>
-              <FieldLabel htmlFor="strategy-json">策略配置 JSON</FieldLabel>
-              <Textarea
-                id="strategy-json"
-                value={jsonText}
-                onChange={(event) => {
-                  setJsonText(event.target.value);
-                  setJsonError(null);
-                }}
-                rows={24}
-                className="font-mono text-xs"
-              />
-              <FieldDescription>
-                信号表达式、来源和风险规则可在 JSON 中编辑。点击“应用 JSON”后同步到常用配置。
-              </FieldDescription>
-              {jsonError && <FieldError>{jsonError}</FieldError>}
-              <Button type="button" variant="outline" className="self-start" onClick={applyJson}>
-                应用 JSON
-              </Button>
-            </Field>
-          </TabsContent>
-        </Tabs>
-        {preview && (
-          <div className="mt-4 space-y-2 text-sm" aria-label="保存口径预览">
-            <p className="font-medium">保存口径预览</p>
-            <p>买入：{preview.entry}</p>
-            <p>卖出：{preview.exit}</p>
-            <p>投入：{preview.sizing}</p>
-          </div>
-        )}
-        {schemaError && (mode === 'edit' || !schemaError.startsWith('name')) && (
-          <p className="mt-4 text-sm text-destructive" role="alert">
-            {schemaError}
-          </p>
-        )}
-      </SheetBody>
-      <SheetFooter>
-        <Button type="button" variant="outline" onClick={() => handleSheetOpenChange(false)}>
-          取消
-        </Button>
-        <Button type="button" disabled={busy} onClick={submit}>
-          {busy && (
-            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
-          )}
-          {saveButtonLabel}
-        </Button>
-      </SheetFooter>
-    </>
-  );
-
-  return (
-    <>
-      {presentation === 'page' ? (
-        <div className="flex min-w-0 flex-col gap-5">{editorContent}</div>
-      ) : (
-        <Sheet open={open} triggerId={triggerId} onOpenChange={handleSheetOpenChange}>
-          <SheetContent
-            side="right"
-            size="form"
-            className="overflow-hidden"
-            aria-describedby="strategy-editor-description"
-            finalFocus={triggerId ? () => document.getElementById(triggerId) : undefined}
-          >
-            {editorContent}
-          </SheetContent>
-        </Sheet>
-      )}
-      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle>
-            <AlertDialogDescription>关闭后，本次修改将丢失。</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button type="button" variant="outline" onClick={() => setConfirmCloseOpen(false)}>
-              继续编辑
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                setConfirmCloseOpen(false);
-                onOpenChange(false);
-              }}
-            >
-              放弃修改并关闭
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
+  return { preview, saveButtonLabel, editorHeader };
 }

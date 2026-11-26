@@ -3,7 +3,7 @@ import type { MarketEventRequestV3 } from '@thesis-ledger/schemas';
 import { DsaClient } from '../../src/integration/dsa/dsa.client.js';
 
 const request: MarketEventRequestV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: 'event-request',
   symbol: '510300.SH',
   routeKey: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'CASH_DISTRIBUTION' },
@@ -40,7 +40,7 @@ describe('DSA 事件 V3 传输', () => {
     const result = await client().marketEventsV3(request);
     expect(result.coverage.complete).toBe(false);
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url.pathname).toBe('/api/v3/thesis-ledger/market/events');
+    expect(url.pathname).toBe('/api/v1/thesis-ledger/market/events');
     expect(init.headers).toMatchObject({ authorization: 'Bearer test-token' });
     expect(JSON.parse(String(init.body))).toEqual(request);
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -75,7 +75,7 @@ describe('DSA 事件 V3 传输', () => {
       ok: false,
       status: 422,
       json: async () => ({
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: request.requestId,
         error: { code: upstream, message: 'sensitive fixture' },
       }),

@@ -7,7 +7,7 @@ const policy = () => ({
   syncState: 'applied',
   enabled: true,
   effectiveProjection: {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'quote-policy',
     revision: 37,
@@ -33,7 +33,7 @@ const policy = () => ({
 });
 
 const quote = {
-  version: 3,
+  version: 1,
   symbol: '159516.SZ',
   open: 0.674,
   high: 0.679,

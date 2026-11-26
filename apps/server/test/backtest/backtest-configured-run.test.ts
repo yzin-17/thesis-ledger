@@ -11,7 +11,7 @@ const fixture = async () => {
   const prisma = {
     backtestJob: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
     strategyVersion: {
-      findUnique: vi.fn().mockResolvedValue({ schemaVersion: 2, schema: f.input.strategy }),
+      findUnique: vi.fn().mockResolvedValue({ schemaVersion: 1, schema: f.input.strategy }),
     },
   };
   const revisions = preparedRevisionReader();
@@ -67,9 +67,9 @@ describe('冻结V3配置的创建前预检', () => {
     expect(original).toEqual(f.input.runConfig);
     f.prisma.backtestJob.findFirst.mockResolvedValue({
       id: 'existing',
-      mode: 'V3',
+      mode: 'frozen',
       runConfig: resolved.input.runConfig,
-      input: { contractVersion: 3, schemaVersion: '3', runConfig: resolved.input.runConfig },
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', runConfig: resolved.input.runConfig },
     });
     f.reader.readV3.mockClear();
     f.revisions.readCurrent.mockClear();
@@ -91,7 +91,7 @@ describe('冻结V3配置的创建前预检', () => {
     f.input.strategy.signalSources[0]!.asset.symbol = '510300.SH';
     await expect(
       f.service.resolve(versionId, f.input.runConfig, 'candidate', { rebindStrategyInputs: true }),
-    ).rejects.toThrow('不同标的或周期');
+    ).rejects.toThrow('不能复用其他标的');
     expect(f.reader.readV3).not.toHaveBeenCalled();
     expect(f.revisions.readCurrent).not.toHaveBeenCalled();
   });
@@ -152,9 +152,9 @@ describe('冻结V3配置的创建前预检', () => {
     const f = await fixture();
     const job = {
       id: 'existing',
-      mode: 'V3',
+      mode: 'frozen',
       runConfig: f.input.runConfig,
-      input: { contractVersion: 3, schemaVersion: '3', runConfig: f.input.runConfig },
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', runConfig: f.input.runConfig },
     };
     f.prisma.backtestJob.findFirst.mockResolvedValue(job);
     f.revisions.readCurrent.mockRejectedValue(new Error('offline'));

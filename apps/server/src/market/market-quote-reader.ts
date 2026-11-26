@@ -70,7 +70,7 @@ export class MarketQuoteReader {
 
   private requestQuote(symbol: string, options: QuoteReadOptions) {
     if (options.background) return readBackgroundQuote(this.dsa, options.background, options.signal);
-    const path = `/api/v3/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}${options.assetType ? `&assetType=${options.assetType}` : ''}`;
+    const path = `/api/v1/thesis-ledger/market/quote?symbol=${encodeURIComponent(symbol)}${options.assetType ? `&assetType=${options.assetType}` : ''}`;
     if (options.signal) return this.dsa.get<Record<string, unknown>>(path, 1, undefined, options.signal);
     return this.dsa.get<Record<string, unknown>>(path, 1);
   }

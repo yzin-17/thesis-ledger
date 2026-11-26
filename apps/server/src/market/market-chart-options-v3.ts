@@ -17,7 +17,7 @@ export const unavailableChartOptions = (
   window?: MarketChartOptionsWindowV3,
   timeframe?: '1m' | '5m' | '15m' | '30m' | '60m' | '1d',
 ): MarketChartOptionsV3 => ({
-  contractVersion: 3,
+  contractVersion: 1,
   symbol,
   mode,
   ...(timeframe && timeframe !== '1d' ? { timeframe } : {}),
@@ -99,7 +99,7 @@ export const resolveChartOptionsV3 = (
     };
   });
   return marketChartOptionsV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     symbol: identity.symbol,
     mode: 'v3',
     ...(identity.timeframe && identity.timeframe !== '1d' ? { timeframe: identity.timeframe } : {}),

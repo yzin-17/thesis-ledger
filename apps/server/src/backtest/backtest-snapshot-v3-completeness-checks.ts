@@ -1,15 +1,18 @@
+import { additionalSignalPricePlanV3 } from './backtest-signal-price-plan-v3.js';
+import { validateAdditionalSignalPricesV3 } from './backtest-signal-price-inputs-v3.js';
+import { assertResearchDataScopeV3 } from './backtest-research-data-scope-v3.js';
 import type {
   BacktestSnapshotManifestV3,
   RunConfigV3,
   BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import {
-  priceResearchNeedsActualPrice,
   priceResearchReferenceArtifactKey,
   priceResearchEvidenceArtifactKey,
 } from '@thesis-ledger/schemas';
 import {
   validatePriceResearchReference,
+  hasPlannedPriceResearchReference,
   priceResearchRuleFacts,
 } from './backtest-price-research-input.js';
 import type { ArtifactRow } from './backtest-artifact-store.js';
@@ -72,6 +75,11 @@ export const validateCompleteSnapshotSourceBindingsV3 = (
   if (!executionSource || !same(executionSource.routeKey, inputPlan.executionRouteKey)) {
     fail('V3 完整快照执行来源与依赖计划不一致');
   }
+  const actualBasis = validatePriceResearchReference(manifest, byKey, strategy, runConfig);
+  const additionalSources = validateAdditionalSignalPricesV3(strategy, runConfig, manifest, byKey, actualBasis);
+  assertResearchDataScopeV3({ strategy, runConfig, rows: byKey,
+    calendarRows: byKey.get(`calendar/${strategy.executionInstrument.market}.parquet`),
+    actualVolumeBasis: actualBasis?.volumeBasis });
   const purposes = [
     ...new Set(
       inputPlan.priceInputs
@@ -82,7 +90,7 @@ export const validateCompleteSnapshotSourceBindingsV3 = (
   if (
     !same(
       manifest.actualSources,
-      purposes.map((purpose) => ({ ...executionSource, purpose })),
+      [...purposes.map((purpose) => ({ ...executionSource, purpose })), ...additionalSources],
     )
   ) {
     fail('V3 完整快照信号或基准来源未绑定冻结执行序列');
@@ -171,11 +179,11 @@ function completeSnapshotArtifactKeys(
     'metadata/market-window-evidence-v3.parquet',
     priceInputBindingsArtifactKeyV3,
     'execution/bars.parquet',
-    ...(runConfig.priceResearch &&
-    (runConfig.priceResearch.actualPriceWindow || priceResearchNeedsActualPrice(strategy))
+    ...(hasPlannedPriceResearchReference(strategy, runConfig.priceResearch)
       ? [priceResearchReferenceArtifactKey, priceResearchEvidenceArtifactKey]
       : []),
     ...validated.artifacts.map(({ key }) => key),
+    ...additionalSignalPricePlanV3(strategy, runConfig).flatMap(plan => [plan.artifactKey, plan.evidenceKey]),
     ...(runConfig.executionModel ? ['metadata/execution-model-v3.parquet'] : []),
     ...(publicFees ? [publicFeesArtifactKeyV3] : []),
     ...(tradingStatus ? [tradingStatusArtifactKeyV3] : []),

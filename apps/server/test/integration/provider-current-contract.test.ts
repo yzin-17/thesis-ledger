@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DsaClient } from '../../src/integration/dsa/dsa.client.js';
 
-const envelope = { contractVersion: 3, consumer: 'thesis-ledger' };
+const envelope = { contractVersion: 1, consumer: 'thesis-ledger' };
 const identity = { ...envelope, providerId: 'tushare', requestId: 'provider-current' };
 const config = {
   ...identity,
@@ -104,8 +104,8 @@ describe('Provider 当前消费合同', () => {
       };
       for (const patch of [
         { contractVersion: undefined },
-        { contractVersion: 1 },
         { contractVersion: 2 },
+        { contractVersion: 3 },
         { consumer: 'other' },
         { providerId: 'longbridge' },
         { requestId: 'late-result' },

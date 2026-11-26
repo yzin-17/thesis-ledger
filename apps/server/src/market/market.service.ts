@@ -154,7 +154,7 @@ export class MarketService {
           load: async () => {
             await this.control.assertCurrent(scope);
             const raw = await this.dsa.get<Record<string, unknown>>(
-              `/api/v3/thesis-ledger/market/chip?symbol=${encodeURIComponent(symbol)}`,
+              `/api/v1/thesis-ledger/market/chip?symbol=${encodeURIComponent(symbol)}`,
             );
             const chip = parseCurrentChip(
               {

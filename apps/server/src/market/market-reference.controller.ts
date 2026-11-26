@@ -34,7 +34,7 @@ export class MarketReferenceController {
     const request = marketReferenceRequestSchema.parse({
       ...checked.data,
       requestId: randomUUID(),
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
     });
     const abort = new AbortController();

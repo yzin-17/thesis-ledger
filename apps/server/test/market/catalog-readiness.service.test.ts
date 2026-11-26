@@ -30,7 +30,7 @@ const readyStatus = (syncedAt = new Date()): LocalStatus => ({
 });
 
 const succeededJob = (overrides: Partial<CatalogJob> = {}): CatalogJob => ({
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   id: 'catalog-job-1',
   status: 'succeeded',
@@ -46,7 +46,7 @@ const succeededJob = (overrides: Partial<CatalogJob> = {}): CatalogJob => ({
 });
 
 const snapshot = {
-  contractVersion: 3,
+  contractVersion: 1,
   generation: 1,
   checksum: 'checksum-1',
   cursor: 'generation:1',

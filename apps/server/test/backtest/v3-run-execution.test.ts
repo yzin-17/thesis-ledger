@@ -56,7 +56,7 @@ const createRunHarness = async (mutateResult?: (result: BacktestResultV3) => unk
 
   let job: Record<string, unknown> = {
     id: fixture.input.runId,
-    mode: 'V3',
+    mode: 'frozen',
     strategyVersionId: fixture.input.strategyVersionId,
     periodStart: new Date(`${fixture.input.runConfig.startDate}T00:00:00.000Z`),
     periodEnd: new Date(`${fixture.input.runConfig.endDate}T00:00:00.000Z`),
@@ -65,8 +65,8 @@ const createRunHarness = async (mutateResult?: (result: BacktestResultV3) => unk
     stage: 'queued',
     executionAttempt: 0,
     input: {
-      contractVersion: 3,
-      schemaVersion: '3',
+      contractVersion: 1,
+      schemaVersion: 'backtest-trade-run-v1',
       strategyVersionId: fixture.input.strategyVersionId,
       runConfig: fixture.input.runConfig,
       snapshotId: built.snapshotRef.snapshotId,
@@ -140,8 +140,8 @@ describe('V3 Run versioned execution', () => {
       stage: 'succeeded',
       executionAttempt: 1,
       result: {
-        schemaVersion: '3',
-        snapshotVersion: 'snapshot-manifest-v3',
+        schemaVersion: 'backtest-trade-result-v1',
+        snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
         runId: harness.built.manifest.runId,
         snapshotId: harness.built.manifest.contentHash,
         contentHash: harness.built.manifest.contentHash,

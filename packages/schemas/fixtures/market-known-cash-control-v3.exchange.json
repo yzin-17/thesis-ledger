@@ -1,6 +1,6 @@
 {
   "request": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "protocolVersion": "known-cash-control-v1",
     "requestId": "known-cash-fixture",
     "symbol": "510300.SH",
@@ -38,7 +38,7 @@
     }
   },
   "response": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "protocolVersion": "known-cash-control-v1",
     "requestId": "known-cash-fixture",
     "symbol": "510300.SH",

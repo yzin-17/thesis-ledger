@@ -27,7 +27,7 @@ const fixture = () => {
   const ref = `sha256:${sha256}`;
   const routeKey = { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'SPLIT_EVENT' };
   return marketEventResponseV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'split-fixture',
     symbol: mapping.symbol,
     routeKey,

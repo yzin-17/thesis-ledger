@@ -5,7 +5,7 @@ import { marketProviderProbeFeedback } from '../src/features/market-data/market-
 const probe = (
   capabilityResults: MarketProviderTestResponse['capabilityResults'],
 ): MarketProviderTestResponse => ({
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   providerId: 'tushare',
   requestId: 'probe-1',

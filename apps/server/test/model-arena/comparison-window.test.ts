@@ -7,7 +7,7 @@ const ownerId = '00000000-0000-4000-8000-000000000003';
 function fixture() {
   const budget = { requests: 10, tokens: 10000, costMicros: 1000000 };
   const protocol = arenaProtocolSchema.parse({
-    version: 1,
+    version: 'arena-historical-match-protocol-v1',
     title: '受控比较',
     market: 'US',
     currency: 'USD',

@@ -87,7 +87,7 @@ export const schemaGenerationFailure = (
   completion?: AiGenerationCompletion,
 ) => {
   const researchV2 =
-    input.contract.id === 'research' && input.contract.version === 'research-generation-v2';
+    input.contract.id === 'research' && input.contract.version === 'research-report-generation-v1';
   return new AiSdkGenerationError(
     aiGenerationErrorSchema.parse({
       code: 'schema_invalid',

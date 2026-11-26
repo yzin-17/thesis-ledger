@@ -48,7 +48,7 @@ describe('账号等级与持久权限', () => {
   });
   it('未包含的功能保持零尝试，不能伪造接口通过', () => {
     expect(marketAccountAccessSchema.safeParse({ ...report.routes[1]?.access, attempted: true }).success).toBe(false);
-    const result = { contractVersion: 3, consumer: 'thesis-ledger', providerId: 'tushare', requestId: 'level-check',
+    const result = { contractVersion: 1, consumer: 'thesis-ledger', providerId: 'tushare', requestId: 'level-check',
       purpose: 'account_access', status: 'healthy', credentialConfigured: true, capabilityResults: {}, accountAccess: report };
     expect(marketProviderTestResponseSchema.safeParse(result).success).toBe(true);
   });

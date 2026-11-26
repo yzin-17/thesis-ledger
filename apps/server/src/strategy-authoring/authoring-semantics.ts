@@ -1,12 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { isEqual } from 'es-toolkit';
 import {
-  authoringStrategySchema,
-  authoringGenerationOutputSchema,
-  strategyCrossDescriptionIssues,
+  authoringModificationOutputSchema,
   strategyCrossSummaryIssue,
   type AuthoringContent,
+  type BacktestStrategy,
+  authoringStrategyV6Schema,
 } from '@thesis-ledger/schemas';
+import { requireCompiledStrategy } from '../backtest/backtest-strategy-compiler.js';
 import { authoringSources, matchesAuthoringSource } from './authoring-source-text.js';
 import {
   authoringRequirementCapabilityIssue,
@@ -75,11 +76,27 @@ function resolveDefinitionPath(value: unknown, path: string): unknown {
   return current;
 }
 
+export function parseAuthoringGeneration(raw: unknown) {
+  const wire = raw as { proposal?: unknown };
+  const proposal = (wire?.proposal ?? raw) as { definition?: unknown; coverage?: unknown };
+  const compiled = requireCompiledStrategy(proposal?.definition);
+  const definition = authoringStrategyV6Schema.parse(JSON.stringify(compiled.definition)) as BacktestStrategy;
+  const coverage = authoringModificationOutputSchema.shape.coverage.parse(proposal?.coverage);
+  if (definition.benchmark || definition.signalSources.some((source) =>
+    source.asset.symbol !== definition.executionInstrument.symbol || source.asset.market !== definition.executionInstrument.market ||
+    source.asset.assetType !== definition.executionInstrument.assetType))
+    reject('AUTHORING_SEMANTIC_MISMATCH', '编写来源必须属于本次唯一执行标的');
+  return { definition, coverage, compilation: compiled.compilation };
+}
+
 export function validateAuthoringGeneration(content: AuthoringContent, raw: unknown) {
+  return validateAuthoringOutput(content, parseAuthoringGeneration(raw));
+}
+
+export function validateAuthoringOutput<T extends { definition: BacktestStrategy; coverage: ReturnType<typeof authoringModificationOutputSchema.parse>['coverage'] }>(content: AuthoringContent, output: T): T {
   const confirmation = requireAuthoringGeneration(content);
-  const output = authoringGenerationOutputSchema.parse(raw);
-  const definition = authoringStrategySchema.parse(JSON.stringify(output.definition));
-  const signalIssues = strategyCrossDescriptionIssues(definition).map((issue) => issue.message);
+  const { definition } = output;
+  const signalIssues: string[] = [];
   for (const path of ['entry', 'exit'] as const) {
     const issue = strategyCrossSummaryIssue(definition[path], confirmation[`${path}Summary`]);
     if (issue) signalIssues.push(`${path}：${issue}`);
@@ -95,7 +112,8 @@ export function validateAuthoringGeneration(content: AuthoringContent, raw: unkn
     cost: confirmation.cost,
   };
   for (const [key, expected] of Object.entries(constraints)) {
-    if (!isEqual(definition[key as keyof typeof definition], expected))
+    const actual = key === 'execution' && confirmation.execution.timing === 'dailyBarOrders' && !('orders' in confirmation.execution) ? { mode: definition.execution.mode, timing: definition.execution.timing } : definition[key as keyof typeof definition];
+    if (!isEqual(actual, expected))
       reject('AUTHORING_SEMANTIC_MISMATCH', '生成定义改变了用户确认条件', [key]);
   }
   const ids = new Set<string>();
@@ -115,7 +133,7 @@ export function validateAuthoringGeneration(content: AuthoringContent, raw: unkn
     if (requirement.state === 'understood' && !ids.has(requirement.id))
       reject('AUTHORING_COVERAGE_INCOMPLETE', '生成定义遗漏用户需求', [requirement.id]);
   }
-  return { definition, coverage: output.coverage };
+  return output;
 }
 
 export function invalidateAuthoringConfirmations(

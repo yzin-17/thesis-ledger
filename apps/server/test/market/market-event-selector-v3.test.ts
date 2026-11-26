@@ -7,12 +7,12 @@ function fixture() {
   const primary = { providerId: 'akshare', upstreamSource: 'eastmoney' };
   const secondary = { providerId: 'other', upstreamSource: 'other-source' };
   const scope: MarketEventSelectionInputV3['scope'] = {
-    contractVersion: 3, requestId: 'event-1', symbol: '510300.SH', routeKey: key,
+    contractVersion: 1, requestId: 'event-1', symbol: '510300.SH', routeKey: key,
     desiredRevision: 2, effectivePolicyRevision: 2, catalogRevision: 3,
     start: '2025-01-01', end: '2025-12-31', dataAsOf: '2026-09-27T01:00:00Z',
   };
   const effective = {
-    contractVersion: 3, consumer: 'thesis-ledger', requestId: 'policy-1', revision: 2,
+    contractVersion: 1, consumer: 'thesis-ledger', requestId: 'policy-1', revision: 2,
     sourceDesiredRevision: 2, enabled: true, appliedAt: '2026-09-26T00:00:00Z',
     routes: [{ key, reason: null, targets: [
       { ...primary, routeIndex: 0, eligible: true, reason: null },
@@ -20,7 +20,7 @@ function fixture() {
     ] }],
   };
   const catalog = {
-    contractVersion: 3, consumer: 'thesis-ledger', catalogRevision: 3,
+    contractVersion: 1, consumer: 'thesis-ledger', catalogRevision: 3,
     generatedAt: '2026-09-26T00:00:00Z', integrity: 'complete',
     entries: [primary, secondary].map((target) => ({ key, target, state: 'ready' })),
   };

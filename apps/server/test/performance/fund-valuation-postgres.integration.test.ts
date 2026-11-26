@@ -12,7 +12,7 @@ import { frozenSnapshotInputs } from '../../src/performance/performance-snapshot
 const databaseUrl = process.env.PORTFOLIO_VALUATION_DATABASE_URL;
 const at = new Date('2026-10-20T08:00:00Z');
 const point = fundNavSchema.parse({
-  version: 3,
+  version: 1,
   symbol: '161725.OF',
   unitNav: 0.54,
   navDate: '2026-10-20T00:00:00Z',
@@ -113,7 +113,7 @@ describe.skipIf(!databaseUrl)('基金快照真实 PostgreSQL 与合成来源输�
   it.each([
     ['零值', { ...point, unitNav: 0 }],
     ['不可用', { ...point, freshness: 'unavailable' as const }],
-  ] as const)('%s 的合法 V3 返回不追加正式修订，原估算逐字段不变', async (_, invalid) => {
+  ] as const)('%s 的现行净值输入不追加正式修订，原估算逐字段相同', async (_, invalid) => {
     const f = await fixture();
     f.history.points = [fundNavSchema.parse(invalid)];
     await f.clear();

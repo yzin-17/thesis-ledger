@@ -10,7 +10,7 @@ import {
 
 export const marketProviderRegistrySchema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     consumer: z.literal('thesis-ledger'),
     providers: z.array(providerManifestSchema),
   })
@@ -23,8 +23,9 @@ export const marketProviderRegistrySchema = z
   .transform(omitUndefinedDeep);
 
 /** 原Server目录读取投影；参数资格条目仍复用同一精确能力合同。 */
+export const marketRouteCatalogReadContractVersion = 1 as const;
 export const marketRouteCatalogReadClientV3Schema = z.object({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(marketRouteCatalogReadContractVersion),
   consumer: z.literal('thesis-ledger'),
   status: z.enum(['complete', 'partial', 'unavailable']),
   catalogRevision: z.number().refine((value) => Number.isInteger(value) && value > 0).nullable(),

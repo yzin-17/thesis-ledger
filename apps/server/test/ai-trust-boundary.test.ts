@@ -28,26 +28,17 @@ describe('AI trust boundary', () => {
     expect(runs.start).toHaveBeenCalledWith('mock', 'm1', 'v1', undefined, modelMetadata);
   });
 
-  it('研究启动由服务端接收问题和精确上下文，不接受客户端 Provider 审计字段', () => {
-    const runs = { startResearch: vi.fn() };
+  it('通用任务入口拒绝旧研究提交，研究请求必须走独立入口', () => {
+    const runs = { start: vi.fn() };
     const controller = new AiController(runs as never);
-    controller.start({
-      question: '当前组合的主要风险是什么？',
-      context: { scope: 'portfolio' },
-      templateId: 'primary-risks',
-    });
-    expect(runs.startResearch).toHaveBeenCalledWith({
-      question: '当前组合的主要风险是什么？',
-      context: { scope: 'portfolio' },
-      templateId: 'primary-risks',
-    });
     expect(() =>
       controller.start({
-        question: '风险？',
+        question: '当前组合的主要风险是什么？',
         context: { scope: 'portfolio' },
-        modelMetadata: { cost: 1 },
+        templateId: 'primary-risks',
       }),
     ).toThrow();
+    expect(runs.start).not.toHaveBeenCalled();
   });
 
   it('历史 limit 非数字时回退默认值，不把 NaN 传给 Prisma', () => {

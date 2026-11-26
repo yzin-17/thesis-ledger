@@ -17,7 +17,7 @@ const source = marketDataBarSeriesResponseV3Schema.parse(
   ),
 );
 const series = (acquisition?: string): BarSeries => ({
-  contractVersion: 3,
+  contractVersion: 1,
   identity: { symbol: source.symbol, assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
   points: structuredClone(source.bars),
   coverage: { ...source.coverage },
@@ -43,7 +43,7 @@ const series = (acquisition?: string): BarSeries => ({
     : {}),
 });
 const detail = (bars: BarSeries): MarketDetailResponse => ({
-  contractVersion: 3,
+  contractVersion: 1,
   symbol: source.symbol,
   assetType: 'ETF',
   identity: { source: 'asset', status: 'confirmed' },

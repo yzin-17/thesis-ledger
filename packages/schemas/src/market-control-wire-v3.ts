@@ -8,32 +8,19 @@ import {
 
 const text = z.string().trim().min(1);
 
-const versionList = z.array(z.number().int().positive()).superRefine((versions, context) => {
-  const seen = new Set<number>();
-  versions.forEach((version, index) => {
-    if (seen.has(version)) {
-      context.addIssue({
-        code: 'custom',
-        path: [index],
-        message: 'Control Contract 版本不得重复',
-      });
-    }
-    seen.add(version);
-  });
-});
+export const DSA_CONTROL_CONTRACT = 'dsa-control-v1' as const;
 
-/** V3 is an explicit Control negotiation; Data versions have their own capability wire. */
 export const marketControlHandshakeRequestV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
+  contract: z.literal(DSA_CONTROL_CONTRACT),
   consumer: z.literal('thesis-ledger'),
   requestId: text,
-  supportedVersions: z.tuple([z.literal(3)]),
 });
 export type MarketControlHandshakeRequestV3 = z.infer<typeof marketControlHandshakeRequestV3Schema>;
 
-/** The flags describe Provider Control only and deliberately contain no Data versions. */
 export const marketControlHandshakeResponseV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
+  contract: z.literal(DSA_CONTROL_CONTRACT),
   consumer: z.literal('thesis-ledger'),
   accepted: z.literal(true),
   providerRegistry: z.boolean(),
@@ -49,20 +36,13 @@ export const marketControlErrorCodeV3 = {
   unsupportedControlContractVersion: 'CONTROL_CONTRACT_UNSUPPORTED',
 } as const;
 
-const unsupportedVersionMessages = z.enum([
-  'Control Contract 版本不兼容',
-  'Control Contract V2 版本不兼容',
-  '没有共同的 Control Contract 版本',
-]);
-
-/** A rejecting peer may identify its error with the Control version it still speaks. */
 export const marketControlUnsupportedVersionErrorV3Schema = z.strictObject({
-  contractVersion: z.number().int().positive(),
+  contractVersion: z.literal(1),
   code: z.literal(marketControlErrorCodeV3.unsupportedControlContractVersion),
-  message: unsupportedVersionMessages,
+  message: text,
   requestId: text,
   diagnosticId: text.optional(),
-  supportedVersions: versionList.optional(),
+  expectedContract: z.literal(DSA_CONTROL_CONTRACT).optional(),
 });
 export type MarketControlUnsupportedVersionErrorV3 = z.infer<
   typeof marketControlUnsupportedVersionErrorV3Schema

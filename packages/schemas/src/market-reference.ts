@@ -9,7 +9,7 @@ import { marketReferenceSources } from './market-reference-sources.js';
 import { validMarketReferenceSymbol } from './market-reference-identity.js';
 import { derivativeReferenceSingleDay } from './market-reference-derivative-catalog.js';
 
-export const marketReferenceEndpoint = '/api/v3/thesis-ledger/market/reference';
+export const marketReferenceEndpoint = '/api/v1/thesis-ledger/market/reference';
 const dataset = z.enum(
   Object.keys(marketReferenceCatalog) as [MarketReferenceDataset, ...MarketReferenceDataset[]],
 );
@@ -81,7 +81,7 @@ export const marketReferenceRequestSchema = z
   .strictObject({
     ...fields,
     requestId: z.string().trim().min(1).max(128),
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     consumer: z.literal('thesis-ledger'),
   })
   .refine(validScope, '市场资料请求无效');
@@ -130,7 +130,7 @@ const resultFields = {
   totalSourceRecords: z.number().int().nonnegative().nullable(),
   historyComplete: z.literal(false),
   notes: z.array(z.string().max(2000)).min(1).max(20),
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   policyRevision: z.number().int().positive(),
   routeTarget: z.strictObject({

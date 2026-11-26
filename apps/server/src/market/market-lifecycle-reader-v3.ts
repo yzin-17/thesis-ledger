@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { isDeepStrictEqual } from 'node:util';
 import {
-  marketTradingStatusResponseV3Schema,
-  type MarketTradingStatusResponseV3,
+  dailyTradingStatusResultV1Schema,
+  marketLifecycleStatusEvidenceV1Schema,
+  securityBasicDatesResultV1Schema,
+  type MarketLifecycleStatusEvidenceV1,
   type StatusCompositionDemandV1,
 } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
@@ -10,65 +12,39 @@ import { readMarketStatusCompositionV1 } from './market-status-composition-reade
 
 export type LifecycleReadScopeV3 = { market: 'CN'; symbol: string; start: string; end: string };
 export interface MarketLifecycleReadPortV3 {
-  read(scope: LifecycleReadScopeV3): Promise<MarketTradingStatusResponseV3>;
+  read(scope: LifecycleReadScopeV3): Promise<MarketLifecycleStatusEvidenceV1>;
 }
 
-/** Market 只按现行标准能力和有效路由读取，不解释供应商字段。 */
 @Injectable()
 export class MarketLifecycleReaderV3 implements MarketLifecycleReadPortV3 {
   constructor(
     @Inject(DsaClient)
-    private readonly dsa: Pick<DsaClient, 'effectiveControlPolicyV3' | 'marketTradingStatusV3' | 'dataCapabilities'>,
+    private readonly dsa: Pick<DsaClient, 'effectiveControlPolicyV3' | 'dataCapabilities'>,
   ) {}
+
   readComposition(demands: readonly StatusCompositionDemandV1[]) {
     return readMarketStatusCompositionV1(demands, this.dsa.dataCapabilities,
       () => this.dsa.effectiveControlPolicyV3().then((result) => result.projection?.effective ?? null));
   }
-  async read(scope: LifecycleReadScopeV3) {
-    const policy = (await this.dsa.effectiveControlPolicyV3()).projection?.effective;
-    const route = policy?.routes.find(
-      (item) =>
-        item.key.kind === 'data' &&
-        item.key.market === scope.market &&
-        item.key.assetType === 'STOCK' &&
-        item.key.capability === 'HISTORICAL_TRADING_STATUS',
-    );
-    if (!policy?.enabled || !route) throw new Error('基础生命周期状态路由不可用');
-    for (const target of route.targets) {
-      if (!target.eligible) continue;
-      let response: MarketTradingStatusResponseV3;
-      try {
-        response = marketTradingStatusResponseV3Schema.parse(
-          await this.dsa.marketTradingStatusV3({
-            contractVersion: 3,
-            consumer: 'thesis-ledger',
-            requestId: crypto.randomUUID(),
-            routeKey: route.key,
-            routeTarget: {
-              providerId: target.providerId,
-              upstreamSource: target.upstreamSource,
-              routeIndex: target.routeIndex,
-            },
-            symbol: scope.symbol,
-            range: { start: scope.start, end: scope.end },
-          }),
-        );
-      } catch {
-        continue;
-      }
-      const after = (await this.dsa.effectiveControlPolicyV3()).projection?.effective;
-      const afterRoute = after?.routes.find(item => isDeepStrictEqual(item.key, route.key));
-      if (!isDeepStrictEqual({ revision: policy.revision, sourceDesiredRevision: policy.sourceDesiredRevision, enabled: policy.enabled, route }, { revision: after?.revision, sourceDesiredRevision: after?.sourceDesiredRevision, enabled: after?.enabled, route: afterRoute })) throw new Error('生命周期读取期间有效路由变化');
-      if (
-        response.symbol !== scope.symbol ||
-        response.range.start !== scope.start ||
-        response.range.end !== scope.end ||
-        response.provenance.providerId !== target.providerId ||
-        response.provenance.upstreamSource !== target.upstreamSource
-      )
-        throw new Error('生命周期响应与请求来源不符');
-      return response;
-    }
-    throw new Error('已配置生命周期来源未取得本次窗口');
+
+  async read({ market, symbol, start, end }: LifecycleReadScopeV3) {
+    const route = { kind: 'data', market, assetType: 'STOCK' } as const;
+    const query = { contractVersion: 1, capabilityVersion: 1, consumer: 'thesis-ledger', symbol } as const;
+    const range = { start, end };
+    const composition = await this.readComposition([
+      { requirement: 'optional', query: { ...query, requestId: randomUUID(),
+        routeKey: { ...route, capability: 'DAILY_TRADING_STATUS' }, range } },
+      { requirement: 'optional', query: { ...query, requestId: randomUUID(),
+        routeKey: { ...route, capability: 'SECURITY_BASIC_DATES' } } },
+    ]);
+    const [statusEntry, datesEntry] = composition.entries;
+    if (statusEntry?.status !== 'included' || datesEntry?.status !== 'included')
+      throw new Error('日级交易状态或证券基础日期不可用');
+    const status = dailyTradingStatusResultV1Schema.parse(statusEntry.result);
+    const dates = securityBasicDatesResultV1Schema.parse(datesEntry.result);
+    return marketLifecycleStatusEvidenceV1Schema.parse({
+      contract: 'market-lifecycle-status-evidence-v1', symbol, range,
+      basicLifecycle: dates.dates, days: status.days, composition,
+    });
   }
 }

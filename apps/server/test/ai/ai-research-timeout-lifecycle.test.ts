@@ -1,8 +1,9 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { aiGenerationContracts } from '@thesis-ledger/schemas';
+import { aiGenerationContracts, researchGenerationV2Schema } from '@thesis-ledger/schemas';
 import { researchFailureOutcome } from '../../src/ai/timeout/ai-research-arrival.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResearchSdkHttpFixture, policy, summary } from './research-sdk-http.fixture.js';
+import { traceContent } from './ai-trace.fixture.js';
 import {
   AiSdkGenerationError,
   type AiSdkGenerationAdapter,
@@ -10,14 +11,7 @@ import {
   type AiSdkGenerationResult,
 } from '../../src/ai/ai-sdk-generation.adapter.js';
 
-const output = {
-  conclusion: '本地研究结果',
-  evidence: [],
-  risks: [],
-  unknowns: [],
-  disclaimer: 'test',
-  signals: [],
-};
+const output = researchGenerationV2Schema.parse(JSON.parse(traceContent));
 const completed = (): AiSdkGenerationResult<typeof output> => ({
   output,
   usage: { status: 'reported', inputTokens: 9, outputTokens: 6 },

@@ -53,172 +53,17 @@ describe('AI 运行审计', () => {
 });
 
 describe("研究创建与冻结执行归属", () => {
-  it('研究启动保存问题、精确上下文和重试关系，列表支持状态筛选', async () => {
-    const create = vi.fn(async ({ data }: { data: object }) => ({ id: 'run-2', ...data }));
-    const findMany = vi.fn(async () => [{ id: 'run-2', status: 'queued', question: '风险？' }]);
-    const findUnique = vi.fn(async ({ select }: { select?: Record<string, unknown> }) => {
-      if (select?.promptVersion) {
-        return {
-          id: '11111111-1111-4111-8111-111111111111',
-          promptVersion: 'research-v1',
-          status: 'failed',
-          question: '旧问题',
-          context: { scope: 'portfolio' },
-          modelMetadata: { templateId: 'primary-risks' },
-          errorCode: 'provider_error',
-        };
-      }
-      return { id: 'run-2', toolCalls: [] };
-    });
-    const service = new AiRunService({ aiRun: { create, findMany, findUnique } } as never);
-
-    await expect(
-      service.startResearch({
-        question: '  当前组合最主要的风险是什么？ ',
-        context: { scope: 'portfolio' },
-        templateId: 'primary-risks',
-        retryOfRunId: '11111111-1111-4111-8111-111111111111',
-        retryConfirmation: {
-          contextConfirmed: true,
-          acknowledgeUnknownOutcomeRisk: false,
-        },
-      }),
-    ).resolves.toMatchObject({
-      id: 'run-2',
-      status: 'queued',
-      question: '当前组合最主要的风险是什么？',
-      context: { scope: 'portfolio' },
-      retryOfRunId: '11111111-1111-4111-8111-111111111111',
-    });
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          provider: 'pending',
-          model: 'pending',
-          createdAt: expect.any(Date),
-          modelMetadata: expect.objectContaining({
-            templateId: 'primary-risks',
-            researchPolicy: expect.objectContaining({ maxAiCalls: 2, maxCost: '0' }),
-            sdkExecution: expect.objectContaining({
-              version: 'sdk-execution-v1',
-              deadlineAt: null,
-              timing: expect.objectContaining({
-                firstStartedAt: null,
-                taskDeadlineAt: null,
-                queueExpiresAt: expect.any(String),
-              }),
-              requests: [],
-            }),
-          }),
-        }),
-      }),
-    );
+  it('通用运行列表按状态过滤，详情排除归属到研究的运行', async () => {
+    const findMany = vi.fn(async () => []);
+    const findUnique = vi.fn(async () => null);
+    const service = new AiRunService({ aiRun: { findMany, findUnique } } as never);
     await service.list(20, 'failed');
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { status: 'failed', researchOwnerId: null }, take: 20 }),
     );
-    await service.resume('run-2');
+    await expect(service.resume('run-2')).resolves.toBeNull();
     expect(findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'run-2', researchOwnerId: null } }),
-    );
-  });
-
-  it('再次生成预填保留来源模板，unknown 来源必须由服务端确认风险', async () => {
-    const create = vi.fn(async ({ data }: { data: object }) => ({ id: 'new-run', ...data }));
-    const findUnique = vi.fn(async () => ({
-      id: '11111111-1111-4111-8111-111111111111',
-      promptVersion: 'research-v1',
-      status: 'failed',
-      question: '原问题',
-      context: { scope: 'portfolio' },
-      modelMetadata: { templateId: 'counter-evidence' },
-      errorCode: 'research_unknown_outcome',
-    }));
-    const service = new AiRunService({ aiRun: { create, findUnique } } as never);
-
-    await expect(
-      service.researchRetryPrefill('11111111-1111-4111-8111-111111111111'),
-    ).resolves.toMatchObject({
-      question: '原问题',
-      context: { scope: 'portfolio' },
-      templateId: 'counter-evidence',
-      sourceOutcome: 'unknown',
-      contextState: 'valid',
-      requiresUnknownOutcomeAcknowledgement: true,
-    });
-    await expect(
-      service.startResearch({
-        question: '原问题',
-        context: { scope: 'portfolio' },
-        retryOfRunId: '11111111-1111-4111-8111-111111111111',
-        retryConfirmation: {
-          contextConfirmed: true,
-          acknowledgeUnknownOutcomeRisk: false,
-        },
-      }),
-    ).rejects.toThrow('必须确认风险');
-    expect(create).not.toHaveBeenCalled();
-    await expect(
-      service.startResearch({
-        question: '原问题',
-        context: { scope: 'portfolio' },
-        retryOfRunId: '11111111-1111-4111-8111-111111111111',
-        retryConfirmation: {
-          contextConfirmed: true,
-          acknowledgeUnknownOutcomeRisk: true,
-        },
-      }),
-    ).resolves.toMatchObject({ id: 'new-run', retryOfRunId: expect.any(String) });
-  });
-
-  it('研究创建时冻结同模型候选路由和配置指纹', async () => {
-    const create = vi.fn(async ({ data }: { data: object }) => ({ id: 'run-routes', ...data }));
-    const providers = {
-      defaultModel: () => 'fixture-model',
-      readyContractCandidates: vi.fn(() => [
-        {
-          provider: { id: 'primary' },
-          execution: {
-            adapter: 'openai-compatible',
-            mode: 'json_validated',
-            readiness: { configurationFingerprint: 'primary-fingerprint' },
-          },
-        },
-        {
-          provider: { id: 'fallback' },
-          execution: {
-            adapter: 'openai-compatible',
-            mode: 'json_validated',
-            readiness: { configurationFingerprint: 'fallback-fingerprint' },
-          },
-        },
-      ]),
-    };
-    const service = new AiRunService({ aiRun: { create } } as never, providers as never);
-
-    await service.startResearch({ question: '风险？', context: { scope: 'portfolio' } });
-
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          provider: 'primary',
-          model: 'fixture-model',
-          modelMetadata: expect.objectContaining({
-            researchRoutes: [
-              expect.objectContaining({
-                provider: 'primary',
-                model: 'fixture-model',
-                configurationFingerprint: 'primary-fingerprint',
-              }),
-              expect.objectContaining({
-                provider: 'fallback',
-                model: 'fixture-model',
-                configurationFingerprint: 'fallback-fingerprint',
-              }),
-            ],
-          }),
-        }),
-      }),
     );
   });
 

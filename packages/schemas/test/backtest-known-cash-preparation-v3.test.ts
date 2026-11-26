@@ -214,7 +214,7 @@ describe('明确的取得后冻结时钟', () => {
     );
     executionModel.scope.instrumentType = 'ETF';
     const intent = {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'old-intent',
       adjustment: 'none',
       accountingBasis: 'raw-events',

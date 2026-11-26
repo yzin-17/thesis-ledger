@@ -26,14 +26,14 @@ export class MarketBackgroundQuotesService {
     const old = this.plans.get(key);
     if (old && now.getTime() - old.checked < 60_000) return old.value;
     const request = {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       consumer: 'thesis-ledger' as const,
       requestId: crypto.randomUUID(),
       symbol: demand.symbol,
       assetType: demand.assetType!,
     };
     const raw = await this.dsa.post(
-      '/api/v3/thesis-ledger/market/background-quote/plan',
+      '/api/v1/thesis-ledger/market/background-quote/plan',
       request,
       1,
     );

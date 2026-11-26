@@ -33,7 +33,7 @@ export class ResearchObservationQueries {
     const report = await this.access.report(ownerId, id, locator);
     const available =
       report.availability === 'available' &&
-      report.result?.version === 2 &&
+      report.result?.version === 'research-report-result-v1' &&
       report.historicalScope.status === 'known';
     if (!available)
       return researchReportObservationsSchema.parse({
@@ -41,13 +41,13 @@ export class ResearchObservationQueries {
         historicalScope: report.historicalScope,
         reportId: id,
         asOf: asOf.toISOString(),
-        availability: report.resultVersion === 1 ? 'not_applicable' : 'unavailable',
+        availability: 'unavailable',
         issues: ['这份报告缺少可自动复核的可信 V2 字段，保留原报告供人工查看。'],
         items: [],
         statistics: observationStatistics([], asOf.toISOString()),
       });
     const result = report.result;
-    if (result?.version !== 2) throw new BadRequestException('研究产物版本不可复核');
+    if (result?.version !== 'research-report-result-v1') throw new BadRequestException('研究产物版本不可复核');
     const observations = await this.store.readRun(ownerId, id, asOf);
     const expected = researchObservationDigest(result);
     if (observations.some((entry) => entry.artifactFingerprint !== expected))
@@ -109,7 +109,7 @@ export class ResearchObservationQueries {
         const report = await this.access.report(ownerId, id, locator);
         if (
           report.availability !== 'available' ||
-          report.result?.version !== 2 ||
+          report.result?.version !== 'research-report-result-v1' ||
           researchObservationDigest(researchComparisonIdentity(report)) !== expected
         )
           continue;
@@ -127,7 +127,7 @@ export class ResearchObservationQueries {
       const source = reports.get(row.runId)!;
       const result = source.report.result;
       if (
-        result?.version !== 2 ||
+        result?.version !== 'research-report-result-v1' ||
         row.artifactFingerprint !== researchObservationDigest(result) ||
         row.lineageId !== source.lineageId
       )

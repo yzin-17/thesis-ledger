@@ -8,7 +8,7 @@ import { omitUndefinedDeep } from './exact-optional.js';
 import { marketAccountAccessSchema, marketProviderAccountLevelSchema } from './market-account-access.js';
 
 const identity = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   providerId: z.string().min(1),
   requestId: z.string().min(1),

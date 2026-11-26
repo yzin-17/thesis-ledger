@@ -65,7 +65,7 @@ it('合成完整事件证据随完整快照落盘重放，映射篡改和不完�
       effectiveControlPolicyV3: async () => ({
         projection: {
           effective: {
-            contractVersion: 3,
+            contractVersion: 1,
             consumer: 'thesis-ledger',
             requestId: 'fixture-policy',
             revision: 7,
@@ -83,7 +83,7 @@ it('合成完整事件证据随完整快照落盘重放，映射篡改和不完�
         },
       }),
       marketRouteCatalogV3: async () => ({
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         catalogRevision: 12,
         generatedAt: '2026-05-01T00:00:00Z',

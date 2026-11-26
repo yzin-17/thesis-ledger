@@ -7,7 +7,7 @@ import { publicFeeRoundingV3Schema } from './backtest-execution-fees.js';
 const text = z.string().trim().min(1);
 const date = z.iso.date();
 export const marketPublicFeesCapabilityV3 = 'HISTORICAL_PUBLIC_FEES' as const;
-export const marketPublicFeesEndpointV3 = '/api/v3/thesis-ledger/market/public-fees' as const;
+export const marketPublicFeesEndpointV3 = '/api/v1/thesis-ledger/market/public-fees' as const;
 const key = marketRouteKeyV3Schema.pipe(
   z.strictObject({
     kind: z.literal('data'),
@@ -20,7 +20,7 @@ const range = z
   .strictObject({ start: date, end: date })
   .refine((value) => value.start <= value.end, { message: '公共收费请求起点不得晚于终点' });
 const envelope = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   requestId: text,
   routeKey: key,

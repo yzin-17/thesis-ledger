@@ -7,7 +7,7 @@ import {
   type BacktestNavRunSummaryV3,
 } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
-import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { persistedRunContract } from './backtest-v3-run-lifecycle.js';
 import { canonicalizeManifest } from './backtest-snapshot.js';
 import { visibleStrategyOwners } from './strategy-access.service.js';
 
@@ -18,6 +18,7 @@ const navRunListSelect = {
   status: true,
   stage: true,
   progress: true,
+  cancelRequestedAt: true,
   periodStart: true,
   periodEnd: true,
   errorCode: true,
@@ -41,8 +42,7 @@ const toInstant = (value: Date): string | undefined =>
 const summaryFor = (row: NavRunListRecord): BacktestNavRunSummaryV3 | undefined => {
   const input = asRecord(row.input);
   if (
-    row.mode !== 'V3' ||
-    persistedContractVersion(row) !== 3 ||
+    persistedRunContract(row) !== 'backtest-nav-run-v1' ||
     input?.inputKind !== 'nav'
   ) {
     return undefined;
@@ -71,7 +71,7 @@ const summaryFor = (row: NavRunListRecord): BacktestNavRunSummaryV3 | undefined 
   }
 
   const parsed = backtestNavRunSummaryV3Schema.safeParse({
-    contractVersion: 3,
+    contractVersion: 1,
     inputKind: 'nav',
     id: row.id,
     strategyVersionId: row.strategyVersionId,
@@ -79,6 +79,8 @@ const summaryFor = (row: NavRunListRecord): BacktestNavRunSummaryV3 | undefined 
     status: row.status,
     stage: row.stage,
     progress: row.progress,
+    cancelRequestedAt: row.cancelRequestedAt?.toISOString() ?? null,
+    ...(typeof input.replayOfRunId === 'string' ? { replayOfRunId: input.replayOfRunId } : {}),
     periodStart,
     periodEnd,
     errorCode: row.errorCode,
@@ -96,11 +98,11 @@ export class BacktestNavRunListService {
   async list(ownerId?: string | null): Promise<BacktestNavRunSummaryV3[]> {
     const rows = await this.prisma.backtestJob.findMany({
       where: {
-        mode: 'V3',
+        mode: 'frozen',
         strategyVersion: { strategy: visibleStrategyOwners(ownerId) },
         AND: [
-          { input: { path: ['contractVersion'], equals: 3 } },
-          { input: { path: ['schemaVersion'], equals: '3' } },
+          { input: { path: ['contractVersion'], equals: 1 } },
+          { input: { path: ['schemaVersion'], equals: 'backtest-nav-run-v1' } },
           { input: { path: ['inputKind'], equals: 'nav' } },
         ],
       },

@@ -1,5 +1,7 @@
 import { StrategyExecutionInstrumentField } from './StrategyExecutionInstrumentField';
-import { strategySchema, priceResearchStrategySummary, type BacktestStrategy, type InstrumentDirectory, type InstrumentSearchResult } from '@thesis-ledger/schemas';
+import { backtestStrategyPlanReadback, strategyEditorTimeframes } from '@thesis-ledger/domain';
+import { strategySchema, type BacktestStrategy, type InstrumentDirectory, type InstrumentSearchResult } from '@thesis-ledger/schemas';
+import { StrategyDefinitionFields } from './StrategyDefinitionFields';
 import { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,12 +26,13 @@ import { useStrategyLibrary } from '../strategy-library/useStrategyLibrary';
 import {
   definitionRecord,
   initialStrategyDefinition,
+  projectStrategyEditorDraft,
   parsePendingStrategySave,
   recoverStrategySave,
   validatedDefinition,
   type PendingStrategySave,
 } from './strategy-editor-state';
-type Draft = { name: string; text: string; pending: PendingStrategySave | null };
+type Draft = { name: string; text: string; definition?: Record<string, unknown>; pending: PendingStrategySave | null };
 async function readDraft(key: string): Promise<Draft | null> {
   const raw = await AsyncStorage.getItem(key);
   if (!raw) return null;
@@ -41,6 +44,7 @@ async function readDraft(key: string): Promise<Draft | null> {
   return {
     name: row.name,
     text: row.text,
+    ...(row.definition && typeof row.definition === 'object' && !Array.isArray(row.definition) ? { definition: row.definition as Record<string, unknown> } : {}),
     pending: row.pending ? parsePendingStrategySave(row.pending) : null,
   };
 }
@@ -48,6 +52,7 @@ function initialEditorDraft(name: string | undefined, schema: unknown): Draft {
   return {
     name: name ?? '我的策略',
     text: JSON.stringify(schema ?? initialStrategyDefinition('我的策略'), null, 2),
+    definition: (schema ?? initialStrategyDefinition('我的策略')) as Record<string, unknown>,
     pending: null,
   };
 }
@@ -90,6 +95,7 @@ export function StrategyEditorScreen() {
           storageKey={storageKey}
           strategyId={strategyId}
           instrumentDirectory={version?.instrumentDirectory}
+          baseline={version?.schema}
           initial={
             stored.data ?? initialEditorDraft(owner?.name, version?.schema)
           }
@@ -106,16 +112,22 @@ function StrategyEditorForm({
   storageKey,
   strategyId,
   instrumentDirectory,
+  baseline,
 }: {
   initial: Draft;
   storageKey: string;
   strategyId: string | undefined;
   instrumentDirectory?: InstrumentDirectory | undefined;
+  baseline?: unknown;
 }) {
   const { api, scope } = useMobileRuntime();
   const client = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<StrategyStackParams>>();
-  const [draft, setDraft] = useState(initial);
+  const [draft, setDraft] = useState(() => {
+    if (initial.definition) return projectStrategyEditorDraft(initial, baseline);
+    try { return projectStrategyEditorDraft({ ...initial, definition: definitionRecord(initial.text) }, baseline); }
+    catch { return { ...initial, definition: {} }; }
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState<{ strategyId: string; versionId: string } | null>(null);
   const [advanced, setAdvanced] = useState('common');
@@ -130,26 +142,16 @@ function StrategyEditorForm({
     setDirty(true);
     setSaved(null);
   };
-  let definition: Record<string, unknown> = {};
-  try {
-    definition = definitionRecord(draft.text);
-  } catch {
-    /* 无效 JSON 保留供修正。 */
-  }
+  const definition = draft.definition ?? {};
+  const replaceDefinition = (next: Record<string, unknown>) => change({ ...draft, definition: next, text: JSON.stringify(next, null, 2) });
   const patch = (values: Record<string, unknown>) => {
-    try {
-      change({
-        ...draft,
-        text: JSON.stringify({ ...definitionRecord(draft.text), ...values }, null, 2),
-      });
-    } catch {
-      setMessage('请先修正高级 JSON，再修改常用配置。');
-    }
+    replaceDefinition({ ...definition, ...values });
   };
   const command = useMobileCommand(
     async (action: 'local' | 'save' | 'recover') => {
       if (action === 'local') {
         await AsyncStorage.setItem(storageKey, JSON.stringify(draft));
+        client.setQueryData([...scope, 'strategy-editor-draft', storageKey], draft);
         setDirty(false);
         setMessage('本机草稿已保存。');
         return;
@@ -208,17 +210,15 @@ function StrategyEditorForm({
   let preview = null;
   try {
     const parsed = strategySchema.parse(validatedDefinition(draft.text));
-    if (parsed.schemaVersion === '3') preview = priceResearchStrategySummary(parsed as BacktestStrategy);
+    preview = backtestStrategyPlanReadback(parsed as BacktestStrategy);
   } catch { /* 输入尚未完整时保留草稿。 */ }
   return (
     <>
       <Copy muted>
         {strategyId ? '保存会创建新版本，原版本仍可阅读。' : '请核对示例规则后明确保存。'}
       </Copy>
-      {preview && <Section title="保存口径预览">
-        <Copy>买入：{preview.entry}</Copy>
-        <Copy>卖出：{preview.exit}</Copy>
-        <Copy>投入：{preview.sizing}</Copy>
+      {preview && <Section title="保存口径预览" variant="content">
+        {preview.map((line, index) => <Copy key={index}>{line}</Copy>)}
       </Section>}
       {draft.pending ? (
         <Section title="原保存待确认">
@@ -235,7 +235,7 @@ function StrategyEditorForm({
         value={draft.name}
         editable={!strategyId && !draft.pending && !command.isPending}
         onChange={(name) => {
-          const next = { ...draft, name };
+          const next = { ...draft, name, definition: { ...definition, name } };
           try {
             next.text = JSON.stringify({ ...definitionRecord(draft.text), name }, null, 2);
           } catch {
@@ -247,7 +247,13 @@ function StrategyEditorForm({
       <Choices
         label="编辑方式"
         value={advanced}
-        onChange={setAdvanced}
+        onChange={(tab) => {
+          if (advanced === 'advanced' && tab === 'common') {
+            try { change({ ...draft, definition: definitionRecord(draft.text) }); setMessage(null); }
+            catch (cause) { setMessage(failureMessage(cause)); return; }
+          }
+          setAdvanced(tab);
+        }}
         options={[
           { value: 'common', label: '常用配置' },
           { value: 'advanced', label: '高级 JSON' },
@@ -260,6 +266,7 @@ function StrategyEditorForm({
           definition={definition}
           locked={!!draft.pending || command.isPending}
           onPatch={patch}
+          onReplace={replaceDefinition}
         />
       ) : (
         <Field
@@ -294,15 +301,17 @@ function StrategyCommonFields({
   onSelect,
   locked,
   onPatch,
+  onReplace,
 }: {
   definition: Record<string, unknown>;
   instrumentDirectory?: InstrumentDirectory | undefined;
   onSelect: (item: InstrumentSearchResult) => void;
   locked: boolean;
   onPatch: (v: Record<string, unknown>) => void;
+  onReplace: (v: Record<string, unknown>) => void;
 }) {
   return (
-    <Section title="常用配置">
+    <Section title="常用配置" variant="content">
       <Field
         label="策略说明"
         value={typeof definition.description === 'string' ? definition.description : ''}
@@ -317,11 +326,8 @@ function StrategyCommonFields({
         locked={locked}
         onChange={onPatch}
       />
-      <Copy>
-        周期：
-        {typeof definition.primaryTimeframe === 'string' ? definition.primaryTimeframe : '未填写'}
-        。信号、仓位、风险、执行与成本可在高级 JSON 中完整编辑。
-      </Copy>
+      <Choices label="主周期" value={typeof definition.primaryTimeframe === 'string' ? definition.primaryTimeframe : ''} disabled={locked} options={strategyEditorTimeframes.map(value => ({ value, label: value }))} onChange={primaryTimeframe => onPatch({ primaryTimeframe })} />
+      <StrategyDefinitionFields definition={definition} locked={locked} onChange={onReplace} />
     </Section>
   );
 }

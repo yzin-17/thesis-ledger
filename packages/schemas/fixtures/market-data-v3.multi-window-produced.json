@@ -1,5 +1,5 @@
 {
-  "contractVersion": 3,
+  "contractVersion": 1,
   "requestId": "market-data-v3-etf-qfq-fixture",
   "symbol": "159516.SZ",
   "routeKey": {
@@ -95,7 +95,7 @@
     "anchor": null,
     "revision": {
       "origin": "local-observation",
-      "contentHash": "1c8f7c32eb89550656fb79a8e1eabc068a2e76e46990badc2a4faa07294d7032"
+      "contentHash": "359ee9fb1bf659404ec0d1b211e558ae168903dc738b4887bd6875f48262e33d"
     },
     "observedAt": "2026-05-20T07:02:00Z",
     "volumeBasis": "unknown",
@@ -111,13 +111,13 @@
     "routeIndex": 0,
     "effectivePolicyRevision": 1
   },
-  "inputFingerprint": "1c8f7c32eb89550656fb79a8e1eabc068a2e76e46990badc2a4faa07294d7032",
+  "inputFingerprint": "359ee9fb1bf659404ec0d1b211e558ae168903dc738b4887bd6875f48262e33d",
   "windowObservations": [
     {
       "startedAt": "2026-05-20T07:00:00Z",
       "completedAt": "2026-05-20T07:02:00Z",
       "response": {
-        "contractVersion": 3,
+        "contractVersion": 1,
         "requestId": "market-data-v3-etf-qfq-fixture",
         "symbol": "159516.SZ",
         "routeKey": {
@@ -224,7 +224,7 @@
       "startedAt": "2026-05-20T07:00:00Z",
       "completedAt": "2026-05-20T07:02:00Z",
       "response": {
-        "contractVersion": 3,
+        "contractVersion": 1,
         "requestId": "market-data-v3-etf-qfq-fixture",
         "symbol": "159516.SZ",
         "routeKey": {

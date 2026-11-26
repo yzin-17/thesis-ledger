@@ -196,7 +196,7 @@ export const appendDraftRow = (
   const sourceTimezone = row.sourceTimezone ?? context.sourceTimezone;
   if (!sourceTimezone) throw new Error('导入行缺少来源时区');
   const common = {
-    version: 3 as const,
+    version: 1 as const,
     eventId: crypto.randomUUID(),
     factId: crypto.randomUUID(),
     accountId: context.ledger.accountId,

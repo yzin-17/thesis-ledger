@@ -24,10 +24,10 @@ describe('Market Route Capability Catalog Control Wire V3', () => {
     );
 
     expect(marketRouteCatalogGetEndpointV3).toBe(
-      '/api/v3/thesis-ledger/control/routes/capabilities?contractVersion=3',
+      '/api/v1/thesis-ledger/control/routes/capabilities?contractVersion=1',
     );
     expect(catalog).toMatchObject({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       catalogRevision: 7,
       integrity: 'complete',

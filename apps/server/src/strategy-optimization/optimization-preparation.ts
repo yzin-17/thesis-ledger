@@ -15,14 +15,16 @@ export class OptimizationPreparation {
 
   async prepare(body: unknown) {
     const { target, intent } = optimizationRunPreparationRequestSchema.parse(body);
-    if (!intent.priceResearch || intent.priceResearchReference !== 'freeze')
+    if (!intent.priceResearch)
       throw new BadRequestException('新实验统一使用后复权研究，请重新准备研究配置。');
+    const preparation = target.sourceMode === 'discovery' && !intent.priceResearchReference
+      ? { ...intent, priceResearchReference: 'optional' as const } : intent;
     const result =
       target.sourceMode === 'existing'
-        ? await this.preparation.prepare({ ...intent, strategyVersionId: target.strategyVersionId })
-        : await this.preparation.prepareDraft(intent, createDiscoverySeed(target.discoveryScope, true));
+        ? await this.preparation.prepare({ ...preparation, strategyVersionId: target.strategyVersionId })
+        : await this.preparation.prepareDraft(preparation, createDiscoverySeed(target.discoveryScope, true));
     const base = {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: result.requestId,
       checkedAt: result.checkedAt,
       scope: 'baseline-window',

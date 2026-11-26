@@ -138,8 +138,6 @@ export function researchClient(request: ResearchRequestParsed) {
         `/research/reports/${runId}/evidence/${reference}${suffix(query)}`,
         researchReportEvidenceSchema.refine((value) => {
           if (value.runId !== runId) return false;
-          if (value.version === 1)
-            return value.toolCall.id === reference && query.view === 'legacy';
           return (
             value.evidence.audit.evidenceId === reference &&
             query.view === 'scoped' &&

@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { OptimizationModelResolution } from '../../src/strategy-optimization/optimization-model-resolution.js';
+import { namedStrategyFixture } from '../backtest/named-v1-strategy.fixture.js';
 
-const strategy = JSON.parse(
+const strategy = namedStrategyFixture(JSON.parse(
   readFileSync(
     new URL('../../../../packages/schemas/fixtures/backtest-v2.exchange.json', import.meta.url),
     'utf8',
   ),
-);
+));
 const existing = {
   sourceMode: 'existing',
   strategyVersionId: '11111111-1111-4111-8111-111111111111',
@@ -19,7 +20,7 @@ const settings = {
   adjustment: 'hfq',
 };
 function setup(schema = strategy) {
-  const findUnique = vi.fn(async () => ({ schemaVersion: 2, schema }));
+  const findUnique = vi.fn(async () => ({ schemaVersion: 1, schema }));
   return {
     findUnique,
     service: new OptimizationModelResolution({ strategyVersion: { findUnique } } as never),
@@ -80,7 +81,7 @@ describe('实验自动成交设置', () => {
     });
     if (result.status !== 'available') throw Error('应可用');
     expect(result.model.scope.market).toBe(market);
-    expect(result.model.segments[0]?.source.references).toContain('app:strategy-space-price-research-v1');
+    expect(result.model.segments[0]?.source.references).toContain('app:strategy-space-price-research-v2');
     expect(result.model.segments[0]?.source.references).not.toContain('strategy-version:discovery');
   });
   it('拒绝市场币种不匹配与基金模式', async () => {
@@ -109,7 +110,7 @@ describe('实验自动成交设置', () => {
     await expect(service.resolve({ ...settings, target: existing })).rejects.toThrow(
       '策略版本不存在',
     );
-    findUnique.mockResolvedValue({ schemaVersion: 1, schema: strategy });
+    findUnique.mockResolvedValue({ schemaVersion: 2, schema: strategy });
     expect(await service.resolve({ ...settings, target: existing })).toMatchObject({
       status: 'blocked',
     });

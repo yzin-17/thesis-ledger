@@ -10,8 +10,9 @@ type JobState = Record<string, unknown> & {
 
 const createPrisma = (initial: JobState) => {
   let stored: JobState = {
-    mode: 'V3',
-    input: { contractVersion: 3, schemaVersion: '3' },
+    mode: 'frozen',
+    input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1' },
+    cancelRequestedAt: null,
     ...initial,
   };
   let beforeNextUpdate: (() => void) | undefined;
@@ -30,9 +31,23 @@ const createPrisma = (initial: JobState) => {
       return { ...stored };
     },
   );
+  const updateMany = vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+    beforeNextUpdate?.(); beforeNextUpdate = undefined;
+    const matches = Object.entries(where).every(([key, expected]) => {
+      const actual = stored[key];
+      if (expected && typeof expected === 'object') {
+        const test = expected as { notIn?: unknown[]; not?: unknown };
+        if (test.notIn) return !test.notIn.includes(actual);
+        if ('not' in test) return actual !== test.not;
+      }
+      return actual === expected;
+    });
+    if (!matches) return { count: 0 };
+    stored = { ...stored, ...data }; return { count: 1 };
+  });
 
   return {
-    prisma: { backtestJob: { findUnique, update } },
+    prisma: { backtestJob: { findUnique, update, updateMany } },
     read: () => ({ ...stored }),
     replace: (next: JobState) => {
       stored = { ...stored, ...next };
@@ -57,7 +72,7 @@ const createQueueService = (
 };
 
 describe('Backtest 队列 CAS 隔离', () => {
-  it('queued 读取后进入新 running attempt 时不执行取消或移除消息', async () => {
+  it('queued读取后进入新running attempt仍持久登记取消，不移除执行消息', async () => {
     const prisma = createPrisma({ id: 'job-1', status: 'queued', executionAttempt: 0 });
     prisma.beforeNextUpdate(() =>
       prisma.replace({ id: 'job-1', status: 'running', executionAttempt: 1 }),
@@ -71,8 +86,9 @@ describe('Backtest 队列 CAS 隔离', () => {
 
     expect(result).toMatchObject({ status: 'running', executionAttempt: 1 });
     expect(prisma.read()).toMatchObject({ status: 'running', executionAttempt: 1 });
+    expect(prisma.read().cancelRequestedAt).toBeInstanceOf(Date);
     expect(queue.remove).not.toHaveBeenCalled();
-    expect(events.publishJob).not.toHaveBeenCalled();
+    expect(events.publishJob).toHaveBeenCalledWith('job-1');
   });
 
   it('queued 读取后已 succeeded 时保留终态与诊断', async () => {
@@ -145,6 +161,19 @@ describe('Backtest 队列 CAS 隔离', () => {
     expect(result).toMatchObject({ status: 'running', executionAttempt: 4 });
     expect(result?.cancelRequestedAt).toBeInstanceOf(Date);
     expect(prisma.read()).toMatchObject({ status: 'running', executionAttempt: 4 });
+  });
+
+  it('重复取消保留第一次登记时点，queued终态后不再次移除，running不提前终态', async () => {
+    for (const status of ['queued', 'running']) {
+      const prisma = createPrisma({ id: `repeat-${status}`, status, executionAttempt: 1 });
+      const { service, queue, events } = createQueueService(prisma, { add: vi.fn(), remove: vi.fn(async () => undefined) });
+      const first = await service.cancel(`repeat-${status}`);
+      const second = await service.cancel(`repeat-${status}`);
+      expect(second?.cancelRequestedAt).toEqual(first?.cancelRequestedAt);
+      expect(second?.status).toBe(status === 'queued' ? 'cancelled' : 'running');
+      expect(queue.remove).toHaveBeenCalledTimes(status === 'queued' ? 1 : 0);
+      expect(events.publishJob).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('队列状态查询失败时记录可恢复错误且不调用 add', async () => {

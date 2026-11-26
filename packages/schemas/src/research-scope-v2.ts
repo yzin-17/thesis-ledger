@@ -22,7 +22,7 @@ export const researchScopeSelectionV2Schema = z.discriminatedUnion('scope', [
   z.strictObject({ scope: z.literal('strategy'), strategyVersionId: z.uuid() }),
 ]);
 export const researchSubmissionV2Schema = z.strictObject({
-  version: z.literal(2),
+  version: z.literal('research-report-submission-v1'),
   submissionId: z.uuid(),
   mode: z.enum(['actual', 'shadow']),
   scope: researchScopeSelectionV2Schema,
@@ -33,7 +33,7 @@ export const researchSubmissionV2Schema = z.strictObject({
   researchSettingsRevision: z.string().trim().min(1).max(120),
 });
 const base = {
-  version: z.literal('research-scope-v2'),
+  version: z.literal('research-scope-snapshot-v1'),
   mode: z.enum(['actual', 'shadow']),
   confirmedAt: z.iso.datetime({ offset: true }),
 };

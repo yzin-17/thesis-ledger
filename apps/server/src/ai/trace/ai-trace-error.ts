@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { NoObjectGeneratedError } from 'ai';
 import type { z } from 'zod';
+import { AiGenerationOutputValidationError } from '../ai-generation-output-error.js';
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
   v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
@@ -17,9 +18,11 @@ export const traceErrorSnapshot = (error: unknown) => {
 export function traceSdkErrorSnapshot(error: unknown, schema: z.ZodType) {
   let current: unknown = error;
   let output: NoObjectGeneratedError | null = null;
+  let parsedText: string | undefined;
   const causes: Array<{ errorClass: string; message: string; issues?: unknown }> = [];
   for (let depth = 0; depth < 6 && current; depth++) {
     if (NoObjectGeneratedError.isInstance(current)) output = current;
+    if (current instanceof AiGenerationOutputValidationError) parsedText ??= current.text;
     if (current instanceof Error) {
       const issues = asRecord(current)?.issues;
       causes.push({
@@ -36,12 +39,13 @@ export function traceSdkErrorSnapshot(error: unknown, schema: z.ZodType) {
     }
     current = asRecord(current)?.cause;
   }
-  const text = output?.text;
+  const text = output?.text ?? parsedText;
   const independentContractCheck = checkSdkErrorOutput(text, schema);
   return {
     ...traceErrorSnapshot(error),
     usage: asRecord(error)?.usage ?? null,
     completion: asRecord(error)?.completion ?? null,
+    finishReason: output?.finishReason ?? asRecord(asRecord(error)?.completion)?.finishReason ?? null,
     causes,
     ...(typeof text === 'string'
       ? {

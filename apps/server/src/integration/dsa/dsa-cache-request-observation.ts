@@ -3,10 +3,10 @@ import { StructuredLogger, currentTraceId } from '../../platform/structured-logg
 
 const logger = new StructuredLogger('DsaCacheRequest');
 const dataPaths = new Set([
-  '/api/v3/thesis-ledger/market/fund-nav',
-  '/api/v3/thesis-ledger/market/fund-nav/history',
-  '/api/v3/thesis-ledger/market/fund-holdings',
-  '/api/v3/thesis-ledger/market/chip',
+  '/api/v1/thesis-ledger/market/fund-nav',
+  '/api/v1/thesis-ledger/market/fund-nav/history',
+  '/api/v1/thesis-ledger/market/fund-holdings',
+  '/api/v1/thesis-ledger/market/chip',
 ]);
 
 /** 只观察原缓存传输尝试；不读取载荷或更改fetch/重试语义。 */
@@ -16,7 +16,7 @@ export async function fetchObservedCacheRequest(
   const method = options.method ?? 'GET';
   let category: 'data' | 'control' | undefined;
   if (method === 'GET' && dataPaths.has(url.pathname)) category = 'data';
-  if (method === 'POST' && url.pathname === '/api/v3/thesis-ledger/market/cache-context') category = 'control';
+  if (method === 'POST' && url.pathname === '/api/v1/thesis-ledger/market/cache-context') category = 'control';
   // 原消费trace才有完整调用证据；独立CLI继续保留原stdout协议。
   if (!category || !currentTraceId()) return fetch(url, options);
   let transportId: string;

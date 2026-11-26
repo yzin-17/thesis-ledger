@@ -72,10 +72,10 @@ describe('Journal 真实 V2 冻结提交与读取', () => {
     expect(created).toBe(runId);
     const frozen = verifyAiFrozenResearchV2(getFrozen());
     expect(frozen).toMatchObject({
-      version: 'frozen-research-v2',
+      version: 'research-frozen-input-v1',
       researchSettingsRevision: '11',
       request: {
-        version: 2,
+        version: 'research-report-submission-v1',
         mode: 'actual',
         scope: { scope: 'account', accountId: data.accountId },
       },
@@ -110,7 +110,7 @@ describe('Journal 真实 V2 冻结提交与读取', () => {
       },
     };
     const inference = {
-      version: 2 as const,
+      version: 'research-report-generation-v1' as const,
       conclusion: '仅根据冻结事实说明收益',
       rationale: [],
       claims: [],

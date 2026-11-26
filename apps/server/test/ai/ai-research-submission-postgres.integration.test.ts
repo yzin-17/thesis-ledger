@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { researchSubmissionReceiptV2Schema } from '@thesis-ledger/schemas';
+import { createResearchSubmissionPostgresHarness } from '../research/research-submission-postgres.fixture.js';
+import { researchFixtureNow } from '../research/research-data-http.fixture.js';
 import {
   createStack,
   databaseUrl,
@@ -13,17 +16,35 @@ import {
 describe.skipIf(!databaseUrl)('研究提交与冻结：隔离 PostgreSQL/HTTP', () => {
   let first: ProviderStack;
   let second: ProviderStack;
+  let submission: Awaited<ReturnType<typeof createResearchSubmissionPostgresHarness>>;
+  const instrumentId = '00000000-0000-4000-8000-000000000001';
   beforeEach(async () => {
+    await submission?.close();
     await first?.close();
     await second?.close();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(researchFixtureNow));
+    vi.stubEnv('STRATEGY_IDENTITY_MODE', undefined);
+    vi.stubEnv('AI_RESEARCH_V2_WRITES_ENABLED', 'true');
     first = await createStack();
     second = await createStack();
     await reset(first);
+    await first.prisma.aiToolCall.deleteMany();
     await first.prisma.aiRun.deleteMany();
+    await first.prisma.instrument.upsert({
+      where: { id: instrumentId },
+      create: { id: instrumentId, market: 'SH', instrumentType: 'STOCK',
+        canonicalCode: '600519', displayName: '受控规范标的', generation: 1 },
+      update: { active: true, generation: 1 },
+    });
+    submission = await createResearchSubmissionPostgresHarness(first.prisma, { runs: first.runs });
   });
   afterAll(async () => {
+    await submission?.close();
     await first?.close();
     await second?.close();
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
   });
   const seed = async (name: string) => {
     const input = providerInput(name);
@@ -38,11 +59,7 @@ describe.skipIf(!databaseUrl)('研究提交与冻结：隔离 PostgreSQL/HTTP', 
     await second.providers.refreshRegistry();
     return input;
   };
-  const body = (revision: string) => ({
-    question: '隔离研究提交验收',
-    context: { scope: 'portfolio' },
-    researchSettingsRevision: revision,
-  });
+  const submit = (revision: string) => submission.post(submission.input(revision));
   const select = (providerId: string, revision: string) =>
     first.providers.updateRoutingSettings({
       researchDefault: { providerId, model: 'model' },
@@ -51,9 +68,9 @@ describe.skipIf(!databaseUrl)('研究提交与冻结：隔离 PostgreSQL/HTTP', 
 
   it('缺少默认阻断，过期设置版本冲突均不创建任务', async () => {
     await seed('selected');
-    expect((await first.request('/ai/runs', body('0'))).status).toBe(400);
+    expect((await submit('0')).status).toBe(400);
     await select('selected', '0');
-    expect((await first.request('/ai/runs', body('0'))).status).toBe(409);
+    expect((await submit('0')).status).toBe(409);
     expect(await first.prisma.aiRun.count()).toBe(0);
   });
 
@@ -61,9 +78,10 @@ describe.skipIf(!databaseUrl)('研究提交与冻结：隔离 PostgreSQL/HTTP', 
     const input = await seed('selected');
     await seed('next');
     await select('selected', '0');
-    const created = await first.request('/ai/runs', body('1'));
-    expect(created.status).toBe(201);
-    const id = (created.body as { id: string }).id;
+    const created = await submit('1');
+    const body: unknown = await created.json();
+    expect(created.status, JSON.stringify(body)).toBe(200);
+    const { runId: id } = researchSubmissionReceiptV2Schema.parse(body);
     const before = await first.prisma.aiRun.findUniqueOrThrow({ where: { id } });
     expect(before).toMatchObject({
       status: 'queued',
@@ -107,7 +125,7 @@ describe.skipIf(!databaseUrl)('研究提交与冻结：隔离 PostgreSQL/HTTP', 
       { timeout: 15000 },
     );
     await locked.promise;
-    const creation = first.request('/ai/runs', body('1'));
+    const creation = submit('1');
     let setting: Promise<unknown> | undefined;
     try {
       await vi.waitFor(async () => {
@@ -133,8 +151,8 @@ describe.skipIf(!databaseUrl)('研究提交与冻结：隔离 PostgreSQL/HTTP', 
       await creation;
       await setting;
     }
-    expect((await creation).status).toBe(201);
-    expect((await first.request('/ai/runs', body('1'))).status).toBe(409);
+    expect((await creation).status).toBe(200);
+    expect((await submit('1')).status).toBe(409);
     expect(await first.prisma.aiRun.count()).toBe(1);
   }, 15000);
 });

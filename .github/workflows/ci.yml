@@ -33,9 +33,13 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - name: 验证本地运行业务工具
+        env:
+          CUTOVER_REF: ${{ startsWith(github.ref_name, 'codex/named-v1-cutover-') && github.ref_name || '' }}
         run: |
-          git clone --depth 1 https://github.com/yzin-17/thesis-ledger-infra.git ../thesis-ledger-infra
-          git clone --depth 1 --branch yzin https://github.com/yzin-17/daily_stock_analysis.git ../daily-stock-analysis
+          git clone --depth 1 --branch "${CUTOVER_REF:-main}" https://github.com/yzin-17/thesis-ledger-infra.git ../thesis-ledger-infra
+          git clone --depth 1 --branch "${CUTOVER_REF:-yzin}" https://github.com/yzin-17/daily_stock_analysis.git ../daily-stock-analysis
+          git -C ../thesis-ledger-infra rev-parse HEAD
+          git -C ../daily-stock-analysis rev-parse HEAD
           node --test scripts/local-runtime/*.test.mjs scripts/deployment/*.test.mjs
           bash scripts/local-runtime/ai-deployment-contract.test.sh
           bash scripts/local-runtime/database-role-contract.test.sh --check-only
@@ -122,11 +126,11 @@ jobs:
       - name: 研究离线轨迹确定性门禁
         run: |
           pnpm --filter @thesis-ledger/server exec vitest run test/ai/research-trace-evaluation.test.ts
-          node scripts/evaluate-research-trace.mjs apps/server/test/ai/fixtures/research-trace-v1.samples.json
+          node scripts/evaluate-research-trace.mjs apps/server/test/ai/fixtures/research-trace-current.samples.json
       - name: Complexity guardrails
         run: pnpm guardrails:complexity
         env:
-          GUARDRAIL_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          GUARDRAIL_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       - name: Mobile import boundary regressions
         run: node --test scripts/test-mobile-boundaries.mjs
       - name: 手机签名与接续拒绝反例

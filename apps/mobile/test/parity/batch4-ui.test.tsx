@@ -9,6 +9,7 @@ import { StrategyRiskCreateScreen } from '../../src/features/strategy-risk/Strat
 import { StrategyRiskEditorScreen } from '../../src/features/strategy-risk/StrategyRiskEditorScreen';
 import { OptimizationSetupScreen } from '../../src/features/optimization-setup/OptimizationSetupScreen';
 import { BacktestPreparationEvidence } from '../../src/features/backtest-setup/BacktestPreparationEvidence';
+import { formatMobileDateTime } from '../../src/app/date-display';
 import { b4Definition,b4Draft,b4Preview,b4Risk,b4Run,b4RunId,b4Strategy,b4VersionId,b4Prepared } from './batch4-fixture';
 import type { ThesisLedgerApiClient } from '@thesis-ledger/api-client';
 import { ledgerAccount } from './ledger-fixture';
@@ -40,26 +41,30 @@ describe('第 4 批手机界面失败恢复',()=>{
   it('冻结概要保留关键来源与指纹，完整配置只在显式展开后显示',async()=>{
     const prepared=b4Prepared();if(prepared.status!=='prepared')throw Error('准备夹具无效');
     await mount(<BacktestPreparationEvidence value={prepared}/>);
-    expect(document.body.textContent).toContain(prepared.runConfig.dataAsOf);
+    expect(document.body.textContent).toContain(formatMobileDateTime(prepared.runConfig.dataAsOf));
+    expect(document.body.textContent).not.toContain(prepared.runConfig.dataAsOf);
     expect(document.body.textContent).toContain(prepared.actualSource.provenance.providerId);
     expect(document.body.textContent).not.toContain('priceInputBindings');
     await click(button('展开完整准备证据'));expect(document.body.textContent).toContain('priceInputBindings');
+    expect(document.body.textContent).toContain(prepared.runConfig.dataAsOf);
     await click(button('收起完整准备证据'));expect(document.body.textContent).not.toContain('priceInputBindings');
   });
   it('创建响应丢失后保留完整输入与基线，找回唯一版本且不再次 POST',async()=>{
+    const definition = b4Definition;
+    const row = { ...b4Strategy, schemaVersion: 1, versions: b4Strategy.versions.map(version => ({ ...version, schemaVersion: 1, schema: definition })) };
     let created=false;let saved:unknown;let posts=0;
     setApi(vi.fn<typeof fetch>().mockImplementation(async(url,init)=>{
       if(String(url).endsWith('/backtests/strategies')){
         if(init?.method==='POST'){posts++;saved=JSON.parse(String(init.body));created=true;throw new TypeError('Network response lost');}
-        return respond(created?[b4Strategy]:[]);
+        return respond(created?[row]:[]);
       }return respond([]);
     }));
     await mount(<StrategyEditorScreen/>);
     await input(field('策略名称'),b4Strategy.name);await click(button('高级 JSON'));
-    const text=JSON.stringify(b4Definition);await input(field('完整策略 JSON'),text);
+    const text=JSON.stringify(definition);await input(field('完整策略 JSON'),text);
     await click(button('确认创建策略'));expect(posts).toBe(1);expect(field('完整策略 JSON').value).toBe(text);
     expect(button('确认创建策略').disabled).toBe(true);expect([...storage.values()].some(v=>JSON.parse(v).pending)).toBe(true);
-    await click(button('读取并找回保存结果'));expect(posts).toBe(1);expect(saved).toEqual({name:b4Strategy.name,schema:b4Definition});
+    await click(button('读取并找回保存结果'));expect(posts).toBe(1);expect(saved).toEqual({name:b4Strategy.name,schema:definition});
     expect(button('打开已保存版本')).toBeTruthy();
   });
   it('编写修订冲突保留需求与本机原修订，不覆盖为服务端内容',async()=>{
@@ -110,7 +115,7 @@ describe('第 4 批手机界面失败恢复',()=>{
       if(init?.method==='POST'&&String(url).endsWith('/retry')){posts++;retried=true;throw new TypeError('Network response lost');}
       return respond(retried?{...b4Run('running'),executionAttempt:2}:b4Run('failed'));
     }));
-    await mount(<BacktestResultScreen/>);await click(button('重试失败回测'));expect(posts).toBe(1);
+    await mount(<BacktestResultScreen/>);await click(button('使用冻结输入重试'));expect(posts).toBe(1);
     expect(button('读取原 Run 找回操作')).toBeTruthy();await click(button('读取原 Run 找回操作'));await flush();
     expect(posts).toBe(1);expect(document.body.textContent).toContain('已从原 Run 找回操作进展');
   });

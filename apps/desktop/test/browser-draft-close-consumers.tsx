@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfirmDialogProvider } from '../src/components/ui/confirm-dialog';
 import { Toaster } from '../src/components/ui/toast';
 import { CashObservationSheet } from '../src/features/account-data/AccountDataCashObservationSheet';
-import { AdvancedJsonSheet } from '../src/features/journal/AdvancedJsonSheet';
+import { AdvancedJsonSheet } from './fixtures/journal/AdvancedJsonSheet.js';
 import '../src/ui/styles.css';
 
 declare global {

@@ -92,7 +92,7 @@ it('观察历史必须绑定报告、逻辑观察及所有版本', async () => {
 it('无效身份及旧报告在发起请求前拒绝自动复核', () => {
   const { api, fetcher } = setup(submission);
   expect(() => api.review('invalid', scoped, input)).toThrow();
-  expect(() => api.review(id, { view: 'legacy' }, input)).toThrow('旧报告');
+  expect(() => api.review(id, { view: 'legacy' } as never, input)).toThrow();
   expect(fetcher).not.toHaveBeenCalled();
 });
 it('同一毫秒内晚到的响应截止时点也必须拒绝', async () => {

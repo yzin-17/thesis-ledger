@@ -95,7 +95,7 @@ export function observationMarketFixture() {
       catalogRevision: 1,
     },
     request: {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'controlled-review-window',
       symbol: data.symbol,
       routeKey: data.routeKey,

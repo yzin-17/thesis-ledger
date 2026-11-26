@@ -84,9 +84,9 @@ health,h=read('/health');cap,c=read('/api/v3/thesis-ledger/capabilities');schema
 control,v=read('/api/v3/thesis-ledger/control/providers',True)
 denied,_=read('/api/v3/thesis-ledger/control/providers');retired,_=read('/api/v1/analysis')
 assert health==cap==schema==control==200
-assert c['dataContractVersions']==[3] and v['contractVersion']==3 and denied==401 and retired==404
+assert c['dataContract']=='dsa-data-v1' and v['contractVersion']==1 and denied==401 and retired==404
 assert '/api/v3/thesis-ledger/market/news' in s['paths'] and '/api/v3/thesis-ledger/backtest/nav-inputs' in s['paths']
-print(json.dumps({'healthStatus':health,'dataContractVersions':c['dataContractVersions'],'controlContractVersion':v['contractVersion'],
+print(json.dumps({'healthStatus':health,'dataContract':c['dataContract'],'controlContractVersion':v['contractVersion'],
  'providerRegistryCount':len(v['providers']),'openApiPaths':len(s['paths']),'unauthorizedStatus':denied,'retiredAnalysisStatus':retired}))`;
 const forwardProgram = `import sys,json,urllib.request,urllib.error
 p=json.load(sys.stdin);u='http://127.0.0.1:'+str(p['port'])+p['path']

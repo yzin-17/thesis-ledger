@@ -4,13 +4,14 @@ import {
   priceResearchNeedsActualPrice,
   priceResearchReferenceArtifactKey,
   priceResearchEvidenceArtifactKey,
+  type BacktestRunPreparationRequestV3,
   type BacktestStrategy,
   type BacktestSnapshotManifestV3,
   type MarketDataBarSeriesResponseV3,
   type RunConfigV3,
 } from '@thesis-ledger/schemas';
 import type { MarketBarReader } from '../market/market-bar-reader.js';
-import type { MarketBarWindowReadResultV3 } from '../market/market-bar-reader-v3.js';
+import type { MarketBarWindowReadInputV3, MarketBarWindowReadResultV3 } from '../market/market-bar-reader-v3.js';
 import { marketFrozenWindowHashV3 } from '../market/market-frozen-window-v3.js';
 import { parseMarketWindowEvidenceResponseV3 } from '../market/market-window-response-v3.js';
 import type { ArtifactRow } from './backtest-artifact-store.js';
@@ -18,23 +19,66 @@ import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot
 import { createBacktestSnapshotV3Source } from './backtest-snapshot-v3-source.js';
 import { executionBarRowsV3 } from './backtest-v3-execution-bar-rows.js';
 import type { BacktestRuleCompatibilityFacts } from './backtest-dependency-plan.js';
+import { preparationDiagnostic, preparationRouteContext } from './backtest-preparation-context.js';
+import { researchStrategyInputNeeds, type BacktestStrategy as DomainStrategy } from '@thesis-ledger/domain';
 
 type Selected = Extract<MarketBarWindowReadResultV3, { status: 'selected' }>;
+
+export function requiredActualPriceNeeds(strategy: BacktestStrategy) {
+  return researchStrategyInputNeeds(strategy as DomainStrategy, { executionCoordinate: 'research' })
+    .needs.filter((need) => need.coordinate === 'actual' && need.necessity === 'required');
+}
 
 export class PriceResearchReferenceUnavailableError extends Error {
   readonly selection: Extract<MarketBarWindowReadResultV3, { status: 'unavailable' }>['selection'];
   constructor(
     read: Extract<MarketBarWindowReadResultV3, { status: 'unavailable' }>,
-    execution: Selected,
+    readonly request: Pick<MarketBarWindowReadInputV3, 'routeKey' | 'symbol' | 'window'>,
   ) {
     const failure = read.selection.primaryFailure ?? read.selection.reason;
     super(
-      `不复权参考行情不可用：${failure}；标的 ${execution.request.symbol}，窗口 ${execution.request.start} 至 ${execution.request.end}${read.selection.backupFailure ? `；备用来源：${read.selection.backupFailure}` : ''}`,
+      `不复权参考行情不可用：${failure}；标的 ${request.symbol}，窗口 ${request.window.start} 至 ${request.window.end}${read.selection.backupFailure ? `；备用来源：${read.selection.backupFailure}` : ''}`,
     );
     this.name = 'PriceResearchReferenceUnavailableError';
     this.selection = read.selection;
   }
 }
+export function optionalPriceReferenceFailure(error: unknown) {
+  if (!(error instanceof PriceResearchReferenceUnavailableError)) return undefined;
+  const selection = error.selection;
+  if (selection.reason === 'route_not_configured' || selection.reason === 'catalog_unavailable')
+    return { capability: 'actual-price', code: selection.reason, message: error.message };
+  const allowed = new Set(['target_not_ready', 'fetch_failed', 'pre_listing', 'missing_window', 'insufficient_warmup']);
+  const failures = [selection.primaryFailure, selection.backupFailure].filter((value) => value !== undefined);
+  if (selection.reason !== 'primary_unavailable' || !failures.length || !failures.every((failure) => allowed.has(failure))) return undefined;
+  return { capability: 'actual-price', code: selection.primaryFailure!, message: error.message };
+}
+
+export function priceResearchReferenceDiagnostics(
+  request: BacktestRunPreparationRequestV3,
+  strategy: BacktestStrategy,
+  policy: unknown,
+  error: unknown,
+) {
+  if (!(error instanceof PriceResearchReferenceUnavailableError)) return [];
+  const { routeKey, symbol, window } = error.request;
+  let targetSources: ReturnType<typeof preparationRouteContext>['targetSources'] = [];
+  if (error.selection.reason !== 'route_not_configured') {
+    try { targetSources = preparationRouteContext(policy, routeKey).targetSources; }
+    catch { /* 原价路由无可报告的配置 */ }
+  }
+  const context = { symbol, routeKey, capability: routeKey.capability, targetSources,
+    dateRange: { startDate: window.start, endDate: window.end } };
+  const consumers = optionalPriceReferenceFailure(error)
+    ? requiredActualPriceNeeds(strategy).flatMap((need) => need.consumers)
+    : [];
+  if (consumers.length === 0) return [preparationDiagnostic(request, error.message, context)];
+  return consumers.map(({ path, fields }) => preparationDiagnostic(request,
+    `${path.join('.')} 需要不复权字段 ${fields.join('、')}。${error.message}`, {
+      ...context, incompatibleRules: [path.join('.')], missingFields: [...fields],
+    }));
+}
+
 const same = (a: unknown, b: unknown) => canonicalizeManifest(a) === canonicalizeManifest(b);
 const referenceRows = (response: MarketDataBarSeriesResponseV3, symbol: string) =>
   executionBarRowsV3(response, symbol, 'normalized-series', true).map((row) => ({
@@ -54,23 +98,26 @@ export async function readPriceResearchReference(input: {
     !runConfig.priceResearch ||
     (!input.forceReference &&
       !runConfig.priceResearch.actualPriceWindow &&
-      !priceResearchNeedsActualPrice(strategy))
+      requiredActualPriceNeeds(strategy).length === 0)
   )
     return undefined;
   const routeKey = { ...execution.request.routeKey, adjustment: 'none' as const };
   const window = { start: execution.request.start, end: execution.request.end };
-  const read = await reader.readV3({
+  const referenceRequest: MarketBarWindowReadInputV3 = {
     market: routeKey.market,
     symbol: strategy.executionInstrument.symbol,
     routeKey,
     window,
-    tradabilityMode: 'assume-untradable-no-bar',
+    tradabilityMode: routeKey.timeframe === '1d' ? 'assume-untradable-no-bar' : 'observed-bars-only',
     priceResearch: true,
+    ...(routeKey.timeframe === '1d' && runConfig.priceResearch.dailyObservationContract !== undefined
+      ? { dailyObservationContract: runConfig.priceResearch.dailyObservationContract } : {}),
     ...(runConfig.priceResearch.actualPriceWindow
       ? { frozenWindowRef: runConfig.priceResearch.actualPriceWindow }
       : {}),
-  });
-  if (read.status !== 'selected') throw new PriceResearchReferenceUnavailableError(read, execution);
+  };
+  const read = await reader.readV3(referenceRequest);
+  if (read.status !== 'selected') throw new PriceResearchReferenceUnavailableError(read, referenceRequest);
   const response = read.selection.response;
   const source = createBacktestSnapshotV3Source(
     { purpose: 'execution', symbol: strategy.executionInstrument.symbol, routeKey, window },
@@ -109,6 +156,18 @@ export async function readPriceResearchReference(input: {
   };
 }
 
+export function hasPlannedPriceResearchReference(
+  strategy: BacktestStrategy,
+  research: RunConfigV3['priceResearch'],
+): boolean {
+  if (!research) return false;
+  return Boolean(research.actualPriceWindow) || (
+    research.dataScope
+      ? requiredActualPriceNeeds(strategy).length > 0
+      : priceResearchNeedsActualPrice(strategy)
+  );
+}
+
 /** Frozen reference prices are checked independently, without promoting them to actual-share execution facts. */
 export function validatePriceResearchReference(
   manifest: BacktestSnapshotManifestV3,
@@ -118,10 +177,9 @@ export function validatePriceResearchReference(
 ): MarketDataBarSeriesResponseV3['sourcePriceBasis'] | undefined {
   if (manifest.priceResearch?.protocolVersion !== runConfig.priceResearch?.protocolVersion)
     throw new Error('价格研究协议与冻结运行配置不一致');
-  if (
-    !runConfig.priceResearch ||
-    (!runConfig.priceResearch.actualPriceWindow && !priceResearchNeedsActualPrice(strategy))
-  ) {
+  if (manifest.priceResearch?.dailyObservationContract !== runConfig.priceResearch?.dailyObservationContract)
+    throw new Error('日级观察版本与冻结运行配置不一致');
+  if (!hasPlannedPriceResearchReference(strategy, runConfig.priceResearch)) {
     if (
       manifest.priceResearch?.actualPriceSource ||
       byKey.has(priceResearchReferenceArtifactKey) ||
@@ -133,7 +191,7 @@ export function validatePriceResearchReference(
   }
   const evidence = byKey.get(priceResearchEvidenceArtifactKey);
   const rows = byKey.get(priceResearchReferenceArtifactKey);
-  const ref = runConfig.priceResearch.actualPriceWindow;
+  const ref = runConfig.priceResearch?.actualPriceWindow;
   if (evidence?.length !== 1 || !rows?.length || !ref || !manifest.priceResearch?.actualPriceSource)
     throw new Error('价格研究缺少已冻结的原价参考窗口');
   return readAndValidatePriceReference(
@@ -239,6 +297,8 @@ function referenceRequestMatchesExecution(
     request.symbol === strategy.executionInstrument.symbol &&
     same(request.routeKey, { ...execution.routeKey, adjustment: 'none' }) &&
     request.start === manifest.dateRange.warmupStartDate &&
-    request.end === runConfig.endDate,
+    request.end === runConfig.endDate &&
+    (request.routeKey.timeframe !== '1d' ||
+      (request.dailyObservationContract) === (runConfig.priceResearch?.dailyObservationContract)),
   );
 }

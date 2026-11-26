@@ -25,13 +25,13 @@ export const provider: ProviderManifest = {
   credentialConfigured: true,
 };
 export const draft: MarketPolicyDraftV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   revision: 4,
   enabled: false,
   routes: [],
 };
 export const catalog: MarketRouteCatalogReadV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   status: 'complete',
   catalogRevision: 9,

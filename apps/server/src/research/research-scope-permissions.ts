@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
-  aiContextSchema,
   type ResearchScopeSnapshotV2,
   type ResearchSubmissionV2,
 } from '@thesis-ledger/schemas';
@@ -31,25 +30,6 @@ export class ResearchScopePermissions implements AiResearchSubmissionV2Access {
     if (localIdentityPrincipal()?.id === ownerId)
       return ['instrument', 'portfolio', 'account', 'position', 'strategy'];
     return ['instrument', 'strategy'];
-  }
-  async assertLegacy(transaction: Prisma.TransactionClient, ownerId: string, raw: unknown) {
-    const context = aiContextSchema.safeParse(raw);
-    if (context.success && context.data.scope === 'strategy' && context.data.strategyVersionId)
-      return strategyAccess(transaction, ownerId, context.data.strategyVersionId);
-    ledgerAccess(ownerId);
-    if (!context.success || !context.data.accountId) return;
-    const account = await transaction.account.findFirst({
-      where: { id: context.data.accountId, active: true },
-      select: { id: true },
-    });
-    if (!account) throw new NotFoundException('历史研究上下文不可访问');
-    if (context.data.scope === 'position' && context.data.symbol) {
-      const position = await transaction.position.findUnique({
-        where: { accountId_symbol: { accountId: account.id, symbol: context.data.symbol } },
-        select: { id: true },
-      });
-      if (!position) throw new NotFoundException('历史研究上下文不可访问');
-    }
   }
   async assertSubmission(
     transaction: Prisma.TransactionClient,

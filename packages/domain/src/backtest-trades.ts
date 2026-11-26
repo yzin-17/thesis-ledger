@@ -1,4 +1,7 @@
+import { availabilityForDecision } from './backtest-observation-clock.js';
+import { type CorporateActionResult } from './backtest-corporate-actions.js';
 import { DecimalValue } from './decimal.js';
+import { finishBacktestComputation } from './backtest-computation.js';
 import type {
   BacktestCurrency,
   BacktestMoney,
@@ -10,6 +13,7 @@ import type {
 export interface BacktestTradeProjectionOptions {
   executionSymbol: string;
   currency: BacktestCurrency;
+  corporateActions?: readonly CorporateActionResult[];
 }
 
 export interface OpenBacktestPosition {
@@ -117,31 +121,64 @@ const openPosition = (lifecycle: OpenLifecycle): OpenBacktestPosition => ({
  * position still open at endDate remains in openPositions and is excluded
  * from trade metrics.
  */
-export const projectBacktestTrades = (
-  fills: readonly SimulationFill[],
+export function* projectBacktestTradesSteps(
+  fills: readonly (SimulationFill & { availableAt?: string })[],
   options: BacktestTradeProjectionOptions,
-): BacktestTradeProjection => {
+): Generator<void, BacktestTradeProjection, void> {
   const warnings: string[] = [];
   const trades: SimulationTrade[] = [];
   let lifecycle: OpenLifecycle | undefined;
   const seenFillIds = new Set<string>();
   let validFills = 0;
+  // 只调整持仓周期的数量口径；历史成交额、费用及原始 fills 均按成交当时保留。
+  const splits = (options.corporateActions ?? [])
+    .flatMap((action) => {
+      if (!action.applied) return [];
+      const { ledgerEvent, fact } = action.mutation;
+      if (
+        ledgerEvent.type !== 'split' ||
+        ledgerEvent.payload.executionSymbol !== options.executionSymbol
+      )
+        return [];
+      return [
+        {
+          at: Math.max(time(ledgerEvent.payload.occurredAt), time(availabilityForDecision(fact)!)),
+          ratio: DecimalValue.from(ledgerEvent.payload.ratio),
+        },
+      ];
+    })
+    .sort((a, b) => a.at - b.at);
+  // 延迟可见的成交按账本可处理时点跨越拆股；同一时点沿用传入的成交顺序。
+  const fillTime = (fill: SimulationFill & { availableAt?: string }) =>
+    Math.max(time(fill.occurredAt), time(fill.availableAt ?? fill.occurredAt));
   const sorted = [...fills].sort((left, right) => {
     try {
-      return compareFills(left, right);
+      return splits.length ? fillTime(left) - fillTime(right) : compareFills(left, right);
     } catch {
       return left.fillId.localeCompare(right.fillId);
     }
   });
+  let splitIndex = 0;
+  function applySplitsThrough(at: number) {
+    while (splitIndex < splits.length && splits[splitIndex]!.at <= at) {
+      const { ratio } = splits[splitIndex++]!;
+      if (lifecycle) {
+        lifecycle.entryQuantity = lifecycle.entryQuantity.times(ratio);
+        lifecycle.exitQuantity = lifecycle.exitQuantity.times(ratio);
+        lifecycle.remainingQuantity = lifecycle.remainingQuantity.times(ratio);
+      }
+    }
+  }
 
   for (const fill of sorted) {
+    yield;
     if (seenFillIds.has(fill.fillId)) {
       warnings.push(`DUPLICATE_FILL:${fill.fillId}`);
       continue;
     }
     seenFillIds.add(fill.fillId);
     try {
-      time(fill.occurredAt);
+      if (splits.length) applySplitsThrough(fillTime(fill));
       if (fill.executionSymbol !== options.executionSymbol) {
         throw new Error(`成交标的 ${fill.executionSymbol} 不是唯一执行标的`);
       }
@@ -194,43 +231,46 @@ export const projectBacktestTrades = (
     }
   }
 
+  applySplitsThrough(Infinity);
   const openPositions = lifecycle ? [openPosition(lifecycle)] : [];
   let status: BacktestTradeProjection['status'] = 'complete';
   if (fills.length > 0 && warnings.length > 0) {
     status = validFills === 0 ? 'unavailable' : 'partial';
   }
   return { source: 'BACKTEST', trades, openPositions, status, warnings };
-};
+}
+
+export const projectBacktestTrades = (...input: Parameters<typeof projectBacktestTradesSteps>) => finishBacktestComputation(projectBacktestTradesSteps(...input));
 
 const available = (value: string): BacktestMetric => ({ status: 'available', value });
 const unavailable = (reason: string): BacktestMetric => ({ status: 'unavailable', reason });
 
 /** Metrics deliberately consume projected closed trades only. */
-export const calculateBacktestTradeMetrics = (
+export function* backtestTradeMetricsSteps(
   trades: readonly SimulationTrade[],
-): BacktestTradeMetrics => {
-  const wins = trades.filter((trade) => DecimalValue.from(trade.realizedPnl.amount).isPositive());
-  const losses = trades.filter((trade) => DecimalValue.from(trade.realizedPnl.amount).isNegative());
-  const grossProfit = wins.reduce(
-    (total, trade) => total.plus(trade.realizedPnl.amount),
-    DecimalValue.from('0'),
-  );
-  const grossLoss = losses.reduce(
-    (total, trade) => total.plus(DecimalValue.from('0').minus(trade.realizedPnl.amount)),
-    DecimalValue.from('0'),
-  );
+): Generator<void, BacktestTradeMetrics, void> {
+  let wins = 0;
+  let grossProfit = DecimalValue.from('0'), grossLoss = DecimalValue.from('0');
+  for (const trade of trades) {
+    yield;
+    const pnl = DecimalValue.from(trade.realizedPnl.amount);
+    if (pnl.isPositive()) { wins++; grossProfit = grossProfit.plus(pnl); }
+    if (pnl.isNegative()) grossLoss = grossLoss.plus(DecimalValue.from('0').minus(pnl));
+  }
   const tradeCount = available(String(trades.length));
   const winRate =
     trades.length === 0
       ? unavailable('NO_CLOSED_TRADES')
       : available(
-          DecimalValue.from(String(wins.length)).dividedBy(String(trades.length), 20).toString(),
+          DecimalValue.from(String(wins)).dividedBy(String(trades.length), 20).toString(),
         );
   const profitFactor = grossLoss.isZero()
     ? unavailable(trades.length === 0 ? 'NO_CLOSED_TRADES' : 'NO_LOSING_TRADES')
     : available(grossProfit.dividedBy(grossLoss, 20).toString());
   return { tradeCount, winRate, profitFactor, warnings: [] };
-};
+}
+
+export const calculateBacktestTradeMetrics = (trades: readonly SimulationTrade[]) => finishBacktestComputation(backtestTradeMetricsSteps(trades));
 
 export const projectSimulationFillsToTrades = projectBacktestTrades;
 export const backtestTradeMetrics = calculateBacktestTradeMetrics;

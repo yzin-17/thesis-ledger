@@ -6,7 +6,7 @@ import {
 } from '../src/backtest-data.js';
 
 const evidence = {
-  contractVersion: 1,
+  contract: 'market-daily-tradability-window-v1', priceOnlyAllowed: false,
   symbol: '159515.SZ',
   market: 'CN',
   instrumentType: 'ETF',
@@ -43,6 +43,16 @@ const evidence = {
 } as const;
 
 describe('backtest daily tradability evidence', () => {
+  it('分钟证明只声明实际观察到的日期，不能以缺分钟推导全天不可交易', () => {
+    const minute = { ...evidence, barSource: { ...evidence.barSource,
+      routeKey: { ...evidence.barSource.routeKey, capability: 'MINUTE_BAR', timeframe: '1m' } },
+      days: evidence.days.map(day => ({ date: day.date, state: 'observed-traded' })) };
+    expect(backtestDailyTradabilityEvidenceV3Schema.safeParse(minute).success).toBe(true);
+    expect(backtestDailyTradabilityEvidenceV3Schema.safeParse({ ...minute, days: evidence.days }).success).toBe(false);
+    expect(backtestDailyTradabilityEvidenceV3Schema.safeParse({ ...minute, barSource: {
+      ...minute.barSource, routeKey: { ...minute.barSource.routeKey, timeframe: '1d' },
+    } }).success).toBe(false);
+  });
   it('精确港股原价窗口保留零量排除，其他none来源/标的/范围拒绝', () => {
     const source = { provider: 'observed-source', revision: 'current', availableAt: '2026-10-08T09:00:00Z' };
     const zero = { open: '0.265', high: '0.265', low: '0.265', close: '0.265', volume: '0', sourceResponseSha256: 'b'.repeat(64) };
@@ -86,7 +96,7 @@ describe('backtest daily tradability evidence', () => {
   });
   it('Instrument Facts 响应保留日级证据并拒绝非法字段', () => {
     const response = {
-      version: 3,
+      version: 1,
       status: 'supported',
       provider: 'hithink',
       providerRevision: 'r1',

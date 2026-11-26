@@ -21,7 +21,7 @@ const setup = () => {
     ),
   );
   const series: BarSeries = {
-    contractVersion: 3,
+    contractVersion: 1,
     identity: { symbol: response.symbol, assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
     points: response.bars,
     coverage: response.coverage,
@@ -44,7 +44,7 @@ const setup = () => {
   };
   const reader = { read: vi.fn(async () => series), readChartV3: vi.fn(async () => series) };
   const calculate = vi.fn(async (input: Omit<IndicatorCalculateRequest, 'contractVersion'>) => ({
-    contractVersion: 3,
+    contractVersion: 1,
     engineVersion: 'dsa-indicator-v3',
     inputFingerprint: input.inputFingerprint,
     results: input.requests.map((request) => ({
@@ -131,7 +131,7 @@ describe('行情详情显式图表 V3 接入', () => {
       'interactive',
       JSON.stringify({ period: 200 }),
       undefined,
-      '3',
+      '1',
     );
     expect(reader.readChartV3).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -154,7 +154,7 @@ describe('行情详情显式图表 V3 接入', () => {
         'interactive',
         undefined,
         undefined,
-        '3',
+        '1',
       ),
     ).rejects.toThrow('3000');
     expect(reader.read).not.toHaveBeenCalled();
@@ -173,7 +173,7 @@ describe('行情详情显式图表 V3 接入', () => {
       'interactive',
       undefined,
       '1',
-      '3',
+      '1',
     );
     expect(reader.read).not.toHaveBeenCalled();
     expect(reader.readChartV3).toHaveBeenCalledWith(
@@ -197,7 +197,7 @@ describe('行情详情显式图表 V3 接入', () => {
       'interactive',
       undefined,
       undefined,
-      '3',
+      '1',
     );
     expect(result.sections.bars?.status).toBe('unavailable');
     expect(reader.read).not.toHaveBeenCalled();
@@ -216,9 +216,9 @@ describe('行情详情显式图表 V3 接入', () => {
         undefined,
         undefined,
         undefined,
-        '4',
+        '3',
       ),
-    ).rejects.toThrow('仅支持 3');
+    ).rejects.toThrow('market-detail-v1');
     await expect(
       controller.detail(
         '159516.SZ',
@@ -231,7 +231,7 @@ describe('行情详情显式图表 V3 接入', () => {
         'complete',
         undefined,
         undefined,
-        '3',
+        '1',
       ),
     ).rejects.toThrow('interactive');
     expect(reader.readChartV3).not.toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe('行情详情显式图表 V3 接入', () => {
       undefined,
       undefined,
       undefined,
-      '3',
+      '1',
     );
     expect(detail.getDetail).toHaveBeenCalledWith(
       '000001.OF',

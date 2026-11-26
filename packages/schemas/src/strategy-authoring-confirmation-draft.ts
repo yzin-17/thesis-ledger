@@ -41,7 +41,7 @@ export function confirmationDraft(content: AuthoringContent): AuthoringConfirmat
     riskMode: 'custom',
     riskPercent: '',
     riskText: JSON.stringify(confirmed.risk, null, 2),
-    executionMode: confirmed.execution.mode,
+    executionMode: confirmed.execution.timing === 'dailyBarOrders' ? 'dailyBarOrders' : confirmed.execution.mode,
     commissionRate: confirmed.cost.commissionRate,
     slippageRate: confirmed.cost.slippageRate,
     periodsAreBarsConfirmed: confirmed.periodsAreBarsConfirmed,
@@ -76,6 +76,8 @@ export function parseConfirmationDraft(
       timeInForce: 'DAY',
       timing: 'nextEligibleBarOpen',
     };
+  else if (draft.executionMode === 'dailyBarOrders')
+    execution = content.confirmation?.execution.timing === 'dailyBarOrders' ? content.confirmation.execution : { mode: 'exchange', timing: 'dailyBarOrders' };
   else throw new Error('请选择成交时机');
   const result = authoringConfirmationSchema.parse({
     instrumentId: draft.instrumentId,
@@ -100,6 +102,6 @@ export function parseConfirmationDraft(
   )
     throw new Error('基金仅支持日线净值及下一可用净值申购赎回');
   if (result.instrument.assetType !== 'fund' && result.execution.mode !== 'exchange')
-    throw new Error('股票及 ETF 使用下一可交易开盘市价成交');
+    throw new Error('股票及 ETF 使用场内执行方式');
   return result;
 }

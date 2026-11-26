@@ -27,7 +27,7 @@ import type { AiTraceReference } from '../ai/trace/ai-trace-contract.js';
 type Run = NonNullable<Awaited<ReturnType<AiRunService['findResearchSubmissionV2']>>>;
 const receipt = (run: Run, reused: boolean) =>
   researchSubmissionReceiptV2Schema.parse({
-    version: 2,
+    version: 'research-report-submission-v1',
     runId: run.id,
     submissionId: run.researchSubmissionId,
     status: run.status,
@@ -47,7 +47,7 @@ export class ResearchSubmissionService {
   ) {}
   capabilities(ownerId: string) {
     return researchCapabilitiesV2Schema.parse({
-      version: 'research-capabilities-v2',
+      version: 'research-capabilities-v1',
       canCreate: researchV2WritesEnabled(),
       scopes: this.scopes.allowedScopes(ownerId),
     });
@@ -116,8 +116,8 @@ export class ResearchSubmissionService {
     const preparedAt = new Date().toISOString();
     const reasons = [...new Set(evidence.flatMap((entry) => entry.reasons))].slice(0, 100);
     const frozen = sealAiFrozenResearchV2({
-      version: 'frozen-research-v2',
-      resultVersion: 2,
+      version: 'research-frozen-input-v1',
+      resultVersion: 'research-report-result-v1',
       request: input,
       scopeSnapshot,
       prompt: { version: prompt.version, template: prompt.template },

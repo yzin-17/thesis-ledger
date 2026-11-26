@@ -3,7 +3,7 @@ import { marketQuoteSymbolSchema, quoteAssetTypeSchema, quoteSchema } from '../s
 
 describe('中港美报价身份合同', () => {
   it.each(['600519.SH', '00700.HK', 'SPY.US', 'BRK.B.US', '^GSPC.US'])('支持规范代码 %s 的报价', (symbol) => {
-    expect(quoteSchema.safeParse({ version: 3, symbol, open: 10, high: 12, low: 9,
+    expect(quoteSchema.safeParse({ version: 1, symbol, open: 10, high: 12, low: 9,
       price: 11, previousClose: 10, volume: null, amount: 0, stale: false,
       provider: 'futu', marketTime: null, fetchedAt: '2026-10-08T00:00:00Z', freshness: 'unknown' }).success).toBe(true);
   });

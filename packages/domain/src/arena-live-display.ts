@@ -3,6 +3,11 @@ export const arenaLiveLabels: Readonly<Record<string, string>> = {
   draft: '草稿', running: '运行中', paused: '已暂停', ended: '已结束', waiting: '等待预约', researching: '研究中',
   needs_attention: '需要处理', budget_exhausted: '预算耗尽', pending: '等待执行', succeeded: '已完成', failed: '失败',
   unknown_usage: '调用结果未知', cancelled: '已取消', active: '有效', filled: '已成交', expired: '已到期', rejected: '已拒绝',
+  waiting_parent: '等待父单成交', awaiting_parent_fill: '尚未激活，不占用已有持仓', parent_unfilled: '父单已结束',
+  waiting_entry: '等待前批全成', awaiting_previous_entry: '前批全成后激活，资金已预留', previous_entry_incomplete: '前批未全成已结束',
+  awaiting_next_entry: '已退出当前份额，等待后续入场', awaiting_parent_quantity: '当前档位额度已用完或不足一手，等待新增入场', protection_exit_cancelled_entry: '保护已退出，入场余量已撤销',
+  plan_position_closed: '本批持仓已退出', paired_exit_filled: '配对腿已成交', model_cancelled: '已按决策撤销',
+  exit_quantity_below_lot: '分档退出数量不足一手',
   market: '市价', limit: '限价', stop_loss: '止损', take_profit: '止盈', delivery_pending: '等待投递',
   market_closed: '等待开市', calendar_unavailable: '交易日历不可用', calendar_incomplete: '交易日历覆盖不足',
   calendar_future: '交易日历尚不可见', calendar_invalid: '交易日历无效', account_conflict: '研究期间账户已变化',
@@ -37,7 +42,7 @@ export function arenaManualDecisionNotice(
 export function arenaAppointmentLabel(condition: ArenaPaperCondition, name: (symbol: string) => string = (s) => s) {
   if (condition.kind === 'time') return '预约时间 · ' + condition.at;
   if (condition.kind === 'fill') return condition.symbol ? name(condition.symbol) + ' 成交后观察' : '任意委托成交后观察';
-  return name(condition.symbol) + ' 价格' + (condition.operator === 'gte' ? ' ≥ ' : ' ≤ ') + condition.price;
+  return name(condition.symbol) + ' 价格' + (condition.operator === 'gte' ? ' ≥ ' : ' ≤ ') + condition.price + ' 时重新研究';
 }
 export const arenaSeriesColors = ['#2563eb', '#d97706', '#059669', '#db2777', '#7c3aed', '#0891b2', '#65a30d', '#c2410c', '#be123c', '#4f46e5', '#0f766e', '#a16207'];
 export type ArenaChartPeriod = 'today' | 'week' | 'month' | 'all';

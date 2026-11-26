@@ -541,7 +541,7 @@ model LedgerEvent {
   economicOrderKey       String?
   recordedAt             DateTime                         @default(now())
   projectionGeneration   BigInt?
-  envelopeVersion        Int?
+  envelopeVersion        Int
   payloadVersion         Int?
   payload                Json?
   sourceCategory         String?
@@ -591,7 +591,7 @@ model PortfolioSnapshot {
   disclosureCoverage   Decimal                 @default(1) @db.Decimal(10, 8)
   pricedCoverage       Decimal                 @default(1) @db.Decimal(10, 8)
   idempotencyKey       String                  @unique
-  payloadVersion       Int                     @default(2)
+  payloadVersion       Int                     @default(1)
   payload              Json
   createdAt            DateTime                @default(now())
   account              Account?                @relation(fields: [accountId], references: [id], onDelete: Restrict)
@@ -1084,7 +1084,7 @@ model StrategyVersion {
 model BacktestJob {
   id                String          @id @default(uuid()) @db.Uuid
   strategyVersionId String          @db.Uuid
-  mode              String          @default("V3")
+  mode              String          @default("frozen")
   idempotencyKey    String?
   status            String
   stage             String?

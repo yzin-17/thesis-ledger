@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { deterministicResultChecksum } from '@thesis-ledger/domain';
-import type { BacktestResultV3, BacktestSnapshotManifestV3 } from '@thesis-ledger/schemas';
+import { backtestResultSchemaV3, type BacktestResultV3, type BacktestSnapshotManifestV3 } from '@thesis-ledger/schemas';
 import { BacktestService } from '../../src/backtest/backtest.service.js';
 import { StrategyOptimizationRunService } from '../../src/strategy-optimization/strategy-optimization-run.service.js';
 import { hashCanonicalManifest } from '../../src/backtest/backtest-snapshot.js';
@@ -20,6 +20,7 @@ const snapshot = JSON.parse(
 ) as BacktestSnapshotManifestV3;
 const currentManifest = {
   ...snapshot,
+  manifestVersion: 'backtest-trade-snapshot-manifest-v1' as const,
   runId: 'succeeded-run',
   strategyVersionId: 'strategy-version',
   runConfigChecksum: hashCanonicalManifest(currentConfig),
@@ -46,8 +47,8 @@ const currentResult: BacktestResultV3 = {
   strategyVersionId: 'strategy-version',
   snapshotId: currentManifest.contentHash,
   engineVersion: 'engine',
-  schemaVersion: '3',
-  snapshotVersion: 'snapshot-manifest-v3',
+  schemaVersion: 'backtest-trade-result-v1',
+  snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
   marketRuleVersion: 'rules',
   calendarVersion: currentManifest.calendarVersion,
   aggregationVersion: currentManifest.aggregationVersion,
@@ -72,11 +73,11 @@ currentResult.resultChecksum = deterministicResultChecksum(resultPayload);
 const currentJob = () => ({
   id: currentManifest.runId,
   strategyVersionId: currentManifest.strategyVersionId,
-  mode: 'V3',
+  mode: 'frozen',
   status: 'succeeded',
   input: {
-    contractVersion: 3,
-    schemaVersion: '3',
+    contractVersion: 1,
+    schemaVersion: 'backtest-trade-run-v1',
     runConfig: currentConfig,
     snapshotId: currentManifest.contentHash,
     snapshotVersion: currentManifest.manifestVersion,
@@ -85,7 +86,7 @@ const currentJob = () => ({
   snapshotId: currentManifest.contentHash,
   snapshotManifest: currentManifest,
   resultChecksum: currentResult.resultChecksum,
-  result: currentResult,
+  result: backtestResultSchemaV3.parse(currentResult),
 });
 
 const oldRun = {
@@ -100,9 +101,9 @@ describe('现行 Run 入口', () => {
     const findMany = vi.fn(async () => [
       {
         id: 'current-run',
-        mode: 'V3',
+        mode: 'frozen',
         status: 'queued',
-        input: { contractVersion: 3, schemaVersion: '3', runConfig: currentConfig },
+        input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', runConfig: currentConfig },
         runConfig: currentConfig,
         snapshotId: null,
         snapshotManifest: null,
@@ -110,16 +111,16 @@ describe('现行 Run 入口', () => {
       },
       {
         id: 'damaged-run',
-        mode: 'V3',
+        mode: 'frozen',
         status: 'queued',
-        input: { contractVersion: 3 },
+        input: { contractVersion: 1 },
         result: null,
       },
       {
         id: 'old-result',
-        mode: 'V3',
+        mode: 'frozen',
         status: 'succeeded',
-        input: { contractVersion: 3, schemaVersion: '3', runConfig: currentConfig },
+        input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', runConfig: currentConfig },
         result: { schemaVersion: '2' },
       },
       currentJob(),
@@ -135,7 +136,7 @@ describe('现行 Run 入口', () => {
       { id: 'succeeded-run' },
     ]);
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { mode: 'V3', strategyVersion: { strategy: { OR: [{ ownerId: null }] } } },
+      where: { mode: 'frozen', strategyVersion: { strategy: { OR: [{ ownerId: null }] } } },
     }));
   });
 
@@ -173,9 +174,9 @@ describe('现行 Run 入口', () => {
         backtestJob: {
           findUnique: vi.fn(async () => ({
             id: 'damaged-run',
-            mode: 'V3',
+            mode: 'frozen',
             status: 'queued',
-            input: { contractVersion: 3, schemaVersion: '3', runConfig: currentConfig },
+            input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', runConfig: currentConfig },
             runConfig: { schemaVersion: '2' },
             snapshotId: null,
             snapshotManifest: null,
@@ -204,8 +205,8 @@ describe('现行 Run 入口', () => {
     const current = {
       ...oldRun,
       id: 'current-run',
-      mode: 'V3',
-      input: { contractVersion: 3, schemaVersion: '3', runConfig: currentConfig },
+      mode: 'frozen',
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', runConfig: currentConfig },
       runConfig: currentConfig,
       snapshotId: null,
       snapshotManifest: null,
@@ -226,11 +227,11 @@ describe('现行 Run 入口', () => {
     const current = {
       id: 'succeeded-run',
       strategyVersionId: 'strategy-version',
-      mode: 'V3',
+      mode: 'frozen',
       status: 'succeeded',
       input: {
-        contractVersion: 3,
-        schemaVersion: '3',
+        contractVersion: 1,
+        schemaVersion: 'backtest-trade-run-v1',
         runConfig: currentConfig,
         snapshotId: currentManifest.contentHash,
         snapshotVersion: currentManifest.manifestVersion,
@@ -255,13 +256,13 @@ describe('现行 Run 入口', () => {
   });
 
   it.each([
-    { contractVersion: 3 },
-    { schemaVersion: '3' },
-    { contractVersion: 2, schemaVersion: '3' },
+    { contractVersion: 1 },
+    { schemaVersion: 'backtest-trade-run-v1' },
+    { contractVersion: 2, schemaVersion: 'backtest-trade-run-v1' },
   ])('模式正确但输入版本不完整时拒绝读取：%j', async (input) => {
     const service = new BacktestService(
       {
-        backtestJob: { findUnique: vi.fn(async () => ({ id: 'damaged-run', mode: 'V3', input })) },
+        backtestJob: { findUnique: vi.fn(async () => ({ id: 'damaged-run', mode: 'frozen', input })) },
       } as never,
       undefined,
       undefined,
@@ -279,13 +280,13 @@ describe('现行 Run 入口', () => {
       snapshotId: 'old-snapshot',
       snapshotManifest: { manifestVersion: 'snapshot-manifest-v2' },
     },
-    { status: 'queued', runConfig: runConfig },
+    { status: 'queued', runConfig: { ...runConfig, schemaVersion: '3' } },
   ])('当前模式记录带旧结果、旧 Snapshot 或旧配置时拒绝读取：%j', async (override) => {
     const current: Record<string, unknown> & { id: string } = {
       id: 'damaged-run',
-      mode: 'V3',
+      mode: 'frozen',
       status: 'queued',
-      input: { contractVersion: 3, schemaVersion: '3', runConfig: currentConfig },
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', runConfig: currentConfig },
       runConfig: currentConfig,
       snapshotId: null,
       snapshotManifest: null,

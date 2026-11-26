@@ -13,6 +13,8 @@ export const authoringContract = (kind: 'analyze' | 'generate' | 'modify') => {
   if (kind === 'generate') return aiGenerationContracts.authoringGeneration;
   return aiGenerationContracts.authoringModification;
 };
+export const savedAuthoringContract = (selection: { kind: 'analyze' | 'generate' | 'modify' }) =>
+  authoringContract(selection.kind);
 export const unknownAuthoringCost = (): AiCostFacts => ({
   status: 'unknown',
   amount: null,

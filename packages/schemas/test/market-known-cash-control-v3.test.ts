@@ -211,7 +211,7 @@ describe('已知方案控制身份的只读复核合同', () => {
   });
   it('安全失败原因与独立协议保持，不透传未知源错误', () => {
     const error = {
-      contractVersion: 3,
+      contractVersion: 1,
       protocolVersion: 'known-cash-control-v1',
       requestId: 'control-check',
       error: {

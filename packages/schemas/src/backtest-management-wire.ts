@@ -3,6 +3,8 @@ import { backtestRunResponseSchemaV3, backtestRunStatusSchema } from './backtest
 import { resultReadEligibilitySchema } from './strategy-optimization.js';
 export const backtestRunIdReadSchema = z.string().min(1);
 const metadata = {
+  replayOfRunId: z.uuid().optional(),
+  cancelRequestedAt: z.string().nullable().optional(),
   progress: z.number().min(0).max(100).nullable().optional(),
   executionAttempt: z.number().int().nonnegative().optional(),
   attempt: z.number().int().nonnegative().optional(),
@@ -19,7 +21,7 @@ export const backtestRunSummaryReadSchema = z
   .object({
     id: backtestRunIdReadSchema,
     strategyVersionId: backtestRunIdReadSchema,
-    mode: z.literal('V3'),
+    mode: z.literal('frozen'),
     status: backtestRunStatusSchema,
     ...metadata,
   })

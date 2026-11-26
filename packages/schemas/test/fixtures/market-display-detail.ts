@@ -5,7 +5,7 @@ export function marketDisplayDetailFixture() {
   const tradingDates = ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'];
   const timestamp = '2026-10-02T07:00:00.000Z';
   const series = marketPeriodBarSeriesSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     identity: { symbol: '159516.SZ', assetType: 'ETF', timeframe: '1w', adjustment: 'qfq' },
     points: [
       {
@@ -71,7 +71,7 @@ export function marketDisplayDetailFixture() {
     },
   };
   return {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     symbol: '159516.SZ',
     assetType: 'ETF' as const,
     identity: { source: 'symbol' as const, status: 'confirmed' as const },

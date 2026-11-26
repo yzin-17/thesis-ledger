@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { projectResearchReport } from '../../src/ai/ai-research-report-projection.js';
 import { comparisonReport } from './research-comparison.fixture.js';
 
-const contract = { id: 'research', version: 'research-generation-v2' } as const;
+const contract = { id: 'research', version: 'research-report-generation-v1' } as const;
 const time = '2026-10-23T01:00:00.000Z';
 const cost = {
   status: 'estimated',

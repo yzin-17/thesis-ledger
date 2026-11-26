@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { runConfigSchemaV3 } from './backtest-contract.js';
 
 export const backtestRunPreflightRequestV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: z.string().trim().min(1).max(200),
   strategyVersionId: z.uuid(),
   runConfig: runConfigSchemaV3,

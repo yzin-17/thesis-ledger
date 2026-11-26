@@ -11,6 +11,9 @@ describe('编写用途代表性格式探针', () => {
     ]) {
       const example = authoringConnectionProbe(contract.ref.id);
       expect(contract.schema.safeParse(example).success).toBe(true);
+      expect(example?.definition.schemaVersion).toBe('strategy-definition-v1');
+      expect(example?.definition.entryTrigger).toBe('rising-edge');
+      expect(example?.definition.signalSources[0]).not.toHaveProperty('series');
       expect(probeMessages(contract.ref.id)[1]!.content).toContain(JSON.stringify(example));
     }
   });
@@ -18,6 +21,6 @@ describe('编写用途代表性格式探针', () => {
     expect(authoringConnectionProbe('strategy_authoring_analysis')).toBeNull();
     expect(authoringConnectionProbe('research')).toBeNull();
     expect(probeMessages('strategy_authoring_analysis')[1]!.content).toContain('answer=null');
-    expect(probeMessages('research')[1]!.content).toContain('最小可用实例');
+    expect(probeMessages('research')[1]!.content).toContain('research-report-generation-v1');
   });
 });

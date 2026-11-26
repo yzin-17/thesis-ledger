@@ -5,6 +5,8 @@ export const strategyMarketSchema = z.enum(['CN', 'HK', 'US']);
 export const backtestAssetTypeSchema = z.enum(['stock', 'etf', 'fund']);
 export const backtestCurrencySchema = z.enum(['CNY', 'HKD', 'USD']);
 export const seriesFieldSchema = z.enum(['open', 'high', 'low', 'close', 'volume', 'nav']);
+export const corporateActionTypeSchema = z.enum(['CASH_DIVIDEND', 'SPLIT', 'REVERSE_SPLIT']);
+export type CorporateActionType = z.infer<typeof corporateActionTypeSchema>;
 
 export type Timeframe = z.infer<typeof backtestTimeframeSchema>;
 export type StrategyMarket = z.infer<typeof strategyMarketSchema>;
@@ -35,7 +37,7 @@ export type SeriesRef = z.infer<typeof seriesRefSchema>;
 export const signalSourceSchema = z
   .object({
     id: z.string().trim().min(1),
-    priceCoordinate: z.enum(['research', 'actual']).optional(),
+    priceCoordinate: z.enum(['research', 'actual', 'run', 'native-nav']).optional(),
     asset: assetSymbolRefSchema,
     timeframe: backtestTimeframeSchema,
     series: z.array(seriesFieldSchema).min(1),

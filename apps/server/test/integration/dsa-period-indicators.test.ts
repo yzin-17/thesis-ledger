@@ -28,7 +28,7 @@ const client = () =>
     },
   }) as DsaClient;
 const result = (payload: (typeof cases)[number]['payload']) => ({
-  contractVersion: 3,
+  contractVersion: 1,
   engineVersion: 'dsa-indicator-v3',
   inputFingerprint: payload.inputFingerprint,
   results: payload.requests.map((request) => ({
@@ -48,7 +48,7 @@ describe('DSA 派生指标传输', () => {
       payload.inputFingerprint,
     );
     const [url, init] = fetcher.mock.calls[0] as unknown as [URL, RequestInit];
-    expect(url.pathname).toBe('/api/v3/thesis-ledger/market/indicators/calculate');
+    expect(url.pathname).toBe('/api/v1/thesis-ledger/market/indicators/calculate');
     expect(JSON.parse(String(init.body))).toEqual(payload);
     expect(init.headers).toMatchObject({ authorization: 'Bearer period-test-token' });
   });
@@ -80,7 +80,7 @@ describe('DSA 派生指标传输', () => {
     vi.stubGlobal('fetch', fetcher);
     expect(await client().marketPeriodIndicatorCapabilities()).toEqual(caps);
     expect((fetcher.mock.calls[0] as unknown as [URL])[0].pathname).toBe(
-      '/api/v3/thesis-ledger/market/indicators/capabilities',
+      '/api/v1/thesis-ledger/market/indicators/capabilities',
     );
   });
 });

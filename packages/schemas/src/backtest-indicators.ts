@@ -4,7 +4,7 @@ import {
   nonNegativeDecimalStringSchema,
   positiveDecimalStringSchema,
 } from './monetary-values.js';
-import { backtestTimeframeSchema, seriesFieldSchema } from './backtest-contract.js';
+import { backtestTimeframeSchema, seriesFieldSchema } from './backtest-values.js';
 
 const isoDateTime = z.iso.datetime({ offset: true });
 
@@ -17,13 +17,24 @@ export const backtestIndicatorNameSchema = z.enum([
   'VWAP',
   'Highest',
   'Lowest',
+  'ADX',
 ]);
 
-export const backtestIndicatorOutputSchema = z.enum(['value', 'macd', 'signal', 'histogram']);
+export const backtestIndicatorOutputSchema = z.enum([
+  'value',
+  'macd',
+  'signal',
+  'histogram',
+  'adx',
+  'plusDI',
+  'minusDI',
+]);
 
 export const backtestSeriesPointSchema = z
   .object({
     occurredAt: isoDateTime,
+    openedAt: isoDateTime.optional(),
+    closedAt: isoDateTime.optional(),
     availableAt: isoDateTime,
     value: decimalStringSchema.optional(),
     status: z.enum(['available', 'unavailable']).optional(),

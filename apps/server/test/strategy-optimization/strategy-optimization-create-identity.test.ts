@@ -9,7 +9,7 @@ import {
 
 const fixture = () => {
   const request = optimizationExperimentCreateSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     sourceMode: 'existing',
     strategyVersionId: '11111111-1111-4111-8111-111111111111',
     allowedParameterIds: ['entry.threshold'],

@@ -117,11 +117,11 @@ export function JournalScreen() {
             </Section>
           ))}
         {query.data?.pages[0]?.total === 0 ? <Copy muted>当前范围暂无复盘对象。</Copy> : null}
-        {query.data?.pages
-          .flatMap((p) => p.legacyItems)
-          .map((row, i) => (
-            <Copy muted key={i}>
-              旧格式复盘需要重新确认，保留历史记录。
+        {query.data?.pages[0]?.unlinkedItems
+          .map((row) => (
+            <Copy muted key={row.id}>
+              {row.journalEntry.symbol ? `${row.journalEntry.symbol} · ` : ''}
+              {row.reason === 'SELL_MAPPING_AMBIGUOUS' ? '减仓映射存在歧义' : '未找到对应减仓'}
             </Copy>
           ))}
       </QueryList>

@@ -221,7 +221,7 @@ export class LedgerService {
       },
     });
     return this.repository.appendRevision(context, {
-      version: 3,
+      version: 1,
       eventId: randomUUID(),
       factId: randomUUID(),
       accountId,
@@ -458,7 +458,7 @@ export class LedgerService {
       const account = await this.assertAccountWithClient(context.transaction, accountId);
       const cashCurrency = currency ?? currencySchema.parse(account.currency);
       const event = await this.repository.appendRevision(context, {
-        version: 3,
+        version: 1,
         eventId: randomUUID(),
         factId: randomUUID(),
         accountId,

@@ -19,7 +19,7 @@ import {
   fetchOptimizationAdoptionContext,
 } from '../src/features/strategy/strategy-optimization.api.js';
 import type { DesktopRequestClient } from '../src/features/shared/request.js';
-import { createDefaultStrategySchema, setStrategyExecutionSymbol } from '../src/features/strategy/strategy.schema.js';
+import { strategySummaryVersion } from './strategy-summary-ratio-samples';
 import type { StrategyRecord } from '../src/features/strategy/strategy.types.js';
 
 describe('实验已采纳版本投影', () => {
@@ -215,8 +215,8 @@ describe('策略实验详情', () => {
   it('使用精确实验和候选标识读取三方差异，并原样提交确认版本与幂等意图', async () => {
     const id = '00000000-0000-4000-8000-000000000041';
     const candidateId = '00000000-0000-4000-8000-000000000042';
-    const version = { id, strategyId: id, version: 7, schemaVersion: 2,
-      schema: setStrategyExecutionSymbol(createDefaultStrategySchema(), '510300.SH') };
+    const version = { id, strategyId: id, version: 7, schemaVersion: 1,
+      schema: strategySummaryVersion('0.25').schema };
     const context = { experimentId: id, candidateId, expectedStrategyVersion: 7,
       baseline: version, current: version, candidate: { ...version, candidateId, executionHash: 'hash-1' },
       candidateVsBaseline: [], candidateVsCurrent: [] };

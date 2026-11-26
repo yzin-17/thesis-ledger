@@ -90,7 +90,7 @@ try {
   }
   const client=new DsaClient();
   const capabilities=await client.marketDataCapabilitiesV3();
-  assert.deepEqual(capabilities.dataContractVersions,[3]);
+  assert.equal(capabilities.dataContract,'dsa-data-v1');
   const fx=await client.fxRates({baseCurrency:'CNY',currencies:['CNY'],asOf:'2026-09-30'});
   assert.equal(fx.version,3);assert.equal(fx.baseCurrency,'CNY');
   assert(fx.rates.some(r=>r.fromCurrency==='CNY'&&r.toCurrency==='CNY'&&r.rate===1&&r.available));

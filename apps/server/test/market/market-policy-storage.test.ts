@@ -29,7 +29,7 @@ const routes = [
 
 describe('market policy JSON storage', () => {
   it('期望修订在原行锁事务内拒绝并行者的相同内容', async () => {
-    const policy = buildMarketPolicyPayload({ contractVersion: 3, enabled: true, routes }, 8);
+    const policy = buildMarketPolicyPayload({ contractVersion: 1, enabled: true, routes }, 8);
     const update = vi.fn();
     const transaction = {
       $queryRaw: vi.fn().mockResolvedValue([]),
@@ -45,7 +45,7 @@ describe('market policy JSON storage', () => {
   });
 
   it('匹配期望修订时仍沿现有持久化与历史写入', async () => {
-    const policy = buildMarketPolicyPayload({ contractVersion: 3, enabled: true, routes }, 8);
+    const policy = buildMarketPolicyPayload({ contractVersion: 1, enabled: true, routes }, 8);
     const update = vi.fn().mockResolvedValue({ revision: 8 });
     const transaction = {
       $queryRaw: vi.fn().mockResolvedValue([]),
@@ -62,18 +62,19 @@ describe('market policy JSON storage', () => {
 
   it('只存储当前精确路由，读取拒绝旧矩阵和旧包装', () => {
     const stored = encodeMarketPolicyRoutes(routes);
-    expect(stored).toEqual({ storageVersion: 3, routes });
+    expect(stored).toEqual({ storageVersion: 'market-routing-policy-v1', routes });
     expect(decodeMarketPolicyRoutes(stored)).toEqual(routes);
+    expect(() => decodeMarketPolicyRoutes({ ...stored, storageVersion: 3 })).toThrow();
     expect(() => decodeMarketPolicyRoutes({ DAILY_BAR: { ETF: [] } })).toThrow();
-    expect(() => decodeMarketPolicyRoutes({ ...stored, legacyV2Routes: {} })).toThrow();
+    expect(() => decodeMarketPolicyRoutes({ storageVersion: 2, legacyV2Routes: { DAILY_BAR: {} } })).toThrow();
     expect(() => decodeMarketPolicyRoutes({ ...stored, routes: { DAILY_BAR: {} } })).toThrow();
   });
 
   it('构建当前合同需要明确版本和精确路由', () => {
     expect(
-      buildMarketPolicyPayload({ contractVersion: 3, enabled: true, routes }, 7),
+      buildMarketPolicyPayload({ contractVersion: 1, enabled: true, routes }, 7),
     ).toMatchObject({
-      contractVersion: 3,
+      contractVersion: 1,
       revision: 7,
       routes,
     });
@@ -96,7 +97,7 @@ describe('market policy JSON storage', () => {
       routes: encodeMarketPolicyRoutes(routes),
       syncState: 'applied',
       effectiveProjection: {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'current-policy',
         revision: 9,
@@ -116,7 +117,7 @@ describe('market policy JSON storage', () => {
       },
     };
     expect(marketPolicyResponse(row)).toMatchObject({
-      contractVersion: 3,
+      contractVersion: 1,
       revision: 9,
       routes,
       effectiveStale: false,
@@ -124,7 +125,7 @@ describe('market policy JSON storage', () => {
     expect(marketPolicyResponse({ ...row, revision: 10 }).effectiveStale).toBe(true);
     for (const projection of [
       { ...row.effectiveProjection, contractVersion: 2 },
-      { contractVersion: 3, sourceDesiredRevision: 9 },
+      { contractVersion: 1, sourceDesiredRevision: 9 },
     ]) {
       expect(() => marketPolicyResponse({ ...row, effectiveProjection: projection })).toThrow(
         'Policy Effective 存储格式不是当前版本',

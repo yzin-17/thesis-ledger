@@ -56,12 +56,23 @@ export const skippedBacktestTradingDatesV3 = (
   const windows = frozenTradabilityWindows(strategy, rows, runId);
   if (!windows.length) return [];
   const bars = rows.get(`${runId}/execution/bars.parquet`) ?? [];
+  const barDates = bars.map((bar) => {
+    if (typeof bar.occurredAt !== 'string') throw new Error('执行 Bar 缺少日期');
+    return bar.occurredAt.slice(0, 10);
+  });
   return assertBacktestTradabilityBars({
+    allowPriceOnly: config.priceResearch?.dailyObservationContract !== undefined &&
+      config.executionPriceProtocol.accountingBasis === 'normalized-series',
     days: windows.flatMap((window) => window.days),
-    barDates: bars.map((bar) => {
-      if (typeof bar.occurredAt !== 'string') throw new Error('执行 Bar 缺少日期');
-      return bar.occurredAt.slice(0, 10);
-    }),
+    barDates: strategy.primaryTimeframe === '1d' ? barDates : [...new Set(barDates)],
     range: { startDate: config.startDate, endDate: config.endDate },
   });
 };
+
+export function priceOnlyObservationWarningsV3(strategy: BacktestStrategy, config: RunConfigV3,
+  rows: ReadonlyMap<string, readonly ArtifactRow[]>, runId: string) {
+  const dates = new Set(frozenTradabilityWindows(strategy, rows, runId).flatMap((window) => window.days)
+    .filter((day) => day.state === 'observed-price-only' && day.date >= config.startDate && day.date <= config.endDate)
+    .map((day) => day.date));
+  return dates.size ? [`本区间${dates.size}个交易日价格有效、成交量未知；仅按价格研究消费，不代表真实份额可执行，也不提供量能／成交量参与率能力。`] : [];
+}

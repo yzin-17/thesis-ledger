@@ -231,7 +231,7 @@ isolated('用途完整期限：不加速时间的公开 HTTP/SDK/PostgreSQL 验�
 });
 
 async function deadlineUpstream() {
-  const research = { id: 'research', version: 'research-generation-v2' } as const;
+  const research = { id: 'research', version: 'research-report-generation-v1' } as const;
   const requests: Array<{ at: string; path: string; stream: boolean; format: string }> = [];
   const closed = deferred();
   const responses = new Set<ServerResponse>();

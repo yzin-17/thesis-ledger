@@ -103,7 +103,7 @@ describe('冻结比较只读授权与默认前序', () => {
     await expect(h.read(previous.row.id)).rejects.toBeInstanceOf(NotFoundException);
     expect(h.access.assertSnapshot).toHaveBeenCalledTimes(1);
     const where = h.transaction.aiRun.findFirst.mock.calls[1]?.[0].where;
-    expect(where.OR).toContainEqual({ researchOwnerId: comparisonOwner });
+    expect(where.researchOwnerId).toBe(comparisonOwner);
   });
 
   it('owner 相同仍不能绕过另一端当前权限', async () => {

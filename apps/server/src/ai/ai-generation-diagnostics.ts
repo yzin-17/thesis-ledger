@@ -16,7 +16,7 @@ export const createGenerationDiagnostics = (input: {
   adapter: AiAdapter;
   transport: 'single' | 'stream';
 }): AiGenerationDiagnostics | undefined => {
-  if (input.contract.id !== 'research' || input.contract.version !== 'research-generation-v2')
+  if (input.contract.id !== 'research' || input.contract.version !== 'research-report-generation-v1')
     return undefined;
   return {
     stream: new AiGenerationStreamDiagnostics(input.adapter, input.transport),

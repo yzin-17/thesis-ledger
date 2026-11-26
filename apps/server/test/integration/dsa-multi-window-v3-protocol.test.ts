@@ -10,7 +10,7 @@ const fixture = () => {
   response.inputFingerprint = golden.expectedContentHash;
   response.sourcePriceBasis.revision.contentHash = golden.expectedContentHash;
   const request = {
-    contractVersion: 3 as const, requestId: response.requestId, symbol: response.symbol,
+    contractVersion: 1 as const, requestId: response.requestId, symbol: response.symbol,
     routeKey: response.routeKey, start: response.coverage.requestedStart, end: response.coverage.requestedEnd,
   };
   return { request, response };

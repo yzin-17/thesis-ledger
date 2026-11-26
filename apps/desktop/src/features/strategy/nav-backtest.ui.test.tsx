@@ -117,7 +117,7 @@ describe('基金净值回测 UI 契约', () => {
 
   it('NAV 任务历史保留可重新打开的独立详情入口', () => {
     const run: BacktestNavRunSummaryV3 = {
-      contractVersion: 3,
+      contractVersion: 1,
       inputKind: 'nav',
       id: '00000000-0000-4000-8000-000000000001',
       strategyVersionId: '00000000-0000-4000-8000-000000000002',

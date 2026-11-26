@@ -10,8 +10,8 @@ const manifest = JSON.parse(
 );
 const result = {
   source: 'BACKTEST',
-  schemaVersion: '3',
-  snapshotVersion: 'snapshot-manifest-v3',
+  schemaVersion: 'backtest-trade-result-v1',
+  snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
   runId: 'run-1',
   strategyVersionId: 'version-1',
   snapshotId: 'snapshot',
@@ -35,7 +35,7 @@ const result = {
 const row = {
   id: result.runId,
   strategyVersionId: result.strategyVersionId,
-  mode: 'V3',
+  mode: 'frozen',
   status: 'succeeded',
   snapshotId: result.snapshotId,
   resultChecksum: result.resultChecksum,
@@ -54,7 +54,7 @@ describe('回测管理共享合同', () => {
   it('列表与详情传递取消信号，保留服务端状态和来源', async () => {
     const controller = new AbortController(),
       { api, fetcher } = setup([
-        { id: 'run-1', strategyVersionId: 'version-1', mode: 'V3', status: 'running', progress: 0 },
+        { id: 'run-1', strategyVersionId: 'version-1', mode: 'frozen', status: 'running', progress: 0 },
       ]);
     await api.listRuns(controller.signal);
     expect(fetcher.mock.calls[0]?.[1]?.signal).toBe(controller.signal);

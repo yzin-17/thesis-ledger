@@ -16,7 +16,7 @@
 
 [多源复权感知回测规格](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md)扩展现有 Market 边界：`MarketBarReader.readV3` 按精确 RouteKey 读取，验证 Desired/Effective/Catalog 的修订与能力，整窗选择实际主源或兼容备用；`MarketBarWindowEvidenceV3` 保存来源证据、完整响应与摘要。冻结父窗口的子集由 `MarketFrozenWindowReaderV3` 校验后复用，每个正式 Run 仍拥有独立 Snapshot。
 
-V3 保留实际抓取时间、价格基准和修订身份，明确区分严格历史时点与固定供应商快照研究。归一化记账只使用模拟单位，事件按实际依赖获取，真实 Risk/Portfolio 不消费研究账本。交互图表由独立 `MarketChartReaderV3` 与 DSA `/api/v3/thesis-ledger/market/chart-bars` 入口处理，可携带未收盘条目但不提供回测 `coverageProof`；回测完整窗口 V3 wire 继续拒绝未收盘日线。
+V3 保留实际抓取时间、价格基准和修订身份，明确区分严格历史时点与固定供应商快照研究。归一化记账只使用模拟单位，事件按实际依赖获取，真实 Risk/Portfolio 不消费研究账本。交互图表由独立 `MarketChartReaderV3` 与 DSA `/api/v1/thesis-ledger/market/chart-bars` 入口处理，可携带未收盘条目但不提供回测 `coverageProof`；回测完整窗口的 `dsa-data-v1` 合同 继续拒绝未收盘日线。
 
 2026-10-03 共同价格基线：HiThink ETF qfq 与腾讯 ETF none/qfq/hfq 按适配、必要凭据和精确路由启用，日级状态由公共层自动整理。图表与固定快照归一化价格研究的同口径整窗备用无需算法等价证明，仍校验有效价格、身份和实际来源。标的目录复用行情弹窗提供只读入口；三口径、备源、扩窗和运行配置隔离已通过目标 Web 验收，四条真实普通回测与冻结重放成功。Electron、新镜像发布和高级历史/事件能力另行验收。当前状态见[验收记录](../evidence/2026-10-03-common-price-baseline.md)和[实施任务](../archive/tasks/2026-09-25-multi-source-adjustment-aware-backtest.md)。
 

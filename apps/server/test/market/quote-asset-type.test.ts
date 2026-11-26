@@ -3,7 +3,7 @@ import { MarketQuoteReader } from '../../src/market/market-quote-reader.js';
 import { quoteControlFixture } from './quote-control-fixture.js';
 
 function harness() {
-  const quote = { version: 3, symbol: 'SPY.US', open: 10, high: 12, low: 9,
+  const quote = { version: 1, symbol: 'SPY.US', open: 10, high: 12, low: 9,
     price: 11, previousClose: 10, volume: 0, amount: null, stale: false,
     provider: 'futu', upstreamSource: 'futu', marketTime: null,
     fetchedAt: '2026-10-08T00:00:00Z', freshness: 'unknown' };
@@ -29,8 +29,8 @@ describe('报价资产身份传递和缓存边界', () => {
       reader.getQuote('SPY.US', { assetType: 'ETF' }), reader.getQuote('SPY.US', { assetType: 'STOCK' }),
     ]);
     expect(etf.price).toBe(12); expect(stock.price).toBe(11);
-    expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/quote?symbol=SPY.US&assetType=ETF', 1);
-    expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/quote?symbol=SPY.US&assetType=STOCK', 1);
+    expect(dsa.get).toHaveBeenCalledWith('/api/v1/thesis-ledger/market/quote?symbol=SPY.US&assetType=ETF', 1);
+    expect(dsa.get).toHaveBeenCalledWith('/api/v1/thesis-ledger/market/quote?symbol=SPY.US&assetType=STOCK', 1);
     expect([...cache.keys()].filter((key) => key.endsWith(':fresh'))).toHaveLength(2);
     expect((await reader.getQuote('SPY.US', { assetType: 'ETF' })).price).toBe(12);
     expect((await reader.getQuote('SPY.US', { assetType: 'STOCK' })).price).toBe(11);
@@ -41,7 +41,7 @@ describe('报价资产身份传递和缓存边界', () => {
     const { reader, dsa } = harness();
     await reader.getQuote('SPY.US');
     await reader.getQuote('SPY.US', { assetType: 'ETF' });
-    expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/quote?symbol=SPY.US', 1);
+    expect(dsa.get).toHaveBeenCalledWith('/api/v1/thesis-ledger/market/quote?symbol=SPY.US', 1);
     expect(dsa.get).toHaveBeenCalledTimes(2);
   });
 });

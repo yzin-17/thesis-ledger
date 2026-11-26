@@ -99,7 +99,7 @@ export function buildMinuteView(
       pointFingerprint: hash(canonicalBarSeriesEncoding(identity, selected)),
     };
     const series = marketMinuteBarSeriesSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity,
       points: selected,
       coverage: {

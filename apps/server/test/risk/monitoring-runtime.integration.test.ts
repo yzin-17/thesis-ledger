@@ -116,7 +116,7 @@ function riskMonitoringContext() {
     await observations.record({
       kind: 'quote',
       value: {
-        version: 3,
+        version: 1,
         symbol: '600519.SH',
         open: price,
         high: price,
@@ -208,7 +208,7 @@ function registerRiskMonitoringSourceCases(suiteScope: ReturnType<typeof riskMon
   it('official NAV refresh retains its published date and rejects late provenance', async () => {
     const now = new Date();
     const nav = {
-      version: 3 as const,
+      version: 1 as const,
       symbol: '000001.OF',
       unitNav: 1.2,
       navDate: new Date(now.getTime() - 3 * 86_400_000).toISOString(),
@@ -249,7 +249,7 @@ function registerRiskMonitoringSourceCases(suiteScope: ReturnType<typeof riskMon
       return {
         ...plan,
         quote: {
-          version: 3,
+          version: 1,
           symbol: '510300.SH',
           provider: 'tencent',
           price: 90,

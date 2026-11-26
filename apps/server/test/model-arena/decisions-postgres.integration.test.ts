@@ -213,7 +213,7 @@ async function prepareArenaDecisionRound(db: PrismaService, owner: string) {
   const day = new Date().toISOString().slice(0, 10);
   const budget = { requests: 2, tokens: 50000, costMicros: 100 };
   const match = await store.create(owner, {
-    version: 1,
+    version: 'arena-historical-match-protocol-v1',
     title: '决策样本',
     market: 'CN',
     currency: 'CNY',

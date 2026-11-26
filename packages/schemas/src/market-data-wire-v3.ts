@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MARKET_DAILY_TRADABILITY_CONTRACT } from './backtest-daily-tradability.js';
 import { backtestDailyTradabilityEvidenceV3Schema } from './backtest-daily-tradability.js';
 import { observedTradabilityDatesV3 } from './market-daily-tradability-v3.js';
 import { barPointSchema, barSeriesIdentitySchema } from './market-bar-series.js';
@@ -43,11 +44,13 @@ export const marketDataRouteTargetPinV3Schema = z.strictObject({
 });
 export type MarketDataRouteTargetPinV3 = z.infer<typeof marketDataRouteTargetPinV3Schema>;
 
-/** Data support is advertised independently from the Control handshake version. */
+export const DSA_DATA_CONTRACT = 'dsa-data-v1' as const;
+
 export const marketDataContractCapabilitiesV3Schema = z.strictObject({
-  dataContractVersions: z.tuple([z.literal(3)]),
+  dataContract: z.literal(DSA_DATA_CONTRACT),
   serviceCapabilities: z.strictObject({ fundNav: z.literal(true) }),
   multiWindowProtocols: z.array(z.literal('market-multi-window-content-v1')).max(1).optional(),
+  dailyObservationContract: z.literal(MARKET_DAILY_TRADABILITY_CONTRACT),
 });
 export type MarketDataContractCapabilitiesV3 = z.infer<
   typeof marketDataContractCapabilitiesV3Schema
@@ -55,22 +58,26 @@ export type MarketDataContractCapabilitiesV3 = z.infer<
 
 export const marketDataBarSeriesRequestV3Schema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     requestId: text,
     symbol: text,
     routeKey: marketDataBarRouteKeyV3Schema,
     /** DSA must verify this target remains eligible before dispatching only to it. */
     routeTarget: marketDataRouteTargetPinV3Schema.optional(),
-    tradabilityMode: z.literal('assume-untradable-no-bar').optional(),
+    tradabilityMode: z.enum(['assume-untradable-no-bar', 'observed-bars-only']).optional(),
+    dailyObservationContract: z.literal(MARKET_DAILY_TRADABILITY_CONTRACT).optional(),
     start: isoDate,
     end: isoDate,
   })
   .superRefine((request, context) => {
+    if (request.dailyObservationContract !== undefined &&
+        (request.routeKey.timeframe !== '1d' || request.tradabilityMode !== 'assume-untradable-no-bar'))
+      context.addIssue({ code: 'custom', path: ['dailyObservationContract'], message: '日级观察版本须显式请求日线观察证据' });
     if (request.start > request.end) {
       context.addIssue({ code: 'custom', path: ['end'], message: '请求区间 end 不得早于 start' });
     }
     if (
-      request.tradabilityMode &&
+      request.tradabilityMode === 'assume-untradable-no-bar' &&
       (!['CN', 'HK', 'US'].includes(request.routeKey.market) || request.routeKey.timeframe !== '1d')
     ) {
       context.addIssue({
@@ -79,6 +86,8 @@ export const marketDataBarSeriesRequestV3Schema = z
         message: '缺日假设仅支持已接入的 CN/HK/US 日线',
       });
     }
+    if (request.tradabilityMode === 'observed-bars-only' && request.routeKey.timeframe !== '1m')
+      context.addIssue({ code: 'custom', path: ['tradabilityMode'], message: '实际分钟观察模式仅支持原始一分钟行情' });
   });
 export type MarketDataBarSeriesRequestV3 = z.infer<typeof marketDataBarSeriesRequestV3Schema>;
 
@@ -112,6 +121,25 @@ const barsV3Schema = z
       }
     }
   });
+
+function dailyBarVolumesMatchObservations(response: {
+  routeKey: { timeframe: string; market: keyof typeof marketCalendarTimezonesV3 };
+  bars: { timestamp: string; volume: number | null }[];
+  historicalTradabilityWindows?: z.infer<typeof backtestDailyTradabilityEvidenceV3Schema>[] | undefined;
+}): boolean {
+  if (response.routeKey.timeframe !== '1d') return true;
+  const days = new Map(response.historicalTradabilityWindows?.flatMap((window) => window.days.map((day) =>
+    [day.date, { state: day.state, priceOnlyAllowed: window.priceOnlyAllowed }] as const)) ?? []);
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: marketCalendarTimezonesV3[response.routeKey.market],
+    year: 'numeric', month: '2-digit', day: '2-digit' });
+  return response.bars.every((bar) => {
+    const date = formatter.format(new Date(bar.timestamp));
+    const day = days.get(date);
+    return day?.state === 'observed-price-only'
+      ? day.priceOnlyAllowed && bar.volume === null
+      : day?.state === 'observed-traded' && bar.volume !== null && bar.volume > 0;
+  });
+}
 
 export const marketDataBarSeriesCoverageV3Schema = z
   .strictObject({
@@ -161,11 +189,13 @@ export type MarketDataBarSeriesProvenanceV3 = z.infer<typeof marketDataBarSeries
 
 export const marketDataBarSeriesResponseV3Schema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     requestId: text,
     symbol: text,
     routeKey: marketDataBarRouteKeyV3Schema,
     bars: barsV3Schema,
+    /** 分钟标签含义必须由来源证明；缺失或 source-native 不认证盘中完成时点。 */
+    timestampConvention: z.enum(['interval-start', 'interval-end', 'source-native']).optional(),
     coverage: marketDataBarSeriesCoverageV3Schema,
     coverageProof: marketCoverageProofV3Schema,
     /** DSA source facts only; Server quantity/accounting/history decisions stay out of this wire. */
@@ -229,17 +259,11 @@ export const marketDataBarSeriesResponseV3Schema = z
             routeKey: response.routeKey,
             target: response.provenance,
             coverageProof: proof,
+            allowPriceOnly: response.historicalTradabilityWindows[0]?.priceOnlyAllowed === true,
           },
         );
-        if (
-          response.bars.some(
-            (bar) =>
-              bar.volume === null ||
-              bar.volume <= 0 ||
-              Math.min(bar.open, bar.high, bar.low, bar.close) <= 0,
-          )
-        ) {
-          throw new Error('日级已交易 Bar 必须有正成交量及正 OHLC');
+        if (!dailyBarVolumesMatchObservations(response) || response.bars.some((bar) => Math.min(bar.open, bar.high, bar.low, bar.close) <= 0)) {
+          throw new Error('日级Bar的成交量须与观察版本及状态一致，并保持正OHLC');
         }
       } catch (error) {
         context.addIssue({
@@ -317,6 +341,8 @@ export const marketDataBarSeriesRequestResponseV3Schema = z
     response: marketDataBarSeriesResponseV3Schema,
   })
   .superRefine(({ request, response }, context) => {
+    if (response.historicalTradabilityWindows?.some((window) => window.priceOnlyAllowed !== Boolean(request.dailyObservationContract)))
+      context.addIssue({ code: 'custom', path: ['response', 'historicalTradabilityWindows'], message: '价格观察许可与请求不一致' });
     if (Boolean(request.tradabilityMode) !== Boolean(response.historicalTradabilityWindows)) {
       context.addIssue({
         code: 'custom',
@@ -441,7 +467,7 @@ export const marketDataErrorDetailV3Schema = z.discriminatedUnion('code', [
 export type MarketDataErrorDetailV3 = z.infer<typeof marketDataErrorDetailV3Schema>;
 
 export const marketDataErrorEnvelopeV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: text,
   error: marketDataErrorDetailV3Schema,
 });

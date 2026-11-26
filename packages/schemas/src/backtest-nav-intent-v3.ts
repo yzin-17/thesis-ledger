@@ -68,7 +68,7 @@ export function createNavPreparationRequest(
   }
 
   return backtestNavPreparationRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: input.requestId,
     strategyVersionId: input.strategyVersionId,
     runConfig: input.runConfig,

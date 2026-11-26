@@ -12,12 +12,12 @@ describe.skipIf(!databaseUrl)('隔离 PostgreSQL 的研报元数据快照', () =
   let repository: MarketReportMetadataRepository;
   const instrumentId = randomUUID();
   const request = reportMetadataRequestSchema.parse({
-    contractVersion: 3, consumer: 'thesis-ledger', requestId: randomUUID(), symbol: '600519.SH',
+    contractVersion: 1, consumer: 'thesis-ledger', requestId: randomUUID(), symbol: '600519.SH',
     start: '2026-08-01', end: '2026-10-23', page: 1, pageSize: 1, requestBudgetMs: 3000,
   });
   const page = {
-    contractVersion: 3 as const, consumer: 'thesis-ledger' as const, capability: 'RESEARCH_REPORT_METADATA' as const,
-    metadataVersion: 'research-report-metadata-v1' as const, adapterRevision: 'eastmoney-report-metadata-page-v1',
+    contractVersion: 1 as const, consumer: 'thesis-ledger' as const, capability: 'RESEARCH_REPORT_METADATA' as const,
+    metadataVersion: 'market-external-report-metadata-v1' as const, adapterRevision: 'eastmoney-report-metadata-page-v1',
     sourceRevision: 'eastmoney-report-list-single-page-v1',
     requestId: request.requestId, symbol: request.symbol, start: request.start, end: request.end,
     page: 1, pageSize: 1, totalItems: 1, totalPages: 1, historyComplete: false as const,

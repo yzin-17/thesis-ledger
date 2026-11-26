@@ -16,7 +16,7 @@ const request: MarketPeriodCalendarRequest = {
 };
 function responseFixture(): BacktestCalendarResponse {
   return {
-    version: 3,
+    version: 1,
     status: 'supported',
     provider: 'exchange-calendars',
     providerRevision: 'controlled-revision',

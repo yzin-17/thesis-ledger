@@ -51,7 +51,7 @@ export const b5Job = {
   managed: false,
 };
 export const b5Policy = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'fixture',
   revision: 2,

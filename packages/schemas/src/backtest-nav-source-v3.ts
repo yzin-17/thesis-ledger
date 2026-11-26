@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { backtestNavFactV3Schema, backtestNavRouteKeyV3Schema } from './backtest-nav-freeze-v3.js';
 import { backtestNavPlanningCalendarV3Schema } from './backtest-nav-calendar-v3.js';
 import { backtestNavVisibilityV3Schema } from './backtest-nav-visibility-v3.js';
-import { marketRouteAdmissionV3Schema } from './market-route-admission-v3.js';
+import { timedMarketRouteAdmissionV3Schema as marketRouteAdmissionV3Schema } from './market-route-admission-v3.js';
 import { compareMarketPitEvidenceInstantStringsV1 } from './market-pit-evidence-instant-v1.js';
 
 const text = z.string().trim().min(1);
@@ -14,7 +14,7 @@ const target = z.strictObject({
   routeIndex: z.number().int().min(0).max(1),
 });
 const identity = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: text.max(128),
   symbol: z.string().regex(/^\d{6}\.OF$/),
   routeKey: backtestNavRouteKeyV3Schema,

@@ -100,7 +100,7 @@ describe('有界影子观测', () => {
       providerId: 'p',
       baseURL: 'http://fixture/v1',
       model: 'fixed',
-      contract: { id: 'research', version: 'research-generation-v2' },
+      contract: { id: 'research', version: 'research-report-generation-v1' },
       mode: 'native_schema',
       transport: 'stream',
       messages: [],

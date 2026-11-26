@@ -1,3 +1,4 @@
+import { namedStrategyFixture } from './named-v1-strategy.fixture.js';
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -6,6 +7,7 @@ import type { Job } from 'bullmq';
 import type { Prisma } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { StrategyCreationService } from '../../src/backtest/strategy-creation.service.js';
 import { BacktestNavPreparationRepository } from '../../src/backtest/backtest-nav-preparation-repository.js';
 import { BacktestNavPreparationService } from '../../src/backtest/backtest-nav-preparation.service.js';
 import { BacktestNavRunExecution } from '../../src/backtest/backtest-nav-run-execution.js';
@@ -193,7 +195,7 @@ function navWorkerContext() {
     await redisRuntime?.cleanup();
     vi.unstubAllEnvs();
   }, 30_000);
-  const createQueuedRun = () => createQueuedNavRun({ worker, fixtureDb, preparation, navRuns });
+  const createQueuedRun = (upgrade = false) => createQueuedNavRun({ worker, fixtureDb, preparation, navRuns, upgrade });
   async function waitForStatus(id: string, status: string, timeoutMs = 45_000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -247,6 +249,20 @@ function navWorkerContext() {
 function registerNavWorkerDeliveryAndCancellation(
   suiteContext: ReturnType<typeof navWorkerContext>,
 ) {
+  it('新基金定义经正式保存、净值准备、实际队列和 Worker 成功读取', async () => {
+    const { fixtureDb, worker, createQueuedRun, waitForStatus, navRuns } = suiteContext;
+    const run = await createQueuedRun(true);
+    const version = await fixtureDb.prisma.strategyVersion.findUniqueOrThrow({ where: { id: run.strategyVersionId } });
+    expect(version.schemaVersion).toBe(1);
+    expect(version.schema).toMatchObject({ schemaVersion: 'strategy-definition-v1', signalSources: [expect.objectContaining({ priceCoordinate: 'native-nav' })] });
+    await worker.resume();
+    const completed = await waitForStatus(run.id, 'succeeded');
+    await worker.pause();
+    const read = await navRuns.read(run.id);
+    expect(read).toMatchObject({ id: run.id, inputKind: 'nav', status: 'succeeded' });
+    expect(read.result).toMatchObject({ resultChecksum: completed.resultChecksum });
+    expect((await navRuns.read(run.id)).result).toEqual(read.result);
+  }, 60000);
   it('重复投递后由实际 Queue/Worker 执行生产入口并返回公开 NAV 成功结果', async () => {
     const {
       fixtureDb,
@@ -359,6 +375,7 @@ function registerNavWorkerRetryLimit(suiteContext: ReturnType<typeof navWorkerCo
 }
 
 async function createQueuedNavRun(input: {
+  upgrade?: boolean;
   worker: Worker<BacktestQueueData>;
   fixtureDb: Awaited<ReturnType<typeof startIsolatedNavPostgres>>;
   preparation: BacktestNavPreparationService;
@@ -371,14 +388,26 @@ async function createQueuedNavRun(input: {
   vi.setSystemTime(FIXTURE_NOW);
   try {
     const fixture = navPreparationFixture();
+    if (input.upgrade) {
+      const definition = namedStrategyFixture(fixture.strategy);
+      const saved = await fixtureDb.prisma.$transaction(tx => new StrategyCreationService().createInTransaction(tx, { name: definition.name, ownerId: null, definition, source: { kind: 'manual' } }));
+      const version = saved.versions[0]!;
+      expect(version.schema).toEqual(definition);
+      fixture.request.strategyVersionId = version.id;
+      const prepared = await preparation.prepare(fixture.request);
+      if (prepared.status !== 'prepared' || !prepared.receipt) throw new Error('具名 V1 NAV 准备未成功');
+      const run = await navRuns.create({ contractVersion: 1, preparationId: prepared.receipt.preparationId, preparationHash: prepared.receipt.preparationHash, idempotencyKey: randomUUID() });
+      if (!run || run.status !== 'queued') throw new Error(`具名 V1 NAV 未排队: ${run?.status}`);
+      return run;
+    }
     const strategy = await fixtureDb.prisma.strategy.create({
-      data: { name: `N3 NAV Worker 隔离验收 ${randomUUID()}`, schemaVersion: 2 },
+      data: { name: `N3 NAV Worker 隔离验收 ${randomUUID()}`, schemaVersion: 1 },
     });
     const version = await fixtureDb.prisma.strategyVersion.create({
       data: {
         strategyId: strategy.id,
         version: 1,
-        schemaVersion: 2,
+        schemaVersion: 1,
         schema: fixture.strategy as unknown as Prisma.InputJsonValue,
       },
     });
@@ -388,7 +417,7 @@ async function createQueuedNavRun(input: {
       throw new Error('NAV 隔离 fixture 未能生成准备凭证');
     }
     const run = await navRuns.create({
-      contractVersion: 3,
+      contractVersion: 1,
       preparationId: prepared.receipt.preparationId,
       preparationHash: prepared.receipt.preparationHash,
       idempotencyKey: randomUUID(),

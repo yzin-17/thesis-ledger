@@ -1,4 +1,8 @@
-import { marketCalculationAnchor, marketDetailRequestSchema } from '@thesis-ledger/schemas';
+import {
+  marketCalculationAnchor,
+  marketDetailContractVersion,
+  marketDetailRequestSchema,
+} from '@thesis-ledger/schemas';
 import type {
   MarketDetailRequest,
   MarketDetailCapability,
@@ -76,7 +80,7 @@ export async function readPlannedMarketDetail(
   const planned = await readChartPlan(market, request, plannedEnd, signal);
   const result = await market.getDetail(symbol, {
     ...params,
-    chartContractVersion: 3,
+    chartContractVersion: marketDetailContractVersion,
     ...(signal ? { signal } : {}),
     ...(planned?.window
       ? {

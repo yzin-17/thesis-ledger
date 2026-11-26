@@ -29,7 +29,7 @@ function fixture() {
   };
   const frozen = {
     request: {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: response.requestId,
       symbol: response.symbol,
       routeKey: response.routeKey,

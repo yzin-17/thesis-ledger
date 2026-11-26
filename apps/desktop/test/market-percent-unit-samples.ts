@@ -92,7 +92,7 @@ export function marketPercentSample(name: string) {
   const at = day + 'T06:01:00Z',
     symbol = '000001.OF';
   const quote = quoteSchema.parse({
-    version: 3,
+    version: 1,
     symbol: '000001.SZ',
     open: sample.price,
     high: Math.max(sample.price, sample.previous),
@@ -112,7 +112,7 @@ export function marketPercentSample(name: string) {
     sample.chip === null
       ? undefined
       : chipDistributionSchema.parse({
-          version: 3,
+          version: 1,
           symbol: '000001.SZ',
           averageCost: 1,
           profitRatio: sample.chip,
@@ -161,7 +161,7 @@ export function marketPercentSample(name: string) {
   });
   const history = fundNavHistorySchema.parse(
     ['2026-07-01', '2026-08-07', '2026-11-07'].map((date, index) => ({
-      version: 3,
+      version: 1,
       symbol,
       unitNav: index === 2 ? sample.price : sample.previous,
       navDate: date + 'T00:00:00Z',

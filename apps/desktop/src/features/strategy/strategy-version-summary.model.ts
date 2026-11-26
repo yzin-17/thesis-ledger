@@ -1,5 +1,5 @@
 import { strategySchema, priceResearchStrategySummary, booleanExpressionSchema, riskRuleSchema, type BacktestStrategy } from '@thesis-ledger/schemas';
-import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
+import { formatDecimalRatioPercent, backtestTradePlanLines, backtestDailyOrderLines, backtestSessionReadback, isPriceResearchStrategyDefinition } from '@thesis-ledger/domain';
 import { strategyInstrumentLabel } from './strategy-instrument-display.js';
 import type { StrategySchema, StrategyVersion } from './strategy.types.js';
 import {
@@ -57,7 +57,7 @@ const sourceDisplayLabels = (sources: BacktestStrategy['signalSources'], version
   new Map(
     sources.map((source) => [
       source.id,
-      `${strategyInstrumentLabel(version.instrumentDirectory, source.asset.symbol)}（${strategyTimeframeLabel(source.timeframe)}${source.priceCoordinate ? ` · ${source.priceCoordinate === 'actual' ? '不复权' : '后复权'}` : ''}）`,
+      `${strategyInstrumentLabel(version.instrumentDirectory, source.asset.symbol)}（${strategyTimeframeLabel(source.timeframe)}${source.priceCoordinate ? ` · ${{ actual: '不复权', research: '后复权', run: '本次运行价格', 'native-nav': '发布单位净值' }[source.priceCoordinate]}` : ''}）`,
     ]),
   );
 
@@ -82,10 +82,22 @@ const numericExpression = (value: unknown, sourceLabels: ReadonlyMap<string, str
     };
     return labels[String(node.field)] ?? '持仓状态';
   }
+  if (node.type === 'sessionValue') {
+    const sourceLabel = sourceLabels.get(String(node.sourceId)) ?? '信号来源';
+    const label = node.field === 'vwap' ? '当日累计均价（收盘价乘成交量）' : '距当日首个开市分钟数（午休不重置）';
+    return `${sourceLabel}的${label}`;
+  }
   if (node.type === 'indicator') {
     const params = record(node.params);
+    if (node.name === 'MACD') {
+      const outputs: Record<string, string> = { macd: '主线', signal: '信号线', histogram: '柱线' };
+      const scalar = (value: unknown) =>
+        typeof value === 'string' || typeof value === 'number' ? String(value) : '未知';
+      const output = typeof node.output === 'string' ? node.output : 'macd';
+      return `MACD${outputs[output] ?? output}（快周期 ${scalar(params?.fastPeriod)}、慢周期 ${scalar(params?.slowPeriod)}、信号周期 ${scalar(params?.signalPeriod)}；${numericExpression(node.input, sourceLabels)}）`;
+    }
     const suffix = params ? `（${Object.values(params).map(String).join('、')}）` : '';
-    const indicatorLabel = strategyIndicatorLabel(node.name);
+    const indicatorLabel = node.name === 'VWAP' ? '滚动成交量加权均价 VWAP' : strategyIndicatorLabel(node.name);
     return `${indicatorLabel}${suffix}［${numericExpression(node.input, sourceLabels)}］`;
   }
   return '无法识别的数值条件';
@@ -98,12 +110,13 @@ const booleanExpression = (value: unknown, sourceLabels: ReadonlyMap<string, str
     const conditions = Array.isArray(node.conditions) ? node.conditions : [];
     const connector = node.type === 'all' ? ' 且 ' : ' 或 ';
     return (
-      conditions.map((condition) => booleanExpression(condition, sourceLabels)).join(connector) ||
+      conditions.map((condition) => `（${booleanExpression(condition, sourceLabels)}）`).join(connector) ||
       '没有条件'
     );
   }
   if (node.type === 'not') return `不满足（${booleanExpression(node.expression, sourceLabels)}）`;
   if (node.type === 'positionState') return '已有持仓';
+  if (node.type === 'corporateActionEvent') return `权益事件 ${String(node.eventType)}`;
   if (node.type === 'cross') {
     return `${numericExpression(node.left, sourceLabels)}${strategyCrossDirectionLabel(node.direction)}${numericExpression(node.right, sourceLabels)}`;
   }
@@ -148,6 +161,7 @@ export const strategyDiffValueSummary = (path: string, value: unknown): string |
 const executionSummary = (schema: BacktestStrategy) => {
   const cost = `佣金率 ${percentage(schema.cost.commissionRate)}，滑点率 ${percentage(schema.cost.slippageRate)}`;
   if (schema.execution.mode === 'nav') return `按下一可用净值申购或赎回；${cost}`;
+  if (schema.execution.timing === 'dailyBarOrders') return `按委托模板与冻结的日线撮合政策执行；${cost}`;
   return `信号后在下一可执行 K 线开盘，以当日有效市价单执行；${cost}`;
 };
 
@@ -172,6 +186,13 @@ export const strategyVersionSummary = (version: StrategyVersion): StrategyVersio
   const value = parsed.data as BacktestStrategy;
   const instrument = value.executionInstrument;
   const sourceLabels = sourceDisplayLabels(value.signalSources, version);
+  const planLines = backtestTradePlanLines(value.tradePlan, isPriceResearchStrategyDefinition(value) ? '研究单位' : undefined, sourceLabels, value.execution.timing === 'dailyBarOrders');
+  const orderLines = value.execution.timing === 'dailyBarOrders' ? backtestDailyOrderLines(value.execution, sourceLabels) : [];
+  let allocation: string;
+  if (value.tradePlan?.volatilityTarget) allocation = '每日收盘按目标波动率主动调仓；公式与限制见交易计划';
+  else if (value.tradePlan?.monthlyRebalance) allocation = '最后交易日收盘按目标仓位与偏离阈值调仓；规则见交易计划';
+  else if (isPriceResearchStrategyDefinition(value) && value.sizing.type === 'fixedQuantity') allocation = priceResearchStrategySummary(value).sizing;
+  else allocation = sizingSummary(value.sizing);
   return {
     kind: 'ready',
     sections: [
@@ -183,8 +204,11 @@ export const strategyVersionSummary = (version: StrategyVersion): StrategyVersio
       },
       { group: 'signals', label: '入场逻辑', value: booleanExpression(value.entry, sourceLabels) },
       { group: 'signals', label: '退出逻辑', value: booleanExpression(value.exit, sourceLabels) },
-      { group: 'execution', label: '仓位管理', value: value.schemaVersion === '3' ? priceResearchStrategySummary(value).sizing : sizingSummary(value.sizing) },
+      ...backtestSessionReadback(value).map(line => ({ group: 'signals' as const, label: '会话与成交时点', value: line })),
+      { group: 'execution', label: '仓位管理', value: allocation },
       { group: 'execution', label: '风险约束', value: riskSummary(value.risk) },
+      ...(planLines.length ? [{ group: 'execution' as const, label: '交易计划', value: planLines.join('\n\n') }] : []),
+      ...(orderLines.length ? [{ group: 'execution' as const, label: '委托计划', value: orderLines.join('\n\n') }] : []),
       { group: 'execution', label: '执行假设', value: executionSummary(value) },
     ],
   };

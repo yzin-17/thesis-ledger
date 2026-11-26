@@ -63,9 +63,9 @@ it('恢复过的空结果自动关闭，随后第一下主动点击即可提示'
 it('自主比赛在旧列表为空时仍显示实际成交并链接模型账户', async () => {
   sessionStorage.setItem(`arena-overlay:${window.location.origin}:local-workspace:600036.SH`, 'live1');
   mocks.list.mockResolvedValue([]);
-  mocks.liveList.mockResolvedValue([{ id: 'live1', protocol: { version: 2, title: '自主比赛', universe: 'market', instruments: [] } }]);
+  mocks.liveList.mockResolvedValue([{ id: 'live1', protocol: { version: 'arena-live-match-protocol-v1', title: '自主比赛', universe: 'market', instruments: [] } }]);
   mocks.liveGet.mockResolvedValue({ agents: [{ id: 'agent1', model: '自主模型' }] });
-  mocks.livePoints.mockResolvedValue([{ protocolVersion: 2, id: 'fill1', arenaId: 'live1', roundId: null, entrantId: 'agent1', model: '自主模型', symbol: '600036.SH', day: '2026-11-06', executedAt: '2026-11-06T02:00:00.000Z', side: 'buy', quantity: '100', price: '42' }]);
+  mocks.livePoints.mockResolvedValue([{ protocolVersion: 'arena-live-match-protocol-v1', id: 'fill1', arenaId: 'live1', roundId: null, entrantId: 'agent1', model: '自主模型', symbol: '600036.SH', day: '2026-11-06', executedAt: '2026-11-06T02:00:00.000Z', side: 'buy', quantity: '100', price: '42' }]);
   await render(); await flush(() => button().click()); await flush(() => {});
   expect(host.querySelector('[data-plot]')?.getAttribute('data-model-points')).toBe('1');
   await selectOption('模型筛选', '自主模型');

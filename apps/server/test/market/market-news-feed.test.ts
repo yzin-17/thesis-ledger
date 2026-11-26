@@ -23,7 +23,7 @@ const client = () =>
 afterEach(() => vi.unstubAllGlobals());
 function feedFetch(status = 200, corrupt = false) {
   const fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
-    expect(String(url)).toBe('https://dsa.example.test/api/v3/thesis-ledger/market/news-feed');
+    expect(String(url)).toBe('https://dsa.example.test/api/v1/thesis-ledger/market/news-feed');
     expect((init?.headers as Record<string, string>).authorization).toBe(
       'Bearer controlled-feed-token',
     );

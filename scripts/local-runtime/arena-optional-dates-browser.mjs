@@ -13,7 +13,7 @@ const inlineValidation = process.env.ARENA_INLINE_VALIDATION === '1';
 const singleModel = process.env.ARENA_SINGLE_MODEL === '1';
 const unlimited = { requests: null, tokens: null, costMicros: null };
 const cases = optionalBudgets ? [['', '', {}], ['', '', { requests: '5', cost: '0.000001', allRequests: '2' }], ['', '', { requests: '0', allCost: '0' }]] : [['', ''], ['2026-11-13', ''], ['', '2026-11-20']];
-const models = ['Atlas', 'Orion'], contract = { id: 'arena_live_research', version: 'arena-live-research-v2' };
+const models = ['Atlas', 'Orion'], contract = s.aiGenerationContracts.arenaLiveResearch.ref;
 const providers = s.aiProviderRecordsSchema.parse([{ name: '受控模型', type: 'ai', enabled: true, priority: 1, capabilities: [], health: 'healthy',
   modelPricing: Object.fromEntries(models.map((model) => [model, { costPer1kInput: 0, costPer1kOutput: 0, costCurrency: 'USD' }])),
   executionRoutes: models.map((model) => ({ model, adapter: 'openai-compatible', mode: 'json_validated', contract, adapterEvidence: null,
@@ -153,6 +153,7 @@ try {
       await page.getByRole('button', { name: '保存比赛草稿', exact: true }).click();
       await page.getByRole('heading', { level: 1, name: optionalRequests && index === 0 ? '自主模型比赛' : '持续比赛', exact: true }).waitFor();
       assert.equal(protocol.entrants.length, singleModel ? 1 : 2);
+      assert.equal(protocol.version, 'arena-live-match-protocol-v1');
       assert.equal(protocol.startsOn, startsOn || null); assert.equal(protocol.endsOn, endsOn || null);
       assert.equal(protocol.calendarVersion, null); assert.equal(calendarReads, before);
       if (optionalRequests) {
@@ -180,7 +181,9 @@ try {
       }
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
       if (!startsOn && !endsOn && index === 0) {
+        await page.getByRole('tab', { name: '比赛设置', exact: true }).click();
         await page.getByText('手动启动 · 手动结束', { exact: true }).waitFor();
+        await page.getByRole('tab', { name: '收益表现', exact: true }).click();
         await page.getByRole('button', { name: '启动比赛', exact: true }).click();
         await page.getByRole('button', { name: '暂停比赛', exact: true }).waitFor();
         await page.getByRole('button', { name: '结束比赛', exact: true }).click();

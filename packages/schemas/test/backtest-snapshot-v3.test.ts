@@ -73,7 +73,7 @@ const normalizedExecutionModel = () => {
 describe('Backtest V3 run and snapshot contracts', () => {
   it('accepts a new run only with the explicit V3 price and history protocol', () => {
     const config = {
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       startDate: '2026-05-16',
       endDate: '2026-08-09',
       dataAsOf: '2026-08-10T00:00:00.000Z',
@@ -92,7 +92,7 @@ describe('Backtest V3 run and snapshot contracts', () => {
     expect(runConfigSchemaV3.parse(config)).toEqual(config);
     expect(
       backtestRunCreateSchemaV3.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         preparationStamp: JSON.parse(
           readFileSync(
             new URL('../fixtures/backtest-preparation-stamp-v3.json', import.meta.url),
@@ -106,7 +106,7 @@ describe('Backtest V3 run and snapshot contracts', () => {
     ).toBe(true);
     expect(
       backtestRunCreateSchemaV3.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         strategyVersionId: 'd2719c01-f684-4cb6-94c6-61c77d4f9881',
         runConfig: config,
         idempotencyKey: 'missing-preparation',
@@ -145,7 +145,7 @@ describe('Backtest V3 run and snapshot contracts', () => {
     const parsed = backtestSnapshotManifestV3Schema.parse(fixture);
     const actualSourceFixture = (fixture.actualSources as Record<string, unknown>[])[0]!;
     const provenanceFixture = actualSourceFixture.provenance as Record<string, unknown>;
-    expect(parsed.manifestVersion).toBe('snapshot-manifest-v3');
+    expect(parsed.manifestVersion).toBe('backtest-trade-snapshot-manifest-v1');
     expect(parsed.executionPriceProtocol.history).toEqual({ basis: 'fixed-provider-snapshot' });
     expect(parsed.actualSources[0]).toMatchObject({
       purpose: 'execution',
@@ -198,8 +198,8 @@ describe('Backtest V3 run and snapshot contracts', () => {
       strategyVersionId: 'strategy-version-1',
       snapshotId: 'snapshot-v3-1',
       engineVersion: 'thesis-ledger-v2',
-      schemaVersion: '3',
-      snapshotVersion: 'snapshot-manifest-v3',
+      schemaVersion: 'backtest-trade-result-v1',
+      snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
       marketRuleVersion: 'market-rules-v1',
       calendarVersion: 'calendar-v1',
       aggregationVersion: 'bar-aggregation-v1',
@@ -219,8 +219,8 @@ describe('Backtest V3 run and snapshot contracts', () => {
     };
 
     expect(backtestResultSchemaV3.parse(result)).toMatchObject({
-      schemaVersion: '3',
-      snapshotVersion: 'snapshot-manifest-v3',
+      schemaVersion: 'backtest-trade-result-v1',
+      snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
       comparableDataFingerprint: 'd'.repeat(64),
     });
     const missingActualSources = withoutField(result, 'actualSources');
@@ -246,7 +246,7 @@ describe('sealed AI feedback contract', () => {
     metrics: { totalReturn: { status: 'available', value: '0.12' } },
   };
   const validContext = {
-    contractVersion: 3,
+    contractVersion: 1,
     modelKey: 'provider:model',
     round: 1,
     objective: { mode: 'return', minClosedTrades: 1 },

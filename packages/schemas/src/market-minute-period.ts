@@ -41,7 +41,7 @@ export const marketMinuteDisplayPointSchema = barPointSchema
   });
 export const marketMinuteBarSeriesSchema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     identity: barSeriesIdentitySchema.extend({
       assetType: z.enum(['STOCK', 'ETF']),
       timeframe: marketMinutePeriodSchema,

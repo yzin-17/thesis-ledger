@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { aiCostFactsSchema, aiUsageFactsSchema } from './ai-execution.js';
+import { aiCostFactsSchema, aiUsageFactsSchema, aiGenerationContractRefSchema } from './ai-execution.js';
+import { strategyCompilationSchema } from './strategy-compilation.js';
 import { AUTHORING_CAPABILITY_VERSION, AUTHORING_LIMITS } from './strategy-authoring-definition.js';
 import { authoringContentSchema } from './strategy-authoring-content.js';
 import { authoringModificationTargetSchema } from './strategy-authoring-modification.js';
@@ -10,7 +11,6 @@ export {
   type AuthoringContent,
 } from './strategy-authoring-content.js';
 
-const shortText = z.string().max(2_000);
 const key = z.string().trim().min(1).max(120);
 const revision = z.number().int().min(1).max(2_147_483_647);
 const limited = <T extends z.ZodType>(schema: T) =>
@@ -36,6 +36,7 @@ export const authoringOperationInputSchema = z
       .regex(/^[a-f0-9]{64}$/u)
       .optional(),
     promptVersion: key,
+    generationContract: aiGenerationContractRefSchema.optional(),
     capabilityVersion: z.literal(AUTHORING_CAPABILITY_VERSION),
     cost: aiCostFactsSchema,
     unknownCostAcknowledgedAt: z.iso.datetime().nullable(),
@@ -109,6 +110,7 @@ export const authoringOperationFinishSchema = z
     status: z.enum(['succeeded', 'failed', 'cancelled']),
     externalResult: z.enum(['not_sent', 'received', 'unknown']),
     outputText: z.string().nullable(),
+    compilation: strategyCompilationSchema.optional(),
     errorCode: key.nullable(),
     usage: aiUsageFactsSchema.nullable(),
     cost: aiCostFactsSchema,
@@ -154,7 +156,7 @@ export const authoringProposalInputSchema = z
     allowedPaths: limited(key).min(1),
     beforeText: z.string().max(AUTHORING_LIMITS.definitionCharacters),
     afterText: z.string().max(AUTHORING_LIMITS.definitionCharacters),
-    differences: limited(z.object({ path: key, before: shortText, after: shortText }).strict()).min(
+    differences: limited(z.object({ path: key, before: z.string().max(AUTHORING_LIMITS.definitionCharacters), after: z.string().max(AUTHORING_LIMITS.definitionCharacters) }).strict()).min(
       1,
     ),
   })

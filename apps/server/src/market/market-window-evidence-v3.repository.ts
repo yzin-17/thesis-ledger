@@ -123,6 +123,7 @@ const identityFingerprint = (identity: NormalizedIdentity): string => {
         identity.inputFingerprint,
         [identity.desiredRevision, identity.effectivePolicyRevision, identity.catalogRevision],
         ...(identity.request.tradabilityMode ? [identity.request.tradabilityMode] : []),
+        ...(identity.request.dailyObservationContract !== undefined ? [['dailyObservationContract', 'market-daily-tradability-window-v1']] : []),
       ]),
     )
     .digest('hex');
@@ -276,6 +277,83 @@ export class MarketWindowEvidenceV3IdentityConflictError extends Error {
   }
 }
 
+const frozenIdentitySchema = z.string().regex(/^[a-f0-9]{64}$/);
+const archiveWireFields = z.object({
+  requestedStart: z.coerce.date(),
+  requestedEnd: z.coerce.date(),
+  fetchedAt: z.coerce.date(),
+  catalogRevision: z.coerce.bigint(),
+});
+
+/** 用正常回读校验核对离线迁移产生的行。 */
+export function readMarketWindowMigrationCandidate(row: Record<string, unknown>, fingerprint: string) {
+  const id = frozenIdentitySchema.parse(fingerprint);
+  const candidate = { ...row, ...archiveWireFields.parse(row) } as PrismaEvidenceV3;
+  return decodeFrozenMarketWindowEvidence(candidate, id);
+}
+
+function decodeFrozenMarketWindowEvidence(row: PrismaEvidenceV3, id: string) {
+  if (row.completeResponse === null && row.completeResponseHash === null) return null;
+  if (
+    !row.completeResponseHash ||
+    marketFrozenWindowHashV3(row.completeResponse) !== row.completeResponseHash
+  ) {
+    throw new MarketWindowEvidenceV3IdentityConflictError();
+  }
+  const response = parseMarketWindowEvidenceResponseV3(row.completeResponse);
+  const request = normalizeRequest({
+    contractVersion: 1,
+    requestId: response.requestId,
+    symbol: row.symbol,
+    routeKey: {
+      kind: row.routeKind,
+      market: row.market,
+      assetType: row.assetType,
+      capability: row.capability,
+      timeframe: row.timeframe,
+      adjustment: row.adjustment,
+    },
+    start: dateOnly(row.requestedStart),
+    end: dateOnly(row.requestedEnd),
+    ...(response.historicalTradabilityWindows?.[0]?.priceOnlyAllowed ? { dailyObservationContract: 'market-daily-tradability-window-v1' } : {}),
+    ...(row.completeResponse && typeof row.completeResponse === 'object' && 'historicalTradabilityWindows' in row.completeResponse
+      ? { tradabilityMode: row.timeframe === '1d' ? 'assume-untradable-no-bar' : 'observed-bars-only' } : {}),
+    routeTarget: {
+      providerId: row.providerId,
+      upstreamSource: row.upstreamSource,
+      routeIndex: row.routeIndex,
+    },
+  });
+  parseMarketWindowEvidenceResponseV3(response, request);
+  assertExactSeriesVersion(request, response, row.seriesVersion);
+  const identity = normalizeIdentity({
+    request,
+    seriesVersion: row.seriesVersion,
+    inputFingerprint: response.inputFingerprint,
+    desiredRevision: row.desiredRevision,
+    effectivePolicyRevision: row.effectivePolicyRevision,
+    catalogRevision: catalogRevisionFromDb(row.catalogRevision),
+  });
+  if (
+    row.identityFingerprint !== id ||
+    identityFingerprint(identity) !== id ||
+    response.provenance.effectivePolicyRevision !== row.effectivePolicyRevision ||
+    !isDeepStrictEqual(row.sourcePriceBasis, response.sourcePriceBasis) ||
+    !isDeepStrictEqual(row.coverageProof, response.coverageProof) ||
+    response.coverage.requestedStart !== request.start ||
+    response.coverage.requestedEnd !== request.end
+  ) {
+    throw new MarketWindowEvidenceV3IdentityConflictError();
+  }
+  return {
+    request,
+    response,
+    seriesVersion: row.seriesVersion,
+    completeResponseHash: row.completeResponseHash,
+    evidence: toStoredEvidence(row, identity),
+  };
+}
+
 @Injectable()
 export class MarketWindowEvidenceV3Repository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -339,72 +417,11 @@ export class MarketWindowEvidenceV3Repository {
   }
 
   async findFrozen(fingerprint: string) {
-    const id = z
-      .string()
-      .regex(/^[a-f0-9]{64}$/)
-      .parse(fingerprint);
+    const id = frozenIdentitySchema.parse(fingerprint);
     const row = await this.prisma.marketBarWindowEvidenceV3.findUnique({
       where: { identityFingerprint: id },
     });
-    if (!row) return null;
-    if (row.completeResponse === null && row.completeResponseHash === null) return null;
-    if (
-      !row.completeResponseHash ||
-      marketFrozenWindowHashV3(row.completeResponse) !== row.completeResponseHash
-    ) {
-      throw new MarketWindowEvidenceV3IdentityConflictError();
-    }
-    const response = parseMarketWindowEvidenceResponseV3(row.completeResponse);
-    const request = normalizeRequest({
-      contractVersion: 3,
-      requestId: response.requestId,
-      symbol: row.symbol,
-      routeKey: {
-        kind: row.routeKind,
-        market: row.market,
-        assetType: row.assetType,
-        capability: row.capability,
-        timeframe: row.timeframe,
-        adjustment: row.adjustment,
-      },
-      start: dateOnly(row.requestedStart),
-      end: dateOnly(row.requestedEnd),
-      ...(row.completeResponse && typeof row.completeResponse === 'object' && 'historicalTradabilityWindows' in row.completeResponse
-        ? { tradabilityMode: 'assume-untradable-no-bar' } : {}),
-      routeTarget: {
-        providerId: row.providerId,
-        upstreamSource: row.upstreamSource,
-        routeIndex: row.routeIndex,
-      },
-    });
-    parseMarketWindowEvidenceResponseV3(response, request);
-    assertExactSeriesVersion(request, response, row.seriesVersion);
-    const identity = normalizeIdentity({
-      request,
-      seriesVersion: row.seriesVersion,
-      inputFingerprint: response.inputFingerprint,
-      desiredRevision: row.desiredRevision,
-      effectivePolicyRevision: row.effectivePolicyRevision,
-      catalogRevision: catalogRevisionFromDb(row.catalogRevision),
-    });
-    if (
-      row.identityFingerprint !== id ||
-      identityFingerprint(identity) !== id ||
-      response.provenance.effectivePolicyRevision !== row.effectivePolicyRevision ||
-      !isDeepStrictEqual(row.sourcePriceBasis, response.sourcePriceBasis) ||
-      !isDeepStrictEqual(row.coverageProof, response.coverageProof) ||
-      response.coverage.requestedStart !== request.start ||
-      response.coverage.requestedEnd !== request.end
-    ) {
-      throw new MarketWindowEvidenceV3IdentityConflictError();
-    }
-    return {
-      request,
-      response,
-      seriesVersion: row.seriesVersion,
-      completeResponseHash: row.completeResponseHash,
-      evidence: toStoredEvidence(row, identity),
-    };
+    return row ? decodeFrozenMarketWindowEvidence(row, id) : null;
   }
 
   async findExact(

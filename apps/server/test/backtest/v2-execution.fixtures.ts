@@ -112,7 +112,7 @@ export const exchangeExecutionModel = () => ({
 });
 
 export const strategy = strategySchema.parse({
-  schemaVersion: '2',
+  schemaVersion: 'strategy-definition-v1',
   name: 'NAV sequential runtime',
   signalSources: [
     {
@@ -120,6 +120,7 @@ export const strategy = strategySchema.parse({
       asset: { symbol: '110011.OF', market: 'CN', assetType: 'fund' },
       timeframe: '1d',
       series: ['nav'],
+      priceCoordinate: 'native-nav',
     },
   ],
   executionInstrument: { symbol: '110011.OF', market: 'CN', assetType: 'fund' },
@@ -138,7 +139,7 @@ export const strategy = strategySchema.parse({
 }) as BacktestStrategy;
 
 export const runConfig = runConfigSchemaV3.parse({
-  schemaVersion: '3',
+  schemaVersion: 'backtest-trade-config-v1',
   executionPriceProtocol: {
     protocolVersion: 'execution-price-v1',
     priceBasis: {

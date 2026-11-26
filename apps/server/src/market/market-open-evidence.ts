@@ -1,6 +1,10 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import {
+  dailyPriceRuleResultV1Schema,
+  dailyTradingStatusResultV1Schema,
+} from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { MarketService } from './market.service.js';
 import { MarketLifecycleReaderV3 } from './market-lifecycle-reader-v3.js';
@@ -55,25 +59,40 @@ export class MarketOpenEvidence {
       executionRules.cashSettlement.buyDebitAfterTradingDays !== 0
     )
       return unavailable('settlement_unqualified');
-    const [quote, history, events] = await Promise.all([
+    const [quote, status, events] = await Promise.all([
       this.market.getQuote(i.symbol, { allowStale: false, assetType: i.assetType }),
-      this.status.read({ market: i.market, symbol: i.symbol, start: day, end: day }),
+      readOpeningStatus(this.status, i.symbol, day),
       new Prisma.Decimal(i.held).isZero() ? [] : this.actions.read(i, day),
     ]);
     if (!events) return unavailable('corporate_action_unverified');
     if (!openingQuoteAvailable(quote, i, date, day))
       return unavailable('opening_price_unavailable');
-    const status = history.days.find((d) => d.date === day);
-    if (
-      !status ||
-      status.state === 'unknown' ||
-      (!status.noDailyPriceLimit && !status.dailyPriceLimit)
-    )
-      return unavailable('trading_status_unknown');
-    return openingExecutionFact(i, day, instrument, quote, history, status, events);
+    if (!status) return unavailable('trading_status_unknown');
+    return openingExecutionFact(i, day, instrument, quote, status, events);
   }
 }
 
+async function readOpeningStatus(status: Pick<MarketLifecycleReaderV3, 'readComposition'>, symbol: string, date: string) {
+  const route = { kind: 'data', market: 'CN', assetType: 'STOCK' } as const;
+  const query = { contractVersion: 1, capabilityVersion: 1, consumer: 'thesis-ledger',
+    symbol, range: { start: date, end: date } } as const;
+  const composition = await status.readComposition([
+    { requirement: 'optional', query: { ...query, requestId: randomUUID(),
+      routeKey: { ...route, capability: 'DAILY_TRADING_STATUS' } } },
+    { requirement: 'optional', query: { ...query, requestId: randomUUID(),
+      routeKey: { ...route, capability: 'DAILY_PRICE_RULE' }, representation: 'rule' } },
+  ]);
+  const [statusEntry, priceEntry] = composition.entries;
+  if (statusEntry?.status !== 'included' || priceEntry?.status !== 'included') return null;
+  const trading = dailyTradingStatusResultV1Schema.parse(statusEntry.result);
+  const prices = dailyPriceRuleResultV1Schema.parse(priceEntry.result);
+  const tradingDay = trading.days.find((item) => item.date === date);
+  const priceDay = prices.days.find((item) => item.date === date);
+  if (!tradingDay || tradingDay.state === 'unknown' || !priceDay || priceDay.rule.kind === 'unknown') return null;
+  return { tradingDay, priceRule: priceDay.rule, composition };
+}
+
+type OpeningStatus = NonNullable<Awaited<ReturnType<typeof readOpeningStatus>>>;
 type InstrumentScope = Awaited<ReturnType<DsaClient['backtestInstrumentFacts']>>;
 type LiveQuote = Awaited<ReturnType<MarketService['getQuote']>>;
 
@@ -137,7 +156,7 @@ function openingQuoteAvailable(
 
 function openingBlocked(
   rule: InstrumentScope['facts'][number],
-  status: Awaited<ReturnType<MarketLifecycleReaderV3['read']>>['days'][number],
+  status: OpeningStatus['tradingDay'],
   i: Input,
 ) {
   return !rule.tradable ||
@@ -156,19 +175,21 @@ function openingExecutionFact(
   day: string,
   instrument: Extract<ReturnType<typeof openingInstrument>, { status: 'available' }>,
   quote: LiveQuote & { marketTime: string },
-  history: Awaited<ReturnType<MarketLifecycleReaderV3['read']>>,
-  status: Awaited<ReturnType<MarketLifecycleReaderV3['read']>>['days'][number],
+  status: OpeningStatus,
   events: NonNullable<Awaited<ReturnType<MarketActionCoverage['read']>>>,
 ) {
   const { rule, lot, tick: tickSize } = instrument;
-  const blocked = openingBlocked(rule, status, i);
-  const band = status.dailyPriceLimit;
-  if (band && quote.previousClose <= 0) return openingUnavailable('price_limit_unknown');
+  const blocked = openingBlocked(rule, status.tradingDay, i);
+  const band = status.priceRule;
+  if (band.kind === 'ratio' && quote.previousClose <= 0) return openingUnavailable('price_limit_unknown');
+  if (band.kind === 'exact' && band.currency !== i.currency) return openingUnavailable('price_limit_currency_mismatch');
   const tick = new Prisma.Decimal(tickSize),
     previous = new Prisma.Decimal(quote.previousClose);
   const limit = (ratio: Prisma.Decimal) => previous.times(ratio).div(tick).round().times(tick);
-  const upper = band && limit(new Prisma.Decimal(1).plus(band.maxUpRatio));
-  const lower = band && limit(new Prisma.Decimal(1).minus(band.maxDownRatio));
+  const upper = band.kind === 'ratio' ? limit(new Prisma.Decimal(1).plus(band.maxUpRatio))
+    : band.kind === 'exact' ? new Prisma.Decimal(band.upper) : undefined;
+  const lower = band.kind === 'ratio' ? limit(new Prisma.Decimal(1).minus(band.maxDownRatio))
+    : band.kind === 'exact' ? new Prisma.Decimal(band.lower) : undefined;
   const sources = {
     quote: {
       provider: quote.provider,
@@ -177,12 +198,12 @@ function openingExecutionFact(
       previousClose: quote.previousClose,
     },
     rule: rule.providerRevision,
-    status: history.provenance.providerRevision,
+    status: status.composition,
     events,
   };
   const sourceRef = createHash('sha256')
     .update(
-      JSON.stringify([i.symbol, day, sources, quote.open, rule.lotSize, rule.tickSize, status]),
+      JSON.stringify([i.symbol, day, sources, quote.open, rule.lotSize, rule.tickSize]),
     )
     .digest('hex');
   return {

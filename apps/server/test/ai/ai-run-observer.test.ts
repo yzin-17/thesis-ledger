@@ -7,7 +7,7 @@ const id = '11111111-1111-4111-8111-111111111111';
 const execution = (deadline = 5000) =>
   aiExecutionReadModelSchema.parse({
     version: 'sdk-execution-v1',
-    contract: { id: 'research', version: 'research-generation-v1' },
+    contract: { id: 'research', version: 'research-report-generation-v1' },
     frozenPolicy: null,
     deadlineAt: new Date(deadline).toISOString(),
     generationStatus: 'pending',

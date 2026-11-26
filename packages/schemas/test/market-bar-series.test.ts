@@ -30,7 +30,7 @@ describe('日线序列现行合同', () => {
   });
   it('校验 identity、coverage 和精确 provenance', () => {
     const result = barSeriesSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
       points: [point],
       coverage: {
@@ -58,7 +58,7 @@ describe('日线序列现行合同', () => {
 
   it('要求指标请求和响应均携带 inputFingerprint', () => {
     const request = indicatorCalculateRequestSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
       inputFingerprint: 'fingerprint-1',
       points: [point],
@@ -66,7 +66,7 @@ describe('日线序列现行合同', () => {
     });
     expect(request.inputFingerprint).toBe('fingerprint-1');
     const response = indicatorCalculateResponseSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       engineVersion: 'dsa-indicator-v3',
       inputFingerprint: request.inputFingerprint,
       results: [{
@@ -86,7 +86,7 @@ describe('日线序列现行合同', () => {
 
   it('拒绝重复时间戳和违反 OHLC 不变量的 points', () => {
     const base = {
-      contractVersion: 3,
+      contractVersion: 1,
       identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
       points: [point, point],
       coverage: { actualStart: point.timestamp, actualEnd: point.timestamp, hasMoreBefore: false, latestCompleteTradingDate: '2025-01-02' },
@@ -121,7 +121,7 @@ describe('日线序列现行合同', () => {
 
   it('行情详情的 bars 和指标共享同一个日线序列 fingerprint', () => {
     const barSeries = barSeriesSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
       points: [point],
       coverage: { actualStart: point.timestamp, actualEnd: point.timestamp, hasMoreBefore: false, latestCompleteTradingDate: '2025-01-02' },
@@ -129,7 +129,7 @@ describe('日线序列现行合同', () => {
       inputFingerprint: 'fingerprint-1',
     });
     const detail = {
-      contractVersion: 3,
+      contractVersion: 1,
       symbol: '510300.SH',
       assetType: 'ETF',
       identity: { source: 'asset', status: 'confirmed' },

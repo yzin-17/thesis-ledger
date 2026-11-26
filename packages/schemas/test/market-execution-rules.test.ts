@@ -19,7 +19,7 @@ const scope = {
   subject: 'SINGLE_EXECUTION',
 } as const;
 const request = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'controlled',
   scope,

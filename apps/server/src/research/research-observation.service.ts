@@ -42,7 +42,7 @@ export class ResearchObservationService {
     const report = await this.access.report(ownerId, id, locator);
     if (
       report.availability !== 'available' ||
-      report.result?.version !== 2 ||
+      report.result?.version !== 'research-report-result-v1' ||
       report.historicalScope.status !== 'known'
     )
       throw new BadRequestException('这份报告缺少可自动复核的可信 V2 字段');

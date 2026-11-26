@@ -24,7 +24,7 @@ client.setQueryData([...root, 'prices', 'actual', sample.page.items.map((item) =
   checkedAt: Object.fromEntries(sample.page.items.map((item) => [item.id, Date.now()])),
 });
 client.setQueryData([...root, 'source-cadence'], {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   status: 'complete',
   catalogRevision: 1,

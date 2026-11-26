@@ -19,6 +19,11 @@ import { MarketAnnouncementPreparationService } from '../market/market-announcem
 import { prepareBacktestRunConfigV3 } from './backtest-run-preparation.js';
 import { hashCanonicalManifest } from './backtest-snapshot.js';
 import { BacktestKnownCashAcquisitionV3 } from './backtest-known-cash-acquisition-v3.service.js';
+import { DsaClient } from '../integration/dsa/dsa.client.js';
+import { calendarDependencyRequests } from './backtest-settlement-calendar.js';
+import { readSnapshotDependencyV3 } from './backtest-snapshot-v3-dependency-collector.js';
+import { planSnapshotInputsV3 } from './backtest-snapshot-v3-input-plan.js';
+import type { RunConfigV3 } from '@thesis-ledger/schemas';
 
 @Injectable()
 export class BacktestRunPreparationService {
@@ -34,6 +39,7 @@ export class BacktestRunPreparationService {
     @Optional()
     @Inject(BacktestKnownCashAcquisitionV3)
     private readonly knownCash?: BacktestKnownCashAcquisitionV3,
+    @Optional() @Inject(DsaClient) private readonly dsa?: DsaClient,
   ) {}
 
   async prepare(input: unknown) {
@@ -42,8 +48,8 @@ export class BacktestRunPreparationService {
       where: { id: request.strategyVersionId },
     });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (![2, 3].includes(version.schemaVersion))
-      throw new BadRequestException('配置准备要求schemaVersion=2的策略版本');
+    if (version.schemaVersion !== 1)
+      throw new BadRequestException('配置准备需要 strategy-definition-v1 策略定义');
     const strategy = strategySchema.parse(version.schema) as BacktestStrategy;
     const announcementPreparation = request.knownCashResearch || request.priceResearch
       ? undefined
@@ -55,7 +61,7 @@ export class BacktestRunPreparationService {
         });
     if (announcementPreparation?.status === 'preparing')
       return {
-        contractVersion: 3 as const,
+        contractVersion: 1 as const,
         requestId: request.requestId,
         checkedAt: new Date().toISOString(),
         scope: 'execution-window' as const,
@@ -67,6 +73,7 @@ export class BacktestRunPreparationService {
       strategy,
       reader: this.reader,
       control: this.control,
+      researchCalendar: (strategy, config, plan) => this.researchCalendar(strategy, config, plan),
       ...(this.lifecycle ? { lifecycle: this.lifecycle } : {}),
       ...(this.knownCash ? { knownCash: (input) => this.knownCash!.acquire(input) } : {}),
       checkedAt: new Date().toISOString(),
@@ -84,6 +91,7 @@ export class BacktestRunPreparationService {
       strategy,
       reader: this.reader,
       control: this.control,
+      researchCalendar: (strategy, config, plan) => this.researchCalendar(strategy, config, plan),
       ...(this.lifecycle ? { lifecycle: this.lifecycle } : {}),
       ...(this.knownCash ? { knownCash: (input) => this.knownCash!.acquire(input) } : {}),
       checkedAt: new Date().toISOString(),
@@ -103,5 +111,13 @@ export class BacktestRunPreparationService {
       strategyContentHash,
       routeRevisions: { desiredRevision, effectiveRevision, catalogRevision },
     };
+  }
+
+  private async researchCalendar(strategy: BacktestStrategy, runConfig: RunConfigV3, plan = planSnapshotInputsV3({ strategy, runConfig }).plan) {
+    if (!this.dsa) throw new Error('逻辑周期能力统计缺少日历读取端口');
+    const input = { strategy, runConfig, plan };
+    const requests = calendarDependencyRequests(input, (message): never => { throw new Error(message); });
+    const calendars = await Promise.all(requests.map((request) => readSnapshotDependencyV3(input, request, this.dsa!)));
+    return calendars.flatMap((calendar) => calendar.rows);
   }
 }

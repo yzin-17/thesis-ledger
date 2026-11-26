@@ -32,7 +32,7 @@ describe('显式已知现金方案交换合同', () => {
   });
   it('安全失败原因使用标准枚举，不能把上游正文或凭证变为原因', () => {
     const error = {
-      contractVersion: 3,
+      contractVersion: 1,
       protocolVersion: 'known-cash-observations-v1',
       requestId: 'known-cash-fixture',
       error: { code: 'upstream_failure', reason: 'permission_denied', message: '读取失败' },

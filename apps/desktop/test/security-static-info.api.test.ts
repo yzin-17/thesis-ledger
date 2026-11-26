@@ -4,7 +4,7 @@ import { fetchSecurityStaticInfo } from '../src/features/market-data/security-st
 const request = vi.fn();
 vi.mock('../src/shared/api/client.js', () => ({ getDesktopApiClient: () => ({ request }) }));
 afterEach(() => request.mockReset());
-const value = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'q', symbol: 'SPY.US', assetType: 'ETF',
+const value = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'q', symbol: 'SPY.US', assetType: 'ETF',
   market: 'US', name: 'SPY', securityId: '9007199254740993', sharesPerLot: '1', listingDate: null,
   delisted: false, exchange: null, provider: 'futu', historicalChanges: 'unverified',
   observedAt: '2026-10-09T01:00:00Z', fetchedAt: '2026-10-09T01:01:00Z', policyRevision: 1,

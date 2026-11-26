@@ -25,14 +25,18 @@ vi.mock('../src/features/portfolio/portfolio.api', async (original) => ({ ...(aw
 vi.mock('../src/features/risk/risk.queries', () => ({ useNotificationRoutingQuery: () => ({ isPending: false, isError: false, data: { routes: [] } }), useRiskNotificationRoutingQuery: () => ({ isPending: false, isError: false, data: { availableRoutes: [], selectedProviders: [] } }) }));
 vi.mock('../src/features/strategy/strategy-optimization.api', async (original) => ({
   ...(await original<object>()), fetchStrategyRiskApplications: api.applications, previewStrategyRiskApplication: api.preview, createStrategyRiskApplication: api.riskSave,
-  fetchOptimizationExperiment: api.detail, fetchOptimizationCompare: api.compare, cloneOptimizationExperiment: api.clone, cancelOptimizationExperiment: api.cancel, finalizeOptimizationExperiment: api.finalize,
+  fetchOptimizationExperiment: api.detail, fetchOptimizationCompare: api.compare, cloneOptimizationExperiment: api.clone, cancelOptimizationExperiment: api.cancel, completeOptimizationExperiment: api.finalize,
   adoptOptimizationCandidate: api.adopt, fetchOptimizationAdoptionContext: api.adoption,
   fetchOptimizationCapabilities: api.capabilities, fetchStrategyOptimizationParameters: api.parameters, createOptimizationExperiment: api.create,
 }));
 // 只隔离配置准备子组件；创建表单、路由、mutation 和后续读取使用实际实现。
 vi.mock('../src/features/strategy/OptimizationPricePreparation', () => ({ OptimizationPricePreparation: ({ target, startDate, endDate, initialCash, currency, onPrepared }: { target: unknown; startDate: string; endDate: string; initialCash: string; currency: string; onPrepared: (value: unknown) => void }) => <button onClick={() => onPrepared({ target, result: { runConfig: { startDate, endDate, baseCurrency: currency, initialCash: { [currency]: initialCash }, priceResearch: { actualPriceWindow: {} }, executionPriceProtocol: { priceBasis: { adjustment: 'hfq' } } } } })}>受控准备完成</button> }));
 vi.mock('../src/components/ui/toast', () => ({ useToastManager: () => ({ add: api.toast, close: api.close }) }));
-const version = { id: fixture.experiment.baselineStrategyVersionId, version: 1, schemaVersion: 3, schema: setStrategyExecutionSymbol(createDefaultStrategySchema('恢复验收策略'), '600519.SH') };
+const version = { id: fixture.experiment.baselineStrategyVersionId, version: 1, schemaVersion: 1, schema: setStrategyExecutionSymbol(createDefaultStrategySchema('恢复验收策略'), '600519.SH') };
+version.schema.signalSources = version.schema.signalSources.map((source: Record<string, unknown>) => ({
+  ...source,
+  asset: version.schema.executionInstrument,
+}));
 const strategy = { id: 'strategy', name: '恢复验收策略', versions: [version] };
 const provider: ProviderManifest = { providerId: 'tushare', displayName: 'Tushare', version: 1, configVersion: 1, configured: true, enabled: true, credentialConfigured: true, credentialSource: 'control', credentialMethod: 'token', credentialFieldsConfigured: { token: true }, requiresCredential: true, capabilities: {}, credentialSchema: { methods: [{ method: 'token', fields: [{ name: 'token', secret: true, required: true }] }] } };
 const experiment = fixture.experiment as unknown as OptimizationExperimentSummary;
@@ -71,12 +75,12 @@ async function click(text: string) { await act(async () => button(text).click())
 async function input(value: string) { const field = document.querySelector('input')!; await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, value); field.dispatchEvent(new Event('input', { bubbles: true })); }); }
 
 describe('市场配置与策略实验恢复', () => {
-  it('旧策略先确认新研究版本，采用后持续锁定新 ID 并用于实验创建', async () => {
-    const legacy = { ...version, schemaVersion: 2, schema: { ...version.schema, schemaVersion: '2' as const,
-      signalSources: version.schema.signalSources.map(source => { const next = { ...source }; delete next.priceCoordinate; return next; }),
+  it('按运行价格绑定的策略确认研究版本后锁定新 ID 并用于实验创建', async () => {
+    const legacy = { ...version, schema: { ...version.schema,
+      signalSources: version.schema.signalSources.map(source => ({ ...source, priceCoordinate: 'run' as const })),
     } };
     const projected = projectPriceResearchStrategy(legacy.schema);
-    const saved = { ...version, id: '55555555-5555-4555-8555-555555555555', version: 2, schemaVersion: 3, schema: projected };
+    const saved = { ...version, id: '55555555-5555-4555-8555-555555555555', version: 2, schema: projected };
     versionApi.save.mockResolvedValue(saved);
     await mount(<StrategyExperimentCreatePage strategies={[{ ...strategy, versions: [legacy] }]} />, '/strategy/experiments/new?strategyVersionId=' + legacy.id);
     await wait(() => expect(document.body.textContent).toContain('仓位'));
@@ -85,7 +89,7 @@ describe('市场配置与策略实验恢复', () => {
     await click('采用研究口径并保存新版本');
     await wait(() => expect(document.body.textContent).toContain('恢复验收策略 · v2'));
     expect(versionApi.save).toHaveBeenCalledWith({ strategyId: strategy.id, schema: projected });
-    expect(legacy.schema.schemaVersion).toBe('2');
+    expect(legacy.schema.signalSources[0]?.priceCoordinate).toBe('run');
     await click('下一步'); await click('下一步'); await click('受控准备完成');
     api.create.mockRejectedValueOnce(new Error('受控创建失败'));
     await click('创建实验'); await wait(() => expect(api.create).toHaveBeenCalledOnce());
@@ -170,7 +174,12 @@ describe('市场配置与策略实验恢复', () => {
     await wait(() => expect(button('预览风险规则').disabled).toBe(false));
   });
 
-  it.each(['克隆实验', '取消实验', '锁定并运行封存测试', '确认采纳'])('%s确认后读取失败不遮蔽结果，恢复只读', async (action) => {
+  it.each(['克隆实验', '取消实验', '重试未完成测试', '确认采纳'])('%s确认后读取失败不遮蔽结果，恢复只读', async (action) => {
+    if (action === '重试未完成测试') {
+      const retryable = { ...experiment, stopReason: 'final_test_retry_required:controlled' };
+      api.detail.mockResolvedValue({ experiment: retryable, candidates: [fixture.candidate], attempts: [] });
+      api.compare.mockResolvedValue({ experiment: retryable, baseline: { metrics: {}, runRefs: {} }, candidates: [fixture.candidate], attempts: [] });
+    }
     if (action === '确认采纳') {
       const completed = { ...experiment, status: 'succeeded', stage: 'completed' };
       api.detail.mockResolvedValue({ experiment: completed, candidates: [fixture.candidate], attempts: [] });
@@ -183,7 +192,7 @@ describe('市场配置与策略实验恢复', () => {
       await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="实验更多操作"]')!.click());
       await wait(() => expect(button(action)).toBeDefined());
     }
-    const mutation = { 克隆实验: api.clone, 取消实验: api.cancel, 锁定并运行封存测试: api.finalize, 确认采纳: api.adopt }[action]!;
+    const mutation = { 克隆实验: api.clone, 取消实验: api.cancel, 重试未完成测试: api.finalize, 确认采纳: api.adopt }[action]!;
     mutation.mockRejectedValueOnce(new Error('受控写入失败'));
     await click(action);
     await wait(() => expect(api.toast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' })));

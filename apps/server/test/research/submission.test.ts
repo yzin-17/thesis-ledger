@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   aiFrozenResearchV2Schema,
+  type IdentityPrincipal,
   type Quote,
   type ResearchScopeSnapshotV2,
 } from '@thesis-ledger/schemas';
+import type { Request, Response } from 'express';
+import { ResearchController } from '../../src/research/research.controller.js';
 import { ResearchSubmissionService } from '../../src/research/research-submission.service.js';
 import { PromptVersionRegistry } from '../../src/ai/prompt-registry.js';
 import { researchPromptsV2 } from '../../src/ai/ai-research-prompts-v2.js';
@@ -35,7 +39,7 @@ function fixture() {
   const executor = { dispatch: vi.fn(), cancelActive: vi.fn() };
   const scopes = { resolve: vi.fn().mockResolvedValue({ scopeSnapshot: scope, privateMaterial: null, fetchedAt: scope.confirmedAt, reasons: [] }) };
   const quote: Quote = {
-    version: 3,
+    version: 1,
     symbol: '600519.SH',
     open: 100,
     high: 100,
@@ -74,6 +78,17 @@ function fixture() {
   );
   return { input, owner, run, runs, executor, scopes, quote, market, news, service };
 }
+
+function submitThroughController(f: ReturnType<typeof fixture>, input: unknown = f.input) {
+  const request = Object.assign(new EventEmitter(), { query: {}, headers: {} });
+  const response = new EventEmitter();
+  return new ResearchController(f.service).submit(
+    input,
+    { id: f.owner } as IdentityPrincipal,
+    request as Request,
+    response as Response,
+  );
+}
 afterEach(() => vi.unstubAllEnvs());
 
 describe('研究准备到提交的有界行为', () => {
@@ -99,9 +114,15 @@ describe('研究准备到提交的有界行为', () => {
   });
   it('部分材料冻结真实数据和未知修订，准备完成后只投递已创建任务', async () => {
     const f = fixture();
-    const result = await f.service.submit(f.owner, f.input);
+    f.runs.startResearchV2.mockImplementationOnce(async () => {
+      expect(f.executor.dispatch).not.toHaveBeenCalled();
+      return { run: f.run, reused: false };
+    });
+    const result = await submitThroughController(f);
     expect(result).toMatchObject({
+      version: 'research-report-submission-v1',
       runId: f.run.id,
+      submissionId: f.input.submissionId,
       reused: false,
       scopeSnapshot: f.run.researchScopeSnapshot,
     });
@@ -132,6 +153,14 @@ describe('研究准备到提交的有界行为', () => {
       'requestBudgetMs',
     ]);
     expect(request).not.toHaveProperty('question');
+  });
+  it('创建失败经提交入口返回原错误，执行链保持未派发', async () => {
+    const f = fixture();
+    const failure = new Error('受控创建故障');
+    f.runs.startResearchV2.mockRejectedValueOnce(failure);
+
+    await expect(submitThroughController(f)).rejects.toBe(failure);
+    expect(f.executor.dispatch).not.toHaveBeenCalled();
   });
   it('需要新闻的模板不会以空搜索或失败材料生成任务', async () => {
     const f = fixture();
@@ -209,7 +238,7 @@ describe('研究准备到提交的有界行为', () => {
   it('客户端伪造服务端字段在准备前拒绝', async () => {
     const f = fixture();
     await expect(
-      f.service.submit(f.owner, { ...f.input, ownerId: randomUUID(), scopeSnapshot: {} }),
+      submitThroughController(f, { ...f.input, ownerId: randomUUID(), scopeSnapshot: {} }),
     ).rejects.toThrow();
     expect(f.scopes.resolve).not.toHaveBeenCalled();
     expect(f.market.getQuote).not.toHaveBeenCalled();

@@ -8,7 +8,7 @@ import {
 } from '../src/index.js';
 
 const detailResponse = {
-  contractVersion: 3,
+  contractVersion: 1,
   symbol: '159516.SZ',
   assetType: 'ETF',
   identity: { source: 'symbol', status: 'confirmed' },
@@ -59,7 +59,7 @@ describe('展示周期 SDK 传输', () => {
       expect(String(fetcher.mock.calls[1]?.[0])).toContain('parameters=');
     },
   );
-  it('旧详情省略周期仍可解析原成功响应，且不添加周期参数', async () => {
+  it('省略时间周期时按现行行情详情合同请求', async () => {
     const fetcher = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify(detailResponse), { status: 200 }));
@@ -67,12 +67,20 @@ describe('展示周期 SDK 传输', () => {
     expect(await client.market.getDetail('159516.SZ')).toEqual(detailResponse);
     const url = new URL(String(fetcher.mock.calls[0]?.[0]));
     expect(url.searchParams.has('timeframe')).toBe(false);
-    expect(url.searchParams.get('chartContractVersion')).toBe('3');
+    expect(url.searchParams.get('chartContractVersion')).toBe('1');
   });
   it('非法展示周期在 SDK 发起请求前拒绝', () => {
     const fetcher = vi.fn();
     const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
     expect(() => client.market.getDetail('159516.SZ', { timeframe: 'weekly' as never })).toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('SDK 发请求前拒绝显式传入的旧行情详情版本', () => {
+    const fetcher = vi.fn();
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+    expect(() =>
+      client.market.getDetail('159516.SZ', { chartContractVersion: 3 as never }),
+    ).toThrow();
     expect(fetcher).not.toHaveBeenCalled();
   });
   it('基金拒绝错误保持 HTTP 与稳定码', async () => {
@@ -99,7 +107,7 @@ describe('展示周期 SDK 传输', () => {
       ),
     );
     const series = barSeriesSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity: { symbol: raw.symbol, assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
       points: raw.bars,
       coverage: raw.coverage,

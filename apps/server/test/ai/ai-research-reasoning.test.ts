@@ -288,9 +288,9 @@ describe('研究用途显式推理参数接线', () => {
     expect(() => readFrozenResearchReasoning({ reasoningEnabled: 'false' })).toThrow('冻结');
   });
 
-  it('拒绝 V1／其他用途及非 OpenRouter 的显式开关', () => {
+  it('拒绝退役研究合同、其他用途及非 OpenRouter 的显式开关', () => {
     for (const contract of [
-      aiGenerationContracts.research.ref,
+      { id: 'research', version: 'research-generation-v1' },
       aiGenerationContracts.authoringAnalysis.ref,
     ])
       expect(

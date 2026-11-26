@@ -51,7 +51,7 @@ const saved = researchReportDetailSchema.parse({
   createdAt: result.createdAt,
   updatedAt: result.createdAt,
   historicalScope: { status: 'known', snapshot: result.scopeSnapshot },
-  resultVersion: 2,
+  resultVersion: 'research-report-result-v1',
   availability: 'available',
   summary: result.inference.conclusion,
   quality: result.quality,

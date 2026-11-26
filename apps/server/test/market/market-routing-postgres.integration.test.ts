@@ -22,7 +22,7 @@ const key = {
 const target = { providerId: 'one', upstreamSource: 'one' };
 const routes = [{ key, targets: [target], enabled: true }];
 const catalog = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   catalogRevision: 1,
   generatedAt: '2026-11-09T00:00:00Z',
@@ -155,7 +155,7 @@ describe.skipIf(process.env.MARKET_ROUTING_POSTGRES !== '1')(
         },
       });
       const policy: DesiredProviderPolicyV3 = {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'failed-atomic-write',
         revision: 11,

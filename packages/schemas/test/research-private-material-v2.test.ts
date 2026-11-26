@@ -18,7 +18,7 @@ function fixture() {
   const { frozen } = researchV2Fixture();
   if (frozen.scopeSnapshot.scope !== 'instrument') throw new Error('公开范围样例缺失');
   const scope = researchScopeSnapshotV2Schema.parse({
-    version: 'research-scope-v2',
+    version: 'research-scope-snapshot-v1',
     mode: 'shadow',
     scope: 'account',
     confirmedAt: frozen.scopeSnapshot.confirmedAt,

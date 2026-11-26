@@ -24,11 +24,11 @@ const disclosure = { status: 'source', response: sample.response };
 const job: BacktestJob = {
   id: 'status-job',
   strategyVersionId: 'version-status',
-  mode: 'V3',
+  mode: 'frozen',
   status: 'succeeded',
 };
 const result = (value: unknown = disclosure): BacktestJobResult => ({
-  schemaVersion: '3',
+  schemaVersion: 'backtest-trade-result-v1',
   completeness: 'partial',
   tradingStatusDisclosure: value,
   benchmarkCompatibility: {

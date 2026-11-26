@@ -29,9 +29,8 @@ export const buildMarketPolicyPayload = (input: unknown, revision: number): Mark
 export const decodeMarketPolicyRoutes = (storedRoutes: unknown): MarketPolicyRoutes => {
   if (
     !isRecord(storedRoutes) ||
-    storedRoutes.storageVersion !== 3 ||
-    'legacyV2Routes' in storedRoutes ||
-    'routesV3' in storedRoutes
+    storedRoutes.storageVersion !== 'market-routing-policy-v1' ||
+    !Array.isArray(storedRoutes.routes)
   ) {
     throw new ConflictException('Policy routes 存储格式不是当前版本');
   }
@@ -41,7 +40,7 @@ export const decodeMarketPolicyRoutes = (storedRoutes: unknown): MarketPolicyRou
 };
 
 export const encodeMarketPolicyRoutes = (routes: MarketPolicyRoutes, routingConfig?: RoutingAuthoring) => ({
-  storageVersion: 3 as const,
+  storageVersion: 'market-routing-policy-v1' as const,
   routes: desiredProviderPolicyV3Schema.shape.routes.parse(routes),
   ...(routingConfig ? { routingConfig } : {}),
 });
@@ -54,7 +53,7 @@ export const marketPolicyResponse = (row: Record<string, unknown>): Record<strin
     throw new ConflictException('Policy Effective 存储格式不是当前版本');
   const effective = effectiveResult.data;
   const parsed = desiredProviderPolicyV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: effective?.requestId ?? randomUUID(),
     revision: row.revision,

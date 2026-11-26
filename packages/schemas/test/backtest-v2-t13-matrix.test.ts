@@ -15,13 +15,14 @@ const exchangeStrategy = (
   assetType: (typeof assetTypes)[number],
   timeframe: (typeof timeframes)[number],
 ): BacktestStrategy => ({
-  schemaVersion: '2',
+  schemaVersion: 'strategy-definition-v1',
   name: `${market}-${assetType}-${timeframe}`,
   signalSources: [
     {
       id: 'execution',
       asset: { market, assetType, symbol: symbols[market][assetType] },
       timeframe,
+      priceCoordinate: 'run',
       series: ['close', 'volume'],
     },
   ],
@@ -61,13 +62,14 @@ describe('策略市场与周期合同', () => {
 
   it('仅接受 CN NAV 日频，并拒绝分钟 NAV 与 HK/US NAV', () => {
     const cnNav = {
-      schemaVersion: '2',
+      schemaVersion: 'strategy-definition-v1',
       name: 'CN NAV',
       signalSources: [
         {
           id: 'nav',
           asset: { market: 'CN', symbol: '110011.OF', assetType: 'fund' },
           timeframe: '1d',
+          priceCoordinate: 'native-nav',
           series: ['nav'],
         },
       ],

@@ -19,6 +19,10 @@ const schema = setStrategyExecutionSymbol(
   createDefaultStrategySchema('逐条通知验收策略'),
   '600519.SH',
 );
+schema.signalSources = schema.signalSources.map((source: Record<string, unknown>) => ({
+  ...source,
+  asset: schema.executionInstrument,
+}));
 schema.risk = [
   { type: 'fixedStop', percent: '0.03' },
   { type: 'maxHoldingPeriod', periods: 10 },
@@ -27,7 +31,7 @@ export const ruleStrategy = {
   id: 'strategy',
   name: '逐条通知验收策略',
   versions: [
-    { id: fixture.experiment.baselineStrategyVersionId, version: 1, schemaVersion: 3, schema },
+    { id: fixture.experiment.baselineStrategyVersionId, version: 1, schemaVersion: 1, schema },
   ],
 };
 export const rulePlan = compileStrategyMonitoringPlan(

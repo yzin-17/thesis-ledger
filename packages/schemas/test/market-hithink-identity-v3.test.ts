@@ -43,7 +43,7 @@ const hash = (value: string) => createHash('sha256').update(value, 'utf8').diges
 
 function fixture(): MarketEventResponseV3 {
   const request = {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'synthetic-hithink-cash',
     symbol: '510300.SH',
     routeKey: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'CASH_DISTRIBUTION' },

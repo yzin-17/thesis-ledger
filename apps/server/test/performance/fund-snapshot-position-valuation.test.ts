@@ -9,7 +9,7 @@ const position = {
   asset: { assetType: 'fund' },
 };
 const nav = fundNavSchema.parse({
-  version: 3,
+  version: 1,
   symbol: position.symbol,
   unitNav: 0.54,
   navDate: '2026-10-20T00:00:00Z',

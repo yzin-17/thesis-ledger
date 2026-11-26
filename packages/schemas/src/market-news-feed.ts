@@ -7,7 +7,7 @@ import {
 } from './market-news-v3.js';
 import { marketNewsReadResultSchema } from './market-news-read.js';
 
-export const marketNewsFeedEndpointV3 = '/api/v3/thesis-ledger/market/news-feed';
+export const marketNewsFeedEndpointV3 = '/api/v1/thesis-ledger/market/news-feed';
 const requestFields = z
   .strictObject(marketNewsRequestV3Schema.shape)
   .omit({ instrument: true }).shape;

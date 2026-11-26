@@ -6,7 +6,7 @@ import { barQueryFixture } from './bar-query.fixture.js';
 const key: MarketDataBarRouteKeyV3 = { kind: 'bar', market: 'CN', assetType: 'ETF', capability: 'DAILY_BAR', timeframe: '1d', adjustment: 'qfq' };
 const targets = [{ providerId: 'new-price-a', upstreamSource: 'source-a' }, { providerId: 'new-price-b', upstreamSource: 'source-b' }];
 const catalog = (routeKey = key): MarketRouteCatalogV3 => ({
-  contractVersion: 3, consumer: 'thesis-ledger', catalogRevision: 10, generatedAt: '2026-10-10T00:00:00Z', integrity: 'complete',
+  contractVersion: 1, consumer: 'thesis-ledger', catalogRevision: 10, generatedAt: '2026-10-10T00:00:00Z', integrity: 'complete',
   entries: targets.map((target) => ({ key: routeKey, target, state: 'ready', barQuery: barQueryFixture(routeKey.adjustment) })),
 });
 

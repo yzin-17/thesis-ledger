@@ -43,7 +43,7 @@ export async function readStrategyResearchContext(
   const fetchedAt = new Date().toISOString();
   return {
     scopeSnapshot: researchScopeSnapshotV2Schema.parse({
-      version: 'research-scope-v2',
+      version: 'research-scope-snapshot-v1',
       scope: 'strategy',
       mode: input.mode,
       confirmedAt: fetchedAt,

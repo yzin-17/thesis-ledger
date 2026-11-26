@@ -18,7 +18,7 @@ function arenaRefreshFixture(schemas) {
     maxOutputTokens: 1000,
   }));
   const protocol = schemas.arenaProtocolSchema.parse({
-    version: 1,
+    version: 'arena-historical-match-protocol-v1',
     title: '受控双模型比赛',
     market: 'CN',
     currency: 'CNY',

@@ -21,7 +21,7 @@ export const navFreezeFixture = (runId = 'nav-run'): NavSnapshotFreezeInput => {
   );
   executionModel.scope.symbol = symbol;
   const runConfig = backtestNavRunConfigV3Schema.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-nav-config-v1',
     startDate: '2026-09-08',
     endDate: '2026-09-15',
     dataAsOf: '2026-09-30T00:00:00.000001Z',
@@ -38,7 +38,7 @@ export const navFreezeFixture = (runId = 'nav-run'): NavSnapshotFreezeInput => {
     },
   });
   const strategy = strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: 'NAV 冻结测试',
     signalSources: [
       {
@@ -46,10 +46,12 @@ export const navFreezeFixture = (runId = 'nav-run'): NavSnapshotFreezeInput => {
         asset: { symbol, market: 'CN', assetType: 'fund' },
         timeframe: '1d',
         series: ['nav'],
+        priceCoordinate: 'native-nav',
       },
     ],
     executionInstrument: { symbol, market: 'CN', assetType: 'fund' },
     primaryTimeframe: '1d',
+    entryTrigger: 'rising-edge',
     entry: {
       type: 'compare',
       operator: 'gt',

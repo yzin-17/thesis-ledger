@@ -109,7 +109,7 @@ export class StrategySubmissionExecution {
       if (p.status !== 'prepared' || p.executionPreflight.status !== 'ready')
         throw new Error('缺少有效回测预检');
       return this.runs.createRun({
-        contractVersion: 3,
+        contractVersion: 1,
         strategyVersionId: input.preparation.strategyVersionId,
         runConfig: p.runConfig,
         preparationStamp: p.executionPreflight.revisionStamp,
@@ -120,7 +120,7 @@ export class StrategySubmissionExecution {
       const p = backtestNavPreparationResultV3Schema.parse(prepared);
       if (p.status !== 'prepared' || !p.receipt) throw new Error('缺少有效净值准备凭证');
       return this.navRuns.create({
-        contractVersion: 3,
+        contractVersion: 1,
         preparationId: p.receipt.preparationId,
         preparationHash: p.receipt.preparationHash,
         idempotencyKey,
@@ -141,7 +141,7 @@ export class StrategySubmissionExecution {
       ...input.settings,
       budget: { ...input.settings.budget, maxCost: '0' },
       ...input.preparation.target,
-      contractVersion: 3,
+      contractVersion: 1,
       runConfig: p.runConfig,
       idempotencyKey,
     });

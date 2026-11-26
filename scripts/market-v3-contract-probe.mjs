@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
+  DSA_CONTROL_CONTRACT,
+  DSA_DATA_CONTRACT,
   marketControlHandshakeResponseV3Schema,
   marketDataContractCapabilitiesV3Schema,
   marketRouteCatalogV3Schema,
@@ -13,7 +15,7 @@ export async function probeMarketV3Contract({ origin, controlToken, dataToken, f
   try {
     target = new URL(origin);
   } catch {
-    throw new Error('V3 契约检查需要有效的 DSA origin');
+    throw new Error('市场合同检查需要有效的 DSA origin');
   }
   if (
     !['http:', 'https:'].includes(target.protocol) ||
@@ -24,15 +26,15 @@ export async function probeMarketV3Contract({ origin, controlToken, dataToken, f
     target.hash
   )
     throw new Error('DSA origin 必须只包含 HTTP(S) 协议、主机与端口');
-  if (!controlToken?.trim()) throw new Error('V3 契约检查缺少 Control Token');
-  if (!dataToken?.trim()) throw new Error('V3 契约检查缺少 Data Token');
+  if (!controlToken?.trim()) throw new Error('市场合同检查缺少 Control Token');
+  if (!dataToken?.trim()) throw new Error('市场合同检查缺少 Data Token');
   const requestId = randomUUID();
-  const handshakePath = '/api/v3/thesis-ledger/control/handshake';
+  const handshakePath = '/api/v1/thesis-ledger/control/handshake';
   const handshake = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId,
-    supportedVersions: [3],
+    contract: DSA_CONTROL_CONTRACT,
   };
   const call = async (path, init = {}, rejected = false, expectedStatus = 200) => {
     let response;
@@ -43,25 +45,31 @@ export async function probeMarketV3Contract({ origin, controlToken, dataToken, f
         signal: AbortSignal.timeout(10_000),
       });
     } catch {
-      throw new Error(`V3 契约端点请求失败：${path}`);
+      throw new Error(`市场合同端点请求失败：${path}`);
     }
     if (rejected) {
       if (![401, 403].includes(response.status))
-        throw new Error(`V3 契约端点未拒绝无效凭据：${path}`);
-      await response.body?.cancel();
+        throw new Error(`市场合同端点未拒绝无效凭据：${path}`);
+      const body = await response.json().catch(() => null);
+      const detail = body?.detail;
+      if (detail?.contractVersion !== 1 || detail.code !== 'unauthorized' ||
+          detail.requestId !== requestId || detail.diagnosticId !== requestId)
+        throw new Error(`市场合同端点未返回现行鉴权信封：${path}`);
       return null;
     }
     if (response.status !== expectedStatus) {
       await response.body?.cancel();
-      throw new Error(`V3 契约端点状态异常：${path} (${response.status})`);
+      throw new Error(`市场合同端点状态异常：${path} (${response.status})`);
     }
     try {
       return await response.json();
     } catch {
-      throw new Error(`V3 契约端点未返回 JSON：${path}`);
+      throw new Error(`市场合同端点未返回 JSON：${path}`);
     }
   };
-  const jsonHeaders = { accept: 'application/json', 'content-type': 'application/json' };
+  const jsonHeaders = {
+    accept: 'application/json', 'content-type': 'application/json', 'x-request-id': requestId,
+  };
   const invalidHeaders = { ...jsonHeaders, authorization: `Bearer invalid-${randomUUID()}` };
   await call(
     handshakePath,
@@ -70,18 +78,18 @@ export async function probeMarketV3Contract({ origin, controlToken, dataToken, f
   );
   await call(marketRouteCatalogGetEndpointV3, { headers: invalidHeaders }, true);
   await call(
-    '/api/v3/thesis-ledger/market/bars',
+    '/api/v1/thesis-ledger/market/bars',
     { method: 'POST', headers: invalidHeaders, body: '{}' },
     true,
   );
   const capabilities = marketDataContractCapabilitiesV3Schema.safeParse(
-    await call('/api/v3/thesis-ledger/capabilities'),
+    await call('/api/v1/thesis-ledger/capabilities'),
   );
-  if (!capabilities.success || !capabilities.data.dataContractVersions.includes(3))
-    throw new Error('DSA 未声明有效的 Data Contract V3');
+  if (!capabilities.success || capabilities.data.dataContract !== DSA_DATA_CONTRACT)
+    throw new Error('DSA 未声明有效的 dsa-data-v1');
   // 无效协议在请求解析阶段拒绝；验证有效 Data Token，绝不进入行情运行时。
   const dataAuth = marketDataErrorEnvelopeV3Schema.safeParse(
-    await call('/api/v3/thesis-ledger/market/bars', {
+    await call('/api/v1/thesis-ledger/market/bars', {
       method: 'POST', headers: { ...jsonHeaders, authorization: `Bearer ${dataToken.trim()}` },
       body: JSON.stringify({ contractVersion: 0, requestId }),
     }, false, 422),
@@ -91,7 +99,7 @@ export async function probeMarketV3Contract({ origin, controlToken, dataToken, f
     throw new Error('Data Token 或无行情请求校验边界无效');
   const headers = { ...jsonHeaders, authorization: `Bearer ${controlToken.trim()}` };
   await call(
-    '/api/v1/thesis-ledger/control/handshake',
+    '/api/v3/thesis-ledger/control/handshake',
     { method: 'POST', headers, body: JSON.stringify(handshake) },
     false,
     404,
@@ -100,17 +108,17 @@ export async function probeMarketV3Contract({ origin, controlToken, dataToken, f
     await call(handshakePath, { method: 'POST', headers, body: JSON.stringify(handshake) }),
   );
   if (!negotiated.success || negotiated.data.requestId !== requestId)
-    throw new Error('Control Contract V3 握手无效或请求身份不匹配');
+    throw new Error('dsa-control-v1 握手无效或请求身份不匹配');
   const catalog = marketRouteCatalogV3Schema.safeParse(
     await call(marketRouteCatalogGetEndpointV3, { headers }),
   );
   if (!catalog.success || catalog.data.integrity !== 'complete')
-    throw new Error('V3 精确路由目录无效或不完整');
+    throw new Error('精确路由目录无效或不完整');
   return {
     status: 'passed',
-    scope: 'market-v3-protocol-only',
-    dataContractVersion: 3,
-    controlContractVersion: 3,
+    scope: 'market-protocol-v1',
+    dataContract: DSA_DATA_CONTRACT,
+    controlContract: DSA_CONTROL_CONTRACT,
     dataAuthentication: 'verified-without-market-read',
     catalogRevision: catalog.data.catalogRevision,
   };

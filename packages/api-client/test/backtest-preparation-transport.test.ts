@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ThesisLedgerApiClient, ThesisLedgerContractError } from '../src/index.js';
 
 const request = backtestRunPreparationRequestV3Schema.parse({
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: 'prepare-transport',
   strategyVersionId: '11111111-1111-4111-8111-111111111111',
   adjustment: 'none',
@@ -31,7 +31,7 @@ const request = backtestRunPreparationRequestV3Schema.parse({
   },
 });
 const blocked = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: request.requestId,
   checkedAt: '2026-09-11T00:00:00Z',
   scope: 'execution-window',

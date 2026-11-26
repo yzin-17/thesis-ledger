@@ -15,8 +15,8 @@ import {
 /** Ai 所有的冻结输入序列化；与 frozen-research-v1 分开解析。 */
 export const aiFrozenResearchV2Schema = z
   .strictObject({
-    version: z.literal('frozen-research-v2'),
-    resultVersion: z.literal(2),
+    version: z.literal('research-frozen-input-v1'),
+    resultVersion: z.literal('research-report-result-v1'),
     request: researchSubmissionV2Schema,
     scopeSnapshot: researchScopeSnapshotV2Schema,
     prompt: z.strictObject({

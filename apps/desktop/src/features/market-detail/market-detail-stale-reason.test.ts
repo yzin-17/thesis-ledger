@@ -10,7 +10,7 @@ const history = (
   status,
   data: [
     {
-      version: 3,
+      version: 1,
       symbol: '000001.OF',
       unitNav: 0.895,
       navDate: '2026-11-03T00:00:00Z',

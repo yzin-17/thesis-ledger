@@ -90,7 +90,7 @@ const route = z
     enabled: z.boolean().optional(),
   })
   .superRefine((value, context) => {
-    if (isStatusCapabilityNameV1(value.key.capability) && value.enabled === undefined)
+    if ((isStatusCapabilityNameV1(value.key.capability) || value.key.capability === 'HISTORICAL_EXECUTION_CONTEXT') && value.enabled === undefined)
       context.addIssue({
         code: 'custom',
         path: ['enabled'],
@@ -109,7 +109,7 @@ const routes = z.array(route).superRefine((entries, context) => {
 });
 
 const envelope = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   requestId: text,
 };

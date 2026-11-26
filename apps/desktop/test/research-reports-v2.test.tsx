@@ -27,7 +27,7 @@ function detail(mode: 'actual' | 'shadow' = 'actual') {
     createdAt: result.createdAt,
     updatedAt: result.createdAt,
     historicalScope: { status: 'known', snapshot: result.scopeSnapshot },
-    resultVersion: 2,
+    resultVersion: 'research-report-result-v1',
     availability: 'available',
     summary: result.inference.conclusion,
     quality: result.quality,
@@ -90,7 +90,7 @@ it('V2正文保留原研究问题，超长问题可展开且不改写原文', ()
 });
 it('V2 保留数值、失效条件、质量、材料和模型字段；模型文本按文本渲染', () => {
   const report = detail();
-  if (report.result?.version !== 2) throw new Error('V2 合同缺失');
+  if (!report.result) throw new Error('现行报告结果缺失');
   report.result.inference.conclusion = '<img src=x onerror=alert(1) />';
   const html = markup(report);
   for (const text of [
@@ -110,7 +110,7 @@ it('V2 保留数值、失效条件、质量、材料和模型字段；模型文�
 });
 it('资料缺口用中文说明，未识别原因保留缺口状态而不冒充完整', () => {
   const report = detail();
-  if (report.result?.version !== 2) throw new Error('V2 合同缺失');
+  if (!report.result) throw new Error('现行报告结果缺失');
   const quality = {
     status: 'partial' as const,
     reasons: ['news_unavailable', 'unrecognized_quality_code'],
@@ -133,7 +133,7 @@ it('另一全局模式不能显示已缓存正文或引用', () => {
 });
 it('正文先于背景和工具，风险与缺口先于依据，空栏目不出现', () => {
   const report = detail();
-  if (report.result?.version !== 2) throw new Error('V2 合同缺失');
+  if (!report.result) throw new Error('现行报告结果缺失');
   report.result.inference.conclusion = '先呈现的研究结论';
   report.result.inference.risks = ['影响判断的重要风险'];
   report.result.inference.unknowns = ['缺少关键依据，无法确认计划可行性'];
@@ -151,7 +151,7 @@ it('正文先于背景和工具，风险与缺口先于依据，空栏目不出�
   expect(html).not.toContain('本报告未列出此项');
   expect(html.split('<details')[0]?.match(/先呈现的研究结论/g)).toHaveLength(1);
 });
-it('旧正文保留待核验标签，不补模式、费用或引用资格', () => {
+it('已退役的报告正文和可信范围缺失的记录不能当作现行报告读取', () => {
   const old = researchResultSchema.parse({
     version: 1,
     provider: 'controlled',
@@ -174,24 +174,19 @@ it('旧正文保留待核验标签，不补模式、费用或引用资格', () =
     unknowns: [],
     disclaimer: '研究参考',
   });
-  const report = researchReportDetailSchema.parse({
+  const parsed = researchReportDetailSchema.safeParse({
     ...detail(),
     historicalScope: { status: 'unrecorded', snapshot: null, label: '历史范围未记录' },
     resultVersion: 1,
-    availability: 'pending_verification',
+    availability: 'available',
     result: old,
     summary: old.conclusion,
     quality: null,
   });
-  const projected = reportToAiRun(report);
-  expect(projected.context).toBeNull();
-  expect(projected.cost).toBeUndefined();
-  expect(projected.result).toEqual(old);
-  const html = markup(report);
-  expect(html).toContain('历史范围未记录');
-  expect(html).toContain('受控旧正文');
-  expect(html).toContain('引用归属尚待核验');
-  expect(html).not.toContain('核对历史引用');
+  expect(parsed.success).toBe(false);
+  if (!parsed.success) {
+    expect(parsed.error.issues.map(({ path }) => path.join('.'))).toContain('resultVersion');
+  }
 });
 it('可见页为空但还有游标时仍能加载；历史页面不提供不可信的来源过滤', () => {
   const props = {

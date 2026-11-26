@@ -136,7 +136,7 @@ export function journalReviewClient(get: RequestParsed, post: PostParsed, suffix
       const response = journalReviewListContractSchema.refine(
         (value) =>
           value.items.every((row) => belongs(row, query)) &&
-          value.legacyItems.every(
+          value.unlinkedItems.every(
             (row) =>
               row.accountId === query.accountId &&
               (row.accountMode === null || row.accountMode === query.mode),

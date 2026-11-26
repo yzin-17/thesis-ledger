@@ -9,16 +9,16 @@ export function snapshotEventDsaFixture(options: { facts?: CorporateActionFact[]
   const target = { providerId: 'fixture-actions', upstreamSource: 'fixture-events' };
   return {
     effectiveControlPolicyV3: vi.fn(async () => ({
-      contractVersion: 3 as const, consumer: 'thesis-ledger' as const,
+      contractVersion: 1 as const, consumer: 'thesis-ledger' as const,
       projection: { effective: {
-        contractVersion: 3 as const, consumer: 'thesis-ledger' as const, requestId: 'policy',
+        contractVersion: 1 as const, consumer: 'thesis-ledger' as const, requestId: 'policy',
         revision: 2, sourceDesiredRevision: 2, enabled: true, appliedAt: '2024-01-01T00:00:00Z',
         routes: keys.map((key) => ({ key, reason: null,
           targets: [{ ...target, routeIndex: 0, eligible: true, reason: null }] })),
       } },
     })),
     marketRouteCatalogV3: vi.fn(async () => ({
-      contractVersion: 3 as const, consumer: 'thesis-ledger' as const, catalogRevision: 3,
+      contractVersion: 1 as const, consumer: 'thesis-ledger' as const, catalogRevision: 3,
       generatedAt: '2024-01-01T00:00:00Z', integrity: 'complete' as const,
       entries: keys.map((key) => ({ key, target, state: 'ready' as const })),
     })),

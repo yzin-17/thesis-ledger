@@ -8,6 +8,10 @@ import {
 } from './backtest-strategy.js';
 
 // 用户确认的交易约束独立于模型输出；空风险也必须有明确选择。
+export const authoringExecutionConfirmationSchema = z.union([
+  executionConfigSchema,
+  z.strictObject({ mode: z.literal('exchange'), timing: z.literal('dailyBarOrders') }),
+]);
 export const authoringConfirmationSchema = z
   .object({
     instrumentId: z.string().trim().min(1).max(200),
@@ -18,12 +22,13 @@ export const authoringConfirmationSchema = z
     sizing: sizingRuleSchema,
     risk: z.array(riskRuleSchema).max(64),
     noExtraRiskConfirmed: z.boolean(),
-    execution: executionConfigSchema,
+    execution: authoringExecutionConfirmationSchema,
     cost: strategyCostModelSchema,
     periodsAreBarsConfirmed: z.literal(true),
   })
   .strict()
   .superRefine((value, ctx) => {
+    if (value.execution.timing === 'dailyBarOrders' && (value.timeframe !== '1d' || value.instrument.assetType === 'fund')) ctx.addIssue({ code: 'custom', message: '日线委托只支持股票／ETF 的日线', path: ['execution'] });
     if (value.risk.length === 0 && !value.noExtraRiskConfirmed)
       ctx.addIssue({ code: 'custom', message: '不设置额外风险规则需要明确确认', path: ['risk'] });
   });

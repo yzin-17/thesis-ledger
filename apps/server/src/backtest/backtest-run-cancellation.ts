@@ -1,7 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import type { BacktestJob } from '@prisma/client';
 import type { PrismaService } from '../platform/prisma.service.js';
-import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { persistedRunContract } from './backtest-v3-run-lifecycle.js';
 
 const terminalStatuses = new Set(['succeeded', 'failed', 'cancelled']);
 
@@ -19,7 +19,7 @@ export async function requestBacktestCancellation(
   if (!job) {
     return { job, changed: false, wasQueued: false };
   }
-  if (persistedContractVersion(job) !== 3) {
+  if (!persistedRunContract(job)) {
     throw new ConflictException({
       code: 'UNSUPPORTED_CONTRACT_VERSION',
       message: '旧回测记录不支持取消',
@@ -33,7 +33,7 @@ export async function requestBacktestCancellation(
     const updated = await prisma.backtestJob.update({
       where: {
         id: jobId,
-        mode: 'V3',
+        mode: 'frozen',
         status: job.status,
         executionAttempt: job.executionAttempt,
       },
@@ -51,7 +51,7 @@ export async function requestBacktestCancellation(
   } catch (error) {
     if (!isMissingRecordError(error)) throw error;
     const current = await prisma.backtestJob.findUnique({ where: { id: jobId } });
-    if (current && persistedContractVersion(current) !== 3) {
+    if (current && !persistedRunContract(current)) {
       throw new ConflictException({
         code: 'UNSUPPORTED_CONTRACT_VERSION',
         message: '旧回测记录不支持取消',

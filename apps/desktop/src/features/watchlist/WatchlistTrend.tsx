@@ -66,7 +66,7 @@ export function WatchlistTrend({
         include: fund ? ['fund-nav-history'] : ['bars'],
         timeframe: fund ? '1d' : period,
         adjustment: minute ? 'none' : 'qfq',
-        chartContractVersion: 3,
+        chartContractVersion: 1,
         barsLimit: minute ? 400 : 20,
         navLimit: 20,
         signal,

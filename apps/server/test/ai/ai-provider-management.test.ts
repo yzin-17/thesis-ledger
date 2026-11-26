@@ -103,11 +103,13 @@ describe('Provider 指定模型和用途测试', () => {
     );
     const generated = sdk.generate.mock.calls[0]?.[0];
     const messages = generated?.messages as Array<{ role: string; content: string }>;
-    // json_validated 由应用侧解析文本，探针必须要求纯 JSON 并内联契约 schema。
     expect(messages.map((message) => message.role)).toEqual(['system', 'user']);
-    expect(messages[0]?.content).toContain('只返回一个满足给定 JSON Schema 的 JSON 对象');
-    expect(messages[0]?.content).toContain('不要输出 Markdown');
-    expect(messages[0]?.content).toContain('"conclusion"');
+    expect(messages[0]?.content).toContain('不增加、删减或修改字段');
+    const example = messages[1]!.content.slice(messages[1]!.content.indexOf('{'));
+    expect(aiGenerationContracts.research.schema.parse(JSON.parse(example))).toMatchObject({
+      version: 'research-report-generation-v1',
+      claims: [],
+    });
     // 用途探针要真正产出契约实例，给推理模型保留安全输出预算；用途探针复用已选推理强度。
     expect(generated).toMatchObject({ maxOutputTokens: 8_192 });
     expect(generated).toHaveProperty('reasoningEffort', 'high');

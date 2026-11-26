@@ -24,15 +24,16 @@
     "mode": "shadow",
     "strategyVersionId": "00000000-0000-4000-8000-000000000020",
     "strategyId": "00000000-0000-4000-8000-000000000021",
-    "schemaVersion": 2,
+    "schemaVersion": 1,
     "definition": {
-      "schemaVersion": "2",
+      "schemaVersion": "strategy-definition-v1",
       "name": "受控策略定义",
       "signalSources": [
         {
           "id": "execution",
           "asset": { "symbol": "600519.SH", "market": "CN", "assetType": "stock" },
           "timeframe": "1d",
+          "priceCoordinate": "run",
           "series": ["close"]
         }
       ],

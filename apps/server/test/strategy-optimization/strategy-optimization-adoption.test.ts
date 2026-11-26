@@ -22,11 +22,15 @@ const candidate = {
 } as CandidateRow;
 
 describe('策略探索采纳', () => {
-  it.each([2, 3].flatMap(schemaVersion => ['valid', 'invalid', 'test_valid', 'test_invalid'].map(validationStatus => ({schemaVersion, validationStatus}))))('Schema V$schemaVersion 的 $validationStatus 候选在同一事务内发布正式 v1', async ({schemaVersion, validationStatus}) => {
+  it.each([2, 1].flatMap(schemaVersion => ['valid', 'invalid', 'test_valid', 'test_invalid'].map(validationStatus => ({schemaVersion, validationStatus}))))('结构版本 $schemaVersion 的 $validationStatus 候选遵守发布门禁', async ({schemaVersion, validationStatus}) => {
     const schema =
-      schemaVersion === 3
+      schemaVersion === 1
         ? projectPriceResearchStrategy(discoverySchema as BacktestStrategy)
-        : discoverySchema;
+        : { ...discoverySchema, schemaVersion: '2', signalSources: discoverySchema.signalSources.map(source => {
+          const result = { ...source };
+          delete result.priceCoordinate;
+          return result;
+        }) };
     const currentCandidate = { ...candidate, executionHash: optimizationSha256(schema) };
     const formal = { id: '44444444-4444-4444-8444-444444444444', version: 1 };
     const facts = {
@@ -90,7 +94,7 @@ describe('策略探索采纳', () => {
         callback(transaction),
       ),
     };
-    await formalizeOptimizationCandidate(
+    const publication = formalizeOptimizationCandidate(
       prisma as never,
       candidate.experimentId,
       candidate.id,
@@ -98,6 +102,13 @@ describe('策略探索采纳', () => {
       0,
       'adopt-discovery',
     );
+    if (schemaVersion === 2) {
+      await expect(publication).rejects.toMatchObject({ response: { errorCode: 'ADOPTION_NOT_ELIGIBLE' } });
+      expect(transaction.strategyVersion.create).not.toHaveBeenCalled();
+      expect(transaction.strategy.update).not.toHaveBeenCalled();
+      return;
+    }
+    await publication;
     expect(transaction.strategy.update).toHaveBeenCalledWith({
       where: { id: '55555555-5555-4555-8555-555555555555' },
       data: { status: 'draft', name: '模型探索策略', description: '模型生成的说明' },

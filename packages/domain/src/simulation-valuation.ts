@@ -222,6 +222,22 @@ const convert = (amount: string, rate: SimulationFxRate, inverted: boolean) => {
 
 const addTo = (left: DecimalValue, right: string) => left.plus(right);
 
+/** 分析金额复用估值的冻结汇率选择，不能混加不同币种。 */
+export function convertSimulationMoneyAt(
+  amount: string, from: BacktestCurrency, to: BacktestCurrency,
+  rates: readonly SimulationFxRate[], at: string,
+): { status: 'available'; value: string } | { status: 'unavailable'; reason: string } {
+  if (from === to || DecimalValue.from(amount).isZero()) return { status: 'available', value: amount };
+  const selected = selectFx(from, to, rates, at);
+  if (!selected) return { status: 'unavailable', reason: 'FX_UNAVAILABLE' };
+  if (selected.invalidReason) return { status: 'unavailable', reason: selected.invalidReason };
+  if (isStale(selected.rate)) return { status: 'unavailable', reason: 'FX_STALE' };
+  const value = convert(amount, selected.rate, selected.inverted);
+  return value === undefined
+    ? { status: 'unavailable', reason: 'FX_INVALID' }
+    : { status: 'available', value };
+}
+
 export const valueSimulationLedger = (
   state: SimulationLedgerState,
   input: SimulationValuationInput,

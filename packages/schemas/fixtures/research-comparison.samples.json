@@ -11,7 +11,7 @@
     "historicalScope": {
       "status": "known",
       "snapshot": {
-        "version": "research-scope-v2",
+        "version": "research-scope-snapshot-v1",
         "mode": "shadow",
         "confirmedAt": "2026-10-18T07:59:00Z",
         "scope": "instrument",
@@ -25,7 +25,7 @@
         }
       }
     },
-    "resultVersion": 2,
+    "resultVersion": "research-report-result-v1",
     "availability": "available",
     "summary": "受控比较后的研究文字。",
     "quality": {
@@ -44,7 +44,7 @@
     "historicalScope": {
       "status": "known",
       "snapshot": {
-        "version": "research-scope-v2",
+        "version": "research-scope-snapshot-v1",
         "mode": "shadow",
         "confirmedAt": "2026-10-18T07:59:00Z",
         "scope": "instrument",
@@ -58,7 +58,7 @@
         }
       }
     },
-    "resultVersion": 2,
+    "resultVersion": "research-report-result-v1",
     "availability": "available",
     "summary": "材料有限，继续观察。",
     "quality": {
@@ -378,7 +378,7 @@
           "label": "研究范围资料",
           "status": "unchanged",
           "before": {
-            "version": "research-scope-v2",
+            "version": "research-scope-snapshot-v1",
             "mode": "shadow",
             "scope": "instrument",
             "instrument": {
@@ -391,7 +391,7 @@
             }
           },
           "after": {
-            "version": "research-scope-v2",
+            "version": "research-scope-snapshot-v1",
             "mode": "shadow",
             "scope": "instrument",
             "instrument": {

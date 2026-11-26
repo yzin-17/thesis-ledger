@@ -1,24 +1,6 @@
-import { createClientRequestId } from '../../lib/client-request-id';
-import { ExperimentDiscoveryInstrumentField, useExperimentDiscoveryInstrument } from './ExperimentDiscoveryInstrumentField.js';
-import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
-import { ExperimentBudgetFields } from './ExperimentBudgetFields.js';
-import { experimentCreateFailure } from './experiment-budget.js';
-import {
-  experimentPreparationTarget,
-  requirePreparedOptimizationConfiguration,
-  type PreparedOptimizationConfiguration,
-} from './optimization.preparation.js';
-import { useEffect, useState } from 'react';
-import { useExperimentResearchVersions } from './use-experiment-research-versions.js';
-import { ExperimentResearchVersionChoice } from './ExperimentResearchVersionChoice.js';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  strategySchema,
-  type OptimizationReasoningEffort,
-  type OptimizationExperimentCreate, type StrategySubmissionInput,
-} from '@thesis-ledger/schemas';
-import { Button } from '@/components/ui/button';
+import { settledStatuses } from './useOptimizationExperimentPanel.js';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateInput } from '@/components/ui/date-input';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -32,252 +14,62 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import {
-  cancelOptimizationExperiment,
-  cloneOptimizationExperiment,
-  createOptimizationExperiment,
-  fetchOptimizationCapabilities,
-  fetchOptimizationCompare,
-  fetchOptimizationExperiments,
-  fetchStrategyOptimizationParameters,
-} from './strategy-optimization.api.js';
-import {
-  routeKey,
-  StrategyOptimizationModelSelector,
-} from './StrategyOptimizationModelSelector.js';
+import { ExperimentBudgetFields } from './ExperimentBudgetFields.js';
+import { ExperimentDiscoveryInstrumentField } from './ExperimentDiscoveryInstrumentField.js';
+import { ExperimentResearchVersionChoice } from './ExperimentResearchVersionChoice.js';
+import { OptimizationPricePreparation } from './OptimizationPricePreparation.js';
 import { StrategyOptimizationExperimentResults } from './StrategyOptimizationExperimentResults.js';
+import { StrategyOptimizationModelSelector } from './StrategyOptimizationModelSelector.js';
 import type { StrategyRecord } from './strategy.types.js';
-const optimizationKey = ['desktop', 'strategy', 'optimization'] as const;
-const settledStatuses = new Set(['awaiting_finalization', 'succeeded', 'failed', 'cancelled']);
-const currencyByMarket = { CN: 'CNY', HK: 'HKD', US: 'USD' } as const;
+import {
+  addDays,
+  objectiveLabels,
+  useStrategyOptimizationExperimentPanel,
+} from './useOptimizationExperimentPanel.js';
+export { addDays, objectiveLabels } from './useOptimizationExperimentPanel.js';
 
-const isoDate = (date: Date) => date.toISOString().slice(0, 10);
-const daysAgo = (days: number) => {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() - days);
-  return isoDate(date);
-};
-export const addDays = (dateOnly: string, days: number) => {
-  const date = new Date(`${dateOnly}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return isoDate(date);
-};
-export const objectiveLabels = {
-  return: '优先收益',
-  drawdown: '优先低回撤',
-  balanced: '收益 / 回撤平衡',
-  lowTurnover: '优先低换手',
-} as const;
+export function StrategyOptimizationExperimentPanel(props: { strategies: StrategyRecord[] }) {
+  const control = useStrategyOptimizationExperimentPanel(props);
+  const {
+    capabilities,
+    sourceMode,
+    setSourceMode,
+    versions,
+    selectedModels,
+    setSelectedModels,
+    reasoningEfforts,
+    setReasoningEfforts,
+    hasUnknownCost,
+    acknowledgeUnknownCost,
+    parameters,
+    selectedParameters,
+    toggleParameter,
+    maxAiCalls,
+    maxBacktestRuns,
+    maxInputTokens,
+    maxOutputTokens,
+    maxDurationSeconds,
+    setMaxAiCalls,
+    setMaxBacktestRuns,
+    setMaxInputTokens,
+    setMaxOutputTokens,
+    setMaxDurationSeconds,
+    maxCost,
+    setMaxCost,
+    createMutation,
+    preparedConfig,
+    hasInvalidReasoningSelection,
+    feedback,
+    experiments,
+    compare,
+    selectedExperimentId,
+    invalidate,
+    setFeedback,
+    setSelectedExperimentId,
+    cloneMutation,
+    cancelMutation,
+  } = control;
 
-export function StrategyOptimizationExperimentPanel({
-  strategies,
-}: {
-  strategies: StrategyRecord[];
-}) {
-  const queryClient = useQueryClient();
-  const { versions, adoptVersion } = useExperimentResearchVersions(strategies);
-  const [convertingVersion, setConvertingVersion] = useState(false);
-  const [strategyVersionId, setStrategyVersionId] = useState(versions[0]?.version.id ?? '');
-  const [sourceMode, setSourceMode] = useState<'existing' | 'discovery'>('existing');
-  const discovery = useExperimentDiscoveryInstrument();
-  const discoveryMarket = discovery.instrument?.market ?? 'CN';
-  const discoveryAssetType = discovery.instrument?.assetType ?? 'stock';
-  const [discoveryTimeframe, setDiscoveryTimeframe] = useState<
-    '1d' | '60m' | '30m' | '15m' | '5m' | '1m'
-  >('1d');
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [selectedParameters, setSelectedParameters] = useState<string[]>([]);
-  const [objective, setObjective] = useState<'return' | 'drawdown' | 'balanced' | 'lowTurnover'>(
-    'balanced',
-  );
-  const [startDate, setStartDate] = useState(daysAgo(360));
-  const [developmentEnd, setDevelopmentEnd] = useState(daysAgo(181));
-  const [validationEnd, setValidationEnd] = useState(daysAgo(91));
-  const [endDate, setEndDate] = useState(daysAgo(1));
-  const [initialCash, setInitialCash] = useState('100000');
-  const [preparedConfig, setPreparedConfig] = useState<PreparedOptimizationConfiguration | null>(
-    null,
-  );
-  const [maxAiCalls, setMaxAiCalls] = useState('6');
-  const [maxBacktestRuns, setMaxBacktestRuns] = useState('20');
-  const [maxInputTokens, setMaxInputTokens] = useState('100000');
-  const [maxOutputTokens, setMaxOutputTokens] = useState('20000');
-  const [maxDurationSeconds, setMaxDurationSeconds] = useState('1800');
-  const [maxCost, setMaxCost] = useState('');
-  const [acknowledgeUnknownCost, setAcknowledgeUnknownCost] = useState(false);
-  const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
-  const [reasoningEfforts, setReasoningEfforts] = useState<
-    Record<string, OptimizationReasoningEffort | undefined>
-  >({});
-  const [feedback, setFeedback] = useState<string | null>(null);
-
-  const capabilities = useQuery({
-    queryKey: [...optimizationKey, 'capabilities'],
-    queryFn: () => fetchOptimizationCapabilities(),
-    staleTime: 30_000,
-  });
-  const parameters = useQuery({
-    queryKey: [...optimizationKey, 'parameters', strategyVersionId],
-    queryFn: () => fetchStrategyOptimizationParameters(strategyVersionId),
-    enabled: Boolean(strategyVersionId),
-  });
-  const experiments = useQuery({
-    queryKey: [...optimizationKey, 'experiments'],
-    queryFn: () => fetchOptimizationExperiments(),
-    refetchInterval: (query) =>
-      query.state.data?.items.some((item) => !settledStatuses.has(item.status)) ? 3_000 : false,
-  });
-  const compare = useQuery({
-    queryKey: [...optimizationKey, 'compare', selectedExperimentId],
-    queryFn: () => fetchOptimizationCompare(selectedExperimentId ?? ''),
-    enabled: Boolean(selectedExperimentId),
-    refetchInterval: (query) => {
-      const status = query.state.data?.experiment.status;
-      return status && !settledStatuses.has(status) ? 3_000 : false;
-    },
-  });
-
-  useEffect(() => {
-    if (!selectedExperimentId && experiments.data?.items[0])
-      setSelectedExperimentId(experiments.data.items[0].id);
-  }, [experiments.data, selectedExperimentId]);
-  useEffect(() => {
-    if (parameters.data?.length && selectedParameters.length === 0)
-      setSelectedParameters(
-        parameters.data.filter((item) => item.optimizationRange).map((item) => item.parameterId),
-      );
-  }, [parameters.data, selectedParameters.length]);
-  useEffect(() => {
-    const providers = capabilities.data?.providers ?? [];
-    if (providers.length > 0 && selectedModels.length === 0)
-      setSelectedModels(
-        providers
-          .slice(0, Math.min(2, providers.length))
-          .map((item) => routeKey(item.provider, item.model)),
-      );
-  }, [capabilities.data?.providers, selectedModels.length]);
-  const selectedProviderRoutes = (capabilities.data?.providers ?? []).filter((route) =>
-    selectedModels.includes(routeKey(route.provider, route.model)),
-  );
-  const hasInvalidReasoningSelection = selectedProviderRoutes.some((route) => {
-    const key = routeKey(route.provider, route.model);
-    const effort = reasoningEfforts[key];
-    if (effort === undefined) return false;
-    return (
-      !route.reasoning?.supportedEfforts?.includes(effort) ||
-      (route.reasoning?.mandatory === true && effort === 'none')
-    );
-  });
-  const hasUnknownCost = selectedProviderRoutes.some((route) => route.costStatus === 'unknown');
-  const selectedVersion =
-    versions.find((entry) => entry.version.id === strategyVersionId) ?? versions[0];
-  const parsedStrategy = selectedVersion?.version.schema
-    ? strategySchema.safeParse(selectedVersion.version.schema)
-    : null;
-  let market: 'CN' | 'HK' | 'US' = discoveryMarket;
-  if (sourceMode !== 'discovery') {
-    market = parsedStrategy?.success ? parsedStrategy.data.executionInstrument.market : 'CN';
-  }
-  const currency = currencyByMarket[market];
-
-  const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: optimizationKey });
-    await queryClient.invalidateQueries({ queryKey: ['desktop', 'strategy', 'strategies'] });
-  };
-
-  const preparationTarget = experimentPreparationTarget(sourceMode, strategyVersionId, {
-    executionInstrument: {
-      symbol: discovery.instrument?.symbol ?? '',
-      market: discoveryMarket,
-      assetType: discoveryAssetType,
-    },
-    primaryTimeframe: discoveryAssetType === 'fund' ? '1d' : discoveryTimeframe,
-  });
-  const settings = (): Extract<StrategySubmissionInput, {kind:'optimization'}>['settings'] => {
-      if (!maxBacktestRuns.trim()) throw new Error('请填写回测次数上限；填 0 表示不限制。');
-      if (!maxAiCalls.trim()) throw new Error('请填写 AI 调用上限；填 0 表示不限制。');
-      if (!maxInputTokens.trim()) throw new Error('请填写输入 Token 上限；填 0 表示不限制。');
-      if (!maxOutputTokens.trim()) throw new Error('请填写输出 Token 上限；填 0 表示不限制。');
-      if (sourceMode === 'existing' && !strategyVersionId) throw new Error('请选择策略版本');
-      if (sourceMode === 'discovery' && !discovery.instrument) throw new Error('请从目录选择探索标的');
-      if (selectedModels.length === 0) throw new Error('至少选择一个模型');
-      if (sourceMode === 'existing' && selectedParameters.length === 0)
-        throw new Error('至少授权一个参数');
-      if (hasInvalidReasoningSelection)
-        throw new Error('所选模型的推理强度不受提供方能力配置支持');
-      const models = selectedProviderRoutes.map((route) => {
-        const effort = reasoningEfforts[routeKey(route.provider, route.model)];
-        return {
-          provider: route.provider,
-          model: route.model,
-          ...(effort === undefined ? {} : { reasoningEffort: effort }),
-        };
-      });
-      return {
-        ...(sourceMode === 'existing' ? { allowedParameterIds: selectedParameters } : {}),
-        models,
-        objective: { mode: objective, minClosedTrades: 1 },
-        split: {
-          development: { start: startDate, end: developmentEnd },
-          validation: { start: addDays(developmentEnd, 1), end: validationEnd },
-          test: { start: addDays(validationEnd, 1), end: endDate },
-        },
-        budget: {
-          maxAiCalls: Number(maxAiCalls),
-          maxBacktestRuns: Number(maxBacktestRuns),
-          maxInputTokens: Number(maxInputTokens),
-          maxOutputTokens: Number(maxOutputTokens),
-          maxDurationSeconds: Number(maxDurationSeconds),
-          ...(maxCost.trim() ? { maxCost: maxCost.trim() } : {}),
-        },
-        maxRounds: 2,
-        acknowledgeUnknownCost: !hasUnknownCost || acknowledgeUnknownCost,
-      };
-  };
-  const createMutation = useMutation({
-    mutationFn: () => {
-      const runConfig = requirePreparedOptimizationConfiguration(
-        preparedConfig,
-        preparationTarget,
-        startDate,
-        endDate,
-        currency,
-        initialCash,
-      );
-      const input: OptimizationExperimentCreate = {
-        ...settings(), ...preparationTarget, contractVersion:3, runConfig,
-        idempotencyKey: createClientRequestId(),
-      };
-      return createOptimizationExperiment(input);
-    },
-    onSuccess: async (experiment) => {
-      setSelectedExperimentId(experiment.id);
-      setFeedback('实验已创建。开发集与验证集先运行，测试集保持封存。');
-      await invalidate();
-    },
-    onError: (error) => setFeedback(experimentCreateFailure(error)),
-  });
-  const cancelMutation = useMutation({
-    mutationFn: (id: string) => cancelOptimizationExperiment(id),
-    onSuccess: invalidate,
-  });
-  const cloneMutation = useMutation({
-    mutationFn: (id: string) => cloneOptimizationExperiment(id),
-    onSuccess: async (experiment) => {
-      setSelectedExperimentId(experiment.id);
-      setFeedback(
-        experiment.testExposedAt
-          ? '实验已克隆；源实验测试集已暴露，新实验继承暴露状态，不视为新的独立验证。'
-          : '实验已克隆，并继承相同模型、参数、数据切分与预算配置。',
-      );
-      await invalidate();
-    },
-    onError: (error) => setFeedback(error instanceof Error ? error.message : '克隆实验失败'),
-  });
-  const toggleParameter = (id: string) =>
-    setSelectedParameters((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
   return (
     <div className="space-y-4">
       <Card>
@@ -306,104 +98,11 @@ export function StrategyOptimizationExperimentPanel({
           <Alert>
             <AlertTitle>实验关系</AlertTitle>
             <AlertDescription>
-              AI 实验 → 正式策略 → 风险规则。手动创建和 AI 采纳的正式 V2
-              版本都可使用确定性风险规则入口。
+              手动创建和从实验采纳的正式策略都可生成风险规则。
             </AlertDescription>
           </Alert>
-          {sourceMode === 'discovery' ? (
-            <FieldGroup className="max-w-2xl">
-              <ExperimentDiscoveryInstrumentField discovery={discovery} />
-              <Field>
-                <FieldLabel>主周期</FieldLabel>
-                <Select
-                  value={discoveryAssetType === 'fund' ? '1d' : discoveryTimeframe}
-                  onValueChange={(value) => value && setDiscoveryTimeframe(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {['1d', '60m', '30m', '15m', '5m', '1m'].map((item) => (
-                        <SelectItem
-                          key={item}
-                          value={item}
-                          disabled={discoveryAssetType === 'fund' && item !== '1d'}
-                        >
-                          {item}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </FieldGroup>
-          ) : null}
-          <div className="grid gap-3 lg:grid-cols-2">
-            {sourceMode === 'existing' ? (
-              <Field className="space-y-1 text-sm">
-                <FieldLabel>
-                  <span className="text-muted-foreground">基线策略版本</span>
-                </FieldLabel>
-                <Select
-                  items={versions.map(({ strategy, version }) => ({
-                    label: `${strategy.name} · v${version.version}`,
-                    value: version.id,
-                  }))}
-                  value={strategyVersionId}
-                  onValueChange={(value) => {
-                    if (!value) return;
-                    setStrategyVersionId(value);
-                    setSelectedParameters([]);
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {versions.map(({ strategy, version }) => (
-                        <SelectItem key={version.id} value={version.id}>
-                          {strategy.name} · v{version.version}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            ) : (
-              <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                探索模式不需要基线策略或参数授权；Server 会创建实验专用隐藏 v0 种子。
-              </div>
-            )}
-            <Field className="space-y-1 text-sm">
-              <FieldLabel>
-                <span className="text-muted-foreground">优化目标</span>
-              </FieldLabel>
-              <Select
-                items={[
-                  { label: '收益 / 回撤平衡', value: 'balanced' },
-                  { label: '优先收益', value: 'return' },
-                  { label: '优先低回撤', value: 'drawdown' },
-                  { label: '优先低换手', value: 'lowTurnover' },
-                ]}
-                value={objective}
-                onValueChange={(value) => value && setObjective(value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>{objectiveLabels[objective]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="balanced">收益 / 回撤平衡</SelectItem>
-                    <SelectItem value="return">优先收益</SelectItem>
-                    <SelectItem value="drawdown">优先低回撤</SelectItem>
-                    <SelectItem value="lowTurnover">优先低换手</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
+          {sourceMode === 'discovery' ? <OptimizationDiscoveryFields control={control} /> : null}
+          <OptimizationSourceAndObjective control={control} />
           <StrategyOptimizationModelSelector
             routes={capabilities.data?.providers ?? []}
             selectedModels={selectedModels}
@@ -411,22 +110,7 @@ export function StrategyOptimizationExperimentPanel({
             reasoningEfforts={reasoningEfforts}
             onReasoningEffortsChange={setReasoningEfforts}
           />
-          {hasUnknownCost ? (
-            <div className="space-y-2 rounded-md border border-caution/40 bg-caution/5 p-3">
-              <div className="text-sm font-medium">所选模型存在未知费用</div>
-              <p className="text-xs text-muted-foreground">
-                系统仍会限制调用、Token、回测和计算时长，但没有价格表时不能保证费用上限。
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant={acknowledgeUnknownCost ? 'default' : 'outline'}
-                onClick={() => setAcknowledgeUnknownCost((current) => !current)}
-              >
-                {acknowledgeUnknownCost ? '已确认未知费用' : '确认后允许创建'}
-              </Button>
-            </div>
-          ) : null}
+          <OptimizationUnknownCostChoice control={control} />
           {sourceMode === 'existing' ? (
             <div className="space-y-2">
               <div className="text-sm text-muted-foreground">允许 AI 修改的参数</div>
@@ -448,58 +132,27 @@ export function StrategyOptimizationExperimentPanel({
               </div>
             </div>
           ) : null}
-          <div className="flex flex-col gap-2">
-            <div className="text-sm text-muted-foreground">
-              时间切分（三段连续、不重叠；验证集/封存测试集从前一段结束日后一天自动开始）
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field>
-                <FieldLabel>开发集开始</FieldLabel>
-                <DateInput
-                  type="date"
-                  value={startDate}
-                  onChange={(event) => setStartDate(event.target.value)}
-                  aria-label="开发集开始"
-                />
-              </Field>
-              <Field>
-                <FieldLabel>开发集结束</FieldLabel>
-                <DateInput
-                  type="date"
-                  value={developmentEnd}
-                  onChange={(event) => setDevelopmentEnd(event.target.value)}
-                  aria-label="开发集结束"
-                />
-              </Field>
-              <Field>
-                <FieldLabel>验证集结束</FieldLabel>
-                <DateInput
-                  type="date"
-                  value={validationEnd}
-                  onChange={(event) => setValidationEnd(event.target.value)}
-                  aria-label="验证集结束"
-                />
-                <FieldDescription>验证集开始：{addDays(developmentEnd, 1)}</FieldDescription>
-              </Field>
-              <Field>
-                <FieldLabel>封存测试结束</FieldLabel>
-                <DateInput
-                  type="date"
-                  value={endDate}
-                  onChange={(event) => setEndDate(event.target.value)}
-                  aria-label="封存测试结束"
-                />
-                <FieldDescription>封存测试开始：{addDays(validationEnd, 1)}</FieldDescription>
-              </Field>
-            </div>
-          </div>
+          <OptimizationDateFields control={control} />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <ExperimentBudgetFields value={{ maxAiCalls, maxBacktestRuns, maxInputTokens, maxOutputTokens, maxDurationSeconds }}
+            <ExperimentBudgetFields
+              value={{
+                maxAiCalls,
+                maxBacktestRuns,
+                maxInputTokens,
+                maxOutputTokens,
+                maxDurationSeconds,
+              }}
               onChange={(field, value) => {
-                const setters = { maxAiCalls: setMaxAiCalls, maxBacktestRuns: setMaxBacktestRuns,
-                  maxInputTokens: setMaxInputTokens, maxOutputTokens: setMaxOutputTokens, maxDurationSeconds: setMaxDurationSeconds };
+                const setters = {
+                  maxAiCalls: setMaxAiCalls,
+                  maxBacktestRuns: setMaxBacktestRuns,
+                  maxInputTokens: setMaxInputTokens,
+                  maxOutputTokens: setMaxOutputTokens,
+                  maxDurationSeconds: setMaxDurationSeconds,
+                };
                 setters[field](value);
-              }} />
+              }}
+            />
             <Field className="space-y-1 text-sm">
               <FieldLabel>
                 <span className="text-muted-foreground">模型费用上限（可选）</span>
@@ -516,29 +169,7 @@ export function StrategyOptimizationExperimentPanel({
             预算为服务端硬上限；模型调用前预留保守输入 Token 与单次输出额度，完成后按提供方实际
             用量结算。
           </p>
-          <div className="grid gap-3 lg:grid-cols-[180px_1fr]">
-            <Field className="space-y-1 text-sm">
-              <FieldLabel>
-                <span className="text-muted-foreground">初始资金（{currency}）</span>
-              </FieldLabel>
-              <Input value={initialCash} onChange={(event) => setInitialCash(event.target.value)} />
-            </Field>
-            {sourceMode === 'existing' && <ExperimentResearchVersionChoice
-              entry={selectedVersion ?? null} disabled={convertingVersion || createMutation.isPending}
-              onBusyChange={setConvertingVersion} onAdopt={version => {
-                if (!selectedVersion) return;
-                adoptVersion(selectedVersion.strategy, version); setStrategyVersionId(version.id);
-                setSelectedParameters([]); setPreparedConfig(null);
-              }} />}
-            {(sourceMode === 'discovery' || selectedVersion?.version.schema?.schemaVersion === '3') && <OptimizationPricePreparation
-              target={preparationTarget}
-              startDate={startDate}
-              endDate={endDate}
-              currency={currency}
-              initialCash={initialCash}
-                onPrepared={setPreparedConfig}
-            />}
-          </div>
+          <OptimizationPreparationFields control={control} />
           <div className="flex flex-wrap items-center gap-2">
             <Button
               disabled={
@@ -550,11 +181,7 @@ export function StrategyOptimizationExperimentPanel({
               }
               onClick={() => createMutation.mutate()}
             >
-              {createMutation.isPending
-                ? '创建中…'
-                : sourceMode === 'discovery'
-                  ? '创建探索实验'
-                  : '创建优化实验'}
+              {optimizationCreateLabel(createMutation.isPending, sourceMode)}
             </Button>
             {feedback ? <span className="text-sm text-muted-foreground">{feedback}</span> : null}
           </div>
@@ -579,3 +206,253 @@ export function StrategyOptimizationExperimentPanel({
     </div>
   );
 }
+
+function OptimizationSourceAndObjective({
+  control,
+}: {
+  control: ReturnType<typeof useStrategyOptimizationExperimentPanel>;
+}) {
+  return (
+    <>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {control.sourceMode === 'existing' ? (
+          <Field className="space-y-1 text-sm">
+            <FieldLabel>
+              <span className="text-muted-foreground">基线策略版本</span>
+            </FieldLabel>
+            <Select
+              items={control.versions.map(({ strategy, version }) => ({
+                label: `${strategy.name} · v${version.version}`,
+                value: version.id,
+              }))}
+              value={control.strategyVersionId}
+              onValueChange={(value) => {
+                if (!value) return;
+                control.setStrategyVersionId(value);
+                control.setSelectedParameters([]);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {control.versions.map(({ strategy, version }) => (
+                    <SelectItem key={version.id} value={version.id}>
+                      {strategy.name} · v{version.version}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : (
+          <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+            探索模式不需要基线策略或参数授权；Server 会创建实验专用隐藏 v0 种子。
+          </div>
+        )}
+        <Field className="space-y-1 text-sm">
+          <FieldLabel>
+            <span className="text-muted-foreground">优化目标</span>
+          </FieldLabel>
+          <Select
+            items={[
+              { label: '收益 / 回撤平衡', value: 'balanced' },
+              { label: '优先收益', value: 'return' },
+              { label: '优先低回撤', value: 'drawdown' },
+              { label: '优先低换手', value: 'lowTurnover' },
+            ]}
+            value={control.objective}
+            onValueChange={(value) => value && control.setObjective(value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue>{objectiveLabels[control.objective]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="balanced">收益 / 回撤平衡</SelectItem>
+                <SelectItem value="return">优先收益</SelectItem>
+                <SelectItem value="drawdown">优先低回撤</SelectItem>
+                <SelectItem value="lowTurnover">优先低换手</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+    </>
+  );
+}
+
+function OptimizationUnknownCostChoice({
+  control,
+}: {
+  control: ReturnType<typeof useStrategyOptimizationExperimentPanel>;
+}) {
+  return (
+    <>
+      {control.hasUnknownCost ? (
+        <div className="space-y-2 rounded-md border border-caution/40 bg-caution/5 p-3">
+          <div className="text-sm font-medium">所选模型存在未知费用</div>
+          <p className="text-xs text-muted-foreground">
+            系统仍会限制调用、Token、回测和计算时长，但没有价格表时不能保证费用上限。
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant={control.acknowledgeUnknownCost ? 'default' : 'outline'}
+            onClick={() => control.setAcknowledgeUnknownCost((current) => !current)}
+          >
+            {control.acknowledgeUnknownCost ? '已确认未知费用' : '确认后允许创建'}
+          </Button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function OptimizationDateFields({
+  control,
+}: {
+  control: ReturnType<typeof useStrategyOptimizationExperimentPanel>;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <div className="text-sm text-muted-foreground">
+          时间切分（三段连续、不重叠；验证集/封存测试集从前一段结束日后一天自动开始）
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field>
+            <FieldLabel>开发集开始</FieldLabel>
+            <DateInput
+              type="date"
+              value={control.startDate}
+              onChange={(event) => control.setStartDate(event.target.value)}
+              aria-label="开发集开始"
+            />
+          </Field>
+          <Field>
+            <FieldLabel>开发集结束</FieldLabel>
+            <DateInput
+              type="date"
+              value={control.developmentEnd}
+              onChange={(event) => control.setDevelopmentEnd(event.target.value)}
+              aria-label="开发集结束"
+            />
+          </Field>
+          <Field>
+            <FieldLabel>验证集结束</FieldLabel>
+            <DateInput
+              type="date"
+              value={control.validationEnd}
+              onChange={(event) => control.setValidationEnd(event.target.value)}
+              aria-label="验证集结束"
+            />
+            <FieldDescription>验证集开始：{addDays(control.developmentEnd, 1)}</FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel>封存测试结束</FieldLabel>
+            <DateInput
+              type="date"
+              value={control.endDate}
+              onChange={(event) => control.setEndDate(event.target.value)}
+              aria-label="封存测试结束"
+            />
+            <FieldDescription>封存测试开始：{addDays(control.validationEnd, 1)}</FieldDescription>
+          </Field>
+        </div>
+      </div>
+    </>
+  );
+}
+function OptimizationPreparationFields({
+  control,
+}: {
+  control: ReturnType<typeof useStrategyOptimizationExperimentPanel>;
+}) {
+  return (
+    <>
+      <div className="grid gap-3 lg:grid-cols-[180px_1fr]">
+        <Field className="space-y-1 text-sm">
+          <FieldLabel>
+            <span className="text-muted-foreground">初始资金（{control.currency}）</span>
+          </FieldLabel>
+          <Input
+            value={control.initialCash}
+            onChange={(event) => control.setInitialCash(event.target.value)}
+          />
+        </Field>
+        {control.sourceMode === 'existing' && (
+          <ExperimentResearchVersionChoice
+            entry={control.selectedVersion ?? null}
+            disabled={control.convertingVersion || control.createMutation.isPending}
+            onBusyChange={control.setConvertingVersion}
+            onAdopt={(version) => {
+              if (!control.selectedVersion) return;
+              control.adoptVersion(control.selectedVersion.strategy, version);
+              control.setStrategyVersionId(version.id);
+              control.setSelectedParameters([]);
+              control.setPreparedConfig(null);
+            }}
+          />
+        )}
+        {(control.sourceMode === 'discovery' ||
+          isPriceResearchStrategyDefinition(control.selectedVersion?.version.schema)) && (
+          <OptimizationPricePreparation
+            dailyOrders={control.sourceMode === 'existing' && strategyEditorVariant('execution', control.selectedVersion?.version.schema?.execution) === 'dailyBarOrders'}
+            target={control.preparationTarget}
+            startDate={control.startDate}
+            endDate={control.endDate}
+            currency={control.currency}
+            initialCash={control.initialCash}
+            onPrepared={control.setPreparedConfig}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+function optimizationCreateLabel(pending: boolean, sourceMode: 'existing' | 'discovery') {
+  if (pending) return '创建中…';
+  if (sourceMode === 'discovery') return '创建探索实验';
+  return '创建优化实验';
+}
+
+function OptimizationDiscoveryFields({
+  control,
+}: {
+  control: ReturnType<typeof useStrategyOptimizationExperimentPanel>;
+}) {
+  return (
+    <>
+      <FieldGroup className="max-w-2xl">
+        <ExperimentDiscoveryInstrumentField discovery={control.discovery} />
+        <Field>
+          <FieldLabel>主周期</FieldLabel>
+          <Select
+            value={control.discoveryAssetType === 'fund' ? '1d' : control.discoveryTimeframe}
+            onValueChange={(value) => value && control.setDiscoveryTimeframe(value)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {['1d', '60m', '30m', '15m', '5m', '1m'].map((item) => (
+                  <SelectItem
+                    key={item}
+                    value={item}
+                    disabled={control.discoveryAssetType === 'fund' && item !== '1d'}
+                  >
+                    {item}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+      </FieldGroup>
+    </>
+  );
+}
+import { isPriceResearchStrategyDefinition, strategyEditorVariant } from '@thesis-ledger/domain';

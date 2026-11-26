@@ -93,7 +93,7 @@ export type BacktestPreflightRevisionStampV3 = z.infer<
 >;
 
 export const backtestPreflightRequestV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: text,
   strategyVersionId: text,
   strategyContentHash: sha256,

@@ -38,26 +38,10 @@ import type {
 } from './strategy.types.js';
 
 import { jobStatusLabel, jobStatusVariant } from './backtest-status.js';
+import { backtestStageDisplay } from '@thesis-ledger/domain';
 export { jobStatusLabel, jobStatusVariant } from './backtest-status.js';
 
-export const backtestStageLabel = (stage: unknown) => {
-  const labels: Record<string, string> = {
-    'preparation-failed': '准备与预检',
-    queued: '排队中',
-    'snapshot-finalized': '快照已完成',
-    running: '运行中',
-    'persisting-result': '正在保存结果',
-    succeeded: '已完成',
-    failed: '失败',
-    cancelled: '已取消',
-    snapshot: '准备快照',
-    prepare: '准备数据',
-    run: '执行回测',
-    finalize: '整理结果',
-  };
-  if (typeof stage !== 'string' || !stage.trim()) return '未配置';
-  return labels[stage] ?? '其他阶段';
-};
+export const backtestStageLabel = backtestStageDisplay;
 
 const strategyStatusLabel = (status: unknown) => {
   if (status === 'active') return '启用';
@@ -428,7 +412,7 @@ export function StrategyJobs({
                             {job.status === 'failed' ? '查看失败详情' : '查看结果'}
                           </Button>
                         )}
-                        {job.mode === 'V3' && job.status === 'failed' && onRetry && (
+                        {job.mode === 'frozen' && job.status === 'failed' && onRetry && (
                           <Button
                             size="sm"
                             variant="outline"

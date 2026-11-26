@@ -27,7 +27,7 @@ export class DataExportService {
     const notifications = await this.readNotifications(accountId, events);
 
     return {
-      formatVersion: 2,
+      format: 'thesis-ledger-data-export-v1' as const,
       exportedAt: new Date().toISOString(),
       scope: accountId
         ? { kind: 'account' as const, accountId, globalSections: ['strategies'] }

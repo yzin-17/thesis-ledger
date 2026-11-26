@@ -11,7 +11,9 @@ import {
 } from '../../src/market/market-bar-reader-v3.js';
 import { MarketWindowEvidenceV3Repository } from '../../src/market/market-window-evidence-v3.repository.js';
 import type { PrismaService } from '../../src/platform/prisma.service.js';
-import type { MarketControlService } from '../../src/market/market-control.service.js';
+import { MarketControlService } from '../../src/market/market-control.service.js';
+import { MarketRouteRevisionService } from '../../src/market/market-route-revision.service.js';
+import { MarketFrozenWindowReaderV3 } from '../../src/market/market-frozen-window-reader-v3.js';
 import {
   desiredProviderPolicyV3Schema,
   effectiveProviderPolicyV3Schema,
@@ -65,11 +67,11 @@ export async function startWorkerDsaHttpFixture(
     try {
       let payload: unknown;
       const query = Object.fromEntries(url.searchParams);
-      if (url.pathname === '/api/v3/thesis-ledger/backtest/calendar') {
+      if (url.pathname === '/api/v1/thesis-ledger/backtest/calendar') {
         payload = await fixture.dsa.backtestCalendar(
           query as Parameters<DsaClient['backtestCalendar']>[0],
         );
-      } else if (url.pathname === '/api/v3/thesis-ledger/backtest/instrument-facts') {
+      } else if (url.pathname === '/api/v1/thesis-ledger/backtest/instrument-facts') {
         payload = await fixture.dsa.backtestInstrumentFacts(
           backtestInstrumentFactsRequestSchema.parse({
             ...query,
@@ -81,7 +83,7 @@ export async function startWorkerDsaHttpFixture(
               : { identityOnly: query.identityOnly === 'true' }),
           }),
         );
-      } else if (url.pathname === '/api/v3/thesis-ledger/market/bars') {
+      } else if (url.pathname === '/api/v1/thesis-ledger/market/bars') {
         let body = '';
         for await (const chunk of request) body += String(chunk);
         const parsed = marketDataBarSeriesRequestV3Schema.parse(JSON.parse(body));
@@ -99,15 +101,15 @@ export async function startWorkerDsaHttpFixture(
         if (planned.status !== 'selected') throw new Error('不支持的样本');
         const single = { ...planned.selection.response, requestId: parsed.requestId };
         payload = multiWindowEnabled ? makeMultiWindowResponseV3(single) : single;
-      } else if (url.pathname === '/api/v3/thesis-ledger/capabilities') {
+      } else if (url.pathname === '/api/v1/thesis-ledger/capabilities') {
         payload = {
           dataContractVersions: [3],
           serviceCapabilities: { fundNav: true },
           multiWindowProtocols: ['market-multi-window-content-v1'],
         };
-      } else if (url.pathname === '/api/v3/thesis-ledger/control/policies/effective') {
-        payload = { contractVersion: 3, consumer: 'thesis-ledger', projection: { effective } };
-      } else if (url.pathname === '/api/v3/thesis-ledger/control/routes/capabilities') {
+      } else if (url.pathname === '/api/v1/thesis-ledger/control/policies/effective') {
+        payload = { contractVersion: 1, consumer: 'thesis-ledger', projection: { effective } };
+      } else if (url.pathname === '/api/v1/thesis-ledger/control/routes/capabilities') {
         payload = catalog;
       } else {
         response.writeHead(404).end('{}');
@@ -156,6 +158,8 @@ export async function startWorkerDsaHttpFixture(
     } as unknown as MarketControlService,
     dsa,
     repository,
+    new MarketFrozenWindowReaderV3(repository,
+      new MarketRouteRevisionService(new MarketControlService(prisma, dsa), dsa)),
   );
   const reader = {
     read: vi.fn(),
@@ -165,6 +169,9 @@ export async function startWorkerDsaHttpFixture(
   };
   return {
     fixture,
+    desired,
+    effective,
+    baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
     dsa,
     reader,
     paths,

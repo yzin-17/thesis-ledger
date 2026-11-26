@@ -1,11 +1,12 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "strategy-definition-v1",
   "name": "均线示例",
   "signalSources": [
     {
       "id": "primary",
       "asset": { "symbol": "510300.SH", "market": "CN", "assetType": "etf" },
       "timeframe": "1d",
+      "priceCoordinate": "run",
       "series": ["open", "high", "low", "close", "volume"]
     }
   ],

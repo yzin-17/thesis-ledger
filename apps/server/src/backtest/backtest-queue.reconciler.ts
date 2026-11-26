@@ -9,7 +9,7 @@ import {
 } from './backtest-queue.service.js';
 import { BACKTEST_MAX_ATTEMPTS } from './backtest-bull-queue.js';
 import { resolveBacktestRetryBudget } from './backtest-retry-budget.js';
-import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { persistedRunContract } from './backtest-v3-run-lifecycle.js';
 import type { BacktestJob } from '@prisma/client';
 
 const RECONCILE_PAGE_SIZE = 100;
@@ -45,7 +45,7 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
       for (;;) {
         const jobs = await this.prisma.backtestJob.findMany({
           where: {
-            mode: 'V3',
+            mode: 'frozen',
             status: { in: ['queued', 'running'] },
             ...(cursor
               ? {
@@ -87,7 +87,7 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
       'id' | 'mode' | 'status' | 'executionAttempt' | 'input' | 'cancelRequestedAt'
     >,
   ) {
-    if (persistedContractVersion(job) !== 3) return;
+    if (!persistedRunContract(job)) return;
     if (!this.queue.getState) return;
 
     let queueState: string | null;
@@ -105,7 +105,7 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
       const cancelled = await this.prisma.backtestJob.updateMany({
         where: {
           id: job.id,
-          mode: 'V3',
+          mode: 'frozen',
           status: 'running',
           executionAttempt: job.executionAttempt,
           cancelRequestedAt: { not: null },
@@ -134,7 +134,7 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
       const failed = await this.prisma.backtestJob.updateMany({
         where: {
           id: job.id,
-          mode: 'V3',
+          mode: 'frozen',
           status: job.status,
           executionAttempt: job.executionAttempt,
           cancelRequestedAt: null,
@@ -156,7 +156,7 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
       const failed = await this.prisma.backtestJob.updateMany({
         where: {
           id: job.id,
-          mode: 'V3',
+          mode: 'frozen',
           status: job.status,
           executionAttempt: job.executionAttempt,
           cancelRequestedAt: null,
@@ -177,7 +177,7 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
       const requeued = await this.prisma.backtestJob.updateMany({
         where: {
           id: job.id,
-          mode: 'V3',
+          mode: 'frozen',
           status: 'running',
           executionAttempt: job.executionAttempt,
           cancelRequestedAt: null,

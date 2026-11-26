@@ -25,7 +25,7 @@ export const drawerPosition = {
   asset: { name: '隔离验收基金', assetType: 'etf' as const },
 };
 export const drawerEvent = {
-  version: 3 as const,
+  version: 1 as const,
   eventId: '22222222-2222-4222-8222-222222222222',
   factId: '33333333-3333-4333-8333-333333333333',
   accountId: drawerAccount.id,

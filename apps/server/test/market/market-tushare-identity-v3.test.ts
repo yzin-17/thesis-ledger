@@ -18,7 +18,7 @@ function selectionFixture() {
       scope,
       read,
       effective: {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'synthetic-identity-policy',
         revision: 1,
@@ -43,7 +43,7 @@ function selectionFixture() {
         ],
       },
       catalog: {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         catalogRevision: 1,
         generatedAt: '2026-09-28T11:00:00Z',

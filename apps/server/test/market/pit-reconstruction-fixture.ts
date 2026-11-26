@@ -28,7 +28,7 @@ export const pitReconstructionFixture = async () => {
   );
   response.sourcePriceBasis.anchor = '2026-05-18';
   const request: PinnedMarketWindowRequestV3 = {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: response.requestId,
     symbol: response.symbol,
     routeKey: response.routeKey,

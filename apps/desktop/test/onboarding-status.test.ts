@@ -11,7 +11,7 @@ function statusClient(rules: boolean[], schedules: boolean[] | Error): DesktopRe
       else if (path === '/api/market-data/providers') response = { providers: [] };
       else if (path === '/api/market-data/policy') {
         response = {
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId: 'onboarding-test',
           revision: 1,

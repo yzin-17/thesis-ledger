@@ -5,7 +5,7 @@ import { MarketQuoteReader } from '../../src/market/market-quote-reader.js';
 import { redisKey, type RedisService } from '../../src/platform/redis.service.js';
 
 const quote = {
-  version: 3,
+  version: 1,
   symbol: '600519.SH',
   open: 2,
   high: 2,
@@ -50,7 +50,7 @@ describe.skipIf(process.env.E04_CACHE_REDIS !== '1')('当前行情缓存隔离 R
       Array.from({ length: 12 }, (_, index) => readers[index % 2]!.getQuote('600519.SH')),
     );
     expect(get).toHaveBeenCalledTimes(1);
-    expect(results.every((result) => result.symbol === quote.symbol && result.version === 3)).toBe(
+    expect(results.every((result) => result.symbol === quote.symbol && result.version === 1)).toBe(
       true,
     );
     expect(await client.get(redisKey('lock', 'market:quote:3:600519.SH'))).toBeNull();

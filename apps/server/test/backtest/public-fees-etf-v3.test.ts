@@ -77,7 +77,7 @@ describe('三个ETF历史切片的正式请求与执行冻结', () => {
       const reader = new DsaDataCapabilityReaderV3(post, (parse) => parse());
       expect(await reader.publicFees(request)).toEqual(response);
       expect(post.mock.calls[0]).toEqual([
-        '/api/v3/thesis-ledger/market/public-fees',
+        '/api/v1/thesis-ledger/market/public-fees',
         request,
         expect.any(Function),
       ]);

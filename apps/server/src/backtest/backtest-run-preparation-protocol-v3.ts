@@ -61,7 +61,7 @@ export function preparedRunConfigV3(
       ? { frozenPriceWarmupPolicy: 'cash-reference-calendar-buffer-v1' }
       : {}),
     ...(lifecyclePreparation ? { lifecyclePreparation } : {}),
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     ...(request.priceResearch ? { priceResearch: { protocolVersion: request.priceResearch } } : {}),
     ...(request.warmupBudgetSessions !== undefined
       ? { frozenWarmupBudgetSessions: request.warmupBudgetSessions }

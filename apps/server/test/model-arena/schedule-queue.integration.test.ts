@@ -70,7 +70,7 @@ it.skipIf(!url || !process.env.ARENA_QUEUE_TEST_SCOPE)(
       });
       const budget = { requests: 5, tokens: 10000, costMicros: 100000 };
       const match = await arenas.create(owner, {
-        version: 1,
+        version: 'arena-historical-match-protocol-v1',
         title: '后台轮次',
         market: 'CN',
         currency: 'CNY',

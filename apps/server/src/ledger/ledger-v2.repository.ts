@@ -112,7 +112,7 @@ export const toLedgerEventV2 = (stored: {
     if (stored.timePrecision === 'DATE') occurredAt = occurredAt.slice(0, 10);
   }
   const event = {
-    version: 3,
+    version: 1,
     eventId: stored.id,
     factId: stored.factId,
     accountId: stored.accountId,
@@ -192,14 +192,6 @@ export class LedgerV2Repository {
       `);
       if (rows.length !== orderedAccountIds.length) throw new Error('无法锁定所有账户账本状态');
 
-      for (const accountId of orderedAccountIds) {
-        const oldEvent = await client.ledgerEvent.findFirst({
-          where: { accountId, envelopeVersion: null },
-          select: { id: true },
-        });
-        if (oldEvent) requireCurrentLedgerEnvelope(null);
-      }
-
       const contexts = new Map<string, AccountLedgerWriteContext>();
       for (const state of rows) {
         contexts.set(state.accountId, {
@@ -259,11 +251,6 @@ export class LedgerV2Repository {
   async readEffectiveEvents(accountId: string, asOfRevision?: string): Promise<LedgerEvent[]> {
     const revisionFilter =
       asOfRevision === undefined ? {} : { ledgerRevision: { lte: BigInt(asOfRevision) } };
-    const oldEvent = await this.prisma.ledgerEvent.findFirst({
-      where: { accountId, envelopeVersion: null },
-      select: { id: true },
-    });
-    if (oldEvent) requireCurrentLedgerEnvelope(null);
     const stored = await this.prisma.ledgerEvent.findMany({
       where: {
         accountId,

@@ -185,7 +185,7 @@ export const deriveBacktestRerun = (job: BacktestJob) => {
   if (cash === null) missing.push('初始资金');
 
   const { executionModel, adjustment, validAdjustment } = rerunExecution(input, runConfig);
-  if (runConfig?.schemaVersion === '3' && !validAdjustment) missing.push('价格口径');
+  if (runConfig?.schemaVersion === 'backtest-trade-config-v1' && !validAdjustment) missing.push('价格口径');
   if (missing.length > 0 || !start || !end || cash === null) return { setup: null, missing };
   const setup: BacktestSetupInput = {
     period: { start, end },

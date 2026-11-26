@@ -29,11 +29,11 @@ export const securityLotReferenceSchema = z.strictObject({
 export type SecurityLotReference = z.infer<typeof securityLotReferenceSchema>;
 
 export const securityLotSizeRequestSchema = z.strictObject({
-  contractVersion: z.literal(3), consumer: z.literal('thesis-ledger'),
+  contractVersion: z.literal(1), consumer: z.literal('thesis-ledger'),
   requestId: z.string().trim().min(1), symbol: securityLotSymbolSchema,
 });
 export const securityLotSizeResponseSchema = securityLotReferenceSchema.extend({
-  contractVersion: z.literal(3), consumer: z.literal('thesis-ledger'),
+  contractVersion: z.literal(1), consumer: z.literal('thesis-ledger'),
   requestId: z.string().trim().min(1), fetchedAt: z.iso.datetime({ offset: true }),
   policyRevision: z.number().int().positive(),
   routeTarget: z.strictObject({

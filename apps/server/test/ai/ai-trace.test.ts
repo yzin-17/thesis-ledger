@@ -45,7 +45,7 @@ const request = (
     baseURL: 'https://fixture.invalid/v1',
     model: 'fixture-model',
     messages: [{ role: 'user', content: `返回 JSON，标记 ${answer}` }],
-    contract: { id: 'research', version: 'research-generation-v2' },
+    contract: { id: 'research', version: 'research-report-generation-v1' },
     schema: z.strictObject({ answer: z.string() }),
     mode: 'native_schema',
     transport: 'stream',

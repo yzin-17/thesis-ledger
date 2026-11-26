@@ -22,7 +22,7 @@ interface BacktestRunAttemptInput<TJob extends BacktestJob> {
   prisma: PrismaService;
   job: TJob;
   execution?: BacktestRunAttemptExecution;
-  runnerId: string;
+  runnerId: string | undefined;
   activeControllers: Map<string, AbortController>;
   execute: (job: TJob, signal: AbortSignal) => Promise<BacktestRunAttemptResult>;
   classifyFailure: (error: unknown) => BacktestRunAttemptFailure;
@@ -55,14 +55,14 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
     where: execution
       ? {
           id: runId,
-          mode: 'V3',
+          mode: 'frozen',
           status: { in: ['queued', 'running'] },
           executionAttempt: { lt: attempt },
           cancelRequestedAt: null,
         }
       : {
           id: runId,
-          mode: 'V3',
+          mode: 'frozen',
           status: 'queued',
           executionAttempt: job.executionAttempt,
           cancelRequestedAt: null,
@@ -73,7 +73,7 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
       progress: 5,
       executionAttempt: attempt,
       startedAt: job.startedAt ?? new Date(),
-      engineVersion: input.runnerId,
+      engineVersion: eligibility.runnerId,
       errorCode: null,
       errorSummary: null,
       diagnostics: Prisma.JsonNull,
@@ -83,14 +83,35 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
 
   const controller = new AbortController();
   activeControllers.set(runId, controller);
+  let polling = false;
+  const checkPersistentCancellation = async () => {
+    if (polling || activeControllers.get(runId) !== controller) return;
+    polling = true;
+    try {
+      const current = await prisma.backtestJob.findUnique({ where: { id: runId },
+        select: { status: true, executionAttempt: true, cancelRequestedAt: true } });
+      if (activeControllers.get(runId) !== controller) return;
+      if (!current || current.cancelRequestedAt || current.status !== 'running' || current.executionAttempt !== attempt)
+        controller.abort(new Error(current?.cancelRequestedAt ? '回测已取消' : '回测执行归属已变化'));
+    } catch {
+      // 本次读取未知不推断任务消失；下一周期只重试读取，不重复计算。
+    } finally { polling = false; }
+  };
+  const cancellationPoll = setInterval(() => { void checkPersistentCancellation(); }, 1_000);
+  cancellationPoll.unref();
   try {
-    const parsed = await input.execute(job, controller.signal);
+    await checkPersistentCancellation();
+    controller.signal.throwIfAborted();
+    const ownedJob = await findCurrent();
+    if (!ownedJob || ownedJob.status !== 'running' || ownedJob.executionAttempt !== attempt || ownedJob.cancelRequestedAt)
+      throw new Error('回测执行归属已变化');
+    const parsed = await input.execute(ownedJob, controller.signal);
     if (controller.signal.aborted) throw new Error('回测已取消');
 
     const committed = await prisma.backtestJob.updateMany({
       where: {
         id: runId,
-        mode: 'V3',
+        mode: 'frozen',
         status: 'running',
         executionAttempt: attempt,
         cancelRequestedAt: null,
@@ -109,6 +130,7 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
   } catch (error) {
     return await handleFailure(error, attempt);
   } finally {
+    clearInterval(cancellationPoll);
     if (activeControllers.get(runId) === controller) activeControllers.delete(runId);
   }
 
@@ -123,7 +145,7 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
       const requeued = await prisma.backtestJob.updateMany({
         where: {
           id: runId,
-          mode: 'V3',
+          mode: 'frozen',
           status: 'running',
           executionAttempt: attempt,
           cancelRequestedAt: null,
@@ -148,7 +170,7 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
     const failed = await prisma.backtestJob.updateMany({
       where: {
         id: runId,
-        mode: 'V3',
+        mode: 'frozen',
         status: 'running',
         executionAttempt: attempt,
         cancelRequestedAt: null,
@@ -164,7 +186,7 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
       },
     });
     if (failed.count === 0) return latestOrAcknowledgeCancellation(attempt);
-    if (execution) throw error;
+    if (execution) throw Object.assign(error instanceof Error ? error : new Error(failure.summary), { unrecoverable: true });
     return findCurrent();
   }
 
@@ -172,7 +194,7 @@ export async function runBacktestAttempt<TJob extends BacktestJob>(
     await prisma.backtestJob.updateMany({
       where: {
         id: runId,
-        mode: 'V3',
+        mode: 'frozen',
         status: 'running',
         executionAttempt: currentAttempt,
         cancelRequestedAt: { not: null },

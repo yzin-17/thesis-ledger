@@ -14,36 +14,6 @@ export function ResearchBody({
         当前正文不可用：{report.errorSummary ?? report.errorCode ?? '尚未取得可展示的报告'}。
       </Copy>
     );
-  if (result.version === 1)
-    return (
-      <>
-        <Copy>{result.conclusion}</Copy>
-        {result.evidence.map((e, i) => (
-          <Section key={i} title={e.claim}>
-            {e.citations.map((c, j) => (
-              <Section key={j}>
-                <Copy>
-                  来源 {c.provider} · {c.sourceId} · {c.observedAt}
-                </Copy>
-                {c.toolCallId ? (
-                  <Action
-                    label={`查看引用 ${c.toolCallId}`}
-                    onPress={() => evidence(c.toolCallId!)}
-                  />
-                ) : null}
-              </Section>
-            ))}
-          </Section>
-        ))}
-        {result.risks.map((v, i) => (
-          <Copy key={i}>风险：{v}</Copy>
-        ))}
-        {result.unknowns.map((v, i) => (
-          <Copy key={i}>未知项：{v}</Copy>
-        ))}
-        <Copy muted>{result.disclaimer}</Copy>
-      </>
-    );
   const value = result.inference;
   return (
     <>

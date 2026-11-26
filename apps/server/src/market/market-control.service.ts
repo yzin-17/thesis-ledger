@@ -51,7 +51,7 @@ export class MarketControlService {
     }
     const payload = buildMarketPolicyPayload(
       {
-        contractVersion: 3,
+        contractVersion: 1,
         enabled: true,
         routes: [],
       },
@@ -96,14 +96,16 @@ export class MarketControlService {
     if (expectedRevision !== undefined && (typeof expectedRevision !== 'number' ||
       !Number.isSafeInteger(expectedRevision) || expectedRevision < 0))
       throw new BadRequestException('expectedRevision 必须是非负安全整数');
-    if (raw.contractVersion !== 3) throw new BadRequestException('Policy contractVersion 必须是 3');
+    if (raw.contractVersion !== 1)
+      throw new BadRequestException('路由策略使用 market-routing-policy-v1，contractVersion 必须为 1');
     if (typeof raw.revision !== 'number' || !Number.isInteger(raw.revision) || raw.revision <= 0)
       throw new BadRequestException('Policy revision 必须是正整数');
     let policy;
     try {
       policy = buildMarketPolicyPayload(policyInput, raw.revision);
     } catch (error) {
-      if (error instanceof ZodError) throw new BadRequestException('Policy V3 结构无效');
+      if (error instanceof ZodError)
+        throw new BadRequestException('market-routing-policy-v1 结构无效');
       throw error;
     }
     await this.ensureSeededPolicy();
@@ -129,7 +131,7 @@ export class MarketControlService {
     });
     if (!target) throw new NotFoundException(`找不到 revision ${targetRevision}`);
     const policy = await this.applyPolicy({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: randomUUID(),
       revision: current.revision + 1,
@@ -150,7 +152,7 @@ export class MarketControlService {
     const removesRule = metadata.routingConfig?.rules?.some(rule => rule.providers.includes(providerId)) ?? false;
     const policy = buildMarketPolicyPayload(
       {
-        contractVersion: 3,
+        contractVersion: 1,
         enabled: current.enabled,
         routes: nextRoutes,
       },

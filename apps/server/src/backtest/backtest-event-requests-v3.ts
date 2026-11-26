@@ -22,7 +22,7 @@ export function planBacktestEventRequestsV3(
     const starts = relevant.map((dependency) => dependency.effectiveDateWindow.startDate).sort();
     const ends = relevant.map((dependency) => dependency.effectiveDateWindow.endDate).sort();
     return [{
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       requestId: requestId(capability),
       symbol: identity.symbol,
       routeKey: { kind: 'data' as const, market: identity.market, assetType: identity.assetType, capability },

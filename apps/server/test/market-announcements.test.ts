@@ -9,7 +9,7 @@ describe('公告目录消费', () => {
     const controller = new MarketAnnouncementsController({ get } as unknown as DsaClient);
     expect(await controller.list('000881')).toEqual(response);
     expect(get).toHaveBeenCalledWith(
-      '/api/v3/thesis-ledger/market/announcements?q=000881&page=1&pageSize=50',
+      '/api/v1/thesis-ledger/market/announcements?q=000881&page=1&pageSize=50',
     );
     await expect(controller.list('', '0')).rejects.toThrow('公告查询参数无效');
     get.mockResolvedValue({ ...response, providerId: 'other' });

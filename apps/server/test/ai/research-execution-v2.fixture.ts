@@ -143,7 +143,6 @@ export async function createResearchExecutionV2Harness(prisma: PrismaClient) {
     runs,
     prisma as never,
     registry,
-    new PromptVersionRegistry(),
     state,
     sdk,
   );

@@ -13,7 +13,7 @@ it.each([
   { name: '当前时点后一毫秒', offset: 7 * 86_400_000 + 1, error: BadRequestException },
 ])('复核截止 $name 保留包含边界及写入前校验', async ({ offset, error }) => {
   const report = comparisonReport().source.detail;
-  if (report.availability !== 'available' || report.result?.version !== 2)
+  if (report.availability !== 'available' || report.result?.version !== 'research-report-result-v1')
     throw new Error('受控报告必须具有完整 V2 结果');
   const createdAt = Date.parse(report.result.createdAt);
   vi.useFakeTimers({ toFake: ['Date'] });

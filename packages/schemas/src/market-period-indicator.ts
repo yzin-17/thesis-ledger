@@ -27,7 +27,7 @@ export const canonicalMarketPeriodIndicatorEncoding = (context: MarketPeriodIndi
 
 export const marketPeriodIndicatorRequestSchema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     identity: barSeriesIdentitySchema
       .extend({
         assetType: z.enum(['STOCK', 'ETF']),
@@ -69,7 +69,7 @@ const periodCapabilitySchema = z.strictObject({
 });
 export const marketPeriodIndicatorCapabilitiesSchema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     engineVersion: z.literal('dsa-indicator-v3'),
     calculation: z.literal('provided-points'),
     periodProtocol: z.literal(MARKET_PERIOD_INDICATOR_PROTOCOL),

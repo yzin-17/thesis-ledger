@@ -13,13 +13,14 @@ const Fields = (props: ComponentProps<typeof StrategyConfigurationFields>) => (
 );
 
 const schema = {
-  schemaVersion: '2',
-  name: 'V2 fixture',
+  schemaVersion: 'strategy-definition-v1',
+  name: '策略配置样本',
   executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
   primaryTimeframe: '1d',
   signalSources: [
     {
       id: 'close',
+      priceCoordinate: 'run',
       asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
       timeframe: '1d',
       series: ['close'],
@@ -53,13 +54,13 @@ describe('策略工作台当前合同', () => {
   it('策略摘要展示中文业务字段和控件', () => {
     const html = renderToStaticMarkup(<Fields schema={schema} onChange={vi.fn()} />);
     expect(html).toContain('信号来源');
-    expect(html).toContain('固定投入金额');
+    expect(html).toContain('固定金额');
     expect(html).toContain('固定止损');
-    expect(html).toContain('下一可执行 K 线开盘');
+    expect(html).toContain('下一可交易开盘');
     expect(html).not.toContain('Signal Sources');
     expect(html).not.toContain('>fixedAmount<');
     expect(html).not.toContain('>fixedStop<');
-    expect(html).not.toContain('nextEligibleBarOpen');
+    expect(html).not.toContain('>nextEligibleBarOpen<');
     expect(html).toContain('strategy-v2-timeframe');
   });
 
@@ -77,9 +78,9 @@ describe('策略工作台当前合同', () => {
   });
 
   it.each([
-    { type: 'percentOfEquity', percent: '0.25' },
-    { type: 'targetWeight', weight: '0.25' },
-  ])('比例仓位明确 0–1 单位并保留原始比例值：$type', async (sizing) => {
+    { label: '权益投入比例', sizing: { type: 'percentOfEquity', percent: '0.25' } },
+    { label: '目标权益仓位', sizing: { type: 'targetWeight', weight: '0.25' } },
+  ])('比例仓位说明小数单位并保留原值：$label', async ({ label, sizing }) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const container = document.createElement('div');
     document.body.append(container);
@@ -89,14 +90,13 @@ describe('策略工作台当前合同', () => {
         root.render(<Fields schema={{ ...schema, sizing }} onChange={vi.fn()} />);
         await Promise.resolve();
       });
-      const input = document.getElementById('strategy-v2-sizing') as HTMLInputElement | null;
-      expect(input?.value).toBe('0.25');
-      expect(input?.getAttribute('aria-describedby')?.split(' ')).toContain(
-        'strategy-v2-sizing-help',
+      const fieldLabel = [...container.querySelectorAll('label')].find(
+        (element) => element.textContent === label,
       );
-      const description = document.getElementById('strategy-v2-sizing-help')?.textContent;
-      expect(description).toContain('0–1');
-      expect(description).toContain('0.25 表示 25%');
+      const input = document.getElementById(fieldLabel?.htmlFor ?? '') as HTMLInputElement | null;
+      expect(input?.value).toBe('0.25');
+      const description = input?.closest('[data-slot="field"]')?.querySelector('[data-slot="field-description"]');
+      expect(description?.textContent).toContain('0.005 = 0.5%');
     } finally {
       await act(async () => {
         root.unmount();
@@ -108,7 +108,7 @@ describe('策略工作台当前合同', () => {
   });
 
   it('取消与重试使用独立的现行 Run 入口', async () => {
-    const run = { id: 'run/1', strategyVersionId: 'version-1', mode: 'V3' };
+    const run = { id: 'run/1', strategyVersionId: 'version-1', mode: 'frozen' };
     const cancel = makeClient({ ...run, status: 'cancelled' });
     await cancelBacktest('run/1', cancel.client);
     expect(cancel.request).toHaveBeenCalledWith('/backtests/runs/run%2F1/cancel', {

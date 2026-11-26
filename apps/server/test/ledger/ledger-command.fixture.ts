@@ -44,7 +44,7 @@ export const storedFromEvent = (event: LedgerEvent) => ({
   sourceTimezone: event.sourceTimezone,
   economicOrderKey: event.economicOrderKey,
   recordedAt: new Date(event.recordedAt),
-  envelopeVersion: 3,
+  envelopeVersion: 1,
   payloadVersion: event.payloadVersion,
   payload: event.revisionAction === 'VOID' ? null : event.payload,
   sourceCategory: event.source.category,

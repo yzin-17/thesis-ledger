@@ -58,7 +58,7 @@ const createOpeningBoundaryEvent = (
   command: CreateTradeOpeningBoundaryAssertionCommand,
   ledgerRevision: bigint,
 ): OpeningBoundaryEvent => ({
-  version: 3,
+  version: 1,
   eventId: randomUUID(),
   factId: randomUUID(),
   accountId: command.accountId,

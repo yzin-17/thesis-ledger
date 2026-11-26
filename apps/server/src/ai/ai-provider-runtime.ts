@@ -12,7 +12,7 @@ import {
 
 export const createStoredAiProvider = async (
   row: ProviderConfig,
-  configs: ProviderConfigService,
+  configs: Pick<ProviderConfigService,'readCredential'>,
   fallbackTimeoutMs: number,
 ): Promise<AiProvider | null> => {
   const settings = parseAiProviderSettings(row.settings);

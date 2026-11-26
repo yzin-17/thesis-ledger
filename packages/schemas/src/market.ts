@@ -49,7 +49,7 @@ export const fxRateSchema = z.object({
 });
 
 export const fxRatesResponseSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(1),
   baseCurrency: currencySchema,
   asOf: isoCalendarDate,
   fetchedAt: isoDate,
@@ -61,7 +61,7 @@ export type FxRatesResponse = z.infer<typeof fxRatesResponseSchema>;
 
 export const quoteSchema = z
   .object({
-    version: z.literal(3),
+    version: z.literal(1),
     symbol: marketQuoteSymbolSchema,
     open: finite.nonnegative(),
     high: finite.nonnegative(),
@@ -92,7 +92,7 @@ export const quoteSchema = z
   .refine((quote) => quote.low <= Math.min(quote.open, quote.high, quote.price), '最低价高于其他价格');
 
 export const chipDistributionSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(1),
   symbol: z.string().min(1),
   buckets: z
     .array(z.object({ price: finite.nonnegative(), weight: finite.min(0).max(1) }))
@@ -112,7 +112,7 @@ export const chipDistributionSchema = z.object({
 });
 
 export const fundNavSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(1),
   symbol: z.string().regex(/^\d{6}\.OF$/),
   unitNav: finite.nonnegative(),
   navDate: isoDate,
@@ -144,7 +144,7 @@ export const fundHoldingSchema = z.object({
 
 export const fundHoldingsSchema = z
   .object({
-    version: z.literal(3),
+    version: z.literal(1),
     fundSymbol: z.string().regex(/^\d{6}\.OF$/),
     reportPeriod: z.string().regex(/^\d{4}-Q[1-4]$/),
     disclosureDate: isoDate.nullable(),
@@ -279,6 +279,7 @@ export const marketDetailCapabilitySchema = z.enum([
   'fund-nav-history',
 ]);
 
+export const marketDetailContractVersion = 1 as const;
 export const marketDetailRequestSchema = z
   .object({
     symbol: z.string().min(1),
@@ -287,21 +288,12 @@ export const marketDetailRequestSchema = z
     navLimit: z.number().int().min(1).max(90).optional(),
     adjustment: priceAdjustmentSchema.optional(),
     timeframe: marketTimeframeSchema.optional(),
-    chartContractVersion: z.literal(3).optional(),
+    chartContractVersion: z.literal(marketDetailContractVersion).optional(),
     start: isoCalendarDate.optional(),
     end: isoCalendarDate.optional(),
     indicatorParams: z.record(z.string(), finite).optional(),
     calculationAnchor: isoDate.optional(),
     refresh: z.boolean().optional(),
-  })
-  .superRefine((request, context) => {
-    if (request.chartContractVersion !== 3 && (request.barsLimit ?? 30) > 90) {
-      context.addIssue({
-        code: 'custom',
-        path: ['barsLimit'],
-        message: '旧版详情最多显示 90 根日线',
-      });
-    }
   });
 
 export const marketDetailAssetTypeSchema = z.enum(['STOCK', 'ETF', 'MUTUAL_FUND', 'UNKNOWN']);
@@ -411,7 +403,7 @@ const marketDetailSectionEnvelopeSchema = z.object({
 });
 
 export const marketDetailResponseEnvelopeSchema = z.object({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   symbol: z.string().min(1),
   assetType: marketDetailAssetTypeSchema,
   identity: z.object({
@@ -528,7 +520,7 @@ export type MarketDetailRequest = {
   navLimit?: number;
   adjustment?: z.infer<typeof priceAdjustmentSchema>;
   timeframe?: MarketTimeframe;
-  chartContractVersion?: 3;
+  chartContractVersion?: typeof marketDetailContractVersion;
   start?: string;
   end?: string;
   indicatorParams?: Readonly<Record<string, number>>;
@@ -551,7 +543,7 @@ export type MarketDetailDependency = {
   error?: MarketDetailDiagnostic;
 };
 export type MarketDetailResponse = {
-  contractVersion: 3;
+  contractVersion: 1;
   symbol: string;
   assetType: MarketDetailAssetType;
   identity: {

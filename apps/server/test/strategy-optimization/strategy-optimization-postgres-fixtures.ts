@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { materializeEntryPolicy } from '@thesis-ledger/domain';
 import {
   backtestExecutionModelSchemaV3,
+  projectPriceResearchStrategy,
   runConfigSchemaV3,
   strategySchema,
   type BacktestStrategy,
@@ -11,11 +13,12 @@ export const createStrategyFixture =
   (symbol: string, suffix: string) =>
   (stopPercent: string, takeProfit?: string): BacktestStrategy =>
     strategySchema.parse({
-      schemaVersion: '2',
+      schemaVersion: 'strategy-definition-v1',
       name: `PostgreSQL 服务级 E2E ${suffix}`,
       signalSources: [
         {
           id: 'price',
+          priceCoordinate: 'run',
           asset: { symbol, market: 'CN', assetType: 'stock' },
           timeframe: '1d',
           series: ['open', 'high', 'low', 'close', 'volume'],
@@ -49,8 +52,14 @@ export const createStrategyFixture =
       cost: { commissionRate: '0', slippageRate: '0' },
     }) as BacktestStrategy;
 
+export function createFormalOptimizationStrategyFixture(symbol: string, suffix: string) {
+  const baseStrategy = createStrategyFixture(symbol, suffix);
+  return (stopPercent: string, takeProfit?: string) =>
+    materializeEntryPolicy(projectPriceResearchStrategy(baseStrategy(stopPercent, takeProfit)));
+}
+
 export const runConfig = {
-  schemaVersion: '3' as const,
+  schemaVersion: 'backtest-trade-config-v1' as const,
   startDate: '2026-01-01',
   endDate: '2026-09-10',
   dataAsOf: '2026-09-11T08:00:00.000Z',

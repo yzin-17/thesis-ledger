@@ -40,7 +40,7 @@ const backupFingerprint = 'b'.repeat(64);
 
 const makePolicies = () => {
   const desired = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     consumer: 'thesis-ledger' as const,
     requestId: 'desired-request-7',
     revision: 7,
@@ -48,7 +48,7 @@ const makePolicies = () => {
     routes: [{ key: routeKey, targets: [primaryTarget, backupTarget] }],
   };
   const effective = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     consumer: 'thesis-ledger' as const,
     requestId: 'effective-snapshot-12',
     revision: 12,
@@ -69,7 +69,7 @@ const makePolicies = () => {
     appliedAt: '2026-05-17T00:00:00Z',
   };
   const catalog = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     consumer: 'thesis-ledger' as const,
     catalogRevision: 20,
     generatedAt: '2026-05-17T00:00:00Z',
@@ -159,7 +159,8 @@ const makeInput = (
     makeResponse(request, target, routeIndex),
   ),
   readCapabilities: vi.fn(async () => ({
-    dataContractVersions: [3] as [3],
+    dataContract: 'dsa-data-v1' as const,
+    dailyObservationContract: 'market-daily-tradability-window-v1' as const,
     serviceCapabilities: { fundNav: true as const },
   })),
   ...overrides,
@@ -291,7 +292,8 @@ describe('market window selector V3', () => {
     };
     const response = golden.response;
     const readCapabilities = vi.fn(async () => ({
-      dataContractVersions: [3] as [3],
+      dataContract: 'dsa-data-v1' as const,
+    dailyObservationContract: 'market-daily-tradability-window-v1' as const,
       serviceCapabilities: { fundNav: true as const },
       ...(supported ? { multiWindowProtocols: ['market-multi-window-content-v1' as const] } : {}),
     }));

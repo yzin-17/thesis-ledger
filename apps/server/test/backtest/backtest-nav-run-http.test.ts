@@ -1,3 +1,4 @@
+import { namedStrategyFixture } from './named-v1-strategy.fixture.js';
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -6,10 +7,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
+import { deterministicResultChecksum } from '@thesis-ledger/domain';
 import { BacktestNavRunController } from '../../src/backtest/backtest-nav-run.controller.js';
 import { BacktestNavRunService } from '../../src/backtest/backtest-nav-run.service.js';
 import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
 import { BacktestRunService } from '../../src/backtest/backtest-run.service.js';
+import { BacktestNavRunExecution } from '../../src/backtest/backtest-nav-run-execution.js';
+import { materializeNavBacktest } from '../../src/backtest/backtest-nav-materialization.js';
 import { navPreparationReceiptContentChecksum } from '../../src/backtest/backtest-nav-preparation-repository.js';
 import { LocalNavSnapshotStore } from '../../src/backtest/backtest-nav-snapshot-store.js';
 import {
@@ -36,13 +40,13 @@ describe('NAV Run 创建与幂等', () => {
   beforeEach(async () => (h = await createHttpHarness()));
   afterEach(async () => h.close());
 
-  it('HTTP 创建冻结真实 Parquet、幂等重放并校验独立读取', async () => {
+  it('HTTP先保存queued意图，Worker冻结真实Parquet，幂等读取及完整性门禁贯通', async () => {
     const created = await h.post();
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
       inputKind: 'nav',
-      status: 'failed',
-      errorCode: 'NAV_RUNNER_UNAVAILABLE',
+      status: 'queued',
+      errorCode: null,
       preparationId,
       preparationHash: h.prepared.binding.preparationHash,
       executionAttempt: 0,
@@ -67,12 +71,13 @@ describe('NAV Run 创建与幂等', () => {
     expect(read.status).toBe(200);
     expect(await read.json()).toMatchObject({
       id: created.body.id,
-      status: 'failed',
-      errorCode: 'NAV_RUNNER_UNAVAILABLE',
+      status: 'queued',
+      errorCode: null,
       snapshotId: created.body.snapshotId,
-      snapshotManifest: { inputKind: 'nav', runId: created.body.id },
+      snapshotManifest: null,
     });
     expect(h.reader.currentRouteState).toHaveBeenCalledTimes(2);
+    expect(await h.runWorker(String(created.body.id))).toMatchObject({ status: 'succeeded' });
     h.state.tamperSnapshotManifest(String(created.body.id));
     expect((await fetch(`${h.endpoint}/${created.body.id}`)).status).toBe(409);
     const differentKey = await h.post({ ...h.createBody(), idempotencyKey: 'second-key' });
@@ -80,6 +85,18 @@ describe('NAV Run 创建与幂等', () => {
     expect(differentKey.body).toMatchObject({ code: 'IDEMPOTENCY_KEY_CONFLICT' });
   }, 30000);
 
+  it('Schema 3净值定义先提交、重复读取，等待Worker物化', async () => {
+    const upgraded = await createHttpHarness({ upgrade: true });
+    try {
+      const created = await upgraded.post();
+      expect(created.status).toBe(201);
+      expect(created.body).toMatchObject({ inputKind: 'nav', status: 'queued', errorCode: null, snapshotId: null });
+      expect((await upgraded.post()).body.id).toBe(created.body.id);
+      const read = await fetch(`${upgraded.endpoint}/${created.body.id}`);
+      expect(read.status).toBe(200);
+      expect(await read.json()).toMatchObject({ id: created.body.id, snapshotId: created.body.snapshotId });
+    } finally { await upgraded.close(); }
+  });
   it('严格拒绝已变化的路由，不冻结、不创建或消费', async () => {
     h.setRouteState({ ...(h.prepared.selection.routeState as object), catalogRevision: 999 });
     expect((await h.post()).status).toBe(409);
@@ -107,39 +124,44 @@ describe('NAV Snapshot 故障与证据核验', () => {
   beforeEach(async () => (h = await createHttpHarness()));
   afterEach(async () => h.close());
 
-  it('完整性错误与文件系统 ENOSPC 形成 NAV_SNAPSHOT_INVALID 终态', async () => {
+  it('完整性错误由Worker形成具体失败，创建请求不提前编码', async () => {
     const integrityStore = failingStore(new SnapshotIntegrityError('broken snapshot'));
     const integrity = await h.postWithSnapshotStore(integrityStore);
     expect(integrity.status).toBe(201);
-    expect(integrity.body).toMatchObject({
+    expect(integrity.body.status).toBe('queued');
+    expect(await h.runWorker(String(integrity.body.id), integrityStore)).toMatchObject({
       status: 'failed',
-      errorCode: 'NAV_SNAPSHOT_INVALID',
+      errorCode: 'SNAPSHOT_HASH_MISMATCH',
       snapshotId: null,
       snapshotManifest: null,
     });
 
+  });
+
+  it('文件系统ENOSPC保留可查询失败及已消费凭证', async () => {
+    const outOfSpace = await h.post();
     const diskFull = Object.assign(new Error('disk full'), { code: 'ENOSPC', syscall: 'write' });
-    const outOfSpace = await h.postWithSnapshotStore(failingStore(diskFull));
-    expect(outOfSpace.status).toBe(201);
-    expect(outOfSpace.body).toMatchObject({
+    expect(await h.runWorker(String(outOfSpace.body.id), failingStore(diskFull))).toMatchObject({
       status: 'failed',
-      errorCode: 'NAV_SNAPSHOT_INVALID',
+      errorCode: 'ENOSPC',
       snapshotId: null,
       snapshotManifest: null,
     });
     expect(h.state.readPreparation().consumedRunId).toBe(outOfSpace.body.id);
   });
 
-  it('未知冻结程序错误保持 500 且不消费准备凭证', async () => {
+  it('未知冻结错误在Worker失败，创建意图和已消费凭证保留', async () => {
     const response = await h.postWithSnapshotStore(failingStore(new Error('unexpected failure')));
-    expect(response.status).toBe(500);
-    expect(h.state.readJobs()).toHaveLength(0);
-    expect(h.state.readPreparation().consumedRunId).toBeNull();
+    expect(response.status).toBe(201);
+    expect(await h.runWorker(String(response.body.id), failingStore(new Error('unexpected failure'))))
+      .toMatchObject({ status: 'failed', errorCode: 'INTERNAL_ERROR' });
+    expect(h.state.readPreparation().consumedRunId).toBe(response.body.id);
   });
 
   it('读取拒绝同步篡改物理与数据库镜像的来源策略版本', async () => {
     const created = await h.post();
-    const manifestPath = join(h.root, 'snapshots', String(created.body.id), 'finalized.json');
+    await h.runWorker(String(created.body.id));
+    const manifestPath = join(h.root, 'attempts', String(created.body.id), '1', 'snapshots', String(created.body.id), 'finalized.json');
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
     const sourceManifest = manifest.source as Record<string, unknown>;
     sourceManifest.policyRevision = Number(sourceManifest.policyRevision) + 1;
@@ -168,7 +190,7 @@ describe('NAV Run 并发与 HTTP 边界', () => {
     });
     const repeated = await h.post();
     expect(repeated.status).toBe(201);
-    expect(repeated.body).toMatchObject({ id: runId, status: 'failed' });
+    expect(repeated.body).toMatchObject({ id: runId, status: 'queued' });
     expect(h.reader.currentRouteState).toHaveBeenCalledTimes(callsBeforeRetry + 1);
   });
 
@@ -182,7 +204,61 @@ describe('NAV Run 并发与 HTTP 边界', () => {
 });
 
 describe('NAV 消费 HTTP 闭环', () => {
-  it('执行与队列可用时冻结后入队并派发', async () => {
+  it('NAV完整文件关联前中断，由下一attempt复用整套产物', async () => {
+    const h = await createHttpHarness();
+    const freeze = vi.spyOn(LocalNavSnapshotStore.prototype, 'freeze');
+    try {
+      const created = await h.post(); const id = String(created.body.id);
+      h.state.updateJob(id, { status: 'running', executionAttempt: 1, engineVersion: 'nav-current' });
+      const update = h.state.prisma.backtestJob.updateMany;
+      const original = update.getMockImplementation()!;
+      update.mockImplementation(async (args) => {
+        if (args.data.snapshotId) throw Object.assign(new Error('db disconnected before publication'), { code: 'P1001' });
+        return original(args);
+      });
+      const job = () => h.state.readJobs().find((row) => row.id === id)!;
+      await expect(materializeNavBacktest(h.state.prisma as never, job() as never, h.store, new AbortController().signal))
+        .rejects.toMatchObject({ code: 'P1001' });
+      expect(job().snapshotId).toBeNull();
+      update.mockImplementation(original);
+      h.state.updateJob(id, { executionAttempt: 2 });
+      const published = await materializeNavBacktest(h.state.prisma as never, job() as never, h.store, new AbortController().signal);
+      expect(published.input).toMatchObject({ snapshotStorageAttempt: 1 });
+      expect(freeze).toHaveBeenCalledOnce();
+      expect((await fetch(`${h.endpoint}/${id}`)).status).toBe(200);
+    } finally { freeze.mockRestore(); await h.close(); }
+  });
+  it('NAV旧版本成功结果可读，显式重试返回关联新id，原凭证过期及路由变化不重新准备', async () => {
+    const h = await createHttpHarness();
+    try {
+      const created = await h.post(); const id = String(created.body.id);
+      const finished = await h.runWorker(id);
+      expect(finished?.status).toBe('succeeded');
+      const payload: Record<string, unknown> = { ...(finished!.result as Record<string, unknown>), engineVersion: 'thesis-ledger-v3-nav-local-runner-v1' };
+      delete payload.resultChecksum;
+      const checksum = deterministicResultChecksum(payload);
+      h.state.updateJob(id, { engineVersion: payload.engineVersion, result: { ...payload, resultChecksum: checksum }, resultChecksum: checksum });
+      expect((await fetch(`${h.endpoint}/${id}`)).status).toBe(200);
+      const original = structuredClone(h.state.readJobs()[0]);
+      vi.setSystemTime('2026-09-30T15:40:00.000Z');
+      h.setRouteState({ catalogRevision: 999 });
+      const calls = h.reader.currentRouteState.mock.calls.length;
+      const nav = new BacktestNavRunExecution(h.state.prisma as never, h.store);
+      const service = new BacktestRunService(h.state.prisma as never, undefined, undefined, undefined, undefined, undefined, nav);
+      const response = await fetch(`${h.endpoint}/${id}/retry`, { method: 'POST' });
+      expect(response.status).toBe(201);
+      const linked = await response.json() as { id: string };
+      expect(linked.id).not.toBe(id);
+      expect((await service.retryRun(id))?.id).toBe(linked.id);
+      const replayed = await h.runWorker(linked.id);
+      expect({ status: replayed?.status, code: replayed?.errorCode, reason: replayed?.errorSummary })
+        .toEqual({ status: 'succeeded', code: null, reason: null });
+      expect((await fetch(`${h.endpoint}/${linked.id}`)).status).toBe(200);
+      expect(h.reader.currentRouteState).toHaveBeenCalledTimes(calls);
+      expect(h.state.readJobs().find((job) => job.id === id)).toEqual(original);
+    } finally { await h.close(); }
+  });
+  it('执行与队列可用时先落库入队，Worker稍后冻结', async () => {
     const queue = {
       supportsNavExecution: vi.fn(() => true),
       ensureEnqueued: vi.fn(async () => undefined),
@@ -254,6 +330,7 @@ describe('NAV 消费 HTTP 闭环', () => {
 });
 
 async function createHttpHarness(input: {
+  upgrade?: boolean;
   queueService?: {
     supportsNavExecution: () => boolean;
     ensureEnqueued: (id: string) => Promise<unknown>;
@@ -265,6 +342,7 @@ async function createHttpHarness(input: {
   vi.setSystemTime(now);
   const root = await mkdtemp(join(tmpdir(), 'nav-run-http-'));
   const source = navPreparationFixture();
+  if (input.upgrade) Object.assign(source.strategy, namedStrategyFixture(source.strategy));
   const prepared = await prepareNavRunConfigV3(source.options);
   let routeState: unknown = prepared.selection.routeState;
   const reader = { currentRouteState: vi.fn(async () => routeState) };
@@ -282,8 +360,9 @@ async function createHttpHarness(input: {
       ensureEnqueued: vi.fn(async () => undefined),
       cancel: vi.fn(async () => undefined),
     };
-  const runExecution = input.runExecution ?? { retryRun: vi.fn(async () => undefined) };
   const store = new LocalNavSnapshotStore(root);
+  const runExecution = input.runExecution ?? new BacktestRunService(state.prisma as never,
+    undefined, undefined, undefined, undefined, undefined, new BacktestNavRunExecution(state.prisma as never, store));
   const service = new BacktestNavRunService(
     state.prisma as never,
     reader as never as MarketNavReaderV3,
@@ -306,7 +385,7 @@ async function createHttpHarness(input: {
   await app.listen(0, '127.0.0.1');
   const endpoint = `${await app.getUrl()}/api/v1/backtests/runs/nav`;
   const createBody = () => ({
-    contractVersion: 3,
+    contractVersion: 1,
     preparationId,
     preparationHash: prepared.binding.preparationHash,
     idempotencyKey,
@@ -361,6 +440,11 @@ async function createHttpHarness(input: {
     createBody,
     post,
     postWithSnapshotStore,
+    runWorker: async (id: string, snapshots = store) => {
+      const nav = new BacktestNavRunExecution(state.prisma as never, snapshots);
+      const worker = new BacktestRunService(state.prisma as never, undefined, undefined, undefined, undefined, undefined, nav);
+      return worker.runCurrent(id);
+    },
     setRouteState: (value: unknown) => {
       routeState = value;
     },
@@ -374,12 +458,14 @@ async function createHttpHarness(input: {
 }
 
 function failingStore(error: Error): LocalNavSnapshotStore {
-  return {
+  const store = {
     freeze: vi.fn(async () => {
       throw error;
     }),
-    replay: vi.fn(),
+    replay: vi.fn(async () => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); }),
+    forAttempt: () => store,
   } as unknown as LocalNavSnapshotStore;
+  return store;
 }
 
 function createDatabase(input: {
@@ -441,11 +527,25 @@ function createDatabase(input: {
     strategyVersion: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
         where.id === input.strategyVersionId
-          ? { id: input.strategyVersionId, schemaVersion: 2, schema: input.strategy }
+          ? { id: input.strategyVersionId, schemaVersion: 1, schema: input.strategy }
           : null,
       ),
     },
     backtestJob: {
+      updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        const job = jobs.get(String(where.id));
+        if (!job) return { count: 0 };
+        const matches = Object.entries(where).every(([key, value]) => {
+          if (value && typeof value === 'object') {
+            if ('lt' in value) return Number(job[key]) < Number(value.lt);
+            if ('in' in value) return (value.in as unknown[]).includes(job[key]);
+          }
+          return (job[key] ?? null) === value;
+        });
+        if (!matches) return { count: 0 };
+        Object.assign(job, data); return { count: 1 };
+      }),
+      findUniqueOrThrow: vi.fn(async ({ where }: { where: { id: string } }) => jobs.get(where.id)),
       findFirst: vi.fn(
         async ({ where }: { where: Record<string, unknown> }) =>
           [...jobs.values()].find(
@@ -461,9 +561,12 @@ function createDatabase(input: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const createdAt = new Date();
         const job = {
+          snapshotId: null,
+          errorCode: null,
+          errorSummary: null,
           ...data,
           snapshotManifest:
-            data.snapshotManifest === Prisma.JsonNull ? null : data.snapshotManifest,
+            data.snapshotManifest === Prisma.JsonNull || data.snapshotManifest == null ? null : data.snapshotManifest,
           createdAt,
           updatedAt: createdAt,
           startedAt: null,

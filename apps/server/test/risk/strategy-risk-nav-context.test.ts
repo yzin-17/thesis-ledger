@@ -10,7 +10,7 @@ const source = {
   trade: { id: 'trade', openedAt: new Date('2026-09-28T00:00:00Z') },
 };
 const point = (day: string, price: number, fetchedAt = '2026-10-01T00:00:00Z') => ({
-  version: 3,
+  version: 1,
   symbol: '110011.OF',
   unitNav: price,
   navDate: `${day}T00:00:00Z`,

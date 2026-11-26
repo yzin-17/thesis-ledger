@@ -15,7 +15,7 @@ type Selection = {
 };
 
 export const isResearchV2Contract = (contract: AiGenerationContractRef) =>
-  contract.id === 'research' && contract.version === 'research-generation-v2';
+  contract.id === 'research' && contract.version === 'research-report-generation-v1';
 
 export const researchReasoningFields = aiRouteReasoningFields;
 

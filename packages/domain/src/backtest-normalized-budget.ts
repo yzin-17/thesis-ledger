@@ -43,6 +43,10 @@ export const fitNormalizedQuantityToAvailableCash = <T>(
   }
   if (initial.status === 'unavailable') return initial;
 
+  const minimum = evaluate(normalizedQuantityFromUnits(1n));
+  if (minimum.status === 'unavailable') return minimum;
+  if (minimum.status === 'insufficient-cash') return { status: 'unavailable', reason: 'INSUFFICIENT_CASH' };
+
   let low = 0n;
   let high = floorNormalizedQuantityUnits(requested.toString());
   let best: { quantity: string; value: T } | undefined;

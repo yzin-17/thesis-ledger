@@ -21,7 +21,7 @@ function input() {
   protocol.history = { basis: 'fixed-provider-snapshot' };
   protocol.marketRuleResearch = 'raw-prices-no-corporate-actions-v1';
   const config = runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: '2024-01-02',
     endDate: '2024-03-29',
     dataAsOf: '2026-10-07T00:00:00Z',
@@ -43,7 +43,7 @@ function input() {
     assetType: 'stock',
   };
   strategy.signalSources = [
-    { id: 'execution', asset: strategy.executionInstrument, timeframe: '1d', series: ['close'] },
+    { id: 'execution', priceCoordinate: 'run', asset: strategy.executionInstrument, timeframe: '1d', series: ['close'] },
   ];
   const series = { type: 'series', sourceId: 'execution', field: 'close' };
   strategy.entry = {
@@ -66,7 +66,7 @@ describe('显式股票原价规则研究', () => {
     const { schemaVersion: _schema, executionPriceProtocol: protocol, ...runConfig } = config;
     void _schema;
     const request = {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'rule-intent',
       strategyVersionId: '11111111-1111-4111-8111-111111111111',
       runConfig,

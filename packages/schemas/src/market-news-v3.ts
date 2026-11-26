@@ -5,7 +5,7 @@ import {
   newsTimeMicrosV3,
 } from './market-news-v3-primitives.js';
 
-export const marketNewsEndpointV3 = '/api/v3/thesis-ledger/market/news';
+export const marketNewsEndpointV3 = '/api/v1/thesis-ledger/market/news';
 export const marketNewsContractVersionV3 = 'news-search-v1';
 const text = (max: number) => z.string().min(1).max(max);
 const timestamp = z
@@ -32,7 +32,7 @@ const instrument = z
   })
   .refine(isNewsInstrumentV3, '新闻标的必须使用与市场一致的规范代码');
 const identity = {
-  version: z.literal(3).default(3),
+  version: z.literal(1).default(1),
   contractVersion: z.literal(marketNewsContractVersionV3).default(marketNewsContractVersionV3),
   capability: z.literal('NEWS_SEARCH').default('NEWS_SEARCH'),
   requestId: text(128),

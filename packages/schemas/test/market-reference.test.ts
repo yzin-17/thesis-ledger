@@ -14,7 +14,7 @@ function page() {
     requestBudgetMs: undefined,
     dataVersion: 'market-reference-v1',
     requestId: 'sample',
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     providerId: 'akshare',
     upstreamSource: 'sina',

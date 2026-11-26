@@ -26,7 +26,7 @@ const request = backtestModelResolutionRequestSchema.parse({
 const configuredAt = '2026-11-07T12:00:00Z';
 const response = () =>
   backtestInstrumentFactsResponseSchema.parse({
-    version: 3,
+    version: 1,
     status: 'supported',
     provider: 'controlled',
     providerRevision: 'rules-r1',
@@ -150,7 +150,7 @@ describe('已保存策略的自动执行模型', () => {
   });
 
   it('只读解析服务读取已保存版本，源异常返回业务原因', async () => {
-    const findUnique = vi.fn(async () => ({ schema: strategy, schemaVersion: 2 }));
+    const findUnique = vi.fn(async () => ({ schema: strategy, schemaVersion: 1 }));
     const backtestInstrumentFacts = vi.fn(async () => response());
     const service = new BacktestModelResolutionService(
       { strategyVersion: { findUnique } } as never,

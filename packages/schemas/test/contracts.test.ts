@@ -120,7 +120,7 @@ describe('行情契约', () => {
   it('接受完整报价', () =>
     expect(
       quoteSchema.parse({
-        version: 3,
+        version: 1,
         symbol: '600519.SH',
         open: 10,
         high: 12,
@@ -138,7 +138,7 @@ describe('行情契约', () => {
     ).toMatchObject({ price: 11 }));
   it('保留 Provider 与实际上游来源', () => {
     const quote = quoteSchema.parse({
-      version: 3,
+      version: 1,
       symbol: '600519.SH',
       open: 10,
       high: 12,
@@ -170,14 +170,14 @@ describe('行情契约', () => {
       ],
     });
     expect(quote).toMatchObject({ provider: 'akshare', upstreamSource: 'tencent' });
-    expect(() => quoteSchema.parse({ ...quote, version: 1 })).toThrow();
+    expect(() => quoteSchema.parse({ ...quote, version: 3 })).toThrow();
     expect(provider.upstreamSources?.[0]?.displayName).toBe('腾讯财经');
     expect(provider).toMatchObject({ markets: ['CN'] });
   });
   it('拒绝非法 OHLC', () =>
     expect(() =>
       quoteSchema.parse({
-        version: 3,
+        version: 1,
         symbol: '600519.SH',
         open: 10,
         high: 8,
@@ -196,7 +196,7 @@ describe('行情契约', () => {
   it('校验筹码权重', () =>
     expect(() =>
       chipDistributionSchema.parse({
-        version: 3,
+        version: 1,
         symbol: '600519.SH',
         buckets: [{ price: 10, weight: 2 }],
         averageCost: 10,
@@ -213,7 +213,7 @@ describe('行情契约', () => {
 
   it('允许只返回筹码摘要而不伪造完整分布', () => {
     const result = chipDistributionSchema.parse({
-      version: 3,
+      version: 1,
       symbol: '600519.SH',
       averageCost: 10,
       profitRatio: 0.5,
@@ -227,12 +227,12 @@ describe('行情契约', () => {
     expect(result.symbol).toBe('600519.SH');
     expect(result).not.toHaveProperty('buckets');
     expect(result).not.toHaveProperty('mainPeak');
-    expect(() => chipDistributionSchema.parse({ ...result, version: 1 })).toThrow();
+    expect(() => chipDistributionSchema.parse({ ...result, version: 3 })).toThrow();
   });
 
   it('基金净值历史要求严格升序且保留真实 Provider', () => {
     const point = (navDate: string) => ({
-      version: 3,
+      version: 1,
       symbol: '000001.OF',
       unitNav: 1.2,
       navDate,
@@ -246,20 +246,20 @@ describe('行情契约', () => {
     expect(() =>
       fundNavHistorySchema.parse([point('2025-01-02T00:00:00Z'), point('2025-01-01T00:00:00Z')]),
     ).toThrow('升序');
-    expect(() => fundNavSchema.parse({ ...point('2025-01-01T00:00:00Z'), version: 1 })).toThrow();
+    expect(() => fundNavSchema.parse({ ...point('2025-01-01T00:00:00Z'), version: 3 })).toThrow();
   });
 
   it('汇率响应拒绝旧版本', () => {
     const response = {
-      version: 3,
+      version: 1,
       baseCurrency: 'CNY',
       asOf: '2025-01-01',
       fetchedAt: time,
       maxAgeDays: 7,
       rates: [],
     };
-    expect(fxRatesResponseSchema.parse(response).version).toBe(3);
-    expect(() => fxRatesResponseSchema.parse({ ...response, version: 1 })).toThrow();
+    expect(fxRatesResponseSchema.parse(response).version).toBe(1);
+    expect(() => fxRatesResponseSchema.parse({ ...response, version: 3 })).toThrow();
   });
 
   it('非图表详情分段仍校验数据与诊断', () => {
@@ -267,7 +267,7 @@ describe('行情契约', () => {
       capability: 'quote',
       status: 'ready',
       data: {
-        version: 3,
+        version: 1,
         symbol: '600519.SH',
         open: 10,
         high: 12,
@@ -311,7 +311,11 @@ describe('行情契约', () => {
     expect(() =>
       marketDetailRequestSchema.parse({ symbol: '600519.SH', adjustment: 'split' }),
     ).toThrow();
-    expect(() => marketDetailRequestSchema.parse({ symbol: '600519.SH', barsLimit: 91 })).toThrow();
+    expect(marketDetailRequestSchema.parse({ symbol: '600519.SH', barsLimit: 3000 }).barsLimit).toBe(3000);
+    expect(() => marketDetailRequestSchema.parse({ symbol: '600519.SH', barsLimit: 3001 })).toThrow();
+    expect(() =>
+      marketDetailRequestSchema.parse({ symbol: '600519.SH', chartContractVersion: 3 }),
+    ).toThrow();
     expect(() =>
       marketDetailRequestSchema.parse({ symbol: '600519.SH', include: ['indicator:ATR'] }),
     ).toThrow();
@@ -320,7 +324,7 @@ describe('行情契约', () => {
   it('目录增量必须携带 fromCursor 与删除身份', () => {
     expect(
       catalogDeltaSchema.parse({
-        contractVersion: 3,
+        contractVersion: 1,
         generation: 2,
         checksum: 'a'.repeat(64),
         cursor: 'generation:2',

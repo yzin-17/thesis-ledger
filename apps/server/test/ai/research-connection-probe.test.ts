@@ -15,10 +15,12 @@ describe('研究V2用途格式探针', () => {
     expect(messages[1]!.content).toContain(JSON.stringify(example));
   });
 
-  it('准确区分研究V1及其他用途，不改变已有探针', () => {
-    expect(researchConnectionProbe(aiGenerationContracts.research.ref)).toBeNull();
+  it('当前研究用途使用同一探针，退役研究合同和其他用途不匹配', () => {
+    const example = researchConnectionProbe(researchGenerationV2Contract.ref);
+    expect(researchConnectionProbe(aiGenerationContracts.research.ref)).toEqual(example);
+    expect(researchConnectionProbe({ id: 'research', version: 'research-generation-v1' } as never)).toBeNull();
     expect(researchConnectionProbe(aiGenerationContracts.parameterOptimization.ref)).toBeNull();
-    expect(probeMessages('research')[1]!.content).toContain('最小可用实例');
+    expect(probeMessages('research')[1]!.content).toContain(JSON.stringify(example));
   });
 
   it('仍拒绝真实失败中没有实际证据的查看动作', () => {

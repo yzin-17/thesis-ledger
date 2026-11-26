@@ -1,3 +1,4 @@
+import { readAdditionalSignalPricesV3 } from './backtest-signal-price-inputs-v3.js';
 import {
   benchmarkExecutionModelCostVersionV3,
   marketDataBarRouteKeyV3Schema,
@@ -23,7 +24,7 @@ import { createBacktestSnapshotV3Source } from './backtest-snapshot-v3-source.js
 import type { LocalSnapshotV3Store } from './backtest-snapshot-v3-store.js';
 import type { MarketBarReader } from '../market/market-bar-reader.js';
 import { collectSnapshotDependenciesV3 } from './backtest-snapshot-v3-dependencies.js';
-import { planSnapshotInputsV3 } from './backtest-snapshot-v3-input-plan.js';
+import { planSnapshotInputsV3, snapshotExecutionRouteKeyV3 } from './backtest-snapshot-v3-input-plan.js';
 import type { MarketLifecycleReadPortV3 } from '../market/market-lifecycle-reader-v3.js';
 import type { MarketKnownCashControlResponseV3 } from '@thesis-ledger/schemas';
 import { knownCashSnapshotContextV3 } from './backtest-known-cash-snapshot-v3.js';
@@ -58,6 +59,7 @@ export interface BacktestSnapshotV3BuildInput {
   executionRouteKey: MarketDataBarRouteKeyV3;
   preparationStamp?: BacktestPreflightRevisionStampV3;
   beforeFinalize?: () => Promise<void>;
+  signal?: AbortSignal;
 }
 
 export interface BacktestSnapshotV3BuildResult {
@@ -78,26 +80,12 @@ const executionSymbol = (strategy: BacktestStrategy) => {
   return instrument.symbol;
 };
 
-const requiredAssetType = (strategy: BacktestStrategy): 'STOCK' | 'ETF' => {
-  if (strategy.executionInstrument.assetType === 'stock') return 'STOCK';
-  if (strategy.executionInstrument.assetType === 'etf') return 'ETF';
-  throw new Error('当前 Snapshot V3 execution 写入切片仅支持股票与 ETF');
-};
-
 const assertRouteMatchesStrategy = (
   routeKey: MarketDataBarRouteKeyV3,
   strategy: BacktestStrategy,
-  protocolAdjustment: string,
+  runConfig: RunConfigV3,
 ): void => {
-  if (strategy.primaryTimeframe !== '1d') {
-    throw new Error('当前 MarketBarReader V3 execution 写入切片仅支持日线');
-  }
-  if (
-    routeKey.market !== strategy.executionInstrument.market ||
-    routeKey.assetType !== requiredAssetType(strategy) ||
-    routeKey.timeframe !== '1d' ||
-    routeKey.adjustment !== protocolAdjustment
-  ) {
+  if (canonicalizeManifest(routeKey) !== canonicalizeManifest(snapshotExecutionRouteKeyV3(strategy, runConfig))) {
     throw new Error('预先确定的 V3 execution RouteKey 与策略标的或价格协议不一致');
   }
 };
@@ -118,14 +106,14 @@ const buildBuildingManifest = (input: BacktestSnapshotV3BuildInput): BacktestSna
   assertRouteMatchesStrategy(
     routeKey,
     strategy,
-    runConfig.executionPriceProtocol.priceBasis.adjustment,
+    runConfig,
   );
   if (runConfig.endDate > runConfig.dataAsOf.slice(0, 10)) {
     throw new Error('RunConfig endDate 不能晚于 dataAsOf');
   }
 
   return {
-    manifestVersion: 'snapshot-manifest-v3',
+    manifestVersion: 'backtest-trade-snapshot-manifest-v1',
     benchmarkCostVersion: benchmarkExecutionModelCostVersionV3,
     runId: input.runId,
     strategyVersionId: input.strategyVersionId,
@@ -145,7 +133,8 @@ const buildBuildingManifest = (input: BacktestSnapshotV3BuildInput): BacktestSna
       : {}),
     executionPriceProtocol: runConfig.executionPriceProtocol,
     ...(runConfig.priceResearch
-      ? { priceResearch: { protocolVersion: runConfig.priceResearch.protocolVersion } }
+      ? { priceResearch: { protocolVersion: runConfig.priceResearch.protocolVersion,
+        ...(runConfig.priceResearch.dailyObservationContract !== undefined ? { dailyObservationContract: runConfig.priceResearch.dailyObservationContract } : {}) } }
       : {}),
     ...(runConfig.frozenExecutionWindow
       ? { frozenExecutionWindow: runConfig.frozenExecutionWindow }
@@ -230,6 +219,7 @@ export const buildBacktestSnapshotV3 = async (
   lifecycle?: MarketLifecycleReadPortV3,
   knownCashCheck?: () => Promise<MarketKnownCashControlResponseV3>,
 ): Promise<BacktestSnapshotV3BuildResult> => {
+  input.signal?.throwIfAborted();
   const initialManifest = buildBuildingManifest(input);
   const strategy = input.strategy;
   const routeKey = marketDataBarRouteKeyV3Schema.parse(input.executionRouteKey);
@@ -256,6 +246,7 @@ export const buildBacktestSnapshotV3 = async (
   const readResult = await bars.readV3(
     snapshotExecutionReadRequest(input, initialManifest, routeKey, symbol, window),
   );
+  input.signal?.throwIfAborted();
   const sourceOutput = createBacktestSnapshotV3Source(
     { purpose: 'execution', symbol, routeKey, window },
     readResult,
@@ -283,6 +274,8 @@ export const buildBacktestSnapshotV3 = async (
     execution: readResult,
     reader: bars,
   });
+  const additionalSignals = await readAdditionalSignalPricesV3({ strategy, runConfig, reader: bars,
+    warmupStart: initialManifest.dateRange.warmupStartDate, requireFrozen: true, ...(reference ? { actualBasis: reference.response.sourcePriceBasis } : {}) });
   cashContext.assertPriceRevisions(readResult.evidence);
   const historyFailure = await backtestHistoricalExecutionPreflightFailureV3(
     {
@@ -322,6 +315,7 @@ export const buildBacktestSnapshotV3 = async (
     initialManifest,
     runConfig,
     reference,
+    additionalSignals,
     sourceOutput,
     statusComposition,
     tradingStatus,
@@ -332,6 +326,7 @@ export const buildBacktestSnapshotV3 = async (
   });
 
   const building = await snapshots.startBuild(manifest);
+  input.signal?.throwIfAborted();
   if (building.status === 'finalized') return replayResult(await snapshots.replay(input.runId));
   try {
     const artifactRefs = await writeBacktestSnapshotV3Artifacts(
@@ -348,8 +343,10 @@ export const buildBacktestSnapshotV3 = async (
       knownCash,
       statusComposition,
       reference,
+      additionalSignals,
     );
     await input.beforeFinalize?.();
+    input.signal?.throwIfAborted();
     await cashContext.read();
     if (runConfig.lifecyclePreparation && lifecycle) {
       const prepared = runConfig.lifecyclePreparation;
@@ -369,7 +366,9 @@ export const buildBacktestSnapshotV3 = async (
     const finalized = await snapshots.finalize(input.runId, building, artifactRefs);
     return replayResult(finalized);
   } catch (error) {
-    await snapshots.deleteRun(input.runId).catch(() => undefined);
+    await snapshots.load(input.runId, true).then((current) => {
+      if (current?.status !== 'finalized') return snapshots.deleteRun(input.runId);
+    }).catch(() => undefined);
     throw error;
   }
 };
@@ -401,7 +400,8 @@ function snapshotExecutionReadRequest(
     symbol,
     routeKey,
     window,
-    ...backtestResearchReadOptionsV3(routeKey.market, initialManifest.executionPriceProtocol),
+    ...backtestResearchReadOptionsV3(routeKey.market, initialManifest.executionPriceProtocol, routeKey.timeframe,
+      input.runConfig.priceResearch?.dailyObservationContract),
     ...(initialManifest.frozenExecutionWindow
       ? {
           frozenWindowRef: initialManifest.frozenExecutionWindow,
@@ -421,6 +421,7 @@ type SnapshotManifestMaterial = {
   initialManifest: BacktestSnapshotManifestV3;
   runConfig: ReturnType<typeof runConfigSchemaV3.parse>;
   reference: Awaited<ReturnType<typeof readPriceResearchReference>>;
+  additionalSignals: Awaited<ReturnType<typeof readAdditionalSignalPricesV3>>;
   sourceOutput: ReturnType<typeof createBacktestSnapshotV3Source>;
   statusComposition: Awaited<ReturnType<typeof collectSnapshotStatusInputsV1>>['statusComposition'];
   tradingStatus: Awaited<ReturnType<typeof collectSnapshotStatusInputsV1>>['tradingStatus'];
@@ -435,6 +436,7 @@ function preparedSnapshotManifest({
   runConfig,
   reference,
   sourceOutput,
+  additionalSignals,
   statusComposition,
   tradingStatus,
   publicFees,
@@ -448,6 +450,7 @@ function preparedSnapshotManifest({
       ? {
           priceResearch: {
             protocolVersion: runConfig.priceResearch.protocolVersion,
+            ...(runConfig.priceResearch.dailyObservationContract !== undefined ? { dailyObservationContract: runConfig.priceResearch.dailyObservationContract } : {}),
             ...(reference ? { actualPriceSource: reference.actualSource } : {}),
           },
         }
@@ -490,7 +493,7 @@ function preparedSnapshotManifest({
         ].map((purpose) => ({
           ...sourceOutput.actualSource,
           purpose,
-        }))
+        })).concat(additionalSignals.map(item => item.actualSource))
       : [sourceOutput.actualSource],
     ...cashContext.manifest,
     providerRevisions: {

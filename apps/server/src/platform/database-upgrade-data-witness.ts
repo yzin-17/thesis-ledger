@@ -45,6 +45,7 @@ export async function captureUpgradeDataWitness(
   target: DatabaseExecutionTarget,
   baseline?: UpgradeDataWitness,
   renamedTables: Readonly<Record<string, string>> = {},
+  beforeNamedLedgerV1 = false,
 ): Promise<UpgradeDataWitness> {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(container)) throw new Error('数据校验容器无效');
   const args = [
@@ -84,8 +85,15 @@ export async function captureUpgradeDataWitness(
   const tables: UpgradeDataWitness['tables'] = [];
   for (const descriptor of descriptors) {
     const physicalTable = renamedTables[descriptor.table] ?? descriptor.table;
+    const columns = descriptor.columns.map((column) => {
+      if (beforeNamedLedgerV1 && descriptor.table === 'LedgerEvent' && column === 'envelopeVersion')
+        return 'CASE "envelopeVersion" WHEN 3 THEN 1 ELSE "envelopeVersion" END';
+      if (beforeNamedLedgerV1 && descriptor.table === 'PortfolioSnapshot' && column === 'payloadVersion')
+        return 'CASE "payloadVersion" WHEN 2 THEN 1 ELSE "payloadVersion" END';
+      return identifier(column);
+    });
     const sql = `SET TIME ZONE 'UTC'; COPY (SELECT encode(sha256(convert_to(to_jsonb(ROW(
-      ${descriptor.columns.map(identifier).join(', ')}))::text, 'UTF8')), 'hex')
+      ${columns.join(', ')}))::text, 'UTF8')), 'hex')
       FROM public.${identifier(physicalTable)} ORDER BY 1) TO STDOUT;`;
     const child = spawn('docker', args, { stdio: ['pipe', 'pipe', 'ignore'] });
     const digest = createHash('sha256');

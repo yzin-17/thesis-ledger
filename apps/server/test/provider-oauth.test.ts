@@ -10,7 +10,7 @@ const session = {
   expiresAt: '2026-09-14T12:00:00Z',
   errorCode: null,
 };
-const wire = { contractVersion: 3, consumer: 'thesis-ledger', ...session };
+const wire = { contractVersion: 1, consumer: 'thesis-ledger', ...session };
 
 describe('Provider OAuth proxy', () => {
   it('创建授权仅转发 Client ID 和控制信封，响应不透传令牌', async () => {
@@ -18,10 +18,10 @@ describe('Provider OAuth proxy', () => {
     const control = vi.spyOn(client, 'control').mockResolvedValue(wire);
     expect(await client.longbridgeOAuth({ kind: 'create', clientId: 'client' })).toEqual(session);
     const [path, init] = control.mock.calls[0]!;
-    expect(path).toBe('/api/v3/thesis-ledger/control/providers/longbridge/oauth/sessions');
+    expect(path).toBe('/api/v1/thesis-ledger/control/providers/longbridge/oauth/sessions');
     expect(init?.method).toBe('POST');
     expect(JSON.parse(init?.body as string)).toEqual({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: expect.any(String),
       clientId: 'client',
@@ -32,7 +32,7 @@ describe('Provider OAuth proxy', () => {
     const client = Object.create(DsaClient.prototype) as DsaClient;
     const control = vi
       .spyOn(client, 'control')
-      .mockResolvedValue({ contractVersion: 3, consumer: 'thesis-ledger', session: null });
+      .mockResolvedValue({ contractVersion: 1, consumer: 'thesis-ledger', session: null });
     expect(await client.longbridgeOAuth({ kind: 'current' })).toEqual({ session: null });
     expect(control).toHaveBeenLastCalledWith(expect.stringContaining('/sessions/current'), {});
     control.mockResolvedValue(wire);
@@ -47,7 +47,7 @@ describe('Provider OAuth proxy', () => {
       { method: 'POST', body: expect.any(String) },
     );
     expect(JSON.parse(control.mock.calls.at(-1)![1]!.body as string)).toEqual({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: expect.any(String),
     });
@@ -87,7 +87,7 @@ describe('Provider OAuth proxy', () => {
   it('页面取消拒绝旧信封，保留无请求体的当前客户端行为', () => {
     const dsa = { longbridgeOAuth: vi.fn() };
     const controller = new MarketDataController({} as never, {} as never, dsa as never);
-    for (const contractVersion of [1, 2]) {
+    for (const contractVersion of [2, 3]) {
       expect(() =>
         controller.cancelProviderOAuth(session.sessionId, { contractVersion }),
       ).toThrow();

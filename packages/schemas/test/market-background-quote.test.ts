@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { correlateBackgroundQuotePlan } from '../src/market-background-quote.js';
-const request = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'source-test', symbol: '510300.SH', assetType: 'ETF' } as const;
+const request = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'source-test', symbol: '510300.SH', assetType: 'ETF' } as const;
 const plan = { ...request, generation: 'a'.repeat(64), policyRevision: 1, acquisition: 'public-snapshot', reason: null,
   target: { providerId: 'tencent', upstreamSource: 'tencent', routeIndex: 1 }, minIntervalSeconds: 600, sourceUpdateIntervalSeconds: null };
 it('pins identity and the currently verified source contract', () => {

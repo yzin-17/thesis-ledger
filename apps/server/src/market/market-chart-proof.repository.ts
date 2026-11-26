@@ -20,7 +20,7 @@ const entrySchema = z.strictObject({
   observation: marketRouteCompatibilityObservationV3Schema,
 });
 export const marketChartProofPackageSchema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   entries: z.array(entrySchema).max(100),
 });
 export type ChartProofLookup = Pick<

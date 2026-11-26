@@ -42,7 +42,7 @@ export function ReviewAction({
   const [message, setMessage] = useState<string | null>(null);
   const command = useMobileCommand(
     async () => {
-      if (!canCreate || locator.view === 'legacy') throw new Error('当前复核写入受控。');
+      if (!canCreate) throw new Error('当前复核写入受控。');
       const input =
         pending.data ??
         researchObservationSubmissionSchema.parse({ submissionId: randomUUID(), claimId, asOf });
@@ -76,7 +76,6 @@ export function ReviewAction({
         label={pending.data ? '找回原复核' : '提交复核'}
         disabled={
           !canCreate ||
-          locator.view === 'legacy' ||
           command.isPending ||
           !pending.isSuccess ||
           pending.isError

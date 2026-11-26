@@ -8,7 +8,7 @@ it('证券事实请求发送成组来源参数及数字索引，不序列化 und
     ok: true,
     status: 200,
     json: async () => ({
-      version: 3,
+      version: 1,
       status: 'unavailable',
       reason: 'fixture source revoked',
       provider: 'fixture',

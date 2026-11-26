@@ -15,7 +15,7 @@ const key = {
 const target = { providerId: 'hithink', upstreamSource: 'fund-market-historical' };
 const result = { status: 'healthy', attempted: true, readOnly: true } as const;
 const response = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   providerId: 'hithink',
   requestId: 'test',

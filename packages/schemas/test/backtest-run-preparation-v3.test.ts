@@ -8,7 +8,7 @@ import {
 } from '../src/index.js';
 
 const request = () => ({
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: 'prepare-1',
   strategyVersionId: '11111111-1111-4111-8111-111111111111',
   adjustment: 'none',
@@ -39,11 +39,22 @@ describe('V3配置准备合同', () => {
   it('现金研究只接受境内ETF原始价格及固定快照意图', () => {
     const input = request();
     input.runConfig.executionModel.scope.instrumentType = 'ETF';
-    const cash = { ...input, history: { basis: 'fixed-provider-snapshot' },
-      cashEventResearch: 'ex-date-entitlement-payment-date-cash-v1' };
+    const cash = {
+      ...input,
+      history: { basis: 'fixed-provider-snapshot' },
+      cashEventResearch: 'ex-date-entitlement-payment-date-cash-v1',
+    };
     expect(backtestRunPreparationRequestV3Schema.safeParse(cash).success).toBe(true);
-    expect(backtestRunPreparationRequestV3Schema.safeParse({ ...cash, adjustment: 'qfq', accountingBasis: 'normalized-series' }).success).toBe(false);
-    expect(backtestRunPreparationRequestV3Schema.safeParse({ ...cash, history: input.history }).success).toBe(false);
+    expect(
+      backtestRunPreparationRequestV3Schema.safeParse({
+        ...cash,
+        adjustment: 'qfq',
+        accountingBasis: 'normalized-series',
+      }).success,
+    ).toBe(false);
+    expect(
+      backtestRunPreparationRequestV3Schema.safeParse({ ...cash, history: input.history }).success,
+    ).toBe(false);
     input.runConfig.executionModel.scope.instrumentType = 'STOCK';
     expect(backtestRunPreparationRequestV3Schema.safeParse(cash).success).toBe(false);
   });
@@ -97,7 +108,7 @@ describe('V3配置准备合同', () => {
     ).toBe(false);
     expect(
       optimizationRunPreparationResultSchema.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: 'prepare',
         checkedAt: intent.runConfig.dataAsOf,
         scope: 'baseline-window',
@@ -110,18 +121,20 @@ describe('V3配置准备合同', () => {
     expect(backtestRunPreparationRequestV3Schema.parse(request())).toEqual(request());
   });
 
-  it.each(['executionPriceProtocol', 'priceInputBindings', 'frozenExecutionWindow'])(
-    '拒绝客户端注入%s',
-    (field) => {
-      const input = request();
-      expect(
-        backtestRunPreparationRequestV3Schema.safeParse({
-          ...input,
-          runConfig: { ...input.runConfig, [field]: {} },
-        }).success,
-      ).toBe(false);
-    },
-  );
+  it.each([
+    'executionPriceProtocol',
+    'priceInputBindings',
+    'frozenExecutionWindow',
+    'signalPriceWindows',
+  ])('拒绝客户端注入%s', (field) => {
+    const input = request();
+    expect(
+      backtestRunPreparationRequestV3Schema.safeParse({
+        ...input,
+        runConfig: { ...input.runConfig, [field]: {} },
+      }).success,
+    ).toBe(false);
+  });
 
   it('拒绝缺模型、日期倒置、无初始现金和原始记账使用前复权', () => {
     const input = request();
@@ -160,7 +173,7 @@ describe('V3配置准备合同', () => {
 
   it('blocked不能混入可提交配置，prepared不能只返回空配置', () => {
     const base = {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'prepare-1',
       checkedAt: '2026-09-11T00:00:00Z',
       scope: 'execution-window',

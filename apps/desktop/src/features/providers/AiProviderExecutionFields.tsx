@@ -11,7 +11,6 @@ import { aiContractOptions, newAiProviderExecutionRouteDraft } from './ai-provid
 import { aiOutputModeLabel } from './ai-output-mode-options.js';
 import { AiGenerationSettings } from './AiGenerationSettings.js';
 import { AiProviderRequestOptionsFields } from './AiProviderRequestOptionsFields.js';
-import { AiProviderResearchVersionField } from './AiProviderResearchVersionField.js';
 import type { AiProviderExecutionRouteDraft, ProviderDraft } from './providers.types.js';
 
 const seconds = (value: string) => (value.trim() ? String(Number(value) / 1000) : '');
@@ -56,7 +55,7 @@ export function AiProviderExecutionFields({
       <div>
         <h3 className="text-sm font-medium">模型用途</h3>
         <p className="text-xs text-muted-foreground">
-          勾选需要的任务，点击“测试并保存”后即可使用。
+          选择需要的任务并测试保存；付费调用还需在具体任务中授权费用。
         </p>
       </div>
       {models.length === 0 ? <p className="text-sm text-muted-foreground">请先选择模型。</p> : null}
@@ -168,10 +167,6 @@ export function AiProviderExecutionFields({
                     </div>
                     {selected ? (
                       <>
-                        <AiProviderResearchVersionField
-                          route={selected}
-                          onChange={(update) => updateRoute(selected.key, update)}
-                        />
                         <Field>
                           <FieldLabel className="flex w-fit items-center gap-2 text-sm font-normal">
                             <Checkbox

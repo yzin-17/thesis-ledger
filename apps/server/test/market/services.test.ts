@@ -5,7 +5,7 @@ import { MarketDataController } from '../../src/market/market-data.controller.js
 import { DataQualityService } from '../../src/quality/data-quality.service.js';
 
 const quote = {
-    version: 3,
+    version: 1,
     symbol: '600519.SH',
     open: 10,
     high: 11,
@@ -113,13 +113,13 @@ describe("基金净值版本及范围缓存", () => {
     const redis = { client: { get: vi.fn(async () => null), set: vi.fn(async () => 'OK'), eval: vi.fn(async () => 0) } };
     const service = new MarketService(dsa as never, redis as never);
     await expect(service.getFundNav('000001.OF')).rejects.toThrow();
-    expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/fund-nav?symbol=000001.OF');
+    expect(dsa.get).toHaveBeenCalledWith('/api/v1/thesis-ledger/market/fund-nav?symbol=000001.OF');
   });
 
   it('基金净值历史相同范围并发请求只调用一次 DSA 并使用完整锁 key', async () => {
     const points = [
       {
-        version: 3,
+        version: 1,
         symbol: '000001.OF',
         unitNav: 1.1,
         navDate: '2025-01-01T00:00:00Z',
@@ -165,7 +165,7 @@ describe("基金净值版本及范围缓存", () => {
     const ttls = new Map<string, number>();
     const points = [
       {
-        version: 3,
+        version: 1,
         symbol: '000001.OF',
         unitNav: 1.1,
         navDate: '2025-01-01T00:00:00Z',
@@ -229,7 +229,7 @@ describe("基金净值版本及范围缓存", () => {
   it('基金净值历史不同范围不会合并 single-flight', async () => {
     const points = [
       {
-        version: 3,
+        version: 1,
         symbol: '000001.OF',
         unitNav: 1.1,
         navDate: '2025-01-01T00:00:00Z',
@@ -264,7 +264,7 @@ describe("筹码摘要与历史入口", () => {
     const timestamp = '2025-01-01T00:00:00Z';
     const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(async () => ({
-        version: 3,
+        version: 1,
         symbol: '600519.SH',
         buckets: [{ price: 10, weight: 1 }],
         averageCost: 10,
@@ -292,7 +292,7 @@ describe("筹码摘要与历史入口", () => {
     const timestamp = '2025-01-01T00:00:00Z';
     const dsa = { marketCacheContextV3: vi.fn(quoteControlFixture),
       get: vi.fn(async () => ({
-        version: 3,
+        version: 1,
         symbol: '600519.SH',
         buckets: [{ price: 10, weight: 1 }],
         averageCost: 10,

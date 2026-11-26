@@ -106,7 +106,7 @@ export const projectNavResultV3 = (
   const payload = backtestNavResultV3Schema.parse({
     source: 'BACKTEST',
     inputKind: 'nav',
-    schemaVersion: '3',
+    schemaVersion: 'backtest-nav-result-v1',
     snapshotVersion: manifest.manifestVersion,
     engineVersion: NAV_V3_RUNNER_VERSION,
     runId: manifest.runId,

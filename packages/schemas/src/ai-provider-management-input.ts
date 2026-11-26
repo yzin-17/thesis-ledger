@@ -127,7 +127,7 @@ export const aiProviderExecutionRouteInputSchema = z.preprocess(
     .refine(
       (route) =>
         route.reasoningEnabled === undefined ||
-        (route.contract.id === 'research' && route.contract.version === 'research-generation-v2'),
+        (route.contract.id === 'research' && route.contract.version === 'research-report-generation-v1'),
       { path: ['reasoningEnabled'], message: '显式推理开关仅适用于研究 V2' },
     )
     .refine((route) => route.reasoningEnabled === undefined || route.reasoningEffort === undefined,

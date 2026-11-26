@@ -41,7 +41,7 @@ export const preparationBlocked = (
   diagnostics: BacktestPreflightDiagnosticV3[],
 ) =>
   backtestRunPreparationResultV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: request.requestId,
     checkedAt,
     scope: 'execution-window',
@@ -58,6 +58,8 @@ export const preparationDiagnostic = (
       | 'category'
       | 'code'
       | 'symbol'
+      | 'capability'
+      | 'dateRange'
       | 'routeKey'
       | 'targetSources'
       | 'missingFields'

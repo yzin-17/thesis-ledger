@@ -2,7 +2,7 @@
   "synthetic": true,
   "description": "离线合成合同；不代表真实身份、币种审核、准入或历史完整覆盖",
   "request": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "offline-synthetic-tushare-identity",
     "symbol": "159516.SZ",
     "routeKey": {
@@ -24,7 +24,7 @@
     "dataAsOf": "2026-09-28T12:00:00.000000001Z"
   },
   "response": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "offline-synthetic-tushare-identity",
     "symbol": "159516.SZ",
     "routeKey": {

@@ -3,7 +3,7 @@ import type { FundNavHistory } from '@thesis-ledger/schemas';
 import type { MarketDetailPosition } from './market-detail.types.js';
 import { fundNavCostReference } from './fund-nav-reference-model.js';
 
-const history: FundNavHistory = [{ version: 3, symbol: '000001.OF', navDate: '2026-11-06T00:00:00Z', unitNav: 1,
+const history: FundNavHistory = [{ version: 1, symbol: '000001.OF', navDate: '2026-11-06T00:00:00Z', unitNav: 1,
   provider: 'fixture', fetchedAt: '2026-11-08T00:00:00Z', freshness: 'delayed' }];
 const position: MarketDetailPosition = { symbol: '000001.OF', accountId: 'account-a', mode: 'actual',
   currency: 'CNY', costPrice: 1.2222222222222, quantity: 90, asset: { name: '验证基金', assetType: 'fund' } };

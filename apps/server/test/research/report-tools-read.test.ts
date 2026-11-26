@@ -89,16 +89,14 @@ describe('报告所属范围的持久化工具审计', () => {
     expect(h.transaction.aiToolCall.findMany).not.toHaveBeenCalled();
   });
 
-  it('不能用其他对象或历史兼容入口读取同一 V2 报告', async () => {
+  it('其他对象与退役入口均无法读取工具记录', async () => {
     const h = harness();
-    for (const locator of [
-      { ...h.locator, scope: 'instrument', instrumentId: '20000000-0000-4000-8000-000000000001' },
-      { view: 'legacy' },
-    ]) {
-      await expect(
-        h.query.tools(comparisonOwner, h.report.row.id, locator, h.access),
-      ).rejects.toBeInstanceOf(NotFoundException);
-    }
+    await expect(h.query.tools(comparisonOwner, h.report.row.id, {
+      ...h.locator, scope: 'instrument', instrumentId: '20000000-0000-4000-8000-000000000001',
+    }, h.access)).rejects.toBeInstanceOf(NotFoundException);
+    expect(() => h.query.tools(
+      comparisonOwner, h.report.row.id, { view: 'legacy', mode: h.locator.mode }, h.access,
+    )).toThrow('scoped');
     expect(h.transaction.aiToolCall.findMany).not.toHaveBeenCalled();
   });
 

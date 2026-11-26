@@ -114,7 +114,7 @@ import { priceResearchFixture } from './price-research.fixtures.js';
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          contractVersion: 3,
+          contractVersion: 1,
           strategyVersionId: version.id,
           idempotencyKey: 'isolated-price-research',
           runConfig: prepared.runConfig,
@@ -202,7 +202,7 @@ import { priceResearchFixture } from './price-research.fixtures.js';
           priceResearchReference: 'freeze', runConfig: { ...baseIntent.runConfig, executionModel: modelResolution.model } } });
       if (discoveryPrepared.status !== 'prepared') throw Error(JSON.stringify(discoveryPrepared));
       const nextDay = (offset: number) => { const date = new Date(f.request.runConfig.startDate + 'T00:00:00Z'); date.setUTCDate(date.getUTCDate() + offset); return date.toISOString().slice(0, 10); };
-      const createdExperiment = await createOptimizationExperiment({ ...target, contractVersion: 3,
+      const createdExperiment = await createOptimizationExperiment({ ...target, contractVersion: 1,
         models: [{ provider: 'controlled', model: 'zero' }], maxRounds: 1, objective: { mode: 'balanced', minClosedTrades: 1 },
         budget: { maxAiCalls: 1, maxBacktestRuns: 0, maxInputTokens: 1000, maxOutputTokens: 1000, maxDurationSeconds: 600 },
         split: { development: { start: nextDay(0), end: nextDay(0) }, validation: { start: nextDay(1), end: nextDay(1) },
@@ -214,12 +214,12 @@ import { priceResearchFixture } from './price-research.fixtures.js';
         SELECT "baselineStrategyVersionId", "strategySpaceVersion" FROM "OptimizationExperiment" WHERE "id"=${createdExperiment.id}::uuid
       `;
       expect(storedExperiments[0]?.strategySpaceVersion).toBe('strategy-space-price-research-v1');
-      expect(await prisma.strategyVersion.findUniqueOrThrow({ where: { id: storedExperiments[0]!.baselineStrategyVersionId } })).toMatchObject({ schemaVersion: 3, schema: { schemaVersion: '3' } });
-      const candidate = projectPriceResearchStrategy({ ...baseline, schemaVersion: '2', entry: { type: 'all', conditions: [baseline.entry, {
+      expect(await prisma.strategyVersion.findUniqueOrThrow({ where: { id: storedExperiments[0]!.baselineStrategyVersionId } })).toMatchObject({ schemaVersion: 1, schema: { schemaVersion: 'strategy-definition-v1' } });
+      const candidate = projectPriceResearchStrategy({ ...baseline, entry: { type: 'all', conditions: [baseline.entry, {
         type: 'compare', operator: 'lt', left: { type: 'series', sourceId: 'research', field: 'close' }, right: { type: 'constant', value: '1000' },
       }] }, sizing: { type: 'fixedQuantity', quantity: '100' } });
       const candidateVersion = await prisma.strategyVersion.create({ data: {
-        strategyId: strategy.id, version: -1, schemaVersion: 3, schema: candidate as unknown as Prisma.InputJsonValue,
+        strategyId: strategy.id, version: -1, schemaVersion: 1, schema: candidate as unknown as Prisma.InputJsonValue,
       } });
       const configured = new BacktestConfiguredRunService(prisma as PrismaService, f.reader as never, revisions as never);
       const fingerprints: string[] = [];

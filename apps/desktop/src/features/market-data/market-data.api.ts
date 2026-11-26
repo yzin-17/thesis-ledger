@@ -17,7 +17,7 @@ const api = () => getDesktopApiClient();
 
 export const parseMarketPolicyResponse = (value: unknown): MarketPolicyResponse => {
   const parsed = marketPolicyClientResponseSchema.safeParse(value);
-  if (!parsed.success) throw new Error('路由策略响应无效：需要 V3 策略。');
+  if (!parsed.success) throw new Error('路由策略响应须符合 market-routing-policy-v1。');
   return parsed.data;
 };
 
@@ -30,7 +30,7 @@ export const fetchMarketRouteCapabilitiesV3 = async (): Promise<MarketRouteCatal
     if (!(error instanceof ThesisLedgerContractError)) throw error;
   }
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     status: 'unavailable',
     catalogRevision: null,
@@ -47,7 +47,7 @@ export const fetchCatalogJob = async (jobId: string) => api().market.catalogJob(
 
 export const saveMarketPolicy = async (policy: MarketPolicyDraftV3) =>
   api().market.savePolicy({
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: createClientRequestId(),
     revision: policy.revision + 1,

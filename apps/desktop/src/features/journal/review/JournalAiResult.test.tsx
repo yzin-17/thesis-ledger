@@ -1,15 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { JournalAiExplanation } from '@thesis-ledger/schemas';
+import { journalAiExplanationSchema, type JournalAiExplanation } from '@thesis-ledger/schemas';
 import { describe, expect, it } from 'vitest';
 import { JournalAiResult } from './JournalAiResult.js';
 
 type Result = NonNullable<JournalAiExplanation['result']>;
 const id = '00000000-0000-4000-8000-000000000011';
 
-describe('Journal AI 解读历史与 V2 展示', () => {
-  it('V2 展示结论、可核对证据、风险与未知，不伪造 V1 Tool 引用', () => {
+describe('复盘 AI 解读', () => {
+  it('现行解读展示结论、可核对证据、风险与未知', () => {
     const result = {
-      version: 2,
+      version: 'research-report-result-v1',
       inference: {
         conclusion: '复盘结论',
         rationale: ['严格区分计划与实际'],
@@ -36,7 +36,7 @@ describe('Journal AI 解读历史与 V2 展示', () => {
     expect(html).not.toContain('来源记录');
   });
 
-  it('历史 V1 仍展示其原有工具来源引用', () => {
+  it('读取边界拒绝退役的解读结果版本', () => {
     const result = {
       version: 1,
       conclusion: '旧复盘',
@@ -44,9 +44,7 @@ describe('Journal AI 解读历史与 V2 展示', () => {
       risks: ['历史风险'],
       unknowns: ['历史未知'],
       disclaimer: '旧声明',
-    } as unknown as Result;
-    const html = renderToStaticMarkup(<JournalAiResult result={result} />);
-    for (const phrase of ['旧复盘', '旧依据', 'journal:old', id, '历史风险', '历史未知', '旧声明'])
-      expect(html).toContain(phrase);
+    };
+    expect(journalAiExplanationSchema.shape.result.safeParse(result).success).toBe(false);
   });
 });

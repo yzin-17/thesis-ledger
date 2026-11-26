@@ -49,6 +49,8 @@ export interface SizingInput {
   priceResearchReference?: { protocolVersion: 'price-research-v1'; actualPrice?: SizingPriceFact };
   equity?: SizingEquityFact;
   fx?: SizingFxFact;
+  /** 仅用于成交预算；不能交给收盘信号、指标或目标数量计算。 */
+  executionProjection?: Pick<SizingInput, 'evaluationAt' | 'price' | 'equity' | 'fx'>;
 }
 
 export interface SizingAvailable {
@@ -58,6 +60,7 @@ export interface SizingAvailable {
   requestedQuantity: string;
   normalizedQuantity: string;
   targetQuantity?: string;
+  investmentLimit?: { fraction: string; scope: 'order' | 'position' };
   cashConstraint?: {
     requestedQuantity: string;
     availableCash: string;
@@ -210,7 +213,9 @@ const requirePrice = (input: SizingInput): SizingPriceFact | SizingUnavailable |
   return input.price;
 };
 
-const requireEquity = (input: SizingInput): DecimalValue | SizingUnavailable | SizingRejected => {
+export const readSizingEquity = (
+  input: SizingInput,
+): DecimalValue | SizingUnavailable | SizingRejected => {
   if (!input.equity) return unavailable('EQUITY_UNAVAILABLE', '缺少权益事实', ['equity=missing']);
   const timing = validateFactTime(input.equity, 'equity', input.evaluationAt, 'EQUITY_UNAVAILABLE');
   if (timing) return timing;
@@ -399,7 +404,7 @@ function readSizingMarketInputs(input: SizingInput): SizingMarketInputs | Sizing
   const price = priceNeeded ? requirePrice(input) : undefined;
   if (price && isSizingResult(price)) return price;
   const equityNeeded = input.rule.type === 'percentOfEquity' || input.rule.type === 'targetWeight';
-  const equity = equityNeeded ? requireEquity(input) : undefined;
+  const equity = equityNeeded ? readSizingEquity(input) : undefined;
   if (equity && isSizingResult(equity)) return equity;
   return {
     priceNeeded,
@@ -439,24 +444,13 @@ export const computeSizing = (input: SizingInput): SizingResult => {
   const market = readSizingMarketInputs(input);
   if ('status' in market) return market;
   const { priceNeeded, equityNeeded, price, equity } = market;
-  const calculation = calculateRequested(
-    input,
-    lot,
-    current,
-    price,
-    equity,
-  );
+  const calculation = calculateRequested(input, lot, current, price, equity);
   if ('status' in calculation) return calculation;
   return finalizeSizing(
     input,
     lot,
     calculation,
-    buildInputFacts(
-      input,
-      priceNeeded,
-      equityNeeded,
-      price,
-    ),
+    buildInputFacts(input, priceNeeded, equityNeeded, price),
     priceNeeded,
     equityNeeded,
   );
@@ -606,22 +600,12 @@ export const computeNormalizedSizing = (input: SizingInput): SizingResult => {
   const market = readSizingMarketInputs(input);
   if ('status' in market) return market;
   const { priceNeeded, equityNeeded, price, equity } = market;
-  const calculation = calculateNormalizedRequested(
-    input,
-    current,
-    price,
-    equity,
-  );
+  const calculation = calculateNormalizedRequested(input, current, price, equity);
   if ('status' in calculation) return calculation;
   return finalizeNormalizedSizing(
     input,
     calculation,
-    buildInputFacts(
-      input,
-      priceNeeded,
-      equityNeeded,
-      price,
-    ),
+    buildInputFacts(input, priceNeeded, equityNeeded, price),
     priceNeeded,
     equityNeeded,
   );

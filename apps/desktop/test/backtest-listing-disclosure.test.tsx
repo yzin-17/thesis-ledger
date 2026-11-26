@@ -12,8 +12,13 @@ import type { BacktestJob } from '../src/features/strategy/strategy.types.js';
 const saved = JSON.parse(
   readFileSync(new URL('./fixtures/backtest-listing-disclosure-v3.json', import.meta.url), 'utf8'),
 );
-const known = backtestResultSchemaV3.parse(saved.known);
-const unknown = backtestResultSchemaV3.parse(saved.unknown);
+const currentResult = (result: Record<string, unknown>) => backtestResultSchemaV3.parse({
+  ...result,
+  schemaVersion: 'backtest-trade-result-v1',
+  snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
+});
+const known = currentResult(saved.known);
+const unknown = currentResult(saved.unknown);
 const job = (result: typeof unknown): BacktestJob => ({
   id: 'listing-disclosure',
   strategyVersionId: 'version',
@@ -37,14 +42,11 @@ describe('上市日期未知的已有数据说明', () => {
     expect(unknown.completeness).toBe(known.completeness);
   });
 
-  it('旧已知结果没有提示，旧 V2 结果继续显示已有模型说明', () => {
+  it('上市日期已知时没有提示，旧合同原样本不能作为现行结果读取', () => {
     expect(renderToStaticMarkup(<BacktestRunDisclosure job={job(known)} />)).not.toContain(
       backtestUnknownListingWarningV3,
     );
-    const legacy = { ...known, schemaVersion: '2' } as unknown as typeof known;
-    const html = renderToStaticMarkup(<BacktestRunDisclosure job={job(legacy)} />);
-    expect(html).toContain('执行模型');
-    expect(html).not.toContain(backtestUnknownListingWarningV3);
+    expect(backtestResultSchemaV3.safeParse(saved.known).success).toBe(false);
   });
 
   it('提示进入脱敏 JSON 与诊断摘要，不暴露其他警告中的凭据', () => {

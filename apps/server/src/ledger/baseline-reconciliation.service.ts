@@ -289,7 +289,7 @@ export class BaselineReconciliationService {
   ): ReconciliationPayloadEvent {
     const recordedAt = new Date().toISOString();
     return {
-      version: 3,
+      version: 1,
       eventId: randomUUID(),
       factId: randomUUID(),
       accountId: command.accountId,
@@ -322,7 +322,7 @@ export class BaselineReconciliationService {
     target: ReconciliationEvent,
   ): ReconciliationVoidEvent {
     return {
-      version: 3,
+      version: 1,
       eventId: randomUUID(),
       factId: target.factId,
       accountId: command.accountId,
@@ -367,7 +367,7 @@ export class BaselineReconciliationService {
     if (duplicateExecutionFactIds.length > 0)
       throw conflict('恢复对账会重复纳入已覆盖成交', { duplicateExecutionFactIds });
     return {
-      version: 3,
+      version: 1,
       eventId: randomUUID(),
       factId: previous.factId,
       accountId: command.accountId,

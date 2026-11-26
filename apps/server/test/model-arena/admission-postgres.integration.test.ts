@@ -37,7 +37,7 @@ describe.skipIf(!url)('比赛开轮事务', () => {
   });
   async function start(budget = total, second = per) {
     const created = await arenas.create(owner, {
-      version: 1,
+      version: 'arena-historical-match-protocol-v1',
       title: '隔离比赛',
       market: 'CN',
       currency: 'CNY',

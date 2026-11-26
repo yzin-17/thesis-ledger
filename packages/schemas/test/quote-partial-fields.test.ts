@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { quoteSchema } from '../src/market.js';
 
 const quote = {
-  version: 3,
+  version: 1,
   symbol: '510300.SH',
   open: 4.1,
   high: 4.3,

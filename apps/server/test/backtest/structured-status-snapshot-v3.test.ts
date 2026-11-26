@@ -12,7 +12,7 @@ import {
   readSnapshotTradingStatusV3,
   tradingStatusArtifactRowsV3,
 } from '../../src/backtest/backtest-trading-status-snapshot-v3.js';
-import { statusExecutionFixture } from './trading-status-execution-fixtures.js';
+import { addArchivedStructuredStatus, statusExecutionFixture } from './trading-status-execution-fixtures.js';
 
 const roots: string[] = [];
 afterEach(async () =>
@@ -72,10 +72,10 @@ const source = (request: MarketTradingStatusRequestV3) => {
 };
 
 describe('结构化来源冻结与现有执行的真实领域接缝', () => {
-  it('新事实进入新快照，起点停牌不成交；旧快照保持，离线重放不读来源', async () => {
+  it('历史结构化事实保留原执行语义，离线重放不读来源', async () => {
     const root = await mkdtemp(join(tmpdir(), 'structured-status-'));
     roots.push(root);
-    const state = await statusExecutionFixture(root, { missingBar: true });
+    const state = await statusExecutionFixture(root, { missingBar: true, legacy: true });
     const runner = new LocalSnapshotV3Runner(state.snapshots);
     const oldRun = {
       runId: state.input.runId,
@@ -83,13 +83,14 @@ describe('结构化来源冻结与现有执行的真实领域接缝', () => {
       artifactRefs: state.built.artifactRefs,
     };
     const oldResult = await runner.run(oldRun, new AbortController().signal);
-    state.dsa.marketTradingStatusV3.mockImplementation(async (request) => source(request));
-    const policy = await state.dsa.effectiveControlPolicyV3();
-    policy.projection.effective.routes[0]!.targets[0]!.providerId = 'baostock';
-    policy.projection.effective.routes[0]!.targets[0]!.upstreamSource = 'baostock';
-    state.dsa.effectiveControlPolicyV3.mockResolvedValue(policy);
-    state.dsa.marketTradingStatusV3.mockClear();
     const input = { ...state.input, runId: `${state.input.runId}-structured` };
+    addArchivedStructuredStatus(state.snapshots, input.runId, input.runConfig, source({
+      contractVersion: 1, consumer: 'thesis-ledger', requestId: 'structured-archived',
+      routeKey: { kind: 'data', market: 'CN', assetType: 'STOCK', capability: 'HISTORICAL_TRADING_STATUS' },
+      routeTarget: { providerId: 'baostock', upstreamSource: 'baostock', routeIndex: 0 },
+      symbol: input.strategy.executionInstrument.symbol,
+      range: { start: input.runConfig.startDate, end: input.runConfig.endDate },
+    }));
     const built = await state.builder.buildV3(input);
     expect(built.manifest.tradingStatus?.freezeVersion).toBe('frozen-trading-status-v4');
     const key = `${input.runId}/${tradingStatusArtifactKeyV3}`;
@@ -106,7 +107,6 @@ describe('结构化来源冻结与现有执行的真实领域接缝', () => {
     expect(frozen.disclosure.response.days[2]!.coarseST).toBe('flagged');
     expect(frozen.disclosure.structuredResearch?.observedAfterPriceCutoff).toBe(true);
     expect(frozen.disclosure.response.days[2]!.dailyPriceLimit).toBeUndefined();
-    state.dsa.marketTradingStatusV3.mockRejectedValue(new Error('禁止离线选源'));
     state.dsa.effectiveControlPolicyV3.mockRejectedValue(new Error('禁止离线查策略'));
     const run = {
       runId: input.runId,
@@ -125,7 +125,7 @@ describe('结构化来源冻结与现有执行的真实领域接缝', () => {
     expect((await state.snapshots.v3.replay(oldRun.runId)).contentHash).toBe(
       state.built.manifest.contentHash,
     );
-    expect(state.dsa.marketTradingStatusV3).toHaveBeenCalledOnce();
+    expect(state.status.post).not.toHaveBeenCalled();
     const invalid = structuredClone(frozen);
     if (invalid.disclosure.status === 'source')
       invalid.disclosure.structuredResearch!.priceDataAsOf = '2024-01-01T00:00:00Z';

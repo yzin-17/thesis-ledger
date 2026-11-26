@@ -78,7 +78,7 @@ describe('派生指标跨运行时合同', () => {
   it('旧原生请求及指纹保持独立', () => {
     const payload = cases[0]!.payload;
     const native = {
-      contractVersion: 3,
+      contractVersion: 1,
       identity: { ...payload.identity, timeframe: '1d' },
       points: payload.points,
       requests: payload.requests,

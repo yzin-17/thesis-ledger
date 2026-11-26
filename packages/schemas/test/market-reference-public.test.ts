@@ -59,7 +59,7 @@ describe('公开来源资料合同', () => {
       ...scope,
       ...source,
       dataVersion: 'market-reference-v1',
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: 'sample',
       adapterRevision: 'market-reference-projection-v1',

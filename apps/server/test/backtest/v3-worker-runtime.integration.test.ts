@@ -106,6 +106,7 @@ function v3WorkerContext() {
         data: {
           accountId: account.id,
           type: 'CASH_DEPOSIT',
+          envelopeVersion: 1,
           occurredAt: new Date('2026-01-01'),
           payload: { amount: '123.45', currency: 'CNY' },
         },
@@ -305,14 +306,14 @@ function registerV3WorkerRuntimeCase(suiteScope: ReturnType<typeof v3WorkerConte
     expect(await suiteScope.witness()).toEqual(before);
     expect(dsaHttp.paths).toEqual(
       expect.arrayContaining([
-        '/api/v3/thesis-ledger/backtest/calendar',
-        '/api/v3/thesis-ledger/backtest/instrument-facts',
-        '/api/v3/thesis-ledger/market/bars',
-        '/api/v3/thesis-ledger/capabilities',
+        '/api/v1/thesis-ledger/backtest/calendar',
+        '/api/v1/thesis-ledger/backtest/instrument-facts',
+        '/api/v1/thesis-ledger/market/bars',
+        '/api/v1/thesis-ledger/capabilities',
       ]),
     );
     expect(
-      dsaHttp.paths.filter((path) => path === '/api/v3/thesis-ledger/capabilities').length,
+      dsaHttp.paths.filter((path) => path === '/api/v1/thesis-ledger/capabilities').length,
     ).toBeGreaterThan(capabilitiesBeforeMulti);
     const response = await fetch(`${http.baseUrl}/api/v1/backtests/runs/${job.id}`);
     expect(response.status).toBe(200);
@@ -330,7 +331,7 @@ function registerV3WorkerRuntimeCase(suiteScope: ReturnType<typeof v3WorkerConte
     });
     dsaHttp.setMissingTradingDates(['2026-05-19']);
     const sparse = await service.createRun({
-      contractVersion: 3,
+      contractVersion: 1,
       strategyVersionId: version.id,
       idempotencyKey: 'worker-runtime-sparse',
       runConfig: fixture.input.runConfig,
@@ -428,7 +429,7 @@ async function prepareV3WorkerJobs(suiteScope: ReturnType<typeof v3WorkerContext
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      contractVersion: 3,
+      contractVersion: 1,
       strategyVersionId: version.id,
       idempotencyKey: 'worker-runtime-fixture',
       runConfig: fixture.input.runConfig,
@@ -450,7 +451,7 @@ async function prepareV3WorkerJobs(suiteScope: ReturnType<typeof v3WorkerContext
   ).toBe('queued');
   expect(await suiteScope.queue.getState(created!.id)).toBe('waiting');
   const damaged = await service.createRun({
-    contractVersion: 3,
+    contractVersion: 1,
     strategyVersionId: version.id,
     idempotencyKey: 'worker-runtime-damaged',
     runConfig: fixture.input.runConfig,
@@ -484,14 +485,14 @@ async function prepareV3WorkerJobs(suiteScope: ReturnType<typeof v3WorkerContext
     quantityBasis: 'normalized-units',
   };
   const capabilitiesBeforeMulti = suiteScope.dsaHttp.paths.filter(
-    (path) => path === '/api/v3/thesis-ledger/capabilities',
+    (path) => path === '/api/v1/thesis-ledger/capabilities',
   ).length;
   suiteScope.dsaHttp.enableMultiWindow();
   const multiCreateResponse = await fetch(`${suiteScope.http.baseUrl}/api/v1/backtests/runs`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      contractVersion: 3,
+      contractVersion: 1,
       strategyVersionId: version.id,
       idempotencyKey: 'worker-runtime-multi-window',
       runConfig: multiConfig,

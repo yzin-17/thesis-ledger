@@ -53,7 +53,7 @@ function setup() {
             id,
             provider: 'selected-provider',
             model: 'selected-model',
-            promptVersion: 'journal-review-v5',
+            promptVersion: 'journal-object-review-prompt-v1',
             status: 'queued',
             errorCode: null,
             errorSummary: null,
@@ -75,7 +75,7 @@ function setup() {
     get: vi.fn().mockResolvedValue(candidate),
   } as never);
   return {
-    service: new JournalReviewAi(analysis, runs as never, v2 as never),
+    service: new JournalReviewAi(analysis, v2 as never),
     candidate,
     evidence,
     request,
@@ -93,14 +93,14 @@ describe('正式复盘 AI 迁移 V2', () => {
       id,
       provider: 'selected-provider',
       model: 'selected-model',
-      promptVersion: 'journal-review-v5',
+      promptVersion: 'journal-object-review-prompt-v1',
       status: 'queued',
     });
     expect(v2.start).toHaveBeenCalledWith(
       principal,
       expect.objectContaining({
         scope: { accountId: request.accountId, mode: request.mode },
-        prompt: expect.objectContaining({ version: 'journal-review-v5' }),
+        prompt: expect.objectContaining({ version: 'journal-object-review-prompt-v1' }),
         data: expect.objectContaining({
           evidenceFingerprint: request.evidenceFingerprint,
           analysisDraft: request.analysisDraft,
@@ -112,53 +112,6 @@ describe('正式复盘 AI 迁移 V2', () => {
     );
     expect(runs.startResearch).not.toHaveBeenCalled();
     expect(candidate).toEqual(before);
-  });
-
-  it('旧 V1 冻结记录仍可读取，不能按新提示覆盖旧版本', async () => {
-    const { service, request, runs, v2 } = setup();
-    v2.read.mockResolvedValueOnce(null as never);
-    runs.resume.mockResolvedValueOnce({
-      id,
-      provider: 'legacy',
-      model: 'legacy-model',
-      promptVersion: 'journal-review-v1',
-      status: 'succeeded',
-      context: { scope: 'account', accountId: request.accountId },
-      result: null,
-      errorCode: null,
-      errorSummary: null,
-      createdAt: new Date('2026-10-04T09:00:00Z'),
-    });
-    runs.frozenEvidence.mockResolvedValueOnce({
-      version: 'frozen-research-v1',
-      prompt: { version: 'journal-review-v1' },
-      source: {
-        tool: 'getJournalReview',
-        permission: 'journal:read',
-        evidence: {
-          data: journalAiFrozenEvidenceSchema.parse({
-            version: 'journal-review-ai-v1',
-            accountId: request.accountId,
-            mode: request.mode,
-            reviewObjectId: request.reference.reviewObjectId,
-            evidenceFingerprint: request.evidenceFingerprint,
-            analysisDraft: request.analysisDraft,
-            facts: {},
-            result: journalAnalyzeCandidate(
-              journalReviewCandidate({
-                evidence: reviewEvidenceFixture(),
-                fxMissing: false,
-                projectionStale: false,
-              }),
-            ),
-          }),
-        },
-      },
-    } as never);
-    expect(
-      await service.get(id, { accountId: request.accountId, mode: request.mode }, principal),
-    ).toMatchObject({ promptVersion: 'journal-review-v1' });
-    expect(runs.startResearch).not.toHaveBeenCalled();
   });
 
   it('跨账户、模式与无效冻结来源不能访问', async () => {
@@ -186,7 +139,7 @@ describe('正式复盘 AI 迁移 V2', () => {
     await service.start(request, principal);
     const input = { ...candidate.input, analysisDraft: { stopLoss: '8', note: '本次说明' } };
     expect(await service.snapshotMetadata(id, input, 'journal-decimal-1', principal)).toMatchObject(
-      { id, promptVersion: 'journal-review-v5' },
+      { id, promptVersion: 'journal-object-review-prompt-v1' },
     );
     for (const wrong of [
       { ...input, analysisDraft: { stopLoss: '9' } },

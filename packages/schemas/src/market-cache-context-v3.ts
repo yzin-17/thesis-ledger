@@ -8,7 +8,7 @@ import {
 export * from './market-bar-cache-context-v3.js';
 
 const identity = {
-  contractVersion: z.literal(3), consumer: z.literal('thesis-ledger'),
+  contractVersion: z.literal(1), consumer: z.literal('thesis-ledger'),
   requestId: z.string().min(1).refine((value) => value.trim() === value),
   symbol: z.string().min(1).max(64).refine((value) => value.trim() === value && value.toUpperCase() === value),
 };

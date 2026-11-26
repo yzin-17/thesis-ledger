@@ -1,10 +1,11 @@
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { aiGenerationContracts } from '@thesis-ledger/schemas';
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
+import { authoringConnectionProbe } from '../../src/ai/authoring-connection-probe.js';
 import { probeMessages } from '../../src/ai/provider-connection-test.js';
 import { authoringFailureCode } from '../../src/strategy-authoring/authoring-attempt.js';
 
@@ -90,23 +91,17 @@ describe('策略编写合同与受控真实 HTTP Provider', () => {
     await once(server, 'close');
   });
   it('各用途在单次请求中保留明确模型、合同与真实用量，不进入研究路由', async () => {
-    const definition: unknown = JSON.parse(
-      readFileSync(
-        new URL(
-          '../../../../packages/schemas/fixtures/strategy-authoring.exchange.json',
-          import.meta.url,
-        ),
-        'utf8',
-      ),
-    );
     const adapter = new AiSdkGenerationAdapter();
     for (const [contract, fixture] of [
       [
         aiGenerationContracts.authoringAnalysis,
         { requirements: [], questions: [], runtimeIntents: [] },
       ],
-      [aiGenerationContracts.authoringGeneration, { definition, coverage: [] }],
-      [aiGenerationContracts.authoringModification, { definition, coverage: [] }],
+      [
+        aiGenerationContracts.authoringGeneration,
+        authoringConnectionProbe('strategy_authoring_generation')!,
+      ],
+      [aiGenerationContracts.authoringModification, authoringConnectionProbe('strategy_authoring_modification')!],
     ] as const) {
       output = fixture;
       const count = bodies.length;
@@ -136,5 +131,29 @@ describe('策略编写合同与受控真实 HTTP Provider', () => {
       });
       expect(result.output).toMatchObject(fixture);
     }
+  });
+  it('实际 HTTP 的原生输入包装只解包一次，正文完整值保持', async () => {
+    const value = { value: '完整原值' };
+    output = { proposal: value };
+    const schema = z
+      .strictObject({ proposal: z.strictObject({ value: z.literal('完整原值') }) })
+      .transform(({ proposal }) => proposal);
+    const result = await new AiSdkGenerationAdapter().generate({
+      requestId: randomUUID(),
+      adapter: 'openai-compatible-chat',
+      providerId: 'controlled-authoring',
+      baseURL,
+      apiKey: 'isolated-not-a-credential',
+      model: 'selected-authoring-model',
+      messages: [{ role: 'user', content: '生成完整建议' }],
+      contract: aiGenerationContracts.authoringGeneration.ref,
+      schema,
+      mode: 'native_schema',
+      transport: 'single',
+      maxOutputTokens: 8192,
+      timeout: { totalMs: 2000 },
+      signal: new AbortController().signal,
+    });
+    expect(result.output).toEqual(value);
   });
 });

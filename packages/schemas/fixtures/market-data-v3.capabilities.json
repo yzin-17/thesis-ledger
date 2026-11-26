@@ -1,4 +1,5 @@
 {
-  "dataContractVersions": [3],
+  "dataContract": "dsa-data-v1",
+  "dailyObservationContract": "market-daily-tradability-window-v1",
   "serviceCapabilities": { "fundNav": true }
 }

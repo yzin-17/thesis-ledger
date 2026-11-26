@@ -197,13 +197,13 @@ describe('StrategyOptimizationReadService backtest grouping', () => {
     });
   });
 
-  it.each([[4, 2], [0, 2], [-1, 2], [4, 0]])('preserves tasks and projects a valid source for version %s / schema %s', async (storedVersion, storedSchemaVersion) => {
+  it.each([[4, 1], [0, 1], [-1, 1], [4, 0]])('preserves tasks and projects a valid source for version %s / schema %s', async (storedVersion, storedSchemaVersion) => {
     const jobId = uuid(6000);
     const strategyVersionId = uuid(6001);
     const backtestJob = {
       id: jobId,
       strategyVersionId,
-      mode: 'V3',
+      mode: 'frozen',
       status: 'queued',
       stage: 'queued',
       progress: 100,
@@ -225,8 +225,8 @@ describe('StrategyOptimizationReadService backtest grouping', () => {
       snapshotId: null,
       diagnostics: null,
       input: {
-        contractVersion: 3,
-        schemaVersion: '3',
+        contractVersion: 1,
+        schemaVersion: 'backtest-trade-run-v1',
         runConfig: runConfigV3(runConfig, 'raw-events'),
       },
       runConfig: runConfigV3(runConfig, 'raw-events'),

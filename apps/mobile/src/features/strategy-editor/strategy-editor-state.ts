@@ -1,14 +1,14 @@
 import { isEqual } from 'es-toolkit';
+import { parseStrategyDefinitionDraft } from '@thesis-ledger/domain';
 import {
   strategySchema,
-  projectPriceResearchStrategy,
-  priceResearchStrategyIssues,
   strategyDefinitionCreateSchema,
   type StrategyDefinitionRead,
-  type BacktestStrategy,
+  projectStrategyEntryPolicyForEditing,
 } from '@thesis-ledger/schemas';
 export const initialStrategyDefinition = (name: string) => ({
-  schemaVersion: '3',
+  schemaVersion: 'strategy-definition-v1',
+  entryTrigger: 'rising-edge',
   name,
   description: '示例规则，保存前请核对信号、执行与成本。',
   signalSources: [
@@ -40,23 +40,28 @@ export const initialStrategyDefinition = (name: string) => ({
   cost: { commissionRate: '0.0003', slippageRate: '0.001' },
 });
 export function definitionRecord(text: string): Record<string, unknown> {
-  const value: unknown = JSON.parse(text);
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw Error('策略定义必须是对象。');
-  return value as Record<string, unknown>;
+  return parseStrategyDefinitionDraft(text);
 }
 export function validatedDefinition(text: string) {
   const value = definitionRecord(text);
+  if (value.entryTrigger === undefined) throw Error('入场政策：请选择并核对入场方式后保存新版本。');
   const parsed = strategySchema.safeParse(value);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     throw Error(`${first?.path.join('.')}：${first?.message ?? '定义无效'}`);
   }
-  if (parsed.data.schemaVersion !== '3') return value;
-  const projected = projectPriceResearchStrategy(parsed.data as BacktestStrategy);
-  const issue = priceResearchStrategyIssues(projected)[0];
-  if (issue) throw Error(`${issue.path.join('.')}：${issue.message}`);
-  return projected;
+  return value;
+}
+
+/** 原待确认保存回执不改；可编辑草稿按原版本政策投影并保留未应用JSON。 */
+export function projectStrategyEditorDraft<T extends { text: string; definition?: Record<string, unknown>; pending: unknown }>(draft: T, baseline?: unknown): T {
+  if (draft.pending) return draft;
+  let parsed: Record<string, unknown>;
+  try { parsed = definitionRecord(draft.text); }
+  catch { return draft; }
+  const definition = projectStrategyEntryPolicyForEditing(draft.definition ?? parsed, baseline ?? parsed);
+  const text = JSON.stringify(projectStrategyEntryPolicyForEditing(parsed, baseline ?? parsed), null, 2);
+  return { ...draft, definition, text };
 }
 export type PendingStrategySave = {
   name: string;

@@ -2,7 +2,6 @@ import { buildGenerationSchemaPrompt, assertGenerationSchemaPrompt } from './ai-
 import { randomUUID } from 'node:crypto';
 import {
   aiGenerationContracts,
-  researchGenerationV2Contract,
   type AiAdapter,
   type AiAuthMode,
   type AiGenerationContractRef,
@@ -73,7 +72,7 @@ const contractForPurpose = (
   reference?: AiGenerationContractRef,
 ) => {
   if (reference !== undefined) {
-    const selected = [...Object.values(aiGenerationContracts), researchGenerationV2Contract].find(
+    const selected = Object.values(aiGenerationContracts).find(
       (contract) => contract.ref.id === reference.id && contract.ref.version === reference.version,
     );
     if (!selected || reference.id !== purpose)

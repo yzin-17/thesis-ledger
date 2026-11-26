@@ -3,7 +3,7 @@ import { PerformanceService } from '../../src/performance/performance.service.js
 import { cashBalanceEvent, cashFlowEvent, fixtureUuid } from '../ledger/ledger-event-fixtures.js';
 
 const fxResponse = (asOf: string, hkdRate = 0.92) => ({
-  version: 3 as const,
+  version: 1 as const,
   baseCurrency: 'CNY' as const,
   asOf,
   fetchedAt: `${asOf}T00:00:00.000Z`,
@@ -235,7 +235,7 @@ describe("版本化目标与默认聚合", () => {
         findFirst: vi.fn(async () => ({
           scope: 'portfolio',
           accountId: null,
-          version: 3,
+          version: 1,
           targets: { stock: 0.7, etf: 0.3 },
         })),
       },
@@ -245,7 +245,7 @@ describe("版本化目标与默认聚合", () => {
       new PerformanceService(prisma as never, {} as never).targets('portfolio'),
     ).resolves.toMatchObject({
       source: 'explicit',
-      version: 3,
+      version: 1,
       targets: { stock: 0.7, etf: 0.3 },
     });
     expect(findAccounts).not.toHaveBeenCalled();
@@ -484,7 +484,7 @@ describe("外汇合并及缺口处理", () => {
     const market = {
       getQuote: vi.fn(async (symbol: string) => ({ price: symbol === '600519.SH' ? 12 : 6 })),
       getFxRates: vi.fn(async () => ({
-        version: 3,
+        version: 1,
         baseCurrency: 'CNY',
         asOf: '2026-08-24',
         fetchedAt: '2026-08-24T00:00:00.000Z',
@@ -544,7 +544,7 @@ describe("外汇合并及缺口处理", () => {
     };
     const market = {
       getFxRates: vi.fn(async () => ({
-        version: 3,
+        version: 1,
         baseCurrency: 'CNY',
         asOf: '2026-08-24',
         fetchedAt: '2026-08-24T00:00:00.000Z',
@@ -633,7 +633,7 @@ describe("外汇合并及缺口处理", () => {
     expect(merged.portfolio).toMatchObject({ currency: 'CNY', cashValue: 192 });
     expect(merged.fx).toMatchObject({
       status: 'ready',
-      evidenceVersion: expect.stringContaining('fx-v3'),
+      evidenceVersion: expect.stringContaining('fx-v1'),
     });
   });
 

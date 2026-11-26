@@ -28,6 +28,7 @@ describe('编写模型输出的完整结构化合同', () => {
         .properties as Record<string, unknown>;
       expect(properties.entry).not.toEqual({});
       expect(properties.execution).not.toEqual({});
+      expect(properties).not.toHaveProperty('benchmark');
     }
   });
   it('拒绝错误的条件或执行表达，保留当前 Canonical 交叉约束', () => {
@@ -56,16 +57,19 @@ describe('编写模型输出的完整结构化合同', () => {
       }).success,
     ).toBe(false);
   });
-  it('新请求使用 v2，历史 v1 引用仍可读且不会伪装成新验证', () => {
-    expect(aiGenerationContracts.authoringGeneration.ref.version).toBe('authoring-generation-v2');
+  it('当前生成和修改分别要求具名合同，并拒绝已退役的引用', () => {
+    expect(aiGenerationContracts.authoringGeneration.ref.version).toBe('strategy-authoring-generation-v1');
     expect(aiGenerationContracts.authoringModification.ref.version).toBe(
-      'authoring-modification-v2',
+      'strategy-authoring-modification-v1',
     );
-    expect(
-      aiGenerationContractRefSchema.parse({
-        id: 'strategy_authoring_generation',
-        version: 'authoring-generation-v1',
-      }).version,
-    ).toBe('authoring-generation-v1');
+    for (const [id, version] of [
+      ['strategy_authoring_generation', 'authoring-generation-v1'],
+      ['strategy_authoring_generation', 'authoring-generation-v4'],
+      ['strategy_discovery', 'strategy-discovery-v4'],
+      ['strategy_discovery', 'strategy-discovery-v5'],
+      ['strategy_authoring_generation', 'authoring-generation-v5'],
+      ['strategy_authoring_modification', 'authoring-modification-v5'],
+    ])
+      expect(aiGenerationContractRefSchema.safeParse({ id, version }).success).toBe(false);
   });
 });

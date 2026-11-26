@@ -38,7 +38,7 @@ const config = z
         });
   });
 const fields = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: z.string().trim().min(1).max(128),
   runConfig: config,
   fundType: z.enum(['domestic', 'qdii']),

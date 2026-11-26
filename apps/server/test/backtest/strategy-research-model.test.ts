@@ -72,7 +72,7 @@ describe('已确认的研究默认规则', () => {
     });
     const service = new BacktestModelResolutionService(
       {
-        strategyVersion: { findUnique: async () => ({ schemaVersion: 2, schema: strategy }) },
+        strategyVersion: { findUnique: async () => ({ schemaVersion: 1, schema: strategy }) },
       } as never,
       { backtestInstrumentFacts } as never,
     );

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isPriceResearchStrategyDefinition, dailyOrderPriceExpressions, expressionChildren, strategyRuleExpressions } from '@thesis-ledger/domain';
 import { strategySchema, type BacktestStrategy } from './backtest-strategy.js';
 import { priceResearchStrategyIssues } from './backtest-price-research-strategy.js';
 
@@ -12,7 +13,7 @@ export const AUTHORING_LIMITS = {
   outputTokens: 8_192,
   astDepth: 8,
   astNodes: 128,
-  deadlineMs: 120_000,
+  deadlineMs: 300_000,
   leaseMs: 60_000,
   maxRedeliveries: 2,
 } as const;
@@ -51,7 +52,7 @@ type AuthoringIssue = (message: string, path?: (string | number)[]) => void;
 function checkAuthoringSources(strategy: BacktestStrategy, fail: AuthoringIssue) {
   const instrument = strategy.executionInstrument;
   const coordinates = strategy.signalSources.map((source) => source.priceCoordinate);
-  if (strategy.schemaVersion === '3') {
+  if (isPriceResearchStrategyDefinition(strategy)) {
     if (strategy.signalSources.length > 2 || new Set(coordinates).size !== coordinates.length)
       fail('同一标的每种价格口径只支持一个信号源', ['signalSources']);
     for (const issue of priceResearchStrategyIssues(strategy)) fail(issue.message, issue.path);
@@ -90,6 +91,7 @@ function checkAuthoringConditions(strategy: BacktestStrategy, fail: AuthoringIss
   const queue = [
     { value: strategy.entry as unknown, depth: 1 },
     { value: strategy.exit as unknown, depth: 1 },
+    ...dailyOrderPriceExpressions(strategy.execution).map(({ expression }) => ({ value: expression, depth: 1 })),
   ];
   let nodes = 0;
   while (queue.length) {
@@ -121,6 +123,25 @@ export const authoringStrategySchema = boundedAuthoringDefinitionSchema.superRef
     checkAuthoringConditions(strategy, fail);
   },
 );
+
+/** V6共用完整合法子节点，不把逻辑来源周期强制成执行主周期。 */
+export const authoringStrategyV6Schema = boundedAuthoringDefinitionSchema.superRefine((value, ctx) => {
+  const strategy = value as BacktestStrategy;
+  if (strategy.benchmark || strategy.signalSources.some((source) => source.asset.symbol !== strategy.executionInstrument.symbol ||
+    source.asset.market !== strategy.executionInstrument.market || source.asset.assetType !== strategy.executionInstrument.assetType))
+    ctx.addIssue({ code: 'custom', path: ['signalSources'], message: '编写来源必须属于本次唯一执行标的' });
+  const queue = strategyRuleExpressions(strategy).map((root) => ({ expression: root.expression, depth: 1 }));
+  let nodes = 0;
+  while (queue.length) {
+    const current = queue.pop()!;
+    if (++nodes > AUTHORING_LIMITS.astNodes || current.depth > AUTHORING_LIMITS.astDepth) {
+      ctx.addIssue({ code: 'custom', message: '策略条件超过复杂度上限' }); break;
+    }
+    if (current.expression.type === 'corporateActionEvent') ctx.addIssue({ code: 'custom', message: '公司行动信号需要独立事实，本期编写不支持' });
+    for (const expression of expressionChildren(current.expression)) queue.push({ expression, depth: current.depth + 1 });
+  }
+  for (const issue of priceResearchStrategyIssues(strategy)) ctx.addIssue({ code: 'custom', path: issue.path, message: issue.message });
+});
 
 export const authoringDefinitionCheck = (definitionText: string) => {
   if (!definitionText.trim()) return { status: 'incomplete' as const, issues: [] as string[] };

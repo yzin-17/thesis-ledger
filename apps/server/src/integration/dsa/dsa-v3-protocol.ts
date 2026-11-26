@@ -51,7 +51,7 @@ const invalidResponse = (message: string, status?: number) =>
   new DsaV3ProtocolError(message, 'invalid-response', status);
 
 const effectivePolicyEnvelopeV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   projection: z
     .strictObject({
@@ -79,7 +79,7 @@ const sameJsonValue = (left: unknown, right: unknown) =>
 export const parseControlHandshakeResponseV3 = (raw: unknown, requestId: string) => {
   const parsed = marketControlHandshakeResponseV3Schema.safeParse(raw);
   if (!parsed.success || parsed.data.requestId !== requestId) {
-    throw invalidResponse('DSA Control V3 握手响应无效');
+    throw invalidResponse('dsa-control-v1 握手响应无效');
   }
   return parsed.data;
 };
@@ -96,7 +96,7 @@ export const parseControlPolicyApplyResponseV3 = (
     !sameJsonValue(parsed.data.desired, validatedRequest) ||
     !effectiveRoutesMatchDesired(parsed.data.effective, validatedRequest)
   ) {
-    throw invalidResponse('DSA Control V3 Policy Apply 响应无效');
+    throw invalidResponse('dsa-control-v1 策略应用响应无效');
   }
   return parsed.data;
 };
@@ -131,19 +131,19 @@ const effectiveRoutesMatchDesired = (
 
 export const parseEffectivePolicyEnvelopeV3 = (raw: unknown): EffectivePolicyEnvelopeV3 => {
   const parsed = effectivePolicyEnvelopeV3Schema.safeParse(raw);
-  if (!parsed.success) throw invalidResponse('DSA Control V3 Effective Policy 响应无效');
+  if (!parsed.success) throw invalidResponse('dsa-control-v1 生效策略响应无效');
   return parsed.data;
 };
 
 export const parseDataCapabilitiesV3 = (raw: unknown): MarketDataContractCapabilitiesV3 => {
   const parsed = marketDataContractCapabilitiesV3Schema.safeParse(raw);
-  if (!parsed.success) throw invalidResponse('DSA Data V3 能力响应无效');
+  if (!parsed.success) throw invalidResponse('dsa-data-v1 能力响应无效');
   return parsed.data;
 };
 
 export const parseMarketRouteCatalogV3 = (raw: unknown): MarketRouteCatalogV3 => {
   const parsed = marketRouteCatalogV3Schema.safeParse(raw);
-  if (!parsed.success) throw invalidResponse('DSA Control V3 精确路由能力目录响应无效');
+  if (!parsed.success) throw invalidResponse('dsa-control-v1 精确路由能力目录响应无效');
 
   if (parsed.data.integrity === 'partial') {
     return { ...parsed.data, entries: [] };
@@ -160,7 +160,7 @@ export const parseBarSeriesResponseV3 = (
     try {
       return parseMultiWindowResponseV3(raw, request, multiWindowProtocol);
     } catch {
-      throw invalidResponse('DSA Data V3 多窗口证据、指纹或协议能力无效');
+      throw invalidResponse('dsa-data-v1 多窗口证据、指纹或协议能力无效');
     }
   }
   const validatedRequest = marketDataBarSeriesRequestV3Schema.parse(request);
@@ -173,14 +173,14 @@ export const parseBarSeriesResponseV3 = (
     associated.data.response.coverage.requestedStart !== validatedRequest.start ||
     associated.data.response.coverage.requestedEnd !== validatedRequest.end
   ) {
-    throw invalidResponse('DSA Data V3 BarSeries 响应与请求不匹配');
+    throw invalidResponse('dsa-data-v1 K 线响应与请求不匹配');
   }
   return associated.data.response;
 };
 
 export const parseChartBarsResponseV3 = (raw: unknown, request: MarketChartBarsRequestV3) => {
   const associated = marketChartBarsRequestResponseV3Schema.safeParse({ request, response: raw });
-  if (!associated.success) throw invalidResponse('DSA 图表 V3 响应与请求不匹配');
+  if (!associated.success) throw invalidResponse('dsa-data-v1 图表响应与请求不匹配');
   return associated.data.response;
 };
 
@@ -193,7 +193,7 @@ const errorDetail = (payload: unknown): unknown =>
 const controlUnsupportedError = (detail: unknown, expectedRequestId?: string, status?: number) => {
   const parsed = marketControlUnsupportedVersionErrorV3Schema.safeParse(detail);
   if (!parsed.success || (expectedRequestId && parsed.data.requestId !== expectedRequestId)) {
-    return invalidResponse('DSA Control V3 版本错误响应无效');
+    return invalidResponse('dsa-control-v1 版本错误响应无效');
   }
   return new DsaV3ProtocolError(parsed.data.message, 'unsupported-capability', status);
 };
@@ -204,6 +204,8 @@ export const mapControlV3HttpError = (
   expectedRequestId?: string,
 ) => {
   const detail = errorDetail(payload);
+  if (isRecord(detail) && 'contractVersion' in detail && detail.contractVersion !== 1)
+    return invalidResponse('dsa-control-v1 错误响应版本无效', status);
   const code = isRecord(detail) ? detail.code : undefined;
   const message = isRecord(detail) && typeof detail.message === 'string' ? detail.message : '';
 
@@ -222,7 +224,7 @@ export const mapControlV3HttpError = (
   }
   if (code === 'unsupported_capability' || status === 404 || status === 405) {
     return new DsaV3ProtocolError(
-      message || 'DSA 不支持 Control Contract V3',
+      message || 'DSA 不支持 dsa-control-v1',
       'unsupported-capability',
       status,
     );
@@ -234,6 +236,13 @@ export const mapControlV3HttpError = (
 };
 
 const marketDataV3ErrorCodes = new Set<string>(Object.values(marketDataErrorCodeV3));
+const dsaDataServiceErrorSchema = z.strictObject({
+  contractVersion: z.literal(1),
+  code: z.string().min(1),
+  message: z.string().min(1),
+  requestId: z.string().min(1),
+  diagnosticId: z.string().min(1),
+});
 
 export const mapDataV3HttpError = (
   status: number,
@@ -241,23 +250,25 @@ export const mapDataV3HttpError = (
   expectedRequestId?: string,
 ) => {
   const detail = errorDetail(payload);
+  const serviceError = dsaDataServiceErrorSchema.safeParse(detail);
+  if (serviceError.success) return mapDataServiceError(status, serviceError.data);
   const errorValue = isRecord(detail) ? detail.error : undefined;
   const code = isRecord(errorValue) ? errorValue.code : undefined;
 
   if (
     marketDataV3ErrorCodes.has(typeof code === 'string' ? code : '') ||
-    (isRecord(detail) && detail.contractVersion === 3)
+    (isRecord(detail) && 'contractVersion' in detail)
   ) {
     const parsed = marketDataErrorEnvelopeV3Schema.safeParse(detail);
     if (!parsed.success || (expectedRequestId && parsed.data.requestId !== expectedRequestId)) {
-      return invalidResponse('DSA Data V3 错误响应无效', status);
+      return invalidResponse('dsa-data-v1 错误响应无效', status);
     }
     const { error } = parsed.data;
     const mapped = mapDataContractError(error, status, expectedRequestId);
     if (mapped) return mapped;
   }
 
-  return mapLegacyDataHttpError(status, detail);
+  return mapDataServiceError(status);
 };
 
 function mapDataContractError(
@@ -305,18 +316,17 @@ function mapDataContractError(
   }
 }
 
-function mapLegacyDataHttpError(status: number, detail: unknown) {
-  const message = isRecord(detail) && typeof detail.message === 'string' ? detail.message : '';
-  const legacyCode = isRecord(detail) ? detail.code : undefined;
-  if (legacyCode === 'unauthorized' || status === 401 || status === 403) {
+function mapDataServiceError(status: number, detail?: z.infer<typeof dsaDataServiceErrorSchema>) {
+  const { code, message } = detail ?? {};
+  if (code === 'unauthorized' || status === 401 || status === 403) {
     return new DsaV3ProtocolError(message || 'DSA Data Token 无效', 'unauthorized', status);
   }
-  if (legacyCode === 'unsupported_capability' || status === 404 || status === 405) {
+  if (code === 'unsupported_capability' || status === 404 || status === 405) {
     return new DsaV3ProtocolError(
-      message || 'DSA 不支持 Data Contract V3',
+      message || 'DSA 不支持 dsa-data-v1',
       'unsupported-capability',
       status,
     );
   }
-  return new DsaV3ProtocolError(message || 'DSA Data V3 暂时不可用', 'unavailable', status);
+  return new DsaV3ProtocolError(message || 'dsa-data-v1 暂时不可用', 'unavailable', status);
 }

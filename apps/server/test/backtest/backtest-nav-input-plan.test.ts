@@ -26,10 +26,11 @@ const compare = (left: unknown) => ({
 });
 const strategy = (overrides: Record<string, unknown> = {}): BacktestStrategy =>
   strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: '净值依赖范围测试',
     signalSources: [
       {
+        priceCoordinate: 'native-nav',
         id: 'nav',
         asset: { symbol, market: 'CN', assetType: 'fund' },
         timeframe: '1d',
@@ -59,7 +60,7 @@ const config = () => {
   ) as BacktestExecutionModelV3;
   model.scope.symbol = symbol;
   return backtestNavRunConfigV3Schema.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-nav-config-v1',
     startDate: '2026-09-08',
     endDate: '2026-09-15',
     dataAsOf: '2026-09-30T00:00:00.000001Z',
@@ -204,6 +205,7 @@ describe('NAV 独立依赖范围', () => {
         ...i.strategy.signalSources,
         {
           id: 'unused',
+          priceCoordinate: 'native-nav',
           asset: { symbol: '161725.OF', market: 'CN', assetType: 'fund' },
           timeframe: '1d',
           series: ['nav'],

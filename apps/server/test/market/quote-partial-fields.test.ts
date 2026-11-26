@@ -3,7 +3,7 @@ import { MarketQuoteReader } from '../../src/market/market-quote-reader.js';
 import { quoteControlFixture } from './quote-control-fixture.js';
 
 const quote = {
-  version: 3,
+  version: 1,
   symbol: '510300.SH',
   open: 4.1,
   high: 4.3,

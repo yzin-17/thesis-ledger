@@ -18,7 +18,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const reference = { symbol: '00147.HK', sharesPerLot: '1000', historicalChanges: 'unverified' as const,
   source: { provider: 'futu', sourceUrl: 'https://openapi.futunn.com/futu-api-doc/quote/get-static-info.html',
     sha256: 'b'.repeat(64), observedAt: '2026-10-08T10:00:00Z' } };
-const response = { ...reference, contractVersion: 3 as const, consumer: 'thesis-ledger' as const, requestId: 'lookup',
+const response = { ...reference, contractVersion: 1 as const, consumer: 'thesis-ledger' as const, requestId: 'lookup',
   fetchedAt: '2026-10-08T10:01:00Z', policyRevision: 2,
   routeTarget: { providerId: 'futu' as const, upstreamSource: 'futu' as const, routeIndex: 0 } };
 function model() {

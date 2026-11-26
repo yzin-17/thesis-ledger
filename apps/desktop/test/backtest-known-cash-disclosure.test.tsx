@@ -114,7 +114,7 @@ describe('已知方案的显式选择/页面与诊断', () => {
     expect(exported.records[0]!.grossCashAmount).toBe('8.8');
     const diagnostics = buildBacktestDiagnosticExport(
       { id: 'job', strategyVersionId: 'strategy', status: 'succeeded' },
-      { schemaVersion: '3', knownCashDividendDisclosure: disclosure },
+      { schemaVersion: 'backtest-trade-result-v1', knownCashDividendDisclosure: disclosure },
     );
     expect(diagnostics.outcome.knownCashDividends).toEqual(exported);
     expect(

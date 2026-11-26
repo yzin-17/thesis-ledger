@@ -1,13 +1,18 @@
 import { BadRequestException } from '@nestjs/common';
 import { isEqual } from 'es-toolkit';
+import { materializeEntryPolicy } from '@thesis-ledger/domain';
 import {
-  authoringStrategySchema,
+  authoringStrategyV6Schema,
   type AuthoringContent,
   type AuthoringModificationTarget,
+  type BacktestStrategy,
+  type AiGenerationContractRef,
 } from '@thesis-ledger/schemas';
-import { requireAuthoringGeneration, validateAuthoringGeneration } from './authoring-semantics.js';
+import { requireAuthoringGeneration, parseAuthoringGeneration, validateAuthoringOutput } from './authoring-semantics.js';
 
-type Selection = { intent: string; modificationTarget?: AuthoringModificationTarget | undefined };
+import { orderValidityScope, validateOrderValidityChange } from './authoring-order-validity.js';
+
+type Selection = { intent: string; modificationTarget?: AuthoringModificationTarget | undefined; generationContract?: AiGenerationContractRef | undefined };
 const reject = (code: string, message: string): never => {
   throw new BadRequestException({ code, message });
 };
@@ -16,8 +21,10 @@ export function requireAuthoringModification(content: AuthoringContent, selectio
   requireAuthoringGeneration(content);
   if (!selection.intent.trim() || !selection.modificationTarget)
     return reject('AUTHORING_MODIFICATION_SCOPE_REQUIRED', '请明确修改内容与唯一规则范围');
-  const before = authoringStrategySchema.parse(content.definitionText);
+  const previous = authoringStrategyV6Schema.parse(content.definitionText) as BacktestStrategy;
+  const before = selection.modificationTarget === 'entryOrderValidity' ? previous : materializeEntryPolicy(previous);
   const target = selection.modificationTarget;
+  if (target === 'entryOrderValidity') return orderValidityScope(content, before);
   if (target !== 'risk')
     return { before, target, allowedPaths: [target], riskIndex: null, percent: null };
   const matches = [...selection.intent.matchAll(/(\d+(?:\.\d+)?)\s*[%％]/gu)];
@@ -39,8 +46,9 @@ export function validateAuthoringModification(
   raw: unknown,
 ) {
   const scope = requireAuthoringModification(content, selection);
-  const rawOutput = raw as { definition?: unknown };
-  const after = authoringStrategySchema.parse(JSON.stringify(rawOutput?.definition));
+  if (scope.target === 'entryOrderValidity') return validateOrderValidityChange(content, scope, raw);
+  const parsed = parseAuthoringGeneration(raw);
+  const after = parsed.definition;
   const masked = structuredClone(after);
   if (scope.riskIndex !== null) {
     const rule = after.risk[scope.riskIndex];
@@ -51,8 +59,13 @@ export function validateAuthoringModification(
     )
       return reject('AUTHORING_MODIFICATION_SCOPE_INVALID', '建议必须只调整所确认的固定止损比例');
     masked.risk[scope.riskIndex] = scope.before.risk[scope.riskIndex]!;
-  } else Object.assign(masked, { [scope.target]: scope.before[scope.target] });
-  if (!isEqual(masked, scope.before))
+  } else if (scope.before[scope.target] === undefined) delete masked[scope.target];
+  else Object.assign(masked, { [scope.target]: scope.before[scope.target] });
+  const comparison = (strategy: BacktestStrategy) => ({
+    ...strategy,
+    signalSources: strategy.signalSources.map(({ series: _series, ...source }) => source),
+  });
+  if (!isEqual(comparison(masked), comparison(scope.before)))
     return reject('AUTHORING_MODIFICATION_SCOPE_INVALID', '建议改变了授权范围以外的规则');
   if (isEqual(after, scope.before))
     return reject('AUTHORING_MODIFICATION_EMPTY', '建议没有实际变化');
@@ -60,9 +73,10 @@ export function validateAuthoringModification(
   if (scope.target === 'risk') confirmation.risk = after.risk;
   else if (scope.target === 'sizing') confirmation.sizing = after.sizing;
   else if (scope.target === 'cost') confirmation.cost = after.cost;
+  else if (scope.target === 'execution') confirmation.execution = after.execution;
   else if (scope.target === 'entry') confirmation.entrySummary = selection.intent;
-  else confirmation.exitSummary = selection.intent;
-  const output = validateAuthoringGeneration({ ...content, confirmation }, raw);
+  else if (scope.target === 'exit') confirmation.exitSummary = selection.intent;
+  const output = validateAuthoringOutput({ ...content, confirmation }, parsed);
   const beforeValue =
     scope.riskIndex === null ? scope.before[scope.target] : scope.before.risk[scope.riskIndex];
   const afterValue = scope.riskIndex === null ? after[scope.target] : after.risk[scope.riskIndex];
@@ -73,8 +87,8 @@ export function validateAuthoringModification(
     differences: [
       {
         path: scope.allowedPaths[0]!,
-        before: JSON.stringify(beforeValue),
-        after: JSON.stringify(afterValue),
+        before: JSON.stringify(beforeValue ?? null),
+        after: JSON.stringify(afterValue ?? null),
       },
     ],
   };

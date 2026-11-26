@@ -19,7 +19,7 @@ const session: MarketSession = {
   ],
 };
 const info = securityStaticInfoResponseSchema.parse({
-  contractVersion: 3, consumer: 'thesis-ledger', requestId: 'controlled', symbol: 'SPY.US', assetType: 'ETF',
+  contractVersion: 1, consumer: 'thesis-ledger', requestId: 'controlled', symbol: 'SPY.US', assetType: 'ETF',
   market: 'US', name: 'SPY', securityId: '9007199254740993', sharesPerLot: '1', listingDate: null,
   delisted: false, exchange: null, provider: 'futu', historicalChanges: 'unverified',
   observedAt: '2026-10-09T01:00:00Z', fetchedAt: '2026-10-09T01:01:00Z', policyRevision: 1,
@@ -27,7 +27,7 @@ const info = securityStaticInfoResponseSchema.parse({
 });
 for (const period of ['1d', '1m']) client.setQueryData(['desktop', 'security-static-price', info.symbol, info.assetType, 'plan', period], { options: [] });
 client.setQueryData(['desktop', 'security-static-price', info.symbol, info.assetType, 'quote'], {
-  version: 3, symbol: info.symbol, price: 600, units: { priceCurrency: 'USD' }, provider: 'futu',
+  version: 1, symbol: info.symbol, price: 600, units: { priceCurrency: 'USD' }, provider: 'futu',
   marketTime: '2026-11-06T21:00:00Z', fetchedAt: '2026-11-08T04:00:00Z', stale: false, freshness: 'delayed',
   sessionContext: { session: 'closed_snapshot', evaluatedAt: session.evaluatedAt, latestTradingDate: '2026-11-06' },
 });

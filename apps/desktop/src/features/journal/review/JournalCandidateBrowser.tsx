@@ -26,7 +26,7 @@ export function JournalCandidateBrowser(props: JournalCandidateBrowserProps) {
     queryKey,
     query,
     rows,
-    legacy,
+    unlinked,
     instrumentLabel,
   } = useJournalCandidates(props);
   return (
@@ -127,13 +127,12 @@ export function JournalCandidateBrowser(props: JournalCandidateBrowserProps) {
           读取下一页
         </Button>
       )}
-      {legacy.length > 0 && (
+      {unlinked.length > 0 && (
         <details>
-          <summary className="cursor-pointer">旧 Journal 记录待确认（{legacy.length}）</summary>
-          {legacy.map((row) => (
+          <summary className="cursor-pointer">待核对记录（{unlinked.length}）</summary>
+          {unlinked.map((row) => (
             <p className="mt-2 text-sm" key={row.journalEntry.id}>
               {row.journalEntry.symbol ? instrumentLabel(row.journalEntry.symbol) : '未知标的'} ·
-              旧记录待确认 ·{' '}
               {row.reason === 'SELL_MAPPING_AMBIGUOUS' ? '减仓映射存在歧义' : '未找到对应减仓'}
             </p>
           ))}
@@ -189,7 +188,7 @@ function useJournalCandidates({
     retry: false,
   });
   const rows = query.data?.pages.flatMap((page) => page.items) ?? [];
-  const legacy = query.data?.pages[0]?.legacyItems ?? [];
+  const unlinked = query.data?.pages[0]?.unlinkedItems ?? [];
   const instrumentNames = new Map(
     query.data?.pages.flatMap((page) =>
       (page.instrumentDirectory?.items ?? []).map(
@@ -210,7 +209,7 @@ function useJournalCandidates({
     queryKey,
     query,
     rows,
-    legacy,
+    unlinked,
     instrumentLabel,
   };
 }

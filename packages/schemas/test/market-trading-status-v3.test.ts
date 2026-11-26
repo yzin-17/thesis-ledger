@@ -32,7 +32,7 @@ describe('日级停复牌来源合同', () => {
     expect(response.provenance.historicalAvailability).toBe('notVerified');
     expect(
       desiredProviderPolicyV3Schema.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'states-policy',
         revision: 1,

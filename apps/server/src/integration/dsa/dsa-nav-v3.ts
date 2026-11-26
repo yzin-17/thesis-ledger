@@ -113,7 +113,7 @@ export function mapNavHttpError(status: number, payload: unknown, requestId: str
     return new DsaV3ProtocolError('DSA 不支持精确净值接口', 'unsupported-capability', status);
   const parsed = z
     .strictObject({
-      contractVersion: z.literal(3),
+      contractVersion: z.literal(1),
       requestId: z.literal(requestId),
       error: z.strictObject({
         code: z.enum(Object.keys(codes) as [string, ...string[]]),

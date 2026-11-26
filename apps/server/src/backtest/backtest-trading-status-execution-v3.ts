@@ -7,7 +7,7 @@ import {
 } from '@thesis-ledger/schemas';
 import type { ArtifactRow } from './backtest-artifact-store.js';
 import { readSnapshotTradingStatusV3 } from './backtest-trading-status-snapshot-v3.js';
-import { intradayStatusInterpretationV3 } from './backtest-intraday-status-v3.js';
+import { interpretDailyStatusHaltsV1, intradayStatusInterpretationV3 } from './backtest-intraday-status-v3.js';
 import {
   basicLifecycleForbidsTradeV3,
   basicLifecycleWarningsV3,
@@ -24,6 +24,12 @@ export const prepareTradingStatusExecutionV3 = (
 ) => {
   const composition = readSnapshotStatusCompositionV1(manifest, runConfig, rows.get(`${manifest.runId}/${statusCompositionArtifactKeyV1}`) ?? []);
   const compositionWarnings = statusCompositionWarningsV1(composition);
+  const dailyStatus = composition?.composition.entries.find((item) =>
+    item.status === 'included' && item.query.routeKey.capability === 'DAILY_TRADING_STATUS');
+  const dailyHalts = dailyStatus?.status === 'included'
+    ? interpretDailyStatusHaltsV1(runConfig, dailyStatus.result, rows)
+    : undefined;
+  if (dailyHalts) compositionWarnings.push(dailyHalts.reason);
   let status = readSnapshotTradingStatusV3(
     {
       runId: manifest.runId,
@@ -57,7 +63,7 @@ export const prepareTradingStatusExecutionV3 = (
           )
           .map((day) => day.date)
       : [...(composition?.adoption.suspendedDates ?? [])];
-  suspendedDates.push(...(interpretation?.excludedDates ?? []));
+  suspendedDates.push(...(interpretation?.excludedDates ?? dailyHalts?.excludedDates ?? []));
   const benchmarkSkippedDates = [...new Set([...suspendedDates, ...lifecycleBenchmarkSkippedDatesV3(runConfig)])];
   if (!suspendedDates.length && !benchmarkSkippedDates.length)
     return { status, compositionWarnings, suspendedDates, benchmarkSkippedDates, executionRows: rows, benchmarkRows: rows };

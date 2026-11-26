@@ -181,7 +181,7 @@ describe("价格研究缩放与单源不变量", () => {
       {
         strategyVersion: {
           findUnique: vi.fn(async () => ({
-            schemaVersion: 3,
+            schemaVersion: 1,
             schema: f.input.strategy,
           })),
         },
@@ -192,7 +192,9 @@ describe("价格研究缩放与单源不变量", () => {
     );
     const prepared = await service.prepare(f.request);
     if (prepared.status !== 'prepared') throw new Error(JSON.stringify(prepared));
-    expect(prepared.runConfig.priceResearch).toEqual({ protocolVersion: 'price-research-v1' });
+    expect(prepared.runConfig.priceResearch).toMatchObject({ protocolVersion: 'price-research-v1',
+      dailyObservationContract: 'market-daily-tradability-window-v1', dataScope: { priceCoordinates: ['research'] } });
+    expect(prepared.runConfig.priceResearch).not.toHaveProperty('actualPriceWindow');
     expect(f.reader.readV3).toHaveBeenCalledOnce();
     expect(announcements.prepare).not.toHaveBeenCalled();
   });

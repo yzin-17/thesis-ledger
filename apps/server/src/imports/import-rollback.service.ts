@@ -90,7 +90,7 @@ export class ImportRollbackService {
       for (const stored of submitted) {
         const event = toLedgerEventV2(stored);
         await this.repository.appendRevision(context, {
-          version: 3,
+          version: 1,
           eventId: randomUUID(),
           factId: event.factId,
           accountId: event.accountId,

@@ -83,7 +83,7 @@ afterEach(() => {
 
 describe('基金净值图的日级日期', () => {
   it('买卖点挂到净值序列，点击打开精确成交详情，关闭不重置窗口且作用域切换清理详情', async () => {
-    const history = fundNavHistorySchema.parse([{ version: 3, symbol: '000001.OF', navDate: '2026-11-02T00:00:00Z', unitNav: 1.2, provider: 'fixture', fetchedAt: '2026-11-03T00:00:00Z', freshness: 'delayed' }]);
+    const history = fundNavHistorySchema.parse([{ version: 1, symbol: '000001.OF', navDate: '2026-11-02T00:00:00Z', unitNav: 1.2, provider: 'fixture', fetchedAt: '2026-11-03T00:00:00Z', freshness: 'delayed' }]);
     const id = 'fund-trade:2026-11-02:buy';
     const trades: FundNavTrades = {
       enabled: true, scope: 'account-a', loading: false, error: false, unavailable: false, notice: '', retry: vi.fn(),
@@ -121,7 +121,7 @@ describe('基金净值图的日级日期', () => {
   });
   it('多个有效盈亏时点绘制独立曲线，净值和盈亏分别使用右轴与左轴', () => {
     const history = fundNavHistorySchema.parse([1, 1.2].map((unitNav, index) => ({
-      version: 3, symbol: '000001.OF', navDate: `2026-11-0${index + 1}T00:00:00Z`, unitNav,
+      version: 1, symbol: '000001.OF', navDate: `2026-11-0${index + 1}T00:00:00Z`, unitNav,
       provider: 'fixture', fetchedAt: '2026-11-04T00:00:00Z', freshness: 'delayed',
     })));
     const points = [10, 30].map((value, index) => ({
@@ -135,7 +135,7 @@ describe('基金净值图的日级日期', () => {
     expect(container.textContent).not.toContain('单点');
   });
   it('同图使用左右独立刻度，并将最新盈亏日期纳入共享时间轴，悬停不借用其他日期值', () => {
-    const history = fundNavHistorySchema.parse([{ version: 3, symbol: '000001.OF', navDate: '2026-11-03T00:00:00Z', unitNav: 0.895, provider: 'fixture', fetchedAt: '2026-11-04T00:00:00Z', freshness: 'delayed' }]);
+    const history = fundNavHistorySchema.parse([{ version: 1, symbol: '000001.OF', navDate: '2026-11-03T00:00:00Z', unitNav: 0.895, provider: 'fixture', fetchedAt: '2026-11-04T00:00:00Z', freshness: 'delayed' }]);
     const points = [{ at: '2026-11-04T01:00:00Z', value: -19.45, unrealizedPnl: -29.45, realizedPnl: 10, reason: null, current: true }];
     act(() => root.render(<FundNavHistoryChart history={history} pnl={{ points, currency: 'CNY' }} />));
     expect(container.querySelectorAll('[data-market-nav-chart]')).toHaveLength(1);
@@ -156,7 +156,7 @@ describe('基金净值图的日级日期', () => {
   });
   it.each(['T00:00:00.000Z', 'T00:00:00+08:00'])('接受日期后缀 %s，并保持悬停和锁定的净值匹配', (suffix) => {
     const history = fundNavHistorySchema.parse(['2026-07-01', '2026-07-02'].map((date, index) => ({
-      version: 3,
+      version: 1,
       symbol: '000001.OF',
       navDate: date + suffix,
       unitNav: index === 0 ? 1.1111 : 1.2222,
@@ -182,7 +182,7 @@ describe('基金净值图的日级日期', () => {
 
 describe('基金成本与净值测量', () => {
   const history = fundNavHistorySchema.parse([1, 1.1, 1.2].map((unitNav, index) => ({
-    version: 3, symbol: '000001.OF', navDate: `2026-11-0${2 + index * 2}T00:00:00Z`, unitNav,
+    version: 1, symbol: '000001.OF', navDate: `2026-11-0${2 + index * 2}T00:00:00Z`, unitNav,
     provider: 'fixture', fetchedAt: '2026-11-08T00:00:00Z', freshness: 'delayed',
   })));
   const position = { symbol: '000001.OF', accountId: 'account-a', mode: 'actual' as const,

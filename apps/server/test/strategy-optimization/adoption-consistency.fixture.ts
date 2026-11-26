@@ -12,9 +12,9 @@ import { StrategyRiskApplicationStoreService } from '../../src/strategy-optimiza
 export async function adoptionFixture(prisma: PrismaService) {
   const schema = createDiscoverySeed({ executionInstrument: { symbol: '00700.HK', market: 'HK', assetType: 'stock' }, primaryTimeframe: '1d' }, true);
   schema.risk.push({ type: 'fixedStop', percent: '0.03' });
-  const strategy = await prisma.strategy.create({ data: { name: '隔离采纳一致性', status: 'draft', schemaVersion: 3 } });
-  const baseline = await prisma.strategyVersion.create({ data: { strategyId: strategy.id, version: 1, schemaVersion: 3, schema: schema as Prisma.InputJsonValue } });
-  const candidateVersion = await prisma.strategyVersion.create({ data: { strategyId: strategy.id, version: -1, schemaVersion: 3, schema: schema as Prisma.InputJsonValue } });
+  const strategy = await prisma.strategy.create({ data: { name: '隔离采纳一致性', status: 'draft', schemaVersion: 1 } });
+  const baseline = await prisma.strategyVersion.create({ data: { strategyId: strategy.id, version: 1, schemaVersion: 1, schema: schema as Prisma.InputJsonValue } });
+  const candidateVersion = await prisma.strategyVersion.create({ data: { strategyId: strategy.id, version: -1, schemaVersion: 1, schema: schema as Prisma.InputJsonValue } });
   const id = randomUUID(), candidateId = randomUUID(), hash = optimizationSha256(schema);
   await prisma.$executeRaw(Prisma.sql`
     INSERT INTO "OptimizationExperiment" ("id", "sourceMode", "baselineStrategyVersionId", "status", "stage", "objective", "allowedParameterIds", "split", "runConfig", "dataFingerprint", "modelConfig", "budget", "maxRounds", "exposure", "idempotencyKey")

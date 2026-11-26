@@ -29,7 +29,11 @@ vi.mock('../src/features/strategy-authoring/AuthoringWorkPage', () => ({ Authori
 const account = { id: 'account', name: '验收账户', type: 'securities' as const, mode: 'shadow' as const, currency: 'CNY' as const };
 const position = { id: 'position', accountId: account.id, symbol: '510300.SH', quantity: 200, costPrice: 4, marketValue: 800, pnl: 0, asset: { name: '验收 ETF', assetType: 'etf' as const } };
 const schema = setStrategyExecutionSymbol(createDefaultStrategySchema('验收策略'), '510300.SH');
-const strategy = { id: 'strategy', name: '验收策略', versions: [{ id: 'version', version: 1, schema }] };
+schema.signalSources = schema.signalSources.map((source: Record<string, unknown>) => ({
+  ...source,
+  asset: schema.executionInstrument,
+}));
+const strategy = { id: 'strategy', name: '验收策略', versions: [{ id: 'version', version: 1, schemaVersion: 1, schema }] };
 const cleanups: Array<() => void> = [];
 const NativeRequest = globalThis.Request;
 beforeEach(() => {

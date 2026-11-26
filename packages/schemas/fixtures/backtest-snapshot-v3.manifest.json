@@ -1,5 +1,5 @@
 {
-  "manifestVersion": "snapshot-manifest-v3",
+  "manifestVersion": "backtest-trade-snapshot-manifest-v1",
   "runId": "run-v3-159516",
   "strategyVersionId": "strategy-version-1",
   "strategyVersionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

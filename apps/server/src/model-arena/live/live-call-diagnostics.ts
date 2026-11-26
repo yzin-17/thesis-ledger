@@ -9,6 +9,7 @@ export function liveCallFailureDiagnostics(error: unknown, schema: z.ZodType, ap
   const text = snapshot.sdkOutputText;
   const redacted = redactAiTrace(text, new Set([apiKey]));
   return {
+    finishReason: snapshot.finishReason,
     outputText: typeof redacted === 'string' ? redacted.slice(0, maximumOutputCharacters) : null,
     outputCharacters: snapshot.sdkOutputCharacters ?? null,
     outputSha256: snapshot.sdkOutputSha256 ?? null,

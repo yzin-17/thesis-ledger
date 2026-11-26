@@ -19,7 +19,7 @@ const key = {
   adjustment: 'qfq',
 } as const;
 const catalog: MarketRouteCatalogReadV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   status: 'complete',
   catalogRevision: 9,
@@ -47,7 +47,7 @@ function Fixture() {
   const [policy, setPolicy] = useState<MarketPolicyDraftV3>(() =>
     withDefaultHithinkRoutes(
       {
-        contractVersion: 3,
+        contractVersion: 1,
         revision: 4,
         enabled: false,
         routes: [],

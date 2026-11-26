@@ -3,6 +3,7 @@ import { marketCalculationAnchor } from '@thesis-ledger/schemas';
 import { BadRequestException, Controller, Get, Optional, Param, Query } from '@nestjs/common';
 import {
   quoteAssetTypeSchema,
+  marketDetailContractVersion,
   marketDetailResponseSchema,
   type BarSeries,
   type MarketDetailCapability,
@@ -150,8 +151,8 @@ export class MarketController {
     @Query('timeframe') timeframe?: string,
     @Query('calculationAnchor') calculationAnchor?: string,
   ) {
-    if (chartContractVersion !== undefined && chartContractVersion !== '3') {
-      throw new BadRequestException('chartContractVersion 仅支持 3');
+    if (chartContractVersion !== undefined && chartContractVersion !== String(marketDetailContractVersion)) {
+      throw new BadRequestException('行情详情使用 market-detail-v1，chartContractVersion 必须为 1');
     }
     if (!this.detailService) throw new Error('MarketDetailService 未注入');
     const identity = await this.detailService.resolveIdentity(symbol);
@@ -189,7 +190,7 @@ export class MarketController {
       barSeries = await this.readDetailBars({ identity, nativeTimeframe, adjustment, start, chartEnd, parsedBarsLimit, acceptance, refresh, indicatorParams, anchor, requested, barCapabilities, sections, dependencies, requestId });
     }
     return marketDetailResponseSchema.parse({
-      contractVersion: 3, symbol: identity.symbol, assetType: identity.assetType,
+      contractVersion: 1, symbol: identity.symbol, assetType: identity.assetType,
       identity: { source: identity.source, status: identity.status }, requested,
       capabilities: { supported: [...supported], unsupported: MARKET_DETAIL_CAPABILITIES.filter((capability) => !supported.includes(capability)) },
       limits: { bars: parsedBarsLimit, nav: parsedNavLimit, barsHasMoreBefore: barSeries?.coverage.hasMoreBefore ?? false },

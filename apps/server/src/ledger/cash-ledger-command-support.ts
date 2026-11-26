@@ -79,7 +79,7 @@ type LedgerEventBaseInput = {
 };
 
 export const createCashLedgerEventBase = (input: LedgerEventBaseInput) => ({
-  version: 3 as const,
+  version: 1 as const,
   accountId: input.accountId,
   ledgerRevision: input.ledgerRevision.toString(),
   occurredAt: input.occurredAt,

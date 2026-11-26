@@ -52,7 +52,7 @@ const install = async (value: unknown) => {
 };
 const setup = async () => {
   const entry = sample();
-  const bundle = { contractVersion: 3, entries: [entry] };
+  const bundle = { contractVersion: 1, entries: [entry] };
   await install(bundle);
   const { sourceFacts, ...identity } = entry.observation;
   void sourceFacts;
@@ -115,7 +115,7 @@ describe('图表审核证明包只读查找', () => {
     const { repo, lookup } = await setup();
     config.marketChartCompatibilitySha256 = '';
     expect(await repo.findExact(lookup)).toBeNull();
-    await install({ contractVersion: 3, entries: ['invalid'] });
+    await install({ contractVersion: 1, entries: ['invalid'] });
     expect(await repo.findExact(lookup)).toBeNull();
     await install('x'.repeat(1_048_577));
     expect(await repo.findExact(lookup)).toBeNull();

@@ -46,7 +46,11 @@ function ComparisonReadState({ query }: { query: ReturnType<typeof useResearchCo
     />
   );
 }
-function ComparisonBody({ report, choices }: Props) {
+function ComparisonBody({
+  report,
+  choices,
+  locator,
+}: Props & { locator: ReturnType<typeof reportEvidenceLocator> }) {
   const fieldId = useId();
   const [open, setOpen] = useState(false);
   const [selection, setSelection] = useState<string | null>(null);
@@ -55,10 +59,6 @@ function ComparisonBody({ report, choices }: Props) {
   useEffect(() => {
     if (selection && beforeId === null) setSelection(null);
   }, [selection, beforeId]);
-  const locator =
-    report.historicalScope.status === 'known'
-      ? reportEvidenceLocator(report.historicalScope.snapshot)
-      : { view: 'legacy' as const };
   const query = useResearchComparisonQuery(report.id, locator, beforeId, open);
   const items = [
     { value: AUTO, label: '默认前序' },
@@ -117,10 +117,8 @@ function ComparisonBody({ report, choices }: Props) {
 }
 export function ResearchComparison(props: Props) {
   const owner = useResearchIdentity();
-  const locator =
-    props.report.historicalScope.status === 'known'
-      ? reportEvidenceLocator(props.report.historicalScope.snapshot)
-      : { view: 'legacy' };
+  if (props.report.historicalScope.status !== 'known') return null;
+  const locator = reportEvidenceLocator(props.report.historicalScope.snapshot);
   const key = JSON.stringify([owner, props.contextKey, props.report.id, locator]);
-  return <ComparisonBody key={key} {...props} />;
+  return <ComparisonBody key={key} {...props} locator={locator} />;
 }

@@ -22,8 +22,8 @@ export type DependencyDsa = Pick<DsaClient, 'backtestCalendar' | 'backtestInstru
       | 'effectiveControlPolicyV3'
       | 'marketRouteCatalogV3'
       | 'marketEventsV3'
+      | 'get'
       | 'marketPublicFeesV3'
-      | 'marketTradingStatusV3'
       | 'dataCapabilities'
     >
   >;
@@ -42,7 +42,7 @@ export async function readSnapshotDependencyV3(
       effectiveControlPolicyV3: () => dsa.effectiveControlPolicyV3!(),
       marketRouteCatalogV3: () => dsa.marketRouteCatalogV3!(),
       marketEventsV3: (scope) => dsa.marketEventsV3!(scope),
-    });
+    }, dsa.get ? { get: dsa.get.bind(dsa) } : undefined);
     return { request, ...result };
   }
   const response =

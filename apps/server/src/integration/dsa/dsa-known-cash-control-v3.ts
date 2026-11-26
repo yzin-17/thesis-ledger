@@ -29,7 +29,7 @@ export function mapKnownCashControlV3HttpError(
   const mapped = mapEventV3HttpError(
     status,
     {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId,
       error: { code: error.code, message: '控制复核失败' },
     },

@@ -1,14 +1,24 @@
 import {
   backtestLifecyclePreparationV3Schema,
   lifecycleWarmupPolicyV3,
+  type BacktestLifecycleEvidence,
   type BacktestLifecyclePreparationV3,
-  type MarketTradingStatusResponseV3,
   type RunConfigV3,
 } from '@thesis-ledger/schemas';
 import { hashCanonicalManifest } from './backtest-snapshot.js';
 
 /** 只对影响准备的来源输入寻址；请求追踪号与每次读取的包装时钟不改变事实身份。 */
-export function lifecycleInputHashV3(response: MarketTradingStatusResponseV3) {
+export function lifecycleInputHashV3(response: BacktestLifecycleEvidence) {
+  if ('composition' in response) {
+    const { composition, ...facts } = response;
+    const sources = composition.entries.flatMap((entry) => {
+      if (entry.status !== 'included') return [];
+      const { routeKey, routeTarget, provenance, evidence } = entry.result;
+      return [{ routeKey, routeTarget, provenance,
+        evidence: evidence.map(({ observedAt: _sampleTime, ...identity }) => identity) }];
+    });
+    return hashCanonicalManifest({ ...facts, sources });
+  }
   const provenance = { ...response.provenance, fetchedAt: undefined };
   return hashCanonicalManifest({
     symbol: response.symbol,
@@ -23,7 +33,7 @@ export function lifecycleInputHashV3(response: MarketTradingStatusResponseV3) {
     provenance,
   });
 }
-export function lifecycleEligibleDateV3(date: string, response: MarketTradingStatusResponseV3) {
+export function lifecycleEligibleDateV3(date: string, response: BacktestLifecycleEvidence) {
   const basic = response.basicLifecycle;
   return (
     !(basic?.ipoDate && date < basic.ipoDate) &&
@@ -32,7 +42,7 @@ export function lifecycleEligibleDateV3(date: string, response: MarketTradingSta
   );
 }
 export function deriveLifecyclePreparationV3(input: {
-  response: MarketTradingStatusResponseV3;
+  response: BacktestLifecycleEvidence;
   bars: readonly { timestamp: string }[];
   start: string;
   end: string;
@@ -80,7 +90,7 @@ export function assertLifecyclePreparationV3(
   config: RunConfigV3,
   bars: readonly { timestamp: string }[],
   required: number,
-  current?: MarketTradingStatusResponseV3,
+  current?: BacktestLifecycleEvidence,
 ) {
   const frozen = config.lifecyclePreparation;
   if (!frozen) return;

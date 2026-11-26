@@ -13,14 +13,14 @@ function setup() {
     baseCurrency: 'CNY', initialCash: { CNY: '10000' }, valuationPolicy: {
       baseTimezone: 'Asia/Shanghai', dailyValuationTime: '15:00', pricePolicy: 'latestAvailable', fxPolicy: 'latestAvailable' },
     executionModel: fixture('backtest-execution-model.cn-2024q1.json') };
-  const request = backtestRunPreparationRequestV3Schema.parse({ contractVersion: 3, requestId: 'chain-1',
+  const request = backtestRunPreparationRequestV3Schema.parse({ contractVersion: 1, requestId: 'chain-1',
     strategyVersionId: '11111111-1111-4111-8111-111111111111', adjustment: 'none',
     accountingBasis: 'raw-events', history: { basis: 'fixed-provider-snapshot' }, runConfig: config });
-  const ready = { contractVersion: 3, requestId: request.requestId, checkedAt: config.dataAsOf,
+  const ready = { contractVersion: 1, requestId: request.requestId, checkedAt: config.dataAsOf,
     status: 'ready', revisionStamp: fixture('backtest-preparation-stamp-v3.json'), diagnostics: [] };
-  const prepared = backtestRunPreparationResultV3Schema.parse({ contractVersion: 3, requestId: request.requestId,
+  const prepared = backtestRunPreparationResultV3Schema.parse({ contractVersion: 1, requestId: request.requestId,
     checkedAt: config.dataAsOf, scope: 'execution-window', status: 'prepared',
-    runConfig: { ...config, schemaVersion: '3', executionPriceProtocol: fixture('execution-price.raw-events.json'),
+    runConfig: { ...config, schemaVersion: 'backtest-trade-config-v1', executionPriceProtocol: fixture('execution-price.raw-events.json'),
       priceInputBindings: { signals: [], benchmark: { binding: 'execution-series' } } },
     actualSource: fixture('backtest-snapshot-v3.manifest.json').actualSources[0], executionPreflight: ready });
   return { request, ready, prepared };

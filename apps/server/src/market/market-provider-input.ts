@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { marketProviderProbeRouteSchema, marketProviderAccountLevelSchema } from '@thesis-ledger/schemas';
 
 const envelope = {
-  contractVersion: z.literal(3).optional(),
+  contractVersion: z.literal(1).optional(),
   consumer: z.literal('thesis-ledger').optional(),
   requestId: z.string().trim().min(1).optional(),
 };

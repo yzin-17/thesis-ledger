@@ -17,7 +17,15 @@ import { BacktestRunService } from '../../src/backtest/backtest-run.service.js';
 import { LocalSnapshotV3Runner } from '../../src/backtest/backtest-v3-runner.js';
 import { RedisService } from '../../src/platform/redis.service.js';
 import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
-import { preparationStampFor, preparedRevisionReader } from './v3-preparation-fixtures.js';
+import { encodeMarketPolicyRoutes } from '../../src/market/market-policy-storage.js';
+import { MarketControlService } from '../../src/market/market-control.service.js';
+import { MarketRouteRevisionService } from '../../src/market/market-route-revision.service.js';
+import { hashCanonicalManifest } from '../../src/backtest/backtest-snapshot.js';
+import { planBacktestPriceInputs } from '../../src/backtest/backtest-dependency-price.js';
+import { backtestResearchReadOptionsV3 } from '../../src/backtest/backtest-research-read-options-v3.js';
+import { MarketFrozenWindowReaderV3 } from '../../src/market/market-frozen-window-reader-v3.js';
+import { MarketWindowEvidenceV3Repository } from '../../src/market/market-window-evidence-v3.repository.js';
+import { preparationStampFor } from './v3-preparation-fixtures.js';
 import { startWorkerDsaHttpFixture } from './worker-dsa-http-fixture.js';
 import { startIsolatedRecoveryPostgres } from './recovery-postgres.fixture.js';
 import { startRecoveryRedis } from './recovery-redis.fixture.js';
@@ -66,6 +74,26 @@ export async function startRecoveryRunFixture() {
     const ownedCache = cache;
     http = await startWorkerDsaHttpFixture(database.databaseUrl, cache.redisUrl, database.prisma);
     const { fixture } = http;
+    await database.prisma.desiredProviderPolicy.create({ data: {
+      consumer: 'thesis-ledger', revision: http.desired.revision, enabled: http.desired.enabled,
+      routes: encodeMarketPolicyRoutes(http.desired.routes), syncState: 'applied',
+      effectiveProjection: http.effective as unknown as Prisma.InputJsonValue,
+    } });
+    const pricePlan = planBacktestPriceInputs(fixture.input.strategy, fixture.input.runConfig);
+    const preparedRequest = { market: 'CN' as const,
+      symbol: fixture.input.strategy.executionInstrument.symbol, routeKey: fixture.input.executionRouteKey,
+      window: { start: pricePlan.warmup.startDate, end: fixture.input.runConfig.endDate },
+      ...backtestResearchReadOptionsV3('CN', fixture.input.runConfig.executionPriceProtocol) };
+    const preparedWindow = await http.reader.readV3(preparedRequest);
+    if (preparedWindow.status !== 'selected' || !preparedWindow.evidence.completeResponseHash)
+      throw new Error('隔离准备未冻结价格窗口');
+    fixture.input.runConfig.frozenExecutionWindow = { version: 'market-frozen-window-v1',
+      identityFingerprint: preparedWindow.evidence.identityFingerprint,
+      responseHash: preparedWindow.evidence.completeResponseHash };
+    const frozenCheck = await new MarketFrozenWindowReaderV3(new MarketWindowEvidenceV3Repository(database.prisma),
+      new MarketRouteRevisionService(new MarketControlService(database.prisma, http.dsa), http.dsa))
+      .read({ ...preparedRequest, frozenWindowRef: fixture.input.runConfig.frozenExecutionWindow });
+    if (frozenCheck.status !== 'selected') throw new Error(`隔离准备冻结读取不一致：${JSON.stringify(frozenCheck.selection)}`);
     connection = new Redis(cache.redisUrl, {
       lazyConnect: true,
       connectTimeout: 1_000,
@@ -102,13 +130,15 @@ export async function startRecoveryRunFixture() {
     const reconciler = new BacktestQueueReconciler(database.prisma, dispatch, transport, events);
     const snapshots = new LocalSnapshotStore(database.artifactRoot);
     const runner = new LocalSnapshotV3Runner(snapshots);
+    const builder = new DsaSnapshotBuilder(http.dsa, snapshots, http.reader);
     const service = new BacktestRunService(
       database.prisma,
       dispatch,
       snapshots,
-      new DsaSnapshotBuilder(http.dsa, snapshots, http.reader),
+      builder,
       runner,
-      new BacktestCreationGuardService(database.prisma, preparedRevisionReader() as never),
+      new BacktestCreationGuardService(database.prisma,
+        new MarketRouteRevisionService(new MarketControlService(database.prisma, http.dsa), http.dsa)),
     );
     const strategy = await database.prisma.strategy.create({
       data: {
@@ -124,6 +154,9 @@ export async function startRecoveryRunFixture() {
         schema: fixture.input.strategy as unknown as Prisma.InputJsonValue,
       },
     });
+    const requestFor = (idempotencyKey: string) => ({ contractVersion: 1 as const,
+      strategyVersionId: version.id, idempotencyKey, runConfig: fixture.input.runConfig,
+      preparationStamp: preparationStampFor(fixture.input.strategy, fixture.input.runConfig, version.id) });
     record('isolation', {
       postgres: database.containerName,
       redis: cache.containerName,
@@ -148,25 +181,30 @@ export async function startRecoveryRunFixture() {
       reconciler,
       snapshots,
       runner,
+      service,
+      http,
+      requestFor,
       record,
       trace,
       cleanup,
       stopWorker,
-      async create() {
-        const created = await service.createRun({
-          contractVersion: 3,
-          strategyVersionId: version.id,
-          idempotencyKey: randomUUID(),
-          runConfig: fixture.input.runConfig,
-          preparationStamp: preparationStampFor(
-            fixture.input.strategy,
-            fixture.input.runConfig,
-            version.id,
-          ),
-        });
+      async create(legacyFrozen = true) {
+        const created = await service.createRun(requestFor(randomUUID()));
         if (created.status !== 'queued') throw new Error(`创建失败: ${created.errorSummary}`);
         if ((await transport.getState(created.id)) !== 'waiting')
           throw new Error('创建后未进入专属队列');
+        if (legacyFrozen) {
+          // 独立构造旧版完整快照，继续验证既有任务的进程恢复合同。
+          const built = await builder.buildV3({ ...fixture.input, runId: created.id,
+            strategyVersionId: version.id, strategyVersionHash: hashCanonicalManifest(fixture.input.strategy) });
+          const manifest = await snapshots.v3.replay(created.id);
+          await database.prisma.backtestJob.update({ where: { id: created.id }, data: {
+            snapshotId: built.snapshotRef.snapshotId,
+            snapshotManifest: manifest as unknown as Prisma.InputJsonValue,
+            input: { ...(created.input as Record<string, Prisma.InputJsonValue>),
+              snapshotId: built.snapshotRef.snapshotId, snapshotVersion: manifest.manifestVersion },
+          } });
+        }
         record('created', { runId: created.id, owner: created.executionAttempt });
         return created;
       },
@@ -186,7 +224,7 @@ export async function startRecoveryRunFixture() {
           record('snapshot-released', { runId });
         };
       },
-      startWorker() {
+      startWorker(stage?: 'indicator' | 'simulation' | 'partial-snapshot') {
         const worker = spawn(
           process.execPath,
           [resolve('test/backtest/recovery-worker.fixture.mjs')],
@@ -198,8 +236,11 @@ export async function startRecoveryRunFixture() {
               REDIS_URL: ownedCache.redisUrl,
               BACKTEST_SNAPSHOT_ROOT: database.artifactRoot,
               BACKTEST_RECOVERY_QUEUE_PREFIX: ownedCache.prefix,
-              DSA_BASE_URL: 'http://127.0.0.1:1',
-              THESIS_LEDGER_DSA_TOKEN: 'offline-recovery',
+              DSA_BASE_URL: http!.baseUrl,
+              THESIS_LEDGER_DSA_TOKEN: 'isolated-dsa-fixture',
+              THESIS_LEDGER_CONTROL_TOKEN: 'isolated-control-fixture',
+              ...(stage === 'partial-snapshot' ? { BACKTEST_RECOVERY_PARTIAL_SNAPSHOT: '1' }
+                : stage ? { BACKTEST_RECOVERY_CPU_STAGE: stage } : {}),
             },
             stdio: ['ignore', 'pipe', 'pipe'],
           },

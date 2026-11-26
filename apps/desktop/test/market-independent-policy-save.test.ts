@@ -12,7 +12,7 @@ beforeEach(() => {
   transport.request.mockReset();
 });
 const draft: MarketPolicyDraftV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   revision: 84,
   enabled: true,
   routes: [

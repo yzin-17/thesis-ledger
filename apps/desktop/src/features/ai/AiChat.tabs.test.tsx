@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useState } from 'react';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AiChat } from './AiChat.js';
@@ -29,17 +29,11 @@ vi.mock('./AiResearchDetailView.js', () => ({
   ResearchDetailSheet: () => null,
   ResearchReadingView: () => null,
 }));
-vi.mock('./NewResearchSheet.js', () => ({ NewResearchSheet: () => null }));
 vi.mock('./ResearchSubmissionSheet.js', () => ({ ResearchSubmissionSheet: () => null }));
 vi.mock('./use-research-workbench.js', () => ({
   useResearchWorkbench: () => {
-    const [historical, setHistorical] = useState(false);
     return {
-      navigate: (destination: { pathname: string; search?: string }) => {
-        navigation.navigate(destination);
-        setHistorical(destination.search === '?history=legacy');
-      },
-      historical,
+      navigate: navigation.navigate,
       pageState: {
         mode: 'list',
         selectedRunId: null,
@@ -100,15 +94,16 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it('就绪状态不占空间，新建研究与 Tab 同行且不出现在页头或筛选栏', async () => {
+it('服务就绪时，列表工具区只显示一个新建研究入口', async () => {
   expect(container.querySelector('[data-ai-provider-status]')).toBeNull();
   expect(container.textContent).not.toContain('服务已就绪');
   expect(container.querySelector('[data-testid="page-header"] button')).toBeNull();
   expect(container.querySelector('[data-testid="run-list"] button')).toBeNull();
-  const tabs = container.querySelector('[data-slot="tabs-list"]');
-  const create = tabs?.parentElement?.querySelector<HTMLButtonElement>(':scope > button');
-  expect(create?.textContent?.trim()).toBe('新建研究');
-  expect(tabs?.parentElement?.className).toContain('flex-wrap');
+  const buttons = [...container.querySelectorAll('button')].filter(
+    (button) => button.textContent?.trim() === '新建研究',
+  );
+  expect(buttons).toHaveLength(1);
+  const [create] = buttons;
   await act(async () => {
     create?.click();
     await Promise.resolve();
@@ -134,34 +129,7 @@ it('服务异常时仍保留状态提醒和配置入口', async () => {
   expect(navigation.navigate).toHaveBeenCalledWith('/providers');
 });
 
-it('通过标签页切换当前研究和历史报告，并同步 URL 与列表范围', async () => {
-  const tabs = [...container.querySelectorAll<HTMLElement>('[role="tab"]')];
-  const scoped = tabs.find((tab) => tab.textContent === '当前模式研究');
-  const legacy = tabs.find((tab) => tab.textContent === '历史报告');
-  expect(scoped?.getAttribute('aria-selected')).toBe('true');
+it('研究工作台使用当前账户模式读取报告', () => {
   expect(container.querySelector('[data-testid="run-view"]')?.textContent).toBe('scoped');
-
-  await act(async () => {
-    legacy?.click();
-    await Promise.resolve();
-  });
-  expect(navigation.navigate).toHaveBeenCalledWith({
-    pathname: '/ai-chat',
-    search: '?history=legacy',
-  });
-  expect(legacy?.getAttribute('aria-selected')).toBe('true');
-  expect(container.querySelector('[data-testid="run-view"]')?.textContent).toBe('legacy');
-  expect(container.textContent).toContain('历史范围未记录');
-
-  await act(async () => {
-    scoped?.click();
-    await Promise.resolve();
-  });
-  expect(navigation.navigate).toHaveBeenLastCalledWith({
-    pathname: '/ai-chat',
-    search: '',
-  });
-  expect(scoped?.getAttribute('aria-selected')).toBe('true');
-  expect(container.querySelector('[data-testid="run-view"]')?.textContent).toBe('scoped');
-  expect(container.textContent).not.toContain('历史范围未记录');
+  expect(container.textContent).not.toContain('历史报告');
 });

@@ -40,6 +40,7 @@ export const backtestNavRunConfigV3Schema = z
     frozenWarmupBudgetSessions: true,
   })
   .extend({
+    schemaVersion: z.literal('backtest-nav-config-v1'),
     executionModel: backtestExecutionModelSchemaV3,
     navInput: z.strictObject({ kind: z.literal('nav'), symbol: fundSymbol }),
     navVisibility: backtestNavVisibilityV3Schema,
@@ -100,7 +101,7 @@ export const backtestNavFactV3Schema = z.strictObject({
 /** 已完成冻结的 NAV 输入必须显式绑定真实发布证据或研究可见性假设。 */
 export const backtestNavSnapshotManifestV3Schema = z
   .strictObject({
-    manifestVersion: z.literal('snapshot-manifest-v3'),
+    manifestVersion: z.literal('backtest-nav-snapshot-manifest-v1'),
     inputKind: z.literal('nav'),
     status: z.literal('finalized'),
     runId: text,

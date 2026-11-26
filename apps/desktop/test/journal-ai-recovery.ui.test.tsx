@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
-import { webcrypto } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JournalAiRunPanel } from '../src/features/journal/review/JournalAiRunPanel.js';
 import { JournalAiExplanation } from '../src/features/journal/review/JournalAiExplanation.js';
-import { journalAiReferenceKey } from '../src/features/journal/review/journal-ai-reference.js';
 import {
   journalClick,
   journalButton,
@@ -11,182 +9,108 @@ import {
   journalWait,
   mountJournal,
 } from './journal-mounted-harness.js';
+import { journalSessionRun as run } from './journal-ai-session.fixture.js';
 
 const api = vi.hoisted(() => ({ explain: vi.fn(), explanation: vi.fn() }));
 vi.mock('../src/shared/api/client', () => ({
   getDesktopApiClient: () => ({ journalReviews: api }),
 }));
-
-const run = {
-  id: '00000000-0000-4000-8000-000000000099',
-  provider: '验收 Provider',
-  model: '验收模型',
-  promptVersion: '验收-v2',
-  algorithmVersion: 'journal-test',
-  status: 'succeeded' as const,
-  errorSummary: null,
-  result: {
-    version: 1 as const,
-    provider: '验收 Provider',
-    conclusion: '只解读已核对的事实',
-    evidence: [
-      {
-        claim: '实际成交独立可追溯',
-        citations: [{ sourceId: 'source:1', toolCallId: 'getJournalReview:1' }],
-      },
-    ],
-    risks: ['止损路径未知'],
-    unknowns: ['没有行情路径'],
-    disclaimer: '验收说明',
-    createdAt: '2026-10-05T00:00:00Z',
-  },
-};
-
-describe('AI 任务引用恢复交互', () => {
+const props = () => ({
+  accountId: '账户一',
+  mode: 'actual',
+  kind: 'object' as const,
+  disabled: false,
+  createRun: vi.fn(async () => run),
+  readRun: vi.fn(async () => run),
+  onRunSelected: vi.fn(),
+});
+describe('当前复盘会话的 AI 任务恢复', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    vi.stubGlobal('crypto', webcrypto);
   });
-  const props = () => ({
-    accountId: '账户一',
-    mode: 'actual',
-    kind: 'object' as const,
-    scope: { object: 'cycle:1', fingerprint: 'facts:1', draft: {} },
-    disabled: false,
-    createRun: vi.fn(async () => run),
-    readRun: vi.fn(async () => run),
-    onRunSelected: vi.fn(),
-  });
-  it('安全上下文保持已有 SHA-256 任务引用键不变', async () => {
-    const scope = JSON.stringify(['object', '账户一', 'actual', { object: 'cycle:1' }]);
-    const key = await journalAiReferenceKey(scope);
-    const digest = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(scope));
-    const hex = Array.from(new Uint8Array(digest), (byte) =>
-      byte.toString(16).padStart(2, '0'),
-    ).join('');
-    expect(key).toBe(`journal-review-ai:v1:${hex}`);
-  });
-
-  it('内网 HTTP 缺少 WebCrypto 时仍能创建和恢复 AI 任务引用', async () => {
-    vi.stubGlobal('crypto', {});
-    const p = props();
-    const scope = JSON.stringify([p.kind, p.accountId, p.mode, p.scope]);
-    const key = await journalAiReferenceKey(scope);
-    expect(key).toMatch(/^journal-review-ai:v1-local:[a-f0-9]{32}$/);
-    expect(key).toBe(await journalAiReferenceKey(scope));
-    expect(key).not.toContain('cycle:1');
-    expect(key).not.toBe(await journalAiReferenceKey(scope + ':other'));
-
-    const first = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    expect(first.host.textContent).not.toContain('AI 任务引用暂不可用');
-    await journalClick('开始 AI 解读');
-    await journalWait(() => expect(first.host.textContent).toContain('只解读已核对的事实'));
-    expect(sessionStorage.getItem(key)).toContain(run.id);
-    await first.dispose();
-
-    const second = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(second.host.textContent).toContain('只解读已核对的事实'));
-    expect(p.createRun).toHaveBeenCalledTimes(1);
-    expect(p.readRun).toHaveBeenCalledTimes(2);
-  });
-
-  it('WebCrypto 摘要异常时不阻塞本地任务索引', async () => {
-    vi.stubGlobal('crypto', {
-      subtle: { digest: vi.fn().mockRejectedValue(new Error('blocked')) },
-    });
-    const key = await journalAiReferenceKey('test-scope');
-    expect(key).toMatch(/^journal-review-ai:v1-local:[a-f0-9]{32}$/);
-  });
-
-  it('重新挂载只读取同一任务，引用中不保存事实和报告', async () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each([{}, { subtle: { digest: vi.fn().mockRejectedValue(new Error('blocked')) } }])(
+    '没有可用 WebCrypto 时仍可显式启动，任务和报告不写入浏览器存储：%j',
+    async (crypto) => {
+      vi.stubGlobal('crypto', crypto);
+      const p = props();
+      const view = await mountJournal(<JournalAiRunPanel {...p} />);
+      expect(p.createRun).not.toHaveBeenCalled();
+      expect(p.readRun).not.toHaveBeenCalled();
+      await journalClick('开始 AI 解读');
+      await journalWait(() => expect(view.host.textContent).toContain('只解读已核对的事实'));
+      expect(p.createRun).toHaveBeenCalledOnce();
+      expect(p.readRun).toHaveBeenCalledOnce();
+      expect(sessionStorage.length).toBe(0);
+    },
+  );
+  it('重新挂载不恢复未保存的旧任务，也不自动创建解读', async () => {
     const p = props();
     const first = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
     await journalClick('开始 AI 解读');
-    await journalWait(() => expect(first.host.textContent).toContain('getJournalReview:1'));
-    expect(p.createRun).toHaveBeenCalledTimes(1);
-    expect(sessionStorage.length).toBe(2);
-    const key = await journalAiReferenceKey(JSON.stringify([p.kind, p.accountId, p.mode, p.scope]));
-    const stored = sessionStorage.getItem(key);
-    expect(JSON.parse(stored!)).toEqual({ version: 1, id: run.id });
+    await journalWait(() => expect(first.host.textContent).toContain(run.result.evidenceBindings[0]!.toolCallId));
     await first.dispose();
+    sessionStorage.setItem('journal-review-ai:v1:old', JSON.stringify({ version: 1, id: run.id }));
     const second = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(second.host.textContent).toContain('只解读已核对的事实'));
-    expect(p.createRun).toHaveBeenCalledTimes(1);
+    expect(journalButton('开始 AI 解读').disabled).toBe(false);
+    expect(second.host.textContent).not.toContain(run.id);
+    expect(p.createRun).toHaveBeenCalledOnce();
+    expect(p.readRun).toHaveBeenCalledOnce();
+    expect(p.onRunSelected).toHaveBeenCalledWith(run.id);
+  });
+  it('状态读取失败可局部重试，不创建第二个任务或绑定失败结果', async () => {
+    const p = props();
+    p.readRun.mockRejectedValueOnce(new Error('网络中断'));
+    const view = await mountJournal(<JournalAiRunPanel {...p} />);
+    await journalClick('开始 AI 解读');
+    await journalWait(() => expect(view.host.textContent).toContain('AI 状态读取失败'));
+    expect(p.onRunSelected).not.toHaveBeenCalled();
+    await journalClick('重新读取');
+    await journalWait(() => expect(view.host.textContent).not.toContain('AI 状态读取失败'));
+    expect(p.createRun).toHaveBeenCalledOnce();
     expect(p.readRun).toHaveBeenCalledTimes(2);
     expect(p.onRunSelected).toHaveBeenCalledWith(run.id);
-    expect(second.host.textContent).not.toContain('开始 AI 解读');
-    expect(second.host.textContent).toContain('移除任务引用');
+    expect(sessionStorage.length).toBe(0);
   });
-  it.each([
-    { accountId: '账户二' },
-    { mode: 'shadow' },
-    { kind: 'period' as const },
-    { scope: { object: 'cycle:2', fingerprint: 'facts:1', draft: {} } },
-    { scope: { object: 'cycle:1', fingerprint: 'facts:2', draft: {} } },
-    { scope: { object: 'cycle:1', fingerprint: 'facts:1', draft: { plannedExit: '13' } } },
-  ])('账户、模式、粒度、对象、证据或草稿变化时隔离旧引用：%j', async (change) => {
+  it('提交失败可显式重试，不留下浏览器任务绑定', async () => {
     const p = props();
-    const view = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    await journalClick('开始 AI 解读');
-    await journalWait(() => expect(view.host.textContent).toContain(run.id));
-    const reads = p.readRun.mock.calls.length;
-    await view.render(<JournalAiRunPanel {...p} {...change} />);
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    expect(view.host.textContent).not.toContain(run.id);
-    expect(p.readRun).toHaveBeenCalledTimes(reads);
-    expect(p.createRun).toHaveBeenCalledTimes(1);
-  });
-  it('读取失败可局部重试或清除，不自动创建新任务', async () => {
-    const p = props();
-    const view = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    await journalClick('开始 AI 解读');
-    await journalWait(() => expect(view.host.textContent).toContain(run.id));
-    await view.dispose();
-    p.readRun.mockRejectedValueOnce(new Error('网络中断'));
-    const restored = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(restored.host.textContent).toContain('AI 状态读取失败'));
-    expect(p.createRun).toHaveBeenCalledTimes(1);
-    await journalClick('重新读取');
-    await journalWait(() => expect(restored.host.textContent).toContain('验收-v2'));
-    await journalClick('移除任务引用');
-    const key = await journalAiReferenceKey(JSON.stringify([p.kind, p.accountId, p.mode, p.scope]));
-    expect(sessionStorage.getItem(key)).toBeNull();
-    expect(restored.host.textContent).not.toContain('只解读已核对的事实');
-    expect(p.onRunSelected).toHaveBeenLastCalledWith(null);
-    expect(p.createRun).toHaveBeenCalledTimes(1);
-  });
-  it('损坏引用在读取阶段清理；生成失败不会留下待恢复引用', async () => {
-    const p = props();
-    const key = await journalAiReferenceKey(JSON.stringify([p.kind, p.accountId, p.mode, p.scope]));
-    sessionStorage.setItem(key, '{broken');
     p.createRun.mockRejectedValueOnce(new Error('默认模型不可用'));
     const view = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    expect(sessionStorage.length).toBe(0);
-    expect(p.readRun).not.toHaveBeenCalled();
     await journalClick('开始 AI 解读');
     await journalWait(() => expect(view.host.textContent).toContain('AI 解读未提交'));
     expect(sessionStorage.length).toBe(0);
-    expect(journalButton('开始 AI 解读').disabled).toBe(false);
-  });
-  it('旧账户的晚生成响应不会在新账户展示或开启自动读取', async () => {
-    const p = props();
-    const late = journalDeferred<typeof run>();
-    p.createRun.mockReturnValueOnce(late.promise);
-    const view = await mountJournal(<JournalAiRunPanel {...p} />);
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    await journalClick('开始 AI 解读');
-    await view.render(<JournalAiRunPanel {...p} accountId="账户二" />);
-    late.resolve(run);
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    expect(view.host.textContent).not.toContain(run.id);
     expect(p.readRun).not.toHaveBeenCalled();
+    await journalClick('开始 AI 解读');
+    await journalWait(() => expect(view.host.textContent).toContain(run.id));
+    expect(p.createRun).toHaveBeenCalledTimes(2);
+    expect(sessionStorage.length).toBe(0);
   });
+  it.each(['账户', '模式', '粒度', '对象', '证据', '草稿'])(
+    '上层切换%s会话后旧创建响应不回填或启动读取',
+    async (change) => {
+      const p = props();
+      const late = journalDeferred<typeof run>();
+      p.createRun.mockReturnValueOnce(late.promise);
+      const view = await mountJournal(<JournalAiRunPanel key="原会话" {...p} />);
+      await journalClick('开始 AI 解读');
+      await view.render(
+        <JournalAiRunPanel
+          key={change}
+          {...p}
+          accountId={change === '账户' ? '账户二' : p.accountId}
+          mode={change === '模式' ? 'shadow' : p.mode}
+          kind={change === '粒度' ? 'period' : p.kind}
+        />,
+      );
+      late.resolve(run);
+      await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
+      expect(view.host.textContent).not.toContain(run.id);
+      expect(p.readRun).not.toHaveBeenCalled();
+      expect(p.createRun).toHaveBeenCalledOnce();
+      expect(p.onRunSelected).not.toHaveBeenCalled();
+    },
+  );
   it.each([
     { reviewObjectId: 'TRADE_CYCLE:other' },
     { evidenceFingerprint: 'other-facts' },
@@ -194,7 +118,7 @@ describe('AI 任务引用恢复交互', () => {
     { mode: 'shadow' },
     { accountId: '00000000-0000-4000-8000-000000000088' },
     { analysisDraft: { plannedExit: '13' } },
-  ])('恢复引用内容与冻结输入不一致时局部拒绝，不展示错误报告：%j', async (change) => {
+  ])('读取结果与冻结输入不一致时拒绝报告，不绑定到快照：%j', async (change) => {
     const request = {
       accountId: '00000000-0000-4000-8000-000000000001',
       mode: 'actual' as const,
@@ -207,10 +131,7 @@ describe('AI 任务引用恢复交互', () => {
       analysisDraft: {},
       expectedAlgorithmVersion: run.algorithmVersion,
     };
-    const key = await journalAiReferenceKey(
-      JSON.stringify(['object', request.accountId, request.mode, request]),
-    );
-    sessionStorage.setItem(key, JSON.stringify({ version: 1, id: run.id }));
+    api.explain.mockResolvedValueOnce({ ...run, status: 'queued', result: null });
     api.explanation.mockResolvedValueOnce({
       ...run,
       accountId: request.accountId,
@@ -220,13 +141,17 @@ describe('AI 任务引用恢复交互', () => {
       analysisDraft: request.analysisDraft,
       ...change,
     });
+    const selected = vi.fn();
     const view = await mountJournal(
-      <JournalAiExplanation request={request} disabled={false} onRunSelected={vi.fn()} />,
+      <JournalAiExplanation request={request} disabled={false} onRunSelected={selected} />,
     );
-    await journalWait(() => expect(view.host.textContent).toContain('AI 状态读取失败'));
-    expect(view.host.textContent).toContain('与本次输入不一致');
-    expect(view.host.textContent).not.toContain('只解读已核对的事实');
     expect(api.explain).not.toHaveBeenCalled();
-    expect(api.explanation).toHaveBeenCalledTimes(1);
+    await journalClick('开始 AI 解读');
+    await journalWait(() => expect(view.host.textContent).toContain('AI 状态读取失败'));
+    expect(view.host.textContent).toContain('与复盘输入不一致');
+    expect(view.host.textContent).not.toContain('只解读已核对的事实');
+    expect(api.explain).toHaveBeenCalledOnce();
+    expect(api.explanation).toHaveBeenCalledOnce();
+    expect(selected).not.toHaveBeenCalled();
   });
 });

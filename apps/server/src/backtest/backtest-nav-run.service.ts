@@ -1,3 +1,4 @@
+import { loadNavRunPreparation } from './backtest-nav-materialization.js';
 import {
   ConflictException,
   Inject,
@@ -19,14 +20,12 @@ import { DsaError } from '../integration/dsa/dsa.client.js';
 import { DsaV3ProtocolError } from '../integration/dsa/dsa-v3-protocol.js';
 import { MarketNavReaderV3 } from '../market/market-nav-reader-v3.js';
 import { PrismaService } from '../platform/prisma.service.js';
-import { ArtifactCorruptionError, ArtifactNotFoundError } from './backtest-artifact-store.js';
 import {
   NavPreparationReceiptError,
   validateNavPreparationReceipt,
 } from './backtest-nav-preparation-repository.js';
 import type { NavRunPreparationV3 } from './backtest-nav-preparation.js';
-import { NavInputPlanError } from './backtest-nav-planning-calendar.js';
-import { hashCanonicalManifest, SnapshotIntegrityError } from './backtest-snapshot.js';
+import { hashCanonicalManifest } from './backtest-snapshot.js';
 import { LocalNavSnapshotStore } from './backtest-nav-snapshot-store.js';
 import { isNavBacktestInput, verifyNavRunForRead } from './backtest-nav-run-read.js';
 import { BacktestQueueService } from './backtest-queue.service.js';
@@ -88,39 +87,6 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
     ? (value as Record<string, unknown>)
     : undefined;
 
-const fileSystemErrorCodes = new Set([
-  'EACCES',
-  'EBADF',
-  'EBUSY',
-  'ECANCELED',
-  'EDQUOT',
-  'EEXIST',
-  'EFAULT',
-  'EFBIG',
-  'EINTR',
-  'EINVAL',
-  'EIO',
-  'EISDIR',
-  'ELOOP',
-  'EMFILE',
-  'EMLINK',
-  'ENAMETOOLONG',
-  'ENFILE',
-  'ENOENT',
-  'ENOMEM',
-  'ENOSPC',
-  'ENOTDIR',
-  'ENOTEMPTY',
-  'ENOTSUP',
-  'ENXIO',
-  'EOPNOTSUPP',
-  'EPERM',
-  'EPIPE',
-  'EROFS',
-  'ETXTBSY',
-  'EXDEV',
-]);
-
 @Injectable()
 export class BacktestNavRunService {
   constructor(
@@ -178,7 +144,7 @@ export class BacktestNavRunService {
     if (!version) throw new NotFoundException('策略版本不存在');
     const strategy = strategySchema.safeParse(version.schema);
     if (
-      version.schemaVersion !== 2 ||
+      version.schemaVersion !== 1 ||
       !strategy.success ||
       hashCanonicalManifest(strategy.data) !== prepared.binding.strategyContentHash
     ) {
@@ -289,49 +255,13 @@ export class BacktestNavRunService {
     await this.assertRouteStillCurrent(prepared);
 
     const runId = randomUUID();
-    let snapshotManifest: unknown = Prisma.JsonNull;
-    let snapshotId: string | null = null;
-    let frozen = false;
-    let errorCode: string | null = 'NAV_RUNNER_UNAVAILABLE';
-    let errorSummary: string | null = 'NAV 冻结输入已保存；NAV V3 执行分支尚未启用。';
-    try {
-      const response = prepared.selection.response;
-      const manifest = await this.snapshots.freeze({
-        runId,
-        strategyVersionId: prepared.binding.strategyVersionId,
-        source: {
-          ...response.source,
-          routeKey: response.routeKey,
-          target: {
-            providerId: response.routeTarget.providerId,
-            upstreamSource: response.routeTarget.upstreamSource,
-          },
-          policyRevision: response.effectivePolicyRevision,
-        },
-        facts: prepared.facts,
-        context: prepared.context,
-      });
-      const replay = await this.snapshots.replay(runId);
-      if (!isDeepStrictEqual(replay.manifest, manifest)) {
-        throw new SnapshotIntegrityError('NAV Snapshot 回放与刚冻结的 Manifest 不一致');
-      }
-      snapshotManifest = manifest;
-      snapshotId = manifest.contentHash;
-      frozen = true;
-    } catch (error) {
-      if (!isKnownSnapshotFailure(error)) throw error;
-      errorCode = 'NAV_SNAPSHOT_INVALID';
-      errorSummary = 'NAV 冻结输入未通过完整性核验，Run 已安全终止。';
-    }
-
-    const queued = frozen && this.queueService?.supportsNavExecution() === true;
-    const status = queued ? 'queued' : 'failed';
-    const stage = status;
-    const progress = queued ? 0 : 100;
-    if (queued) {
-      errorCode = null;
-      errorSummary = null;
-    }
+    const status = 'queued';
+    const stage = 'queued';
+    const progress = 0;
+    const errorCode = null;
+    const errorSummary = null;
+    const snapshotId = null;
+    const snapshotManifest = Prisma.JsonNull;
 
     try {
       const persistedId = await this.database().$transaction(
@@ -388,7 +318,7 @@ export class BacktestNavRunService {
             data: {
               id: runId,
               strategyVersionId: row.strategyVersionId,
-              mode: 'V3',
+              mode: 'frozen',
               idempotencyKey: request.idempotencyKey,
               status,
               stage,
@@ -397,9 +327,11 @@ export class BacktestNavRunService {
               periodEnd: new Date(`${runConfig.endDate}T00:00:00.000Z`),
               dataAsOf: new Date(runConfig.dataAsOf),
               input: {
-                contractVersion: 3,
-                schemaVersion: '3',
+                contractVersion: 1,
+                schemaVersion: 'backtest-nav-run-v1',
                 inputKind: 'nav',
+                materialization: { version: 'backtest-job-input-v1', kind: 'configured',
+                  strategyVersionHash: lockedPrepared.binding.strategyContentHash },
                 runConfig: runConfig as unknown as Prisma.InputJsonValue,
                 preparationId: request.preparationId,
                 preparationHash: request.preparationHash,
@@ -409,7 +341,7 @@ export class BacktestNavRunService {
               dispatchedAt: null,
               errorCode,
               errorSummary,
-              finishedAt: queued ? null : createdAt,
+              finishedAt: null,
               createdAt,
               updatedAt: createdAt,
               snapshotId,
@@ -431,7 +363,7 @@ export class BacktestNavRunService {
         },
         { maxWait: 30000, timeout: 30000 },
       );
-      if (queued) await this.queueService.ensureEnqueued(persistedId);
+      await this.queueService?.ensureEnqueued(persistedId);
       return this.read(persistedId);
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
@@ -465,30 +397,7 @@ export class BacktestNavRunService {
         message: 'NAV Run 缺少准备凭证关联',
       });
     }
-    const preparation = await this.database().navBacktestPreparation.findUnique({
-      where: { consumedRunId: id },
-    });
-    if (!preparation) {
-      throw new ConflictException({
-        code: 'NAV_RUN_INTEGRITY_INVALID',
-        message: 'NAV Run 的准备凭证关联不存在',
-      });
-    }
-    const prepared = await this.prepareReceipt(preparation, () => job.createdAt.getTime());
-    if (preparation.consumedRunId !== job.id) {
-      conflict('NAV_RUN_INTEGRITY_INVALID', 'NAV Run 与准备凭证消费关联不一致');
-    }
-    const version = await this.database().strategyVersion.findUnique({
-      where: { id: job.strategyVersionId },
-    });
-    const storedStrategy = strategySchema.safeParse(version?.schema);
-    if (
-      version?.schemaVersion !== 2 ||
-      !storedStrategy.success ||
-      hashCanonicalManifest(storedStrategy.data) !== prepared.binding.strategyContentHash
-    ) {
-      conflict('NAV_RUN_INTEGRITY_INVALID', 'NAV Run 所属策略版本与冻结证据不一致');
-    }
+    const { preparation, prepared } = await loadNavRunPreparation(this.prisma, job as never);
     return verifyNavRunForRead({
       job: job as never,
       preparation,
@@ -496,17 +405,4 @@ export class BacktestNavRunService {
       snapshots: this.snapshots,
     });
   }
-}
-
-function isKnownSnapshotFailure(error: unknown): boolean {
-  const code =
-    typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-  return (
-    error instanceof SnapshotIntegrityError ||
-    error instanceof NavInputPlanError ||
-    error instanceof ArtifactCorruptionError ||
-    error instanceof ArtifactNotFoundError ||
-    error instanceof ZodError ||
-    (typeof code === 'string' && fileSystemErrorCodes.has(code))
-  );
 }

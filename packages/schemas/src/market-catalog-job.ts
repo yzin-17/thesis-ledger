@@ -2,7 +2,7 @@ import { z } from 'zod';
 const date = z.iso.datetime({ offset: true });
 export const marketCatalogJobSchema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     consumer: z.literal('thesis-ledger'),
     requestId: z.string().min(1).optional(),
     id: z.string().min(1),

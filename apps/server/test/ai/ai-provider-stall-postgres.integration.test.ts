@@ -96,7 +96,7 @@ isolated('默认停顿时限：真实墙钟、HTTP、SDK 和 PostgreSQL', () => 
               model: 'model',
               mode: 'json_mode',
               outputPolicy: 'manual',
-              contract: { id: 'research', version: 'research-generation-v2' },
+              contract: { id: 'research', version: 'research-report-generation-v1' },
             },
             {
               model: 'model',

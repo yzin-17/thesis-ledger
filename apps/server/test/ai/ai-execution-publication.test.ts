@@ -9,7 +9,7 @@ import {
 const first = Date.parse('2026-10-27T00:00:00Z');
 const prepared = aiExecutionSummarySchema.parse({
   version: 'sdk-execution-v1',
-  contract: { id: 'research', version: 'research-generation-v2' },
+  contract: { id: 'research', version: 'research-report-generation-v1' },
   frozenPolicy: DEFAULT_AI_RESEARCH_POLICY_V1,
   deadlineAt: null,
   timing: queuedResearchClock(DEFAULT_AI_RESEARCH_POLICY_V1, {}, first),

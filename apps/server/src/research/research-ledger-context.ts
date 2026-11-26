@@ -98,7 +98,7 @@ export async function readLedgerResearchContext(
   const canonical = await instruments.resolveCanonicalSymbols(symbols, transaction);
   if (canonical.items.length > 10) throw tooLarge();
   const fetchedAt = new Date().toISOString();
-  const base = { version: 'research-scope-v2', mode: input.mode, confirmedAt: fetchedAt };
+  const base = { version: 'research-scope-snapshot-v1', mode: input.mode, confirmedAt: fetchedAt };
   let scope: unknown;
   if (selection.scope === 'portfolio')
     scope = {

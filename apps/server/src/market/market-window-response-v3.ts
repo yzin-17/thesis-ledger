@@ -20,13 +20,15 @@ export const parseMarketWindowEvidenceResponseV3 = (
     return response;
   }
   return parseBarSeriesResponseV3(response, request ?? {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: response.requestId,
     symbol: response.symbol,
     routeKey: response.routeKey,
     start: response.coverage.requestedStart,
     end: response.coverage.requestedEnd,
-    ...(response.historicalTradabilityWindows ? { tradabilityMode: 'assume-untradable-no-bar' as const } : {}),
+    ...(response.historicalTradabilityWindows?.[0]?.priceOnlyAllowed ? { dailyObservationContract: 'market-daily-tradability-window-v1' as const } : {}),
+    ...(response.historicalTradabilityWindows ? { tradabilityMode: response.routeKey.timeframe === '1d'
+      ? 'assume-untradable-no-bar' as const : 'observed-bars-only' as const } : {}),
   }, multiWindow ? 'market-multi-window-content-v1' : undefined);
 };
 

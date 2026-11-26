@@ -97,24 +97,22 @@ afterAll(async () => {
 
 const business = async (
     selected = true,
-    options: { rejectBusiness?: boolean; files?: AiTraceFileStore; v2?: boolean } = {},
+    options: { rejectBusiness?: boolean; files?: AiTraceFileStore } = {},
   ) => {
     const f = traceFixture(join(root, 'traces'), selected, options.files);
-    if (options.v2) {
-      f.run.modelMetadata.sdkExecution.contract = researchGenerationV2Contract.ref;
-      Object.assign(f.run.modelMetadata, {
-        frozenResearch: sealAiFrozenResearchV2(submissionV2Fixture().frozen),
-        researchRoutes: [
-          {
-            provider: 'fixture',
-            model: 'fixture-model',
-            configurationFingerprint: 'fixture-fingerprint',
-            adapter: 'openai-compatible-chat',
-            mode: 'native_schema',
-          },
-        ],
-      });
-    }
+    f.run.modelMetadata.sdkExecution.contract = researchGenerationV2Contract.ref;
+    Object.assign(f.run.modelMetadata, {
+      frozenResearch: sealAiFrozenResearchV2(submissionV2Fixture().frozen),
+      researchRoutes: [
+        {
+          provider: 'fixture',
+          model: 'fixture-model',
+          configurationFingerprint: 'fixture-fingerprint',
+          adapter: 'openai-compatible-chat',
+          mode: 'native_schema',
+        },
+      ],
+    });
     const registry = {
       defaultModel: () => 'fixture-model',
       readyContractCandidates: () => [
@@ -156,14 +154,10 @@ const business = async (
     };
     const buildResult = (output: unknown) => {
       if (options.rejectBusiness) throw new Error('受控业务校验失败');
-      return { inference: output, version: options.v2 ? 2 : 1 };
+      return { inference: output, version: 'research-report-result-v1' };
     };
     await f.capture.runClaimed(f.run as never, () =>
-      service.execute(
-        options.v2
-          ? { ...common, contractVersion: 'research-generation-v2', buildResult }
-          : { ...common, buildResult },
-      ),
+      service.execute({ ...common, buildResult }),
     );
     return f;
   };
@@ -225,11 +219,11 @@ describe("Trace 回环执行与契约", () => {
     });
     expect(artifact(found, 'business.final_state', 'output')).toMatchObject({
       status: 'succeeded',
-      result: { version: 1 },
+      result: { version: 'research-report-result-v1' },
     });
     expect(artifact(found, 'business.execution', 'output')).toMatchObject({
       status: 'succeeded',
-      result: { version: 1 },
+      result: { version: 'research-report-result-v1' },
     });
     const saved = JSON.stringify(found);
     expect(saved).toContain('PRIVATE_PROMPT');
@@ -293,7 +287,7 @@ describe("Trace 回环执行与契约", () => {
 
   it('当前完整 V2 Schema 失败也通过正式业务执行与 StateStore 留下上游文本及字段路径', async () => {
     mode = 'schema';
-    const f = await business(true, { v2: true });
+    const f = await business();
     const found = await f.read();
     expect(calls).toBe(1);
     expect(f.run).toMatchObject({
@@ -416,7 +410,7 @@ describe("Trace 回环故障和取消", () => {
           baseURL: origin + '/v1',
           model: 'fixture-model',
           messages: [{ role: 'user', content: '返回 JSON' }],
-          contract: { id: 'research', version: 'research-generation-v2' },
+          contract: { id: 'research', version: 'research-report-generation-v1' },
           schema: z.object({ answer: z.string() }),
           mode: 'native_schema',
           transport: 'stream',

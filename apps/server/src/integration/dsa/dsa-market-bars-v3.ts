@@ -12,13 +12,15 @@ export const readBarSeriesV3 = async (
   readCapabilities: () => Promise<MarketDataContractCapabilitiesV3>,
 ) => {
   const request = marketDataBarSeriesRequestV3Schema.parse(input);
+  let capabilities = request.dailyObservationContract !== undefined ? await readCapabilities() : undefined;
+  if (capabilities !== undefined) parseDataCapabilitiesV3(capabilities);
   const raw = await read(request);
   let protocol: string | undefined;
   if (raw !== null && typeof raw === 'object' && 'windowObservations' in raw) {
-    const capabilities = await readCapabilities();
+    capabilities ??= await readCapabilities();
     return () => {
       const parsed = parseDataCapabilitiesV3(capabilities);
-      if (parsed.dataContractVersions.includes(3)) protocol = parsed.multiWindowProtocols?.[0];
+      protocol = parsed.multiWindowProtocols?.[0];
       return parseBarSeriesResponseV3(raw, request, protocol);
     };
   }

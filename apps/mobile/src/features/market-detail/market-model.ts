@@ -101,7 +101,7 @@ export function marketChartRequest(
     barsLimit,
     indicatorParams: params,
     include,
-    chartContractVersion: 3,
+    chartContractVersion: 1,
     ...(end ? { end } : {}),
   };
 }

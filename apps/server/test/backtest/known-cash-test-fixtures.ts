@@ -64,6 +64,7 @@ export async function knownCashRunFixture() {
   strategyValue.signalSources = [
     {
       id: 'execution',
+      priceCoordinate: 'run',
       asset: strategyValue.executionInstrument,
       timeframe: '1d',
       series: ['close'],
@@ -102,7 +103,7 @@ export async function knownCashRunFixture() {
     prepared,
     strategy: strategySchema.parse(strategyValue) as BacktestStrategy,
     runConfig: runConfigSchemaV3.parse({
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       startDate: scope.startDate,
       endDate: scope.endDate,
       dataAsOf: scope.dataAsOf,

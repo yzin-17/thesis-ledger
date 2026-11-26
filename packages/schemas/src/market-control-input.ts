@@ -3,7 +3,7 @@ import { marketProviderProbeRouteSchema } from './market-provider-control.js';
 import { marketProviderAccountLevelSchema } from './market-account-access.js';
 import { desiredProviderPolicyV3Schema } from './market-route-v3.js';
 const envelope = {
-  contractVersion: z.literal(3).optional(),
+  contractVersion: z.literal(1).optional(),
   consumer: z.literal('thesis-ledger').optional(),
   requestId: z.string().trim().min(1).optional(),
 };

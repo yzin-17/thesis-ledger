@@ -10,7 +10,7 @@ ThesisLedger 是一个本地优先的个人投资研究与风险管理系统。�
 - `packages/domain`：无基础设施依赖的确定性计算。
 - `packages/schemas`：跨模块版本化契约。
 - `services/dsa-adapter`：可替换行情 Provider、路由、健康和凭证类型。
-- `../daily-stock-analysis`：同级 DSA Fork，不属于主仓源码；Server 通过 `DSA_BASE_URL` 调用 `/api/v3/thesis-ledger` 的 Data/Control 合同。
+- `../daily-stock-analysis`：同级 DSA Fork，不属于主仓源码；Server 通过 `DSA_BASE_URL` 调用 `/api/v1/thesis-ledger` 的 `dsa-data-v1` 与 `dsa-control-v1` 合同。
 - `../thesis-ledger-infra`：固定镜像和同级源码开发编排，不纳入主仓。
 - PostgreSQL 保存事实；Redis 只保存缓存、锁和可重建状态。
 
@@ -287,7 +287,7 @@ pnpm --filter @thesis-ledger/mobile start
 ## 当前限制
 
 - 免费数据源可能延迟、缺失或限流；界面会显示 stale/partial，而不会伪装为最新完整数据。
-- DSA Fork 位于同级 `daily-stock-analysis` 仓库；ThesisLedger 当前消费 Data/Control V3。基金最新净值产品入口为 `GET /api/market/:symbol/fund-nav`，实际能力和权限以当前配置及读取结果为准。
+- DSA Fork 位于同级 `daily-stock-analysis` 仓库；ThesisLedger 当前使用 `dsa-data-v1` 与 `dsa-control-v1`。基金最新净值产品入口为 `GET /api/market/:symbol/fund-nav`，实际能力和权限以当前配置及读取结果为准。
 - 真实飞书 Webhook、专业 Provider 和跨平台签名仍需要仓库所有者提供外部资源。
 - 所有收益、风险、回测和 AI 输出仅供研究，不构成投资建议。
 

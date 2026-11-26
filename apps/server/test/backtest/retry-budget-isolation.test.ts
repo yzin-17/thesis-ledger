@@ -4,11 +4,11 @@ import { prepareBacktestExecution } from '../../src/backtest/backtest-execution-
 const statefulRun = (input: Record<string, unknown>, executionAttempt: number) => {
   let job = {
     id: 'current-run',
-    mode: 'V3',
+    mode: 'frozen',
     status: 'queued',
     cancelRequestedAt: null,
     executionAttempt,
-    input: { contractVersion: 3, schemaVersion: '3', ...input },
+    input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', ...input },
   };
   const updateMany = vi.fn(async ({ data }: { data: Partial<typeof job> }) => {
     job = { ...job, ...data };
@@ -28,11 +28,11 @@ describe('现行 Run 重试预算隔离', () => {
     [{ retryAttemptBase: 0 }, 3],
   ])('预算收敛拒绝读取后变为旧模式的记录', async (input, executionAttempt) => {
     const snapshot = {
-      mode: 'V3',
+      mode: 'frozen',
       status: 'queued',
       executionAttempt,
       cancelRequestedAt: null,
-      input: { contractVersion: 3, schemaVersion: '3', ...input },
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', ...input },
     };
     const persisted = { ...snapshot, mode: 'V2' };
     const updateMany = vi.fn(async ({ where, data }) => {

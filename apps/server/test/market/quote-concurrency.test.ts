@@ -5,7 +5,7 @@ import { StructuredLogger } from '../../src/platform/structured-logger.js';
 import { quoteControlFixture, quoteControlCacheKey } from './quote-control-fixture.js';
 
 const quote = {
-  version: 3,
+  version: 1,
   symbol: '600519.SH',
   open: 10,
   high: 11,
@@ -108,7 +108,7 @@ describe("报价来源时钟与租约", () => {
     const cached = await service.getQuote(symbol);
 
     expect(dsa.get).toHaveBeenCalledWith(
-      `/api/v3/thesis-ledger/market/quote?symbol=${symbol}`,
+      `/api/v1/thesis-ledger/market/quote?symbol=${symbol}`,
       1,
     );
     expect(dsa.get).toHaveBeenCalledTimes(1);
@@ -147,7 +147,7 @@ describe("报价来源时钟与租约", () => {
     const [ownerResult, waiterResult] = await Promise.all([owner, waiter]);
 
     expect(dsa.get).toHaveBeenCalledTimes(1);
-    expect(dsa.get).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/quote?symbol=600519.SH', 1);
+    expect(dsa.get).toHaveBeenCalledWith('/api/v1/thesis-ledger/market/quote?symbol=600519.SH', 1);
     // 锁内两次控制围栏与一次数据读取分别沿用原 DSA deadline。
     expect(redis.ttl).toBe(26_000);
     expect(ownerResult.servedFromCache).toBe(false);

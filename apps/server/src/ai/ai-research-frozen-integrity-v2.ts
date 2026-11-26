@@ -36,7 +36,7 @@ function evidenceFingerprint(value: ResearchFrozenEvidenceV2) {
     reasons: value.reasons,
   });
 }
-function inputFingerprint(value: AiFrozenResearchV2) {
+export function frozenResearchInputFingerprint(value: Record<string, unknown>) {
   const input = Object.fromEntries(
     Object.entries(value).filter(([key]) => key !== 'inputFingerprint'),
   );
@@ -47,7 +47,7 @@ function inputFingerprint(value: AiFrozenResearchV2) {
 export function sealAiFrozenResearchV2(value: unknown): AiFrozenResearchV2 {
   const frozen = aiFrozenResearchV2Schema.parse(structuredClone(value));
   for (const entry of frozen.evidence) entry.audit.fingerprint = evidenceFingerprint(entry);
-  frozen.inputFingerprint = inputFingerprint(frozen);
+  frozen.inputFingerprint = frozenResearchInputFingerprint(frozen);
   return frozen;
 }
 
@@ -58,7 +58,7 @@ export function verifyAiFrozenResearchV2(value: unknown): AiFrozenResearchV2 {
   const frozen = parsed.data;
   if (frozen.evidence.some((entry) => entry.audit.fingerprint !== evidenceFingerprint(entry)))
     throw new AiFrozenResearchError('V2 冻结证据内容或来源指纹不一致');
-  if (frozen.inputFingerprint !== inputFingerprint(frozen))
+  if (frozen.inputFingerprint !== frozenResearchInputFingerprint(frozen))
     throw new AiFrozenResearchError('V2 冻结输入指纹不一致');
   if (
     frozen.evidence.some(

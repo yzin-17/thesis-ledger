@@ -65,10 +65,11 @@ const executionModelFor = (
 
 const strategyValue = (overrides: Record<string, unknown> = {}): BacktestStrategy =>
   strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: 'dependency plan',
     signalSources: [
       {
+        priceCoordinate: 'run',
         id: 'close',
         asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
         timeframe: '1d',
@@ -112,7 +113,7 @@ const runConfigValue = (
 ): RunConfigV3 => {
   const normalized = accountingBasis === 'normalized-series';
   return runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: '2024-02-01',
     endDate: '2024-02-29',
     dataAsOf: '2024-03-04T16:00:00+08:00',
@@ -173,7 +174,7 @@ const actionsResponse = (
     complete: true,
   },
 ): BacktestCorporateActionsResponse => ({
-  version: 3,
+  version: 1,
   status: 'supported',
   provider: 'fixture',
   providerRevision: 'r1',
@@ -250,12 +251,14 @@ describe('backtest dependency plan', () => {
       signalSources: [
         {
           id: 'close',
+          priceCoordinate: 'run',
           asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
           timeframe: '1d',
           series: ['close'],
         },
         {
           id: 'unused-us',
+          priceCoordinate: 'run',
           asset: { symbol: 'AAPL', market: 'US', assetType: 'stock' },
           timeframe: '1d',
           series: ['close'],

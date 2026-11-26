@@ -22,7 +22,7 @@ function Fixture() {
   if (scenario === 'closed') freshness = 'delayed';
   const closed = scenario === 'closed' || scenario === 'closedFailure';
   const detail = marketDisplayDetailResponseSchema.parse({
-    contractVersion: 3, symbol: '510300.SH', assetType: 'ETF', requestId: 'controlled', generatedAt: '2026-11-09T02:00:00Z',
+    contractVersion: 1, symbol: '510300.SH', assetType: 'ETF', requestId: 'controlled', generatedAt: '2026-11-09T02:00:00Z',
     identity: { source: 'asset', status: 'confirmed' }, requested: ['quote'], dependencies: {},
     capabilities: { supported: ['quote'], unsupported: [] }, limits: { bars: 90, nav: 90 },
     sections: { quote: { capability: 'quote', status: stale ? 'stale' : 'ready', data: {

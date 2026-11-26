@@ -2,6 +2,7 @@ import { tradingCalendarFromFact } from '@thesis-ledger/domain';
 import {
   tradingCalendarFactSchema,
   compareMarketPitEvidenceInstantStringsV1,
+  dailyTradingStatusResultV1Schema,
   type MarketTradingStatusResponseV3,
   type RunConfigV3,
 } from '@thesis-ledger/schemas';
@@ -43,6 +44,41 @@ export function intradayStatusInterpretationV3(
 ) {
   validateIntradayStatusV3(config, response);
   if (!response.days.some((day) => day.intradayHalts)) return undefined;
+  const days = response.days.map(({ date, intradayHalts }) => ({ date, intradayHalts: intradayHalts ?? [] }));
+  return interpretHalts(config, response.routeKey.market, response.provenance.timezone, days, rows);
+}
+
+export function interpretDailyStatusHaltsV1(
+  config: RunConfigV3,
+  result: unknown,
+  rows: ReadonlyMap<string, readonly ArtifactRow[]>,
+) {
+  const daily = dailyTradingStatusResultV1Schema.parse(result);
+  if (!daily.days.some((day) => day.intradayHalts.length)) return undefined;
+  const evidence = new Map(daily.evidence.map((item) => [item.id, item]));
+  const days = daily.days.map((day) => {
+    const observedBeforeCutoff = day.evidenceRefs.length > 0 && day.evidenceRefs.every((id) => {
+      const item = evidence.get(id);
+      const order = item?.observedAt
+        ? compareMarketPitEvidenceInstantStringsV1(item.observedAt, config.dataAsOf)
+        : undefined;
+      return item?.kind === 'document' && item.hashScope === 'originalBytes' && item.sha256 &&
+        order !== undefined && order <= 0;
+    });
+    return { date: day.date, intradayHalts: observedBeforeCutoff ? day.intradayHalts : [] };
+  });
+  if (!days.some((day) => day.intradayHalts.length))
+    return { excludedDates: [], reason: '盘中暂停原件未能证明在冻结截点前获得，保留为观察事实。' };
+  return interpretHalts(config, daily.routeKey.market, daily.clock.timezone, days, rows);
+}
+
+function interpretHalts(
+  config: RunConfigV3,
+  market: string,
+  timezone: string | undefined,
+  days: readonly { date: string; intradayHalts: readonly { startedAt: string; endedAt: string | null }[] }[],
+  rows: ReadonlyMap<string, readonly ArtifactRow[]>,
+) {
   const selected = config.executionModel?.segments.some(
     (segment) =>
       segment.execution.mode === 'exchange' &&
@@ -56,7 +92,7 @@ export function intradayStatusInterpretationV3(
     };
   const fact = [...rows]
     .find(([key]) => key.split('/').at(-2) === 'calendar')?.[1]
-    .find((row) => row.market === response.routeKey.market);
+    .find((row) => row.market === market);
   if (!fact) throw new Error('盘中状态缺少同一市场冻结日历');
   const parsed: Record<string, unknown> = { ...fact };
   for (const key of ['sessions', 'sessionOverrides', 'holidays', 'range']) {
@@ -64,10 +100,10 @@ export function intradayStatusInterpretationV3(
     parsed[key] = JSON.parse(fact[key]) as unknown;
   }
   const calendar = tradingCalendarFromFact(tradingCalendarFactSchema.parse(parsed));
-  if (calendar.timezone !== response.provenance.timezone)
+  if (calendar.timezone !== timezone)
     throw new Error('盘中状态来源与冻结会话时区不一致');
-  const halts = response.days.flatMap((day) => day.intradayHalts ?? []);
-  const excludedDates = response.days
+  const halts = days.flatMap((day) => day.intradayHalts);
+  const excludedDates = days
     .filter((day) => {
       const segment = config.executionModel?.segments.find(
         (item) => item.range.start <= day.date && item.range.end >= day.date,

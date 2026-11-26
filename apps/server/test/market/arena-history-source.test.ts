@@ -4,7 +4,7 @@ import { readArenaHistoryMinutes, readArenaHistoryInstruments } from '../../src/
 import { liveProtocolFixture } from '../model-arena/live-fixture.js';
 
 const stamp = '2026-11-02T01:30:00.000Z';
-const raw = { contractVersion: 3 as const, consumer: 'thesis-ledger' as const, requestId: 'test',
+const raw = { contractVersion: 1 as const, consumer: 'thesis-ledger' as const, requestId: 'test',
   kind: 'reconstructed-minutes' as const, date: '2026-11-02', providerId: 'futu', policyRevision: 199,
   archiveRef: `arena-history/${'a'.repeat(64)}.json`, value: { symbol: '600000.SH', assetType: 'STOCK' as const,
     market: 'CN' as const, source: 'futu', timezone: 'Asia/Shanghai' as const, timeframe: '1m' as const, session: 'regular' as const,
@@ -13,7 +13,7 @@ const raw = { contractVersion: 3 as const, consumer: 'thesis-ledger' as const, r
     rows: [0, 1, 2].map((i) => ({ timestamp: new Date(Date.parse(stamp) + i * 60000).toISOString(), open: 10, high: 10, low: 10, close: 10, volume: 1, amount: 10, complete: true })) } };
 describe('历史重建消费者', () => {
   it('AI 精确检索缺录 ETF 时按词读取身份，然后只取该 ETF 的历史；身份不认证历史资格', async () => {
-    const discovery = { contractVersion: 3 as const, consumer: 'thesis-ledger' as const, requestId: 'search', kind: 'current-instrument-discovery' as const,
+    const discovery = { contractVersion: 1 as const, consumer: 'thesis-ledger' as const, requestId: 'search', kind: 'current-instrument-discovery' as const,
       historicalEligibility: 'unverified' as const, market: 'CN' as const, date: '2026-11-02', query: '510300', providerId: 'hithink' as const,
       providerVersion: 3, observedAt: '2026-11-13T00:00:00Z', sourceTimestamp: 1716105600000, responseSha256: 'b'.repeat(64), archiveRef: `arena-history/${'b'.repeat(64)}.json`,
       items: [{ symbol: '510300.SH', name: '510300.SH', assetType: 'ETF' as const }] };

@@ -2,6 +2,7 @@ import {
   marketPolicyClientResponseSchema,
   marketPolicySaveInputSchema,
   marketRouteCatalogReadClientV3Schema,
+  marketRouteCatalogReadContractVersion,
   type MarketPolicySaveInput,
 } from '@thesis-ledger/schemas';
 import type { ParsedRequest } from './parsed-request.js';
@@ -9,7 +10,7 @@ export function marketPolicyClient(request: ParsedRequest) {
   return {
     routeCapabilities: (signal?: AbortSignal) =>
       request(
-        '/api/market-data/routes/capabilities?contractVersion=3',
+        `/api/market-data/routes/capabilities?contractVersion=${marketRouteCatalogReadContractVersion}`,
         marketRouteCatalogReadClientV3Schema,
         { signal: signal ?? null },
       ),

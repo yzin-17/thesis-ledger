@@ -17,11 +17,12 @@ const handshakeResponseFixture = () => fixture('market-control-v3.handshake.resp
 const effectiveFixture = () => fixture('market-control-v3.effective.etf-qfq.json');
 
 describe('Market Control Wire V3', () => {
-  it('解析 V3 握手并让 Control 能力与 Data 版本独立声明', () => {
+  it('解析具名 Control 握手并让 Control 能力与 Data 版本独立声明', () => {
     const request = marketControlHandshakeRequestV3Schema.parse(handshakeRequestFixture());
     const response = marketControlHandshakeResponseV3Schema.parse(handshakeResponseFixture());
     const dataCapabilities = marketDataContractCapabilitiesV3Schema.parse({
-      dataContractVersions: [3],
+      dataContract: 'dsa-data-v1',
+      dailyObservationContract: 'market-daily-tradability-window-v1',
       serviceCapabilities: { fundNav: true },
     });
 
@@ -33,7 +34,7 @@ describe('Market Control Wire V3', () => {
       requestId: request.requestId,
     });
     expect('dataContractVersions' in response).toBe(false);
-    expect(dataCapabilities.dataContractVersions).toEqual([3]);
+    expect(dataCapabilities.dataContract).toBe('dsa-data-v1');
     expect(
       marketControlHandshakeResponseV3Schema.safeParse({
         ...response,

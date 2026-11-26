@@ -122,7 +122,7 @@ export class AiResearchSubmissionV2 {
       researchGenerationV2Contract.ref,
     );
     if (routes.provider === 'pending' || routes.routes.length === 0)
-      throw new BadRequestException('研究默认模型尚无可执行的 V2 合同路由');
+      throw new BadRequestException('研究默认模型尚无可执行的报告生成路由');
     return {
       routing,
       policy: loadAiResearchPolicy(aiTimeoutProfileFor(routes.routes[0] ?? {})),

@@ -16,17 +16,7 @@ export function ResearchEvidenceScreen() {
   return (
     <Page title="研究引用证据">
       <QueryStatus query={query} retry={() => void query.refetch()} />
-      {value?.version === 1 ? (
-        <Section title={value.toolCall.tool}>
-          <Copy>历史兼容引用 · {value.toolCall.provider ?? '来源未记录'}</Copy>
-          <Copy>
-            可见 {value.toolCall.availableAt ?? '未记录'} · 抓取{' '}
-            {value.toolCall.fetchedAt ?? '未记录'}
-          </Copy>
-          <Copy>工具调用 {value.toolCall.id}</Copy>
-        </Section>
-      ) : null}
-      {value?.version === 2 ? (
+      {value?.version === 'research-report-evidence-v1' ? (
         <Section title="冻结证据">
           <Copy>
             来源 {value.evidence.audit.providerId ?? '未记录'} ·{' '}

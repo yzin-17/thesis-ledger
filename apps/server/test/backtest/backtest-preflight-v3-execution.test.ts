@@ -40,10 +40,11 @@ const checkedAt = '2026-05-21T08:00:00.000Z';
 
 const strategyValue = (): BacktestStrategy =>
   strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: 'execution preflight',
     signalSources: [
       {
+        priceCoordinate: 'run',
         id: 'execution-close',
         asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
         timeframe: '1d',
@@ -120,7 +121,7 @@ const runConfigValue = (
     sourcePriceBasis.conversionEvidenceRef = 'conversion-evidence-1';
   }
   return runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: '2024-02-01',
     endDate: '2024-02-29',
     dataAsOf: options.pointInTime ? '2024-03-04T08:00:00.000Z' : checkedAt,
@@ -249,7 +250,7 @@ const validFixture = (
     routeKey,
   };
   const request = backtestPreflightRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'execution-window-preflight-1',
     strategyVersionId: 'strategy-version-1',
     strategyContentHash: hashCanonicalManifest(strategy),
@@ -258,7 +259,7 @@ const validFixture = (
   });
   const routeTarget = { ...target, routeIndex: 0 as const };
   const pinnedRequest = marketDataBarSeriesRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'window-read-1',
     symbol: '600519.SH',
     routeKey,

@@ -163,7 +163,7 @@ async function crossWeekMatch(db: PrismaService, owner: string) {
   const budget = { requests: 10, tokens: 10000, costMicros: 200 };
   const store = new ModelArenaRepository(db);
   const match = await store.create(owner, {
-    version: 1,
+    version: 'arena-historical-match-protocol-v1',
     title: '跨周样本',
     market: 'CN',
     currency: 'CNY',

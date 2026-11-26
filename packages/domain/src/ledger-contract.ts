@@ -125,7 +125,7 @@ export interface LedgerEventPayloadByType {
 }
 
 export interface LedgerEventEnvelopeBase<TType extends LedgerEventType> {
-  version: 3;
+  version: 1;
   eventId: string;
   factId: string;
   accountId: string;

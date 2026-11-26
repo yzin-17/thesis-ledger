@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { VersionedExecutionRules, tradingCalendarFromFact,
   type FrozenExchangeExecutionModelSegment } from '@thesis-ledger/domain';
 import {
@@ -10,10 +10,10 @@ import {
 } from '@thesis-ledger/schemas';
 import { statusPriceExecutionModelV3 } from '../../src/backtest/backtest-status-price-model-v3.js';
 import {
-  collectSnapshotTradingStatusV3,
   readSnapshotTradingStatusV3,
   tradingStatusArtifactRowsV3,
 } from '../../src/backtest/backtest-trading-status-snapshot-v3.js';
+import { hashCanonicalManifest } from '../../src/backtest/backtest-snapshot.js';
 
 const fixture = (name: string) =>
   JSON.parse(
@@ -31,7 +31,7 @@ function inputs() {
   protocol.history = { basis: 'fixed-provider-snapshot' };
   protocol.marketRuleResearch = 'raw-prices-no-corporate-actions-v1';
   const config = runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: response.range.start,
     endDate: response.range.end,
     dataAsOf: '2026-10-08T00:00:00Z',
@@ -142,22 +142,13 @@ describe('真实公告风险与日涨跌幅执行组合', () => {
     late.sourceDocuments[0]!.observedAt = '2026-10-09T00:00:00Z';
     expect(() => statusPriceExecutionModelV3(config, late)).toThrow('冻结截点');
   });
-  it('使用新冻结版本，离线读回核验版本与模型绑定，旧版本拒绝回填', async () => {
+  it('离线读回已有精细状态产物时核验版本与原模型绑定', () => {
     const { response, config } = inputs();
-    const dsa = {
-      marketTradingStatusV3: vi.fn(async () => response),
-      effectiveControlPolicyV3: vi.fn(async () => ({
-        projection: {
-          effective: {
-            enabled: true,
-            routes: [
-              { key: response.routeKey, targets: [{ ...response.routeTarget, eligible: true }] },
-            ],
-          },
-        },
-      })),
-    };
-    const snapshot = (await collectSnapshotTradingStatusV3(config, dsa as never))!;
+    const snapshot = backtestTradingStatusSnapshotV3Schema.parse({
+      freezeVersion: 'frozen-trading-status-v2',
+      runConfigChecksum: hashCanonicalManifest(config),
+      disclosure: { status: 'source', response },
+    });
     expect(snapshot.freezeVersion).toBe('frozen-trading-status-v2');
     expect(snapshot.disclosure.status).toBe('source');
     expect(
@@ -191,8 +182,8 @@ describe('真实公告风险与日涨跌幅执行组合', () => {
     ).toThrow('冻结版本');
     const legacy = structuredClone(config);
     delete legacy.executionPriceProtocol.marketRuleResearch;
-    expect((await collectSnapshotTradingStatusV3(legacy, dsa as never))!.disclosure.status).toBe(
-      'notIncluded',
-    );
+    expect(() => readSnapshotTradingStatusV3(context, legacy, tradingStatusArtifactRowsV3({
+      ...snapshot, runConfigChecksum: hashCanonicalManifest(legacy),
+    }))).toThrow('原价规则研究');
   });
 });

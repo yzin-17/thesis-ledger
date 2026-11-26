@@ -11,7 +11,7 @@ function fixture(warmup = true) {
   const view = buildMarketPeriodView(source, window);
   const requests = [{ name: 'MA' as const, parameters: { period: 5 } }];
   const response = {
-    contractVersion: 3,
+    contractVersion: 1,
     engineVersion: DSA_MARKET_INDICATOR_ENGINE_VERSION,
     inputFingerprint: view.calculation.series.inputFingerprint,
     results: [

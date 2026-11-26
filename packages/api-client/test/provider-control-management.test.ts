@@ -15,7 +15,7 @@ const session = {
   errorCode: null,
 };
 const policy = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'b5',
   revision: 2,
@@ -26,7 +26,7 @@ const policy = {
   effectiveStale: true,
 };
 const job = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   id,
   status: 'running',
@@ -60,7 +60,7 @@ describe('来源与路由共享控制合同', () => {
   });
   it('账号结论不能用普通健康探测冒充，读取失败不视为未配置成功', async () => {
     const value = {
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       providerId: 'fixture',
       requestId: 'b5',
@@ -104,7 +104,7 @@ describe('来源与路由共享控制合同', () => {
   });
   it('路由保存绑定修订并保留 pending/Effective 陈旧状态', async () => {
     const input = {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       consumer: 'thesis-ledger' as const,
       requestId: 'b5',
       expectedRevision: 1,

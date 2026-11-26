@@ -1,7 +1,6 @@
 import type { AiRun, AiToolCall, Prisma } from '@prisma/client';
 import {
   correlateResearchResultV2,
-  researchResultSchema,
   researchResultV2Schema,
   researchReportDetailSchema,
   type AiFrozenResearchV2,
@@ -31,7 +30,7 @@ function emptyDetail(row: AiRun, historicalScope: Scope): ResearchReportDetail {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     historicalScope,
-    resultVersion: historicalScope.status === 'known' ? 2 : 1,
+    resultVersion: historicalScope.status === 'known' ? 'research-report-result-v1' : null,
     availability,
     summary: null,
     quality: null,
@@ -130,53 +129,6 @@ async function v2Projection(
     return invalid(detail);
   }
 }
-async function legacyProjection(
-  transaction: Prisma.TransactionClient,
-  row: AiRun,
-  detail: ResearchReportDetail,
-): Promise<ResearchReadProjection> {
-  if (row.status !== 'succeeded')
-    return { detail: researchReportDetailSchema.parse(detail), frozen: null, calls: [] };
-  if (
-    row.result &&
-    typeof row.result === 'object' &&
-    !Array.isArray(row.result) &&
-    row.result.version !== 1
-  )
-    return invalid(detail, 'unsupported');
-  const parsed = researchResultSchema.safeParse(row.result);
-  if (!parsed.success) return invalid(detail);
-  const references = parsed.data.evidence.flatMap((entry) =>
-    entry.citations.map((citation) => citation.toolCallId),
-  );
-  const ids = references.filter((id): id is string => Boolean(id));
-  const calls = await ownedCalls(transaction, row.id, ids);
-  if (
-    !references.length ||
-    ids.length !== references.length ||
-    ids.some((id) => !calls.some((call) => call.id === id))
-  )
-    return {
-      detail: researchReportDetailSchema.parse({
-        ...detail,
-        result: parsed.data,
-        summary: parsed.data.conclusion,
-        availability: 'pending_verification',
-      }),
-      frozen: null,
-      calls: [],
-    };
-  return {
-    detail: researchReportDetailSchema.parse({
-      ...detail,
-      result: parsed.data,
-      summary: parsed.data.conclusion,
-      availability: 'available',
-    }),
-    frozen: null,
-    calls,
-  };
-}
 /** 查询只验证保存的产物和审计事实；数据库错误继续向上传播。 */
 export function projectResearchReport(
   transaction: Prisma.TransactionClient,
@@ -185,5 +137,5 @@ export function projectResearchReport(
 ) {
   const detail = emptyDetail(row, scope);
   if (scope.status === 'known') return v2Projection(transaction, row, detail);
-  return legacyProjection(transaction, row, detail);
+  return invalid(detail, 'unsupported');
 }

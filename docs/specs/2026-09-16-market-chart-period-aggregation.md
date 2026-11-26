@@ -218,9 +218,9 @@ Schema/Domain 测试证明聚合与枚举；Server 测试证明声明、窗口�
 
 派生 `periodContext` 固定为 `protocol / aggregationFingerprint / pointFingerprint`：聚合摘要来自 T3 对完整 `canonicalMarketPeriodEncoding` 的 SHA-256，计算点摘要复用现行 identity/points 编码，最终 `inputFingerprint` 为 `["market-period-indicator-v1", aggregationFingerprint, pointFingerprint]` 紧凑 JSON 的 SHA-256。DSA 重算实际点摘要与最终绑定摘要，拒绝不一致；不在 DSA 重算交易日历或来源事实，不将数值摘要冒充聚合元数据摘要。T3/T4 对聚合摘要、计算窗口与可见窗口承担所有权。
 
-四种派生周期仅接受 STOCK/ETF，计算点数 1～3650，参数保持现行 2～200。独立 `/api/v3/thesis-ledger/market/indicators/capabilities` 声明四周期的 provided-points 计算能力、上限及与 Server 一致的预热规则：MA 为 `max(period,60)-1`，MACD 为 `slow+signal`，RSI 为 `max(short,mid,long)+1`。能力声明不证明真实历史数据充足；T3 核验实际预热与来源覆盖，T4 在给定周期点上计算并保留不足预热的空值，尤其年度指标不能补值。
+四种派生周期仅接受 STOCK/ETF，计算点数 1～3650，参数保持现行 2～200。独立 `/api/v1/thesis-ledger/market/indicators/capabilities` 声明四周期的 provided-points 计算能力、上限及与 Server 一致的预热规则：MA 为 `max(period,60)-1`，MACD 为 `slow+signal`，RSI 为 `max(short,mid,long)+1`。能力声明不证明真实历史数据充足；T3 核验实际预热与来源覆盖，T4 在给定周期点上计算并保留不足预热的空值，尤其年度指标不能补值。
 
-本叶不改变 Data V3 capabilities 握手、原始来源 timeframes、Provider 路由或指标公式；通过同一脱敏 JSON payload 的主仓 Schema/编码测试与 DSA 实际计算测试证明跨运行时兼容。真实聚合装配和公开成功响应仍由 T3/T4 承担。
+本叶不改变 `dsa-data-v1` 能力声明、原始来源 timeframes、Provider 路由或指标公式；通过同一脱敏 JSON payload 的主仓 Schema/编码测试与 DSA 实际计算测试证明跨运行时兼容。真实聚合装配和公开成功响应仍由 T3/T4 承担。
 
 ## T3 分阶段装配与日历事实边界
 

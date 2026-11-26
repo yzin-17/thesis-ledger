@@ -91,7 +91,7 @@ function registerReportFrozenIdentity(suiteContext: ReturnType<typeof reportRead
     const evidence = await get(`/${row.id}/evidence/${reference.audit.evidenceId}`);
     expect(evidence.status).toBe(200);
     expect(await evidence.json()).toMatchObject({
-      version: 2,
+      version: 'research-report-evidence-v1',
       runId: row.id,
       toolCallId: reference.toolCallId,
       evidence: { audit: reference.audit, data: { price: 100 } },

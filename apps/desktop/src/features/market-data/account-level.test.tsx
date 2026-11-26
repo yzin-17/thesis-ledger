@@ -20,7 +20,7 @@ const report: MarketProviderAccountAccessReport = { scope: 'account_interfaces',
       target: { providerId: 'tushare', upstreamSource: 'tushare' },
       access: { state: 'not_included', attempted: false, errorCode: 'account_level_insufficient', configVersion: 2, checkedAt, persisted: true } },
   ] };
-const catalog: MarketRouteCatalogReadV3 = { contractVersion: 3, consumer: 'thesis-ledger', status: 'complete',
+const catalog: MarketRouteCatalogReadV3 = { contractVersion: 1, consumer: 'thesis-ledger', status: 'complete',
   catalogRevision: 1, generatedAt: checkedAt, reason: null,
   entries: report.routes.map((route) => ({ ...route, accountAccess: route.access, state: 'ready' as const })),
 };

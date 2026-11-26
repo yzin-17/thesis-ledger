@@ -9,7 +9,7 @@ import { readReportMetadata } from '../src/integration/dsa/dsa-report-metadata.j
 const dsaRoot = fileURLToPath(new URL('../../../../daily-stock-analysis/', import.meta.url));
 const python = `${dsaRoot}.venv/bin/python`;
 const request = reportMetadataRequestSchema.parse({
-  contractVersion: 3, consumer: 'thesis-ledger', requestId: 'report-error-contract',
+  contractVersion: 1, consumer: 'thesis-ledger', requestId: 'report-error-contract',
   symbol: '600519.SH', page: 1, pageSize: 2, requestBudgetMs: 3000,
 });
 
@@ -24,7 +24,7 @@ from fastapi.testclient import TestClient
 from api.thesis_ledger_auth import require_contract_token
 from api.thesis_ledger_report_metadata import build_report_metadata_router
 from src.services.thesis_ledger_provider_runtime import ProviderCallError
-body = {'contractVersion': 3, 'consumer': 'thesis-ledger', 'requestId': 'report-error-contract',
+body = {'contractVersion': 1, 'consumer': 'thesis-ledger', 'requestId': 'report-error-contract',
         'symbol': '600519.SH', 'page': 1, 'pageSize': 2, 'requestBudgetMs': 3000}
 results = []
 for code in ['upstream_failure', 'invalid_response', 'permission_denied', 'authentication_failed', 'invalid_request']:

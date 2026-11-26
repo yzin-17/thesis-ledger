@@ -3,7 +3,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CashObservationSheet } from '../src/features/account-data/AccountDataCashObservationSheet';
-import { AdvancedJsonSheet } from '../src/features/journal/AdvancedJsonSheet';
+import { AdvancedJsonSheet } from './fixtures/journal/AdvancedJsonSheet.js';
 import { RiskRuleEditorSheet } from '../src/features/risk/RiskRuleEditorSheet';
 import type { RiskRuleRecord } from '../src/features/risk/risk.types';
 

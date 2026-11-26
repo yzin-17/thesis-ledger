@@ -13,12 +13,9 @@ import {
   marketPublicFeesRequestV3Schema,
   marketPublicFeesResponseV3Schema,
   marketPublicFeesEndpointV3,
-  marketTradingStatusRequestV3Schema,
-  marketTradingStatusEndpointV3,
   type MarketChartBarsRequestV3,
   type MarketEventRequestV3,
   type MarketPublicFeesRequestV3,
-  type MarketTradingStatusRequestV3,
   type MarketDataBarSeriesRequestV3,
   type MarketDataContractCapabilitiesV3,
   statusCapabilityRequestV1Schema, correlateStatusCapabilityV1, type StatusCapabilityRequestV1,
@@ -37,7 +34,6 @@ import {
   parseChartBarsResponseV3,
 } from './dsa-v3-protocol.js';
 import { readBarSeriesV3 } from './dsa-market-bars-v3.js';
-import { parseTradingStatusResponseV3 } from './dsa-trading-status-v3.js';
 import { readStatusRouteV1, type RoutedStatusRequestV1, type StatusPolicyReadV1 } from './dsa-status-route-reader-v1.js';
 
 type Mapper = (status: number, payload: unknown) => DsaV3ProtocolError;
@@ -57,7 +53,7 @@ export class DsaDataCapabilityReaderV3 {
     return readBarSeriesV3(
       input,
       (request) =>
-        this.post('/api/v3/thesis-ledger/market/bars', request, (status, payload) =>
+        this.post('/api/v1/thesis-ledger/market/bars', request, (status, payload) =>
           mapDataV3HttpError(status, payload, request.requestId),
         ),
       this.capabilities,
@@ -66,14 +62,14 @@ export class DsaDataCapabilityReaderV3 {
 
   chartBars(input: MarketChartBarsRequestV3) {
     const request = marketChartBarsRequestV3Schema.parse(input);
-    return this.post('/api/v3/thesis-ledger/market/chart-bars', request, (status, payload) =>
+    return this.post('/api/v1/thesis-ledger/market/chart-bars', request, (status, payload) =>
       mapDataV3HttpError(status, payload, request.requestId),
     ).then((raw) => this.parse(() => parseChartBarsResponseV3(raw, request)));
   }
 
   events(input: MarketEventRequestV3) {
     const request = marketEventRequestV3Schema.parse(input);
-    return this.post('/api/v3/thesis-ledger/market/events', request, (status, payload) =>
+    return this.post('/api/v1/thesis-ledger/market/events', request, (status, payload) =>
       mapEventV3HttpError(status, payload, request.requestId),
     ).then((raw) => this.parse(() => parseEventResponseV3(raw, request)));
   }
@@ -87,7 +83,7 @@ export class DsaDataCapabilityReaderV3 {
 
   cacheContext(input: MarketCacheContextRequestV3, signal?: AbortSignal) {
     const request = marketCacheContextRequestV3Schema.parse(input);
-    return this.post('/api/v3/thesis-ledger/market/cache-context', request, (status, payload) =>
+    return this.post('/api/v1/thesis-ledger/market/cache-context', request, (status, payload) =>
       mapDataV3HttpError(status, payload, request.requestId), undefined, signal,
     ).then((raw) => this.parse(() => {
       try { return correlateMarketCacheContextV3(request, raw); }
@@ -109,16 +105,9 @@ export class DsaDataCapabilityReaderV3 {
     ).then((raw) => this.parse(() => parseKnownCashControlResponseV3(raw, request)));
   }
 
-  tradingStatus(input: MarketTradingStatusRequestV3) {
-    const request = marketTradingStatusRequestV3Schema.parse(input);
-    return this.post(marketTradingStatusEndpointV3, request, (status, payload) =>
-      mapDataV3HttpError(status, payload, request.requestId),
-    ).then((raw) => this.parse(() => parseTradingStatusResponseV3(raw, request)));
-  }
-
   statusCapability(input: StatusCapabilityRequestV1) {
     const request = statusCapabilityRequestV1Schema.parse(input);
-    return this.post('/api/v3/thesis-ledger/market/status-capabilities', request, (status, payload) =>
+    return this.post('/api/v1/thesis-ledger/market/status-capabilities', request, (status, payload) =>
       mapDataV3HttpError(status, payload, request.requestId),
     ).then((raw) => this.parse(() => {
       try { return correlateStatusCapabilityV1(request, raw); }

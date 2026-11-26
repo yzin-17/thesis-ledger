@@ -24,7 +24,7 @@ describe('Market Data Wire V3', () => {
     const request = marketDataBarSeriesRequestV3Schema.parse(requestFixture());
     const response = marketDataBarSeriesResponseV3Schema.parse(responseFixture());
 
-    expect(capabilities.dataContractVersions).toEqual([3]);
+    expect(capabilities.dataContract).toBe('dsa-data-v1');
     expect(capabilities.serviceCapabilities.fundNav).toBe(true);
     expect(request.routeKey).toMatchObject({
       kind: 'bar',
@@ -116,7 +116,7 @@ describe('Market Data Wire V3', () => {
 
   it('仅声明当前 Data 版本并独立于 Control 版本', () => {
     expect(
-      marketDataContractCapabilitiesV3Schema.safeParse({ dataContractVersions: [3], serviceCapabilities: { fundNav: true } }).success,
+      marketDataContractCapabilitiesV3Schema.safeParse(capabilitiesFixture()).success,
     ).toBe(true);
     expect(
       marketDataContractCapabilitiesV3Schema.safeParse({ dataContractVersions: [2, 2, 3], serviceCapabilities: { fundNav: true } }).success,
@@ -412,7 +412,7 @@ describe('Market Data Wire V3 指纹与错误信封', () => {
     ]);
     expect(
       marketDataErrorEnvelopeV3Schema.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: 'provider-error',
         error: {
           code: 'upstream_failure',
@@ -422,7 +422,7 @@ describe('Market Data Wire V3 指纹与错误信封', () => {
     ).toBe(false);
     expect(
       marketDataErrorEnvelopeV3Schema.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: 'provider-error',
         error: {
           code: 'upstream_failure',
@@ -441,7 +441,7 @@ describe('Market Data Wire V3 指纹与错误信封', () => {
   });
   it('能力不支持有独立固定错误，保持严格文案与信封', () => {
     const value = {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'status-request',
       error: { code: 'unsupported_capability', message: '来源不支持请求的数据能力' },
     };

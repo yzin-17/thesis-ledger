@@ -1,7 +1,7 @@
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { aiGenerationErrorSchema, researchGenerationV2Contract } from '@thesis-ledger/schemas';
+import { aiGenerationContracts, aiGenerationErrorSchema, researchGenerationV2Contract, type AiGenerationContractRef } from '@thesis-ledger/schemas';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import {
@@ -105,7 +105,7 @@ const scenarios = [
   },
 ];
 
-const generate = (origin: string, version: 'research-generation-v1' | 'research-generation-v2') =>
+const generate = (origin: string, contract: AiGenerationContractRef) =>
   new AiSdkGenerationAdapter().generate({
     requestId: randomUUID(),
     adapter: 'openai-compatible-chat',
@@ -115,7 +115,7 @@ const generate = (origin: string, version: 'research-generation-v1' | 'research-
     baseURL: `${origin}/v1`,
     model: 'openrouter/free',
     messages: [{ role: 'user', content: 'PRIVATE_PROMPT' }],
-    contract: { id: 'research', version },
+    contract,
     schema: z.strictObject({ answer: z.string() }),
     mode: 'native_schema',
     transport: 'stream',
@@ -245,8 +245,8 @@ describe('原始响应进入当前真实 SDK 的本地对照', () => {
       const failures: AiSdkGenerationError[] = [];
       const fetchCounts: number[] = [];
       for (const version of [
-        'research-generation-v1',
-        researchGenerationV2Contract.ref.version,
+        aiGenerationContracts.parameterOptimization.ref,
+        researchGenerationV2Contract.ref,
       ] as const) {
         const before = spy.mock.calls.length;
         failures.push(await failureOf(origin, version));
@@ -310,9 +310,9 @@ describe('原始响应进入当前真实 SDK 的本地对照', () => {
         return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
       });
       try {
-        const baseline = await failureOf(origin, 'research-generation-v1');
+        const baseline = await failureOf(origin, aiGenerationContracts.parameterOptimization.ref);
         expect(spy).toHaveBeenCalledTimes(1);
-        const failure = await failureOf(origin, researchGenerationV2Contract.ref.version);
+        const failure = await failureOf(origin, researchGenerationV2Contract.ref);
         expect(spy).toHaveBeenCalledTimes(2);
         compareEnrichment(baseline, failure);
         const observation = observe(name, failure, spy.mock.calls.length - 1);

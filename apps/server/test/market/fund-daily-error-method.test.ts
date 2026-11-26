@@ -36,7 +36,7 @@ it('未知日历与错位评价时点不冻结历史估值', async () => {
   expect(closingEstimate(row, new Date(day + 'T08:00:00Z'), { ...session, evaluatedAt: day + 'T03:28:00Z' })).toBeNull();
 });
 it('正式净值使用事实收盘时点验证可得性，保留十进制误差精度', () => {
-  const nav = { version: 3, symbol: estimate.symbol, unitNav: 0.978, navDate: day + 'T00:00:00Z', provider: 'akshare', fetchedAt: day + 'T04:00:00Z', freshness: 'delayed', fallbackUsed: false } as const;
+  const nav = { version: 1, symbol: estimate.symbol, unitNav: 0.978, navDate: day + 'T00:00:00Z', provider: 'akshare', fetchedAt: day + 'T04:00:00Z', freshness: 'delayed', fallbackUsed: false } as const;
   const now = new Date(day + 'T08:00:00Z');
   expect(fundErrorFor(day, estimate.symbol, 1.01, nav, now, day + 'T07:00:00Z')).toBeNull();
   expect(fundErrorFor(day, estimate.symbol, 1.01, nav, now, day + 'T03:30:00Z')).toMatchObject({ signed: '0.032', absolute: '0.032' });

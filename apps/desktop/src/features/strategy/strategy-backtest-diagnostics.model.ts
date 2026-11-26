@@ -299,7 +299,7 @@ const outcomeExport = (
   metrics: metricsExport(result.metrics),
   benchmark: metricsExport(result.benchmark),
   benchmarkCompatibility: benchmarkCompatibilityExport(result),
-  ...(result.schemaVersion === '3' && result.knownCashDividendDisclosure !== undefined
+  ...(result.schemaVersion === 'backtest-trade-result-v1' && result.knownCashDividendDisclosure !== undefined
     ? {
         knownCashDividends: knownCashDiagnosticExport(
           result.knownCashDividendDisclosure,
@@ -307,7 +307,7 @@ const outcomeExport = (
         ),
       }
     : {}),
-  ...(result.schemaVersion === '3' && result.publicFeesDisclosure !== undefined
+  ...(result.schemaVersion === 'backtest-trade-result-v1' && result.publicFeesDisclosure !== undefined
     ? {
         publicFees: publicFeesDiagnosticExport(
           result.publicFeesDisclosure,
@@ -315,7 +315,7 @@ const outcomeExport = (
         ),
       }
     : {}),
-  ...(result.schemaVersion === '3' && result.cashDividendDisclosure !== undefined
+  ...(result.schemaVersion === 'backtest-trade-result-v1' && result.cashDividendDisclosure !== undefined
     ? {
         cashDividends: cashDividendDiagnosticExport(
           result.cashDividendDisclosure,
@@ -323,7 +323,7 @@ const outcomeExport = (
         ),
       }
     : {}),
-  ...(result.schemaVersion === '3' && result.tradingStatusDisclosure !== undefined
+  ...(result.schemaVersion === 'backtest-trade-result-v1' && result.tradingStatusDisclosure !== undefined
     ? {
         tradingStatus: tradingStatusDiagnosticExport(
           result.tradingStatusDisclosure,

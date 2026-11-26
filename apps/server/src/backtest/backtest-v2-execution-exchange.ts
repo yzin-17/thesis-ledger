@@ -1,22 +1,31 @@
 import {
-  runExchangeSimulation,
-  availabilityForDecision,
+  type runExchangeSimulation,
+  exchangeSimulationSteps,
+  advanceBacktestComputation,
+  finishBacktestComputation,
+  type BacktestComputationOptions,
+  projectBacktestTradesSteps,
+  buildBacktestAnalyticsSteps,
+  tradePlanIndicatorExpressions,
+  tradePlanProtectionRules,
+  dailyOrderPriceExpressions,
+  RuleDiagnosticsCollector,
+  strategyRuleExpressions,
   DecimalValue,
   type BacktestEquityPoint,
   type BacktestCorporateActionFact,
 } from '@thesis-ledger/domain';
-import { lifecycleSignalDateV3, lifecycleWarmupRowV3 } from './backtest-lifecycle-execution-v3.js';
+import { lifecycleSignalDateV3 } from './backtest-lifecycle-execution-v3.js';
+import { frozenExchangeSignalSeries } from './backtest-exchange-source-series.js';
+import { exchangeSessionSeriesSteps } from './backtest-session-series.js';
 import { runConfigSchemaV3, priceResearchReferenceArtifactKey } from '@thesis-ledger/schemas';
 import { expectedStatusRejectionV3 } from './backtest-status-rejection-availability-v3.js';
 import {
-  buildBacktestAnalytics,
-  projectBacktestTrades,
   SimulationLedger,
   tradingCalendarFromFact,
   VersionedExecutionRules,
   createRiskEvaluationAdapter,
   type BacktestSeries,
-  type SimulationTargetIntent,
   type BacktestVerticalInput,
   type ExchangeVerticalResult,
   calendarFact,
@@ -29,15 +38,14 @@ import {
   rowFor,
   rowsAtTimeframe,
   rowsForPurpose,
-  signalArtifactFor,
-  sourceSeriesKey,
   stringField,
   toCorporateAction,
 } from './backtest-v2-execution-shared.js';
-import { buildPointInTimeIndicatorSeries } from './backtest-adjusted-indicators.js';
+import { pointInTimeIndicatorSeriesSteps } from './backtest-adjusted-indicators.js';
 import { frozenAccountingActionsV3 } from './backtest-known-cash-accounting-v3.js';
 import { knownCashEntitlementV3 } from './backtest-known-cash-entitlement-v3.js';
 import { exchangeDecisionTicksV3 } from './backtest-exchange-clocks-v3.js';
+import { tradePlanExecutionInput } from './backtest-trade-plan-execution.js';
 import { cashDividendExecutionEventsV3 } from './backtest-cash-event-accounting-v3.js';
 import {
   annualizationFactorFromValuations,
@@ -45,8 +53,7 @@ import {
   buildBacktestEquityPoint,
 } from './backtest-equity-curve.js';
 import { requireFrozenExecutionRules } from './backtest-market-rules.js';
-import { buildBacktestSizingEquity } from './backtest-sizing-equity.js';
-import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
+import { exchangeSizing } from './backtest-exchange-sizing.js';
 import { requireV3EventSignalVisibility } from './backtest-v3-event-signal-clock.js';
 import { hkResearchLotForFactV3 } from './backtest-hk-research-lot-v3.js';
 
@@ -60,10 +67,12 @@ const runConfigVersion = (runConfig: ExchangeVerticalInput['runConfig']) => {
   return { accountingBasis: parsed.data.executionPriceProtocol.accountingBasis };
 };
 
-export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerticalResult => {
+export function* exchangeVerticalSteps(input: ExchangeVerticalInput): Generator<void, ExchangeVerticalResult, void> {
   const snapshotProtocol = runConfigVersion(input.runConfig);
   const isNormalizedSeries = snapshotProtocol.accountingBasis === 'normalized-series';
   const v3Config = input.runConfig;
+  const dailyOrders = input.strategy.execution.timing === 'dailyBarOrders' ? input.strategy.execution : undefined;
+  if (dailyOrders && !v3Config.dailyOrderMatching) throw new Error('日线委托缺少已冻结的模拟撮合政策');
   if (input.strategy.executionInstrument.assetType === 'fund') {
     throw new Error('NAV Fund 必须走 CN NAV simulation');
   }
@@ -88,9 +97,8 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
         end: input.runConfig.endDate,
       });
   const calendarRows = rowsForPurpose(input.rows, 'calendar');
-  const calendar = tradingCalendarFromFact(
-    calendarFact(rowFor(calendarRows, (row) => row.market === instrument.market)),
-  );
+  const frozenCalendar = calendarFact(rowFor(calendarRows, (row) => row.market === instrument.market));
+  const calendar = tradingCalendarFromFact(frozenCalendar);
   const rules = frozenExchangeRules(
     input,
     calendarRows,
@@ -106,14 +114,18 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
   const ledger = new SimulationLedger(ledgerConfig);
   const barRows = rowsForPurpose(input.rows, 'execution');
   const bars = executionBars(
-    rowsAtTimeframe(barRows, input.strategy.primaryTimeframe, calendar),
+    rowsAtTimeframe(barRows, input.strategy.primaryTimeframe, calendar, v3Config.priceResearch?.dailyObservationContract !== undefined),
     calendar,
     v3Config,
   );
+  yield;
   const fxRates = fxRatesFrom(input.rows);
   const actualRows = input.rows.get(`${input.runId}/${priceResearchReferenceArtifactKey}`) ?? [];
-  const actualBars = v3Config.priceResearch ? executionBars(actualRows, calendar, v3Config) : [];
+  const actualBars = v3Config.priceResearch ? executionBars(rowsAtTimeframe(actualRows, input.strategy.primaryTimeframe, calendar,
+    v3Config.priceResearch.dailyObservationContract !== undefined), calendar, v3Config) : [];
+  yield;
   const sourceSeries = frozenExchangeSignalSeries(input, calendarRows, barRows, isNormalizedSeries);
+  yield;
   const costs = {
     version: executionModel
       ? `execution-model-v1:${executionModel.id}:${executionModel.version}`
@@ -132,6 +144,7 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     calendar,
     bars,
   });
+  yield;
   const cashEntitlement = knownCashEntitlementV3(calendar, v3Config);
   const executionSeries: BacktestSeries = {
     sourceId: `execution:${instrument.market}:${instrument.symbol}`,
@@ -157,6 +170,7 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     const tradingDate = calendar.status(bar.occurredAt).date;
     return tradingDate >= input.runConfig.startDate && tradingDate <= input.runConfig.endDate;
   });
+  yield;
   const decisionBars = executionRangeBars.filter((bar) =>
     lifecycleSignalDateV3(v3Config, calendar.status(bar.occurredAt).date),
   );
@@ -165,6 +179,7 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     input.strategy.primaryTimeframe,
     (at) => calendar.status(at).date,
   );
+  yield;
   requireV3EventSignalVisibility({
     strategy: input.strategy,
     facts: corporateActions,
@@ -172,12 +187,22 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     symbol: instrument.symbol,
     market: instrument.market,
   });
-  const indicatorSeries = buildPointInTimeIndicatorSeries({
-    expressions: [input.strategy.entry, input.strategy.exit],
+  const regularIndicators = yield* pointInTimeIndicatorSeriesSteps({
+    expressions: [input.strategy.entry, input.strategy.exit, ...tradePlanIndicatorExpressions(input.strategy.tradePlan),
+      ...tradePlanProtectionRules(input.strategy.tradePlan).map(rule => rule.expression),
+      ...dailyOrderPriceExpressions(input.strategy.execution).map(rule => rule.expression)],
     sourceSeries,
     corporateActions: isNormalizedSeries ? [] : corporateActions,
     ticks,
   });
+  const sessions = yield* exchangeSessionSeriesSteps({
+    strategy: input.strategy, sourceSeries, calendarRows, ticks, runConfig: v3Config,
+  });
+  const indicatorSeries = new Map([...regularIndicators, ...sessions]);
+  for (const series of [...sourceSeries.values(), ...indicatorSeries.values()]) {
+    for (const point of series.points) { Object.freeze(point); yield; }
+    Object.freeze(series.points);
+  }
   const equityCurve: BacktestEquityPoint[] = [];
   const valuationUnavailableReasons: string[] = [];
   const valuationTicks = buildDailyValuationTicks({
@@ -188,14 +213,18 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
   });
   const riskAdapter = exchangeRiskAdapter(input, executionSeries);
   const positionStateAt = exchangePositionState(ledger, cashEntitlement, ticks);
-  const simulation = runExchangeSimulation({
+  const ruleDiagnostics = new RuleDiagnosticsCollector(strategyRuleExpressions(input.strategy), sourceSeries);
+  const simulation = yield* exchangeSimulationSteps({
     simulation: {
+      observeRule: ruleDiagnostics.observe,
       runId: input.runId,
       strategy: {
         entry: input.strategy.entry,
         exit: input.strategy.exit,
         executionInstrument: input.strategy.executionInstrument,
         primaryTimeframe: input.strategy.primaryTimeframe,
+        ...(input.strategy.entryTrigger ? { entryTrigger: input.strategy.entryTrigger } : {}),
+        ...(input.strategy.tradePlan ? { tradePlan: input.strategy.tradePlan } : {}),
       },
       ticks,
       sourceSeries,
@@ -237,6 +266,8 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     ledger,
     accountingBasis: snapshotProtocol.accountingBasis,
     exchange: {
+      ...(dailyOrders && v3Config.dailyOrderMatching ? { dailyOrders: { execution: dailyOrders, matching: v3Config.dailyOrderMatching } } : {}),
+      ...tradePlanExecutionInput(input.strategy, executionSeries, frozenCalendar, v3Config?.dataAsOf),
       ...(cashEntitlement
         ? {
             cashEntitlementFor: (fact: BacktestCorporateActionFact) =>
@@ -259,7 +290,7 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
       ),
     },
   });
-  return exchangeVerticalResult(input, {
+  const result = yield* exchangeVerticalResultSteps(input, {
     simulation,
     ledger,
     isNormalizedSeries,
@@ -269,7 +300,11 @@ export const runExchangeVertical = (input: ExchangeVerticalInput): ExchangeVerti
     ticks,
     fact,
   });
-};
+  return { ...result, ruleDiagnostics: ruleDiagnostics.snapshot() };
+}
+
+export const runExchangeVertical = (input: ExchangeVerticalInput) => finishBacktestComputation(exchangeVerticalSteps(input));
+export const runExchangeVerticalCooperatively = (input: ExchangeVerticalInput, options: BacktestComputationOptions) => advanceBacktestComputation(exchangeVerticalSteps(input), options);
 
 export type { ExchangeVerticalResult };
 
@@ -277,10 +312,6 @@ type FrozenExecutionModel =
   | NonNullable<Parameters<typeof runExchangeSimulation>[0]['exchange']['executionModel']>
   | undefined;
 type ExchangeCalendar = ReturnType<typeof tradingCalendarFromFact>;
-type ExchangeBars = ReturnType<typeof executionBars>;
-type ExchangeSizing = NonNullable<
-  Parameters<typeof runExchangeSimulation>[0]['exchange']['sizingForIntent']
->;
 
 function frozenExchangeRules(
   input: ExchangeVerticalInput,
@@ -347,89 +378,6 @@ function frozenExchangeRules(
   return rules;
 }
 
-function frozenExchangeSignalSeries(
-  input: ExchangeVerticalInput,
-  calendarRows: ReturnType<typeof rowsForPurpose>,
-  barRows: ReturnType<typeof rowsForPurpose>,
-  isNormalizedSeries: boolean,
-) {
-  const v3Config = input.runConfig;
-  const sourceSeries = new Map<string, BacktestSeries>();
-  for (const source of input.strategy.signalSources) {
-    const binding = v3Config.priceInputBindings?.signals.find(
-      (alias) => alias.sourceId === source.id,
-    );
-    const actualReference = binding?.binding === 'actual-price-series';
-    const priceKey = actualReference ? priceResearchReferenceArtifactKey : 'execution/bars.parquet';
-    const ref = binding
-      ? input.artifacts.find((artifact) => artifact.key.endsWith(`/${priceKey}`))
-      : signalArtifactFor(input.artifacts, source.asset.market, source.asset.symbol);
-    if (ref) {
-      const sourceCalendar = tradingCalendarFromFact(
-        calendarFact(rowFor(calendarRows, (row) => row.market === source.asset.market)),
-      );
-      let rows = rowsAtTimeframe(
-        input.rows.get(ref.key) ?? [],
-        source.timeframe,
-        sourceCalendar,
-      ).filter((row) => lifecycleWarmupRowV3(v3Config, row));
-      if (actualReference) {
-        const byTime = new Map(rows.map((row) => [Date.parse(String(row.occurredAt)), row]));
-        rows = barRows.map(
-          (row) =>
-            byTime.get(Date.parse(String(row.occurredAt))) ?? {
-              ...row,
-              open: null,
-              high: null,
-              low: null,
-              close: null,
-              volume: null,
-              amount: null,
-            },
-        );
-      }
-      for (const field of source.series) {
-        sourceSeries.set(sourceSeriesKey(source.id, field), {
-          sourceId: source.id,
-          symbol: source.asset.symbol,
-          market: source.asset.market,
-          assetType: source.asset.assetType,
-          field,
-          timeframe: source.timeframe,
-          adjusted: isNormalizedSeries && !actualReference,
-          points: rows.flatMap<BacktestSeries['points'][number]>((row) => {
-            if (typeof row.occurredAt !== 'string' || typeof row.availableAt !== 'string')
-              return [];
-            const value = row[field];
-            if (typeof value !== 'string') {
-              if (!actualReference) return [];
-              return [
-                {
-                  occurredAt: row.occurredAt,
-                  availableAt: row.availableAt,
-                  ...barResearchClocksV3(row, sourceCalendar, v3Config),
-                  status: 'unavailable',
-                  reason: '该会话缺少不复权参考价格',
-                },
-              ];
-            }
-            return [
-              {
-                occurredAt: row.occurredAt,
-                availableAt: row.availableAt,
-                ...barResearchClocksV3(row, sourceCalendar, v3Config),
-                value,
-                status: 'available' as const,
-              },
-            ];
-          }),
-        });
-      }
-    }
-  }
-
-  return sourceSeries;
-}
 
 function exchangeRiskAdapter(input: ExchangeVerticalInput, executionSeries: BacktestSeries) {
   const instrument = input.strategy.executionInstrument;
@@ -517,98 +465,8 @@ function exchangePositionState(
   return positionStateAt;
 }
 
-function exchangeSizing(
-  input: ExchangeVerticalInput,
-  bars: ExchangeBars,
-  calendar: ExchangeCalendar,
-  fact: ReturnType<typeof instrumentFact>,
-  fxRates: ReturnType<typeof fxRatesFrom>,
-  actualBars: ExchangeBars,
-  isNormalizedSeries: boolean,
-): ExchangeSizing {
-  const v3Config = input.runConfig;
-  const instrument = input.strategy.executionInstrument;
-  return (intent: SimulationTargetIntent, state) => {
-    const next = bars.find(
-      (bar) =>
-        Date.parse(bar.openedAt) > Date.parse(intent.occurredAt) &&
-        calendar.isTradingSession(bar.openedAt),
-    );
-    const openAvailability = next
-      ? {
-          availableAt: next.openAvailableAt,
-          ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
-        }
-      : undefined;
-    const evaluationAt = openAvailability
-      ? availabilityForDecision(openAvailability)!
-      : intent.occurredAt;
-    const sizingEquity = next
-      ? buildBacktestSizingEquity({
-          state,
-          executionCurrency: fact.currency,
-          evaluationAt,
-          policy: input.runConfig.valuationPolicy,
-          price: {
-            symbol: instrument.symbol,
-            market: instrument.market,
-            assetType: instrument.assetType,
-            currency: fact.currency,
-            price: next.open,
-            occurredAt: next.openedAt,
-            availableAt: next.openAvailableAt,
-            ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
-          },
-          fxRates,
-        })
-      : undefined;
-    let sizingRule = input.strategy.sizing;
-    if (intent.side === 'sell') {
-      if (isNormalizedSeries) sizingRule = { type: 'targetWeight', weight: '0' };
-      else sizingRule = { type: 'fixedQuantity', quantity: state.position.quantity };
-    }
-    const actual = next ? actualBars.find((bar) => bar.openedAt === next.openedAt) : undefined;
-    return {
-      rule: sizingRule,
-      ...(v3Config.priceResearch && sizingRule.type === 'fixedQuantity'
-        ? {
-            priceResearchReference: {
-              protocolVersion: v3Config.priceResearch.protocolVersion,
-              ...(actual
-                ? {
-                    actualPrice: {
-                      value: actual.open,
-                      occurredAt: actual.openedAt,
-                      availableAt: actual.openAvailableAt,
-                      ...(actual.openResearchClock
-                        ? { researchClock: actual.openResearchClock }
-                        : {}),
-                    },
-                  }
-                : {}),
-            },
-          }
-        : {}),
-      executionCurrency: fact.currency,
-      lotSize: fact.lotSize,
-      currentQuantity: state.position.quantity,
-      evaluationAt,
-      ...(next
-        ? {
-            price: {
-              value: next.open,
-              occurredAt: next.openedAt,
-              availableAt: next.openAvailableAt,
-              ...(next.openResearchClock ? { researchClock: next.openResearchClock } : {}),
-            },
-          }
-        : {}),
-      ...(sizingEquity ?? {}),
-    };
-  };
-}
 
-function exchangeVerticalResult(
+function* exchangeVerticalResultSteps(
   input: ExchangeVerticalInput,
   context: {
     simulation: ReturnType<typeof runExchangeSimulation>;
@@ -620,7 +478,7 @@ function exchangeVerticalResult(
     ticks: ReturnType<typeof exchangeDecisionTicksV3>;
     fact: ReturnType<typeof instrumentFact>;
   },
-): ExchangeVerticalResult {
+): Generator<void, ExchangeVerticalResult, void> {
   const {
     simulation,
     ledger,
@@ -637,13 +495,16 @@ function exchangeVerticalResult(
   const rejects = simulation.rejects.filter(
     (reject) => !isNormalizedSeries || reject.code !== 'CORPORATE_ACTION_IGNORED',
   );
-  const trades = projectBacktestTrades(
+  const trades = yield* projectBacktestTradesSteps(
     fills.map((fill) => ({ ...fill, charges: [...fill.charges] })),
-    { executionSymbol: instrument.symbol, currency: fact.currency },
+    { executionSymbol: instrument.symbol, currency: fact.currency, corporateActions: simulation.corporateActionResults },
   );
   const ledgerUnavailableReasons = simulation.ledgerMutations.flatMap((mutation) =>
     mutation.applied ? [] : [`LEDGER_${mutation.code}:${mutation.reason}`],
   );
+  if (ledgerUnavailableReasons.length)
+    throw Object.assign(new Error(`模拟账本未接受执行结果：${ledgerUnavailableReasons.join('；')}`),
+      { code: 'SIMULATION_LEDGER_ERROR' });
   const executionUnavailableReasons = rejects.flatMap((reject) => {
     if (expectedStatusRejectionV3(input.runConfig, reject)) return [];
     const expiredAtRangeEnd =
@@ -651,6 +512,7 @@ function exchangeVerticalResult(
     return expiredAtRangeEnd ? [] : [`${reject.code}:${reject.reason}`];
   });
   const unavailableReasons = [
+    ...(simulation.tradePlan?.diagnostics ?? []),
     ...valuationUnavailableReasons,
     ...(executionModel ? ledgerUnavailableReasons : []),
     ...(executionModel ? executionUnavailableReasons : []),
@@ -660,7 +522,7 @@ function exchangeVerticalResult(
         : [`CORPORATE_ACTION_REJECTED:${result.code}`],
     ),
   ];
-  const computedAnalytics = buildBacktestAnalytics({
+  const computedAnalytics = yield* buildBacktestAnalyticsSteps({
     runId: input.runId,
     strategyVersionId: input.strategyVersionId,
     snapshotId: input.snapshotId,
@@ -692,6 +554,7 @@ function exchangeVerticalResult(
     : computedAnalytics;
   return {
     fills,
+    ...(simulation.dailyOrders && v3Config.dailyOrderMatching ? { dailyOrders: { ...simulation.dailyOrders, matching: v3Config.dailyOrderMatching } } : {}),
     rejects,
     trades: trades.trades,
     analytics,

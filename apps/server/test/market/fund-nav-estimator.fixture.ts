@@ -26,12 +26,12 @@ export const fixture = (options: { quoteAt?: string; basisAt?: string; stale?: b
         getSession: controlledMarketSession,
         getQuote,
         getFundNav: async () => fundNavSchema.parse({
-          version: 3, symbol: '000001.OF', unitNav: 1,
+          version: 1, symbol: '000001.OF', unitNav: 1,
           navDate: options.futureNav ? '2026-11-05T00:00:00Z' : '2026-11-03T00:00:00Z',
           provider: 'fixture', fetchedAt: at.toISOString(), freshness: 'delayed',
         }),
         getFundHoldings: async () => fundHoldingsSchema.parse({
-          version: 3, fundSymbol: '000001.OF', reportPeriod: '2026-Q3',
+          version: 1, fundSymbol: '000001.OF', reportPeriod: '2026-Q3',
           disclosureDate: options.disclosure ?? '2026-10-30T00:00:00Z',
           provider: 'fixture', fetchedAt: at.toISOString(), evidenceVersion: 'fixture',
           holdings: [{ symbol: '600519.SH', name: '受控持仓', weight: 0.25 }],

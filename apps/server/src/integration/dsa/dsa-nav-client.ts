@@ -20,7 +20,7 @@ export class DsaNavClient {
     const signal = AbortSignal.timeout(this.config.dsaTimeoutMs);
     try {
       const response = await fetch(
-        new URL('/api/v3/thesis-ledger/backtest/nav-inputs', this.config.dsaBaseUrl),
+        new URL('/api/v1/thesis-ledger/backtest/nav-inputs', this.config.dsaBaseUrl),
         {
           method: 'POST',
           redirect: 'error',

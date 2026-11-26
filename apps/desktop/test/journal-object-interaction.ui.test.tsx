@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { journalExplanationResult } from './journal-ai-session.fixture.js';
 import { createHash, webcrypto } from 'node:crypto';
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -86,16 +87,7 @@ function journalObjectInteractionContext() {
       algorithmVersion: 'journal-decimal-1',
       status: 'succeeded',
       errorSummary: null,
-      result: {
-        version: 1,
-        provider: '验收 Provider',
-        conclusion: '本轮 AI 生成结果',
-        evidence: [],
-        risks: [],
-        unknowns: [],
-        disclaimer: '测试说明',
-        createdAt: '2026-11-13T00:00:00Z',
-      },
+      result: journalExplanationResult('本轮 AI 生成结果'),
     }));
   });
   const mount = async () => {

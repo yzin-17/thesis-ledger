@@ -30,7 +30,7 @@ const session = (): MarketSession => ({
 const response = (input: MarketDetailRequest): MarketDisplayDetailResponse => {
   const at = new Date().toISOString();
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     symbol: input.symbol,
     assetType: 'STOCK',
     identity: { source: 'asset', status: 'confirmed' },
@@ -45,7 +45,7 @@ const response = (input: MarketDetailRequest): MarketDisplayDetailResponse => {
         capability: 'quote',
         status: 'ready',
         data: {
-          version: 3,
+          version: 1,
           symbol: input.symbol,
           open: sequence,
           high: sequence + 1,
@@ -68,7 +68,7 @@ const response = (input: MarketDetailRequest): MarketDisplayDetailResponse => {
       },
     },
     barSeries: {
-      contractVersion: 3,
+      contractVersion: 1,
       identity: {
         symbol: input.symbol,
         assetType: 'STOCK',
@@ -152,15 +152,15 @@ function Harness() {
     onLatestDetail: setDetail,
     onSectionRetry: setDetail,
   });
-  retryLatest = () => { void latest.retryLater(); };
+  retryLatest = () => {
+    void latest.retryLater();
+  };
   const query = useMarketDetailQuery({ ...options, enabled: true, latestRefresh: latest });
   setAutomatic = query.setAutoRefresh;
   useEffect(() => {
     if (query.data) setDetail(query.data);
   }, [query.data]);
-  const page = latest.laterPages.at(-1)?.response ?? detail;
-  const quote = detail?.sections.quote;
-  const price = quote?.capability === 'quote' ? quote.data?.price : undefined;
+  const { page, price } = marketQueryHarnessReadout(latest, detail);
   return (
     <output
       data-loading={query.isFetching || latest.latestLoading}
@@ -397,3 +397,13 @@ describe('服务端交易会话有效期', () => {
     expect(minuteSessionIsOpen(null, NOW, NOW)).toBe(false);
   });
 });
+
+function marketQueryHarnessReadout(
+  latest: ReturnType<typeof useMarketChartLatestRefresh>,
+  detail: MarketDisplayDetailResponse | null,
+) {
+  const page = latest.laterPages.at(-1)?.response ?? detail;
+  const quote = detail?.sections.quote;
+  const price = quote?.capability === 'quote' ? quote.data?.price : undefined;
+  return { page, price };
+}

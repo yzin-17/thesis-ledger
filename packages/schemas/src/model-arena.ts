@@ -26,9 +26,10 @@ const instrument = z.strictObject({
   assetType: z.enum(['STOCK', 'ETF']),
 });
 const unique = (values: string[]) => new Set(values).size === values.length;
+export const arenaHistoricalProtocolVersion = 'arena-historical-match-protocol-v1';
 export const arenaProtocolSchema = z
   .strictObject({
-    version: z.literal(1),
+    version: z.literal(arenaHistoricalProtocolVersion),
     title: label,
     market: z.enum(['CN', 'HK', 'US']),
     currency: currencySchema,

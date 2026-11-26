@@ -8,7 +8,7 @@ import { quoteControlFixture, quoteControlCacheKey } from './quote-control-fixtu
 
 const now = Date.parse('2026-11-09T02:00:00Z');
 const quote: Quote = {
-  version: 3, symbol: '600519.SH', price: 10, open: 10, high: 11, low: 9,
+  version: 1, symbol: '600519.SH', price: 10, open: 10, high: 11, low: 9,
   previousClose: 10, volume: null, amount: null, stale: false,
   freshness: 'live', provider: 'fixture', marketTime: '2026-11-09T01:59:00Z',
   fetchedAt: '2026-11-09T01:59:01Z',

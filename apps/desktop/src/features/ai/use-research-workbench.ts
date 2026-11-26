@@ -108,7 +108,6 @@ export function useResearchWorkbench() {
   const navigate = useNavigate();
   const pageState = useMemo(() => parseAiResearchPageState(location.search), [location.search]);
   const accountMode = useOptionalPortfolioMode()?.mode ?? 'actual';
-  const historical = new URLSearchParams(location.search).get('history') === 'legacy';
   const [newResearchOpen, setNewResearchOpen] = useState(false);
   const [initialQuestion, setInitialQuestion] = useState('');
   const [initialInstrument, setInitialInstrument] = useState<InstrumentLookup | null>(null);
@@ -116,12 +115,10 @@ export function useResearchWorkbench() {
     const seed = readResearchSeed(location.state, owner);
     if (!seed) return;
     setInitialInstrument(seed);
-    setRetryOfRunId(undefined);
     setInitialQuestion('');
     setNewResearchOpen(true);
     void navigate(location.pathname + location.search, { replace: true, state: null });
   }, [location.state, location.pathname, location.search, owner, navigate]);
-  const [retryOfRunId, setRetryOfRunId] = useState<string | undefined>();
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const listFallbackRef = useRef<HTMLElement | null>(null);
@@ -133,7 +130,6 @@ export function useResearchWorkbench() {
     setInitialInstrument(null);
     setNewResearchOpen(false);
     setInitialQuestion('');
-    setRetryOfRunId(undefined);
     setNavigationIds([]);
     void navigate('/ai-chat', { replace: true });
   }, [owner, navigate]);
@@ -144,7 +140,6 @@ export function useResearchWorkbench() {
   ) => {
     const next = { ...pageState, ...updates };
     const params = new URLSearchParams(serializeAiResearchPageState(next));
-    if (historical) params.set('history', 'legacy');
     const search = params.toString();
     void navigate(
       { pathname: '/ai-chat', ...(search ? { search: `?${search}` } : {}) },
@@ -154,32 +149,29 @@ export function useResearchWorkbench() {
 
   const [searchInput, setSearchInput] = useResearchPageSearch(
     pageState.search,
-    JSON.stringify([owner, accountMode, historical]),
+    JSON.stringify([owner, accountMode]),
     (value) => updatePageState({ search: value, selectedRunId: null, mode: 'list' }),
   );
 
   const listFilter = useMemo(
-    () => researchWorkbenchListFilter(pageState, historical, accountMode),
+    () => researchWorkbenchListFilter(pageState, accountMode),
     [
       pageState.includeInternal,
       pageState.search,
       pageState.sort,
       pageState.source,
       pageState.status,
-      historical,
       accountMode,
     ],
   );
   const runsQuery = useResearchReportsQuery(listFilter);
   const detailQuery = useResearchReportQuery(
     pageState.selectedRunId,
-    listFilter.view === 'legacy'
-      ? { view: 'legacy' }
-      : {
-          view: 'scoped',
-          mode: accountMode,
-          ...(listFilter.kind ? { kind: listFilter.kind } : {}),
-        },
+    {
+      view: 'scoped',
+      mode: accountMode,
+      ...(listFilter.kind ? { kind: listFilter.kind } : {}),
+    },
   );
   const capabilitiesQuery = useAiCapabilitiesQuery();
   const runs = useMemo(() => uniqueRuns(runsQuery.data?.pages), [runsQuery.data?.pages]);
@@ -237,11 +229,10 @@ export function useResearchWorkbench() {
     updatePageState({ selectedRunId: null, mode: 'list' });
   };
 
-  const openNewResearch = (question = '', retryId?: string) => {
+  const openNewResearch = (question = '') => {
     const openForm = () => {
       setInitialInstrument(null);
       setInitialQuestion(question);
-      setRetryOfRunId(retryId);
       setNewResearchOpen(true);
     };
     if (pageState.selectedRunId) {
@@ -252,16 +243,15 @@ export function useResearchWorkbench() {
     openForm();
   };
 
-  const handleCreated = (run: Pick<AiRunResult, 'id'>, view: 'legacy' | 'scoped') => {
+  const handleCreated = (run: Pick<AiRunResult, 'id'>) => {
     setNewResearchOpen(false);
-    setRetryOfRunId(undefined);
     void runsQuery.refetch();
     setNavigationIds([]);
     requestAnimationFrame(
       () =>
         void navigate({
           pathname: '/ai-chat',
-          search: `?run=${encodeURIComponent(run.id)}&mode=drawer${view === 'legacy' ? '&history=legacy' : ''}`,
+          search: `?run=${encodeURIComponent(run.id)}&mode=drawer`,
         }),
     );
   };
@@ -269,7 +259,6 @@ export function useResearchWorkbench() {
     setNewResearchOpen(open);
     if (!open) {
       setInitialQuestion('');
-      setRetryOfRunId(undefined);
     }
   };
 
@@ -290,32 +279,17 @@ export function useResearchWorkbench() {
     contentRef,
     onClose: closeDetail,
     onSwitch: switchRun,
-    onRetry: (run: AiRunRecord) =>
-      openNewResearch(
-        run.question ?? '',
-        run.savedReport?.historicalScope.status === 'known' ? undefined : run.id,
-      ),
+    onRetry: (run: AiRunRecord) => openNewResearch(run.question ?? ''),
     onOpenSource: (href: string) => void navigate(href),
-    ...(!historical && pageState.selectedRunId
-      ? {
-          onLegacy: () =>
-            void navigate({
-              pathname: '/ai-chat',
-              search: `?history=legacy&run=${encodeURIComponent(pageState.selectedRunId!)}&mode=drawer`,
-            }),
-        }
-      : {}),
   };
 
   return {
     navigate,
     pageState,
     accountMode,
-    historical,
     initialInstrument,
     newResearchOpen,
     initialQuestion,
-    retryOfRunId,
     listFallbackRef,
     searchInput,
     setSearchInput,
@@ -335,24 +309,14 @@ export function useResearchWorkbench() {
 
 function researchWorkbenchListFilter(
   pageState: ReturnType<typeof parseAiResearchPageState>,
-  historical: boolean,
   accountMode: 'actual' | 'shadow',
 ) {
   return {
-    ...(historical
-      ? { view: 'legacy' as const }
-      : {
-          view: 'scoped' as const,
-          mode: accountMode,
-          ...(['instrument', 'portfolio', 'account', 'position', 'strategy'].includes(
-            pageState.source,
-          )
-            ? {
-                kind: pageState.source as
-                  'instrument' | 'portfolio' | 'account' | 'position' | 'strategy',
-              }
-            : {}),
-        }),
+    view: 'scoped' as const,
+    mode: accountMode,
+    ...(['instrument', 'portfolio', 'account', 'position', 'strategy'].includes(pageState.source)
+      ? { kind: pageState.source as 'instrument' | 'portfolio' | 'account' | 'position' | 'strategy' }
+      : {}),
     ...(pageState.status === 'all' ? {} : { status: pageState.status }),
     ...(pageState.search ? { search: pageState.search } : {}),
   };

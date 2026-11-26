@@ -1,5 +1,5 @@
 export interface CatalogJobResponse {
-  contractVersion: 3;
+  contractVersion: 1;
   consumer: 'thesis-ledger';
   id: string;
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'timeout';
@@ -34,7 +34,7 @@ const jobFields = new Set([
 function assertJobIdentity(value: Record<string, unknown>, expectedId?: string) {
   if (
     Object.keys(value).some((key) => !jobFields.has(key)) ||
-    value.contractVersion !== 3 ||
+    value.contractVersion !== 1 ||
     value.consumer !== 'thesis-ledger' ||
     typeof value.id !== 'string' ||
     !value.id ||
@@ -104,7 +104,7 @@ export function parseCatalogJobResponse(raw: unknown, expectedId?: string): Cata
   assertJobLease(value);
   assertJobProjection(value);
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     id: value.id as string,
     status: value.status as CatalogJobResponse['status'],

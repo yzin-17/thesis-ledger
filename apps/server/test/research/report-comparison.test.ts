@@ -187,7 +187,7 @@ describe('冻结比较的范围与可用性', () => {
             value.scopeSnapshot.scope === 'instrument' ? value.scopeSnapshot.instrument : null;
           value.request.scope = { scope: 'portfolio', portfolioId: 'all' };
           value.scopeSnapshot = {
-            version: 'research-scope-v2',
+            version: 'research-scope-snapshot-v1',
             mode: value.request.mode,
             confirmedAt: value.scopeSnapshot.confirmedAt,
             scope: 'portfolio',
@@ -220,7 +220,7 @@ describe('冻结比较的范围与可用性', () => {
       frozen: null,
       detail: {
         ...before.source.detail,
-        resultVersion: 1 as const,
+        resultVersion: null,
         result: null,
         submission: null,
         availability: 'missing' as const,

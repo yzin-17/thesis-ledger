@@ -22,7 +22,7 @@ function fixture() {
   const primary = { providerId: 'any-primary', upstreamSource: 'announced-plans' };
   const secondary = { providerId: 'any-secondary', upstreamSource: 'secondary-plans' };
   const effective = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'policy',
     revision: 1,
@@ -43,7 +43,7 @@ function fixture() {
     ],
   };
   const catalog = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     catalogRevision: 1,
     generatedAt: '2026-10-09T12:00:00Z',

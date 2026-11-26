@@ -89,7 +89,7 @@ describe('真实行情读取器自动记录', () => {
   it('实际日历覆盖不足记录问题，输入错误和来源不可用不记录', async () => {
     const observe = vi.fn(async () => null);
     const marketCalendar = vi.fn(async () => ({
-      version: 3,
+      version: 1,
       status: 'supported',
       coverage: { start: '2026-09-21', end: '2026-09-27', complete: false },
       provider: 'fixture',

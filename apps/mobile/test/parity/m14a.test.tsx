@@ -13,7 +13,7 @@ describe('M14a 证券静态资料', () => {
           symbol: '00700.HK',
           sharesPerLot: '100',
           historicalChanges: 'unverified',
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId: 'fixture-lot',
           fetchedAt: '2026-10-23T01:00:00Z',

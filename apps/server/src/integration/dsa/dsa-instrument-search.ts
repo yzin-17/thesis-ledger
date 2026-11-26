@@ -4,7 +4,7 @@ import type { DsaClient } from './dsa.client.js';
 import { DsaError } from './dsa-client-errors.js';
 
 const responseSchema = z.object({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   providerId: z.enum(['hithink', 'futu']),
   items: z.array(catalogItemSchema.extend({
     canonicalCode: z.string().trim().min(1),
@@ -16,7 +16,7 @@ const responseSchema = z.object({
 
 export async function searchDsaInstruments(dsa: DsaClient, query: string) {
   const params = new URLSearchParams({ query });
-  const response = await dsa.get<unknown>(`/api/v3/thesis-ledger/instruments/search?${params}`, 1);
+  const response = await dsa.get<unknown>(`/api/v1/thesis-ledger/instruments/search?${params}`, 1);
   const parsed = responseSchema.safeParse(response);
   if (!parsed.success) throw new DsaError('标的搜索响应格式无效', 'invalid-response');
   return parsed.data.items;

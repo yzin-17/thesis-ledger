@@ -5,12 +5,12 @@ import {
 } from '../src/research-report-metadata.js';
 
 const request = reportMetadataRequestSchema.parse({
-  contractVersion: 3, consumer: 'thesis-ledger', requestId: 'metadata-test', symbol: '600519.SH',
+  contractVersion: 1, consumer: 'thesis-ledger', requestId: 'metadata-test', symbol: '600519.SH',
   start: '2026-08-01', end: '2026-10-23', page: 1, pageSize: 2, requestBudgetMs: 3000,
 });
 const response = {
-  contractVersion: 3, consumer: 'thesis-ledger', capability: 'RESEARCH_REPORT_METADATA',
-  metadataVersion: 'research-report-metadata-v1', adapterRevision: 'eastmoney-report-metadata-page-v1',
+  contractVersion: 1, consumer: 'thesis-ledger', capability: 'RESEARCH_REPORT_METADATA',
+  metadataVersion: 'market-external-report-metadata-v1', adapterRevision: 'eastmoney-report-metadata-page-v1',
   sourceRevision: 'eastmoney-report-list-single-page-v1',
   requestId: request.requestId, symbol: request.symbol, start: request.start, end: request.end,
   page: 1, pageSize: 2, totalItems: 772, totalPages: 386, historyComplete: false,

@@ -1,5 +1,6 @@
 {
-  "contractVersion": 3,
+  "contractVersion": 1,
+  "contract": "dsa-control-v1",
   "consumer": "thesis-ledger",
   "accepted": true,
   "providerRegistry": true,

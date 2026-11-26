@@ -1,6 +1,5 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '../shared/PageHeader.js';
 import { RefreshIconButton } from '../shared/RefreshIconButton.js';
 import { usePageRefresh } from '../shared/usePageRefresh.js';
@@ -8,7 +7,6 @@ import { researchKeys } from './research.queries.js';
 import { aiKeys } from './ai.queries.js';
 import { ResearchDetailSheet, ResearchReadingView } from './AiResearchDetailView.js';
 import { AiRunList } from './AiRunList.js';
-import { NewResearchSheet } from './NewResearchSheet.js';
 import { ResearchSubmissionSheet } from './ResearchSubmissionSheet.js';
 import { useResearchWorkbench } from './use-research-workbench.js';
 
@@ -20,15 +18,12 @@ export function AiChat() {
   const {
     navigate,
     pageState,
-    historical,
     newResearchOpen,
     initialQuestion,
     initialInstrument,
-    retryOfRunId,
     listFallbackRef,
     searchInput,
     setSearchInput,
-    setNavigationIds,
     runsQuery,
     runs,
     loadState,
@@ -76,37 +71,14 @@ export function AiChat() {
           )}
         </div>
       )}
-      <Tabs
-        value={historical ? 'legacy' : 'scoped'}
-        onValueChange={(value) => {
-          if (value !== 'scoped' && value !== 'legacy') return;
-          void navigate({
-            pathname: '/ai-chat',
-            search: value === 'legacy' ? '?history=legacy' : '',
-          });
-          setNavigationIds([]);
-        }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <TabsList variant="line" aria-label="报告范围" className="w-auto min-w-0 max-w-full">
-            <TabsTrigger value="scoped">当前模式研究</TabsTrigger>
-            <TabsTrigger value="legacy">历史报告</TabsTrigger>
-          </TabsList>
-          <Button type="button" size="sm" className="ml-auto shrink-0" onClick={() => openNewResearch()}>
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex justify-end">
+          <Button type="button" size="sm" onClick={() => openNewResearch()}>
             新建研究
           </Button>
         </div>
-        <TabsContent
-          value={historical ? 'legacy' : 'scoped'}
-          className="flex min-w-0 flex-col gap-3"
-        >
-          {historical && (
-            <p className="text-sm text-muted-foreground">
-              历史范围未记录，旧报告按原权限读取，不归入当前账户模式。
-            </p>
-          )}
           <AiRunList
-            readView={historical ? 'legacy' : 'scoped'}
+            readView="scoped"
             runs={runs}
             selectedId={pageState.selectedRunId}
             status={pageState.status}
@@ -143,30 +115,19 @@ export function AiChat() {
             onLoadMore={() => void runsQuery.fetchNextPage()}
             isLoadingMore={runsQuery.isFetchingNextPage}
           />
-        </TabsContent>
-      </Tabs>
+      </div>
       <ResearchDetailSheet
         {...detailViewProps}
         open={pageState.mode === 'drawer' && Boolean(pageState.selectedRunId)}
         onRead={() => updatePageState({ mode: 'reading' })}
       />
-      {retryOfRunId ? (
-        <NewResearchSheet
-          open={newResearchOpen}
-          onOpenChange={changeNewResearchOpen}
-          initialQuestion={initialQuestion}
-          retryOfRunId={retryOfRunId}
-          onCreated={(run) => handleCreated(run, 'legacy')}
-        />
-      ) : (
         <ResearchSubmissionSheet
           initialInstrument={initialInstrument}
           open={newResearchOpen}
           onOpenChange={changeNewResearchOpen}
           initialQuestion={initialQuestion}
-          onCreated={(receipt) => handleCreated({ id: receipt.runId }, 'scoped')}
+          onCreated={(receipt) => handleCreated({ id: receipt.runId })}
         />
-      )}
     </section>
   );
 }

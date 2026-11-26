@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { backtestDailyMatchingSchema } from './backtest-daily-orders.js';
 import {
   backtestLifecyclePreparationV3Schema,
   lifecycleRunIssuesV3,
@@ -84,13 +85,15 @@ export const validateRunConfig = (
 /** 当前配置冻结明确的价格坐标与历史可见性语义。 */
 const runConfigV3Fields = z
   .strictObject({
-    schemaVersion: z.literal('3'),
+    schemaVersion: z.literal('backtest-trade-config-v1'),
     priceResearch: backtestPriceResearchSchema.optional(),
     ...runConfigFields,
     executionModel: backtestExecutionModelSchemaV3.optional(),
+    dailyOrderMatching: backtestDailyMatchingSchema.optional(),
     executionPriceProtocol: executionPriceProtocolSchema,
     priceInputBindings: backtestPriceInputBindingsSchemaV3.optional(),
     frozenExecutionWindow: marketFrozenWindowRefV3Schema.optional(),
+    signalPriceWindows: z.array(z.strictObject({ artifactKey: z.string().min(1).max(500), frozenWindowRef: marketFrozenWindowRefV3Schema })).max(12).optional(),
     lifecyclePreparation: backtestLifecyclePreparationV3Schema.optional(),
     knownCashPreparation: backtestKnownCashPreparationV3Schema.optional(),
     frozenWarmupBudgetSessions: z.number().int().min(0).max(504).optional(),
@@ -158,7 +161,7 @@ export type RunConfigV3 = z.infer<typeof runConfigSchemaV3>;
 
 /** 当前 Run 创建入口。 */
 export const backtestRunCreateSchemaV3 = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   preparationStamp: backtestPreflightRevisionStampV3Schema,
   strategyVersionId: z.uuid(),
   runConfig: runConfigSchemaV3,
@@ -179,6 +182,10 @@ export const backtestRunStageSchema = z.enum([
   'preparation-failed',
   'queued',
   'snapshot-finalized',
+  'preparing',
+  'freezing',
+  'simulating',
+  'analyzing',
   'running',
   'persisting-result',
   'succeeded',
@@ -191,8 +198,9 @@ export const backtestRunResponseSchemaV3 = z
   .object({
     id: z.string().trim().min(1),
     strategyVersionId: z.string().trim().min(1),
-    mode: z.literal('V3'),
+    mode: z.literal('frozen'),
     status: backtestRunStatusSchema,
+    replayOfRunId: z.uuid().optional(),
     stage: backtestRunStageSchema.nullable().optional(),
     snapshotId: z.string().trim().min(1).nullable().optional(),
     errorCode: z.string().trim().min(1).nullable().optional(),
@@ -259,6 +267,8 @@ export const validateStrategyRunConfig = (
         message: error.message,
       }))
     : [];
+  const daily = strategy.execution.timing === 'dailyBarOrders';
+  if (daily && !runConfig.dailyOrderMatching) errors.push({ code: 'INVALID_SCHEMA', path: ['runConfig', 'dailyOrderMatching'], message: '日线委托须明确冻结模拟撮合政策' });
   return {
     valid: errors.length === 0 && cash.valid,
     errors: [...errors, ...cash.errors],

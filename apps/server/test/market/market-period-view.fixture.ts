@@ -57,7 +57,7 @@ export function periodViewFixture(timeframe: MarketPeriod = '1w', warmup = false
       availableAt: `${date}T07:00:00.000Z`,
     }));
   const source = barSeriesSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     identity,
     points,
     coverage: {

@@ -13,7 +13,7 @@ import { evaluateResearchTraceInputV1 } from '../../src/ai/ai-research-trace-eva
 const fixture = () =>
   researchTraceInputV1Schema.parse(
     JSON.parse(
-      readFileSync(new URL('./fixtures/research-trace-v1.samples.json', import.meta.url), 'utf8'),
+      readFileSync(new URL('./fixtures/research-trace-current.samples.json', import.meta.url), 'utf8'),
     ),
   );
 type Input = ReturnType<typeof fixture>;

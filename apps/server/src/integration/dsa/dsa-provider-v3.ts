@@ -9,7 +9,7 @@ import {
 } from '@thesis-ledger/schemas';
 import { DsaV3ProtocolError } from './dsa-v3-protocol.js';
 
-const envelope = { contractVersion: z.literal(3), consumer: z.literal('thesis-ledger') };
+const envelope = { contractVersion: z.literal(1), consumer: z.literal('thesis-ledger') };
 const identity = { ...envelope, providerId: z.string().min(1), requestId: z.string().min(1) };
 const registry = marketProviderRegistrySchema;
 const config = marketProviderConfigResponseSchema;
