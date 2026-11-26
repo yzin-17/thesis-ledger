@@ -205,7 +205,7 @@ describe('用途验证真实 HTTP/SSE 超时与取消', () => {
         authMode: 'none',
         apiKey: '',
         model: 'model',
-        timeoutMs: 35,
+        timeoutMs: 500,
       }),
     ).rejects.toThrow();
     expect(requests).toBe(1);

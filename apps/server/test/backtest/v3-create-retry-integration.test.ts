@@ -33,7 +33,7 @@ afterEach(async () => {
 type HarnessOptions = {
   multipleSignals?: boolean;
   failFirstRun?: boolean;
-  waitForAbort?: boolean;
+  onRunnerStart?: () => void;
   raceExisting?: Record<string, unknown>;
 };
 
@@ -90,7 +90,8 @@ const createHarness = async (options: HarnessOptions = {}) => {
         return localRunner.run(input, signal, context);
       }),
     };
-  } else if (options.waitForAbort) {
+  } else if (options.onRunnerStart) {
+    const notifyRunnerStarted = options.onRunnerStart;
     runner = {
       id: localRunner.id,
       run: vi.fn(
@@ -99,6 +100,7 @@ const createHarness = async (options: HarnessOptions = {}) => {
             observedSignal = signal;
             releaseAbort = () => reject(new Error('aborted'));
             signal.addEventListener('abort', () => releaseAbort?.(), { once: true });
+            notifyRunnerStarted();
           }),
       ),
     };
@@ -478,11 +480,17 @@ describe("冻结重试及幂等竞争", () => {
 
 describe("取消与晚到提交", () => {
   it('does not let a cancellation commit a late result', async () => {
-    const harness = await createHarness({ waitForAbort: true });
+    let onRunnerStart!: () => void;
+    const started = new Promise<void>((resolve) => { onRunnerStart = resolve; });
+    const harness = await createHarness({ onRunnerStart });
     const created = await harness.service.createRun(harness.request);
     assert(created);
     const running = harness.service.runCurrent(String(created.id));
-    await vi.waitFor(() => expect(harness.runner.run).toHaveBeenCalledOnce());
+    await Promise.race([
+      started,
+      running.then(() => { throw new Error('回测在执行器启动前已结束'); }),
+    ]);
+    expect(harness.runner.run).toHaveBeenCalledOnce();
 
     harness.setJob({ ...harness.job()!, cancelRequestedAt: new Date() });
     expect(harness.service.abortActiveRun(String(created.id))).toBe(true);

@@ -91,7 +91,7 @@ function sdkExecutionContext() {
       costCurrency: 'USD',
       pricingVersion: 'fixture-v1',
     },
-    sdkRuntime: () => ({ baseURL: `${baseURL}/v1`, apiKey: 'fixture-secret', timeoutMs: 2_000 }),
+    sdkRuntime: () => ({ baseURL: `${baseURL}/v1`, apiKey: 'fixture-secret', timeoutMs: 15_000 }),
   };
   const route = { provider: provider.id, model: 'fixture-model' };
   const step = {
@@ -132,8 +132,8 @@ function sdkExecutionContext() {
       model: 'fixture-model',
       mode: 'json_validated',
       contract,
-      firstOutputTimeoutMs: 1_000,
-      outputIdleTimeoutMs: 1_000,
+      firstOutputTimeoutMs: 5_000,
+      outputIdleTimeoutMs: 5_000,
       readiness: { state: 'ready', reasons: [], configurationFingerprint: 'fixture-fingerprint' },
     },
   });

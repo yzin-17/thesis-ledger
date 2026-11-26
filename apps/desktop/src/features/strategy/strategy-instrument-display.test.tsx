@@ -33,6 +33,7 @@ describe('策略标的名称展示', () => {
     const host = document.createElement('div'); document.body.append(host);
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
+        fetcher.mockClear();
         const root = createRoot(host);
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
         await interact(() => root.render(<QueryClientProvider client={client}>
