@@ -1,6 +1,6 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { strategySchema } from '@thesis-ledger/schemas';
+import { requireNewStrategyDefinition } from './strategy-definition-write.js';
 import type { PrismaService } from '../platform/prisma.service.js';
 
 /** 所有正式版本发布共用同一策略锁；实验内部的非正版本另行分配。 */
@@ -18,14 +18,16 @@ export async function publishManualStrategyVersion(
   strategyId: string,
   schema: unknown,
 ) {
-  const parsed = strategySchema.parse(schema);
+  if (!schema || typeof schema !== 'object' || !('entryTrigger' in schema) || schema.entryTrigger === undefined)
+    throw new BadRequestException({ code: 'STRATEGY_ENTRY_TRIGGER_REQUIRED', message: '请先按原版本物化并核对入场政策，再发布新版本。' });
+  const parsed = requireNewStrategyDefinition(schema);
   return prisma.$transaction(async (transaction) => {
     await lockStrategyVersionPublication(transaction, strategyId);
     const owner = await transaction.strategy.findUnique({
       where: { id: strategyId }, select: { schemaVersion: true },
     });
     if (!owner) throw new NotFoundException('策略不存在');
-    if (![2, 3].includes(owner.schemaVersion)) {
+    if (owner.schemaVersion !== 1) {
       throw new ConflictException({
         code: 'UNSUPPORTED_CONTRACT_VERSION', message: '旧策略不支持创建现行版本',
       });
@@ -35,7 +37,7 @@ export async function publishManualStrategyVersion(
     });
     return transaction.strategyVersion.create({ data: {
       strategyId, version: Math.max(latest._max.version ?? 0, 0) + 1,
-      schemaVersion: Number(parsed.schemaVersion), schema: parsed as Prisma.InputJsonValue,
+      schemaVersion: 1, schema: parsed,
       source: { kind: 'manual' },
     } });
   });

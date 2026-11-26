@@ -72,7 +72,7 @@ export function completedOptimizationRun(input: {
     strategyVersionId: input.strategyVersionId,
     snapshotId: manifest.contentHash,
     engineVersion: 'postgres-e2e-engine',
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-result-v1',
     snapshotVersion: manifest.manifestVersion,
     marketRuleVersion: manifest.marketRuleVersion,
     calendarVersion: manifest.calendarVersion,
@@ -117,7 +117,7 @@ export function completedOptimizationRun(input: {
     errorSummary: null,
     input: {
       contractVersion: 1,
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-run-v1',
       runConfig: config,
       snapshotId: manifest.contentHash,
       snapshotVersion: manifest.manifestVersion,

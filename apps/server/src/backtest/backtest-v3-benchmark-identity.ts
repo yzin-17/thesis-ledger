@@ -20,13 +20,14 @@ export function benchmarkCompatibilityIdentityV3(
   costAssumption: BacktestBenchmarkCostAssumption | undefined,
   benchmarkConvention: string,
 ): BacktestBenchmarkCompatibilityIdentity {
+  if (source.routeKey.kind !== 'bar') throw new Error('基准价格身份需要冻结的 K 线来源');
   return {
     priceProtocol: {
       priceBasis: JSON.parse(
         JSON.stringify(runConfig.executionPriceProtocol.priceBasis),
       ) as BacktestBenchmarkCompatibilityFact,
       accountingBasis: runConfig.executionPriceProtocol.accountingBasis,
-      timeframe: '1d',
+      timeframe: source.routeKey.timeframe,
     },
     returnProtocol: {
       version: 'v3-total-return-v1',

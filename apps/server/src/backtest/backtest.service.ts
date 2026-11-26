@@ -15,6 +15,7 @@ import { BacktestRunService } from './backtest-run.service.js';
 import type { ComparableDataFingerprintRange } from './backtest-run.service.js';
 import { persistedRunContract } from './backtest-v3-run-lifecycle.js';
 import { assertCurrentRunForRead, isCurrentRunForRead } from './backtest-current-run-read.js';
+import { withBacktestModelDisclosure } from './backtest-model-disclosure.js';
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
 import { visibleStrategyOwners } from './strategy-access.service.js';
 import { StrategyCreationService } from './strategy-creation.service.js';
@@ -66,8 +67,8 @@ export class BacktestService {
 
   async listStrategies(ownerId?: string | null) {
     const strategies = await this.prisma.strategy.findMany({
-      where: { schemaVersion: { in: [2, 3] }, status: { not: 'experiment-only' }, ...visibleStrategyOwners(ownerId) },
-      include: { versions: { where: { schemaVersion: { in: [2, 3] } } } },
+      where: { schemaVersion: 1, status: { not: 'experiment-only' }, ...visibleStrategyOwners(ownerId) },
+      include: { versions: { where: { schemaVersion: 1 } } },
       orderBy: { updatedAt: 'desc' },
     });
     const versions = await nameStrategyVersions(strategies.flatMap((row) => row.versions), this.display);
@@ -105,7 +106,7 @@ export class BacktestService {
       job,
       await this.resultReadPolicy.run(id),
     );
-    return protectedJob;
+    return withBacktestModelDisclosure(protectedJob);
   }
 
   private async requireCurrentRun(id: string): Promise<void> {
@@ -200,8 +201,8 @@ export class BacktestService {
     return this.protectMutationResult(job);
   }
 
-  private async protectMutationResult<T extends { id: string } | null>(job: T) {
+  private async protectMutationResult<T extends { id: string; input?: unknown } | null>(job: T) {
     if (!job) return job;
-    return this.resultReadPolicy.protectBacktestJob(job, await this.resultReadPolicy.run(job.id));
+    return withBacktestModelDisclosure(this.resultReadPolicy.protectBacktestJob(job, await this.resultReadPolicy.run(job.id)));
   }
 }

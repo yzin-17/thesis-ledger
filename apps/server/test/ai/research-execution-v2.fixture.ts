@@ -11,7 +11,6 @@ import { AiResearchSdkExecution } from '../../src/ai/ai-research-sdk-execution.j
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { AiRoutingSettingsService } from '../../src/ai/ai-routing-settings.service.js';
 import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
-import { PromptVersionRegistry } from '../../src/ai/prompt-registry.js';
 import type { AiProvider } from '../../src/ai/contracts.js';
 import type { AiResearchSubmissionV2Access } from '../../src/ai/ai-research-submission-v2.store.js';
 import { AI_COMPATIBILITY_EXTENSION_PROFILE_OPENROUTER_V1 } from '../../src/ai/ai-provider-upstream.js';

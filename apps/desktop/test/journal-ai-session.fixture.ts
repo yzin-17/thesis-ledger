@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
+import { URL as NodeURL } from 'node:url';
 import { researchResultV2Schema } from '@thesis-ledger/schemas';
 
 const sample = JSON.parse(
-  readFileSync(new URL('../../../packages/schemas/fixtures/research-v2.samples.json', import.meta.url), 'utf8'),
+  readFileSync(new NodeURL('../../../packages/schemas/fixtures/research-v2.samples.json', import.meta.url), 'utf8'),
 ) as { result: unknown };
 
 export function journalExplanationResult(conclusion: string) {

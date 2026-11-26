@@ -1,6 +1,10 @@
 import {
   checkBacktestRuleCompatibility,
   strategyRequiredLookback,
+  expressionCumulativeAnchor,
+  tradePlanProtectionRules,
+  researchStrategyInputNeeds,
+  type BacktestStrategy as DomainStrategy,
   type FrozenExecutionModel,
   type RequiredRuleConversion,
   type RulePriceCoordinateFacts,
@@ -40,33 +44,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const collectUsedSignalSources = (strategy: BacktestStrategy) => {
-  const fieldsBySource = new Map<string, Set<string>>();
-  const visit = (value: unknown): void => {
-    if (Array.isArray(value)) {
-      value.forEach(visit);
-      return;
-    }
-    if (!isRecord(value)) return;
-    if (
-      value.type === 'series' &&
-      typeof value.sourceId === 'string' &&
-      typeof value.field === 'string'
-    ) {
-      const fields = fieldsBySource.get(value.sourceId) ?? new Set<string>();
-      fields.add(value.field);
-      fieldsBySource.set(value.sourceId, fields);
-    }
-    Object.values(value).forEach(visit);
-  };
-  visit(strategy.entry);
-  visit(strategy.exit);
+  const fieldsBySource = new Map(researchStrategyInputNeeds(strategy as DomainStrategy,
+    { executionCoordinate: 'research' }).needs.filter((need) => need.sourceKind === 'signal')
+    .map((need) => [need.sourceId, need.fields]));
   return strategy.signalSources
     .filter((source) => fieldsBySource.has(source.id))
     .map((source) => ({
       id: source.id,
       instrument: instrumentKey(source.asset),
       timeframe: source.timeframe,
-      fields: uniqueSorted([...fieldsBySource.get(source.id)!]),
+      fields: uniqueSorted(fieldsBySource.get(source.id)!),
       asset: source.asset,
     }))
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -90,6 +77,16 @@ const withoutEventPredicates = (expression: unknown): unknown => {
     return { ...expression, expression: withoutEventPredicates(expression.expression) };
   }
   return expression;
+};
+
+const withoutEventProtection = (plan: BacktestStrategy['tradePlan']) => {
+  const result = plan ? structuredClone(plan) : undefined;
+  for (const { key, expression } of tradePlanProtectionRules(result)) {
+    const rule = result![key]!;
+    const converted = withoutEventPredicates(expression) as typeof expression;
+    if (rule.activation?.kind === 'condition') rule.activation.condition = converted;
+  }
+  return result;
 };
 
 const subtractUtcDays = (date: string, days: number): string | undefined => {
@@ -170,6 +167,7 @@ const planRuleCompatibility = (
     ...strategy,
     entry: withoutEventPredicates(strategy.entry),
     exit: withoutEventPredicates(strategy.exit),
+    tradePlan: withoutEventProtection(strategy.tradePlan),
   };
   const report = checkBacktestRuleCompatibility(unitStrategy, {
     protocol: {
@@ -202,6 +200,47 @@ const planRuleCompatibility = (
   };
 };
 
+/** 累计锚点、窗口预热与冻结预算共同决定允许读取的起点。 */
+function planExpressionWarmup(strategy: BacktestStrategy, defaultWarmupStart: string | undefined,
+  startDate: string, requiredLookback: number, frozenBudget?: number, checkFrozenParent = false) {
+  const anchor = expressionCumulativeAnchor(strategy);
+  const anchorDate = anchor ? new Date(anchor).toISOString().slice(0, 10) : undefined;
+  const warmupStartDate =
+    anchorDate && defaultWarmupStart && anchorDate < defaultWarmupStart
+      ? anchorDate
+      : defaultWarmupStart;
+  const blockingIssues: BacktestDependencyPlanIssue[] = [];
+  if (
+    anchorDate &&
+    defaultWarmupStart &&
+    anchorDate < defaultWarmupStart &&
+    frozenBudget !== undefined && !checkFrozenParent
+  )
+    blockingIssues.push({
+      code: 'INVALID_WARMUP_RANGE',
+      path: ['warmup'],
+      message: '累计锚点超出已冻结预热窗口，需先扩展并重新冻结预算',
+    });
+  if (
+    frozenBudget !== undefined &&
+    requiredLookback > frozenBudget
+  ) {
+    blockingIssues.push({
+      code: 'INVALID_WARMUP_RANGE',
+      path: ['warmup'],
+      message: '策略预热需求超过实验已冻结的交易日预算',
+    });
+  }
+  if (!warmupStartDate) {
+    blockingIssues.push({
+      code: 'INVALID_WARMUP_RANGE',
+      path: ['warmup'],
+      message: '策略预热窗口无法表示为有效日期',
+    });
+  }
+  return { warmupStart: warmupStartDate ?? startDate, blockingIssues };
+}
+
 export const planBacktestPriceInputs = (
   strategy: BacktestStrategy,
   runConfig: Pick<
@@ -212,7 +251,7 @@ export const planBacktestPriceInputs = (
     | 'frozenWarmupBudgetSessions'
     | 'frozenPriceWarmupPolicy'
   > &
-    Partial<Pick<RunConfigV3, 'executionPriceProtocol'>>,
+    Partial<Pick<RunConfigV3, 'executionPriceProtocol' | 'priceResearch' | 'frozenExecutionWindow'>>,
   options: {
     minimumWarmupSessions?: number;
     cashEventResearch?: RunConfigV3['executionPriceProtocol']['cashEventResearch'];
@@ -230,8 +269,11 @@ export const planBacktestPriceInputs = (
     baseTimeframe(strategy.primaryTimeframe),
   ].sort((left, right) => timeframeRank[left] - timeframeRank[right])[0]!;
   const lookback = strategyRequiredLookback({
+    execution: strategy.execution,
     entry: withoutEventPredicates(strategy.entry),
     exit: withoutEventPredicates(strategy.exit),
+    tradePlan: withoutEventProtection(strategy.tradePlan),
+    ...(strategy.tradePlan ? { tradePlan: strategy.tradePlan } : {}),
   } as Parameters<typeof strategyRequiredLookback>[0]);
   const requiredSessions = Math.max(lookback.required, options.minimumWarmupSessions ?? 0);
   const warmupPolicy = shareWindowWarmupPolicyV3(
@@ -244,29 +286,14 @@ export const planBacktestPriceInputs = (
     priceWarmupPolicy,
     warmupPolicy.calendarBufferDays,
   );
-  const warmupStartDate = subtractUtcDays(
+  const defaultWarmupStart = subtractUtcDays(
     runConfig.startDate,
     requiredSessions * 2 + calendarBufferDays,
   );
-  const blockingIssues: BacktestDependencyPlanIssue[] = [];
-  if (
-    runConfig.frozenWarmupBudgetSessions !== undefined &&
-    lookback.required > runConfig.frozenWarmupBudgetSessions
-  ) {
-    blockingIssues.push({
-      code: 'INVALID_WARMUP_RANGE',
-      path: ['warmup'],
-      message: '策略预热需求超过实验已冻结的交易日预算',
-    });
-  }
-  if (!warmupStartDate) {
-    blockingIssues.push({
-      code: 'INVALID_WARMUP_RANGE',
-      path: ['warmup'],
-      message: '策略预热窗口无法表示为有效日期',
-    });
-  }
-  const warmupStart = warmupStartDate ?? runConfig.startDate;
+  const { warmupStart, blockingIssues } = planExpressionWarmup(
+    strategy, defaultWarmupStart, runConfig.startDate, lookback.required, runConfig.frozenWarmupBudgetSessions,
+    Boolean(runConfig.priceResearch?.dataScope && runConfig.frozenExecutionWindow),
+  );
   const usedAssets = [
     ...signalSources.map((source) => ({ asset: source.asset, role: 'signal' })),
     { asset: strategy.executionInstrument, role: 'execution' },

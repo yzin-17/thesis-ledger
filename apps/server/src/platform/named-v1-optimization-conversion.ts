@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { omit } from 'es-toolkit';
 import { backtestSnapshotManifestV3Schema } from '@thesis-ledger/schemas';
 import { fingerprintBacktestRunData, type ComparableDataFingerprintRange } from '../backtest/backtest-comparable-run-data.js';
 import { comparableTradabilityWindows } from '../backtest/backtest-comparable-tradability.js';
-import { LocalSnapshotStore, canonicalizeManifest } from '../backtest/backtest-snapshot.js';
+import { type LocalSnapshotStore, canonicalizeManifest } from '../backtest/backtest-snapshot.js';
 import { optimizationDataArtifactFingerprint, optimizationSha256, toRecord } from '../strategy-optimization/strategy-optimization-common.js';
 import { convertLegacyTradeRunConfig, type BacktestMigrationRow } from './named-v1-backtest-conversion.js';
 import { convertObservation } from './named-v1-market-window-conversion.js';
@@ -21,9 +22,9 @@ const splitName = z.enum(['development', 'validation', 'test']);
 function legacyComparableWindows(encoded: string, range: ComparableDataFingerprintRange) {
   const current = (JSON.parse(encoded) as Json[]).map(convertObservation);
   const sliced = JSON.parse(comparableTradabilityWindows(canonicalizeManifest(current), range)) as Json[];
-  return canonicalizeManifest(sliced.map(({ contract: _contract, priceOnlyAllowed, ...facts }) => ({
-    ...facts,
-    contractVersion: priceOnlyAllowed ? 2 : 1,
+  return canonicalizeManifest(sliced.map(observation => ({
+    ...omit(observation, ['contract', 'priceOnlyAllowed']),
+    contractVersion: observation.priceOnlyAllowed ? 2 : 1,
   })));
 }
 

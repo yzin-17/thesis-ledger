@@ -233,7 +233,7 @@
     "清单为所选标的当前近月的认购与认沽代码，两侧完整读取后分页；月提示与可选合约月分开，不自动扫描所有月份。",
     "合约月按本次月份接口返回选择；合约清单与报价是独立读取，翻页期间来源清单可能变化。"
   ],
-  "contractVersion": 3,
+  "contractVersion": 1,
   "consumer": "thesis-ledger",
   "policyRevision": 189,
   "routeTarget": {

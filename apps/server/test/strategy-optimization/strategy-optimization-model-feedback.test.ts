@@ -80,7 +80,7 @@ describe('模型反馈封存投影', () => {
       expect(actualRequest).not.toContain('futureHigh');
       expect(actualRequest).not.toContain('"test"');
       expect(actualRequest).toContain('-0.1');
-      expect(actualRequest).toContain('不得描述为严格无前视样本外');
+      expect(actualRequest).toMatch(/不得(?:描述为|声称)严格无前视样本外/);
       const user = messages.find((message) => message.role === 'user')!;
       const payload = JSON.parse(user.content.slice(user.content.indexOf(':') + 1));
       expect(payload.priorCandidates[0].metrics.validation).not.toHaveProperty('totalReturn');
@@ -109,5 +109,27 @@ describe('模型反馈封存投影', () => {
         validation: { status: 'invalid', failureCategory: 'data-unavailable' },
       }),
     ).toEqual({ validation: { status: 'invalid', failureCategory: 'data-unavailable' } });
+  });
+  it('新版周转率与评分版本进入开发反馈，封存结果继续隔离', () => {
+    const next = { status: 'valid', analyticsVersion: 'research-analytics-v2',
+      scoreVersion: 'optimization-score-v2', tradedNotional: '1500', turnoverRate: '1.5' };
+    expect(optimizationModelMetrics({ development: { ...next, secret: 'sealed' }, test: next }))
+      .toEqual({ development: next });
+  });
+  it('模型只收到诊断计数，时点样本与封存诊断均不进入上下文', () => {
+    const diagnostic = { version: 'rule-evaluation-v1', rules: [{ ruleId: 'entry', path: ['entry'],
+      observations: 1, computableObservations: 0, trueObservations: 0, applicableDecisions: 1,
+      computableDecisions: 0, warmupObservations: 0,
+      unavailableReasons: [{ code: 'RULE_INPUT_UNAVAILABLE', reason: '缺量', count: 1,
+        samples: [{ path: ['entry'], occurredAt: '2035-01-02T00:00:00Z', message: 'future-sample' }] }],
+    }] };
+    const result = optimizationModelMetrics({
+      development: { status: 'invalid', ruleDiagnostics: diagnostic },
+      test: { status: 'invalid', ruleDiagnostics: diagnostic },
+    });
+    expect(result.development!.ruleDiagnostics!.rules[0]!.unavailableReasons[0])
+      .toMatchObject({ count: 1, samples: [] });
+    expect(JSON.stringify(result)).not.toContain('2035-01-02');
+    expect(result).not.toHaveProperty('test');
   });
 });

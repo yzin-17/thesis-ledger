@@ -10,6 +10,8 @@ export function executionBarRowsV3(
 ): ArtifactRow[] {
   const routeKey = response.routeKey;
   const accountingBasis = typeof protocol === 'string' ? protocol : protocol.accountingBasis;
+  // 盘中归一化模拟不以市场成交量决定撮合数量；缺量保留 null，由量价信号保守停用。
+  const volumeOptional = priceResearch || (routeKey.timeframe === '1m' && accountingBasis === 'normalized-series');
   const sharePriceResearch =
     typeof protocol === 'object' &&
     protocol.accountingBasis === 'raw-events' &&
@@ -22,7 +24,7 @@ export function executionBarRowsV3(
   if (
     response.bars.some(
       (point) =>
-        (!priceResearch && point.volume === null) ||
+        (!volumeOptional && point.volume === null) ||
         (accountingBasis !== 'normalized-series' && !sharePriceResearch && point.amount === null),
     )
   )
@@ -49,6 +51,7 @@ export function executionBarRowsV3(
     effectivePolicyRevision: response.provenance.effectivePolicyRevision,
     inputFingerprint: response.inputFingerprint,
     completionStatus: point.completionStatus,
+    ...(response.timestampConvention ? { timestampConvention: response.timestampConvention } : {}),
     quality: 'complete',
   }));
 }

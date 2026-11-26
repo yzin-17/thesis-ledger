@@ -74,7 +74,7 @@ const output = (strategy: ReturnType<typeof definition>) => ({
   proposal: {
     definition: {
       ...strategy,
-      signalSources: strategy.signalSources.map(({ series: _series, ...source }) => source),
+      signalSources: strategy.signalSources.map(source => omit(source, ['series'])),
     },
     coverage: [{ requirementId: 'plan', definitionPaths: ['tradePlan'] }],
   },
@@ -169,3 +169,4 @@ it.each(['0.015', '0.5'])(
     ).toBe(value);
   },
 );
+import { omit } from 'es-toolkit';

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { omit } from 'es-toolkit';
 import { z } from 'zod';
 import {
   correlateReportMetadata,
@@ -43,10 +44,7 @@ export function convertReportMetadata(raw: unknown) {
 }
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const input = z.array(z.unknown()).parse(JSON.parse(readFileSync(0, 'utf8')));
-  const entries = input.map((row) => {
-    const { payload, ...entry } = convertReportMetadata(row);
-    return entry;
-  });
+  const entries = input.map((row) => omit(convertReportMetadata(row), ['payload']));
   process.stdout.write(JSON.stringify({
     contract: 'market-external-report-metadata-migration-preview-v1', entries,
   }) + '\n');

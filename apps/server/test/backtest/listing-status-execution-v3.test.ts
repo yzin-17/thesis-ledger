@@ -24,7 +24,7 @@ function inputs() {
   const protocol = fixture('execution-price.raw-events.json');
   protocol.history = { basis: 'fixed-provider-snapshot' };
   protocol.marketRuleResearch = 'raw-prices-no-corporate-actions-v1';
-  const config = runConfigSchemaV3.parse({ schemaVersion: '3', startDate: response.range.start,
+  const config = runConfigSchemaV3.parse({ schemaVersion: 'backtest-trade-config-v1', startDate: response.range.start,
     endDate: response.range.end, dataAsOf: '2026-10-08T00:00:00Z', baseCurrency: 'CNY',
     initialCash: { CNY: '100000' }, valuationPolicy: { baseTimezone: 'Asia/Shanghai', dailyValuationTime: '15:00',
       pricePolicy: 'latestAvailable', fxPolicy: 'latestAvailable' }, executionModel: model, executionPriceProtocol: protocol });

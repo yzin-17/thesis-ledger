@@ -9,6 +9,7 @@ import {
   StickyTableActionHeader,
 } from '../src/features/shared/StickyTableActions.js';
 import { TableCell, TableHead } from '../src/components/ui/table.js';
+import { staticTableActionContext } from './table-action-source-context.js';
 
 const featureRoot = fileURLToPath(new URL('../src/features', import.meta.url));
 
@@ -50,16 +51,7 @@ describe('表格操作列统一契约', () => {
           }
           if ((tag === 'td' || tag === 'TableCell') && !attributes.includes('colSpan')) {
             if (lastInRow) {
-              let table: ts.Node | undefined = row.parent;
-              while (
-                table &&
-                !(
-                  ts.isJsxElement(table) &&
-                  /^(table|Table)$/.test(table.openingElement.tagName.getText(source))
-                )
-              )
-                table = table.parent;
-              const staticActions = table?.getText(source).includes('data-table-action-static');
+              const staticActions = staticTableActionContext(node, source);
               if (
                 /onClick=|<Link\b|<DropdownMenuTrigger\b/.test(node.getText(source)) &&
                 !staticActions
@@ -73,6 +65,36 @@ describe('表格操作列统一契约', () => {
       visit(source);
     }
     expect(violations).toEqual([]);
+  });
+
+  it('私有行组件只在全部宿主表格声明静态操作列时继承例外', () => {
+    const audit = (hosts: string) => {
+      const source = ts.createSourceFile(
+        'sample.tsx',
+        `function Row() { return <tr><td><button onClick={go}>操作</button></td></tr>; } ${hosts}`,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      let cell: ts.Node | undefined;
+      const visit = (node: ts.Node) => {
+        if (ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === 'td')
+          cell = node;
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+      return staticTableActionContext(cell!, source);
+    };
+    expect(
+      audit('function Page() { return <table data-table-action-static><Row /></table>; }'),
+    ).toBe(true);
+    expect(audit('function Page() { return <table><Row /></table>; }')).toBe(false);
+    expect(
+      audit(
+        'function Page() { return <><table data-table-action-static><Row /></table><table><Row /></table></>; }',
+      ),
+    ).toBe(false);
+    expect(audit('')).toBe(false);
   });
 
   it('共享表头和单元格都固定在右侧，具备不透底背景与左边界', () => {

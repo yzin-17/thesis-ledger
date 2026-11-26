@@ -94,9 +94,6 @@ export class BacktestQueueReconciler implements OnModuleInit, OnModuleDestroy {
     try {
       queueState = await this.queue.getState(job.id);
     } catch {
-      if (job.status === 'queued' && !job.cancelRequestedAt) {
-        await this.queueService.ensureEnqueued(job.id);
-      }
       return;
     }
     if (queueState !== null && !['completed', 'failed'].includes(queueState)) return;

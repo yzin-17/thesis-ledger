@@ -145,6 +145,7 @@ export const resultMetadata = (
   response: unknown,
   providerMetadata: unknown,
   timing: { firstEvent: number | null; firstText: number | null },
+  rawOutputText?: string,
 ) => ({
   finishReason,
   rawFinishReason: rawFinishReason ?? null,
@@ -154,6 +155,7 @@ export const resultMetadata = (
   providerCostCurrency: providerCost(providerMetadata) === null ? null : 'USD',
   timeToFirstEventMs: timing.firstEvent,
   timeToFirstTextMs: timing.firstText,
+  ...(rawOutputText === undefined ? {} : { rawOutputText }),
 });
 
 export type AiGenerationCompletion = ReturnType<typeof resultMetadata>;

@@ -137,7 +137,7 @@ export class MarketArenaReplayReader {
           statusCompositionDemandV1Schema.parse({
             requirement: 'completeWindow',
             query: {
-              contractVersion: 3,
+              contractVersion: 1,
               capabilityVersion: 1,
               consumer: 'thesis-ledger',
               requestId: randomUUID(),

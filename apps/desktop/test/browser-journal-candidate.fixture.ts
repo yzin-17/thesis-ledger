@@ -1,7 +1,7 @@
 import { journalReviewObjectTimes, journalStatisticsEligibility } from '@thesis-ledger/domain';
 import {
   journalReviewCandidateContractSchema,
-  journalLegacyReviewContractSchema,
+  journalUnlinkedReviewSchema,
   type JournalReviewEvidenceInput,
 } from '@thesis-ledger/schemas';
 import { journalBrowserStateFixture } from './browser-journal-state.fixture.js';
@@ -9,11 +9,11 @@ import { browserJournalEvidenceScenario } from './browser-journal-evidence.fixtu
 
 export function browserJournalLegacy(accountId: string, mode: 'actual' | 'shadow') {
   const ambiguous = journalBrowserStateFixture.state === 'legacy-ambiguous';
-  return journalLegacyReviewContractSchema.parse({
-    id: 'legacy:00000000-0000-4000-8000-000000000070',
+  return journalUnlinkedReviewSchema.parse({
+    id: 'unlinked:00000000-0000-4000-8000-000000000070',
     accountId,
     accountMode: mode,
-    reviewStatus: 'LEGACY_REVIEW_NEEDS_CONFIRMATION',
+    reviewStatus: 'NEEDS_REVIEW_ASSOCIATION',
     reason: ambiguous ? 'SELL_MAPPING_AMBIGUOUS' : 'SELL_MAPPING_MISSING',
     possibleReferences: ambiguous
       ? ['slice-one', 'slice-two'].map((closeSliceId) => ({
@@ -23,7 +23,7 @@ export function browserJournalLegacy(accountId: string, mode: 'actual' | 'shadow
           closeSliceId,
         }))
       : [],
-    statisticsEligibility: { eligible: false, reasons: ['LEGACY_UNCONFIRMED'] },
+    statisticsEligibility: { eligible: false, reasons: ['UNLINKED_JOURNAL_ENTRY'] },
     journalEntry: {
       id: '00000000-0000-4000-8000-000000000070',
       accountId,

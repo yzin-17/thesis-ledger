@@ -18,6 +18,7 @@ import {
   requireOptimizationPriceResearch,
   requireOptimizationResearchStrategy,
 } from './strategy-optimization-research.js';
+import { assertStrategyResearchScopeV3 } from '../backtest/backtest-research-data-scope-v3.js';
 
 export async function createOptimizationExperiment(
   input: unknown,
@@ -62,6 +63,7 @@ export async function createOptimizationExperiment(
   } else {
     const baseline = await reads.formalStrategyVersion(parsed.strategyVersionId!);
     requireOptimizationResearchStrategy(baseline.strategy);
+    assertStrategyResearchScopeV3(baseline.strategy, parsed.runConfig);
     const descriptors = describeStrategyParameters(baseline.strategy);
     candidates.validateAuthorizedParameters(descriptors, parsed.allowedParameterIds!);
     created = await insertOptimizationExperiment(prisma, parsed, baseline, modelConfig);

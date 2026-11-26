@@ -11,6 +11,7 @@ import type { BacktestNavRunExecution } from './backtest-nav-run-execution.js';
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
 import { loadVerifiedBacktestV3Snapshot } from './backtest-v3-run-execution.js';
 import type { LocalSnapshotStore } from './backtest-snapshot.js';
+import { readBacktestMaterialization } from './backtest-job-materialization-input.js';
 
 export async function verifyBacktestRunRetrySnapshot(input: {
   job: BacktestJob;
@@ -22,6 +23,12 @@ export async function verifyBacktestRunRetrySnapshot(input: {
   defaultV3RunnerAvailable: boolean;
 }): Promise<void> {
   const { job, prisma, snapshotBuilder, snapshotStore, queueService, navExecution } = input;
+  if (!job.snapshotId && readBacktestMaterialization(job.input)) {
+    if (!queueService || (isNavBacktestInput(job.input) && !navExecution) ||
+      (!isNavBacktestInput(job.input) && !input.defaultV3RunnerAvailable))
+      throw new ConflictException({ code: 'QUEUE_UNAVAILABLE', message: '回测执行器或队列未配置，当前不能重试。' });
+    return;
+  }
   if (isNavBacktestInput(job.input)) {
     if (!navExecution) {
       throw new ConflictException({

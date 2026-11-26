@@ -152,7 +152,7 @@ export class StrategyOptimizationReadService {
   async formalStrategyVersion(id: string) {
     const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (![2, 3].includes(version.schemaVersion) || version.version <= 0)
+    if (version.schemaVersion !== 1 || version.version <= 0)
       throw new BadRequestException('AI 优化需要有效的正式策略版本');
     return { ...version, strategy: strategySchema.parse(version.schema) as BacktestStrategy };
   }
@@ -193,7 +193,7 @@ export class StrategyOptimizationReadService {
       where: { id: strategyVersionId },
     });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (![2, 3].includes(version.schemaVersion) || version.version <= 0)
+    if (version.schemaVersion !== 1 || version.version <= 0)
       throw new BadRequestException('只有正式策略版本可以配置优化参数');
     return describeStrategyParameters(strategySchema.parse(version.schema) as BacktestStrategy);
   }

@@ -49,13 +49,13 @@ export function ArenaLivePerformance({
                 </p>
               )}
             </div>
-            <Table className="table-fixed">
+            <Table className="min-w-96 table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-10 px-2">排名</TableHead>
-                  <TableHead className="px-2">模型</TableHead>
-                  <TableHead className="w-28 px-2 text-right">收益 / 净值</TableHead>
-                  <TableHead className="w-20 px-2 text-right">回撤</TableHead>
+                  <TableHead className="w-14">排名</TableHead>
+                  <TableHead>模型</TableHead>
+                  <TableHead className="w-28 text-right">收益 / 净值</TableHead>
+                  <TableHead className="w-20 text-right">回撤</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -63,8 +63,8 @@ export function ArenaLivePerformance({
                   const mark = latest?.marks.find((item) => item.agentId === agent.id);
                   return (
                     <TableRow key={agent.id}>
-                      <TableCell className="px-2 tabular-nums">{mark?.rank ?? '—'}</TableCell>
-                      <TableCell className="min-w-0 px-2 whitespace-normal">
+                      <TableCell className="tabular-nums">{mark?.rank ?? '—'}</TableCell>
+                      <TableCell className="min-w-0 whitespace-normal">
                         <Button
                           type="button"
                           size="sm"
@@ -91,7 +91,7 @@ export function ArenaLivePerformance({
                           })}
                         </p>
                       </TableCell>
-                      <TableCell className="px-2 text-right tabular-nums">
+                      <TableCell className="text-right tabular-nums">
                         <span>
                           {mark?.returnRatio == null ? '—' : arenaRatio(mark.returnRatio)}
                         </span>
@@ -99,7 +99,7 @@ export function ArenaLivePerformance({
                           {mark?.nav == null ? '未估值' : formatDecimalNumber(mark.nav)}
                         </p>
                       </TableCell>
-                      <TableCell className="px-2 text-right tabular-nums">
+                      <TableCell className="text-right tabular-nums">
                         {mark?.drawdown == null ? '—' : arenaRatio(mark.drawdown)}
                       </TableCell>
                     </TableRow>

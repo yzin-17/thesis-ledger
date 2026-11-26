@@ -10,7 +10,7 @@ export function useExperimentResearchVersions(strategies: StrategyRecord[]) {
         .filter(
           (version) =>
             version.version > 0 &&
-            (version.schemaVersion === 2 || version.schemaVersion === 3) &&
+            version.schemaVersion === 1 &&
             version.schema,
         )
         .map((version) => ({ strategy, version })),

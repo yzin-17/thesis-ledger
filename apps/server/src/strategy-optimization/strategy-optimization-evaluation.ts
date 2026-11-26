@@ -27,9 +27,13 @@ const executionDiagnostics = (result: BacktestResultV3) => {
 /** 事实展示独立于评分资格；失败评价仍保留实际数值。 */
 export const optimizationResultFacts = (result: BacktestResultV3) => ({
   tradeCount: result.trades.length,
+  ...(result.ruleDiagnostics ? { ruleDiagnostics: result.ruleDiagnostics } : {}),
+  ...(result.analyticsVersion ? { analyticsVersion: result.analyticsVersion,
+    scoreVersion: 'optimization-score-v2' as const } : {}),
   ...executionDiagnostics(result),
   ...Object.fromEntries(
-    ['totalReturn', 'maxDrawdown', 'turnover'].flatMap((key) => {
+    ['totalReturn', 'maxDrawdown', ...(result.analyticsVersion
+      ? ['tradedNotional', 'turnoverRate'] : ['turnover'])].flatMap((key) => {
       const value = metricValue(result, [key]);
       return value === undefined ? [] : [[key, value]];
     }),
@@ -81,8 +85,13 @@ export function evaluateOptimizationResult(
   objectiveValue: unknown,
 ): EvaluationSummary {
   const result = backtestResultSchemaV3.parse(run.result);
-  if (result.completeness !== 'complete')
+  const currentAnalytics = result.analyticsVersion === 'research-analytics-v2';
+  if (!currentAnalytics && result.completeness !== 'complete')
     return invalidSummary(run.id, result, '回测数据完整性不是 complete', 'data-unavailable');
+  const unusable = result.ruleDiagnostics?.rules.find((rule) =>
+    rule.applicableDecisions > 0 && rule.computableDecisions === 0);
+  if (unusable) return invalidSummary(run.id, result,
+    `规则 ${unusable.path.join('.')} 在全部 ${unusable.applicableDecisions} 个适用时点不可计算`, 'data-unavailable');
   const objective = toRecord(objectiveValue);
   const minimumTrades =
     typeof objective.minClosedTrades === 'number' ? objective.minClosedTrades : 1;
@@ -90,11 +99,20 @@ export function evaluateOptimizationResult(
     return invalidSummary(run.id, result, `闭合交易少于 ${minimumTrades}`, 'strategy-ineligible');
   const totalReturn = metricValue(result, ['totalReturn', 'cumulativeReturn', 'return']);
   const maxDrawdown = metricValue(result, ['maxDrawdown', 'drawdown']);
-  if (!totalReturn || !maxDrawdown)
+  const mode = ['return', 'drawdown', 'balanced', 'lowTurnover'].includes(String(objective.mode))
+    ? objective.mode : 'balanced';
+  const maxAllowed = typeof objective.maxDrawdown === 'string' ? objective.maxDrawdown : undefined;
+  const needsReturn = !currentAnalytics || mode === 'return' || mode === 'balanced';
+  const needsDrawdown = !currentAnalytics || mode === 'drawdown' || mode === 'balanced' || maxAllowed !== undefined;
+  if ((needsReturn && totalReturn === undefined) || (needsDrawdown && maxDrawdown === undefined))
     return invalidSummary(run.id, result, '关键收益/回撤指标不可用', 'data-unavailable');
-  const turnover = metricValue(result, ['turnover', 'turnoverRate']);
+  const turnover = metricValue(result, result.analyticsVersion
+    ? ['turnoverRate'] : ['turnover', 'turnoverRate']);
+  const turnoverFacts = turnover === undefined ? {} : {
+    [result.analyticsVersion ? 'turnoverRate' : 'turnover']: turnover,
+  };
   if (
-    (objective.mode === 'lowTurnover' || objective.mode === 'balanced') &&
+    (mode === 'lowTurnover' || mode === 'balanced') &&
     turnover === undefined
   ) {
     return invalidSummary(
@@ -104,26 +122,21 @@ export function evaluateOptimizationResult(
       'data-unavailable',
     );
   }
-  const maxAllowed = typeof objective.maxDrawdown === 'string' ? objective.maxDrawdown : undefined;
-  if (maxAllowed && drawdownMagnitude(maxDrawdown).compareTo(maxAllowed) > 0)
+  if (maxAllowed && maxDrawdown !== undefined && drawdownMagnitude(maxDrawdown).compareTo(maxAllowed) > 0)
     return {
       ...invalidSummary(run.id, result, '最大回撤超过硬约束', 'strategy-performance'),
-      totalReturn,
       maxDrawdown,
-      ...(turnover ? { turnover } : {}),
+      ...turnoverFacts,
     };
-  const score = calculateOptimizationScore(objective.mode, totalReturn, maxDrawdown, turnover);
+  const score = calculateOptimizationScore(mode, totalReturn ?? '0', maxDrawdown ?? '0', turnover);
   if (!Number.isFinite(score))
     return invalidSummary(run.id, result, '优化评分超出可表示范围', 'data-unavailable');
   return {
     runId: run.id,
     status: 'valid',
     completeness: result.completeness,
-    tradeCount: result.trades.length,
-    ...executionDiagnostics(result),
-    totalReturn,
-    maxDrawdown,
-    ...(turnover ? { turnover } : {}),
+    ...optimizationResultFacts(result),
+    ...turnoverFacts,
     score,
   };
 }

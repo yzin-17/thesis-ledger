@@ -27,49 +27,18 @@ export async function requestBacktestCancellation(
   }
   if (terminalStatuses.has(job.status)) return { job, changed: false, wasQueued: false };
 
-  const wasQueued = job.status === 'queued';
   const now = new Date();
-  try {
-    const updated = await prisma.backtestJob.update({
-      where: {
-        id: jobId,
-        mode: 'frozen',
-        status: job.status,
-        executionAttempt: job.executionAttempt,
-      },
-      data: wasQueued
-        ? {
-            status: 'cancelled',
-            stage: 'cancelled',
-            progress: 100,
-            cancelRequestedAt: now,
-            finishedAt: now,
-          }
-        : { cancelRequestedAt: now },
-    });
-    return { job: updated, changed: true, wasQueued };
-  } catch (error) {
-    if (!isMissingRecordError(error)) throw error;
-    const current = await prisma.backtestJob.findUnique({ where: { id: jobId } });
-    if (current && !persistedRunContract(current)) {
-      throw new ConflictException({
-        code: 'UNSUPPORTED_CONTRACT_VERSION',
-        message: '旧回测记录不支持取消',
-      });
-    }
-    return {
-      job: current,
-      changed: false,
-      wasQueued: false,
-    };
-  }
-}
-
-function isMissingRecordError(error: unknown): boolean {
-  return Boolean(
-    error &&
-    typeof error === 'object' &&
-    'code' in error &&
-    (error as { code?: unknown }).code === 'P2025',
-  );
+  // Run级意图不绑定早先读取的status或attempt，领取竞争不能丢掉取消。
+  const registered = await prisma.backtestJob.updateMany({
+    where: { id: jobId, mode: 'frozen', status: { notIn: [...terminalStatuses] }, cancelRequestedAt: null },
+    data: { cancelRequestedAt: now },
+  });
+  const queued = await prisma.backtestJob.updateMany({
+    where: { id: jobId, mode: 'frozen', status: 'queued', cancelRequestedAt: { not: null } },
+    data: { status: 'cancelled', stage: 'cancelled', progress: 100, finishedAt: now },
+  });
+  const current = await prisma.backtestJob.findUnique({ where: { id: jobId } });
+  if (current && !persistedRunContract(current))
+    throw new ConflictException({ code: 'UNSUPPORTED_CONTRACT_VERSION', message: '旧回测记录不支持取消' });
+  return { job: current, changed: registered.count > 0 || queued.count > 0, wasQueued: queued.count > 0 };
 }

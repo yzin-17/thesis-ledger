@@ -23,7 +23,7 @@ export class OptimizationModelResolution {
         where: { id: target.strategyVersionId },
       });
       if (!version) throw new NotFoundException('策略版本不存在');
-      if (![2, 3].includes(version.schemaVersion))
+      if (version.schemaVersion !== 1)
         return {
           status: 'blocked',
           reasonCode: 'unsupported-strategy',

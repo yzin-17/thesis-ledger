@@ -25,6 +25,14 @@ function fail(message: string): never {
 const sameCanonicalValue = (left: unknown, right: unknown): boolean =>
   canonicalizeManifest(left) === canonicalizeManifest(right);
 
+// 收集时事实是稀疏行；Parquet 回读时按分区实际列集合补 null。
+function sameEventRows(actual: readonly ArtifactRow[], expected: readonly ArtifactRow[]): boolean {
+  if (sameCanonicalValue(actual, expected)) return true;
+  const columns = new Set(expected.flatMap(row => Object.keys(row)));
+  const emptyColumns = Object.fromEntries(Array.from(columns, key => [key, null]));
+  return sameCanonicalValue(actual, expected.map(row => ({ ...emptyColumns, ...row })));
+}
+
 /**
  * Rechecks the required dependency set and response proof without network access.
  * Evidence stays under metadata so fact readers cannot mistake it for domain rows.
@@ -67,7 +75,7 @@ export const validateSnapshotDependencyArtifactsV3 = (
       const event = validateSnapshotEventsV3(input, request, serializedResponse);
       if (
         !sameCanonicalValue(proof, event.evidence) ||
-        !sameCanonicalValue(artifact.rows, event.rows)
+        !sameEventRows(artifact.rows, event.rows)
       ) {
         fail(`Snapshot V3 事件事实行或原始响应证据不一致: ${request.key}`);
       }

@@ -15,7 +15,11 @@ it.each(dailyModelCases)('固定成对样本 $id：正式冻结 Worker、完整�
     const s = await fixedDailyModelCase(sample);
     expect(dailyModelIssues(sample, s)).toEqual([]);
     const f = await dailyModelSnapshot(root, sample, s), result = await f.run();
-    expect(result.completeness).toBe('complete');
+    expect(result.completeness, JSON.stringify({
+      warnings: result.warnings,
+      metrics: result.metrics,
+      simulationFills: result.simulationFills,
+    })).toBe('complete');
     expect(dailyModelExecutionIssues(sample, result.simulationFills)).toEqual([]);
     expect(await f.run()).toEqual(result);
     const chinese = backtestStrategyPlanReadback(s).join('\n');
@@ -33,7 +37,7 @@ it.each(dailyModelCases)('固定成对样本 $id：正式冻结 Worker、完整�
 it.each(dailyModelCases)('生成合同 $id：编写与限定范围修改能原样接受固定配置', async sample => {
   const proposal = ({ signalSources, ...strategy }: BacktestStrategy) => ({
     ...strategy,
-    signalSources: signalSources.map(({ series: _series, ...source }) => source),
+    signalSources: signalSources.map(source => omit(source, ['series'])),
   });
   const expected = { ...await fixedDailyModelCase(sample), entryTrigger: 'while-flat' as const };
   const content = dailyModelContent(sample, expected, false);
@@ -60,3 +64,4 @@ it('模型验收比较数值含义，保留等值小数原文，不将表达精�
   expect(dailyModelIssues(sample, s)).toEqual([]);
   expect(JSON.stringify(s)).toBe(before);
 });
+import { omit } from 'es-toolkit';

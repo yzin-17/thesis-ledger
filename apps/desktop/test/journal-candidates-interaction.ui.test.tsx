@@ -46,7 +46,7 @@ const props = {
 };
 const page = () => ({
   items: [journalMountedCandidate()],
-  legacyItems: [],
+  unlinkedItems: [],
   nextCursor: null as string | null,
 });
 
@@ -205,7 +205,7 @@ describe('复盘名称与分页', () => {
     api.candidates.mockResolvedValueOnce({
       ...page(),
       items: [candidate],
-      legacyItems: [legacy],
+      unlinkedItems: [legacy],
       instrumentDirectory: {
         generation: 9,
         items: [{ symbol: candidate.input.trade.symbol, displayName: '目录证券名称' }],
@@ -218,7 +218,7 @@ describe('复盘名称与分页', () => {
     );
     expect(
       [...view.host.querySelectorAll('details')].find((row) =>
-        row.textContent?.includes('旧 Journal'),
+        row.textContent?.includes('待核对记录'),
       )?.textContent,
     ).toContain('目录证券名称');
     expect(view.host.querySelector('tbody')?.textContent).toContain(candidate.input.trade.symbol);
@@ -303,9 +303,9 @@ describe('候选失败与条件恢复', () => {
     await view.client.refetchQueries({ queryKey: ['journal-review-candidates'] });
     await journalWait(() => expect(view.host.textContent).toContain('候选读取失败'));
     const legacy = browserJournalLegacy(accountId, 'actual');
-    api.candidates.mockResolvedValueOnce({ ...page(), items: [], legacyItems: [legacy] });
+    api.candidates.mockResolvedValueOnce({ ...page(), items: [], unlinkedItems: [legacy] });
     await journalClick('重新读取');
-    await journalWait(() => expect(view.host.textContent).toContain('旧 Journal 记录待确认（1）'));
+    await journalWait(() => expect(view.host.textContent).toContain('待核对记录（1）'));
     expect(view.host.querySelectorAll('tbody tr')).toHaveLength(0);
     expect(view.host.textContent).not.toContain('候选读取失败');
   });

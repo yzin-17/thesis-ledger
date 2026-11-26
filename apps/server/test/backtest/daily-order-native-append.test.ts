@@ -72,16 +72,16 @@ function setup(entry: Entry, strategy: BacktestStrategy, frozen = false) {
       { requirementId: 'rules', definitionPaths: [frozen ? 'tradePlan' : 'execution'] },
     ]);
     if (entry !== 'discovery') return result;
-    const {
-      schemaVersion: _schemaVersion, executionInstrument: _asset, primaryTimeframe: _period,
-      cost: _cost, signalSources, ...idea
-    } = result.proposal.definition;
+    const { signalSources } = result.proposal.definition;
+    const idea = omit(result.proposal.definition, [
+      'schemaVersion', 'executionInstrument', 'primaryTimeframe', 'cost', 'signalSources',
+    ]);
     return {
       reason: '离线构造输入',
       evidenceRefs: [],
       strategy: {
         ...idea,
-        signalSources: signalSources.map(({ asset: _asset, ...declaration }) => declaration),
+        signalSources: signalSources.map(declaration => omit(declaration, ['asset'])),
       },
     };
   };
@@ -317,3 +317,4 @@ it.skipIf(!captureRoot)('只读回归旧合格三单和当前完整捕获，保�
   expect(rows).toHaveLength(48);
   await save('capture-regression.json', rows);
 });
+import { omit } from 'es-toolkit';

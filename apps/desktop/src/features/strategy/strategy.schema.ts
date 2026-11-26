@@ -1,8 +1,9 @@
-import { strategySchema } from '@thesis-ledger/schemas';
+import { projectStrategyEntryPolicyForEditing, strategySchema } from '@thesis-ledger/schemas';
 import type { StrategySchema, StrategyVersion } from './strategy.types.js';
 
 export const createDefaultStrategySchema = (name = '我的第一条策略'): StrategySchema => ({
-  schemaVersion: '3',
+  schemaVersion: 'strategy-definition-v1',
+  entryTrigger: 'rising-edge',
   name,
   description: '示例规则：收盘价高于开盘价时入场，持仓时退出；保存前请核对。',
   signalSources: [
@@ -36,7 +37,7 @@ export const createDefaultStrategySchema = (name = '我的第一条策略'): Str
 
 export const schemaFromVersion = (version: StrategyVersion | null, fallbackName?: string) => {
   if (version?.schema) {
-    const schema = structuredClone(version.schema);
+    const schema = projectStrategyEntryPolicyForEditing(version.schema);
     if (fallbackName) schema.name = fallbackName;
     return schema;
   }
@@ -61,13 +62,6 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 export const setStrategyExecutionSymbol = (schema: StrategySchema, symbol: string) => ({
   ...schema,
   executionInstrument: { ...asRecord(schema.executionInstrument), symbol },
-  signalSources: Array.isArray(schema.signalSources)
-    ? schema.signalSources.map((source: unknown) => {
-        const record = asRecord(source);
-        if (record.id !== 'execution') return source;
-        return { ...record, asset: { ...asRecord(record.asset), symbol } };
-      })
-    : [],
 });
 
 export const setStrategyExecutionAssetType = (
@@ -76,24 +70,11 @@ export const setStrategyExecutionAssetType = (
 ) => ({
   ...schema,
   executionInstrument: { ...asRecord(schema.executionInstrument), assetType },
-  signalSources: Array.isArray(schema.signalSources)
-    ? schema.signalSources.map((source: unknown) => {
-        const record = asRecord(source);
-        if (record.id !== 'execution') return source;
-        return { ...record, asset: { ...asRecord(record.asset), assetType } };
-      })
-    : [],
 });
 
 export const setStrategyPrimaryTimeframe = (schema: StrategySchema, timeframe: string) => ({
   ...schema,
   primaryTimeframe: timeframe,
-  signalSources: Array.isArray(schema.signalSources)
-    ? schema.signalSources.map((source: unknown) => {
-        const record = asRecord(source);
-        return record.id === 'execution' ? { ...record, timeframe } : source;
-      })
-    : [],
 });
 
 export const schemaAsOf = (schema: StrategySchema) => {
@@ -102,6 +83,7 @@ export const schemaAsOf = (schema: StrategySchema) => {
 };
 
 export const validateStrategySchema = (schema: StrategySchema) => {
+  if (schema.entryTrigger === undefined) return { schema: null, error: '入场政策：请选择并核对入场方式后保存新版本。' };
   const parsed = strategySchema.safeParse(schema);
   if (parsed.success) return { schema: parsed.data as StrategySchema, error: null };
   const issue = parsed.error.issues[0];

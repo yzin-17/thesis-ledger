@@ -68,12 +68,18 @@ export const validateExecutionBarsEvidenceV3 = (
   });
   let expectedDates = marketCoverageSessionDatesV3(coverageProof);
   if (typeof evidence.historicalTradabilityWindows === 'string') {
+    const windows = backtestDailyTradabilityEvidenceV3Schema.array().min(1).parse(JSON.parse(evidence.historicalTradabilityWindows));
+    if (windows.some((window) => window.priceOnlyAllowed !== (executionRouteKey.timeframe === '1d' &&
+      manifest.priceResearch?.dailyObservationContract !== undefined))) fail('价格观察许可与快照合同不一致');
     expectedDates = observedTradabilityDatesV3(
-      backtestDailyTradabilityEvidenceV3Schema.array().min(1).parse(JSON.parse(evidence.historicalTradabilityWindows)),
-      { symbol: source.symbol, routeKey: executionRouteKey, target: source.provenance, coverageProof },
+      windows,
+      { symbol: source.symbol, routeKey: executionRouteKey, target: source.provenance, coverageProof,
+        allowPriceOnly: manifest.priceResearch?.dailyObservationContract !== undefined &&
+          manifest.executionPriceProtocol.accountingBasis === 'normalized-series' },
     );
   }
-  if (context.canonicalize(barDates) !== context.canonicalize(expectedDates)) {
+  const observedDates = executionRouteKey.timeframe === '1d' ? barDates : [...new Set(barDates)];
+  if (context.canonicalize(observedDates) !== context.canonicalize(expectedDates)) {
     fail('Snapshot V3 execution bars 未覆盖完整交易日历窗口');
   }
 };

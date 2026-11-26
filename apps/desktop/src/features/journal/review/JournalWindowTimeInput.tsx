@@ -4,7 +4,7 @@ export function journalLocalTime(value: string) {
   if (!value) return '';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, -1);
 }
 
 export function journalInstant(value: string) {
@@ -25,7 +25,7 @@ export function JournalWindowTimeInput({
     <DateInput
       {...props}
       type="datetime-local"
-      step={60}
+      step={0.001}
       value={journalLocalTime(value)}
       onChange={(event) => onValueChange(journalInstant(event.target.value))}
     />

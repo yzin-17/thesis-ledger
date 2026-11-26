@@ -21,6 +21,9 @@ describe('完整 V3 冻结输入的指标消费', () => {
       const root = await mkdtemp(join(tmpdir(), 'indicator-v3-'));
       roots.push(root);
       const fixture = await completeSnapshotFixture();
+      if (name === 'ATR') {
+        fixture.input.strategy.signalSources[0]!.series = ['high', 'low', 'close', 'volume'];
+      }
       const expression = {
         type: 'indicator' as const,
         name,
@@ -60,7 +63,7 @@ describe('完整 V3 冻结输入的指标消费', () => {
         new AbortController().signal,
       );
       expect(backtestResultSchemaV3.safeParse(result).success).toBe(true);
-      expect(result.engineVersion).toBe('thesis-ledger-v3-local-runner-v3');
+      expect(result.engineVersion).toBe(runner.id);
       expect(replay).toEqual(result);
       expect(await snapshots.v3.replay(fixture.input.runId)).toEqual(before);
       expect(fixture.reader.readV3).not.toHaveBeenCalled();

@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { isEqual } from 'es-toolkit';
+import { isEqual, omit } from 'es-toolkit';
 import { materializeEntryPolicy } from '@thesis-ledger/domain';
 import {
   authoringStrategyV6Schema,
@@ -63,7 +63,7 @@ export function validateAuthoringModification(
   else Object.assign(masked, { [scope.target]: scope.before[scope.target] });
   const comparison = (strategy: BacktestStrategy) => ({
     ...strategy,
-    signalSources: strategy.signalSources.map(({ series: _series, ...source }) => source),
+    signalSources: strategy.signalSources.map(source => omit(source, ['series'])),
   });
   if (!isEqual(comparison(masked), comparison(scope.before)))
     return reject('AUTHORING_MODIFICATION_SCOPE_INVALID', '建议改变了授权范围以外的规则');

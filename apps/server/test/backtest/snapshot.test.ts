@@ -14,16 +14,18 @@ import {
 
 function contracts(): { strategy: BacktestStrategy; runConfig: RunConfigV3 } {
   const strategy = strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: 'snapshot test',
     signalSources: [
       {
+        priceCoordinate: 'run',
         id: 'cn-close',
         asset: { symbol: '000001', market: 'CN', assetType: 'stock' },
         timeframe: '1d',
         series: ['close'],
       },
       {
+        priceCoordinate: 'run',
         id: 'us-close',
         asset: { symbol: 'AAPL', market: 'US', assetType: 'stock' },
         timeframe: '1d',
@@ -56,7 +58,7 @@ function contracts(): { strategy: BacktestStrategy; runConfig: RunConfigV3 } {
     benchmark: { symbol: '000300', market: 'CN', assetType: 'etf' },
   }) as BacktestStrategy;
   const runConfig = runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     executionPriceProtocol: {
       protocolVersion: 'execution-price-v1',
       priceBasis: {

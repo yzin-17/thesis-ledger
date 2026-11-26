@@ -115,7 +115,7 @@ describe('第 4 批手机界面失败恢复',()=>{
       if(init?.method==='POST'&&String(url).endsWith('/retry')){posts++;retried=true;throw new TypeError('Network response lost');}
       return respond(retried?{...b4Run('running'),executionAttempt:2}:b4Run('failed'));
     }));
-    await mount(<BacktestResultScreen/>);await click(button('使用冻结输入重试'));expect(posts).toBe(1);
+    await mount(<BacktestResultScreen/>);await click(button('重试失败回测'));expect(posts).toBe(1);
     expect(button('读取原 Run 找回操作')).toBeTruthy();await click(button('读取原 Run 找回操作'));await flush();
     expect(posts).toBe(1);expect(document.body.textContent).toContain('已从原 Run 找回操作进展');
   });

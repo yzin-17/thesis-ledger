@@ -5,10 +5,11 @@ describe('Desktop routes', () => {
   it('keeps the primary navigation entries in URL order', () => {
     expect(desktopRoutes.map(({ view, path }) => [view, path])).toEqual([
       ['performance', '/performance'],
-      ['watchlist','/watchlist'],
+      ['watchlist', '/watchlist'],
       ['position-entry', '/accounts'],
       ['risk-center', '/risk-center'],
       ['strategy', '/strategy'],
+      ['arena', '/arena'],
       ['journal', '/journal'],
       ['ai-chat', '/ai-chat'],
       ['providers', '/providers'],
@@ -20,6 +21,7 @@ describe('Desktop routes', () => {
       'position-entry',
       'risk-center',
       'strategy',
+      'arena',
       'journal',
       'ai-chat',
       'providers',
@@ -30,6 +32,7 @@ describe('Desktop routes', () => {
   it('resolves navigable views and leaves internal view state unrouted', () => {
     expect(desktopPathForView('portfolio')).toBe('/performance');
     expect(desktopPathForView('providers')).toBe('/providers');
+    expect(desktopPathForView('arena')).toBe('/arena');
     expect(desktopPathForView('market-data')).toBe('/market-data');
     expect(desktopPathForView('position-detail')).toBeNull();
     expect(desktopPathForView('automation')).toBeNull();

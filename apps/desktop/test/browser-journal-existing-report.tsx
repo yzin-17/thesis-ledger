@@ -6,7 +6,7 @@ import { JournalReviewWorkspace } from '../src/features/journal/review/JournalRe
 import { fetchAccounts } from '../src/features/portfolio/portfolio.api.js';
 import { Button } from '../src/components/ui/button.js';
 import { Input } from '../src/components/ui/input.js';
-import { importExistingJournalReferences } from './browser-journal-existing-reference.js';
+import { checkExistingJournalReports } from './browser-journal-existing-reference.js';
 import {
   armJournalExistingReadFailure,
   installJournalExistingAudit,
@@ -24,8 +24,7 @@ function ExistingReportControls() {
   const [notice, setNotice] = useState('');
   const [rows, setRows] = useState(readJournalExistingAudit);
   const imported = useMutation({
-    mutationFn: importExistingJournalReferences,
-    onSuccess: () => controlsClient.invalidateQueries({ queryKey: ['journal-review-ai-tasks'] }),
+    mutationFn: checkExistingJournalReports,
   });
   useEffect(() => {
     const update = () => setRows(readJournalExistingAudit());
@@ -40,7 +39,7 @@ function ExistingReportControls() {
       <p>真实 API 验收：正式工作台读取目标账户、既有报告和快照；本页记录请求并限制写入。</p>
       <div className="flex flex-wrap gap-2">
         <Button disabled={imported.isPending} onClick={() => imported.mutate()}>
-          导入既有验收任务引用
+          核对既有验收报告
         </Button>
         <Button variant="outline" onClick={() => window.location.reload()}>
           刷新当前验收页

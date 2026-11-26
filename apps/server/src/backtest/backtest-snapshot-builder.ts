@@ -33,11 +33,11 @@ export class DsaSnapshotBuilder implements BacktestSnapshotBuilder {
     private readonly knownCash?: BacktestKnownCashGuardV3,
   ) {}
 
-  async buildV3(input: BacktestSnapshotV3BuildInput): Promise<BacktestSnapshotV3BuildResult> {
+  async buildV3(input: BacktestSnapshotV3BuildInput, snapshots = this.snapshots): Promise<BacktestSnapshotV3BuildResult> {
     const prepared = input.runConfig.knownCashPreparation;
     return buildBacktestSnapshotV3(
       input,
-      this.snapshots.v3,
+      snapshots.v3,
       { readV3: this.bars.readV3.bind(this.bars) },
       this.dsa,
       this.reconstruction,

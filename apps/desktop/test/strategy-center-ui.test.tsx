@@ -63,7 +63,7 @@ const experimentCreateSource = readFileSync(
 const experimentDetailSource = readFileSync(
   new URL('../src/features/strategy/StrategyExperimentDetailPage.tsx', import.meta.url),
   'utf8',
-) + readFileSync(new URL("../src/features/strategy/useExperimentDetailPage.ts", import.meta.url), "utf8");
+);
 const experimentDetailSectionsSource = readFileSync(
   new URL('../src/features/strategy/StrategyExperimentDetailSections.tsx', import.meta.url),
   'utf8',

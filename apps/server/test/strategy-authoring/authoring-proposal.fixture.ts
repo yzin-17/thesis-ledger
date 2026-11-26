@@ -8,10 +8,11 @@ export function authoringProposal(
     proposal: {
       definition: {
         ...strategy,
-        signalSources: strategy.signalSources.map(({ series: _series, ...source }) => source),
+        signalSources: strategy.signalSources.map(source => omit(source, ['series'])),
       },
       coverage,
     },
     intentCheck: '核对本次规则的触发条件和执行时点',
   };
 }
+import { omit } from 'es-toolkit';

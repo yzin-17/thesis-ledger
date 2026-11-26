@@ -1,4 +1,5 @@
 import { simulationCashDividendAmount } from './simulation-cash-dividend-entitlement.js';
+import { consumeSimulationCashReservation } from './simulation-cash-reservation.js';
 import { DecimalValue } from './decimal.js';
 import { simulationEventAvailabilityIssue } from './simulation-event-availability.js';
 import type { BacktestResearchClock } from './backtest-observation-clock.js';
@@ -81,6 +82,7 @@ export interface SimulationLedgerFill {
   /** Gross cash amount for amount-based fills such as NAV subscriptions. */
   cashDebit?: string;
   cashReservationId?: string;
+  cashReservationRemaining?: string;
 }
 
 export interface SimulationSettlement {
@@ -524,18 +526,12 @@ export class SimulationLedger {
       return this.rejection(fill.eventId, 'INVALID_AMOUNT', '成交扣款必须为正数');
     }
     const debit = gross.plus(charges);
+    if (fill.cashReservationRemaining !== undefined && !fill.cashReservationId)
+      return this.rejection(fill.eventId, 'INVALID_AMOUNT', '余单占款必须关联现金预留');
     if (fill.cashReservationId !== undefined) {
-      const reservation = this.cashReservations.get(fill.cashReservationId);
-      if (!reservation) {
-        return this.rejection(fill.eventId, 'SETTLEMENT_SOURCE_NOT_FOUND', '成交缺少现金占款');
-      }
-      if (reservation.currency !== fill.currency) {
-        return this.rejection(fill.eventId, 'CURRENCY_MISMATCH', '现金占款币种与成交不一致');
-      }
-      if (reservation.amount.compareTo(debit) < 0) {
-        return this.rejection(fill.eventId, 'INSUFFICIENT_CASH', '现金占款不足以覆盖成交扣款');
-      }
-      this.cashReservations.delete(fill.cashReservationId);
+      const result = consumeSimulationCashReservation({ reservations: this.cashReservations,
+        id: fill.cashReservationId, currency: fill.currency, debit, remaining: fill.cashReservationRemaining });
+      if (!result.accepted) return this.rejection(fill.eventId, result.code, result.reason);
     } else if (DecimalValue.from(this.availableCash(fill.currency)).compareTo(debit) < 0) {
       return this.rejection(fill.eventId, 'INSUFFICIENT_CASH', '执行币种已结算现金不足');
     }

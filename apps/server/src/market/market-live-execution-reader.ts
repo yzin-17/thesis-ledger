@@ -91,7 +91,7 @@ export class MarketLiveExecutionReader {
           statusCompositionDemandV1Schema.parse({
             requirement: 'completeWindow' as const,
             query: {
-              contractVersion: 3 as const,
+              contractVersion: 1 as const,
               capabilityVersion: 1 as const,
               consumer: 'thesis-ledger' as const,
               requestId: randomUUID(),

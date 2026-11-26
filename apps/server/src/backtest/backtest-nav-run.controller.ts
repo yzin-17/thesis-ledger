@@ -46,8 +46,8 @@ export class BacktestNavRunController {
   @Post(':id/retry')
   async retry(@Param('id', new ParseUUIDPipe()) id: string) {
     await this.runs.read(id);
-    await this.runExecution.retryRun(id);
-    return this.runs.read(id);
+    const retried = await this.runExecution.retryRun(id);
+    return this.runs.read(retried?.id ?? id);
   }
 
   @Post(':id/cancel')

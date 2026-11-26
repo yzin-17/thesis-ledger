@@ -7,6 +7,7 @@ import {
   type StrategyVersionProvenance,
 } from '@thesis-ledger/schemas';
 import { hashCanonicalManifest } from './backtest-snapshot.js';
+import { requireNewStrategyDefinition } from './strategy-definition-write.js';
 
 @Injectable()
 export class StrategyCreationService {
@@ -24,7 +25,7 @@ export class StrategyCreationService {
     },
   ) {
     if (input.ownerId !== null) z.uuid().parse(input.ownerId);
-    const definition = strategySchema.parse(input.definition);
+    const definition = requireNewStrategyDefinition(input.definition);
     const source = strategyVersionProvenanceSchema.parse(input.source);
     return tx.strategy.create({
       data: {
@@ -32,12 +33,12 @@ export class StrategyCreationService {
         ownerId: input.ownerId,
         description: input.description ?? definition.description ?? null,
         status: 'draft',
-        schemaVersion: Number(definition.schemaVersion),
+        schemaVersion: 1,
         versions: {
           create: {
             version: 1,
-            schemaVersion: Number(definition.schemaVersion),
-            schema: definition as Prisma.InputJsonValue,
+            schemaVersion: 1,
+            schema: definition,
             source,
           },
         },

@@ -8,14 +8,15 @@ export function authoringConnectionProbe(purpose: AiGenerationContractRef['id'])
   const average = { type: 'indicator', name: 'MA', input: close, params: { period: 20 } };
   const example = {
     definition: {
-      schemaVersion: '2',
+      schemaVersion: 'strategy-definition-v1',
+      entryTrigger: 'rising-edge',
       name: '编写用途格式验证',
       signalSources: [
         {
           id: 'primary',
           asset: { symbol: '510300.SH', market: 'CN', assetType: 'etf' },
           timeframe: '1d',
-          series: ['open', 'high', 'low', 'close', 'volume'],
+          priceCoordinate: 'research',
         },
       ],
       executionInstrument: { symbol: '510300.SH', market: 'CN', assetType: 'etf' },

@@ -1,14 +1,14 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import type { BacktestJob } from '@prisma/client';
-import { strategySchema } from '@thesis-ledger/schemas';
 import { PrismaService } from '../platform/prisma.service.js';
-import { validateNavPreparationReceipt } from './backtest-nav-preparation-receipt.js';
-import { verifyNavRunForRead } from './backtest-nav-run-read.js';
+import { navSnapshotStoreForJob, verifyNavRunForRead } from './backtest-nav-run-read.js';
 import { LocalNavSnapshotStore } from './backtest-nav-snapshot-store.js';
 import { LocalNavSnapshotV3Runner, type BacktestNavV3Runner } from './backtest-nav-v3-runner.js';
 import { verifyNavResultV3 } from './backtest-nav-result-v3.js';
 import { hashCanonicalManifest } from './backtest-snapshot.js';
 import { BacktestSnapshotUnavailableError } from './backtest-v3-run-lifecycle.js';
+import { loadNavRunPreparation, materializeNavBacktest } from './backtest-nav-materialization.js';
+import { advanceBacktestStage } from './backtest-materialization-publication.js';
 
 @Injectable()
 export class BacktestNavRunExecution {
@@ -22,6 +22,7 @@ export class BacktestNavRunExecution {
   }
 
   async execute(job: BacktestJob, signal: AbortSignal) {
+    job = await materializeNavBacktest(this.prisma, job, this.snapshots, signal);
     const frozen = await this.loadVerified(job);
     if (signal.aborted) throw new Error('NAV 执行已取消');
     const { manifest } = frozen;
@@ -36,6 +37,8 @@ export class BacktestNavRunExecution {
         })),
       },
       signal,
+      { snapshots: navSnapshotStoreForJob(job, this.snapshots),
+        onStage: (stage) => advanceBacktestStage(this.prisma, job, signal, stage) },
     );
     if (signal.aborted) throw new Error('NAV 执行已取消');
     // 提交前重新读取物理产物，拒绝执行过程中发生的冻结输入变化。
@@ -51,23 +54,7 @@ export class BacktestNavRunExecution {
 
   async loadVerified(job: BacktestJob) {
     try {
-      const preparation = await this.prisma.navBacktestPreparation.findUnique({
-        where: { consumedRunId: job.id },
-      });
-      if (!preparation) throw new Error('NAV Run 缺少已消费准备凭证');
-      const prepared = await validateNavPreparationReceipt(preparation, () =>
-        job.createdAt.getTime(),
-      );
-      const version = await this.prisma.strategyVersion.findUnique({
-        where: { id: job.strategyVersionId },
-      });
-      const strategy = strategySchema.safeParse(version?.schema);
-      if (
-        version?.schemaVersion !== 2 ||
-        !strategy.success ||
-        hashCanonicalManifest(strategy.data) !== prepared.binding.strategyContentHash
-      )
-        throw new Error('NAV Run 策略与准备凭证不一致');
+      const { preparation, prepared } = await loadNavRunPreparation(this.prisma, job);
       const checked = await verifyNavRunForRead({
         job,
         preparation,
@@ -75,7 +62,7 @@ export class BacktestNavRunExecution {
         snapshots: this.snapshots,
       });
       if (!checked.snapshotId || !checked.snapshotManifest) throw new Error('NAV Run 尚未冻结');
-      const frozen = await this.snapshots.replay(job.id);
+      const frozen = await navSnapshotStoreForJob(job, this.snapshots).replay(job.id);
       if (
         hashCanonicalManifest(frozen.manifest) !== hashCanonicalManifest(checked.snapshotManifest)
       )

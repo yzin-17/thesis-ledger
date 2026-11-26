@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { omit } from 'es-toolkit';
 import { deterministicResultChecksum } from '@thesis-ledger/domain';
 import { backtestSnapshotManifestV3Schema } from '@thesis-ledger/schemas';
 import { isCurrentRunForRead } from '../backtest/backtest-current-run-read.js';
@@ -28,7 +29,9 @@ export type PriceAcquisition = {
 function convertTradabilityColumns(row: ArtifactRow): ArtifactRow {
   const converted = { ...row };
   if (typeof row.historicalTradability === 'string')
-    converted.historicalTradability = canonicalizeManifest(convertObservation(JSON.parse(row.historicalTradability)));
+    converted.historicalTradability = canonicalizeManifest(
+      convertObservation(JSON.parse(row.historicalTradability) as Record<string, unknown>),
+    );
   if (typeof row.historicalTradabilityWindows === 'string')
     converted.historicalTradabilityWindows = canonicalizeManifest(
       (JSON.parse(row.historicalTradabilityWindows) as Record<string, unknown>[]).map(convertObservation),
@@ -101,7 +104,7 @@ function convertDependencyMetadata(
     if (Array.isArray(value.historicalTradabilityWindows))
       result.historicalTradabilityWindows = value.historicalTradabilityWindows.map(convertObservation);
     if (Array.isArray(value.exchanges))
-      result.exchanges = value.exchanges.map((exchange) => ({
+      result.exchanges = (value.exchanges as Record<string, unknown>[]).map((exchange) => ({
         ...exchange, request: convertControlProjection(exchange.request), response: convertControlProjection(exchange.response),
       }));
     return result;
@@ -123,7 +126,7 @@ function convertDependencyMetadata(
     request: canonicalizeManifest(convertControlProjection(JSON.parse(row.request))),
     response: canonicalizeManifest(converted),
     ...(typeof row.sourceResponse === 'string' ? {
-      sourceResponse: canonicalizeManifest(convertResponse(JSON.parse(row.sourceResponse))),
+      sourceResponse: canonicalizeManifest(convertResponse(JSON.parse(row.sourceResponse) as Record<string, unknown>)),
     } : {}),
   };
 }
@@ -219,7 +222,9 @@ export async function rehearseBacktestArtifactConversion(candidate: ArtifactCand
           if (!previousReference || typeof row.frozenWindowRef !== 'string' || typeof row.completeResponse !== 'string')
             return { outcome: 'unproven' as const, reason: '原价参考制品缺少源窗口或完整响应' };
           const child = JSON.parse(row.frozenWindowRef) as typeof previousReference;
-          const prior = typeof row.sourceFrozenWindowRef === 'string' ? JSON.parse(row.sourceFrozenWindowRef) : child;
+          const prior = typeof row.sourceFrozenWindowRef === 'string'
+            ? JSON.parse(row.sourceFrozenWindowRef) as typeof previousReference
+            : child;
           if (prior.identityFingerprint !== previousReference.identityFingerprint ||
               prior.responseHash !== previousReference.responseHash)
             return { outcome: 'unproven' as const, reason: '原价参考裁剪与父窗口绑定不一致' };
@@ -277,7 +282,7 @@ export async function rehearseBacktestArtifactConversion(candidate: ArtifactCand
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, canonicalizeManifest(nextManifest) + '\n', { flag: 'wx' });
   await target.v3.replay(original.id);
-  const { resultChecksum: _priorChecksum, ...resultBody } = converted.result as Record<string, unknown>;
+  const resultBody = omit(converted.result as Record<string, unknown>, ['resultChecksum']);
   const resultPayload = { ...resultBody, snapshotId, contentHash: snapshotId, comparableDataFingerprint };
   const resultChecksum = deterministicResultChecksum(resultPayload);
   const row = { ...converted, snapshotId, snapshotManifest: nextManifest,

@@ -1,8 +1,9 @@
 import { Prisma } from '@prisma/client';
+import { isStrategyCapabilityGap } from '@thesis-ledger/schemas';
 import type { PrismaService } from '../platform/prisma.service.js';
 import type { CandidateRow } from './strategy-optimization-common.js';
 
-type AttemptOutcome = { status: string; errorCode: string | null };
+type AttemptOutcome = { status: string; errorCode: string | null; proposal?: unknown };
 type CandidateOutcome = Pick<CandidateRow, 'validationStatus'>;
 
 const formatFailureCodes = new Set(['optimization_schema_invalid', 'optimization_invalid_json']);
@@ -13,6 +14,8 @@ export const proposalStageFailureReason = (
 ) => {
   if (candidates.some((candidate) => candidate.validationStatus === 'valid')) return null;
   if (candidates.length > 0) return 'no_valid_candidate';
+  if (attempts.length > 0 && attempts.every((attempt) => isStrategyCapabilityGap(attempt.proposal)))
+    return 'model_capability_gap';
   if (
     attempts.length > 0 &&
     attempts.every(
@@ -32,7 +35,7 @@ export const concludeOptimizationProposalStage = async (
   const attempts = candidates.some((candidate) => candidate.validationStatus === 'valid')
     ? []
     : await prisma.$queryRaw<AttemptOutcome[]>(Prisma.sql`
-        SELECT attempt."status", run."errorCode"
+        SELECT attempt."status", attempt."proposal", run."errorCode"
         FROM "OptimizationAttempt" AS attempt
         LEFT JOIN "AiRun" AS run ON run."id"=attempt."aiRunId"
         WHERE attempt."experimentId"=${experimentId}::uuid

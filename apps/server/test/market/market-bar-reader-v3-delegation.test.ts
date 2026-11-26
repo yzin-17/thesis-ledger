@@ -1,7 +1,6 @@
 import 'reflect-metadata';
 import { describe, expect, it, vi } from 'vitest';
 import type { MarketDataBarRouteKeyV3 } from '@thesis-ledger/schemas';
-import { MarketBacktestInputModule } from '../../src/market/market-backtest-input.module.js';
 import { MarketModule } from '../../src/market/market.module.js';
 import { MarketBarReader } from '../../src/market/market-bar-reader.js';
 import {
@@ -50,8 +49,7 @@ describe('MarketBarReader V3 wiring', () => {
   });
 
   it('registers the V3 reader and exact-window evidence repository in MarketModule', () => {
-    expect(Reflect.getMetadata('imports', MarketModule)).toContain(MarketBacktestInputModule);
-    const providers = Reflect.getMetadata('providers', MarketBacktestInputModule) as unknown[];
+    const providers = Reflect.getMetadata('providers', MarketModule) as unknown[];
 
     expect(providers).toContain(MarketBarWindowReaderV3);
     expect(providers).toContain(MarketWindowEvidenceV3Repository);

@@ -1,5 +1,5 @@
 import type { ExecutionInstrumentFact } from '@thesis-ledger/domain';
-import type { BacktestResearchLotSize } from '@thesis-ledger/schemas';
+import { backtestDailyTradabilityEvidenceV3Schema, type BacktestResearchLotSize } from '@thesis-ledger/schemas';
 import type { ArtifactRow } from './backtest-artifact-store.js';
 
 /** 身份观察与执行坐标转换；原产物中的未知单位保持不变。 */
@@ -10,6 +10,9 @@ export function instrumentFact(row: ArtifactRow, normalizedCoordinates = false, 
     return value;
   };
   const coordinateOnly = normalizedCoordinates && row.lotSize === null && row.tickSize === null;
+  const observedPriceOnly = normalizedCoordinates && typeof row.historicalTradabilityWindows === 'string' &&
+    backtestDailyTradabilityEvidenceV3Schema.array().parse(JSON.parse(row.historicalTradabilityWindows))
+      .some((window) => window.priceOnlyAllowed && window.days.some((day) => day.state === 'observed-price-only'));
   let provider = coordinateOnly ? 'normalized-execution-coordinate-config' : stringField('provider');
   let providerRevision = stringField('providerRevision');
   if (researchLot) {
@@ -23,7 +26,7 @@ export function instrumentFact(row: ArtifactRow, normalizedCoordinates = false, 
     currency: row.currency as ExecutionInstrumentFact['currency'],
     lotSize: researchLot?.sharesPerLot ?? (coordinateOnly ? '1' : stringField('lotSize')),
     tickSize: coordinateOnly ? '1' : stringField('tickSize'),
-    tradable: row.tradable === true,
+    tradable: row.tradable === true || observedPriceOnly,
     provider,
     providerRevision,
     occurredAt: stringField('occurredAt'),

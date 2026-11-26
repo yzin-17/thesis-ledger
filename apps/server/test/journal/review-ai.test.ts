@@ -1,15 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
+import type {
   journalAiFrozenEvidenceSchema,
-  type IdentityPrincipal,
-  type JournalAnalysisDraft,
+  IdentityPrincipal,
+  JournalAnalysisDraft,
 } from '@thesis-ledger/schemas';
 import { localIdentityPrincipal } from '../../src/identity/local-workspace.js';
 import { JournalReviewAi } from '../../src/journal/journal-review-ai.js';
-import {
-  JournalReviewAnalysis,
-  journalAnalyzeCandidate,
-} from '../../src/journal/journal-review-analysis.js';
+import { JournalReviewAnalysis } from '../../src/journal/journal-review-analysis.js';
 import { journalReviewCandidate } from '../../src/journal/journal-review-candidate.js';
 import { reviewEvidenceFixture } from './review-evidence.fixture.js';
 
