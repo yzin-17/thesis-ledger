@@ -207,7 +207,11 @@ describe.skipIf(!databaseUrl)('真实风险 handler、规则、状态和诊断�
       output: {
         valuation: { portfolioComplete: false },
         results: expect.arrayContaining([
-          { ruleId: concentrationId, error: expect.stringContaining('组合权重不可用') },
+          {
+            ruleId: concentrationId,
+            error: expect.stringContaining('组合权重不可用'),
+            errorCode: 'input-unavailable',
+          },
         ]),
       },
     });

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { aiGenerationContracts } from '../../packages/schemas/dist/index.js';
 import test from 'node:test';
 import {
   convertHealthRecord,
@@ -46,8 +47,10 @@ test('连接、生成和成功慢响应转换只更新详情，保留原始计�
   assert.equal(convertHealthRecord(original).details.status, 'passed');
   original.details.testKind = 'generation';
   original.details.purpose = 'research';
-  original.details.contract = { id: 'research', version: 'research-generation-v2' };
+  original.details.contract = aiGenerationContracts.research.ref;
   assert.equal(convertHealthRecord(original).action, 'convert');
+  original.details.contract = { id: 'research', version: 'research-generation-v2' };
+  assert.equal(convertHealthRecord(original).action, 'delete');
 });
 
 test('失败和取消只映射已有事实，不将未知费用写为零', () => {

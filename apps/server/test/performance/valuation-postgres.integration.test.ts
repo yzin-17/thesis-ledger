@@ -9,6 +9,7 @@ import { PerformanceLayerService } from '../../src/performance/performance-layer
 import { PerformanceSnapshotService } from '../../src/performance/performance-snapshot.service.js';
 import { frozenSnapshotInputs } from '../../src/performance/performance-snapshot-inputs.js';
 import { PerformanceValuationSeriesService } from '../../src/performance/performance-valuation-series.service.js';
+import { controlledMarketSession } from '../market/market-session.fixture.js';
 
 const databaseUrl = process.env.PORTFOLIO_VALUATION_DATABASE_URL;
 const intradayId = '00000000-0000-4000-8000-000000000011';
@@ -20,6 +21,7 @@ const managedSystemKeys = [
 
 async function createValuationFixture() {
   const market = {
+    getSession: controlledMarketSession,
     getQuote: async () => ({ price: 12, provider: 'isolated-fixture', stale: false }),
   };
 

@@ -101,7 +101,7 @@ export async function runRepair(args = process.argv.slice(2)) {
     assert.equal(hashCanonicalManifest(strategySchema.parse(version.schema)), hashCanonicalManifest(after));
     const stamp = { ...original.input.preparationStamp, strategyVersionId: version.id, strategyContentHash: hashCanonicalManifest(after) };
     const input = backtestRunCreateSchemaV3.parse({
-      contractVersion: 3, strategyVersionId: version.id, runConfig: original.runConfig,
+      contractVersion: 1, strategyVersionId: version.id, runConfig: original.runConfig,
       preparationStamp: stamp, idempotencyKey: `cross-direction-repair:${sourceRunId}:${version.id}`,
     });
     // 服务端仍复核当前路由、冻结配置和版本指纹；不降低原预检标准。
