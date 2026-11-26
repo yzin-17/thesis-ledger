@@ -9,7 +9,7 @@ function fixture() {
   const { request, response } = navSourceFixture();
   const target = { providerId: 'efinance', upstreamSource: 'eastmoney' };
   const desired = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'policy',
     revision: 1,
@@ -19,7 +19,7 @@ function fixture() {
     effectiveStale: false,
   };
   const effective = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'policy',
     revision: 1,
@@ -35,7 +35,7 @@ function fixture() {
     ],
   };
   const catalog = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     catalogRevision: 2,
     generatedAt: '2026-10-01T00:00:00Z',

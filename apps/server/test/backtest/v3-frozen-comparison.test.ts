@@ -77,7 +77,7 @@ async function build(
   ).buildV3(input);
   const job = {
     id: input.runId,
-    mode: 'V3',
+    mode: 'frozen',
     strategyVersionId: input.strategyVersionId,
     periodStart: new Date(`${input.runConfig.startDate}T00:00:00.000Z`),
     periodEnd: new Date(`${input.runConfig.endDate}T00:00:00.000Z`),
@@ -86,8 +86,8 @@ async function build(
     snapshotId: built.manifest.contentHash,
     snapshotManifest: built.manifest,
     input: {
-      contractVersion: 3,
-      schemaVersion: '3',
+      contractVersion: 1,
+      schemaVersion: 'backtest-trade-run-v1',
       strategyVersionId: input.strategyVersionId,
       runConfig: input.runConfig,
       snapshotId: built.manifest.contentHash,

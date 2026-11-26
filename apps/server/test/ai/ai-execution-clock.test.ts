@@ -14,7 +14,7 @@ const policy = { ...DEFAULT_AI_RESEARCH_POLICY_V1, maxDurationSeconds: 600 };
 const summary = () =>
   aiExecutionSummarySchema.parse({
     version: 'sdk-execution-v1',
-    contract: { id: 'research', version: 'research-generation-v2' },
+    contract: { id: 'research', version: 'research-report-generation-v1' },
     frozenPolicy: policy,
     deadlineAt: null,
     timing: queuedResearchClock(policy, {}, epoch),

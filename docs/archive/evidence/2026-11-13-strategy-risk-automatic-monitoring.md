@@ -38,7 +38,7 @@ Market 的后台日线读取按精确窗口保留 600 秒成功/失败缓存和�
 
 ## 浏览器
 
-`PLAYWRIGHT_MODULE=/tmp/thesis-risk-notification-qa/node_modules/playwright node scripts/local-runtime/strategy-risk-monitoring-browser.mjs` 通过。
+`PLAYWRIGHT_MODULE=/tmp/thesis-risk-notification-qa/node_modules/playwright node scripts/local-runtime/browser/risk/strategy-risk-monitoring.regression.mjs` 通过。
 
 Desktop 实际 RiskCenter 和 Mobile 实际监控组件分别在 1440、1024、768、390 宽度验证，共 40 个组合：缺持仓、日历/日线来源缺失、缺成本/持有周期、等待首次检查、数据恢复正常。全部无横向溢出、脚本错误、意外请求或写请求。
 

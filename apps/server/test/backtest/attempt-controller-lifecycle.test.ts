@@ -9,10 +9,10 @@ it.each([true, false])('失败收敛期间保留当前取消控制器，重试=%
   // 只提供本职责实际读取的持久化字段；不是数据库或协议验收样本。
   const job = {
     id: 'controlled-run',
-    mode: 'V3',
+    mode: 'frozen',
     status: 'queued',
     executionAttempt: 0,
-    input: { contractVersion: 3, schemaVersion: '3' },
+    input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1' },
     cancelRequestedAt: null,
     engineVersion: 'controlled-runner',
     startedAt: null,

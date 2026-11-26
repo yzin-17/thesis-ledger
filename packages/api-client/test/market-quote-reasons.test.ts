@@ -11,7 +11,7 @@ it('详情 HTTP 合同不丢失报价回退诊断和原始时间', async () => {
     sessionContext: { session: 'closed_snapshot', evaluatedAt: '2026-11-09T02:00:00Z', latestTradingDate: '2026-11-06', calendarRevision: 'verified' },
   };
   const fetcher = vi.fn<typeof fetch>(async () => Response.json({
-    contractVersion: 3, symbol: quote.symbol, assetType: 'STOCK',
+    contractVersion: 1, symbol: quote.symbol, assetType: 'STOCK',
     requestId: 'controlled', generatedAt: quote.fetchedAt,
     identity: { source: 'asset', status: 'confirmed' }, requested: ['quote'],
     capabilities: { supported: ['quote'], unsupported: [] }, limits: { bars: 90, nav: 90 },

@@ -10,11 +10,16 @@ require_matching_file() {
     printf '无法读取容器内兼容性基线: %s (%s)\n' "$label" "$container_file" >&2
     return 1
   fi
-  if ! cmp -s "$source_file" "$copied_file"; then
-    printf '%s 与当前容器不一致，不能仅同步代码。\n' "$label" >&2
-    print_error '请使用 ./scripts/update.sh 更新依赖或运行时。'
-    return 1
+  if cmp -s "$source_file" "$copied_file"; then
+    return 0
   fi
+  if [[ "$container_file" == /app/package.json ]] &&
+    node "$app_dir/scripts/deployment/match-pnpm-server-manifest.mjs" "$source_file" "$copied_file"; then
+    return 0
+  fi
+  printf '%s 与当前容器不一致，不能仅同步代码。\n' "$label" >&2
+  print_error '请使用 ./scripts/update.sh 更新依赖或运行时。'
+  return 1
 }
 
 preflight_thesis_ledger_compatibility() {
@@ -83,6 +88,9 @@ build_thesis_ledger_payload() {
     mkdir -p "$payload_dir/$package-dist"
     cp -R "$output_dir/." "$payload_dir/$package-dist/"
   done
+
+  # 传入容器的产物由 root 替换，Server 和 Worker 以镜像的非 root 用户读取。
+  chmod -R a+rX "$payload_dir"/{server,domain,schemas,shared}-dist
 }
 
 

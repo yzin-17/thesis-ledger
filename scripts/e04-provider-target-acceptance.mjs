@@ -87,13 +87,13 @@ const call=async(path,method='GET',body)=>{
 };
 for(const provider of registry.providers)for(const action of ['config','test','remove']) {
  for(const version of [1,2]) {
-  const r=await call('/api/v3/thesis-ledger/control/providers/'+provider.providerId+'/'+action,'POST',
+  const r=await call('/api/v1/thesis-ledger/control/providers/'+provider.providerId+'/'+action,'POST',
    {contractVersion:version,consumer:'thesis-ledger',requestId:'canonical-reject-provider',enabled:false});
   assert.equal(r.status,422); assert.equal(r.body.detail.code,'CONTROL_CONTRACT_UNSUPPORTED');oldBody+=1;
  }
 }
 for(const version of [1,2])for(const suffix of ['', '/11111111-1111-4111-8111-111111111111/cancel']) {
- const r=await call('/api/v3/thesis-ledger/control/providers/longbridge/oauth/sessions'+suffix,'POST',
+ const r=await call('/api/v1/thesis-ledger/control/providers/longbridge/oauth/sessions'+suffix,'POST',
  {contractVersion:version,consumer:'thesis-ledger',requestId:'canonical-reject-oauth',...(suffix===''?{clientId:'reject-before-create'}:{})});
  assert.equal(r.status,422);assert.equal(r.body.detail.code,'CONTROL_CONTRACT_UNSUPPORTED');oldBody+=1;
 }

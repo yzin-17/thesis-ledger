@@ -95,7 +95,7 @@ try {
       now,
     ).model;
     const request = backtestRunPreparationRequestV3Schema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'readonly-price-research',
       strategyVersionId: '11111111-1111-4111-8111-111111111111',
       priceResearch: 'price-research-v1',

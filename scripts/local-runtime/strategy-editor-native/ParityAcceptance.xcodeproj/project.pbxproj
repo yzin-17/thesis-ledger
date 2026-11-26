@@ -1,0 +1,23 @@
+// !$*UTF8*$!
+{
+  archiveVersion = 1;
+  classes = {};
+  objectVersion = 56;
+  objects = {
+    A00000000000000000000001 = {isa = PBXProject; attributes = {LastUpgradeCheck = 2600; TargetAttributes = {A00000000000000000000002 = {CreatedOnToolsVersion = 26.0; }; }; }; buildConfigurationList = A00000000000000000000010; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = A00000000000000000000003; productRefGroup = A00000000000000000000004; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000002); };
+    A00000000000000000000002 = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000011; buildPhases = (A00000000000000000000007, A00000000000000000000008, A00000000000000000000009); buildRules = (); dependencies = (); name = ParityAcceptanceUITests; productName = ParityAcceptanceUITests; productReference = A00000000000000000000006; productType = "com.apple.product-type.bundle.ui-testing"; };
+    A00000000000000000000003 = {isa = PBXGroup; children = (A00000000000000000000005, A00000000000000000000004); sourceTree = "<group>"; };
+    A00000000000000000000004 = {isa = PBXGroup; children = (A00000000000000000000006); name = Products; sourceTree = "<group>"; };
+    A00000000000000000000005 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParityAcceptance.swift; sourceTree = "<group>"; };
+    A00000000000000000000006 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ParityAcceptanceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+    A00000000000000000000007 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A0000000000000000000000A); runOnlyForDeploymentPostprocessing = 0; };
+    A00000000000000000000008 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+    A00000000000000000000009 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+    A0000000000000000000000A = {isa = PBXBuildFile; fileRef = A00000000000000000000005; };
+    A00000000000000000000010 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000012); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+    A00000000000000000000011 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000013); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+    A00000000000000000000012 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphonesimulator; SWIFT_VERSION = 5.0; }; name = Debug; };
+    A00000000000000000000013 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGNING_ALLOWED = NO; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = io.github.yzin17.mobile.strategy.editor.acceptance; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = iphonesimulator; SWIFT_EMIT_LOC_STRINGS = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Debug; };
+  };
+  rootObject = A00000000000000000000001;
+}

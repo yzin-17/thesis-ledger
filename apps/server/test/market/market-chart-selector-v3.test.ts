@@ -71,7 +71,7 @@ const setup = () => {
   });
   const input = {
     request: {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       purpose: 'interactive-chart' as const,
       requestId: 'chart-proof-test',
       symbol: proof.symbol,

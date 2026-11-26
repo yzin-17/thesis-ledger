@@ -30,7 +30,7 @@ export class JournalReviewController {
     const page = await this.candidates.list(query);
     const symbols = [
       ...page.items.map((row) => row.input.trade.symbol),
-      ...page.legacyItems.flatMap((row) =>
+      ...page.unlinkedItems.flatMap((row) =>
         row.journalEntry.symbol === null ? [] : [row.journalEntry.symbol],
       ),
     ];

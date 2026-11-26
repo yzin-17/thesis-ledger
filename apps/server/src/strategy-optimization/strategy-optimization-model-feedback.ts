@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   runConfigSchemaV3,
+  backtestRuleDiagnosticsSchema,
   strategyParameterDescriptorSchema,
   type StrategyParameterDescriptor,
 } from '@thesis-ledger/schemas';
@@ -17,6 +18,11 @@ const summary = z.object({
   totalReturn: decimal.optional(),
   maxDrawdown: decimal.optional(),
   turnover: decimal.optional(),
+  tradedNotional: decimal.optional(),
+  turnoverRate: decimal.optional(),
+  analyticsVersion: z.literal('research-analytics-v2').optional(),
+  scoreVersion: z.literal('optimization-score-v2').optional(),
+  ruleDiagnostics: backtestRuleDiagnosticsSchema.optional(),
   score: z.number().finite().optional(),
   failureCategory: z
     .enum([
@@ -34,7 +40,15 @@ export function optimizationModelMetrics(value: unknown) {
   const allowed: Record<string, z.infer<typeof summary>> = {};
   for (const split of ['development', 'validation']) {
     const parsed = summary.safeParse(record[split]);
-    if (parsed.success) allowed[split] = parsed.data;
+    if (parsed.success) {
+      const value = parsed.data;
+      if (value.ruleDiagnostics) value.ruleDiagnostics = { ...value.ruleDiagnostics,
+        rules: value.ruleDiagnostics.rules.map((rule) => ({ ...rule,
+          unavailableReasons: rule.unavailableReasons.map((reason) => ({ ...reason, samples: [] })),
+        })),
+      };
+      allowed[split] = value;
+    }
   }
   return allowed;
 }
@@ -64,8 +78,8 @@ export function optimizationModelDiff(
   });
 }
 
-export function optimizationModelResearchNotice(value: unknown): string {
-  if (toRecord(value).schemaVersion !== '3')
+export function optimizationModelResearchNotice(value: unknown, dataScopeInRequest = false): string {
+  if (toRecord(value).schemaVersion !== 'backtest-trade-config-v1')
     return '仅使用开发与验证摘要；未提供严格历史无前视证明，不得据此声称严格样本外有效。';
   const config = runConfigSchemaV3.parse(value);
   const protocol = config.executionPriceProtocol;
@@ -76,16 +90,19 @@ export function optimizationModelResearchNotice(value: unknown): string {
     historyBasis: protocol.history.basis,
   };
   const notice =
-    `冻结研究语义：${JSON.stringify(facts)}。` +
+    `冻结价格/记账/数量/历史：${Object.values(facts).join('/')}。` +
     (protocol.history.basis === 'fixed-provider-snapshot'
-      ? '这是事后固定供应商序列研究，复权价格可能包含后来事件影响，不得描述为严格无前视样本外。'
+      ? '事后固定序列可能含后来事件影响，不得声称严格无前视样本外。'
       : '严格历史时点语义仍须逐项证据验证，不得仅凭实验标签宣称通过。');
+  if (config.priceResearch?.dataScope)
+    return notice + '本次候选只能使用已冻结dataScope中的价格坐标、周期、字段、窗口与投入方式。缺少actual时仅使用纯指标和金额／比例投入；不得添加原价条件、固定份数或临时补取行情。' +
+      (dataScopeInRequest ? '' : JSON.stringify(config.priceResearch.dataScope));
   if (config.priceResearch)
     return notice + '指标与模拟收益使用后复权；具体价格常量使用已冻结的不复权参考价。固定投入参考份数按操作时点原价确定投入，再换算研究单位；由共享研究规则装配，不得自行推导复权因子或改写阈值。';
   if (protocol.accountingBasis === 'normalized-series')
     return (
       notice +
-      '归一化研究优先使用同一坐标内的相对价格、资金比例与持仓状态规则；绝对价格、真实股数或实物单位规则需要可核验的转换证据，未提供该证据时不得使用。'
+      '归一化研究用同坐标相对价/资金比例/持仓状态；真实报价、股数及实物单位须可核验转换证据，否则禁止。用户明确指定本次模拟执行坐标中的委托触发价时，同坐标直接使用该价位。'
     );
   return notice;
 }

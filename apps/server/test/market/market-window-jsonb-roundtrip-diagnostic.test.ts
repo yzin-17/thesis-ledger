@@ -188,7 +188,7 @@ const databaseName = process.env.DIAG_DATABASE_NAME;
       }
       const response = await syntheticResponse();
       const request = marketDataBarSeriesRequestV3Schema.parse({
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: response.requestId,
         symbol: response.symbol,
         routeKey: response.routeKey,

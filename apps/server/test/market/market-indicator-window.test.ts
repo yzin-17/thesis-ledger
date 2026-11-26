@@ -15,7 +15,7 @@ const fixture = () => {
     } };
   }).filter(({ date }) => date.getUTCDay() !== 0 && date.getUTCDay() !== 6).map(({ point }) => point);
   const series: BarSeries = {
-    contractVersion: 3, identity, points, inputFingerprint: barSeriesInputFingerprint(identity, points),
+    contractVersion: 1, identity, points, inputFingerprint: barSeriesInputFingerprint(identity, points),
     coverage: { actualStart: points[0]!.timestamp, actualEnd: points.at(-1)!.timestamp, hasMoreBefore: false,
       latestCompleteTradingDate: points.at(-1)!.timestamp.slice(0, 10) },
     provenance: { providerId: 'tencent', upstreamSource: 'tencent', routeIndex: 0, effectivePolicyRevision: 7,
@@ -24,7 +24,7 @@ const fixture = () => {
   };
   const read = vi.fn(async (input: BarReadInput) => sliceBarSeries(series, input.window));
   const calculate = vi.fn(async (request: Omit<IndicatorCalculateRequest, 'contractVersion'>) => ({
-    contractVersion: 3 as const, engineVersion: 'dsa-indicator-v3', inputFingerprint: request.inputFingerprint,
+    contractVersion: 1 as const, engineVersion: 'dsa-indicator-v3', inputFingerprint: request.inputFingerprint,
     // fixture 仅证明输入、投影及来源对应，不替代 DSA 指标公式测试。
     results: request.requests.map((item) => ({ ...item, inputFingerprint: request.inputFingerprint,
       points: request.points.map((point) => ({ timestamp: point.timestamp, values: { value: 123 } })) })),
@@ -53,13 +53,17 @@ describe('指标预热和部分成功回归', () => {
       const anchor = series.points.at(-5)!.timestamp;
       const url = new URL(`${await app.getUrl()}/api/market/510300.SH/detail`);
       url.search = new URLSearchParams({ include: 'bars,indicator:MA', barsLimit: '90',
-        calculationAnchor: anchor, chartContractVersion: '3' }).toString();
+        calculationAnchor: anchor, chartContractVersion: '1' }).toString();
       const response = await fetch(url);
       expect(response.status).toBe(200);
       const result = await response.json();
       expect(result.barSeries.points.at(-1).timestamp).toBe(anchor);
       expect(read.mock.calls[0]![0].window.end).toBe(anchor);
       read.mockClear(); calculate.mockClear();
+      url.searchParams.set('chartContractVersion', '3');
+      expect((await fetch(url)).status).toBe(400);
+      expect(read).not.toHaveBeenCalled();
+      url.searchParams.set('chartContractVersion', '1');
       url.searchParams.set('calculationAnchor', '2026-11-04');
       expect((await fetch(url)).status).toBe(400);
       expect(read).not.toHaveBeenCalled();
@@ -71,7 +75,7 @@ describe('指标预热和部分成功回归', () => {
     const anchor = series.points.at(-5)!.timestamp;
     for (const limit of ['90', '180']) {
       const result = await controller.detail('510300.SH', 'bars,indicator:MA', limit, undefined,
-        'qfq', undefined, anchor.slice(0, 10), undefined, undefined, undefined, '3', '1d', anchor);
+        'qfq', undefined, anchor.slice(0, 10), undefined, undefined, undefined, '1', '1d', anchor);
       expect(read.mock.calls.at(-1)![0].window.end).toBe(anchor);
       expect(result.barSeries?.points).toHaveLength(Number(limit));
       expect(result.barSeries?.points.at(-1)?.timestamp).toBe(anchor);
@@ -88,7 +92,7 @@ describe('指标预热和部分成功回归', () => {
     const { controller, read, calculate } = fixture();
     for (const anchor of ['2026-05-20', '2026-02-30T00:00:00Z', '2026-05-19T00:00:00Z'])
       await expect(controller.detail('510300.SH', 'bars,indicator:MA', '90', undefined,
-        'qfq', undefined, '2026-05-20', undefined, undefined, undefined, '3', '1d', anchor)).rejects.toThrow('calculationAnchor');
+        'qfq', undefined, '2026-05-20', undefined, undefined, undefined, '1', '1d', anchor)).rejects.toThrow('calculationAnchor');
     expect(read).not.toHaveBeenCalled();
     expect(calculate).not.toHaveBeenCalled();
   });
@@ -146,7 +150,7 @@ describe('指标预热和部分成功回归', () => {
   it('DSA 回传带偏移的 ISO 时间戳时仍投影出可见窗口，并归一为 BarSeries 写法', async () => {
     const { controller, calculate } = fixture();
     calculate.mockImplementation(async (request) => ({
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       engineVersion: 'dsa-indicator-v3',
       inputFingerprint: request.inputFingerprint,
       // 真实 DSA 返回 `2026-03-18T00:00:00+00:00`，与 BarSeries 的 `…000Z` 不同串同时刻。

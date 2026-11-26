@@ -3,7 +3,7 @@ import { marketTradingStatusResponseV3Schema } from '../src/market-trading-statu
 import { backtestTradingStatusSnapshotV3Schema } from '../src/backtest-trading-status-v3.js';
 
 const response = () => ({
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'structured-status',
   routeKey: {

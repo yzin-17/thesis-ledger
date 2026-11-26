@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
 import { JournalDraftSheet } from '../src/features/journal/review/JournalDraftSheet.js';
 import {
   journalInstant,
   journalLocalTime,
+  JournalWindowTimeInput,
 } from '../src/features/journal/review/JournalWindowTimeInput.js';
 import {
   journalClick,
@@ -68,5 +70,40 @@ describe('复盘草稿价格与本地时间输入', () => {
     }
     expect(journalLocalTime('')).toBe('');
     expect(journalInstant('')).toBe('');
+  });
+
+  it('未编辑时间只聚焦失焦和修改其他字段，真实表单提交仍保留毫秒', async () => {
+    const instant = '2026-10-20T00:00:00.123Z';
+    const change = vi.fn();
+    const submit = vi.fn();
+    const { host } = await mountJournal(
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit(journalInstant(String(new FormData(event.currentTarget).get('at'))));
+        }}
+      >
+        <JournalWindowTimeInput
+          name="at"
+          aria-label="时间边界"
+          value={instant}
+          onValueChange={change}
+        />
+        <input aria-label="备注" defaultValue="原备注" />
+      </form>,
+    );
+    const stored = host.querySelector<HTMLInputElement>('[data-slot="date-input-value"]')!;
+    const editor = host.querySelector<HTMLInputElement>('input[type="text"]')!;
+    expect(stored.validity.valid).toBe(true);
+    expect(stored.step).toBe('0.001');
+    expect(journalInstant(stored.value)).toBe(instant);
+    await act(async () => {
+      editor.focus();
+      editor.blur();
+    });
+    await journalFill('备注', '修改后的备注');
+    await act(async () => host.querySelector('form')!.requestSubmit());
+    expect(change).not.toHaveBeenCalled();
+    expect(submit).toHaveBeenCalledExactlyOnceWith(instant);
   });
 });

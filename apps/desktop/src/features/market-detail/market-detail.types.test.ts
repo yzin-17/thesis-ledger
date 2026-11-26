@@ -10,7 +10,7 @@ import type { BarSeries } from '@thesis-ledger/schemas';
 import type { MarketDetailResponse } from '@thesis-ledger/api-client';
 
 const detail = (symbol: string): MarketDetailResponse => ({
-  contractVersion: 3,
+  contractVersion: 1,
   symbol,
   assetType: 'STOCK',
   identity: { source: 'asset', status: 'confirmed' },
@@ -24,7 +24,7 @@ const detail = (symbol: string): MarketDetailResponse => ({
 });
 
 const series = (timestamps: string[]): BarSeries => ({
-  contractVersion: 3 as const,
+  contractVersion: 1 as const,
   identity: { symbol: '600519.SH', assetType: 'STOCK' as const, timeframe: '1d' as const, adjustment: 'qfq' as const },
   points: timestamps.map((timestamp) => ({ timestamp, open: 10, high: 12, low: 9, close: 11, volume: 100, amount: 1100, completionStatus: 'complete' as const, availableAt: timestamp })),
   coverage: { actualStart: timestamps[0] ?? null, actualEnd: timestamps.at(-1) ?? null, hasMoreBefore: false, latestCompleteTradingDate: timestamps.at(-1)?.slice(0, 10) ?? null },

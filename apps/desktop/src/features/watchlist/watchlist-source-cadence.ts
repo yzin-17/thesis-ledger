@@ -3,7 +3,7 @@ import type {
   WatchlistItem,
   WatchlistPrice,
 } from '@thesis-ledger/schemas';
-import { accountAccessSelectable } from '../market-data/provider-account-access.js';
+import { accountAccessState } from '../market-data/provider-account-access.js';
 export type SourceCadence = { seconds: number; label: string };
 export type CadenceCatalog = MarketRouteCatalogReadClientV3 | undefined;
 export function watchlistSourceCadence(
@@ -23,7 +23,7 @@ export function watchlistSourceCadence(
       entry.target.providerId === source.provider &&
       entry.target.upstreamSource === source.upstreamSource &&
       entry.state === 'ready' &&
-      accountAccessSelectable(entry.accountAccess, now) &&
+      (!entry.accountAccess || accountAccessState(entry.accountAccess, now) === 'allowed') &&
       entry.key.kind === 'bar' &&
       entry.key.market === market &&
       entry.key.assetType === item.instrument.instrumentType,

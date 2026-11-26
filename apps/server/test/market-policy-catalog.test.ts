@@ -17,7 +17,7 @@ const key: DesiredProviderPolicyV3['routes'][number]['key'] = {
 };
 const target = { providerId: 'hithink', upstreamSource: 'hithink-financial-api' };
 const policy: DesiredProviderPolicyV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'catalog-test',
   revision: 5,
@@ -28,7 +28,7 @@ const catalog = (
   state: 'ready' | 'credential_missing' = 'ready',
   integrity: 'complete' | 'partial' = 'complete',
 ) => ({
-  contractVersion: 3 as const,
+  contractVersion: 1 as const,
   consumer: 'thesis-ledger' as const,
   catalogRevision: 12,
   generatedAt: '2026-09-25T04:00:00.000Z',
@@ -41,7 +41,7 @@ const applyResponse = (desired: DesiredProviderPolicyV3) => ({
   idempotent: false,
   desired,
   effective: {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     consumer: 'thesis-ledger' as const,
     requestId: desired.requestId,
     revision: desired.revision,
@@ -142,7 +142,7 @@ describe("策略路由目录完整性", () => {
         generatedAt: '2026-09-25T04:00:00.000Z',
         integrity: 'partial',
       },
-      effectiveProjection: { contractVersion: 3, sourceDesiredRevision: 4 },
+      effectiveProjection: { contractVersion: 1, sourceDesiredRevision: 4 },
     });
     expect(dsa.applyControlPolicyV3).not.toHaveBeenCalled();
   });
@@ -303,7 +303,7 @@ describe("策略路由 Apply 与失败", () => {
     expect(result).toMatchObject({
       syncState: 'rejected',
       lastError: { code: 'invalid-response' },
-      effectiveProjection: { contractVersion: 3, sourceDesiredRevision: 4 },
+      effectiveProjection: { contractVersion: 1, sourceDesiredRevision: 4 },
       effectiveStale: true,
     });
   });
@@ -331,7 +331,7 @@ describe("策略路由 Apply 与失败", () => {
         code: 'route_catalog_unavailable',
         issues: [{ path: ['routes', 0, 'targets', 0], reason: 'catalog_unavailable' }],
       },
-      effectiveProjection: { contractVersion: 3, sourceDesiredRevision: 4 },
+      effectiveProjection: { contractVersion: 1, sourceDesiredRevision: 4 },
       effectiveStale: true,
     });
     expect(unavailableDsa.applyControlPolicyV3).not.toHaveBeenCalled();
@@ -354,7 +354,7 @@ describe("策略路由 Apply 与失败", () => {
 
     expect(failed).toMatchObject({
       syncState: 'pending',
-      effectiveProjection: { contractVersion: 3, sourceDesiredRevision: 4 },
+      effectiveProjection: { contractVersion: 1, sourceDesiredRevision: 4 },
       effectiveStale: true,
     });
   });
@@ -429,7 +429,7 @@ describe("策略路由修订竞争", () => {
     expect(store.current).toMatchObject({
       syncState: 'rejected',
       lastError: { code: 'invalid-response' },
-      effectiveProjection: { contractVersion: 3, sourceDesiredRevision: 4 },
+      effectiveProjection: { contractVersion: 1, sourceDesiredRevision: 4 },
     });
   });
 });

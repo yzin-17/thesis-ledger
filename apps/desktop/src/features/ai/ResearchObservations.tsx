@@ -26,7 +26,7 @@ export function ResearchObservations({
   contextKey?: string;
 }) {
   const owner = useResearchIdentity();
-  if (report.historicalScope.status !== 'known' || report.result?.version !== 2) return null;
+  if (report.historicalScope.status !== 'known' || report.result?.version !== 'research-report-result-v1') return null;
   const locator = reportEvidenceLocator(report.historicalScope.snapshot);
   return (
     <ObservationCard
@@ -84,7 +84,7 @@ function ObservationRead({
     );
   const data = query.data;
   const result = report.result;
-  if (result?.version !== 2 || data.availability !== 'available')
+  if (result?.version !== 'research-report-result-v1' || data.availability !== 'available')
     return (
       <Alert>
         <AlertTitle>自动复核暂不可用</AlertTitle>

@@ -151,7 +151,7 @@ export class FundDailyErrorService {
     });
     if (claimed.count !== 1) return;
     const raw = await this.dsa.get(
-      '/api/v3/thesis-ledger/market/fund-nav/public-comparison?symbol=' +
+      '/api/v1/thesis-ledger/market/fund-nav/public-comparison?symbol=' +
         encodeURIComponent(row.symbol),
       1,
     );

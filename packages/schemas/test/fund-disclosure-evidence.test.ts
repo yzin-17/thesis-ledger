@@ -28,7 +28,7 @@ const proof = (changes: Partial<Matched> = {}): Matched => ({
   ...changes,
 });
 const payload = () => ({
-  version: 3,
+  version: 1,
   fundSymbol: '161725.OF',
   reportPeriod: '2026-Q2',
   disclosureDate: null as string | null,

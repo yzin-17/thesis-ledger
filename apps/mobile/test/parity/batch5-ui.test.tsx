@@ -197,7 +197,7 @@ describe('手机行情配置、OAuth 与管理诊断', () => {
           posts.push(JSON.parse(String(init.body)));
           return response({ message: 'fixture-secret-token' }, 409);
         }
-        return response({ contractVersion: 3, consumer: 'thesis-ledger', providers: [b5Provider] });
+        return response({ contractVersion: 1, consumer: 'thesis-ledger', providers: [b5Provider] });
       }),
     );
     await mount(
@@ -231,7 +231,7 @@ describe('手机行情配置、OAuth 与管理诊断', () => {
             );
           });
         }
-        return response({ contractVersion: 3, consumer: 'thesis-ledger', providers: [b5Provider] });
+        return response({ contractVersion: 1, consumer: 'thesis-ledger', providers: [b5Provider] });
       }),
     );
     await mount(
@@ -273,7 +273,7 @@ describe('手机行情配置、OAuth 与管理诊断', () => {
         }
         if (String(url).includes('/routes/'))
           return response({
-            contractVersion: 3,
+            contractVersion: 1,
             consumer: 'thesis-ledger',
             status: 'unavailable',
             catalogRevision: null,

@@ -1,12 +1,12 @@
 import { isEqual } from 'es-toolkit';
-import { authoringStrategySchema, type AuthoringContent } from '@thesis-ledger/schemas';
+import { authoringStrategyV6Schema, type AuthoringContent } from '@thesis-ledger/schemas';
 
 export function editAuthoringDefinition(
   content: AuthoringContent,
   definitionText: string,
 ): AuthoringContent {
-  const previous = authoringStrategySchema.safeParse(content.definitionText);
-  const next = authoringStrategySchema.safeParse(definitionText);
+  const previous = authoringStrategyV6Schema.safeParse(content.definitionText);
+  const next = authoringStrategyV6Schema.safeParse(definitionText);
   if (previous.success && next.success && isEqual(previous.data, next.data))
     return { ...content, definitionText };
   return {

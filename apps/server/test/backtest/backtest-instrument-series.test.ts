@@ -83,6 +83,15 @@ const setup = (rows: ArtifactRow[] = [row('2026-05-18', '1.1234567890123456789')
   return { job, read, openRead, service };
 };
 describe('冻结标的序列', () => {
+  it('新Run走势图按已发布的attempt位置读取冻结产物', async () => {
+    const h = setup();
+    const forAttempt = vi.fn(() => ({ artifacts: { openRead: h.openRead } }));
+    h.read.mockResolvedValue({ ...h.job, input: { snapshotStorageAttempt: 2 }, executionAttempt: 3 });
+    const service = new BacktestInstrumentSeriesService({ currentRunForRead: h.read } as never,
+      { forAttempt, artifacts: { openRead: vi.fn(() => { throw new Error('must not read legacy path'); }) } } as never);
+    expect(await service.read(id)).toMatchObject({ status: 'available' });
+    expect(forAttempt).toHaveBeenCalledWith(id, 2);
+  });
   it('读取精确冻结来源、过滤预热和区间外点、排序并保留十进制与缺值', async () => {
     const rows = [
       row('2026-05-20', null),

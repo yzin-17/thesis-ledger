@@ -47,7 +47,7 @@ export async function createCompositionTargetInput(clock = new Date().toISOStrin
     quantityUnits: 'continuous-normalized-decimal', lotSizeConstraint: 'not-applied',
     tickSizeConstraint: 'not-applied', dailyPriceLimit: 'not-applied', feeBasis: 'simulatedTurnover' };
   const executionModel = backtestExecutionModelSchemaV3.parse(model);
-  const intent = backtestRunPreparationIntentV3Schema.parse({ contractVersion: 3,
+  const intent = backtestRunPreparationIntentV3Schema.parse({ contractVersion: 1,
     requestId: randomUUID(), adjustment: 'qfq', accountingBasis: 'normalized-series',
     history: { basis: 'fixed-provider-snapshot' }, warmupBudgetSessions: 1,
     freezeTimePolicy: 'after-acquisition', runConfig: { startDate: range.start, endDate: range.end,

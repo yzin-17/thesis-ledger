@@ -14,7 +14,7 @@ function context(name = 'DAILY_TRADING_STATUS') {
   delete input.routeTarget;
   delete input.policyRevision;
   const targets = [item.request.routeTarget, { providerId: 'fixture-backup', upstreamSource: 'backup', routeIndex: 1 }];
-  const policy = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'policy-trace', revision: item.request.policyRevision,
+  const policy = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'policy-trace', revision: item.request.policyRevision,
     sourceDesiredRevision: item.request.policyRevision, enabled: true, appliedAt: '2026-10-10T15:00:00Z',
     routes: [{ key: item.request.routeKey, enabled: true, reason: null,
       targets: targets.map((target) => ({ ...target, eligible: true, reason: null })) }] };
@@ -34,7 +34,7 @@ describe('原能力 Reader 的 Server 唯一主备边界', () => {
     const calls: unknown[] = [];
     vi.stubGlobal('fetch', vi.fn(async (url: URL, options?: RequestInit) => {
       if (url.pathname.endsWith('/policies/effective')) return new Response(JSON.stringify({
-        contractVersion: 3, consumer: 'thesis-ledger', projection: { effective: c.policy },
+        contractVersion: 1, consumer: 'thesis-ledger', projection: { effective: c.policy },
       }), { status: 200 });
       const request = JSON.parse(options!.body as string);
       calls.push(request.routeTarget);
@@ -54,7 +54,7 @@ describe('原能力 Reader 的 Server 唯一主备边界', () => {
     expect(result.result).toEqual(c.item.result);
     expect(result.outcome).toBe(name === 'SECURITY_BASIC_DATES' ? 'observed' : 'complete');
     expect(c.post).toHaveBeenCalledOnce();
-    expect(c.post).toHaveBeenCalledWith('/api/v3/thesis-ledger/market/status-capabilities', c.item.request, expect.any(Function));
+    expect(c.post).toHaveBeenCalledWith('/api/v1/thesis-ledger/market/status-capabilities', c.item.request, expect.any(Function));
   });
   it('分类来源失败只执行一次人工备用，披露实际目标及两次尝试', async () => {
     const c = context();

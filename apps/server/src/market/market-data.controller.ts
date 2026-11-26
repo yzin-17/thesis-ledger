@@ -11,7 +11,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { instrumentLocatorSchema } from '@thesis-ledger/schemas';
+import { instrumentLocatorSchema, marketRouteCatalogReadContractVersion } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { CatalogReadinessService } from './catalog-readiness.service.js';
 import { InstrumentService } from './instrument.service.js';
@@ -42,7 +42,8 @@ export class MarketDataController {
   @Get('routes/capabilities')
   @Header('Cache-Control', 'no-store')
   routeCapabilities(@Query('contractVersion') contractVersion?: string) {
-    if (contractVersion !== '3') throw new BadRequestException('contractVersion 必须为 3');
+    if (contractVersion !== String(marketRouteCatalogReadContractVersion))
+      throw new BadRequestException('行情来源能力目录使用 market-route-catalog-read-v1，contractVersion 必须为 1');
     return this.control.routeCapabilitiesV3();
   }
 

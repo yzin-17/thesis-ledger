@@ -93,7 +93,7 @@ describe('复盘候选查询编排', () => {
     ]);
     expect(result.items[0]!.input.plan!.plannedEntry).toBe('1234567890123456.00000001');
     expect(result.items[0]!.input.journalEntries[0]!.notes).toBe('复盘说明');
-    expect(result.legacyItems).toEqual([]);
+    expect(result.unlinkedItems).toEqual([]);
   });
   it('投影读取期间出现更新时返回可刷新冲突，不返回混合世代', async () => {
     const { query } = setup({ currentVersion: { ...version, projectionGeneration: '8' } });
@@ -165,7 +165,7 @@ describe('复盘候选查询编排', () => {
     const trade = reviewEvidenceFixture().trade;
     const entry = reviewNoteFixture({ tradePlanId: null });
     const unique = await setup({ details: [trade], entries: [entry] }).query.list({ accountId });
-    expect(unique.legacyItems).toEqual([]);
+    expect(unique.unlinkedItems).toEqual([]);
     expect(
       unique.items.find((row) => row.input.reference.reviewObjectType === 'CLOSE_SLICE')!.input
         .journalEntries[0]!.id,
@@ -177,8 +177,8 @@ describe('复盘候选查询编排', () => {
         reviewNoteFixture({ id: '00000000-0000-4000-8000-000000000099', side: 'BUY' }),
       ],
     }).query.list({ accountId });
-    expect(missing.legacyItems).toHaveLength(1);
-    expect(missing.legacyItems[0]).toMatchObject({
+    expect(missing.unlinkedItems).toHaveLength(1);
+    expect(missing.unlinkedItems[0]).toMatchObject({
       accountMode: null,
       reason: 'SELL_MAPPING_MISSING',
       journalEntry: { notes: '复盘说明' },
@@ -190,8 +190,8 @@ describe('复盘候选查询编排', () => {
     const ambiguous = await setup({ details: [trade, duplicate], entries: [entry] }).query.list({
       accountId,
     });
-    expect(ambiguous.legacyItems[0]!.reason).toBe('SELL_MAPPING_AMBIGUOUS');
-    expect(ambiguous.legacyItems[0]!.possibleReferences.map((row) => row.reviewObjectId)).toEqual([
+    expect(ambiguous.unlinkedItems[0]!.reason).toBe('SELL_MAPPING_AMBIGUOUS');
+    expect(ambiguous.unlinkedItems[0]!.possibleReferences.map((row) => row.reviewObjectId)).toEqual([
       'CLOSE_SLICE:slice-1',
       'CLOSE_SLICE:slice-2',
     ]);

@@ -35,9 +35,6 @@ export class ResearchScopeReader implements AiResearchSubmissionV2Access {
   ) {
     return this.permissions.assertSnapshot(transaction, ownerId, snapshot);
   }
-  assertLegacy(transaction: Prisma.TransactionClient, ownerId: string, context: unknown) {
-    return this.permissions.assertLegacy(transaction, ownerId, context);
-  }
   allowedScopes(ownerId: string) {
     return this.permissions.allowedScopes(ownerId);
   }
@@ -53,7 +50,7 @@ export class ResearchScopeReader implements AiResearchSubmissionV2Access {
           const fetchedAt = new Date().toISOString();
           return {
             scopeSnapshot: researchScopeSnapshotV2Schema.parse({
-              version: 'research-scope-v2',
+              version: 'research-scope-snapshot-v1',
               mode: input.mode,
               scope: 'instrument',
               confirmedAt: fetchedAt,

@@ -17,11 +17,16 @@ import { AiSdkGenerationError } from '../../src/ai/ai-sdk-generation-facts.js';
 import { createLiveExperimentBudget } from '../../src/ai/research-live-experiment-budget.js';
 import { runLiveResearchArm } from '../../src/ai/research-live-experiment-arm.js';
 import type { LiveTerminalContinuation } from '../../src/ai/research-live-experiment-terminal.js';
+import { currentExperimentFrozenFixture } from './research-experiment-contract.fixture.js';
 
 const read = (name: string) =>
   JSON.parse(readFileSync(new URL('../fixtures/' + name, import.meta.url), 'utf8'));
 export function fixture() {
-  const benchmark = liveBenchmarkSchema.parse(read('research-stage-benchmark-v1.json'));
+  const sample = read('research-stage-benchmark-v1.json');
+  const cases = (sample.cases as Array<{
+    frozen: Parameters<typeof currentExperimentFrozenFixture>[0];
+  }>).map((entry) => ({ ...entry, frozen: currentExperimentFrozenFixture(entry.frozen) }));
+  const benchmark = liveBenchmarkSchema.parse({ ...sample, cases });
   const evaluation = liveEvaluationSchema.parse(read('research-stage-evaluation-v1.json'));
   const protocol: LiveExperimentProtocol = {
     version: 'research-live-experiment-v2' as const,
@@ -65,6 +70,7 @@ export function fixture() {
             : '',
         ),
     );
+    output.version = 'research-report-generation-v1';
     output.numericClaims = [
       {
         id: 'price',

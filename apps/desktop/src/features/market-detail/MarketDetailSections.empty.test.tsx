@@ -6,7 +6,7 @@ import { BarsSection } from './MarketDetailSections.js';
 describe('行情空分段', () => {
   it.each([undefined, null, []])('合同允许的空数据 %j 只渲染空态', (data) => {
     const response = marketDetailResponseSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       symbol: '159516.SZ',
       assetType: 'ETF',
       identity: { source: 'symbol', status: 'confirmed' },

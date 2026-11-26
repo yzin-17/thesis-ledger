@@ -3,8 +3,8 @@ import { backtestRunPreparationRequestV3Schema } from './backtest-run-preparatio
 
 /** 尚未生成正式运行配置的失败请求；不能作为可执行 Run 消费。 */
 export const backtestPreparationFailureInputSchema = z.strictObject({
-  contractVersion: z.literal(3),
-  schemaVersion: z.literal('3'),
+  contractVersion: z.literal(1),
+  schemaVersion: z.literal('backtest-trade-run-v1'),
   kind: z.literal('preparation-failure'),
   submissionId: z.uuid(),
   preparation: backtestRunPreparationRequestV3Schema,

@@ -31,6 +31,7 @@ export function StrategyExecutionInstrumentField({
   return (
     <>
       <InstrumentPicker
+        variant="content"
         purpose="browse"
         label="执行标的"
         value={search ?? symbol}

@@ -5,7 +5,7 @@ import { MarketSecurityLotSizeController } from '../src/market/market-security-l
 import type { DsaClient } from '../src/integration/dsa/dsa.client.js';
 
 const response = (requestId: string) => ({
-  contractVersion: 3, consumer: 'thesis-ledger', requestId, symbol: '00700.HK',
+  contractVersion: 1, consumer: 'thesis-ledger', requestId, symbol: '00700.HK',
   sharesPerLot: '100', historicalChanges: 'unverified',
   source: { provider: 'futu', sourceUrl: 'https://openapi.futunn.com/futu-api-doc/quote/get-static-info.html',
     sha256: 'a'.repeat(64), observedAt: '2026-10-08T10:00:00Z' },
@@ -18,8 +18,8 @@ describe('独立每手股数产品读取', () => {
     const post = vi.fn(async (_path, request) => response(request.requestId));
     const value = await readSecurityLotSize({ post } as unknown as DsaClient, '700.HK');
     expect(post.mock.calls[0]?.slice(0, 3)).toEqual([
-      '/api/v3/thesis-ledger/market/security-lot-size',
-      { contractVersion: 3, consumer: 'thesis-ledger', requestId: value.requestId, symbol: '00700.HK' }, 1,
+      '/api/v1/thesis-ledger/market/security-lot-size',
+      { contractVersion: 1, consumer: 'thesis-ledger', requestId: value.requestId, symbol: '00700.HK' }, 1,
     ]);
     expect(value.routeTarget.routeIndex).toBe(1);
   });

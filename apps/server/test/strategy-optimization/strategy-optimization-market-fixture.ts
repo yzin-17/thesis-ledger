@@ -14,8 +14,8 @@ export const createRiskMarketFixture = (_prisma: PrismaService, symbol: string, 
         selection: {
           response: {
             bars: [{
-              timestamp: '2026-09-10T07:00:00.000Z',
-              availableAt: '2026-09-10T08:01:00.000Z',
+              timestamp: '2026-09-11T07:00:00.000Z',
+              availableAt: '2026-09-11T07:01:00.000Z',
               open: 95, high: 96, low: 89, close: 90, volume: 1000, amount: 90000,
               completionStatus: 'complete' as const,
             }],

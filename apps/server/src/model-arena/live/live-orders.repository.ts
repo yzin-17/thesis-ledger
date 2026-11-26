@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
-import { arenaMatchOrders, arenaSubmitDecision } from '@thesis-ledger/domain';
+import { arenaExpireOrders, arenaMatchOrders, arenaSubmitDecision } from '@thesis-ledger/domain';
 import {
   arenaLiveAccountSchema,
   arenaLiveDecisionSchema,
@@ -9,6 +9,7 @@ import { PrismaService } from '../../platform/prisma.service.js';
 import { LiveExecutionContext } from './live-execution-context.js';
 import { liveAgents, liveMatch, saveLiveAccount, type LiveCycleRow } from './live-storage.js';
 import { liveTimeline } from './live-timeline.js';
+import { liveOrderCommand } from './live-order-identities.js';
 
 @Injectable()
 export class LiveOrdersRepository {
@@ -57,14 +58,7 @@ export class LiveOrdersRepository {
           (s) => Date.parse(s.startAt) <= now.getTime() && Date.parse(s.endAt) > now.getTime(),
         );
       if (decision.orders.length && !open) throw new ConflictException('market_closed');
-      const command = {
-        ...decision,
-        orders: decision.orders.map((o) => ({
-          ...o,
-          clientId: cycleId + ':' + o.clientId,
-          exitGroup: o.exitGroup ? cycleId + ':' + o.exitGroup : null,
-        })),
-      };
+      const command = liveOrderCommand(cycleId, decision);
       const next = arenaSubmitDecision(account, cycle.bookRevision, command, {
         ...prepared.context,
         at: now.toISOString(),
@@ -125,16 +119,8 @@ export class LiveOrdersRepository {
       if (match.state !== 'running') return;
       for (const agent of await liveAgents(tx, id, true)) {
         const book = arenaLiveAccountSchema.parse(agent.account);
-        const expired = book.orders.filter(
-          (o) => o.state === 'active' && Date.parse(o.expiresAt) <= now.getTime(),
-        );
-        if (!expired.length) continue;
-        for (const order of expired) {
-          order.state = 'expired';
-          order.reason = 'order_expired';
-        }
-        book.revision++;
-        await saveLiveAccount(tx, agent.id, book);
+        const next = arenaExpireOrders(book, now.toISOString());
+        if (next.revision !== book.revision) await saveLiveAccount(tx, agent.id, next);
       }
     });
   }

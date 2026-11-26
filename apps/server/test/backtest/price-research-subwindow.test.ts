@@ -122,6 +122,8 @@ describe('双价格研究的冻结子窗口', () => {
         routeKey: { ...f.input.executionRouteKey, adjustment: 'hfq' },
         window: { start: output.manifest.dateRange.warmupStartDate, end: runConfig.endDate },
         frozenWindowRef: runConfig.frozenExecutionWindow!,
+        priceResearch: true,
+        dailyObservationContract: runConfig.priceResearch!.dailyObservationContract!,
       });
       const read = f.reader.readV3.getMockImplementation()!;
       f.reader.readV3.mockImplementation(async (input) => ({

@@ -2,7 +2,7 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { deterministicResultChecksum } from '@thesis-ledger/domain';
+import { deterministicResultChecksum, DecimalValue } from '@thesis-ledger/domain';
 import { backtestExecutionResultV3Schema } from '@thesis-ledger/schemas';
 import { LocalNavSnapshotStore } from '../../src/backtest/backtest-nav-snapshot-store.js';
 import {
@@ -80,9 +80,19 @@ describe('现行 Runner 的 NAV 离线能力', () => {
     expect(result).not.toHaveProperty('executionPriceProtocol');
     expect(result.navSource.routeKey.capability).toBe('FUND_NAV_HISTORY');
     expect(result.simulationFills.length).toBeGreaterThan(0);
+    expect(result.analyticsVersion).toBe('research-analytics-v2');
+    expect(result.metrics.tradedNotional?.status).toBe('available');
+    expect(result.metrics.turnoverRate?.status).toBe('available');
+    expect(result.metrics.turnover).toBeUndefined();
     expect(result.equityCurve).toHaveLength(7);
     expect(result.equityCurve.at(-1)!.occurredAt).toBe('2026-09-15T20:00:00+08:00');
     expect(result.pendingRequestIds.length).toBeGreaterThan(0);
+    const confirmedNotional = result.requests.filter((request) => request.fillId).reduce(
+      (sum, request) => sum.plus(DecimalValue.from(request.confirmedShares!).times(request.nav!)),
+      DecimalValue.from('0'),
+    );
+    expect(result.metrics.tradedNotional?.value).toBe(confirmedNotional.toString());
+    expect(result.metrics.turnoverRate?.value).toBe(confirmedNotional.dividedBy('10000').toString());
     expect(result.completeness).not.toBe('complete');
     const { resultChecksum, ...payload } = result;
     expect(resultChecksum).toBe(deterministicResultChecksum(payload));

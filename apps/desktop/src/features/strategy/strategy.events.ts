@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { isBacktestRunUpdateOlder } from '@thesis-ledger/domain';
 import { useQueryClient } from '@tanstack/react-query';
 import { strategyKeys } from './strategy.queries.js';
 import type { BacktestJobSummary } from './strategy.types.js';
@@ -57,10 +58,11 @@ export const applyBacktestJobSummaryEvent = (
   current: BacktestJobSummary[] | undefined,
   incoming: BacktestJobSummary,
 ) => {
-  if (incoming.mode !== 'V3') return current ?? [];
+  if (incoming.mode !== 'frozen') return current ?? [];
   if (!current) return [incoming];
   const index = current.findIndex((job) => job.id === incoming.id);
   if (index < 0) return [incoming, ...current];
+  if (isBacktestRunUpdateOlder(current[index], incoming)) return current;
   return current.map((job, jobIndex) => (jobIndex === index ? incoming : job));
 };
 
@@ -74,7 +76,8 @@ export const useBacktestJobEvents = () => {
         void queryClient.invalidateQueries({ queryKey: strategyKeys.groups() });
       },
       onUpdate: (incoming) => {
-        if (incoming.mode !== 'V3') return;
+        if (incoming.mode !== 'frozen') return;
+        void queryClient.cancelQueries({ queryKey: strategyKeys.jobs() });
         queryClient.setQueryData<BacktestJobSummary[]>(strategyKeys.jobs(), (current) =>
           applyBacktestJobSummaryEvent(current, incoming),
         );
@@ -86,6 +89,7 @@ export const useBacktestJobEvents = () => {
         }
         queryClient.setQueryData(strategyKeys.job(incoming.id), (current: unknown) => {
           if (!current || typeof current !== 'object') return current;
+          if (isBacktestRunUpdateOlder(current, incoming)) return current;
           return { ...current, ...incoming };
         });
         if (['succeeded', 'failed', 'cancelled'].includes(incoming.status)) {

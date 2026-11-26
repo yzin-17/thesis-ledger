@@ -1,6 +1,6 @@
 import type { PrismaService } from '../platform/prisma.service.js';
 import { resolveBacktestRetryBudget } from './backtest-retry-budget.js';
-import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { persistedRunContract } from './backtest-v3-run-lifecycle.js';
 
 const terminalStatuses = new Set(['succeeded', 'failed', 'cancelled']);
 
@@ -34,7 +34,7 @@ export async function prepareBacktestExecution(
     },
   });
   if (!job) return { action: 'skip', reason: 'missing' };
-  if (persistedContractVersion(job) !== 3)
+  if (!persistedRunContract(job))
     return { action: 'skip', reason: 'unsupported_contract' };
   if (terminalStatuses.has(job.status)) return { action: 'skip', reason: 'terminal' };
   if (job.cancelRequestedAt) return { action: 'skip', reason: 'cancel_requested' };
@@ -47,7 +47,7 @@ export async function prepareBacktestExecution(
     await prisma.backtestJob.updateMany({
       where: {
         id: jobId,
-        mode: 'V3',
+        mode: 'frozen',
         status: 'queued',
         executionAttempt: job.executionAttempt,
         cancelRequestedAt: null,
@@ -68,7 +68,7 @@ export async function prepareBacktestExecution(
     await prisma.backtestJob.updateMany({
       where: {
         id: jobId,
-        mode: 'V3',
+        mode: 'frozen',
         status: 'queued',
         executionAttempt: job.executionAttempt,
         cancelRequestedAt: null,

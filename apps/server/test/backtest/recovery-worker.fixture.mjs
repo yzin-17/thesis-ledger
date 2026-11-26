@@ -11,9 +11,14 @@ const { assertBacktestWorkerDatabaseReady } = await import(
 await assertBacktestWorkerDatabaseReady();
 const connection = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
 connection.on('error', () => undefined);
+let processor = 'src/backtest/backtest.processor.js';
+if (process.env.BACKTEST_RECOVERY_CPU_STAGE)
+  processor = 'test/backtest/cpu-worker-processor.fixture.js';
+if (process.env.BACKTEST_RECOVERY_PARTIAL_SNAPSHOT === '1')
+  processor = 'test/backtest/partial-snapshot-processor.fixture.js';
 const worker = new Worker(
   'backtest-run',
-  pathToFileURL(resolve(build, 'src/backtest/backtest.processor.js')),
+  pathToFileURL(resolve(build, processor)),
   {
     connection,
     concurrency: 1,

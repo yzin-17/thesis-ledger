@@ -18,7 +18,7 @@ mkdirSync(output, { recursive: true });
       await page.route((url) => url.pathname.startsWith('/api/'), (route) => {
         const url = new URL(route.request().url());
         if (!url.pathname.endsWith('/chart-options')) return route.fulfill({ status: 503, json: { message: '受控资料读取失败' } });
-        return route.fulfill({ json: { contractVersion: 3, symbol: '600036.SH', mode: 'v3',
+        return route.fulfill({ json: { contractVersion: 1, symbol: '600036.SH', mode: 'v3',
           window: { start: '2026-01-01', end: '2026-11-06' },
           plan: { barsLimit: Number(url.searchParams.get('barsLimit')), indicatorParams: JSON.parse(url.searchParams.get('indicatorParams') || '{}') },
           options: ['none', 'qfq', 'hfq'].map((adjustment) => ({ adjustment, available: true, reason: null })) } });

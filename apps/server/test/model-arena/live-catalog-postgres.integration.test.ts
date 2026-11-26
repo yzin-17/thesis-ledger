@@ -24,7 +24,7 @@ describe.skipIf(!url)('统一比赛目录数据库读取', () => {
     await db.$executeRaw`INSERT INTO "ArenaLiveMatch" (id,"ownerId",protocol,remaining,state,"createdAt")
       VALUES (${randomUUID()}::uuid,${owner}::uuid,${JSON.stringify(old)}::jsonb,'{}'::jsonb,'ended','2024-01-01')`;
     await db.$executeRaw`INSERT INTO "ModelArena" (id,"ownerId",protocol,remaining,state,"createdAt")
-      VALUES (${randomUUID()}::uuid,${owner}::uuid,${JSON.stringify({ ...old, version: 1, title: '日频比赛' })}::jsonb,'{}'::jsonb,'ended','2025-01-01')`;
+      VALUES (${randomUUID()}::uuid,${owner}::uuid,${JSON.stringify({ ...old, version: 'arena-historical-match-protocol-v1', title: '日频比赛' })}::jsonb,'{}'::jsonb,'ended','2025-01-01')`;
   });
   afterAll(async () => {
     await db.$executeRaw`DELETE FROM "ArenaLiveMatch" WHERE "ownerId"=${owner}::uuid`;

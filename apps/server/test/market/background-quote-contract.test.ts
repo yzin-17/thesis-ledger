@@ -3,7 +3,7 @@ import { readBackgroundQuote } from '../../src/market/market-background-quote-co
 import type { BackgroundQuotePlan } from '@thesis-ledger/schemas';
 import { MarketQuoteReader } from '../../src/market/market-quote-reader.js';
 const plan = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'source-test',
   symbol: '510300.SH',
@@ -39,7 +39,7 @@ it('uses one Data POST pinned to generation; response target and provider must m
     provider: 'tencent',
     price: 4,
   });
-  expect(post.mock.calls[0]?.[0]).toBe('/api/v3/thesis-ledger/market/background-quote');
+  expect(post.mock.calls[0]?.[0]).toBe('/api/v1/thesis-ledger/market/background-quote');
   expect(post.mock.calls[0]?.[1]).toMatchObject({ generation: plan.generation });
   post.mockImplementationOnce(async (_path, request) => ({
     ...plan,

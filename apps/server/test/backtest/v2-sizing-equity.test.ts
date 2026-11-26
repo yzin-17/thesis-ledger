@@ -195,10 +195,11 @@ describe('实际 Exchange Runner 的总权益定仓', () => {
       ],
     ]);
     const strategy = strategySchema.parse({
-      schemaVersion: '2',
+      schemaVersion: 'strategy-definition-v1',
       name: '总权益目标权重回归',
       signalSources: [
         {
+          priceCoordinate: 'run',
           id: 'close',
           asset: { symbol: '600000.SH', market: 'CN', assetType: 'stock' },
           timeframe: '1d',
@@ -235,7 +236,7 @@ describe('实际 Exchange Runner 的总权益定仓', () => {
       snapshotId: 'snapshot-sizing-equity',
       strategy,
       runConfig: runConfigSchemaV3.parse({
-        schemaVersion: '3',
+        schemaVersion: 'backtest-trade-config-v1',
         executionPriceProtocol: {
           protocolVersion: 'execution-price-v1',
           priceBasis: {

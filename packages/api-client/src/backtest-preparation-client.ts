@@ -20,7 +20,7 @@ export function checkedBacktestPreparation(
     }
     const preflight = await config.preflightRunConfig(
       {
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: input.requestId,
         strategyVersionId: input.strategyVersionId,
         runConfig: result.runConfig,
@@ -34,7 +34,7 @@ export function checkedBacktestPreparation(
     }
     if (preflight.status !== 'ready')
       return backtestRunPreparationResultV3Schema.parse({
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: input.requestId,
         checkedAt: preflight.checkedAt,
         scope: 'execution-window',

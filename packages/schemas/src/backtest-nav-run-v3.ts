@@ -10,7 +10,7 @@ const instant = z.iso.datetime({ offset: true });
 
 /** NAV Run 只接受服务端已落库、带当前冻结摘要的准备凭证。 */
 export const backtestNavRunCreateV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   preparationId: z.uuid(),
   preparationHash: hash,
   idempotencyKey: z.string().trim().min(1).max(128),
@@ -19,8 +19,8 @@ export const backtestNavRunCreateV3Schema = z.strictObject({
 /** NAV Run 的独立 HTTP 读取合同，不复用场内执行结果结构。 */
 export const backtestNavRunResponseV3Schema = z
   .strictObject({
-    contractVersion: z.literal(3),
-    schemaVersion: z.literal('3'),
+    contractVersion: z.literal(1),
+    schemaVersion: z.literal('backtest-nav-run-v1'),
     inputKind: z.literal('nav'),
     id: z.uuid(),
     strategyVersionId: z.uuid(),
@@ -28,6 +28,8 @@ export const backtestNavRunResponseV3Schema = z
     preparationHash: hash,
     idempotencyKey: z.string().min(1).max(128),
     status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']),
+    replayOfRunId: z.uuid().optional(),
+    cancelRequestedAt: instant.nullable().optional(),
     stage: z.string().nullable(),
     progress: z.number().int().min(0).max(100),
     periodStart: instant,
@@ -75,12 +77,14 @@ export type BacktestNavRunResponseV3 = z.infer<typeof backtestNavRunResponseV3Sc
 
 /** 列表只投影任务身份和状态；经济结果与物理冻结校验仍由详情入口负责。 */
 export const backtestNavRunSummaryV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   inputKind: z.literal('nav'),
   id: z.uuid(),
   strategyVersionId: z.uuid(),
   symbol: z.string().regex(/^\d{6}\.OF$/),
   status: backtestNavRunResponseV3Schema.shape.status,
+  replayOfRunId: z.uuid().optional(),
+  cancelRequestedAt: instant.nullable().optional(),
   stage: z.string().nullable(),
   progress: z.number().int().min(0).max(100),
   periodStart: instant,

@@ -222,7 +222,7 @@ export const marketPeriodProvenanceSchema = z.strictObject({
 /** Server 展示序列；不属于 Provider Route/Data 原始事实协议。 */
 export const marketPeriodBarSeriesSchema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     identity: barSeriesIdentitySchema.extend({
       assetType: z.enum(['STOCK', 'ETF']),
       timeframe: marketDerivedTimeframeSchema,

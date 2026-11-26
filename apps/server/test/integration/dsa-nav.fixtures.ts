@@ -31,7 +31,7 @@ export function navSourceFixture() {
     decision: '用户确认缺日不交易研究口径',
   });
   const request: BacktestNavSourceRequestV3 = {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'nav-client-test',
     symbol,
     fundType: 'domestic',
@@ -142,7 +142,7 @@ export function navSourceFixture() {
   };
   const responseRaw = navCanonical(envelope);
   const response = {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: request.requestId,
     symbol,
     routeKey: key,

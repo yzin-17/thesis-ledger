@@ -28,6 +28,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: 数据库恢复工具合同
+        run: pnpm test:database-tools
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
@@ -37,6 +39,7 @@ jobs:
           git clone --depth 1 https://github.com/yzin-17/thesis-ledger-infra.git ../thesis-ledger-infra
           git clone --depth 1 --branch yzin https://github.com/yzin-17/daily_stock_analysis.git ../daily-stock-analysis
           node --test scripts/local-runtime/*.test.mjs scripts/deployment/*.test.mjs
+          node --test scripts/archive/2026-11-12-strategy-cross-direction/strategy-cross-repair.test.mjs
           bash scripts/local-runtime/ai-deployment-contract.test.sh
           bash scripts/local-runtime/database-role-contract.test.sh --check-only
 
@@ -97,6 +100,8 @@ jobs:
           node scripts/test-ai-provider-postgres.mjs
       - name: 基金定投隔离 PostgreSQL
         run: node scripts/test-fund-investment-postgres.mjs
+      - name: 数据库恢复隔离 PostgreSQL
+        run: node scripts/database/test-restore-postgres.mjs
       - name: 组合估值隔离 PostgreSQL
         run: node scripts/test-portfolio-valuation-postgres.mjs
       - name: 收益与风险正确性隔离 PostgreSQL
@@ -122,7 +127,7 @@ jobs:
       - name: 研究离线轨迹确定性门禁
         run: |
           pnpm --filter @thesis-ledger/server exec vitest run test/ai/research-trace-evaluation.test.ts
-          node scripts/evaluate-research-trace.mjs apps/server/test/ai/fixtures/research-trace-v1.samples.json
+          node scripts/evaluate-research-trace.mjs apps/server/test/ai/fixtures/research-trace-current.samples.json
       - name: Complexity guardrails
         run: pnpm guardrails:complexity
         env:
@@ -131,6 +136,36 @@ jobs:
         run: node --test scripts/test-mobile-boundaries.mjs
       - name: 手机签名与接续拒绝反例
         run: node --test scripts/mobile-release/*.test.mjs
+
+  browser-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 构建界面回归依赖
+        run: pnpm --filter '@thesis-ledger/desktop^...' build
+      - name: 安装固定版本 Chromium
+        run: pnpm exec playwright install --with-deps --no-shell chromium
+      - name: 执行全部界面回归
+        run: pnpm test:browser-regressions --output "$RUNNER_TEMP/browser-regressions"
+      - name: 保留界面回归报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-regressions
+          path: |
+            ${{ runner.temp }}/browser-regressions
+            !${{ runner.temp }}/browser-regressions/**/vite-cache/**
+          retention-days: 7
+          if-no-files-found: ignore
 
   mobile-android-native:
     runs-on: ubuntu-latest

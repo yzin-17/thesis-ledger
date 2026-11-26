@@ -14,7 +14,6 @@ import {
   researchQualityReason,
 } from './research-report-display.js';
 import { researchKeys } from './research.queries.js';
-import { ResearchReportContent } from './ResearchReportContent.js';
 import { ResearchEvidenceRead } from './ResearchEvidenceRead.js';
 import { ResearchInferenceSections, ResearchTextSection } from './ResearchInferenceSections.js';
 import { ResearchComparison } from './ResearchComparison.js';
@@ -92,71 +91,9 @@ function ResearchRunStatus({
     </>
   );
 }
-function ResearchLegacyReport({
-  report,
-  onRetry,
-  onOpenSource,
-}: {
-  report: ResearchReportDetail;
-  onRetry: () => void;
-  onOpenSource: (href: string) => void;
-}) {
-  const result = report.result;
-  const ids = new Set(
-    result?.version === 1
-      ? result.evidence.flatMap((entry) =>
-          entry.citations.flatMap((citation) => (citation.toolCallId ? [citation.toolCallId] : [])),
-        )
-      : [],
-  );
-  return (
-    <div className="flex flex-col gap-4">
-      <Alert>
-        <AlertTitle>历史范围未记录</AlertTitle>
-        <AlertDescription>
-          旧报告保留原文，不按当前账户模式重新归类。
-          {report.availability === 'pending_verification' && '引用归属尚待核验。'}
-        </AlertDescription>
-      </Alert>
-      {report.availability === 'pending_verification' && result?.version === 1 && (
-        <section
-          aria-label="待核验的历史正文"
-          className="flex flex-col gap-3 rounded-md border p-4"
-        >
-          <h3 className="font-semibold">待核验的历史正文</h3>
-          <p className="whitespace-pre-wrap text-sm leading-6">{result.conclusion}</p>
-          <ResearchTextSection title="旧报告风险陈述" items={result.risks} />
-          <ResearchTextSection title="旧报告未知项" items={result.unknowns} />
-          <ResearchTextSection
-            title="旧报告证据陈述（关联待核验）"
-            items={result.evidence.map((entry) => entry.claim)}
-          />
-        </section>
-      )}
-      <ResearchReportContent
-        run={reportToAiRun(report)}
-        toolCalls={[]}
-        onRetry={onRetry}
-        onOpenSource={onOpenSource}
-      />
-      {report.availability === 'available' &&
-        [...ids].map((id, index) => (
-          <ResearchEvidenceRead
-            key={id}
-            runId={report.id}
-            referenceId={id}
-            locator={{ view: 'legacy' }}
-            label={'核对历史引用 ' + (index + 1)}
-          />
-        ))}
-      <ResearchSavedFields report={report} />
-    </div>
-  );
-}
 export function ResearchSavedReport({
   report,
   onRetry,
-  onOpenSource,
   comparisonChoices = [],
   comparisonContextKey = '',
 }: {
@@ -168,7 +105,7 @@ export function ResearchSavedReport({
 }) {
   const mode = useOptionalPortfolioMode()?.mode ?? 'actual';
   if (report.historicalScope.status === 'unrecorded')
-    return <ResearchLegacyReport report={report} onRetry={onRetry} onOpenSource={onOpenSource} />;
+    return <Alert><AlertDescription>研究范围不可用。</AlertDescription></Alert>;
   if (report.historicalScope.snapshot.mode !== mode)
     return (
       <Alert>
@@ -186,7 +123,7 @@ export function ResearchSavedReport({
         </Badge>
       </div>
       <ResearchRunStatus report={report} onRetry={onRetry} />
-      {!(report.result?.version === 2 && report.availability === 'available') && (
+      {!(report.result?.version === 'research-report-result-v1' && report.availability === 'available') && (
         <ResearchReportQuality report={report} />
       )}
       {report.status === 'succeeded' && report.availability !== 'available' && (
@@ -210,7 +147,7 @@ export function ResearchSavedReport({
             choices={comparisonChoices}
             contextKey={comparisonContextKey}
           />
-          {report.result?.version === 2 && (
+          {report.result?.version === 'research-report-result-v1' && (
             <ResearchObservations report={report} contextKey={comparisonContextKey} />
           )}
         </>
@@ -241,7 +178,7 @@ function ResearchVerifiedInference({
   snapshot: Parameters<typeof reportEvidenceLocator>[0];
 }) {
   const result = report.result;
-  if (result?.version !== 2 || report.availability !== 'available') return null;
+  if (result?.version !== 'research-report-result-v1' || report.availability !== 'available') return null;
   return (
     <ResearchInferenceSections
       result={result}

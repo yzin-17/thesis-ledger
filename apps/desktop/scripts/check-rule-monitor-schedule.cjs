@@ -198,12 +198,8 @@ async function controlled(browser, width) {
   await page.getByRole('option').filter({ hasText: state.sources[1].name }).click();
   await page.getByRole('button', { name: '更新任务来源', exact: true }).click();
   await monitor
-    .getByText('任务保存失败，所选来源已保留。请重试或重新读取。', { exact: true })
+    .getByText('任务保存失败，所选来源已保留。', { exact: true })
     .waitFor();
-  await monitor.getByRole('button', { name: '重新读取任务', exact: true }).click();
-  await monitor
-    .getByRole('button', { name: '重新读取任务', exact: true })
-    .waitFor({ state: 'hidden' });
   await monitor.getByRole('button', { name: '更新任务来源', exact: true }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('[data-slot="combobox-chip"]').length === 2,

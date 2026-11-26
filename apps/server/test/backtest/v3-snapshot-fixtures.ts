@@ -47,7 +47,7 @@ export const makeReaderResult = async (
   listingUnknown = false,
 ): Promise<MarketBarWindowReadResultV3> => {
   const request = marketDataBarSeriesRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'synthetic-snapshot-v3-request',
     symbol: input.symbol,
     routeKey: input.routeKey,
@@ -59,6 +59,7 @@ export const makeReaderResult = async (
     start: input.window.start,
     end: input.window.end,
     ...(input.tradabilityMode ? { tradabilityMode: input.tradabilityMode } : {}),
+    ...(input.dailyObservationContract !== undefined ? { dailyObservationContract: input.dailyObservationContract } : {}),
   }) as PinnedMarketWindowRequestV3;
   const response = await fixture<MarketDataBarSeriesResponseV3>(
     'market-data-v3.response.etf-qfq.json',
@@ -120,7 +121,7 @@ export const makeReaderResult = async (
   if (missingDates.length) typedResponse.inputFingerprint += `-missing-${missingDates.join(',')}`;
   typedResponse.coverage.actualStart = typedResponse.bars[0]?.timestamp ?? null;
   typedResponse.coverage.actualEnd = typedResponse.bars.at(-1)?.timestamp ?? null;
-  if (input.tradabilityMode) typedResponse.historicalTradabilityWindows = [tradabilityFixtureV3(tradabilityWindowFromResponseV3(typedResponse))];
+  if (input.tradabilityMode) typedResponse.historicalTradabilityWindows = [tradabilityFixtureV3(tradabilityWindowFromResponseV3(typedResponse), input.dailyObservationContract)];
   typedResponse = marketDataBarSeriesResponseV3Schema.parse(typedResponse);
   const selectedTarget = {
     providerId: request.routeTarget!.providerId,
@@ -167,6 +168,7 @@ export const buildInput = async (): Promise<{
   input: Parameters<DsaSnapshotBuilder['buildV3']>[0];
 }> => {
   const strategy = await fixture<BacktestStrategy>('backtest-v2.exchange.json');
+  strategy.schemaVersion = 'strategy-definition-v1';
   strategy.executionInstrument = {
     symbol: '159516.SZ',
     market: 'CN',
@@ -177,6 +179,7 @@ export const buildInput = async (): Promise<{
     .map((source) => ({
       ...source,
       asset: { symbol: '159516.SZ', market: 'CN', assetType: 'etf' },
+      priceCoordinate: 'run',
     }));
   const sourceResponse = await fixture<MarketDataBarSeriesResponseV3>(
     'market-data-v3.response.etf-qfq.json',
@@ -207,7 +210,7 @@ export const buildInput = async (): Promise<{
     };
   }
   const runConfig = runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: '2026-05-18',
     endDate: '2026-05-20',
     dataAsOf: '2026-05-21T00:00:00.000Z',

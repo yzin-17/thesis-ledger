@@ -2,7 +2,7 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  importExistingJournalReferences,
+  checkExistingJournalReports,
   journalExistingRuns,
   journalExistingScope,
 } from './browser-journal-existing-reference.js';
@@ -76,8 +76,8 @@ describe('既有报告验收入口的数据保护', () => {
     window.fetch = originalFetch;
     vi.unstubAllGlobals();
   });
-  it('只读取既有任务并保存 ID 和摘要键，导入成功前不写引用', async () => {
-    await importExistingJournalReferences();
+  it('只读取既有任务并核对冻结范围，不保存任务引用', async () => {
+    await checkExistingJournalReports();
     expect(api.explanation.mock.calls.map((row) => row[0])).toEqual([
       journalExistingRuns.object,
       journalExistingRuns.failed,
@@ -86,26 +86,16 @@ describe('既有报告验收入口的数据保护', () => {
       journalExistingRuns.period,
       journalExistingScope,
     );
-    expect(sessionStorage.length).toBe(3);
-    const stored = Array.from({ length: sessionStorage.length }, (_, index) =>
-      JSON.parse(sessionStorage.getItem(sessionStorage.key(index)!)!),
-    );
-    expect(stored).toContainEqual({ version: 1, id: journalExistingRuns.object });
-    expect(stored).toContainEqual({ version: 1, id: journalExistingRuns.period });
-    expect(stored).toContainEqual([
-      { id: journalExistingRuns.object, kind: 'object' },
-      { id: journalExistingRuns.period, kind: 'period' },
-      { id: journalExistingRuns.failed, kind: 'object' },
-    ]);
+    expect(sessionStorage.length).toBe(0);
   });
   it.each([
     { ledgerRevision: '13' },
     { projectionGeneration: '8' },
     { nextCursor: '另一页' },
     { items: [] },
-  ])('事实范围变化时拒绝导入，不覆盖本机引用：%j', async (change) => {
+  ])('事实范围变化时核对失败，不覆盖本机引用：%j', async (change) => {
     api.candidates.mockResolvedValue({ ...page, ...change });
-    await expect(importExistingJournalReferences()).rejects.toThrow('目标事实已变化');
+    await expect(checkExistingJournalReports()).rejects.toThrow('目标事实已变化');
     expect(sessionStorage.length).toBe(0);
   });
   it.each([

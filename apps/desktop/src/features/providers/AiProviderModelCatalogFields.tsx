@@ -178,9 +178,10 @@ export function AiProviderModelCatalogFields({
           />
           <CatalogChoice
             id="ai-catalog-filter"
-            label="目录筛选"
+            label="模型列表筛选"
             value={catalog.filter ? 'equals' : 'none'}
             items={filterOptions}
+            description="需要按返回字段只保留部分模型时开启；全部保留则选“不筛选”。"
             onChange={(value) =>
               update({ filter: value === 'equals' ? { path: '/type', equals: '' } : null })
             }
@@ -203,9 +204,10 @@ export function AiProviderModelCatalogFields({
           )}
           <CatalogChoice
             id="ai-catalog-pagination"
-            label="目录分页"
+            label="模型列表分页"
             value={catalog.pagination ? 'page' : 'none'}
             items={paginationOptions}
+            description="接口按页返回模型时开启，自动逐页获取；一次返回全部则选“不分页”。"
             onChange={(value) =>
               update({
                 pagination:

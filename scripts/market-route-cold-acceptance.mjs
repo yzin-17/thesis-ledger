@@ -100,7 +100,7 @@ export async function prepareColdPrimary() {
     inputHashes: inputHashes(),
     sourceHashes: hashes(),
     request: {
-      contractVersion: 3,
+      contractVersion: 1,
       purpose: 'interactive-chart',
       requestId: randomUUID(),
       symbol: '510300.SH',

@@ -51,7 +51,7 @@ const input = () => ({
   noTradingEvidence: [],
 });
 const series = () => ({
-  contractVersion: 3,
+  contractVersion: 1,
   identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1w', adjustment: 'none' },
   points: [
     {
@@ -128,7 +128,7 @@ describe('行情周期公共合同', () => {
     expect(barSeriesIdentitySchema.safeParse({ ...identity, timeframe: '1w' }).success).toBe(false);
     expect(
       marketDataBarSeriesRequestV3Schema.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: 'test',
         symbol: identity.symbol,
         start: dates[0],

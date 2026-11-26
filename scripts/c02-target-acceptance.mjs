@@ -45,7 +45,7 @@ try {
   const run=runs.find(r=>r.input.inputKind!=='nav');
   assert(run);
   const legacy=await p.backtestJob.findFirstOrThrow({where:{mode:{not:'V3'}}});
-  console.log(JSON.stringify({witness,id:run.id,legacy:legacy.id,request:{contractVersion:3,strategyVersionId:run.strategyVersionId,idempotencyKey:run.idempotencyKey,runConfig:run.input.runConfig,preparationStamp:run.input.preparationStamp}}));
+  console.log(JSON.stringify({witness,id:run.id,legacy:legacy.id,request:{contractVersion:1,strategyVersionId:run.strategyVersionId,idempotencyKey:run.idempotencyKey,runConfig:run.input.runConfig,preparationStamp:run.input.preparationStamp}}));
 }finally{await p.$disconnect();}
 `,
     ),

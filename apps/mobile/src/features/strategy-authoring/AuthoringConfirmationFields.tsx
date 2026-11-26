@@ -141,6 +141,7 @@ export function AuthoringConfirmationFields({
         onChange={(executionMode) => patch({ executionMode })}
         options={[
           { value: 'exchange', label: '下一可交易开盘市价' },
+          { value: 'dailyBarOrders', label: '按需求生成日线委托计划' },
           { value: 'nav', label: '下一可用净值申购赎回' },
         ]}
       />

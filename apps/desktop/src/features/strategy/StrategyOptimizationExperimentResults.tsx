@@ -1,3 +1,6 @@
+import { isStrategyCapabilityGap } from '@thesis-ledger/schemas';
+import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
+import { StrategyCapabilityGap } from './StrategyCapabilityGap.js';
 import { createClientRequestId } from '../../lib/client-request-id';
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { Spinner } from '@/components/ui/spinner';
@@ -26,14 +29,16 @@ import {
   tradingCostText,
   candidateAdoptionEligibility,
 } from './strategy-experiment-detail.model.js';
-const metricText = (value: unknown) => {
+const metricText = (value: unknown, currency = '基准币种') => {
   if (!value || typeof value !== 'object') return '指标不可用';
   const metric = value as Record<string, unknown>;
   return (
     [
-      typeof metric.totalReturn === 'string' ? `收益 ${metric.totalReturn}` : null,
-      typeof metric.maxDrawdown === 'string' ? `回撤 ${metric.maxDrawdown}` : null,
-      typeof metric.turnover === 'string' ? `换手 ${metric.turnover}` : null,
+      typeof metric.totalReturn === 'string' ? `收益 ${formatDecimalRatioPercent(metric.totalReturn)}` : null,
+      typeof metric.maxDrawdown === 'string' ? `回撤 ${formatDecimalRatioPercent(metric.maxDrawdown)}` : null,
+      typeof metric.turnoverRate === 'string' ? `区间双边资金周转率 ${formatDecimalRatioPercent(metric.turnoverRate)}` : null,
+      typeof metric.tradedNotional === 'string' ? `成交额 ${metric.tradedNotional} ${currency}` : null,
+      typeof metric.turnover === 'string' ? `成交额（旧口径） ${metric.turnover} ${currency}` : null,
       typeof metric.tradeCount === 'number' ? `交易 ${metric.tradeCount}` : null,
       typeof metric.fillCount === 'number' ? `成交 ${metric.fillCount}` : null,
       typeof metric.rejectedOrderCount === 'number' ? `拒绝 ${metric.rejectedOrderCount}` : null,
@@ -42,8 +47,11 @@ const metricText = (value: unknown) => {
       .join(' · ') || '指标不可用'
   );
 };
-const validationMetricText = (candidate: OptimizationCandidate) =>
-  metricText(candidate.metrics.validation);
+const validationMetricText = (candidate: OptimizationCandidate, currency: string) =>
+  metricText(candidate.metrics.validation, currency);
+const metricCurrency = (config: unknown) =>
+  config && typeof config === 'object' && 'baseCurrency' in config &&
+  typeof config.baseCurrency === 'string' ? config.baseCurrency : '币种未记录';
 const durationText = (durationMs: number) =>
   durationMs >= 1_000 ? `${(durationMs / 1_000).toFixed(1)}s` : `${durationMs}ms`;
 const displayScalar = (value: unknown, fallback = '—') =>
@@ -205,11 +213,11 @@ export function StrategyOptimizationExperimentResults({
                 <Badge variant="outline">固定对照</Badge>
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                验证集：{metricText(compare.baseline.metrics.validation)}
+                验证集：{metricText(compare.baseline.metrics.validation, metricCurrency(compare.experiment.runConfig))}
               </div>
               {compare.baseline.metrics.test ? (
                 <div className="mt-1 text-xs text-muted-foreground">
-                  测试集：{metricText(compare.baseline.metrics.test)}
+                  测试集：{metricText(compare.baseline.metrics.test, metricCurrency(compare.experiment.runConfig))}
                 </div>
               ) : null}
             </div>
@@ -227,12 +235,12 @@ export function StrategyOptimizationExperimentResults({
                         候选 {candidate.candidateNumber} · {candidate.modelKey}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        验证集：{validationMetricText(candidate)} · score{' '}
+                        验证集：{validationMetricText(candidate, metricCurrency(compare.experiment.runConfig))} · score{' '}
                         {candidate.validationScore ?? '—'}
                       </div>
                       {candidate.metrics.test ? (
                         <div className="text-xs text-muted-foreground">
-                          测试集：{metricText(candidate.metrics.test)}
+                          测试集：{metricText(candidate.metrics.test, metricCurrency(compare.experiment.runConfig))}
                         </div>
                       ) : null}
                     </div>
@@ -460,11 +468,16 @@ function ExperimentModelSummaries({ compare }: { compare: OptimizationCompare })
               <span>AI 费用</span>
               <span>{costText}</span>
               <span>Latest status</span>
-              <span>{String(latest?.status ?? '尚未开始')}</span>
+              <span>
+                {isStrategyCapabilityGap(latest?.proposal)
+                  ? '能力缺口'
+                  : String(latest?.status ?? '尚未开始')}
+              </span>
             </div>
             {latest?.error ? (
               <div className="mt-2 text-xs text-destructive">Failure: {String(latest.error)}</div>
             ) : null}
+            <StrategyCapabilityGap value={latest?.proposal} />
           </div>
         );
       })}

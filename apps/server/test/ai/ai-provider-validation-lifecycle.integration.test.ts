@@ -7,16 +7,11 @@ import { AiProviderSaveService } from '../../src/ai/ai-provider-save.service.js'
 import { aiProviderInputSchema } from '../../src/ai/ai-provider.contracts.js';
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { runProviderConnectionTest } from '../../src/ai/provider-connection-test.js';
+import { researchConnectionProbe } from '../../src/ai/research-connection-probe.js';
 import * as validationPolicy from '../../src/ai/ai-provider-validation-policy.js';
 import { createAiTimeoutPolicy } from '../../src/ai/timeout/ai-timeout-policy.js';
 
-const report = {
-  conclusion: '样例',
-  evidence: [],
-  risks: [],
-  unknowns: [],
-  disclaimer: '格式验证',
-};
+const report = researchConnectionProbe(aiGenerationContracts.research.ref);
 const frame = (response: ServerResponse, content: string, finishReason: string | null = null) =>
   response.write(
     `data: ${JSON.stringify({

@@ -3,16 +3,13 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
+import { aiProviderTestTimeout, runAiProviderTestProcess } from './ai-provider-test-process.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const container = `ledger-ai-provider-test-${randomUUID().slice(0, 8)}`;
 const database = 'ai_provider_concurrency_fixture';
 const owner = 'fixture_owner';
-const testTimeoutMs = Number(process.env.AI_PROVIDER_TEST_TIMEOUT_MS ?? 120_000);
-if (!Number.isSafeInteger(testTimeoutMs) || testTimeoutMs < 120_000 || testTimeoutMs > 900_000)
-  throw new Error(
-    'AI_PROVIDER_TEST_TIMEOUT_MS 必须是 120000～900000 的整数，仅控制隔离测试进程等待',
-  );
+const testTimeoutMs = aiProviderTestTimeout(process.env, process.argv.slice(2));
 const run = (command, args, options = {}) => {
   const result = spawnSync(command, args, {
     cwd: root,
@@ -130,12 +127,14 @@ try {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
+  const upgradeFixtureIds = [];
   for (const migration of migrations) {
     // 在扩展前写入真实 V1 行，逐字段核对保留升级；不接触业务数据库。
     let retained;
     let observationRetained;
     const retainedId = randomUUID();
     if (verifyObservationUpgrade && migration === '20261019020000_research_observation_versions') {
+      upgradeFixtureIds.push(retainedId);
       sql(`INSERT INTO "AiRun" ("id", "provider", "model", "promptVersion", "status", "question", "result", "createdAt", "updatedAt")
         VALUES ('${retainedId}', 'controlled-observation-upgrade', 'controlled-model', 'research-v1', 'succeeded', '观察升级保留报告', '{"version":1,"conclusion":"原报告保持原样"}'::jsonb, '2026-10-18T08:00:00Z', '2026-10-18T08:00:00Z');
         INSERT INTO "JournalEntry" ("id", "reason", "content", "tags", "createdAt", "updatedAt")
@@ -145,6 +144,7 @@ try {
         'journal', (SELECT to_jsonb(j) FROM "JournalEntry" j WHERE id = '${retainedId}'));`);
     }
     if (verifyResearchUpgrade && migration === '20261019010000_research_submission_v2') {
+      upgradeFixtureIds.push(retainedId);
       const result = JSON.stringify({
         version: 1,
         provider: 'controlled-upgrade',
@@ -201,10 +201,20 @@ try {
     COMMIT;`);
   if (sql('SELECT version FROM "SchemaVersion" WHERE id=1;') !== migrations.at(-1))
     throw new Error('隔离数据库结构 head 与实际 migration 输入不一致');
+  if (upgradeFixtureIds.length > 0) {
+    const ids = upgradeFixtureIds.map((id) => `'${id}'::uuid`).join(',');
+    sql(`BEGIN;
+      DELETE FROM "JournalEntry" WHERE id IN (${ids});
+      DELETE FROM "AiRun" WHERE id IN (${ids});
+      COMMIT;`);
+    if (sql(`SELECT count(*) FROM "AiRun" WHERE id IN (${ids});`) !== '0')
+      throw new Error('本次升级验证样本未清理，不能进入服务测试');
+    console.log(`已清理 ${upgradeFixtureIds.length} 份本次升级样本，服务测试从空业务样本开始`);
+  }
   const port = run('docker', ['port', container, '5432/tcp']).split(':').at(-1);
   const url = `postgresql://${owner}:isolated_fixture@127.0.0.1:${port}/${database}`;
   console.log(JSON.stringify({ database, owner, migrations: migrations.length, isolated: true }));
-  const result = spawnSync(
+  const result = await runAiProviderTestProcess(
     'pnpm',
     [
       '--filter',
@@ -213,6 +223,8 @@ try {
       'vitest',
       'run',
       '--no-file-parallelism',
+      '--config',
+      'test/ai/provider-isolation.config.ts',
       ...tests,
     ],
     {
@@ -228,7 +240,6 @@ try {
       },
     },
   );
-  if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
 } finally {
   if (started) run('docker', ['rm', '-f', container]);

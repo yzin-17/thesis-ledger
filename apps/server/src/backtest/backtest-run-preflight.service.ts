@@ -44,10 +44,10 @@ export class BacktestRunPreflightService {
     const { strategyVersionId, runConfig, requestId } = request;
     const version = await this.prisma.strategyVersion.findUnique({ where: { id: strategyVersionId } });
     if (!version) throw new NotFoundException('策略版本不存在');
-    if (![2, 3].includes(version.schemaVersion)) throw new BadRequestException('不支持的策略版本');
+    if (version.schemaVersion !== 1) throw new BadRequestException('不支持的策略版本');
     const strategy = strategySchema.parse(version.schema) as BacktestStrategy;
     const checkedAt = new Date().toISOString();
-    const base = { contractVersion: 3 as const, requestId, checkedAt };
+    const base = { contractVersion: 1 as const, requestId, checkedAt };
     let plan: ReturnType<typeof planSnapshotInputsV3>;
     try {
       plan = planSnapshotInputsV3({ strategy, runConfig });
@@ -60,7 +60,7 @@ export class BacktestRunPreflightService {
       });
     }
     const requirement = {
-      symbol: strategy.executionInstrument.symbol, capability: 'DAILY_BAR', purpose: 'execution' as const,
+      symbol: strategy.executionInstrument.symbol, capability: plan.executionRouteKey.capability, purpose: 'execution' as const,
       dateRange: { startDate: plan.warmup.startDate, endDate: runConfig.endDate }, routeKey: plan.executionRouteKey,
     };
     const identity = { strategyVersionId, strategyContentHash: hashCanonicalManifest(strategy),
@@ -86,7 +86,7 @@ export class BacktestRunPreflightService {
       } },
       ...(this.reconstruction ? { reconstruction: this.reconstruction } : {}),
       context: { checkedAt, routeRevisions, request: {
-        contractVersion: 3, requestId, ...identity, requirements: [requirement],
+        contractVersion: 1, requestId, ...identity, requirements: [requirement],
       } },
     });
     if (execution.status !== 'ready') return execution;
@@ -98,7 +98,7 @@ export class BacktestRunPreflightService {
         effectivePolicyRevision: stamp.effectiveRevision!, catalogRevision: stamp.catalogRevision! },
     }, this.dsa);
     try {
-      await this.guard.check({ contractVersion: 3, strategyVersionId, runConfig,
+      await this.guard.check({ contractVersion: 1, strategyVersionId, runConfig,
         idempotencyKey: requestId, preparationStamp: stamp }, strategy);
     } catch { return stale(); }
     return backtestPreflightResultV3Schema.parse({ ...base,

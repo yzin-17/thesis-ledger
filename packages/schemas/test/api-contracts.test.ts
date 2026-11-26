@@ -61,7 +61,7 @@ describe('shared API contracts', () => {
       mode: 'actual',
       baseCurrency: 'CNY',
       fx: {
-        version: 3,
+        version: 1,
         evidenceVersion: 'fx-v3|CNY|2026-08-20|HKD: CNY',
         enabled: true,
         status: 'ready',

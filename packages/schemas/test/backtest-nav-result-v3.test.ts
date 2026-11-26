@@ -19,8 +19,8 @@ const fixture = () => {
   return {
     source: 'BACKTEST',
     inputKind: 'nav',
-    schemaVersion: '3',
-    snapshotVersion: 'snapshot-manifest-v3',
+    schemaVersion: 'backtest-nav-result-v1',
+    snapshotVersion: 'backtest-nav-snapshot-manifest-v1',
     engineVersion: 'thesis-ledger-v3-nav-local-runner-v1',
     runId: 'nav-run',
     strategyVersionId: 'nav-strategy',
@@ -78,7 +78,7 @@ const fixture = () => {
 describe('NAV V3 公开结果合同', () => {
   it('NAV 列表只允许独立身份与任务状态，不暴露未经详情校验的经济结果', () => {
     const summary = {
-      contractVersion: 3,
+      contractVersion: 1,
       inputKind: 'nav',
       id: '11111111-1111-4111-8111-111111111111',
       strategyVersionId: '22222222-2222-4222-8222-222222222222',
@@ -109,8 +109,8 @@ describe('NAV V3 公开结果合同', () => {
     result.runId = '11111111-1111-4111-8111-111111111111';
     result.strategyVersionId = '22222222-2222-4222-8222-222222222222';
     const run = {
-      contractVersion: 3,
-      schemaVersion: '3',
+      contractVersion: 1,
+      schemaVersion: 'backtest-nav-run-v1',
       inputKind: 'nav',
       id: result.runId,
       strategyVersionId: result.strategyVersionId,
@@ -124,7 +124,7 @@ describe('NAV V3 公开结果合同', () => {
       periodEnd: '2026-09-15T00:00:00Z',
       dataAsOf: result.dataAsOf,
       runConfig: {
-        schemaVersion: '3',
+        schemaVersion: 'backtest-nav-config-v1',
         startDate: '2026-09-08',
         endDate: '2026-09-15',
         dataAsOf: result.dataAsOf,

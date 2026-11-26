@@ -140,7 +140,7 @@ async function bounds(page, width) {
             };
             const routes = preview.routes;
             const policy = {
-              contractVersion: 3,
+              contractVersion: 1,
               consumer: 'thesis-ledger',
               requestId: 'browser-controlled',
               revision: savedView.revision,
@@ -149,7 +149,7 @@ async function bounds(page, width) {
               syncState: 'applied',
               effectiveStale: false,
               effectiveProjection: {
-                contractVersion: 3,
+                contractVersion: 1,
                 consumer: 'thesis-ledger',
                 requestId: 'browser-controlled',
                 revision: savedView.revision,

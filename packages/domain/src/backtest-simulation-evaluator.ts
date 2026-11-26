@@ -1,8 +1,13 @@
 import { alignSeriesAt, type BacktestSeries, type BacktestSeriesPoint } from './backtest-series.js';
 import { type BooleanExpression, type NumericExpression } from './backtest-contract.js';
 import { DecimalValue } from './decimal.js';
-import { mergeBacktestAvailability } from './backtest-observation-clock.js';
+import {
+  mergeBacktestAvailability,
+  isAvailableForDecisionAt,
+} from './backtest-observation-clock.js';
 import { evaluateCorporateActionSignal } from './backtest-event-signal.js';
+import { evaluateScalarOperation, isScalarOperation } from './backtest-numeric-operations.js';
+import { latestExpressionObservation } from './backtest-expression-observations.js';
 import type {
   AvailableEvaluation,
   BooleanEvaluation,
@@ -21,7 +26,8 @@ const stableSerialize = (value: unknown): string => {
     .join(',')}}`;
 };
 
-export const numericExpressionKey = (expression: NumericExpression) => stableSerialize(expression);
+export const numericExpressionKey = (expression: NumericExpression | BooleanExpression) =>
+  stableSerialize(expression);
 
 export const sourceSeriesKey = (sourceId: string, field: BacktestSeries['field']) =>
   `${sourceId}:${field}`;
@@ -75,8 +81,15 @@ const corporateActionEventType = (expression: BooleanExpression): string | undef
 export const evaluateNumericExpression = (
   expression: NumericExpression,
   context: SimulationExpressionContext,
+  options: { strict?: boolean; materialize?: boolean } = {},
 ): NumericEvaluation => {
   const occurredAt = context.tick.occurredAt;
+  if (expression.type === 'eventValue')
+    return context.eventValue ?? unavailable(occurredAt, '当前事件没有冻结取值');
+  if (isScalarOperation(expression))
+    return evaluateScalarOperation(expression, occurredAt, (input) =>
+      evaluateNumericExpression(input, context, { ...options, strict: true }),
+    );
   if (expression.type === 'constant') {
     return { status: 'available', value: expression.value, occurredAt, availableAt: occurredAt };
   }
@@ -93,13 +106,36 @@ export const evaluateNumericExpression = (
   if (expression.type === 'series') {
     const series = getSeries(context.sourceSeries, expression.sourceId, expression.field);
     if (!series) return unavailable(occurredAt, `未知 Source: ${expression.sourceId}`);
+    if (options.strict) {
+      const point = latestExpressionObservation(series, occurredAt);
+      return point && (options.materialize || isAvailableForDecisionAt(point, occurredAt))
+        ? pointEvaluation(point, occurredAt)
+        : unavailable(occurredAt, '当前观测不可用');
+    }
     const aligned = alignSeriesAt(series, [occurredAt])[0];
     return aligned?.point
       ? pointEvaluation(aligned.point, occurredAt)
       : unavailable(occurredAt, aligned?.reason ?? 'Series unavailable');
   }
   const indicatorSeries = getSeries(context.indicatorSeries, numericExpressionKey(expression));
-  if (!indicatorSeries) return unavailable(occurredAt, `Indicator 尚未可用: ${expression.name}`);
+  if (!indicatorSeries) return unavailable(occurredAt, '指标或会话数值尚未可用');
+  if (
+    options.strict ||
+    ['lag', 'rolling', 'cumulative', 'countTrue', 'confirmedPivot'].includes(expression.type)
+  ) {
+    const point = latestExpressionObservation(indicatorSeries, occurredAt);
+    return point && (options.materialize || isAvailableForDecisionAt(point, occurredAt))
+      ? pointEvaluation(point, occurredAt)
+      : unavailable(occurredAt, '历史或窗口观测不可用');
+  }
+  if (expression.type === 'sessionValue') {
+    const point = indicatorSeries.points.find(
+      (item) => Date.parse(item.occurredAt) === Date.parse(occurredAt),
+    );
+    return point && isAvailableForDecisionAt(point, occurredAt)
+      ? pointEvaluation(point, occurredAt)
+      : unavailable(occurredAt, '当前会话数值不可用');
+  }
   const aligned = alignSeriesAt(indicatorSeries, [occurredAt])[0];
   return aligned?.point
     ? pointEvaluation(aligned.point, occurredAt)
@@ -109,13 +145,13 @@ export const evaluateNumericExpression = (
 const evaluateNumericBoolean = (
   expression: Extract<BooleanExpression, { type: 'compare' | 'cross' }>,
   context: SimulationExpressionContext,
+  options: { strict?: boolean; materialize?: boolean } = {},
 ): BooleanEvaluation => {
   const occurredAt = context.tick.occurredAt;
-  const left = evaluateNumericExpression(expression.left, context);
-  const right = evaluateNumericExpression(expression.right, context);
-  if (left.status !== 'available' || right.status !== 'available') {
-    return unavailable(occurredAt, '比较输入 unavailable');
-  }
+  const left = evaluateNumericExpression(expression.left, context, options);
+  const right = evaluateNumericExpression(expression.right, context, options);
+  if (left.status !== 'available') return left;
+  if (right.status !== 'available') return right;
   if (expression.type === 'compare') {
     const comparison = DecimalValue.from(left.value).compareTo(right.value);
     let result: boolean;
@@ -168,8 +204,17 @@ const evaluateNumericBoolean = (
 export const evaluateBooleanExpression = (
   expression: BooleanExpression,
   context: SimulationExpressionContext,
+  options: { strict?: boolean; materialize?: boolean } = {},
 ): BooleanEvaluation => {
   const occurredAt = context.tick.occurredAt;
+  if (expression.type === 'consecutive' || expression.type === 'sequence') {
+    const series = getSeries(context.indicatorSeries, numericExpressionKey(expression));
+    const point = series ? latestExpressionObservation(series, occurredAt) : undefined;
+    if (!point || (!options.materialize && !isAvailableForDecisionAt(point, occurredAt)))
+      return unavailable(occurredAt, '连续确认窗口不可用');
+    const value = pointEvaluation(point, occurredAt);
+    return value.status === 'available' ? { ...value, value: value.value === '1' } : value;
+  }
   const actionEventType = corporateActionEventType(expression);
   if (actionEventType !== undefined) {
     return evaluateCorporateActionSignal(actionEventType, context);
@@ -185,13 +230,18 @@ export const evaluateBooleanExpression = (
     };
   }
   if (expression.type === 'not') {
-    const value = evaluateBooleanExpression(expression.expression, context);
+    const value = evaluateBooleanExpression(expression.expression, context, options);
     return value.status === 'available' ? { ...value, value: !value.value } : value;
   }
   if (expression.type === 'all' || expression.type === 'any') {
-    const values = expression.conditions.map((condition) =>
-      evaluateBooleanExpression(condition, context),
-    );
+    const values: BooleanEvaluation[] = [];
+    const decisive = expression.type === 'any';
+    for (const condition of expression.conditions) {
+      const value = evaluateBooleanExpression(condition, context, options);
+      if (value.status === 'available' && value.value === decisive &&
+          isAvailableForDecisionAt(value, occurredAt)) return value;
+      values.push(value);
+    }
     const unavailableValue = values.find((value) => value.status === 'unavailable');
     if (unavailableValue) return unavailableValue;
     const availableValues = values as AvailableEvaluation<boolean>[];
@@ -205,7 +255,7 @@ export const evaluateBooleanExpression = (
     };
   }
   if (expression.type === 'compare' || expression.type === 'cross') {
-    return evaluateNumericBoolean(expression, context);
+    return evaluateNumericBoolean(expression, context, options);
   }
   return unavailable(occurredAt, 'Boolean expression 的执行语义尚未实现');
 };

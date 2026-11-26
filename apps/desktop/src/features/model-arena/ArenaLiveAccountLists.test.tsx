@@ -41,7 +41,7 @@ function detailWith(book: Book) {
 
 const tabs = [
   { tab: '持仓', label: '持仓列表', headers: ['标的', '持有数量', '当前可卖', '可卖日期'], empty: '当前空仓', colSpan: 4 },
-  { tab: '委托', label: '委托列表', headers: ['标的', '方向与类型', '数量', '价格', '状态', '有效至'], empty: '暂无委托', colSpan: 6 },
+  { tab: '委托', label: '委托列表', headers: ['标的', '方向与类型', '数量', '价格／触发价', '状态与保护', '有效至'], empty: '暂无委托', colSpan: 6 },
   { tab: '成交', label: '成交列表', headers: ['行情时间', '标的', '方向', '数量', '成交价', '费用', '证据'], empty: '暂无成交', colSpan: 7 },
 ];
 

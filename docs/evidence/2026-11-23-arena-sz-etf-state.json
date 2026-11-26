@@ -1,0 +1,40 @@
+{
+  "说明": "富途字段按本轮终端实际读取的文本保存，不声称为 SDK 原始网络报文。真实收市来源与受控盘中测试分别使用。",
+  "futu": {
+    "requestedAt": "2026-11-23T14:00:50.240381+00:00",
+    "symbol": "159915.SZ",
+    "assetType": "ETF",
+    "calls": 1,
+    "status": "observed",
+    "fields": {
+      "code": "SZ.159915",
+      "name": "创业板ETF易方达",
+      "update_time": "2026-11-23 15:00:00",
+      "suspension": "False",
+      "sec_status": "NORMAL",
+      "lot_size": "100",
+      "last_price": "2.295"
+    },
+    "sourceControlUnchanged": true
+  },
+  "modelCalls": 0,
+  "qualificationCalls": 0,
+  "competitionOperations": 0,
+  "sourceRouteMutations": 0,
+  "directPublicCandidates": [
+    {
+      "request": "https://www.szse.cn/api/market/ssjjhq/getSnapshotData?marketId=1&code=159915",
+      "status": 404,
+      "bytes": 8675,
+      "sha256": "d5086c31d9a9d3da1e5a28e3c5f516c997b4508b20dee99ccda33b1b75d3976b"
+    },
+    {
+      "request": "https://www.szse.cn/api/report/ShowReport/data?SHOWTYPE=JSON&CATALOGID=1801&TABKEY=tab1&PAGENO=1",
+      "status": 200,
+      "bytes": 440,
+      "sha256": "2fbadd8ef7768f76aeae6ebb96373535b108a44169d55c41c037441c966eb448",
+      "shape": 1
+    }
+  ],
+  "sourceReceiptSha256": "02196cf65800805542d6e3453426f1d2b4777b5dd21b5dc60a13aeb989cc84e3"
+}

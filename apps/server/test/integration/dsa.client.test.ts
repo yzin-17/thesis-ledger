@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { DsaClient } from '../../src/integration/dsa/dsa.client.js';
+import { mapControlV3HttpError, mapDataV3HttpError } from '../../src/integration/dsa/dsa-v3-protocol.js';
 import { runWithTrace } from '../../src/platform/structured-logger.js';
+
+it.each([mapDataV3HttpError, mapControlV3HttpError])('保留现行服务鉴权诊断，拒绝旧错误信封', (map) => {
+  const detail = { contractVersion: 1, code: 'unauthorized', message: '测试鉴权',
+    requestId: 'request-header', diagnosticId: 'request-header' };
+  expect(map(401, { detail }, 'request-body')).toMatchObject({ code: 'unauthorized', message: detail.message });
+  expect(map(401, { detail: { ...detail, contractVersion: 3 } })).toMatchObject({ code: 'invalid-response' });
+});
 
 const createClient = (overrides: { controlToken?: string | undefined } = {}) =>
   Object.assign(Object.create(DsaClient.prototype), {
@@ -60,7 +68,7 @@ describe("图表指标协议", () => {
   it('图表指标只向 V3 路由发送当前合同', async () => {
     const timestamp = '2026-09-28T07:00:00.000Z';
     const fetchMock = vi.fn(async () => response({
-      contractVersion: 3,
+      contractVersion: 1,
       engineVersion: 'dsa-indicator-v3',
       inputFingerprint: 'fingerprint-1',
       results: [{
@@ -81,8 +89,8 @@ describe("图表指标协议", () => {
     });
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
-    expect(url.pathname).toBe('/api/v3/thesis-ledger/market/indicators/calculate');
-    expect(JSON.parse(String(init.body))).toMatchObject({ contractVersion: 3, inputFingerprint: 'fingerprint-1' });
+    expect(url.pathname).toBe('/api/v1/thesis-ledger/market/indicators/calculate');
+    expect(JSON.parse(String(init.body))).toMatchObject({ contractVersion: 1, inputFingerprint: 'fingerprint-1' });
     expect(result.engineVersion).toBe('dsa-indicator-v3');
   });
 });
@@ -104,7 +112,7 @@ describe("Control 握手及路由目录", () => {
     expect(result.requestId).toBe(request.requestId);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
     expect(url).toEqual(
-      new URL('/api/v3/thesis-ledger/control/handshake', 'https://dsa.example.test'),
+      new URL('/api/v1/thesis-ledger/control/handshake', 'https://dsa.example.test'),
     );
     expect(init.method).toBe('POST');
     expect(init.headers).toMatchObject({
@@ -112,10 +120,10 @@ describe("Control 握手及路由目录", () => {
       'x-request-id': request.requestId,
     });
     expect(JSON.parse(String(init.body))).toEqual({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: request.requestId,
-      supportedVersions: [3],
+      contract: 'dsa-control-v1',
     });
   });
 
@@ -158,7 +166,7 @@ describe("Control 握手及路由目录", () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
     expect(url).toEqual(
       new URL(
-        '/api/v3/thesis-ledger/control/routes/capabilities?contractVersion=3',
+        '/api/v1/thesis-ledger/control/routes/capabilities?contractVersion=1',
         'https://dsa.example.test',
       ),
     );
@@ -228,7 +236,7 @@ describe("Control Policy 版本及顺序", () => {
       .mockResolvedValueOnce(response(applyResponse))
       .mockResolvedValueOnce(
         response({
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           projection: { effective },
         }),
@@ -245,11 +253,11 @@ describe("Control Policy 版本及顺序", () => {
     expect(projection.projection?.effective.revision).toBe(1);
     const [applyUrl, applyInit] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
     const [effectiveUrl, effectiveInit] = fetchMock.mock.calls[1] as unknown as [URL, RequestInit];
-    expect(applyUrl.pathname).toBe('/api/v3/thesis-ledger/control/policies/apply');
+    expect(applyUrl.pathname).toBe('/api/v1/thesis-ledger/control/policies/apply');
     expect(JSON.parse(String(applyInit.body))).toEqual(desired);
     expect(applyInit.headers).toMatchObject({ authorization: 'Bearer control-token' });
-    expect(effectiveUrl.pathname).toBe('/api/v3/thesis-ledger/control/policies/effective');
-    expect(effectiveUrl.searchParams.get('contractVersion')).toBe('3');
+    expect(effectiveUrl.pathname).toBe('/api/v1/thesis-ledger/control/policies/effective');
+    expect(effectiveUrl.searchParams.get('contractVersion')).toBe('1');
     expect(effectiveInit.headers).toMatchObject({ authorization: 'Bearer control-token' });
   });
 
@@ -332,7 +340,7 @@ describe("Data 行情证据及错误协议", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-  it('通过 Data Token 单独读取 V3 能力与严格匹配的 BarSeries', async () => {
+  it('通过 Data Token 读取 Data 合同能力与严格匹配的 BarSeries', async () => {
     const capabilities = fixture('market-data-v3.capabilities.json');
     const request = fixture('market-data-v3.request.etf-qfq.json') as {
       requestId: string;
@@ -352,16 +360,16 @@ describe("Data 行情证据及错误协议", () => {
     const parsedCapabilities = await client.marketDataCapabilitiesV3();
     const parsedBars = await client.marketBarsV3(request as never);
 
-    expect(parsedCapabilities.dataContractVersions).toEqual([3]);
+    expect(parsedCapabilities.dataContract).toBe('dsa-data-v1');
     expect(parsedBars.requestId).toBe(request.requestId);
     const [capabilitiesUrl, capabilitiesInit] = fetchMock.mock.calls[0] as unknown as [
       URL,
       RequestInit,
     ];
     const [barsUrl, barsInit] = fetchMock.mock.calls[1] as unknown as [URL, RequestInit];
-    expect(capabilitiesUrl.pathname).toBe('/api/v3/thesis-ledger/capabilities');
+    expect(capabilitiesUrl.pathname).toBe('/api/v1/thesis-ledger/capabilities');
     expect(capabilitiesInit.headers).toMatchObject({ authorization: 'Bearer dsa-token' });
-    expect(barsUrl.pathname).toBe('/api/v3/thesis-ledger/market/bars');
+    expect(barsUrl.pathname).toBe('/api/v1/thesis-ledger/market/bars');
     expect(barsInit.method).toBe('POST');
     expect(barsInit.headers).toMatchObject({ authorization: 'Bearer dsa-token' });
     expect(JSON.parse(String(barsInit.body))).toEqual(request);

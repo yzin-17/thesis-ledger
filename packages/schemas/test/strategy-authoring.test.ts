@@ -93,6 +93,7 @@ describe('自然语言编写合同和能力交集', () => {
     nav.executionInstrument = { symbol: '110011.OF', market: 'CN', assetType: 'fund' };
     nav.signalSources[0].asset = nav.executionInstrument;
     nav.signalSources[0].series = ['nav'];
+    nav.signalSources[0].priceCoordinate = 'native-nav';
     nav.entry.left.field = 'nav';
     nav.entry.right.input.field = 'nav';
     nav.exit.left.field = 'nav';

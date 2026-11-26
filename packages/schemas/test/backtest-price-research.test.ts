@@ -7,13 +7,14 @@ import { strategySchema, type BacktestStrategy } from '../src/backtest-strategy.
 
 const strategy = (): BacktestStrategy =>
   strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: '价格与均线研究',
     signalSources: [
       {
         id: 'price',
         asset: { symbol: '510300.SH', market: 'CN', assetType: 'etf' },
         timeframe: '1d',
+        priceCoordinate: 'research',
         series: ['close'],
       },
     ],
@@ -90,7 +91,7 @@ describe('价格研究策略的版本投影', () => {
       before = JSON.stringify(original);
     const result = projectPriceResearchStrategy(original);
     expect(JSON.stringify(original)).toBe(before);
-    expect(result.schemaVersion).toBe('3');
+    expect(result.schemaVersion).toBe('strategy-definition-v1');
     expect(result.signalSources.map((source) => [source.id, source.priceCoordinate])).toEqual([
       ['price', 'research'],
       ['price:actual', 'actual'],
@@ -120,8 +121,6 @@ describe('价格研究策略的版本投影', () => {
 
   it('新草稿中的具体价格条件也采用原价，并可重复预览', () => {
     const draft = strategy();
-    draft.schemaVersion = '3';
-    draft.signalSources[0]!.priceCoordinate = 'research';
     const preview = projectPriceResearchStrategy(draft);
     expect(preview.entry).toMatchObject({
       conditions: [{ left: { sourceId: 'price:actual' } }, {}],
@@ -130,9 +129,10 @@ describe('价格研究策略的版本投影', () => {
     expect(projectPriceResearchStrategy(preview)).toEqual(preview);
   });
 
-  it('新策略必须保存来源坐标，旧策略不会被填入新默认字段', () => {
+  it('现行策略必须保存来源坐标，旧版本受拒', () => {
     const original = strategy();
-    expect(original.signalSources[0]).not.toHaveProperty('priceCoordinate');
     expect(strategySchema.safeParse({ ...original, schemaVersion: '3' }).success).toBe(false);
+    delete original.signalSources[0]!.priceCoordinate;
+    expect(strategySchema.safeParse(original).success).toBe(false);
   });
 });

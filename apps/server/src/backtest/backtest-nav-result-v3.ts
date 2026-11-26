@@ -1,8 +1,10 @@
 import {
-  buildBacktestAnalytics,
+  buildBacktestAnalyticsSteps,
   DecimalValue,
   deterministicResultChecksum,
-  projectBacktestTrades,
+  projectBacktestTradesSteps,
+  researchAnalyticsV2Steps,
+  finishBacktestComputation,
 } from '@thesis-ledger/domain';
 import { backtestNavResultV3Schema, type BacktestNavResultV3 } from '@thesis-ledger/schemas';
 import { adaptNavDomainInputsV3 } from './backtest-nav-domain-input.js';
@@ -10,7 +12,7 @@ import type { runNavOfflineStrategyV3 } from './backtest-nav-offline-strategy.js
 import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot.js';
 import { navOfflineExecutionDay, type NavOfflineInputs } from './backtest-nav-offline-events.js';
 
-export const NAV_V3_RUNNER_VERSION = 'thesis-ledger-v3-nav-local-runner-v1';
+export const NAV_V3_RUNNER_VERSION = 'thesis-ledger-v3-nav-local-runner-v2';
 type FrozenNavInput = Parameters<typeof adaptNavDomainInputsV3>[0];
 type NavStrategyOutput = ReturnType<typeof runNavOfflineStrategyV3>;
 
@@ -35,20 +37,20 @@ const verifyNavResultPricing = (result: BacktestNavResultV3, input: NavOfflineIn
   }
 };
 
-export const projectNavResultV3 = (
+export function* navResultV3Steps(
   frozen: FrozenNavInput,
   offline: NavStrategyOutput,
-): BacktestNavResultV3 => {
+): Generator<void, BacktestNavResultV3, void> {
   const { manifest, context } = frozen;
   const fills = offline.fills.map((fill) => ({
     ...fill,
     charges: [...fill.charges],
     reason: offline.requestReasons[fill.orderId] ?? fill.reason,
   }));
-  const trades = projectBacktestTrades(fills, {
+  const trades = (yield* projectBacktestTradesSteps(fills, {
     executionSymbol: manifest.navInput.symbol,
     currency: 'CNY',
-  }).trades;
+  })).trades;
   const diagnostics = [
     ...offline.rejects,
     ...offline.sizingRejects.map((reject, index) => ({
@@ -66,7 +68,7 @@ export const projectNavResultV3 = (
     ...offline.valuations.filter((point) => point.evaluatedAt !== offline.through),
     { evaluatedAt: offline.through, equity: offline.valuation.equity },
   ];
-  const analytics = buildBacktestAnalytics({
+  const analytics = yield* buildBacktestAnalyticsSteps({
     runId: manifest.runId,
     strategyVersionId: manifest.strategyVersionId,
     snapshotId: manifest.contentHash,
@@ -106,7 +108,7 @@ export const projectNavResultV3 = (
   const payload = backtestNavResultV3Schema.parse({
     source: 'BACKTEST',
     inputKind: 'nav',
-    schemaVersion: '3',
+    schemaVersion: 'backtest-nav-result-v1',
     snapshotVersion: manifest.manifestVersion,
     engineVersion: NAV_V3_RUNNER_VERSION,
     runId: manifest.runId,
@@ -145,7 +147,7 @@ export const projectNavResultV3 = (
     trades,
     equityCurve: analytics.equityCurve,
     drawdownCurve: analytics.drawdownCurve,
-    metrics: analytics.metrics,
+    ...(yield* researchAnalyticsV2Steps(analytics, fills, context.runConfig.initialCash.CNY ?? '0')),
     benchmark,
     resultChecksum: '0000000000000000',
   });
@@ -155,10 +157,12 @@ export const projectNavResultV3 = (
     ...checksumPayload,
     resultChecksum: deterministicResultChecksum(checksumPayload),
   });
-};
+}
+
+export const projectNavResultV3 = (frozen: FrozenNavInput, offline: NavStrategyOutput) => finishBacktestComputation(navResultV3Steps(frozen, offline));
 
 /** Worker 汇合可复用此读取守卫；不执行状态提交或赋予投递能力。 */
-export const verifyNavResultV3 = (value: unknown, frozen: FrozenNavInput): BacktestNavResultV3 => {
+export const verifyNavResultV3 = (value: unknown, frozen: FrozenNavInput, expectedRunnerVersion = NAV_V3_RUNNER_VERSION): BacktestNavResultV3 => {
   const result = backtestNavResultV3Schema.parse(value);
   const input = adaptNavDomainInputsV3(frozen);
   const { manifest, context } = frozen;
@@ -170,7 +174,7 @@ export const verifyNavResultV3 = (value: unknown, frozen: FrozenNavInput): Backt
     result.strategyVersionId !== manifest.strategyVersionId ||
     result.snapshotId !== manifest.contentHash ||
     result.comparableDataFingerprint !== manifest.comparableDataFingerprint ||
-    result.engineVersion !== NAV_V3_RUNNER_VERSION ||
+    result.engineVersion !== expectedRunnerVersion ||
     result.dataAsOf !== manifest.dataAsOf ||
     result.evaluatedAt !== expectedAt ||
     result.executionSymbol !== manifest.navInput.symbol ||

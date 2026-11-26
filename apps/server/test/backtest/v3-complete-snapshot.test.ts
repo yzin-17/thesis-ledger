@@ -148,7 +148,7 @@ describe('完整 Snapshot V3', () => {
   it('缺失关键事实时不保留已完成快照，也不补取未声明的公司行动', async () => {
     const { input, builder, snapshots, dsa } = await setup();
     dsa.backtestInstrumentFacts.mockResolvedValue({
-      version: 3,
+      version: 1,
       status: 'unavailable',
       provider: 'fixture',
       providerRevision: 'v1',

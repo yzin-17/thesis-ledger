@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
 import { correlateMarketCacheContextV3, marketCacheContextRequestV3Schema } from '../src/market-cache-context-v3.js';
 
-const request = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'cache-context',
+const request = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'cache-context',
   capability: 'REALTIME_QUOTE', symbol: '510300.SH', assetType: 'ETF' } as const;
-const response = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'cache-context',
+const response = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'cache-context',
   capability: 'REALTIME_QUOTE', symbol: '510300.SH', routeKey: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'REALTIME_QUOTE' },
   policyRevision: 1, generation: 'a'.repeat(64), ready: true, reason: null };
 it('控制投影响应绑定身份、能力和资产类型', () => {

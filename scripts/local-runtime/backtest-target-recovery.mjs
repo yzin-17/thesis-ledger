@@ -14,9 +14,9 @@ async function prepare(runtime) {
   const { priceBasis: { adjustment }, accountingBasis, history } = config.executionPriceProtocol;
   for (const key of ['schemaVersion', 'executionPriceProtocol', 'priceInputBindings', 'frozenExecutionWindow', 'frozenWarmupBudgetSessions']) delete config[key];
   config.dataAsOf = new Date().toISOString();
-  const result = await runtime.request('/backtests/run-config/prepare', { contractVersion: 3, requestId: runtime.prefix, strategyVersionId: seed.strategyVersionId, runConfig: config, adjustment, accountingBasis, history, freezeTimePolicy: 'after-acquisition' });
+  const result = await runtime.request('/backtests/run-config/prepare', { contractVersion: 1, requestId: runtime.prefix, strategyVersionId: seed.strategyVersionId, runConfig: config, adjustment, accountingBasis, history, freezeTimePolicy: 'after-acquisition' });
   assert.equal(result.status, 'prepared', JSON.stringify(result.diagnostics));
-  return { contractVersion: 3, strategyVersionId: seed.strategyVersionId, runConfig: result.runConfig,
+  return { contractVersion: 1, strategyVersionId: seed.strategyVersionId, runConfig: result.runConfig,
     preparationStamp: result.executionPreflight.revisionStamp, idempotencyKey: runtime.prefix };
 }
 

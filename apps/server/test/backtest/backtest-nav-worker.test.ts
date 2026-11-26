@@ -1,3 +1,4 @@
+import { namedStrategyFixture } from './named-v1-strategy.fixture.js';
 import 'reflect-metadata';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -19,8 +20,9 @@ beforeEach(async () => {
 });
 afterEach(async () => rm(root, { recursive: true, force: true }));
 
-async function harness(path: string) {
+async function harness(path: string, upgrade = false) {
   const fixture = navPreparationFixture();
+  if (upgrade) Object.assign(fixture.strategy, namedStrategyFixture(fixture.strategy));
   const prepared = await prepareNavRunConfigV3(fixture.options);
   const snapshots = new LocalNavSnapshotStore(path);
   const response = prepared.selection.response;
@@ -53,7 +55,7 @@ async function harness(path: string) {
   };
   let job: Row = {
     id,
-    mode: 'V3',
+    mode: 'frozen',
     strategyVersionId: fixture.request.strategyVersionId,
     idempotencyKey: 'nav-worker',
     status: 'queued',
@@ -65,8 +67,8 @@ async function harness(path: string) {
     dataAsOf: new Date(prepared.runConfig.dataAsOf),
     runConfig: prepared.runConfig,
     input: {
-      contractVersion: 3,
-      schemaVersion: '3',
+      contractVersion: 1,
+      schemaVersion: 'backtest-nav-run-v1',
       inputKind: 'nav',
       runConfig: prepared.runConfig,
       preparationId: preparation.id,
@@ -104,7 +106,7 @@ async function harness(path: string) {
     },
     navBacktestPreparation: { findUnique: vi.fn(async () => preparation) },
     strategyVersion: {
-      findUnique: vi.fn(async () => ({ schemaVersion: 2, schema: fixture.strategy })),
+      findUnique: vi.fn(async () => ({ schemaVersion: 1, schema: fixture.strategy })),
     },
   };
   const execution = new BacktestNavRunExecution(prisma as never, snapshots);
@@ -134,6 +136,22 @@ async function harness(path: string) {
 }
 
 describe('NAV Worker 生命周期汇合', () => {
+  it('显式升级定义的 Worker 提交与重复投递保留原冻结结果', async () => {
+    const previous = await harness(join(root, 'schema2'));
+    const upgraded = await harness(join(root, 'schema3'), true);
+    await previous.service.runCurrent(previous.id);
+    await upgraded.service.runCurrent(upgraded.id);
+    expect(upgraded.read().status).toBe('succeeded');
+    const before = previous.read().result as Row;
+    const after = upgraded.read().result as Row;
+    for (const key of ['requests', 'simulationFills', 'trades', 'equityCurve', 'metrics']) {
+      expect(after[key], key).toEqual(before[key]);
+    }
+    const checksum = upgraded.read().resultChecksum;
+    await upgraded.service.runCurrent(upgraded.id);
+    expect(upgraded.read().resultChecksum).toBe(checksum);
+    expect(upgraded.exchange.run).not.toHaveBeenCalled();
+  });
   it('已过期但合法消费的凭证经真实 Parquet 执行并原子提交 NAV 结果', async () => {
     const result = await h.service.runCurrent(h.id);
     expect(result).toMatchObject({
@@ -145,7 +163,7 @@ describe('NAV Worker 生命周期汇合', () => {
     expect(h.read().resultChecksum).toBe((h.read().result as Row).resultChecksum);
     expect(h.exchange.run).not.toHaveBeenCalled();
     expect(h.prisma.backtestJob.updateMany.mock.calls[1]![0].where).toMatchObject({
-      mode: 'V3',
+      mode: 'frozen',
       status: 'running',
       executionAttempt: 1,
       cancelRequestedAt: null,
@@ -224,7 +242,7 @@ describe('NAV Worker 生命周期汇合', () => {
       h.exchange,
     );
     await service.runCurrent(h.id);
-    expect(h.read()).toMatchObject({ status: 'failed', errorCode: 'DATA_UNAVAILABLE' });
+    expect(h.read()).toMatchObject({ status: 'failed', errorCode: 'BACKTEST_RUNNER_UNAVAILABLE' });
     expect(h.exchange.run).not.toHaveBeenCalled();
   });
   it('数据库暂不可用按上限重试，最终收敛失败', async () => {
@@ -241,7 +259,7 @@ describe('NAV Worker 生命周期汇合', () => {
     expect(h.read()).toMatchObject({
       status: 'failed',
       executionAttempt: 2,
-      errorCode: 'INTERNAL_ERROR',
+      errorCode: 'P1001',
     });
   });
   it('执行后物理冻结读取失败时拒绝提交', async () => {

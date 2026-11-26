@@ -179,8 +179,10 @@ export const ledgerEventSourceSchema = z
   })
   .strict();
 
+export const LEDGER_EVENT_ENVELOPE_CONTRACT = 'ledger-event-envelope-v1' as const;
+
 const commonEnvelopeShape = {
-  version: z.literal(3),
+  version: z.literal(1),
   eventId: z.uuid(),
   factId: z.uuid(),
   accountId: z.uuid(),

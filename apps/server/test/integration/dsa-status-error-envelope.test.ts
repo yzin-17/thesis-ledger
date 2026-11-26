@@ -4,7 +4,7 @@ import { mapDataV3HttpError } from '../../src/integration/dsa/dsa-v3-protocol.js
 
 const envelope = (code: string, message: string) => ({
   detail: {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'capability-request',
     error: { code, message },
   },
@@ -36,7 +36,7 @@ describe('独立能力沿Data V3标准安全错误', () => {
     const bad = [
       {
         detail: {
-          contractVersion: 3,
+          contractVersion: 1,
           requestId: 'capability-request',
           code: 'upstream_failure',
           message: '行情上游暂时不可用',

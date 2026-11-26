@@ -28,7 +28,7 @@ const scope = {
 };
 const input = () =>
   optimizationExperimentCreateSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     sourceMode: 'discovery',
     discoveryScope: scope,
     models: [{ provider: 'fixture', model: 'fixture' }],
@@ -64,13 +64,13 @@ describe('AI 实验统一后复权研究', () => {
       '具体价格常量使用已冻结的不复权参考价',
     );
     expect(optimizationModelResearchNotice(createNormalizedRunConfig())).toContain(
-      '未提供该证据时不得使用',
+      '须可核验转换证据，否则禁止',
     );
   });
-  it('新研究种子与候选自动分配实际价格常量，历史种子保留 V2', () => {
+  it('探索种子保留价格坐标，研究配置要求确认价格输入', () => {
     const seed = createDiscoverySeed(scope, true);
-    expect(seed.schemaVersion).toBe('3');
-    expect(createDiscoverySeed(scope).schemaVersion).toBe('2');
+    expect(seed.schemaVersion).toBe('strategy-definition-v1');
+    expect(createDiscoverySeed(scope).schemaVersion).toBe('strategy-definition-v1');
     const proposal = assembleDiscoveryGeneration({ discoveryScope: scope } as never, seed, {
       strategy: {
         name: '实际价格条件',
@@ -88,25 +88,26 @@ describe('AI 实验统一后复权研究', () => {
       reason: '受控样本',
       evidenceRefs: [],
     });
-    expect(proposal.strategy.schemaVersion).toBe('3');
+    expect(proposal.strategy.schemaVersion).toBe('strategy-definition-v1');
     expect(proposal.strategy.signalSources[0]?.priceCoordinate).toBe('actual');
     expect(priceResearchStrategyIssues(proposal.strategy as never)).toEqual([]);
     expect(() =>
       discoveryCandidateStrategy(
         { discoveryScope: scope, runConfig: optimizationResearchRunConfig() } as never,
-        { ...proposal, strategy: createDiscoverySeed(scope) },
+        { ...proposal, strategy: { ...proposal.strategy, signalSources: proposal.strategy.signalSources
+          .map((source) => ({ ...source, priceCoordinate: 'research' })) } },
       ),
-    ).toThrow('预览并确认');
+    ).toThrow('同一价格口径');
   });
-  it('新种子及克隆保存 V3，历史克隆继续保存原 V2', async () => {
+  it('新种子及克隆保存当前策略版本，来源运行配置保持原值', async () => {
     const { prisma, transaction } = store();
     await createDiscoveryExperiment(prisma as never, input(), []);
     expect(transaction.strategyVersion.create.mock.calls[0]?.[0]).toMatchObject({
-      data: { schemaVersion: 3, schema: { schemaVersion: '3' } },
+      data: { schemaVersion: 1, schema: { schemaVersion: 'strategy-definition-v1' } },
     });
     for (const [runConfig, expected] of [
-      [optimizationResearchRunConfig(), 3],
-      [createNormalizedRunConfig(), 2],
+      [optimizationResearchRunConfig(), 1],
+      [createNormalizedRunConfig(), 1],
     ] as const) {
       transaction.strategyVersion.create.mockClear();
       await cloneDiscoveryExperiment(
@@ -117,7 +118,7 @@ describe('AI 实验统一后复权研究', () => {
         {},
       );
       expect(transaction.strategyVersion.create.mock.calls[0]?.[0]).toMatchObject({
-        data: { schemaVersion: expected, schema: { schemaVersion: String(expected) } },
+        data: { schemaVersion: expected, schema: { schemaVersion: 'strategy-definition-v1' } },
       });
     }
   });
@@ -134,7 +135,7 @@ describe('AI 实验统一后复权研究', () => {
     const process = vi.fn();
     const dependencies = { prisma, providers, reads, candidates: {}, process } as never;
     await expect(createOptimizationExperiment(parsed, dependencies)).rejects.toThrow(
-      '统一后复权研究',
+      '后复权研究窗口与本次数据能力范围',
     );
     const modelConfig = buildOptimizationModelConfig(
       parsed.models,

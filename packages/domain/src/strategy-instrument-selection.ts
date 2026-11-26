@@ -45,12 +45,5 @@ export function withStrategyExecutionInstrument(
   return {
     ...definition,
     executionInstrument: { ...record(definition.executionInstrument), ...patch },
-    signalSources: Array.isArray(definition.signalSources)
-      ? definition.signalSources.map((source: unknown) => {
-          const row = record(source);
-          if (row.id !== 'execution') return source;
-          return { ...row, asset: { ...record(row.asset), ...patch } };
-        })
-      : [],
   };
 }

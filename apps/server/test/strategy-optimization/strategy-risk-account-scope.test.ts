@@ -17,7 +17,7 @@ const harness = (account: unknown) => {
         id: strategyVersionId,
         strategyId: accountId,
         version: 1,
-        schemaVersion: 2,
+        schemaVersion: 1,
         schema: createStrategyFixture(symbol, '账户准入预览')('0.05'),
       })),
     },

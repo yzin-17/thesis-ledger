@@ -19,7 +19,7 @@ describe('来源窗口错误投影', () => {
     };
     const target = { providerId: 'futu', upstreamSource: 'futu' };
     const policy = {
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: 'policy',
       revision: 1,
@@ -29,7 +29,7 @@ describe('来源窗口错误投影', () => {
       throw mapDataV3HttpError(
         422,
         {
-          contractVersion: 3,
+          contractVersion: 1,
           requestId: request.requestId,
           error: { code, message },
         },
@@ -51,7 +51,7 @@ describe('来源窗口错误投影', () => {
         ],
       },
       catalog: {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         catalogRevision: 1,
         generatedAt: '2026-11-10T00:00:00Z',
@@ -65,7 +65,8 @@ describe('来源窗口错误投影', () => {
       now: '2026-11-11T00:00:00Z',
       read,
       readCapabilities: async () => ({
-        dataContractVersions: [3],
+        dataContract: 'dsa-data-v1',
+        dailyObservationContract: 'market-daily-tradability-window-v1',
         serviceCapabilities: { fundNav: true },
       }),
     });

@@ -1,12 +1,6 @@
 import { DecimalValue } from './decimal.js';
-import { fitNormalizedQuantityToAvailableCash } from './backtest-normalized-budget.js';
-import {
-  computeSizing,
-  floorLotUnits,
-  type SizingAvailable,
-  type SizingInput,
-  type SizingResult,
-} from './backtest-sizing.js';
+import { fitBuyToInvestmentBudget } from './backtest-investment-budget.js';
+import { computeSizing, type SizingInput, type SizingResult } from './backtest-sizing.js';
 import type {
   ExchangeMarketSimulationInput,
   ExchangeOrderRequest,
@@ -25,6 +19,11 @@ import { evaluateRiskAt, type RiskEvaluationInput, type RiskResult } from './bac
 import type { CnNavRequest } from './nav-simulation-contracts.js';
 
 export interface ExchangeSizingAdapterConfig {
+  transformSizing?: (
+    intent: SimulationTargetIntent,
+    input: SizingInput,
+    result: SizingResult,
+  ) => SizingResult;
   sizingForIntent: (intent: SimulationTargetIntent) => SizingInput;
   orderDefaults: (
     intent: SimulationTargetIntent,
@@ -58,122 +57,6 @@ const unavailableSizingDecision = (result: SizingFailure) => ({
   inputFacts: result.inputFacts,
 });
 
-const fitBuyToAvailableCash = (
-  order: ExchangeOrderRequest,
-  sizing: SizingAvailable,
-  exchangeInputForOrder: ExchangeSizingAdapterConfig['exchangeInputForOrder'],
-  simulation: ExchangeMarketSimulation,
-) => {
-  if (order.side !== 'buy' || !DecimalValue.from(order.quantity).isPositive()) {
-    return { order, sizing };
-  }
-
-  const input = exchangeInputForOrder(order);
-  const accountingBasis = input.accountingBasis ?? 'raw-events';
-  if ((sizing.accountingBasis ?? 'raw-events') !== accountingBasis) {
-    return { order, sizing };
-  }
-  if (accountingBasis === 'normalized-series') {
-    return fitNormalizedBuyToAvailableCash(order, sizing, input, simulation);
-  }
-
-  const initialPlan = simulation.plan({ ...input, order });
-  if (initialPlan.status !== 'rejected' || initialPlan.reject.code !== 'INSUFFICIENT_CASH') {
-    return { order, sizing };
-  }
-
-  const lotSize = input.rules.instrumentFact.lotSize;
-  let low = 0n;
-  let high = BigInt(floorLotUnits(order.quantity, lotSize));
-  let bestOrder: ExchangeOrderRequest | undefined;
-  let bestPlan: Extract<ExchangePlan, { status: 'filled' }> | undefined;
-  while (low < high) {
-    const middle = low + (high - low + 1n) / 2n;
-    const candidate: ExchangeOrderRequest = {
-      ...order,
-      quantity: DecimalValue.from(middle.toString()).times(lotSize).toString(),
-    };
-    const candidatePlan = simulation.plan({
-      ...exchangeInputForOrder(candidate),
-      order: candidate,
-    });
-    if (candidatePlan.status === 'filled') {
-      low = middle;
-      bestOrder = candidate;
-      bestPlan = candidatePlan;
-    } else if (candidatePlan.reject.code === 'INSUFFICIENT_CASH') {
-      high = middle - 1n;
-    } else {
-      return { order, sizing };
-    }
-  }
-
-  if (low === 0n || !bestOrder || !bestPlan) return { order, sizing };
-  const requiredCash = bestPlan.cashReservation?.amount;
-  if (requiredCash === undefined) return { order, sizing };
-  const cashConstraint = {
-    requestedQuantity: sizing.normalizedQuantity,
-    availableCash: input.account.settledCash,
-    requiredCash,
-  };
-  return {
-    order: bestOrder,
-    sizing: {
-      ...sizing,
-      normalizedQuantity: bestOrder.quantity,
-      cashConstraint,
-      inputFacts: [
-        ...sizing.inputFacts,
-        `cash.available=${cashConstraint.availableCash}`,
-        `cash.required=${cashConstraint.requiredCash}`,
-      ].sort(),
-    },
-  };
-};
-
-const fitNormalizedBuyToAvailableCash = (
-  order: ExchangeOrderRequest,
-  sizing: SizingAvailable,
-  input: Omit<ExchangeMarketSimulationInput, 'order'>,
-  simulation: ExchangeMarketSimulation,
-) => {
-  const fitted = fitNormalizedQuantityToAvailableCash(order.quantity, (quantity) => {
-    const candidateOrder = { ...order, quantity };
-    const plan = simulation.plan({ ...input, order: candidateOrder });
-    if (plan.status === 'filled') return { status: 'affordable' as const, value: plan };
-    if (plan.reject.code === 'INSUFFICIENT_CASH') {
-      return { status: 'insufficient-cash' as const };
-    }
-    return { status: 'unavailable' as const, reason: 'EXCHANGE_PLAN_REJECTED' };
-  });
-  if (fitted.status !== 'available' || fitted.quantity === order.quantity) {
-    return { order, sizing };
-  }
-
-  const bestOrder = { ...order, quantity: fitted.quantity };
-  const bestPlan = fitted.value;
-  const requiredCash = bestPlan.cashReservation?.amount;
-  if (requiredCash === undefined) return { order, sizing };
-  const cashConstraint = {
-    requestedQuantity: sizing.normalizedQuantity,
-    availableCash: input.account.settledCash,
-    requiredCash,
-  };
-  return {
-    order: bestOrder,
-    sizing: {
-      ...sizing,
-      normalizedQuantity: bestOrder.quantity,
-      cashConstraint,
-      inputFacts: [
-        ...sizing.inputFacts,
-        `cash.available=${cashConstraint.availableCash}`,
-        `cash.required=${cashConstraint.requiredCash}`,
-      ].sort(),
-    },
-  };
-};
-
 export const createExchangeSizingAdapter = (
   config: ExchangeSizingAdapterConfig,
 ): ExchangeSizingAdapter => {
@@ -182,7 +65,9 @@ export const createExchangeSizingAdapter = (
   const simulation = new ExchangeMarketSimulation();
 
   const toOrder = (intent: SimulationTargetIntent): ExchangeOrderRequest => {
-    let sizing = computeSizing(config.sizingForIntent(intent));
+    const input = config.sizingForIntent(intent);
+    let sizing = computeSizing(input);
+    sizing = config.transformSizing?.(intent, input, sizing) ?? sizing;
     const orderId = `${intent.intentId}:order`;
     const available = sizing.status === 'available' ? sizing : undefined;
     const defaults = available
@@ -195,9 +80,10 @@ export const createExchangeSizingAdapter = (
       ...defaults,
     };
     if (available) {
-      const result = fitBuyToAvailableCash(
+      const result = fitBuyToInvestmentBudget(
         order,
         available,
+        input,
         config.exchangeInputForOrder,
         simulation,
       );
@@ -332,6 +218,7 @@ export const createRiskEvaluationAdapter = (
       return {
         status: 'available',
         value: Boolean(result.intent),
+        ...(result.intent ? { trigger: result.intent.trigger } : {}),
         occurredAt: result.occurredAt,
         availableAt: result.availableAt,
       };

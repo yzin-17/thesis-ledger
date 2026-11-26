@@ -65,7 +65,7 @@ it('回放只在研究阶段的开放会话投递，并按原时钟／attempt �
     pending.id,
     1,
     new Date(at),
-    new Date('2026-11-12T21:00:00Z'),
+    undefined, // 未配置周期时限，不以市场收盘时间制造请求期限。
     at,
     { state: 'open', date: '2026-11-12', reason: null },
   );

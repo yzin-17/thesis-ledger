@@ -52,7 +52,7 @@ export function publicNavPreparationResult(prepared: NavRunPreparationV3) {
   const plan = prepared.plan;
   const response = prepared.selection.response;
   return backtestNavPreparationResultV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     status: 'prepared',
     scope: 'nav-input-plan',
     requestId: prepared.requestId,

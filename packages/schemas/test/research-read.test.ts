@@ -71,7 +71,7 @@ it('分页字段不改变对象定位；历史入口不补模式', () => {
     limit: 1,
   });
   expect(researchReportSelection(query)).toEqual({ scope: 'account', accountId: id });
-  expect(researchReportLocatorSchema.parse({ view: 'legacy' })).toEqual({ view: 'legacy' });
+  expect(researchReportLocatorSchema.safeParse({ view: 'legacy' }).success).toBe(false);
 });
 it('V2 产物必须保持读取范围；不能进入未知历史范围', () => {
   const fixture = researchV2Fixture();
@@ -82,7 +82,7 @@ it('V2 产物必须保持读取范围；不能进入未知历史范围', () => {
     createdAt: fixture.result.createdAt,
     updatedAt: fixture.result.createdAt,
     historicalScope: { status: 'known', snapshot: fixture.result.scopeSnapshot },
-    resultVersion: 2,
+    resultVersion: fixture.result.version,
     availability: 'available',
     summary: fixture.result.inference.conclusion,
     quality: fixture.result.quality,

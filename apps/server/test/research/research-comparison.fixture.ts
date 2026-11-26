@@ -109,7 +109,7 @@ export function comparisonReport(
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     historicalScope: { status: 'known', snapshot: frozen.scopeSnapshot },
-    resultVersion: 2,
+    resultVersion: 'research-report-result-v1',
     availability: 'available',
     summary: result.inference.conclusion,
     quality: frozen.quality,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AuthoringProposalReview } from './AuthoringProposalReview';
 import {
   requireAuthoringModel,
   prepareAuthoringOperation,
@@ -14,6 +15,7 @@ import { randomUUID } from 'expo-crypto';
 import { useQuery } from '@tanstack/react-query';
 import {
   authoringSubmitIntentSchema,
+  authoringModificationTargetOptions,
   type AuthoringSubmitIntent,
   type AuthoringModificationTarget,
 } from '@thesis-ledger/schemas';
@@ -378,19 +380,8 @@ export function AuthoringOperations({
       ) : null}
       {proposalId ? <QueryStatus query={proposal} retry={() => void proposal.refetch()} /> : null}
       {proposal.data ? (
-        <Section title="修改差异">
-          <Copy>{JSON.stringify(proposal.data.payload.differences, null, 2)}</Copy>
-          <Action
-            label="确认采用修改建议"
-            disabled={!controls.proposalApply}
-            onPress={() => execute('proposal-apply')}
-          />
-          <Action
-            label="丢弃修改建议"
-            disabled={!controls.proposalDiscard}
-            onPress={() => execute('proposal-discard')}
-          />
-        </Section>
+        <AuthoringProposalReview payload={proposal.data.payload} canApply={controls.proposalApply} canDiscard={controls.proposalDiscard}
+          onApply={() => execute('proposal-apply')} onDiscard={() => execute('proposal-discard')} />
       ) : null}
       <Feedback busy={command.isPending} message={message} error={command.isError} />
     </Section>
@@ -473,13 +464,7 @@ function AuthoringModelFields({
             value={target}
             disabled={busy || !!pending.data}
             onChange={setTarget}
-            options={[
-              { value: 'entry', label: '入场' },
-              { value: 'exit', label: '退出' },
-              { value: 'sizing', label: '仓位' },
-              { value: 'risk', label: '风险' },
-              { value: 'cost', label: '成本' },
-            ]}
+            options={authoringModificationTargetOptions}
           />
         </>
       ) : null}

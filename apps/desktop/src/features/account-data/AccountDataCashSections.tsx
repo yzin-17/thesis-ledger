@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LoadingState } from '@/components/ui/spinner';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MoreHorizontalIcon } from 'lucide-react';
 
 import type { Account } from '../portfolio/portfolio.types.js';
@@ -298,7 +299,7 @@ function CashOverview({
 
   return (
     <section aria-label="现金余额">
-      <div className="flex min-w-0 flex-col gap-4 rounded-md bg-muted/30 p-4 sm:p-5">
+      <div className="flex min-w-0 flex-col gap-4 rounded-md bg-muted p-4 sm:p-5">
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-sm font-medium">可用现金</span>
@@ -463,35 +464,53 @@ export function RecentCashFlowSection({ rows, refreshing = false }: { rows: Sett
             <EmptyDescription>暂无现金流水</EmptyDescription>
           </Empty>
         ) : (
-          <div className="divide-y divide-border">
-            {visibleRows.map((row) => (
-              <div
-                key={row.id}
-                className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_auto]"
-              >
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {formatCashShortDate(row.settledAt)}
-                </span>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    <strong className="min-w-0 truncate text-sm font-medium">{row.label}</strong>
-                    {row.label === '账户间划转' && <span className="text-xs text-muted-foreground">{row.direction === '流入' ? '转入' : '转出'}</span>}
-                  </div>
-                  {row.note && (
-                    <span className="mt-1 block max-w-[36rem] truncate text-xs text-muted-foreground">
-                      备注：{row.note}
-                    </span>
-                  )}
-                </div>
-                <div className="flex min-w-0 flex-wrap items-baseline justify-end gap-x-2 gap-y-1 text-right">
-                  <span className="text-xs text-muted-foreground">{row.currency}</span>
-                  <strong className="block break-all text-sm font-semibold tabular-nums sm:text-base">
-                    {formatSignedCashAmount(row.amount, row.currency, row.direction)}
-                  </strong>
-                </div>
-              </div>
-            ))}
-          </div>
+          <Table
+            className="table-fixed"
+            containerClassName="bg-card"
+            aria-labelledby="cash-recent-title"
+          >
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">流水类型</TableHead>
+                <TableHead scope="col" className="w-20 sm:w-1/5">
+                  结算日期
+                </TableHead>
+                <TableHead scope="col" className="w-32 text-right sm:w-44">
+                  金额
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibleRows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="py-3 align-top whitespace-normal wrap-anywhere">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <strong className="min-w-0 font-medium">{row.label}</strong>
+                      {row.label === '账户间划转' && (
+                        <span className="text-xs text-muted-foreground">
+                          {row.direction === '流入' ? '转入' : '转出'}
+                        </span>
+                      )}
+                    </div>
+                    {row.note && (
+                      <p className="mt-1 mb-0 text-xs text-muted-foreground">备注：{row.note}</p>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-3 align-top text-muted-foreground tabular-nums">
+                    {formatCashShortDate(row.settledAt)}
+                  </TableCell>
+                  <TableCell className="py-3 text-right align-top whitespace-normal">
+                    <div className="flex flex-wrap items-baseline justify-end gap-x-2 gap-y-1">
+                      <span className="text-xs text-muted-foreground">{row.currency}</span>
+                      <span className="min-w-0 font-mono wrap-anywhere tabular-nums">
+                        {formatSignedCashAmount(row.amount, row.currency, row.direction)}
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </ListRefreshRegion>
     </section>

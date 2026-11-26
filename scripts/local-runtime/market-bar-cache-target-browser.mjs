@@ -47,7 +47,7 @@ try {
           ...(url.searchParams.has('timeframe') ? { timeframe } : {}),
           ...(url.searchParams.has('assetType') ? { assetType: url.searchParams.get('assetType') } : {}),
         } : undefined;
-        return json(schemas.marketChartOptionsV3Schema.parse({ contractVersion: 3, symbol: '600036.SH', mode: 'v3', timeframe,
+        return json(schemas.marketChartOptionsV3Schema.parse({ contractVersion: 1, symbol: '600036.SH', mode: 'v3', timeframe,
           ...(plan ? { plan, window: { start: day, end: day } } : {}),
           options: ['none', 'qfq', 'hfq'].map(adjustment => ({ adjustment,
             available: adjustment === 'none', reason: adjustment === 'none' ? null : 'unsupported_adjustment' })) }));

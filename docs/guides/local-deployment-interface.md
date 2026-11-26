@@ -5,7 +5,7 @@
 ## 命令
 
 - `bash scripts/local-deployment.sh sync-preflight <容器ID> <工作目录>`：只读核对依赖 manifest、workspace 路径和全部 Prisma 结构输入。
-- `bash scripts/local-deployment.sh sync-payload <新的绝对载荷目录>`：构建 Server 及 workspace，检查 Server/Worker 入口，装配载荷；目录已存在或构建失败时拒绝。
+- `bash scripts/local-deployment.sh sync-payload <新的绝对载荷目录>`：构建 Server 及 workspace，检查 Server/Worker 入口，装配载荷。明确设置部署产物的读取与目录遍历权限，使镜像内非 root 用户可使用入口。目录已存在或构建失败时拒绝。
 - `bash scripts/local-deployment.sh validate-image`：从标准输入接收工作目录、用户和 JSON 命令三行，验证 Server 镜像运行形态。
 
 这些是正式入口使用的准备命令，不能替代更新或快更。`scripts/deployment/apply-code.sh` 只由 infra 持锁后传入目标容器执行，应用维护产物路径与替换方式；infra 维护目标选择、传输、重启、健康及失败同镜像回退。

@@ -9,6 +9,7 @@ export function simulationExpressionContext(
 ): SimulationExpressionContext {
   return {
     tick, sourceSeries: input.sourceSeries,
+    ...(input.observeRule ? { observeRule: input.observeRule } : {}),
     ...(positionState ? { positionState } : {}),
     ...(input.indicatorSeries ? { indicatorSeries: input.indicatorSeries } : {}),
     ...(previousNumeric ? { previousNumeric } : {}),

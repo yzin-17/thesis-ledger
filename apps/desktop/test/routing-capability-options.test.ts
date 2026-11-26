@@ -68,7 +68,7 @@ describe('当前能力的路由选项', () => {
     expect(updateRoutingSourceChoice(config, scope, 0, options[0]!)).toBe(config);
   });
 
-  it('账号权限必须经原有规则确认；缺少报告、等级不包含、配置过期均排除', () => {
+  it('未验证与配置过期保留首次尝试，明确无权限仍排除且不伪造验证成功', () => {
     const checked = { ...provider, accountAccessSupported: true, configVersion: 7 };
     const access = {
       state: 'allowed',
@@ -76,7 +76,11 @@ describe('当前能力的路由选项', () => {
       persisted: true,
       configVersion: 7,
     } as const;
-    expect(routingSourceChoices([checked], [entry], scope)).toEqual([]);
+    const unchecked = routingSourceChoices([checked], [entry], scope);
+    expect(unchecked).toHaveLength(1);
+    expect(unchecked[0]).toMatchObject({ disabled: false, upstreamSource: 'history' });
+    expect(unchecked[0]?.label).toContain('未验证');
+    expect(unchecked[0]?.label).not.toContain('已验证');
     expect(
       routingSourceChoices([checked], [{ ...entry, accountAccess: access }], scope),
     ).toHaveLength(1);
@@ -87,13 +91,20 @@ describe('当前能力的路由选项', () => {
         scope,
       ),
     ).toEqual([]);
-    expect(
-      routingSourceChoices(
-        [checked],
-        [{ ...entry, accountAccess: { ...access, configVersion: 6 } }],
-        scope,
-      ),
-    ).toEqual([]);
+    const outdated = routingSourceChoices(
+      [checked],
+      [{ ...entry, accountAccess: { ...access, configVersion: 6 } }],
+      scope,
+    );
+    expect(outdated).toHaveLength(1);
+    expect(outdated[0]?.disabled).toBe(false);
+    expect(outdated[0]?.label).toContain('未验证');
+    expect(outdated[0]?.label).not.toContain('已验证');
+    for (const state of ['permission_missing', 'credential_invalid'] as const) {
+      expect(
+        routingSourceChoices([checked], [{ ...entry, accountAccess: { ...access, state } }], scope),
+      ).toEqual([]);
+    }
   });
 
   it('聚合范围保留部分覆盖；仅有既有不适用选择时可回显和清空，不写回读取结果', () => {

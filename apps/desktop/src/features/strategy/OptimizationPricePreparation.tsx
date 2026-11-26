@@ -22,9 +22,144 @@ import {
   type PreparedOptimizationConfiguration,
 } from './optimization.preparation.js';
 import { usePreparationRouteStale } from './strategy.preparation.js';
+import { BacktestDailyMatchingFields, BacktestDailyMatchingDisclosure, useBacktestDailyMatching } from './BacktestDailyMatching.js';
 const adjustmentLabels = { qfq: '前复权', hfq: '后复权', none: '不复权' } as const;
 
-export function OptimizationPricePreparation({
+export function OptimizationPricePreparation(props: {
+  dailyOrders?: boolean;
+  target: OptimizationPreparationTarget;
+  startDate: string;
+  endDate: string;
+  currency: 'CNY' | 'HKD' | 'USD';
+  initialCash: string;
+  onPrepared: (value: PreparedOptimizationConfiguration | null) => void;
+}) {
+  const control = useOptimizationPricePreparation(props);
+  const {
+    warmupBudget,
+    onPrepared,
+    setWarmupBudget,
+    resolution,
+    target,
+    history,
+    query,
+    prepare,
+    model,
+    result,
+    error,
+    stale,
+  } = control;
+
+  return (
+    <FieldGroup>
+      <Field>
+        <FieldLabel>候选预热预算（交易日）</FieldLabel>
+        <Input
+          aria-label="候选预热预算（交易日）"
+          type="number"
+          min={0}
+          max={504}
+          step={1}
+          value={warmupBudget}
+          onChange={(event) => {
+            onPrepared(null);
+            setWarmupBudget(event.target.value);
+          }}
+        />
+        <p className="text-sm text-muted-foreground">
+          准备时一次冻结所需行情，候选超过预算将停止，不自动重新取价。
+        </p>
+      </Field>
+      <Field>
+        <FieldLabel>策略收益研究</FieldLabel>
+        <p className="text-sm">后复权计算指标与模拟收益；具体价格条件使用不复权参考价。</p>
+        <p className="text-xs text-muted-foreground">
+          准备时冻结两套行情，基线和所有候选复用相同版本。
+        </p>
+      </Field>
+      <OptimizationExecutionSettings
+        resolution={resolution}
+        discovery={target.sourceMode === 'discovery'}
+      />
+      <BacktestDailyMatchingFields control={control.matching} unit="研究单位" optional={!control.matching.required} disabled={query.isFetching || result?.status === 'preparing'} />
+      <Field>
+        <FieldLabel>历史数据使用方式</FieldLabel>
+        <p className="text-sm">{histories[history]}</p>
+        <p className="text-xs text-muted-foreground">
+          准备完成后冻结；复权历史可能包含后来公司行动的影响，不代表当时可见的数据版本。
+        </p>
+      </Field>
+      <Button
+        aria-busy={query.isFetching}
+        type="button"
+        variant="outline"
+        onClick={() => prepare()}
+        disabled={
+          !model ||
+          !control.matching.valid ||
+          resolution.loading ||
+          Boolean(resolution.message) ||
+          query.isFetching ||
+          result?.status === 'preparing'
+        }
+      >
+        {query.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
+        {query.isFetching ? '正在准备实验配置…' : '准备实验配置'}
+      </Button>
+      {error && (
+        <Field invalid>
+          <FieldError>{error}</FieldError>
+        </Field>
+      )}
+      {stale && (
+        <Field invalid>
+          <FieldError>路由配置已经改变，请重新准备实验配置。</FieldError>
+        </Field>
+      )}
+      {query.error && (
+        <Field invalid>
+          <FieldError>
+            {query.error instanceof Error ? query.error.message : '实验配置准备失败'}
+          </FieldError>
+        </Field>
+      )}
+      <AnnouncementPreparationStatus result={result} />
+      {result?.status === 'blocked' && (
+        <Alert variant="destructive">
+          <AlertTitle>实验配置暂不可用</AlertTitle>
+          <AlertDescription>
+            {result.diagnostics.map((diagnostic, index) => (
+              <p key={index}>
+                {diagnostic.message}{' '}
+                {diagnostic.suggestedActions.map((action) => action.description).join('；')}
+              </p>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
+      {result?.status === 'prepared' && (
+        <Alert>
+          <AlertTitle>实验配置已准备</AlertTitle>
+          <AlertDescription>
+            <p>冻结时间：{formatDateTime(result.runConfig.dataAsOf)}</p>
+            <BacktestDailyMatchingDisclosure policy={result.runConfig.dailyOrderMatching} unit="研究单位" />
+            <p>
+              {adjustmentLabels[result.runConfig.executionPriceProtocol.priceBasis.adjustment]} ·{' '}
+              {histories[result.runConfig.executionPriceProtocol.history.basis]}
+            </p>
+            <PreparedPriceSources value={result} />
+            <p>
+              已检查基线行情窗口；各候选与切分仍需核对冻结事实。此操作未调用模型，也未创建实验。
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+    </FieldGroup>
+  );
+}
+
+function useOptimizationPricePreparation({
+  dailyOrders = false,
   target,
   startDate,
   endDate,
@@ -32,6 +167,7 @@ export function OptimizationPricePreparation({
   initialCash,
   onPrepared,
 }: {
+  dailyOrders?: boolean;
   target: OptimizationPreparationTarget;
   startDate: string;
   endDate: string;
@@ -42,7 +178,14 @@ export function OptimizationPricePreparation({
   const adjustment = 'hfq' as const;
   const history = 'fixed-provider-snapshot' as const;
   const [warmupBudget, setWarmupBudget] = useState('60');
-  const resolution = useOptimizationExecutionModel({ target, startDate, endDate, currency, adjustment });
+  const matching = useBacktestDailyMatching(dailyOrders);
+  const resolution = useOptimizationExecutionModel({
+    target,
+    startDate,
+    endDate,
+    currency,
+    adjustment,
+  });
   const model = resolution.model;
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<{
@@ -50,6 +193,7 @@ export function OptimizationPricePreparation({
     request: OptimizationRunPreparationRequest;
   } | null>(null);
   const key = JSON.stringify({
+    dailyMatching: matching.signature,
     target,
     startDate,
     endDate,
@@ -68,7 +212,7 @@ export function OptimizationPricePreparation({
       return prepareOptimizationConfiguration(submitted.request, signal);
     },
     retry: false,
-    refetchInterval: (query) => query.state.data?.status === 'preparing' ? 2000 : false,
+    refetchInterval: (query) => (query.state.data?.status === 'preparing' ? 2000 : false),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
@@ -94,7 +238,7 @@ export function OptimizationPricePreparation({
     const parsed = optimizationRunPreparationRequestSchema.safeParse({
       target,
       intent: {
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: createClientRequestId(),
         freezeTimePolicy: 'after-acquisition',
         warmupBudgetSessions: warmupBudget.trim() === '' ? undefined : Number(warmupBudget),
@@ -116,6 +260,7 @@ export function OptimizationPricePreparation({
             fxPolicy: 'latestAvailable',
           },
           executionModel: model,
+          ...(matching.policy ? { dailyOrderMatching: matching.policy } : {}),
         },
       },
     });
@@ -127,84 +272,20 @@ export function OptimizationPricePreparation({
     onPrepared(null);
     setSubmitted({ key, request: parsed.data });
   };
-  return (
-    <FieldGroup>
-      <Field>
-        <FieldLabel>候选预热预算（交易日）</FieldLabel>
-        <Input
-          aria-label="候选预热预算（交易日）"
-          type="number"
-          min={0}
-          max={504}
-          step={1}
-          value={warmupBudget}
-          onChange={(event) => {
-            onPrepared(null);
-            setWarmupBudget(event.target.value);
-          }}
-        />
-        <p className="text-sm text-muted-foreground">
-          准备时一次冻结所需行情，候选超过预算将停止，不自动重新取价。
-        </p>
-      </Field>
-      <Field>
-        <FieldLabel>策略收益研究</FieldLabel>
-        <p className="text-sm">后复权计算指标与模拟收益；具体价格条件使用不复权参考价。</p>
-        <p className="text-xs text-muted-foreground">准备时冻结两套行情，基线和所有候选复用相同版本。</p>
-      </Field>
-      <OptimizationExecutionSettings resolution={resolution} discovery={target.sourceMode === 'discovery'} />
-      <Field>
-        <FieldLabel>历史数据使用方式</FieldLabel>
-        <p className="text-sm">{histories[history]}</p>
-        <p className="text-xs text-muted-foreground">准备完成后冻结；复权历史可能包含后来公司行动的影响，不代表当时可见的数据版本。</p>
-      </Field>
-      <Button
-        aria-busy={query.isFetching}
-        type="button"
-        variant="outline"
-        onClick={()=>prepare()}
-        disabled={!model || resolution.loading || Boolean(resolution.message) || query.isFetching || result?.status === 'preparing'}
-      >
-        {query.isFetching && <Spinner data-icon="inline-start" aria-hidden="true" />}
-        {query.isFetching ? '正在准备实验配置…' : '准备实验配置'}
-      </Button>
-      {error && <Field invalid><FieldError>{error}</FieldError></Field>}
-      {stale && <Field invalid><FieldError>路由配置已经改变，请重新准备实验配置。</FieldError></Field>}
-      {query.error && (
-        <Field invalid><FieldError>
-          {query.error instanceof Error ? query.error.message : '实验配置准备失败'}
-        </FieldError></Field>
-      )}
-      <AnnouncementPreparationStatus result={result} />
-      {result?.status === 'blocked' && (
-        <Alert variant="destructive">
-          <AlertTitle>实验配置暂不可用</AlertTitle>
-          <AlertDescription>
-            {result.diagnostics.map((diagnostic, index) => (
-              <p key={index}>
-                {diagnostic.message}{' '}
-                {diagnostic.suggestedActions.map((action) => action.description).join('；')}
-              </p>
-            ))}
-          </AlertDescription>
-        </Alert>
-      )}
-      {result?.status === 'prepared' && (
-        <Alert>
-          <AlertTitle>实验配置已准备</AlertTitle>
-          <AlertDescription>
-            <p>冻结时间：{formatDateTime(result.runConfig.dataAsOf)}</p>
-            <p>
-              {adjustmentLabels[result.runConfig.executionPriceProtocol.priceBasis.adjustment]} ·{' '}
-              {histories[result.runConfig.executionPriceProtocol.history.basis]}
-            </p>
-            <PreparedPriceSources value={result} />
-            <p>
-              已检查基线行情窗口；各候选与切分仍需核对冻结事实。此操作未调用模型，也未创建实验。
-            </p>
-          </AlertDescription>
-        </Alert>
-      )}
-    </FieldGroup>
-  );
+
+  return {
+    warmupBudget,
+    matching,
+    onPrepared,
+    setWarmupBudget,
+    resolution,
+    target,
+    history,
+    query,
+    prepare,
+    model,
+    result,
+    error,
+    stale,
+  };
 }

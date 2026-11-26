@@ -278,6 +278,11 @@ export function qualifyLiveExperiment(raw: unknown, rawCases: unknown, rawEvalua
     experimentFingerprint(evaluation) !== protocol.evaluationFingerprint
   )
     throw new Error('固定集或封存评价摘要不一致');
+  verifyLiveExperimentDataset(benchmark, evaluation);
+  return { protocol, benchmark, evaluation };
+}
+
+export function verifyLiveExperimentDataset(benchmark: LiveBenchmark, evaluation: LiveEvaluation) {
   const ids = new Set(benchmark.cases.map((entry) => entry.id));
   if (
     ids.size !== 20 ||
@@ -291,7 +296,6 @@ export function qualifyLiveExperiment(raw: unknown, rawCases: unknown, rawEvalua
   )
     throw new Error('封存评价必须精确覆盖固定集');
   verifyLiveBenchmarkBindings(benchmark);
-  return { protocol, benchmark, evaluation };
 }
 
 function verifyLiveScreeningCases(protocol: LiveExperimentProtocol, benchmark: LiveBenchmark) {

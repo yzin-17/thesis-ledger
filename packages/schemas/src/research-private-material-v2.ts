@@ -94,7 +94,7 @@ export const researchStrategyMaterialV2Schema = z
     unresolvedSymbols: z.array(symbol).max(1000),
   })
   .refine(
-    (value) => value.schemaVersion === Number(value.definition.schemaVersion),
+    (value) => value.schemaVersion === 1,
     '策略版本与定义合同不一致',
   );
 export const researchPrivateMaterialV2Schema = z.discriminatedUnion('version', [

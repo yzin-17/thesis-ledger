@@ -1,3 +1,4 @@
+import { namedStrategyFixture } from './named-v1-strategy.fixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -73,10 +74,13 @@ const setup = async (options?: {
   signalOnlyAtRangeEnd?: boolean;
   tailSide?: 'sell';
   legacyCostVersion?: boolean;
+  upgrade?: boolean;
+  assetType?: 'etf' | 'stock';
 }) => {
   const root = await mkdtemp(join(tmpdir(), 'v3-runner-'));
   directories.push(root);
-  const fixture = await completeSnapshotFixture();
+  const fixture = await completeSnapshotFixture(options?.assetType);
+  if (options?.upgrade) fixture.input.strategy = namedStrategyFixture(fixture.input.strategy);
   if (options?.cost === 'proportional') {
     setProportionalCosts(fixture.input.runConfig);
     fixture.input.strategy.cost.slippageRate = '0.001';
@@ -154,6 +158,18 @@ const setup = async (options?: {
 const signal = () => new AbortController().signal;
 
 describe('LocalSnapshotV3Runner', () => {
+  it.each(['etf', 'stock'] as const)('%s 升级为 run 坐标后非空成交、权益和收益保持一致且原冻结摘要不变', async (assetType) => {
+    const previous = await setup({ assetType });
+    const upgraded = await setup({ upgrade: true, assetType });
+    const oldHash = previous.built.manifest.contentHash;
+    const before = await previous.runner.run(previous.input, signal());
+    const after = await upgraded.runner.run(upgraded.input, signal());
+    expect(before.simulationFills.length).toBeGreaterThan(0);
+    for (const key of ['simulationFills', 'trades', 'equityCurve', 'metrics', 'benchmark'] as const) expect(after[key], key).toEqual(before[key]);
+    expect(await previous.runner.run(previous.input, signal())).toEqual(before);
+    expect(previous.built.manifest.contentHash).toBe(oldHash);
+    expect(await upgraded.runner.run(upgraded.input, signal())).toEqual(after);
+  });
   it('旧快照复用和重放保持原比例摘要限制、内容身份与结果校验和', async () => {
     const { fixture, snapshots, built, runner, input } = await setup({ legacyCostVersion: true });
     expect(built.manifest).not.toHaveProperty('benchmarkCostVersion');
@@ -178,6 +194,9 @@ describe('LocalSnapshotV3Runner', () => {
 
     const result = await runner.run(input, signal());
     const repeated = await runner.run(input, signal());
+    expect(result.ruleDiagnostics?.version).toBe('rule-evaluation-v1');
+    expect(result.ruleDiagnostics?.rules.find((rule) => rule.ruleId === 'entry')?.observations)
+      .toBeGreaterThan(0);
     const { resultChecksum, ...checksumPayload } = result;
 
     expect(backtestResultSchemaV3.safeParse(result).success).toBe(true);
@@ -185,8 +204,8 @@ describe('LocalSnapshotV3Runner', () => {
       runId: fixture.input.runId,
       strategyVersionId: fixture.input.strategyVersionId,
       snapshotId: built.manifest.contentHash,
-      schemaVersion: '3',
-      snapshotVersion: 'snapshot-manifest-v3',
+      schemaVersion: 'backtest-trade-result-v1',
+      snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
       executionPriceProtocol: built.manifest.executionPriceProtocol,
       comparableDataFingerprint: built.manifest.comparableDataFingerprint,
       actualSources: built.manifest.actualSources,

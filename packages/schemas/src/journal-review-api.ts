@@ -3,7 +3,7 @@ import {
   journalReviewCandidateContractSchema,
   journalDeterministicReviewSchema,
 } from './journal-review.js';
-import { journalLegacyReviewContractSchema } from './journal-review-legacy.js';
+import { journalUnlinkedReviewSchema } from './journal-review-unlinked.js';
 import { instrumentDirectorySchema } from './market.js';
 import { journalStoredSnapshotViewSchema } from './journal-review-history.js';
 import { journalPeriodReviewResultSchema } from './journal-period-review.js';
@@ -39,7 +39,7 @@ export type JournalReviewReferenceLocator = z.infer<typeof journalReviewReferenc
 export const journalReviewListContractSchema = z
   .object({
     items: z.array(journalReviewCandidateContractSchema),
-    legacyItems: z.array(journalLegacyReviewContractSchema),
+    unlinkedItems: z.array(journalUnlinkedReviewSchema),
     total: z.number().int().nonnegative(),
     nextCursor: z.string().min(1).nullable(),
     ledgerRevision: z.string().regex(/^\d+$/),

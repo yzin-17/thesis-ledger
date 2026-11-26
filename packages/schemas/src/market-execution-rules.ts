@@ -51,7 +51,7 @@ const stepSchema = z
 
 export const executionRuleRequestSchema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     consumer: z.literal('thesis-ledger'),
     requestId: z.string().trim().min(1),
     scope: scopeSchema,

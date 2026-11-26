@@ -20,7 +20,7 @@ def main():
 
         assert runtime_module._runtime is None
         request = json.load(sys.stdin)
-        assert request["contractVersion"] == 3
+        assert request["contractVersion"] == 1
         assert request["symbol"] == "510300.SH"
         assert request["start"] == "2024-07-15" and request["end"] == "2024-07-19"
         assert request["purpose"] == "interactive-chart"
@@ -36,7 +36,7 @@ def main():
         client = TestClient(app, raise_server_exceptions=False)
         app_ready = time.perf_counter()
         try:
-            response = client.post("/api/v3/thesis-ledger/market/chart-bars", json=request,
+            response = client.post("/api/v1/thesis-ledger/market/chart-bars", json=request,
                                    headers={"authorization": "Bearer " + token,
                                             "x-request-id": request["requestId"]})
             body = response.json()

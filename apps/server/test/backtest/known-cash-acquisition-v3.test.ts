@@ -17,7 +17,7 @@ describe('现金取得编排与Server原包授信', () => {
       const exchange = f.prepared.acquisition.exchange;
       const target = exchange.request.routeTarget;
       const effective = {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'policy',
         revision: 1,
@@ -33,7 +33,7 @@ describe('现金取得编排与Server原包授信', () => {
         ],
       };
       const catalog = {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         catalogRevision: 1,
         generatedAt: '2026-10-09T12:00:00Z',
@@ -102,7 +102,7 @@ describe('现金取得编排与Server原包授信', () => {
       const service = new BacktestKnownCashAcquisitionV3(dsa as never, control as never, originals);
       const c = f.runConfig;
       const request = {
-        contractVersion: 3 as const,
+        contractVersion: 1 as const,
         requestId: 'intent',
         strategyVersionId: '11111111-1111-4111-8111-111111111111',
         adjustment: 'none' as const,

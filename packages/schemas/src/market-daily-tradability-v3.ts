@@ -44,6 +44,7 @@ export const observedTradabilityDatesV3 = (
     routeKey: MarketDataBarRouteKeyV3;
     target: { providerId: string; upstreamSource: string };
     coverageProof: MarketCoverageProofV3;
+    allowPriceOnly?: boolean;
   },
 ): string[] => {
   const proof = scope.coverageProof;
@@ -51,6 +52,9 @@ export const observedTradabilityDatesV3 = (
   const expected = marketCoverageSessionDatesV3(proof);
   const states = new Map<string, BacktestDailyTradabilityEvidenceV3['days'][number]['state']>();
   for (const evidence of windows) {
+    if (evidence.priceOnlyAllowed !== windows[0]!.priceOnlyAllowed ||
+        (!scope.allowPriceOnly && evidence.days.some((day) => day.state === 'observed-price-only')))
+      throw new Error('日级价格观察许可不一致或消费方未启用价格研究');
     assertTradabilitySourceV3(evidence, scope, windows[0]!.barSource.providerRevision);
     if (
       evidence.range.start < proof.window.requestedStart ||
@@ -77,7 +81,8 @@ export const observedTradabilityDatesV3 = (
   if (JSON.stringify([...states.keys()].sort()) !== JSON.stringify(expected)) {
     throw new Error('逐窗日级证据未覆盖全部预期交易日');
   }
-  return expected.filter((date) => states.get(date) === 'observed-traded');
+  return expected.filter((date) => states.get(date) === 'observed-traded' ||
+    (scope.allowPriceOnly && states.get(date) === 'observed-price-only'));
 };
 
 export const sliceTradabilityWindowsV3 = (

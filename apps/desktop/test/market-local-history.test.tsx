@@ -89,7 +89,7 @@ describe('本地历史资料展示', () => {
       },
     ];
     const catalog = {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       consumer: 'thesis-ledger' as const,
       status: 'complete' as const,
       catalogRevision: 1,

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { journalExplanationResult } from './journal-ai-session.fixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { journalAnalyze, journalAnalyzePeriod } from '@thesis-ledger/domain';
 import { act } from 'react';
@@ -82,16 +83,7 @@ function journalSnapshotTestContext() {
       promptVersion: '保存时-v2',
       status: 'succeeded',
       errorSummary: null,
-      result: {
-        version: 1,
-        provider: '保存时 Provider',
-        conclusion: '这是保存到快照中的 AI 解读正文',
-        evidence: [],
-        risks: [],
-        unknowns: [],
-        disclaimer: '保存时说明',
-        createdAt: '2026-01-05T00:00:00Z',
-      },
+      result: journalExplanationResult('这是保存到快照中的 AI 解读正文'),
     });
   });
   const period = (createdAt = '2026-01-06T00:00:00Z') => {

@@ -1,3 +1,4 @@
+import { atrInputSeries } from './backtest-atr-input.js';
 import {
   DecimalValue,
   createCorporateActionPort,
@@ -12,6 +13,9 @@ import {
   evaluateNumericExpression,
   aggregateMinuteBars,
   evaluateIndicator,
+  buildNumericOperationSeriesSteps,
+  evaluateIndicatorSteps,
+  finishBacktestComputation,
   numericExpressionKey,
   sourceSeriesKey,
   CnNavSimulation,
@@ -24,6 +28,7 @@ import {
   type CorporateActionResult,
   type LedgerMutationResult,
   type BacktestSeries,
+  type BacktestDailyMatchState,
   type ExecutionCalendarFact,
   type ExecutionInstrumentFact,
   type SimulationFillRecord,
@@ -39,6 +44,7 @@ import {
   type SimulationEngineInput,
   type BacktestMinuteBar,
   type TradingCalendar,
+  type RuleEvaluationDiagnostics,
 } from '@thesis-ledger/domain';
 import {
   executionRuleSnapshotSchema,
@@ -50,6 +56,7 @@ import {
 import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 import { dailyBarSessionTimes } from './backtest-daily-bar-session.js';
 import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
+import { intradayBarSessionWindow } from './backtest-intraday-bar-session.js';
 import { instrumentFact } from './backtest-instrument-fact-v3.js';
 
 export type RowsByArtifact = ReadonlyMap<string, readonly ArtifactRow[]>;
@@ -153,22 +160,23 @@ const rowsAtTimeframe = (
   rows: readonly ArtifactRow[],
   timeframe: BacktestStrategy['primaryTimeframe'],
   calendar: TradingCalendar,
+  preserveUnknownMetrics = false,
 ): readonly Record<string, unknown>[] => {
   if (timeframe === '1m' || timeframe === '1d') return rows;
   const minuteBars: BacktestMinuteBar[] = rows.map((row) => ({
     symbol: stringField(row, 'symbol'),
     market: row.market as BacktestMinuteBar['market'],
     timeframe: '1m',
-    occurredAt: stringField(row, 'occurredAt'),
+    occurredAt: intradayBarSessionWindow(row, calendar).openedAt,
     availableAt: stringField(row, 'availableAt'),
     open: stringField(row, 'open'),
     high: stringField(row, 'high'),
     low: stringField(row, 'low'),
     close: stringField(row, 'close'),
-    volume: stringField(row, 'volume'),
+    volume: preserveUnknownMetrics && typeof row.volume !== 'string' ? undefined : stringField(row, 'volume'),
     ...(typeof row.amount === 'string' ? { amount: row.amount } : {}),
-    provider: stringField(row, 'provider'),
-    providerRevision: stringField(row, 'providerRevision'),
+    provider: typeof row.provider === 'string' ? row.provider : stringField(row, 'providerId'),
+    ...(typeof row.providerRevision === 'string' ? { providerRevision: row.providerRevision } : {}),
     ...(row.quality === 'complete' ||
     row.quality === 'partial' ||
     row.quality === 'suspended' ||
@@ -177,7 +185,7 @@ const rowsAtTimeframe = (
       : {}),
     ...(row.suspended === true ? { suspended: true } : {}),
   }));
-  return aggregateMinuteBars(minuteBars, timeframe, { calendar }).map((bar) =>
+  return aggregateMinuteBars(minuteBars, timeframe, { calendar, preserveUnknownMetrics }).map((bar) =>
     Object.fromEntries(Object.entries(bar)),
   );
 };
@@ -199,7 +207,9 @@ const executionBars = (
       stringField(left, 'occurredAt').localeCompare(stringField(right, 'occurredAt')),
     );
   return ordered.map((row, index) => {
-    const sessionTimes = dailyBarSessionTimes(row, calendar);
+    const interval = row.timeframe === '1d' ? undefined : intradayBarSessionWindow(row, calendar);
+    const sessionTimes = interval ? { openedAt: interval.openedAt,
+      openAvailableAt: typeof row.openAvailableAt === 'string' ? row.openAvailableAt : stringField(row, 'availableAt') } : dailyBarSessionTimes(row, calendar);
     const clocks = barResearchClocksV3(row, calendar, runConfig);
     const previousClock =
       index > 0
@@ -222,7 +232,7 @@ const executionBars = (
       previousCloseAvailableAt = stringField(row, 'availableAt');
     }
     return {
-      occurredAt: stringField(row, 'occurredAt'),
+      occurredAt: interval?.closedAt ?? stringField(row, 'occurredAt'),
       availableAt: stringField(row, 'availableAt'),
       openedAt: sessionTimes.openedAt ?? stringField(row, 'occurredAt'),
       openAvailableAt: clocks.openResearchClock
@@ -232,6 +242,8 @@ const executionBars = (
       ...clocks,
       ...(previousClock ? { previousCloseResearchClock: previousClock } : {}),
       open: stringField(row, 'open'),
+      ...(typeof row.high === 'string' ? { high: row.high } : {}),
+      ...(typeof row.low === 'string' ? { low: row.low } : {}),
       close: stringField(row, 'close'),
       previousClose,
       status: row.quality === 'suspended' ? ('unavailable' as const) : ('available' as const),
@@ -308,20 +320,23 @@ const initialLedgerConfig = (
   };
 };
 
-const indicatorSeriesFor = (
+function* indicatorSeriesForSteps(
   expression: BooleanExpression | NumericExpression,
   sourceSeries: ReadonlyMap<string, BacktestSeries>,
   output: Map<string, BacktestSeries>,
-): void => {
+): Generator<void, void, void> {
+  if (yield* buildNumericOperationSeriesSteps(expression, sourceSeries, output, (input) => indicatorSeriesForSteps(input, sourceSeries, output))) return;
   if (expression.type === 'indicator') {
-    indicatorSeriesFor(expression.input, sourceSeries, output);
-    const inputSeries =
+    yield* indicatorSeriesForSteps(expression.input, sourceSeries, output);
+    let inputSeries =
       expression.input.type === 'series'
         ? (sourceSeries.get(sourceSeriesKey(expression.input.sourceId, expression.input.field)) ??
           sourceSeries.get(expression.input.sourceId))
         : output.get(numericExpressionKey(expression.input));
     if (!inputSeries) return;
-    const indicator = evaluateIndicator(expression.name, inputSeries.points, expression.params, {
+    if ((expression.name === 'ATR' || expression.name === 'ADX') && expression.input.type === 'series')
+      inputSeries = atrInputSeries(inputSeries, sourceSeries, expression.input.sourceId);
+    const indicator = yield* evaluateIndicatorSteps(expression.name, inputSeries.points, expression.params, {
       output: expression.output ?? 'value',
     });
     output.set(numericExpressionKey(expression), {
@@ -332,16 +347,16 @@ const indicatorSeriesFor = (
     return;
   }
   if (expression.type === 'compare' || expression.type === 'cross') {
-    indicatorSeriesFor(expression.left, sourceSeries, output);
-    indicatorSeriesFor(expression.right, sourceSeries, output);
+    yield* indicatorSeriesForSteps(expression.left, sourceSeries, output);
+    yield* indicatorSeriesForSteps(expression.right, sourceSeries, output);
   } else if (expression.type === 'all' || expression.type === 'any') {
-    expression.conditions.forEach((condition) =>
-      indicatorSeriesFor(condition, sourceSeries, output),
-    );
+    for (const condition of expression.conditions) yield* indicatorSeriesForSteps(condition, sourceSeries, output);
   } else if (expression.type === 'not') {
-    indicatorSeriesFor(expression.expression, sourceSeries, output);
+    yield* indicatorSeriesForSteps(expression.expression, sourceSeries, output);
   }
 };
+
+const indicatorSeriesFor = (...input: Parameters<typeof indicatorSeriesForSteps>) => finishBacktestComputation(indicatorSeriesForSteps(...input));
 
 const numericExpressionsIn = (expression: BooleanExpression): readonly NumericExpression[] => {
   if (expression.type === 'compare' || expression.type === 'cross') {
@@ -355,6 +370,8 @@ const numericExpressionsIn = (expression: BooleanExpression): readonly NumericEx
 };
 
 export interface ExchangeVerticalResult {
+  ruleDiagnostics?: RuleEvaluationDiagnostics;
+  dailyOrders?: BacktestDailyMatchState & { matching: NonNullable<RunConfigV3['dailyOrderMatching']> };
   researchBalances?: { fundsBalance: { amount: string; currency: 'CNY' | 'HKD' | 'USD' };
     positionUnits: string; simulatedPnl?: { amount: string; currency: 'CNY' | 'HKD' | 'USD' } };
   fills: readonly SimulationFillRecord[];
@@ -427,6 +444,7 @@ export {
   executionBars,
   fxRatesFrom,
   indicatorSeriesFor,
+  indicatorSeriesForSteps,
   initialLedgerConfig,
   instrumentFact,
   instrumentType,

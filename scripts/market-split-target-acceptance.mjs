@@ -71,10 +71,10 @@ import {readDsaEventAdmissionCatalogV3} from '/app/apps/server/dist/src/integrat
 let input='';for await(const chunk of process.stdin)input+=chunk;const {revision,digest}=JSON.parse(input);
 const c=new DsaClient(),post=c.post;let eventRequests=0,innerFailure;
 const safeFailure=(${safeSplitClientFailure.toString()});
-c.post=function(path,...args){if(path==='/api/v3/thesis-ledger/market/events'){eventRequests++;assert.equal(eventRequests,1);assert.equal(args[1],1);}return post.call(this,path,...args);};
+c.post=function(path,...args){if(path==='/api/v1/thesis-ledger/market/events'){eventRequests++;assert.equal(eventRequests,1);assert.equal(args[1],1);}return post.call(this,path,...args);};
 const effective=await c.effectiveControlPolicyV3(),view=await readDsaEventAdmissionCatalogV3(c),catalog=view.catalog;
 assert.equal(effective.projection.effective.revision,revision);assert.equal(effective.projection.effective.sourceDesiredRevision,revision);
-const scope={contractVersion:3,requestId:randomUUID(),desiredRevision:revision,effectivePolicyRevision:revision,catalogRevision:catalog.catalogRevision,
+const scope={contractVersion:1,requestId:randomUUID(),desiredRevision:revision,effectivePolicyRevision:revision,catalogRevision:catalog.catalogRevision,
  routeKey:{kind:'data',market:'CN',assetType:'ETF',capability:'SPLIT_EVENT'},symbol:'159516.SZ',start:'2026-03-30',end:'2026-07-10',dataAsOf:new Date().toISOString()};
 const result=await acquireMarketSplitAfterAcquisitionV3({mode:'after-acquisition',readTimeoutMs:c.timeoutMs,scope,effective:effective.projection.effective,catalog,admissions:view.admissions,
 readStateAfter:async()=>{const [state,afterView]=await Promise.all([c.effectiveControlPolicyV3(),readDsaEventAdmissionCatalogV3(c)]);return{effective:state.projection.effective,catalog:afterView.catalog,admissions:afterView.admissions};},read:async r=>{
@@ -96,7 +96,7 @@ async function main() {
     assert(response.ok, `原Server API拒绝：${response.status}`);return response.json();
   };
   const api = { get: () => request('GET', '/api/market-data/policy'), put: body => request('PUT', '/api/market-data/policy', body) };
-  const plan = splitPlan(await api.get(), await request('GET', '/api/market-data/routes/capabilities?contractVersion=3'));
+  const plan = splitPlan(await api.get(), await request('GET', '/api/market-data/routes/capabilities?contractVersion=1'));
   if (args.length === 0) { console.log(JSON.stringify({ mode: 'preview', plan }));return; }
   assert.deepEqual(args, ['--execute', '--authorized-159516-split-case', `--expected-policy=${plan.baseline.revision}`]);
   const root = resolve('.recovery-artifacts', 'split-' + plan.caseId);

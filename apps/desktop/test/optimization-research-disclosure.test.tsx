@@ -28,7 +28,7 @@ const config = () => {
     };
   }
   return runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: '2024-01-02',
     endDate: '2024-03-29',
     dataAsOf: '2026-09-11T00:00:00Z',

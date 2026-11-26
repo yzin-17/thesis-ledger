@@ -62,63 +62,33 @@ function StrategyEditorDrawerState({
   );
 }
 
-export function StrategyEditorPage({
-  strategies,
-  loading,
-  mode,
-  presentation = 'page',
-}: {
+export function StrategyEditorPage(props: {
   strategies: StrategyRecord[];
   loading: boolean;
   mode: 'create' | 'edit';
   presentation?: 'page' | 'drawer';
 }) {
-  const params = useParams();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [creationMode, setCreationMode] = useState(
-    searchParams.has('draft') || searchParams.get('authoring') === '1' ? 'authoring' : 'manual',
-  );
-  const [authoringDirty, setAuthoringDirty] = useState(false);
-  const selection =
-    mode === 'edit' ? findStrategyVersion(strategies, params.strategyId, params.versionId) : null;
-  const [dirty, setDirty] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const allowNavigationRef = useRef(false);
-  const createStrategy = useCreateStrategyMutation();
-  const createVersion = useCreateStrategyVersionMutation();
-  const toastManager = useToastManager();
-  const busy = createStrategy.isPending || createVersion.isPending;
-  const strategy = selection?.strategy ?? null;
-  const version = selection?.version ?? null;
-  useNavigationGuard({
-    dirty: dirty || authoringDirty,
+  const control = useStrategyEditorPage(props);
+  const {
+    creationMode,
+    setCreationMode,
+    searchParams,
+    setSearchParams,
+    setAuthoringDirty,
+    allowNavigationRef,
+    navigate,
+    presentation,
+    mode,
+    strategy,
+    version,
     busy,
-    draft: { mode, creationMode, strategyId: strategy?.id, versionId: version?.id,
-      authoringDraftId: searchParams.get('draft') },
-    bypass: () => allowNavigationRef.current,
-    blocksLocation: (currentLocation, nextLocation) => {
-      const leavingPage = currentLocation.pathname !== nextLocation.pathname;
-      const changingDraft =
-        new URLSearchParams(currentLocation.search).get('draft') !==
-        new URLSearchParams(nextLocation.search).get('draft');
-      return leavingPage || (authoringDirty && changingDraft);
-    },
-  });
-
-  const closePage = () => {
-    allowNavigationRef.current = true;
-    let destination: string = strategyCenterPath.library;
-    if (strategy && version) {
-      destination = strategyCenterPath.strategyVersion(strategy.id, version.id);
-    } else if (params.strategyId && params.versionId) {
-      destination = strategyCenterPath.strategyVersion(params.strategyId, params.versionId);
-    }
-    void navigate(destination, {
-      state: strategyCenterFocusState(strategyCenterTriggerId.editVersion),
-    });
-  };
-
+    error,
+    setDirty,
+    closePage,
+    save,
+    loading,
+    selection,
+  } = control;
   if (mode === 'edit' && loading) {
     if (presentation === 'drawer') {
       return (
@@ -151,46 +121,6 @@ export function StrategyEditorPage({
     }
     return unavailable;
   }
-
-  const save = async (schema: StrategySchema) => {
-    if (busy) return;
-    setError(null);
-    try {
-      if (mode === 'create') {
-        const name =
-          typeof schema.name === 'string' && schema.name.trim() ? schema.name.trim() : '未命名策略';
-        const created = await createStrategy.mutateAsync({ name, schema });
-        const createdVersion = latestStrategyVersion(created.versions);
-        if (!createdVersion) throw new Error('策略已创建，但响应中没有可定位的版本');
-        toastManager.add({
-          title: '策略已创建',
-          description: '首个版本已保存，无需重复创建。',
-          type: 'success',
-        });
-        allowNavigationRef.current = true;
-        void navigate(strategyCenterPath.strategyVersion(created.id, createdVersion.id), {
-          replace: true,
-          state: strategyCenterFocusState(strategyCenterTriggerId.editVersion),
-        });
-        return;
-      }
-      if (!strategy) return;
-      const createdVersion = await createVersion.mutateAsync({ strategyId: strategy.id, schema });
-      toastManager.add({
-        title: '新版本已保存',
-        description: '原版本保持不变，无需重复保存。',
-        type: 'success',
-      });
-      allowNavigationRef.current = true;
-      void navigate(strategyCenterPath.strategyVersion(strategy.id, createdVersion.id), {
-        replace: true,
-        state: strategyCenterFocusState(strategyCenterTriggerId.editVersion),
-      });
-    } catch (cause) {
-      setError(requestFailureMessage(cause, '保存失败，请保留当前输入后重试。'));
-    }
-  };
-
   const editor = (
     <>
       <StrategyEditorSheet
@@ -211,9 +141,7 @@ export function StrategyEditorPage({
       />
     </>
   );
-
   if (presentation === 'drawer') return editor;
-
   if (mode === 'edit') {
     return (
       <div className="flex max-w-3xl flex-col gap-5">
@@ -271,4 +199,127 @@ export function StrategyEditorPage({
       </TabsContent>
     </Tabs>
   );
+}
+
+function useStrategyEditorPage({
+  strategies,
+  loading,
+  mode,
+  presentation = 'page',
+}: {
+  strategies: StrategyRecord[];
+  loading: boolean;
+  mode: 'create' | 'edit';
+  presentation?: 'page' | 'drawer';
+}) {
+  const params = useParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [creationMode, setCreationMode] = useState(
+    searchParams.has('draft') || searchParams.get('authoring') === '1' ? 'authoring' : 'manual',
+  );
+  const [authoringDirty, setAuthoringDirty] = useState(false);
+  const selection =
+    mode === 'edit' ? findStrategyVersion(strategies, params.strategyId, params.versionId) : null;
+  const [dirty, setDirty] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const allowNavigationRef = useRef(false);
+  const createStrategy = useCreateStrategyMutation();
+  const createVersion = useCreateStrategyVersionMutation();
+  const toastManager = useToastManager();
+  const busy = createStrategy.isPending || createVersion.isPending;
+  const strategy = selection?.strategy ?? null;
+  const version = selection?.version ?? null;
+  useNavigationGuard({
+    dirty: dirty || authoringDirty,
+    busy,
+    draft: {
+      mode,
+      creationMode,
+      strategyId: strategy?.id,
+      versionId: version?.id,
+      authoringDraftId: searchParams.get('draft'),
+    },
+    bypass: () => allowNavigationRef.current,
+    blocksLocation: (currentLocation, nextLocation) => {
+      const leavingPage = currentLocation.pathname !== nextLocation.pathname;
+      const changingDraft =
+        new URLSearchParams(currentLocation.search).get('draft') !==
+        new URLSearchParams(nextLocation.search).get('draft');
+      return leavingPage || (authoringDirty && changingDraft);
+    },
+  });
+
+  const closePage = () => {
+    allowNavigationRef.current = true;
+    let destination: string = strategyCenterPath.library;
+    if (strategy && version) {
+      destination = strategyCenterPath.strategyVersion(strategy.id, version.id);
+    } else if (params.strategyId && params.versionId) {
+      destination = strategyCenterPath.strategyVersion(params.strategyId, params.versionId);
+    }
+    void navigate(destination, {
+      state: strategyCenterFocusState(strategyCenterTriggerId.editVersion),
+    });
+  };
+
+  const save = async (schema: StrategySchema) => {
+    if (busy) return;
+    setError(null);
+    try {
+      if (mode === 'create') {
+        const name =
+          typeof schema.name === 'string' && schema.name.trim() ? schema.name.trim() : '未命名策略';
+        const created = await createStrategy.mutateAsync({ name, schema });
+        const createdVersion = latestStrategyVersion(created.versions);
+        if (!createdVersion) throw new Error('策略已创建，但响应中没有可定位的版本');
+        toastManager.add({
+          title: '策略已创建',
+          description: '首个版本已保存，无需重复创建。',
+          type: 'success',
+        });
+        allowNavigationRef.current = true;
+        void navigate(strategyCenterPath.strategyVersion(created.id, createdVersion.id), {
+          replace: true,
+          state: strategyCenterFocusState(strategyCenterTriggerId.editVersion),
+        });
+        return;
+      }
+      if (!strategy) return;
+      const createdVersion = await createVersion.mutateAsync({ strategyId: strategy.id, schema });
+      toastManager.add({
+        title: '新版本已保存',
+        description: '原版本保持不变，无需重复保存。',
+        type: 'success',
+      });
+      allowNavigationRef.current = true;
+      void navigate(strategyCenterPath.strategyVersion(strategy.id, createdVersion.id), {
+        replace: true,
+        state: strategyCenterFocusState(strategyCenterTriggerId.editVersion),
+      });
+    } catch (cause) {
+      setError(requestFailureMessage(cause, '保存失败，请保留当前输入后重试。'));
+    }
+  };
+
+  return {
+    creationMode,
+    setCreationMode,
+    searchParams,
+    setSearchParams,
+    setAuthoringDirty,
+    allowNavigationRef,
+    navigate,
+    presentation,
+    mode,
+    strategy,
+    version,
+    busy,
+    error,
+    setDirty,
+    closePage,
+    save,
+    loading,
+    selection,
+  };
 }

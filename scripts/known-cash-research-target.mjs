@@ -103,7 +103,7 @@ const policy = {
   uncertainRecords: process.argv.includes('--assume-unknown') ? 'assume-scheduled' : 'exclude',
 };
 const intent = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: randomUUID(),
   adjustment: 'none',
   accountingBasis: 'raw-events',
@@ -191,7 +191,7 @@ if (!process.argv.includes('--run')) {
   );
   assert.equal(prepared.status, 'prepared');
   const preflight = await api('/api/v1/backtests/run-config/preflight', {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: request.requestId,
     strategyVersionId,
     runConfig: prepared.runConfig,
@@ -203,7 +203,7 @@ if (!process.argv.includes('--run')) {
   const queued = await api(
     '/api/v1/backtests/runs',
     backtestRunCreateSchemaV3.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       strategyVersionId,
       runConfig: prepared.runConfig,
       preparationStamp: preflight.revisionStamp,

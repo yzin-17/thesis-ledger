@@ -3,7 +3,7 @@ import { ledgerEventEnvelopeSchema, type LedgerEvent } from '@thesis-ledger/sche
 export const accountId = '11111111-1111-4111-8111-111111111111';
 
 export const knownEvent = ledgerEventEnvelopeSchema.parse({
-  version: 3,
+  version: 1,
   eventId: '33333333-3333-4333-8333-333333333333',
   factId: '44444444-4444-4444-8444-444444444444',
   accountId,
@@ -39,7 +39,7 @@ export const storedFromEvent = (event: LedgerEvent) => ({
   sourceTimezone: event.sourceTimezone,
   economicOrderKey: event.economicOrderKey,
   recordedAt: new Date(event.recordedAt),
-  envelopeVersion: 3,
+  envelopeVersion: 1,
   payloadVersion: event.payloadVersion,
   payload: event.revisionAction === 'VOID' ? null : event.payload,
   sourceCategory: event.source.category,

@@ -2,6 +2,7 @@ import {
   barSeriesIdentitySchema,
   barSeriesSchema,
   indicatorCalculateResponseSchema,
+  marketDetailContractVersion,
   marketDetailRequestSchema,
   marketDetailResponseSchema,
   marketDisplayDetailResponseSchema,
@@ -79,7 +80,7 @@ export function marketDisplayClient(get: Request, suffix: Suffix) {
       symbol: string,
       params: Omit<MarketDetailQuery, 'timeframe'> & { timeframe?: T } = {},
     ) => {
-      marketDetailRequestSchema.parse({ ...params, symbol, chartContractVersion: 3 });
+      marketDetailRequestSchema.parse({ ...params, symbol });
       const { signal, refresh, include, indicatorParams, adjustment, ...query } = params;
       const timeframe = params.timeframe ?? '1d';
       const expectedAdjustment = adjustment ?? (isMarketMinuteTimeframe(timeframe) ? 'none' : 'qfq');
@@ -90,7 +91,7 @@ export function marketDisplayClient(get: Request, suffix: Suffix) {
       return get<DetailResult<T>>(
         `/api/market/${encodeURIComponent(symbol)}/detail${suffix({
           ...query,
-          chartContractVersion: 3,
+          chartContractVersion: marketDetailContractVersion,
           ...(adjustment === undefined ? {} : { adjustment }),
           ...(indicatorParams ? { indicatorParams: JSON.stringify(indicatorParams) } : {}),
           ...(refresh ? { refresh: 1 } : {}),

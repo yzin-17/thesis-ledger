@@ -38,3 +38,10 @@ it('多窗允许相同的重叠状态，拒绝矛盾分类', () => {
     }),
   ).toThrow(/冲突/);
 });
+
+it('价格观察仅对明确研究开放，不授予默认真实执行资格', () => {
+  const priceOnly: BacktestTradabilityDay[] = [{ date: '2026-05-18', state: 'observed-price-only' }];
+  const input = { days: priceOnly, barDates: ['2026-05-18'], range };
+  expect(() => assertBacktestTradabilityBars(input)).toThrow('真实份额执行资格');
+  expect(assertBacktestTradabilityBars({ ...input, allowPriceOnly: true })).toEqual([]);
+});

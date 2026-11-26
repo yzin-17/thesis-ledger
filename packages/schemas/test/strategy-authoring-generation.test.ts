@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { aiGenerationContracts, aiGenerationContractRefSchema } from '../src/ai-execution.js';
+import { strategySchema } from '../src/backtest-strategy.js';
+
+const sample = () => strategySchema.parse(JSON.parse(
+  readFileSync(new URL('../fixtures/strategy-authoring.exchange.json', import.meta.url), 'utf8'),
+));
 
 const question = { id: 'instrument', basedOnRevision: 1, quote: '某个标的', reason: '目录存在歧义',
   options: [], dependsOn: [], answer: null, answerState: 'unanswered' };
@@ -21,11 +26,23 @@ describe('策略编写独立用途合同', () => {
     expect(schema.safeParse({ ...base, ownerId: 'forged' }).success).toBe(false);
   });
   it('生成与修改只携带策略定义和覆盖映射，不能携带执行指令', () => {
-    const definition: unknown = JSON.parse(readFileSync(new URL('../fixtures/strategy-authoring.exchange.json', import.meta.url), 'utf8'));
+    const compiled = sample();
+    const definition = { ...compiled, entryTrigger: 'rising-edge', signalSources: compiled.signalSources.map((source) => Object.fromEntries(Object.entries(source).filter(([key]) => key !== 'series'))) };
     for (const contract of [aiGenerationContracts.authoringGeneration, aiGenerationContracts.authoringModification]) {
       expect(contract.schema.safeParse({ definition, coverage: [] }).success).toBe(true);
       expect(contract.schema.safeParse({ definition, coverage: [], runBacktest: true }).success).toBe(false);
       expect(contract.schema.safeParse({ definition: 'arbitrary-code', coverage: [] }).success).toBe(false);
     }
+  });
+  it('生成和修改均拒绝退役的策略定义版本', () => {
+    const compiled = sample();
+    const definition = {
+      ...compiled,
+      schemaVersion: '3',
+      entryTrigger: 'rising-edge',
+      signalSources: compiled.signalSources.map(({ series, ...source }) => source),
+    };
+    for (const contract of [aiGenerationContracts.authoringGeneration, aiGenerationContracts.authoringModification])
+      expect(contract.schema.safeParse({ definition, coverage: [] }).success).toBe(false);
   });
 });

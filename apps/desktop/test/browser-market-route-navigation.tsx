@@ -41,7 +41,7 @@ const keys: MarketRouteKeyV3[] = [
   { ...base, capability: 'REALTIME_QUOTE', market: 'US', assetType: 'ETF' },
 ];
 const initial: MarketPolicyResponse = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'sample',
   revision: 4,
@@ -58,7 +58,7 @@ const initial: MarketPolicyResponse = {
   lastError: null,
 };
 const catalog: MarketRouteCatalogReadV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   status: 'complete',
   reason: null,

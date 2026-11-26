@@ -18,6 +18,7 @@ import { LiveResearchRunner } from '../../src/model-arena/live/live-research-run
 import { LiveRuntime } from '../../src/model-arena/live/live-runtime.js';
 import { LiveValuations } from '../../src/model-arena/live/live-valuations.js';
 import { liveAgents, type LiveCycleRow } from '../../src/model-arena/live/live-storage.js';
+import { liveTimeline } from '../../src/model-arena/live/live-timeline.js';
 import { liveProtocolFixture } from './live-fixture.js';
 import { LiveReplayRuntime } from '../../src/model-arena/live/live-replay-runtime.js';
 
@@ -50,7 +51,6 @@ it.skipIf(!url || !process.env.ARENA_QUEUE_TEST_SCOPE).each([false, true])(
         }),
       ),
     };
-    const runner = new LiveResearchRunner(db, call, tools, budget, orders);
     const valuations = new LiveValuations(
       db,
       {
@@ -84,18 +84,21 @@ it.skipIf(!url || !process.env.ARENA_QUEUE_TEST_SCOPE).each([false, true])(
       },
       matches,
     );
-    const runtime = new LiveRuntime(
-      db,
-      redis,
-      market,
-      appointments,
-      cycles,
-      orders,
-      runner,
-      valuations,
-      matches,
-      replay,
-    );
+    const createRuntime = (connection: RedisService) =>
+      new LiveRuntime(
+        db,
+        connection,
+        market,
+        appointments,
+        cycles,
+        orders,
+        new LiveResearchRunner(db, call, tools, budget, orders),
+        valuations,
+        matches,
+        replay,
+      );
+    let connection = redis;
+    let runtime = createRuntime(connection);
     let matchId: string | undefined;
     const instrumentId = randomUUID(),
       owner = randomUUID();
@@ -132,7 +135,18 @@ it.skipIf(!url || !process.env.ARENA_QUEUE_TEST_SCOPE).each([false, true])(
             LiveCycleRow[]
           >`SELECT * FROM "ArenaLiveCycle" WHERE "matchId"=${created.id}::uuid AND state='succeeded'`
         ).length;
-      await vi.waitFor(async () => expect(await succeeded()).toBe(2), { timeout: 15000 });
+      try {
+        await vi.waitFor(async () => expect(await succeeded()).toBe(2), { timeout: 15000 });
+      } catch (error) {
+        const timeline = await liveTimeline(db, created.id);
+        const outcomes = await db.$queryRaw<
+          Pick<LiveCycleRow, 'state' | 'reason' | 'attempt'>[]
+        >`SELECT state,reason,attempt FROM "ArenaLiveCycle" WHERE "matchId"=${created.id}::uuid`;
+        throw new Error(
+          JSON.stringify({ timeline, outcomes, receivedFixtureRequests: seen.length }),
+          { cause: error },
+        );
+      }
       expect(seen).toHaveLength(4);
       expect(tools.execute).toHaveBeenCalledTimes(2);
       if (replayMode)
@@ -167,13 +181,32 @@ it.skipIf(!url || !process.env.ARENA_QUEUE_TEST_SCOPE).each([false, true])(
       await appointments.admit(created.id);
       redis.client.disconnect();
       await expect(runtime.reconcile()).rejects.toThrow();
-      expect((await cycles.pending()).filter((c) => c.matchId === created.id)).toHaveLength(2);
+      const pending = (await cycles.pending()).filter((c) => c.matchId === created.id);
+      expect(pending).toHaveLength(2);
+      expect(pending.every((c) => c.attempt === 0)).toBe(true);
       expect(seen).toHaveLength(6);
-      await redis.client.connect();
+      if (!replayMode) {
+        await runtime.onModuleDestroy();
+        connection = new RedisService();
+        runtime = createRuntime(connection);
+        await connection.ping();
+        runtime.start();
+        await vi.waitFor(async () => expect(await succeeded()).toBe(6), { timeout: 10000 });
+        const restored = await db.$queryRaw<
+          Pick<LiveCycleRow, 'id' | 'state' | 'attempt'>[]
+        >`SELECT id,state,attempt FROM "ArenaLiveCycle" WHERE "matchId"=${created.id}::uuid AND state='succeeded'`;
+        expect(restored.filter((row) => pending.some((cycle) => cycle.id === row.id))).toHaveLength(2);
+        expect(restored.every((row) => row.attempt === 1)).toBe(true);
+        await runtime.reconcile();
+        expect(await succeeded()).toBe(6);
+        expect(seen).toHaveLength(8);
+      } else {
+        await redis.client.connect();
+      }
       await matches.transition(owner, created.id, 'paused');
     } finally {
       await runtime.onModuleDestroy();
-      await redis.onModuleDestroy();
+      await connection.onModuleDestroy();
       server.close();
       server.closeAllConnections();
       if (matchId) {

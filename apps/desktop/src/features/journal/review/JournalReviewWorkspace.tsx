@@ -31,6 +31,7 @@ import { JournalEmpty, JournalRequestError } from './JournalReviewFeedback.js';
 import { useGuardedTransition } from '../../shared/navigation-guard.js';
 
 type WorkspaceProps = {
+  modelWeekliesLink?: ReactNode;
   mode?: Account['mode'];
   onAccountChange?: (accountId: string) => void;
   accounts?: Account[];
@@ -244,11 +245,14 @@ function Workspace(props: WorkspaceProps) {
         eyebrow="INVESTMENT JOURNAL"
         title="投资复盘"
         actions={
-          <RefreshIconButton
-            label="刷新复盘数据"
-            refreshing={refreshing}
-            onClick={() => void refresh()}
-          />
+          <>
+            {props.modelWeekliesLink}
+            <RefreshIconButton
+              label="刷新复盘数据"
+              refreshing={refreshing}
+              onClick={() => void refresh()}
+            />
+          </>
         }
       />
       {content}

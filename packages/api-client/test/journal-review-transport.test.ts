@@ -98,7 +98,7 @@ describe('正式复盘传输范围', () => {
       items: [row],
       total: 1,
       nextCursor: null,
-      legacyItems: [],
+      unlinkedItems: [],
       ledgerRevision: '12',
       projectionGeneration: '7',
       instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },

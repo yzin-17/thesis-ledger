@@ -37,7 +37,7 @@ const request = (state: 'prepared' | 'dispatching'): AiRequestAttempt => ({
 const execution = (state: 'prepared' | 'dispatching') =>
   aiExecutionSummarySchema.parse({
     version: 'sdk-execution-v1',
-    contract: { id: 'research', version: 'research-generation-v2' },
+    contract: { id: 'research', version: 'research-report-generation-v1' },
     frozenPolicy: DEFAULT_AI_RESEARCH_POLICY_V1,
     deadlineAt: now.toISOString(),
     generationStatus: 'pending',

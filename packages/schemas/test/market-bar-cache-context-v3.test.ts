@@ -4,7 +4,7 @@ import {
 } from '../src/market-cache-context-v3.js';
 
 const request = {
-  contractVersion: 3, consumer: 'thesis-ledger', requestId: 'bar-control',
+  contractVersion: 1, consumer: 'thesis-ledger', requestId: 'bar-control',
   purpose: 'interactive-chart', capability: 'MINUTE_BAR', symbol: 'AAPL.US',
   routeKey: { kind: 'bar', market: 'US', assetType: 'STOCK', capability: 'MINUTE_BAR', timeframe: '1m', adjustment: 'none' },
   routeTarget: { providerId: 'futu', upstreamSource: 'futu', routeIndex: 0 },

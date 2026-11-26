@@ -72,7 +72,7 @@ rawModel.segments[0].execution.normalizedExecution = {
 };
 const executionModel = backtestExecutionModelSchemaV3.parse(rawModel);
 const intent = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: randomUUID(),
   adjustment: 'qfq',
   accountingBasis: 'normalized-series',
@@ -154,7 +154,7 @@ if (!process.argv.includes('--run')) {
     ),
   );
 } else {
-  const catalog = await api('/api/market-data/routes/capabilities?contractVersion=3');
+  const catalog = await api('/api/market-data/routes/capabilities?contractVersion=1');
   assert.equal(catalog.status, 'complete');
   for (const route of desiredRoutes) {
     for (const target of route.targets)
@@ -197,7 +197,7 @@ if (!process.argv.includes('--run')) {
     policy = await api(
       '/api/market-data/policy',
       {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: randomUUID(),
         revision: current.revision + 1,
@@ -242,7 +242,7 @@ if (!process.argv.includes('--run')) {
   const queued = await api(
     '/api/v1/backtests/runs',
     backtestRunCreateSchemaV3.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       strategyVersionId,
       runConfig: prepared.runConfig,
       preparationStamp: prepared.executionPreflight.revisionStamp,

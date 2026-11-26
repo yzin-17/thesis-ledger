@@ -31,6 +31,7 @@ function diagnostic(error: unknown, request?: DependencyRequest): BacktestPrefli
     category: future ? 'point-in-time-unavailable' : 'data-unavailable',
     code: future ? 'FUTURE_DATA' : 'DATA_UNAVAILABLE',
     message: future ? '依赖事实晚于冻结时点，无法用于本次运行。' : '运行所需依赖未通过读取或完整性验证。',
+    ...(reason === 'action_announcement_found' ? { message: '查到可能相关的公司行动公告，请核对生效日期与事件事实。' } : {}),
     symbol,
     capability,
     purpose: request?.purpose ?? null,

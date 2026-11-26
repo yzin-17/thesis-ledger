@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync, realpathSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 import { createTargetRuntime, docker } from './backtest-target-runtime.mjs';
 import { assertDevelopmentRebuildAuthorization } from '../../../thesis-ledger/apps/server/dist/src/platform/database-structure.js';
 import { parseConfig } from '../../../thesis-ledger/apps/server/dist/src/platform/config.js';
@@ -23,15 +24,33 @@ export function assertPrivateCompose(config, project) {
   assert.equal(config.services['backtest-worker'].ports, undefined);
 }
 
+function syncPayloadMounts(container, payload) {
+  const root = realpathSync(payload);
+  const packages = JSON.parse(docker('exec', container, 'node', '-e', `
+    const { dirname } = require('node:path');
+    const names = ['domain', 'schemas', 'shared'];
+    console.log(JSON.stringify(Object.fromEntries(names.map(name => [
+      name, dirname(require.resolve('@thesis-ledger/' + name)),
+    ]))));
+  `));
+  return Object.entries({ server: '/app/apps/server/dist', ...packages }).map(([name, target]) => {
+    const source = join(root, name + '-dist');
+    assert(statSync(source).isDirectory(), '缺少快更编译产物');
+    return { type: 'bind', source, target, read_only: true, bind: { create_host_path: false } };
+  });
+}
+
 async function main() {
-  assert.deepEqual(process.argv.slice(2), ['--confirm', 'isolated-production-smoke']);
+  const { values } = parseArgs({ options: { confirm: { type: 'string' }, 'sync-payload': { type: 'string' } } });
+  assert.equal(values.confirm, 'isolated-production-smoke');
+  const payload = values['sync-payload'];
   const runtime = createTargetRuntime(`t4-${randomUUID()}`);
   const project = `thesis-ledger-t4-production-${randomUUID().slice(0,8)}`;
   const cwd = fileURLToPath(new URL('../../../thesis-ledger-infra/', import.meta.url));
   const directory = mkdtempSync(join(tmpdir(), `${project}-`));
   const override = join(directory, 'override.yml');
   const volumes = ['thesis-ledger-postgres-data', 'thesis-ledger-redis-data', 'thesis-ledger-dsa-data', 'thesis-ledger-backtest-data'];
-  writeFileSync(override, `services:\n  thesis-ledger:\n    ports: !override ["127.0.0.1::3000"]\nvolumes:\n${volumes.map(key => `  ${key}:\n    name: ${project}-${key}\n    external: false`).join('\n')}\n`);
+  const ports = '    ports: !override ["127.0.0.1::3000"]';
   const env = {
     ...process.env, THESIS_LEDGER_IMAGE: runtime.baseline.get('thesis-ledger').Image,
     DSA_IMAGE: runtime.baseline.get('dsa').Image,
@@ -45,8 +64,18 @@ async function main() {
   let validated = false;
   const protectedData = runtime.protect();
   try {
+    const mounts = payload ? syncPayloadMounts(runtime.baseline.get('thesis-ledger').Id, payload) : [];
+    const mountConfig = mounts.length ? `\n    volumes:\n${mounts.map(mount => '      - ' + JSON.stringify(mount)).join('\n')}` : '';
+    const worker = mounts.length ? `\n  backtest-worker:${mountConfig}` : '';
+    writeFileSync(override, `services:\n  thesis-ledger:\n${ports}${mountConfig}${worker}\nvolumes:\n${volumes.map(key => `  ${key}:\n    name: ${project}-${key}\n    external: false`).join('\n')}\n`);
     const config = JSON.parse(compose('config','--format','json'));
     assertPrivateCompose(config, project);
+    for (const service of ['thesis-ledger', 'backtest-worker']) {
+      const code = config.services[service].volumes.filter(volume => volume.type === 'bind');
+      assert.equal(code.length, mounts.length);
+      for (const mount of mounts)
+        assert(code.some(entry => entry.source === mount.source && entry.target === mount.target && entry.read_only));
+    }
     parseConfig(Object.fromEntries(Object.entries(config.services['thesis-ledger'].environment).filter(([,value])=>value!==null)));
     assert.equal(docker('ps','-aq','--filter',`label=com.docker.compose.project=${project}`),'');
     assert.equal(config.services['thesis-ledger'].image, config.services['backtest-worker'].image);
@@ -69,7 +98,7 @@ async function main() {
     assert.equal(response.status,200,'生产 Compose 映射的 API 必须可访问');
     const identity = JSON.parse(docker('exec',`${project}-postgres-1`,'psql','-U','t4_owner','-d','t4_lifecycle','-Atq','-c',`SELECT json_build_object('head',(SELECT version FROM "SchemaVersion" WHERE id=1),'tables',(SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'),'appRole',exists(SELECT 1 FROM pg_roles WHERE rolname='t4_app'))`));
     assert.equal(identity.head,structure.head); assert.equal(identity.tables,structure.tables); assert(identity.appRole);
-    runtime.record('production-compose', { project, ...identity, healthyServices:rows.length, apiStatus:response.status, image:config.services['thesis-ledger'].image, dedicatedVolumes:volumes.length, published:false });
+    runtime.record('production-compose', { project, ...identity, healthyServices:rows.length, apiStatus:response.status, image:config.services['thesis-ledger'].image, dedicatedVolumes:volumes.length, codeMounts:mounts.length, published:false });
     assert.deepEqual(runtime.protect(), protectedData);
   } catch (error) {
     if (validated) {

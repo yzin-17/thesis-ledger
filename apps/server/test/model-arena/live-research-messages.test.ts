@@ -49,6 +49,8 @@ describe('自主研究日期与观察时刻契约', () => {
     expect(realtime[0]!.content).toContain('允许web_search');
     expect(realtime[0]!.content).toContain('exitGroup');
     expect(realtime[0]!.content).toContain('不能用 exitGroup 连接买入单与止损单');
-    expect(realtime[0]!.content).toContain('先预约 kind=fill');
+    expect(realtime[0]!.content).toContain('on_full_fill');
+    expect(realtime[0]!.content).toContain('不等待模型再次调用');
+    expect(realtime[0]!.content).toContain('价格 wakeups 只会重新研究');
   });
 });

@@ -64,7 +64,12 @@ export async function runDatabaseUpgradeRehearsal(options: {
     stage = '恢复后结构校验';
     if ((await execute(headQuery)) !== fromHead) throw new Error('恢复副本的源 head 不匹配');
     stage = '旧数据摘要';
-    const before = await captureUpgradeDataWitness(isolation.container, backup.target);
+    const beforeNamedLedgerV1 = plan.pendingMigrations.some(
+      ({ name }) => name === '20261124143000_named_v1_ledger_envelope',
+    );
+    const before = await captureUpgradeDataWitness(
+      isolation.container, backup.target, undefined, {}, beforeNamedLedgerV1,
+    );
     stage = '执行隔离升级';
     await execute(sql, { name: appRole, password: randomUUID() });
     const upgradeCompletedAt = new Date().toISOString();

@@ -33,6 +33,7 @@ type EventFreeSource = NonNullable<
 function supportsEventFreeInput(input: MarketBarWindowReadInputV3) {
   if (
     !input.priceResearch ||
+    input.dailyObservationContract !== undefined ||
     input.frozenWindowRef ||
     input.market !== 'CN' ||
     input.routeKey.assetType !== 'STOCK' ||
@@ -128,7 +129,7 @@ export class MarketEventFreeReader {
     const dates = [...new Set(calendar.calendar.sessions.map((s) => s.tradingDate))].sort();
     if (dates.join(',') !== prepared.dates.join(',')) return unavailable();
     const request = {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       requestId: randomUUID(),
       symbol: input.symbol,
       routeKey: input.routeKey,
@@ -147,7 +148,7 @@ export class MarketEventFreeReader {
     );
     const bars = prepared.derived.bars;
     let response = marketDataBarSeriesResponseV3Schema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: request.requestId,
       symbol: input.symbol,
       routeKey: input.routeKey,

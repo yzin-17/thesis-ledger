@@ -139,7 +139,7 @@ const stockDividend = {
 const akshareEastmoney = { providerId: 'akshare', upstreamSource: 'eastmoney' };
 const tencent = { providerId: 'tencent', upstreamSource: 'tencent' };
 const v3Catalog: MarketRouteCatalogReadV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   status: 'complete',
   catalogRevision: 8,
@@ -155,7 +155,7 @@ const v3Catalog: MarketRouteCatalogReadV3 = {
   reason: null,
 };
 const v3Draft: MarketPolicyDraftV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   revision: 14,
   enabled: true,
   routes: [
@@ -172,7 +172,7 @@ const v3AppliedPolicy: MarketPolicyV3 = {
   dsaRevision: 9,
   effectiveStale: false,
   effectiveProjection: {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'policy-14',
     revision: 9,
@@ -201,10 +201,10 @@ describe('市场数据 Provider 与主备路由', () => {
     expect(html).toContain('aria-orientation="vertical"');
     expect(html).toContain('配置内容');
   });
-  it('拒绝旧合同策略响应，保留 V3 的精确路由', () => {
+  it('拒绝旧合同策略响应，保留现行合同的精确路由', () => {
     expect(parseMarketPolicyResponse(v3AppliedPolicy).routes).toEqual(v3Draft.routes);
     expect(() => parseMarketPolicyResponse({ ...v3AppliedPolicy, contractVersion: 2 })).toThrow(
-      '需要 V3 策略',
+      'market-routing-policy-v1',
     );
   });
 

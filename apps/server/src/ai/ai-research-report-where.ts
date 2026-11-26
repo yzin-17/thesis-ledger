@@ -6,8 +6,6 @@ export function researchReportWhere(
   ownerId: string,
   locator: ResearchReportLocator,
 ): Prisma.AiRunWhereInput {
-  if (locator.view === 'legacy')
-    return { researchOwnerId: null, researchSubmissionId: null, promptVersion: 'research-v1' };
   const filters: Prisma.AiRunWhereInput[] = [
     { researchScopeSnapshot: { path: ['mode'], equals: locator.mode } },
   ];

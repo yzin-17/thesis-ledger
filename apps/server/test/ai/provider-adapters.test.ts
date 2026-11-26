@@ -83,7 +83,7 @@ describe('AI Provider adapters', () => {
     });
     expect(result.content).toMatchObject({
       strategy: {
-        schemaVersion: '2',
+        schemaVersion: 'strategy-definition-v1',
         executionInstrument: seed.executionInstrument,
         primaryTimeframe: '1d',
       },

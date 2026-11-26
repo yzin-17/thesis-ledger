@@ -8,7 +8,7 @@ export const catalogItemSchema = z.strictObject({
 });
 const cursorSchema = z.string().regex(/^generation:[1-9]\d*$/);
 const snapshot = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   generation: z.number().int().positive(),
   checksum: z.string().regex(/^[a-f0-9]{64}$/),
   cursor: cursorSchema,

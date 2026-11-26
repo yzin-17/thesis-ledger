@@ -28,8 +28,9 @@ COPY . .
 RUN --mount=type=cache,id=thesis-ledger-prisma-engines,target=/root/.cache/prisma,sharing=locked \
     pnpm --filter @thesis-ledger/server exec prisma generate
 RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter @thesis-ledger/server... build
+# 此处只安装 Server 生产依赖，工作区的移动端补丁在该子集中没有目标包。
 RUN --mount=type=cache,id=thesis-ledger-pnpm-store,target=/pnpm/store,sharing=locked \
-    pnpm --filter @thesis-ledger/server deploy --prod /tmp/server-runtime --legacy
+    PNPM_CONFIG_ALLOW_UNUSED_PATCHES=true pnpm --filter @thesis-ledger/server deploy --prod /tmp/server-runtime --legacy
 
 FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app

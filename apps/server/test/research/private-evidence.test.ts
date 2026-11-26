@@ -40,7 +40,7 @@ function fixture() {
   if (frozen.scopeSnapshot.scope !== 'instrument') throw new Error('受控公开标的缺失');
   const instrument = frozen.scopeSnapshot.instrument;
   const snapshot = researchScopeSnapshotV2Schema.parse({
-    version: 'research-scope-v2',
+    version: 'research-scope-snapshot-v1',
     mode: 'shadow',
     scope: 'account',
     accountId: material.accounts[0]!.accountId,
@@ -154,7 +154,7 @@ it('策略材料通过现有定义合同，不能替换冻结的版本或材料�
   const f = fixture();
   f.frozen.request.scope = { scope: 'strategy', strategyVersionId: f.strategy.strategyVersionId };
   f.frozen.scopeSnapshot = researchScopeSnapshotV2Schema.parse({
-    version: 'research-scope-v2',
+    version: 'research-scope-snapshot-v1',
     scope: 'strategy',
     strategyVersionId: f.strategy.strategyVersionId,
     mode: 'shadow',

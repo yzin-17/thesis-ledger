@@ -34,7 +34,7 @@ export function browserMarket({ symbol, instrumentId, days }) {
       if (params.has('planEnd')) plan.end = params.get('planEnd');
       return route.fulfill({
         json: {
-          contractVersion: 3,
+          contractVersion: 1,
           mode: 'v3',
           symbol,
           window: { start, end },
@@ -50,7 +50,7 @@ export function browserMarket({ symbol, instrumentId, days }) {
     if (url.pathname.endsWith('/detail'))
       return route.fulfill({
         json: {
-          contractVersion: 3,
+          contractVersion: 1,
           symbol,
           assetType: 'STOCK',
           identity: { source: 'symbol', status: 'confirmed' },

@@ -1,17 +1,19 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "strategy-definition-v1",
   "name": "多源均线策略",
   "signalSources": [
     {
       "id": "execution",
       "asset": { "symbol": "600519.SH", "market": "CN", "assetType": "stock" },
       "timeframe": "1d",
+      "priceCoordinate": "run",
       "series": ["close", "volume"]
     },
     {
       "id": "benchmark",
       "asset": { "symbol": "000300.SH", "market": "CN", "assetType": "etf" },
       "timeframe": "1d",
+      "priceCoordinate": "run",
       "series": ["close"]
     }
   ],

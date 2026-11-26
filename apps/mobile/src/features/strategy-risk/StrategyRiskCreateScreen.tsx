@@ -256,6 +256,7 @@ export function StrategyRiskCreateScreen() {
         <Copy>策略风险应用尚未就绪；此页只读能力状态。</Copy>
       ) : null}
       <StrategyVersionPicker
+        riskEligible
         rows={library.data ?? []}
         label="风险策略版本"
         value={versionId}

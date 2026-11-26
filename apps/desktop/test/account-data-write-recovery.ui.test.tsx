@@ -484,7 +484,7 @@ describe('未验证成交与原始精度', () => {
         if (scenario.reference === 'pending') return new Promise(() => {});
         if (scenario.reference === 'available')
           return {
-            contractVersion: 3,
+            contractVersion: 1,
             consumer: 'thesis-ledger',
             requestId: 'reference-test',
             symbol: scenario.symbol,

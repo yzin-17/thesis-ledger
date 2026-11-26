@@ -11,7 +11,7 @@ vi.mock('./MarketDetailCharts.js', () => ({
 const renderQuote = (price: number, currency?: 'CNY' | 'HKD' | 'USD') => {
   const time = '2026-10-16T00:00:00.000Z';
   const quote = quoteSchema.parse({
-    version: 3,
+    version: 1,
     symbol: '00700.HK',
     open: price,
     high: price,

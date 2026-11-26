@@ -93,7 +93,7 @@ describe('手机复盘解读版本与冻结引用', () => {
     expect(fetcher).toHaveBeenCalledOnce();
   });
 
-  it('V1 历史正文和引用仍按原合同展示与导航', async () => {
+  it('拒绝已退役的非具名复盘解读结果，不展示其中正文或引用', async () => {
     const legacy = {
       ...run,
       result: {
@@ -125,12 +125,9 @@ describe('手机复盘解读版本与冻结引用', () => {
     await mount(
       <JournalAiPanel accountId={accountId} mode="shadow" kind="object" existingRunId={runId} />,
     );
-    expect(document.body.textContent).toContain('历史复盘结论');
-    expect(document.body.textContent).toContain('历史风险');
-    await click(button('定位解读引用 ' + binding.toolCallId));
-    expect(view.navigate).toHaveBeenCalledWith(
-      'JournalEvidence',
-      expect.objectContaining({ toolCallId: binding.toolCallId }),
-    );
+    expect(document.body.textContent).toContain('ThesisLedger API 响应契约不匹配');
+    expect(document.body.textContent).not.toContain('历史复盘结论');
+    expect(document.body.textContent).not.toContain('历史风险');
+    expect(view.navigate).not.toHaveBeenCalled();
   });
 });

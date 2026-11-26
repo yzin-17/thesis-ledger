@@ -8,7 +8,7 @@ import {
 import { assertCatalogSyncInput } from '../../src/market/market-catalog-input.js';
 
 const checksum = 'a'.repeat(64);
-const envelope = { contractVersion: 3, consumer: 'thesis-ledger' };
+const envelope = { contractVersion: 1, consumer: 'thesis-ledger' };
 const job = {
   ...envelope,
   id: 'job-1',
@@ -24,7 +24,7 @@ const job = {
   updatedAt: '2026-10-02T00:00:01Z',
 };
 const snapshot = {
-  contractVersion: 3,
+  contractVersion: 1,
   generation: 1,
   checksum,
   cursor: 'generation:1',
@@ -51,7 +51,7 @@ describe('Catalog 当前传输身份', () => {
     ).toEqual([]);
     expect(parseCatalogAck(ack, 1, checksum, 'request-1')).toEqual(ack);
   });
-  it.each([1, 2, undefined])('旧信封 %s 不解析为当前 Job 或目录', (contractVersion) => {
+  it.each([2, 3, undefined])('旧信封 %s 不解析为当前 Job 或目录', (contractVersion) => {
     expect(() => parseCatalogJob({ ...job, contractVersion }, {})).toThrow();
     expect(() => parseCatalogSnapshot({ ...snapshot, contractVersion })).toThrow();
     expect(() => parseCatalogAck({ ...ack, contractVersion }, 1, checksum, 'request-1')).toThrow();
@@ -107,12 +107,13 @@ describe('Catalog 当前传输身份', () => {
   it('公开同步入口在业务前拒绝旧信封', () => {
     expect(() => assertCatalogSyncInput()).not.toThrow();
     for (const raw of [
-      { contractVersion: 1 },
       { contractVersion: 2 },
+      { contractVersion: 3 },
       { cursor: '0' },
       { consumer: 'other' },
     ])
       expect(() => assertCatalogSyncInput(raw)).toThrow();
+    expect(() => assertCatalogSyncInput({ contractVersion: 1 })).not.toThrow();
   });
   it('同步范围显式传递且不能误认另一市场任务', () => {
     expect(assertCatalogSyncInput({ scope: 'HK_US' })).toEqual({ scope: 'HK_US' });

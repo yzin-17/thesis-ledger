@@ -1,12 +1,11 @@
-import { TableContainer, TableHeader, TableHead } from '@/components/ui/table';
+import { BacktestCompactTable as CompactTable } from './BacktestCompactTable.js';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDateTime } from '@/lib/date-display';
-import { formatDecimalNumber } from '@thesis-ledger/domain';
+import { backtestMetricDisplay, formatDecimalNumber } from '@thesis-ledger/domain';
 import { cn } from '@/lib/utils';
 import { marketToneClass, marketToneForValue } from '@/ui/market-color';
 import { Metric } from '../shared/DesktopPrimitives.js';
@@ -26,6 +25,8 @@ import { StrategyBacktestEquityExport } from './StrategyBacktestEquityExport.js'
 import { StrategyBacktestDiagnostics } from './StrategyBacktestDiagnostics.js';
 import { BacktestRunDisclosure } from './BacktestModelDisclosure.js';
 import { BacktestRunSettings } from './BacktestRunSettings.js';
+import { BacktestDailyOrders } from './BacktestDailyOrders.js';
+import { BacktestRuleObservations } from './BacktestRuleObservations.js';
 import {
   backtestBenchmarkDisplayMetrics,
   backtestMetricReasonLabel,
@@ -84,139 +85,71 @@ const moneyText = (value: unknown, currency: 'CNY' | 'HKD' | 'USD' | null) => {
   }).format(amount);
 };
 
-function CompactTable({
-  label,
-  headers,
-  rows,
-  empty,
-  numericColumns = [],
-}: {
-  label: string;
-  headers: string[];
-  rows: string[][];
-  empty: string;
-  numericColumns?: number[];
-}) {
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const offset = (currentPage - 1) * pageSize;
-  const visibleRows = rows.slice(offset, offset + pageSize);
-  return (
-    <>
-    <TableContainer>
-      <table aria-label={label} className="w-full min-w-[640px] text-sm">
-        <TableHeader className="border-b text-left">
-          <tr>
-            {headers.map((header, index) => (
-              <TableHead
-                key={header}
-                className={numericColumns.includes(index) ? 'text-right' : undefined}
-              >
-                {header}
-              </TableHead>
-            ))}
-          </tr>
-        </TableHeader>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td className="px-3 py-6 text-center text-muted-foreground" colSpan={headers.length}>
-                {empty}
-              </td>
-            </tr>
-          ) : (
-            visibleRows.map((row, index) => (
-              <tr key={`${row[0] ?? 'row'}-${index}`} className="border-b last:border-0">
-                {row.map((cell, cellIndex) => (
-                  <td
-                    key={`${cellIndex}-${cell}`}
-                    className={`px-3 py-2 ${numericColumns.includes(cellIndex) ? 'text-right tabular-nums' : 'text-left'}`}
-                  >
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </TableContainer>
-    {rows.length > pageSize && (
-      <nav aria-label={`${label}分页`} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="text-muted-foreground" aria-live="polite">
-          共 {rows.length} 条，第 {offset + 1}–{Math.min(offset + pageSize, rows.length)} 条 · 第 {currentPage}/{pageCount} 页
-        </span>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>上一页</Button>
-          <Button type="button" variant="outline" size="sm" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>下一页</Button>
-        </div>
-      </nav>
-    )}
-    </>
-  );
-}
 
-function ResultOverview({ job, result, instrumentRequest }: { job: BacktestJob; result: BacktestJobResult; instrumentRequest?: BacktestInstrumentChartRequest | undefined }) {
-  const [visibleRange, setVisibleRange] = useState<{ from: number; to: number } | null>(null);
-  useEffect(() => setVisibleRange(null), [job.id]);
-  const metrics = record(result.metrics);
-  const research = record(result.priceResearch);
-  const benchmark = backtestBenchmarkDisplayMetrics(result);
-  const collections = backtestResultCollections(result);
-  const currency = backtestBaseCurrency(job, result);
-  const lastEquity = collections.equityCurve.at(-1);
-  const lastEquityRecord = record(lastEquity);
-  const finalValue = result.finalValue ?? lastEquityRecord?.value;
-  const hasTrades = Array.isArray(result.trades);
-  const hasFills = Array.isArray(result.simulationFills);
-  let countLabel = '交易次数';
-  let countValue = '不可用';
-  if (hasTrades) {
-    countLabel = '已平仓交易数';
-    countValue = String(collections.trades.length);
-  } else if (hasFills) {
-    countLabel = '成交笔数';
-    countValue = String(collections.fills.length);
-  }
-  const rejectionAvailable =
-    Array.isArray(result.rejectedOrders) || Array.isArray(result.rejectedNavRequests);
-  const chartModel = useMemo(() => buildBacktestChartModel(job, result, instrumentRequest?.data), [job, result, instrumentRequest?.data]);
-  const secondary = [
-    { label: '年化收益', value: metricText(metrics, ['cagr', 'annualizedReturn']), tone: marketToneForValue(backtestMetricNumber(metrics?.cagr ?? metrics?.annualizedReturn)) },
-    { label: '波动率', value: metricText(metrics, ['volatility']), tone: undefined },
-    { label: '夏普比率', value: metricText(metrics, ['sharpe'], 'ratio'), tone: undefined },
-    { label: '胜率', value: metricText(metrics, ['tradeWinRate', 'winRate']), tone: undefined },
-    { label: '利润因子', value: metricText(metrics, ['profitFactor'], 'ratio'), tone: undefined },
-  ].filter(({ value }) => value !== '不可用');
-  if (benchmark) {
-    secondary.push(
-      { label: '基准净收益', value: metricText(benchmark, ['totalReturn']), tone: marketToneForValue(backtestMetricNumber(benchmark.totalReturn)) },
-      { label: '净收益差', value: metricText(benchmark, ['excessReturn']), tone: marketToneForValue(backtestMetricNumber(benchmark.excessReturn)) },
-    );
-  }
+function ResultOverview(props: {
+  job: BacktestJob;
+  result: BacktestJobResult;
+  instrumentRequest?: BacktestInstrumentChartRequest | undefined;
+}) {
+  const control = useResultOverview(props);
+  const {
+    research,
+    metrics,
+    finalValue,
+    currency,
+    countLabel,
+    countValue,
+    chartModel,
+    job,
+    setVisibleRange,
+    instrumentRequest,
+    visibleRange,
+    secondary,
+    hasFills,
+    collections,
+    hasTrades,
+    rejectionAvailable,
+  } = control;
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           label={research ? '模拟收益率' : '策略净收益'}
           value={metricText(metrics, ['cumulativeReturn', 'totalReturn'])}
-          tone={marketToneForValue(backtestMetricNumber(metrics?.cumulativeReturn ?? metrics?.totalReturn))}
+          tone={marketToneForValue(
+            backtestMetricNumber(metrics?.cumulativeReturn ?? metrics?.totalReturn),
+          )}
         />
+        <Metric label="最大回撤" value={metricText(metrics, ['maxDrawdown'], 'percent', true)} />
         <Metric
-          label="最大回撤"
-          value={metricText(metrics, ['maxDrawdown'], 'percent', true)}
+          label={research ? '研究权益' : '期末资产'}
+          value={moneyText(finalValue, currency)}
         />
-        <Metric label={research ? '研究权益' : '期末资产'} value={moneyText(finalValue, currency)} />
         <Metric label={countLabel} value={countValue} />
-        {research && <>
-          <Metric label="模拟盈亏" value={moneyText(research.simulatedPnl, currency)} tone={marketToneForValue(backtestNumber(research.simulatedPnl))} />
-          <Metric label="研究资金余额" value={moneyText(research.fundsBalance, currency)} />
-          <Metric label="研究持仓数量" value={formatDecimalNumber(typeof research.positionUnits === 'string' ? research.positionUnits : undefined)} detail="按后复权价格换算的模拟数量" />
-        </>}
+        {research && (
+          <>
+            <Metric
+              label="模拟盈亏"
+              value={moneyText(research.simulatedPnl, currency)}
+              tone={marketToneForValue(backtestNumber(research.simulatedPnl))}
+            />
+            <Metric label="研究资金余额" value={moneyText(research.fundsBalance, currency)} />
+            <Metric
+              label="研究持仓数量"
+              value={formatDecimalNumber(
+                typeof research.positionUnits === 'string' ? research.positionUnits : undefined,
+              )}
+              detail="按后复权价格换算的模拟数量"
+            />
+          </>
+        )}
       </div>
-      {research && <p className="text-xs text-muted-foreground">采用冻结的后复权序列计算模型收益，具体价格条件使用不复权行情。</p>}
+      {research && (
+        <p className="text-xs text-muted-foreground">
+          采用冻结的后复权序列计算模型收益；需要实际价格条件时，读取本次冻结的不复权参考。
+        </p>
+      )}
       {chartModel.limitation && (
         <Alert>
           <AlertTitle>图表覆盖说明</AlertTitle>
@@ -236,7 +169,7 @@ function ResultOverview({ job, result, instrumentRequest }: { job: BacktestJob; 
       />
       <StrategyBacktestEquityExport jobId={job.id} model={chartModel} range={visibleRange} />
       {secondary.length > 0 && (
-        <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-lg border bg-muted/10 px-4 py-3">
+        <div className="flex flex-wrap gap-x-6 gap-y-3 py-3">
           {secondary.map(({ label, value, tone }) => (
             <div key={label} className="min-w-28">
               <p className="text-xs text-muted-foreground">{label}</p>
@@ -245,6 +178,7 @@ function ResultOverview({ job, result, instrumentRequest }: { job: BacktestJob; 
           ))}
         </div>
       )}
+      <BacktestRuleObservations value={props.result.ruleDiagnostics} />
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
           <CardHeader>
@@ -273,6 +207,93 @@ function ResultOverview({ job, result, instrumentRequest }: { job: BacktestJob; 
   );
 }
 
+function useResultOverview({
+  job,
+  result,
+  instrumentRequest,
+}: {
+  job: BacktestJob;
+  result: BacktestJobResult;
+  instrumentRequest?: BacktestInstrumentChartRequest | undefined;
+}) {
+  const [visibleRange, setVisibleRange] = useState<{ from: number; to: number } | null>(null);
+  useEffect(() => setVisibleRange(null), [job.id]);
+  const metrics = record(result.metrics);
+  const research = record(result.priceResearch);
+  const benchmark = backtestBenchmarkDisplayMetrics(result);
+  const collections = backtestResultCollections(result);
+  const currency: 'CNY' | 'HKD' | 'USD' | null = backtestBaseCurrency(job, result);
+  const lastEquity = collections.equityCurve.at(-1);
+  const lastEquityRecord = record(lastEquity);
+  const finalValue = result.finalValue ?? lastEquityRecord?.value;
+  const hasTrades = Array.isArray(result.trades);
+  const hasFills = Array.isArray(result.simulationFills);
+  let countLabel = '交易次数';
+  let countValue = '不可用';
+  if (hasTrades) {
+    countLabel = '已平仓交易数';
+    countValue = String(collections.trades.length);
+  } else if (hasFills) {
+    countLabel = '成交笔数';
+    countValue = String(collections.fills.length);
+  }
+  const rejectionAvailable =
+    Array.isArray(result.rejectedOrders) || Array.isArray(result.rejectedNavRequests);
+  const chartModel = useMemo(
+    () => buildBacktestChartModel(job, result, instrumentRequest?.data),
+    [job, result, instrumentRequest?.data],
+  );
+  const secondary = [
+    {
+      label: '年化收益',
+      value: metricText(metrics, ['cagr', 'annualizedReturn']),
+      tone: marketToneForValue(backtestMetricNumber(metrics?.cagr ?? metrics?.annualizedReturn)),
+    },
+    { label: '波动率', value: metricText(metrics, ['volatility']), tone: undefined },
+    { label: '夏普比率', value: metricText(metrics, ['sharpe'], 'ratio'), tone: undefined },
+    { label: '胜率', value: metricText(metrics, ['tradeWinRate', 'winRate']), tone: undefined },
+    { label: '利润因子', value: metricText(metrics, ['profitFactor'], 'ratio'), tone: undefined },
+  ].filter(({ value }) => value !== '不可用');
+  for (const key of ['tradedNotional', 'turnoverRate', 'turnover']) {
+    if (metrics?.[key] === undefined) continue;
+    const display = backtestMetricDisplay(key, metrics[key], currency ?? '币种未记录');
+    secondary.push({ label: display.label, value: display.value, tone: undefined });
+  }
+  if (benchmark) {
+    secondary.push(
+      {
+        label: '基准净收益',
+        value: metricText(benchmark, ['totalReturn']),
+        tone: marketToneForValue(backtestMetricNumber(benchmark.totalReturn)),
+      },
+      {
+        label: '净收益差',
+        value: metricText(benchmark, ['excessReturn']),
+        tone: marketToneForValue(backtestMetricNumber(benchmark.excessReturn)),
+      },
+    );
+  }
+
+  return {
+    research,
+    metrics,
+    finalValue,
+    currency,
+    countLabel,
+    countValue,
+    chartModel,
+    job,
+    setVisibleRange,
+    instrumentRequest,
+    visibleRange,
+    secondary,
+    hasFills,
+    collections,
+    hasTrades,
+    rejectionAvailable,
+  };
+}
+
 function TradesAndOrders({ result }: { result: BacktestJobResult }) {
   const research = Boolean(record(result.priceResearch));
   const { trades, fills, orders, rejectedOrders, rejectedNavRequests } =
@@ -281,7 +302,8 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
     displayDateTime(trade.closedAt ?? trade.date ?? trade.occurredAt),
     display(trade.executionSymbol ?? trade.symbol),
     sideDisplay(trade.side ?? trade.closeReason),
-    research ? formatDecimalNumber(display(trade.quantity ?? trade.exitQuantity))
+    research
+      ? formatDecimalNumber(display(trade.quantity ?? trade.exitQuantity))
       : display(trade.quantity ?? trade.exitQuantity),
   ]);
   const fillRows = fills.map((fill) => [
@@ -290,8 +312,13 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
     sideDisplay(fill.side),
     research ? formatDecimalNumber(display(fill.quantity)) : display(fill.quantity),
     display(record(fill.price)?.amount ?? fill.price),
-    ...(research ? [display(fill.actualReferencePrice), display(record(fill.researchSizing)?.referenceQuantity),
-      display(record(fill.researchSizing)?.requestedNotional)] : []),
+    ...(research
+      ? [
+          display(fill.actualReferencePrice),
+          display(record(fill.researchSizing)?.referenceQuantity),
+          display(record(fill.researchSizing)?.requestedNotional),
+        ]
+      : []),
   ]);
   const orderRows = orders.map((order) => [
     displayDateTime(order.occurredAt ?? order.createdAt),
@@ -322,14 +349,26 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
         <h3 className="font-medium">成交</h3>
         <CompactTable
           label="成交"
-          headers={research ? ['时间', '标的', '方向', '研究单位', '后复权操作价', '实际参考价', '投入参考份数', '请求投入金额']
-            : ['时间', '标的', '方向', '数量', '价格']}
+          headers={
+            research
+              ? [
+                  '时间',
+                  '标的',
+                  '方向',
+                  '研究单位',
+                  '后复权操作价',
+                  '实际参考价',
+                  '投入参考份数',
+                  '请求投入金额',
+                ]
+              : ['时间', '标的', '方向', '数量', '价格']
+          }
           numericColumns={[3, 4, 5, 6, 7]}
           rows={fillRows}
           empty="没有成交记录"
         />
       </section>
-      <section className="space-y-2">
+      {result.dailyOrders !== undefined ? <BacktestDailyOrders value={result.dailyOrders} unit={research ? '研究单位' : '实际股／份'} /> : <section className="space-y-2">
         <h3 className="font-medium">委托</h3>
         <CompactTable
           label="委托"
@@ -337,7 +376,7 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
           rows={orderRows}
           empty="当前结果契约未提供委托明细"
         />
-      </section>
+      </section>}
       <section className="space-y-2">
         <h3 className="font-medium">拒单</h3>
         <CompactTable
@@ -351,7 +390,13 @@ function TradesAndOrders({ result }: { result: BacktestJobResult }) {
   );
 }
 
-export function StrategyBacktestResultTabs({ job, instrumentRequest }: { job: BacktestJob; instrumentRequest?: BacktestInstrumentChartRequest | undefined }) {
+export function StrategyBacktestResultTabs({
+  job,
+  instrumentRequest,
+}: {
+  job: BacktestJob;
+  instrumentRequest?: BacktestInstrumentChartRequest | undefined;
+}) {
   const result = readableBacktestResult(job);
   if (job.readEligibility?.state === 'restricted') {
     return (

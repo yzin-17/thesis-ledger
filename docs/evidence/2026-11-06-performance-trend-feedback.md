@@ -1,6 +1,6 @@
 # 收益趋势粒度与失败提示验收
 
-关联 [Task](../tasks/2026-11-06-performance-trend-feedback.md)、[Spec](../specs/2026-11-06-performance-trend-feedback.md)。执行窗口：2026-11-07 00:08–00:16 UTC（任务沿用发起日）。
+关联 [归档任务](../archive/tasks/2026-11-06-performance-trend-feedback.md)、[Spec](../specs/2026-11-06-performance-trend-feedback.md)。执行窗口：2026-11-07 00:08–00:16 UTC（任务沿用发起日）。
 
 ## 根因与数据边界
 

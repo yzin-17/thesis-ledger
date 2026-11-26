@@ -49,7 +49,7 @@ def main():
     key = {"kind": "data", "market": "CN", "assetType": "ETF", "capability": "NEWS_SEARCH"}
     target = {"providerId": "searxng", "upstreamSource": "searxng-news-search"}
     store.save_provider_config("searxng", {
-        "contractVersion": 3, "consumer": "thesis-ledger", "requestId": "g1-config", "enabled": True,
+        "contractVersion": 1, "consumer": "thesis-ledger", "requestId": "g1-config", "enabled": True,
         "credentials": {"method": "search", "values": {"baseUrls": json.dumps([origin + "/search-source"])}},
     })
     rows = [{"canonicalCode": "510300", "market": "SH", "instrumentType": "ETF", "displayName": "沪深300ETF"}]
@@ -75,7 +75,7 @@ def main():
 
     admit()
     store.apply_policy_v3({
-        "contractVersion": 3, "consumer": "thesis-ledger", "requestId": "g1-policy", "revision": 1, "enabled": True,
+        "contractVersion": 1, "consumer": "thesis-ledger", "requestId": "g1-policy", "revision": 1, "enabled": True,
         "routes": [
             {"key": {**key, "capability": "REALTIME_QUOTE"},
              "targets": [{"providerId": "tencent", "upstreamSource": "tencent"}]},

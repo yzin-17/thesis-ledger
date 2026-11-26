@@ -1,5 +1,32 @@
 # 历史文档归档
 
+- [全产品具名 V1 合同与存量转换](tasks/2026-11-24-named-v1-cutover.md)已完成目标切换、OpenAI 五样本复验与三仓远端 CI。 [业务与 CI 验收](evidence/2026-11-25-named-v1-entrypoint-verification.md) · [历史行情路由修订验收](evidence/2026-11-25-market-policy-history-cutover.md)
+
+- [实验重试冻结校验修复](tasks/2026-11-12-experiment-retry-catalog-revalidation.md)已核对原实验候选生成、自动完成与冻结结果读回，保留完整失败历史。见[终态验收](../evidence/2026-11-12-experiment-retry-catalog-revalidation.md#2026-11-22-真实终态只读验收)。
+
+- [研究详情与投资复盘阅读布局](tasks/2026-11-14-research-journal-reading.md)已通过实际研究和复盘入口的四宽度验收。
+
+- [收益趋势粒度与读取反馈](tasks/2026-11-06-performance-trend-feedback.md)已通过目标只读走势接口、四宽度区间控件和失败恢复验收。
+
+- [周期复盘快照](tasks/2026-11-14-journal-period-snapshots.md)、[历史快照标的名称](tasks/2026-11-14-journal-history-instrument-name.md)与[研究列表标的名称](tasks/2026-11-13-research-list-instrument-name.md)已完成真实数据阅读及四宽度复核，[日记 AI 解读 V2](tasks/2026-11-13-journal-ai-research-v2.md)已补齐 V5 隔离数据库验收。见[收尾验证](../evidence/2026-11-22-active-task-followup.md)。
+
+- [策略定义统一与双向编辑](tasks/2026-11-13-strategy-definition-authoring.md)已完成原 13 个意图对账、跨周期与能力报告运行态复核。见[结案验收](../evidence/2026-11-19-strategy-definition-remaining.md#2026-11-22-零模型调用结案验收)。
+- [策略回测补充收尾](tasks/2026-11-22-backtest-practical-closeout.md)已完成 AC03、AC22 与 T06／T13f，见[补充证据](../evidence/2026-11-20-backtest-practical-implementation.md#2026-11-22-补充收尾)。
+- [AC03 目标 Docker 同步](tasks/2026-11-22-backtest-ac03-target-sync.md)已完成正式快更、两容器产物比对及原价缺失诊断验收。
+- [策略回测最终版本七例复验](tasks/2026-11-21-backtest-final-seven-recheck.md)：V6同批七例的原意、原始说明、创建与重复冻结执行全部通过，见[验收证据](../evidence/2026-11-22-backtest-comparison-readback-recheck.md)。
+
+- [回测实际投入硬上限](tasks/2026-11-15-backtest-investment-budget.md)：含费用、滑点的实际支出按比例封顶，保护计划保持普通仓位；同一 282 条冻结行情的正式回测和正成本内存对照通过，旧记录保留，见[证据](evidence/2026-11-15-backtest-investment-budget.md)。
+
+- [空交易计划执行等价修复](tasks/2026-11-15-empty-trade-plan.md)：空计划恢复普通仓位与执行路径；原 v3 同一 RunConfig、282 条冻结行情新增回测成功，旧记录保持不变，见[证据](evidence/2026-11-15-empty-trade-plan.md)。
+
+- [策略交叉方向真实 AI 验收](tasks/2026-11-15-strategy-cross-live-ai-validation.md)：真实 AI 原样发布 v3，重新冻结同一区间并完成正式回测，23 笔信号成交方向与 6 笔风险退出核验通过；旧记录保留，来源事实及空计划仓位差异见[证据](evidence/2026-11-15-strategy-cross-live-ai-validation.md)。
+
+- [Arena 配置回读复杂度告警修复](evidence/2026-11-15-arena-plan-display-complexity.md)：独立提取撤单影响说明，领域包 873 项及全仓 3950 文件零告警验证通过。
+
+- [实验详情状态与回执隔离](tasks/2026-11-15-experiment-detail-scope-isolation.md)：跨实验残留和五类晚到回执已修复，20 项新增回归、2116 项前端测试及四宽度受控页面通过，见[证据](evidence/2026-11-15-experiment-detail-scope-isolation.md)。
+
+- [全仓告警与回归修复](tasks/2026-11-12-complexity-warning-remediation.md)：六项前端失败及隔离兼容性修复、3942 文件零告警和四宽度受控浏览器通过，见[验收证据](evidence/2026-11-12-complexity-warning-remediation.md)；[规格](../specs/2026-11-12-complexity-warning-remediation.md)继续有效。
+
 - [策略风险自动监控](tasks/2026-11-13-strategy-risk-automatic-monitoring.md)：策略应用自动评估、逐条缺数诊断、双端展示与本地快更完成，见[验收](evidence/2026-11-13-strategy-risk-automatic-monitoring.md)。
 
 - [AI 策略交叉方向修复](tasks/2026-11-12-strategy-cross-direction.md)：生成主语与方向校验、v2 与冻结对照回测、历史摘要保留；方向修正后仍频繁交叉且收益更差，见[验收](evidence/2026-11-12-strategy-cross-direction.md)。

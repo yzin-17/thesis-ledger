@@ -14,7 +14,7 @@ vi.mock('../src/shared/api/client.js', () => ({
 }));
 
 const pending = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   id: 'current-job',
   status: 'pending',

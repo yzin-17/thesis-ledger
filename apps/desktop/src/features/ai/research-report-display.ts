@@ -58,7 +58,6 @@ function primaryStatus(report: ResearchReportSummary): AiResearchPrimaryStatus {
     report.status === 'cancelled'
   )
     return report.status;
-  if (report.availability === 'pending_verification') return 'pending_verification';
   if (report.availability !== 'available') return 'result_unavailable';
   return report.quality?.status === 'partial' ? 'result_gap' : 'completed';
 }
@@ -108,18 +107,17 @@ export function reportToAiRun(
   const detail = 'result' in report ? report : null;
   const result = detail?.result;
   let verificationReason: string | null = null;
-  if (report.availability === 'pending_verification') verificationReason = '历史引用归属尚待核验';
-  else if (['invalid', 'unsupported'].includes(report.availability))
+  if (['invalid', 'unsupported'].includes(report.availability))
     verificationReason = '保存的产物无法核验，正文和引用不可用';
   return {
     id: report.id,
-    provider: result?.version === 2 ? result.model.providerId : (result?.provider ?? '未记录'),
-    model: result?.version === 2 ? result.model.modelId : '未记录',
-    promptVersion: result?.version === 2 ? result.promptVersion : '未记录',
+    provider: result?.model.providerId ?? '未记录',
+    model: result?.model.modelId ?? '未记录',
+    promptVersion: result?.promptVersion ?? '未记录',
     status: report.status,
     question: report.question,
     context: null,
-    result: result?.version === 1 ? result : null,
+    result: null,
     createdAt: report.createdAt,
     updatedAt: report.updatedAt,
     errorCode: report.errorCode,

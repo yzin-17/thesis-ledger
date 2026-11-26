@@ -62,7 +62,7 @@ async function main() {
   const api = { get: (endpoint) => request('GET', endpoint), put: (endpoint, body) => request('PUT', endpoint, body) };
   const state = await api.get('/api/market-data/policy');
   const providers = await api.get('/api/market-data/providers');
-  const catalog = await api.get('/api/market-data/routes/capabilities?contractVersion=3');
+  const catalog = await api.get('/api/market-data/routes/capabilities?contractVersion=1');
   const plan = createFunctionalCase(state, providers.providers, catalog);
   if (!args.includes('--execute')) {
     console.log(JSON.stringify({ mode: 'read-only-preview', expectedPolicy: plan.baseline.revision,

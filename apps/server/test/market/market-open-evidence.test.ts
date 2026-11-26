@@ -1,6 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { backtestInstrumentFactsRequestSchema } from '@thesis-ledger/schemas';
 import { MarketOpenEvidence } from '../../src/market/market-open-evidence.js';
+import { MarketLifecycleReaderV3 } from '../../src/market/market-lifecycle-reader-v3.js';
+import { compositionFixture } from './status-composition-fixtures.js';
 
 afterEach(() => vi.useRealTimers());
 
@@ -20,20 +22,13 @@ it.each([0, 10])('有效开盘资料保留价格限制，昨收 %s 单独判断�
       fetchedAt: openAt.toISOString(),
     }),
   };
-  const status = {
-    read: vi.fn().mockResolvedValue({
-      days: [
-        {
-          date: '2026-11-06',
-          state: 'normal',
-          noDailyPriceLimit: false,
-          dailyPriceLimit: { maxUpRatio: '0.1', maxDownRatio: '0.1' },
-          intradayHalts: [],
-        },
-      ],
-      provenance: { providerRevision: 'controlled-status' },
-    }),
-  };
+  const fixture = compositionFixture({ symbol: '600036.SH', dates: ['2026-11-06'] });
+  const prices = fixture.samples.find((sample: { name: string }) => sample.name === 'DAILY_PRICE_RULE');
+  prices.result.days[0].rule = { kind: 'ratio', reference: 'previousRawClose', maxUpRatio: '0.1', maxDownRatio: '0.1' };
+  const status = new MarketLifecycleReaderV3({
+    dataCapabilities: fixture.reader,
+    effectiveControlPolicyV3: async () => ({ projection: { effective: await fixture.readPolicy() } }),
+  } as never);
   const dsa = {
     backtestInstrumentFacts: vi.fn().mockResolvedValue({
       status: 'supported',
@@ -95,6 +90,8 @@ it.each([0, 10])('有效开盘资料保留价格限制，昨收 %s 单独判断�
     });
   }
   expect(actions.read).not.toHaveBeenCalled();
+  expect(fixture.post.mock.calls.map(([, query]) => query.routeKey.capability).sort())
+    .toEqual(['DAILY_PRICE_RULE', 'DAILY_TRADING_STATUS']);
 });
 
 it.each([

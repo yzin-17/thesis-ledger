@@ -58,7 +58,7 @@ it('通用搜索网关核对市场、检索词与条数，不把响应错误当�
   const response = { status: 'ready', market: 'US', query: '行业', provider: 'controlled', coverage: 'last_year', upstreamAttempts: 1, observedAt: new Date().toISOString(), reason: null, items: [] };
   const post = vi.fn().mockResolvedValue(response), gateway = new ResearchPublicSearch({ post } as never), signal = new AbortController().signal;
   expect(await gateway.read('行业', 'US', signal)).toEqual(response);
-  expect(post).toHaveBeenCalledWith('/api/v3/thesis-ledger/research/search', { market: 'US', query: '行业', limit: 5 }, 1, undefined, 15000, signal);
+  expect(post).toHaveBeenCalledWith('/api/v1/thesis-ledger/research/search', { market: 'US', query: '行业', limit: 5 }, 1, undefined, 15000, signal);
   post.mockResolvedValue({ ...response, market: 'HK' });
   await expect(gateway.read('行业', 'US', signal)).rejects.toThrow('search_response_mismatch');
 });

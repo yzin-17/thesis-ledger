@@ -1,4 +1,7 @@
-import type { AuthoringModificationTarget } from '@thesis-ledger/schemas';
+import {
+  authoringModificationTargetOptions,
+  type AuthoringModificationTarget,
+} from '@thesis-ledger/schemas';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -62,13 +65,7 @@ export function AuthoringModificationPanel({ model }: { model: AuthoringEditorMo
             value={model.target}
             onChange={(value) => model.setTarget(value as AuthoringModificationTarget)}
             disabled={disabled}
-            options={[
-              { value: 'risk', label: '固定止损' },
-              { value: 'entry', label: '入场规则' },
-              { value: 'exit', label: '退出规则' },
-              { value: 'sizing', label: '仓位' },
-              { value: 'cost', label: '交易成本' },
-            ]}
+            options={authoringModificationTargetOptions}
           />
         </Field>
         <Field>

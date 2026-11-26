@@ -6,7 +6,7 @@ import {
 } from './market-client-projections.js';
 
 const policy = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'current-policy',
   revision: 4,
@@ -15,7 +15,7 @@ const policy = {
   syncState: 'applied',
   effectiveStale: false,
   effectiveProjection: {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'current-policy',
     revision: 2,
@@ -64,14 +64,14 @@ describe('客户端当前 Market 投影', () => {
   it('Provider 列表缺版本或缺列表不能变成空成功', () => {
     expect(
       marketProviderRegistrySchema.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         providers: [],
       }).success,
     ).toBe(true);
     expect(marketProviderRegistrySchema.safeParse({ providers: [] }).success).toBe(false);
     expect(
-      marketProviderRegistrySchema.safeParse({ contractVersion: 3, consumer: 'thesis-ledger' })
+      marketProviderRegistrySchema.safeParse({ contractVersion: 1, consumer: 'thesis-ledger' })
         .success,
     ).toBe(false);
   });

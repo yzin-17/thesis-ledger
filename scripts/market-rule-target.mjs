@@ -40,7 +40,7 @@ for (const segment of model.segments) {
     segment.fees[charge] = { treatment: 'notApplicable', reason: '本次状态研究明确不收费' };
   segment.execution.price = { kind: 'noDailyLimit', reason: '未知限制时的显式模型假设，已知来源覆盖' };
 }
-const intent = { contractVersion: 3, requestId: randomUUID(), adjustment: 'none',
+const intent = { contractVersion: 1, requestId: randomUUID(), adjustment: 'none',
   accountingBasis: 'raw-events', history: { basis: 'fixed-provider-snapshot' },
   marketRuleResearch: 'raw-prices-no-corporate-actions-v1', warmupBudgetSessions: 1,
   freezeTimePolicy: 'after-acquisition', runConfig: { startDate: range.start, endDate: range.end,
@@ -94,12 +94,12 @@ if (!process.argv.includes('--run')) {
     }
     const restored = current.routes.map((item) => key(item.key) === key(price.key)
       ? { ...item, targets: originalPriceTargets } : item);
-    await api('/api/market-data/policy', { contractVersion: 3, consumer: 'thesis-ledger',
+    await api('/api/market-data/policy', { contractVersion: 1, consumer: 'thesis-ledger',
       requestId: randomUUID(), revision: current.revision + 1, enabled: current.enabled, routes: restored }, 'PUT');
     console.error(JSON.stringify({ stage: 'price-choice-restored', revision: current.revision + 1 }));
   };
   try {
-  if (changed) await api('/api/market-data/policy', { contractVersion: 3, consumer: 'thesis-ledger',
+  if (changed) await api('/api/market-data/policy', { contractVersion: 1, consumer: 'thesis-ledger',
     requestId: randomUUID(), revision: policy.revision + 1, enabled: true, routes }, 'PUT');
   assert.equal((await api('/api/market-data/policy')).syncState, 'applied');
   const saved = await api('/api/v1/backtests/strategies', { name: `${strategy.name} ${clock}`,
@@ -110,7 +110,7 @@ if (!process.argv.includes('--run')) {
   console.error(JSON.stringify({ stage: 'prepared', strategyVersionId, response: prepared }));
   assert.equal(prepared.status, 'prepared');
   assert.equal(prepared.runConfig.executionPriceProtocol.marketRuleResearch, intent.marketRuleResearch);
-  const created = await api('/api/v1/backtests/runs', backtestRunCreateSchemaV3.parse({ contractVersion: 3,
+  const created = await api('/api/v1/backtests/runs', backtestRunCreateSchemaV3.parse({ contractVersion: 1,
     strategyVersionId, runConfig: prepared.runConfig, preparationStamp: prepared.executionPreflight.revisionStamp,
     idempotencyKey: `p6-cn-${randomUUID()}` }));
   console.error(JSON.stringify({ stage: 'queued', jobId: created.id }));

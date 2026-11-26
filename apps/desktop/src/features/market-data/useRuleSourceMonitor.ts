@@ -6,7 +6,6 @@ import {
   type RuleMonitorCheck,
   type RuleMonitorConfigure,
   type RuleMonitorStatus,
-  type RuleMonitorTask,
 } from '@thesis-ledger/schemas';
 import { getDesktopApiClient } from '../../shared/api/client.js';
 export const ruleMonitorKey = ['desktop', 'market-data', 'rule-monitor'] as const;
@@ -42,7 +41,19 @@ export function useRuleSourceMonitor(options: { onTaskSaved?: () => void } = {})
     },
   });
   const create = useMutation({
-    mutationFn: (input: RuleMonitorTask) => api().createRuleMonitorTask(input),
+    mutationFn: async (sourceIds: string[]) => {
+      const current = await client.fetchQuery({
+        queryKey: ruleMonitorKey,
+        queryFn: ({ signal }) => api().getRuleMonitor(signal),
+        staleTime: 0,
+        retry: false,
+      });
+      return api().createRuleMonitorTask({
+        version: ruleSourceMonitorVersion,
+        expectedRevision: current.config.revision,
+        sourceIds,
+      });
+    },
     onMutate: () => client.cancelQueries({ queryKey: ruleMonitorKey }),
     onSuccess: (result) => {
       client.setQueryData<RuleMonitorStatus>(ruleMonitorKey, (current) =>
@@ -82,19 +93,7 @@ export function useRuleSourceMonitor(options: { onTaskSaved?: () => void } = {})
   };
   const runSources = (sourceIds: string[]) => check.mutateAsync(checkInput(sourceIds));
   const createTask = () => {
-    if (selection)
-      create.mutate({
-        version: ruleSourceMonitorVersion,
-        expectedRevision: selection.revision,
-        sourceIds: selection.sourceIds,
-      });
-  };
-  const reloadTask = async () => {
-    const result = await status.refetch();
-    if (result.error || !result.data) return;
-    const revision = result.data.config.revision;
-    setDraft((current) => (current ? { ...current, revision } : null));
-    create.reset();
+    if (selection) create.mutate([...selection.sourceIds]);
   };
   const busy =
     save.isPending ||
@@ -111,7 +110,6 @@ export function useRuleSourceMonitor(options: { onTaskSaved?: () => void } = {})
     runSources,
     create,
     createTask,
-    reloadTask,
     busy,
   };
 }

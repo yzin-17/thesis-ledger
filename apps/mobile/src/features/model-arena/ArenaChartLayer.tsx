@@ -44,7 +44,7 @@ function Selection({ symbol, ...props }: Omit<Props, 'timeframe'>) {
     [...(live.data ?? []).filter((m) => m.protocol.universe === 'market' || m.protocol.instruments.some((i) => i.symbol === symbol)),
       ...(list.data ?? []).filter((m) => m.protocol.instruments.some((i) => i.symbol === symbol))];
   const active = choices.find((m) => m.id === match);
-  const isLive = active?.protocol.version === 2;
+  const isLive = active?.protocol.version === 'arena-live-match-protocol-v1';
   const detail = useQuery({
     queryKey: [...key, match],
     enabled: !!active,

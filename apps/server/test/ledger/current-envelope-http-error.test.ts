@@ -20,7 +20,7 @@ describe('旧账本 HTTP 拒绝合同', () => {
     expect(apiErrorResponseSchema.parse(json.mock.calls[0]?.[0])).toMatchObject({
       error: 'UNSUPPORTED_CONTRACT_VERSION',
       code: 'UNSUPPORTED_CONTRACT_VERSION',
-      message: '旧账本事件不支持读取或修订',
+      message: '账本事件须使用 ledger-event-envelope-v1',
     });
   });
 });

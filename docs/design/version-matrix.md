@@ -7,20 +7,20 @@
 | 组件 | 当前源码合同 | 阻断门禁 |
 | --- | --- | --- |
 | ThesisLedger | `0.1.0`；当前 Market、Backtest Run 与 Ledger 公共入口 | 定向及包级测试、`pnpm contract:test`、目标 HTTP 与客户端 |
-| DSA Data | V3；`/api/v3/thesis-ledger/*`；独立 Data Token | DSA 离线测试、对应能力的配置/准入、协议与正向业务 smoke |
-| DSA Control | V3；`/api/v3/thesis-ledger/control/*`；独立 Control Token | 握手/策略/目录/修订测试、目标配置与撤销 |
+| DSA Data | `dsa-data-v1`；`/api/v1/thesis-ledger/*`；独立 Data Token | DSA 离线测试、对应能力的配置/准入、协议与正向业务 smoke |
+| DSA Control | `dsa-control-v1`；`/api/v1/thesis-ledger/control/*`；独立 Control Token | 握手/策略/目录/修订测试、目标配置与撤销 |
 | DSA Fork release | `v3.28.0-thesisledger.1` 命名约定 | 不可变镜像摘要、与主仓相同的当前合同 |
 | `@thesis-ledger/schemas` | `0.1.0`；当前共享 Schema 与不可变证据格式 | Schema 测试、类型与构建、跨运行时解析 |
 | PostgreSQL | 主仓全部顺序 migration 和 raw-owned 表共同定义动态 head | `pnpm migration:matrix`、隔离升级、目标结构和权限检查 |
-| Infrastructure | `compatibility.json` schemaVersion 2；Data/Control 均为 V3 | `node scripts/check-compatibility.mjs`、官方更新入口及目标服务健康 |
+| Infrastructure | `compatibility.json` schemaVersion 1；校验 Data 与 Control 的具名合同 | `node scripts/check-compatibility.mjs`、官方更新入口及目标服务健康 |
 
 ## 兼容规则
 
-### V3 源码增量与发布基线
+### 现行合同与历史发布基线
 
-2026-10-03 的共同价格基线按[多源 Spec §1.1](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md#11-2026-10-03-共同能力基线)执行：HiThink ETF qfq 与腾讯 ETF none/qfq/hfq 不再以人工窗口准入为前置，日级状态自动整理；同口径整窗备用支持图表和固定快照归一化价格研究。协议仍为 V3，无依赖、数据库或镜像格式变化。目标使用官方 `sync-code.sh` 同步，真实 Server/Worker 与重放结果见[验收记录](../evidence/2026-10-03-common-price-baseline.md)；该批次未发布新镜像。
+2026-10-03 的共同价格基线按[多源 Spec §1.1](../specs/2026-09-25-multi-source-adjustment-aware-backtest.md#11-2026-10-03-共同能力基线)执行：HiThink ETF qfq 与腾讯 ETF none/qfq/hfq 不再以人工窗口准入为前置，日级状态自动整理；同口径整窗备用支持图表和固定快照归一化价格研究。当时协议为 V3，无依赖、数据库或镜像格式变化。目标使用官方 `sync-code.sh` 同步，真实 Server/Worker 与重放结果见[验收记录](../evidence/2026-10-03-common-price-baseline.md)；该批次未发布新镜像。
 
-当前 DSA ThesisLedger 专属 Data/Control 只有 V3 可调用路由，主仓 Server 和客户端按同一合同消费。DSA 原生 `/api/v1` 仍服务其自身功能；它不构成 ThesisLedger 旧合同读取能力。`RunConfigV3`、V3 Snapshot 与结果格式需要按自己的不可变标识校验，旧 Run/产物不得在当前执行路径中被解码或回放。Canonical 的 NAV/Ledger 正向接线已有[归档任务](../archive/tasks/2026-09-29-thesis-ledger-canonical-runtime-replacement.md)中的有界验收；后续现金、NAV 确认和账户投影的独立业务条件仍由[当前任务索引](../tasks/README.md)承接，不能用协议删除或接线完成替代。
+当前 DSA 专属路由位于 `/api/v1/thesis-ledger`。行情目录和行情详情的客户端请求使用版本 1。策略、交易回测和净值回测各自校验具名定义、快照与结果；切换与存量转换见[具名 V1 归档任务](../archive/tasks/2026-11-24-named-v1-cutover.md)。
 
 2026-09-27 的保留数据升级和 2026-09-28 的 `BIGINT` 结构升级各有当时目标证据，见[数据库升级任务](../archive/tasks/2026-09-27-preserve-data-database-upgrade.md)与[目录修复证据](../evidence/2026-09-28-cont-159516-catalog-revision-bigint.md)。这些结果不声明 2026-09-29 的后续迁移已进入目标环境；当前结构 head 必须从实际 migration 输入重新派生。
 
@@ -30,7 +30,7 @@
 
 - 开发数据库显式重建与正式保留数据升级分开验收；默认更新保留数据，不隐式清库或删除卷。
 - 业务模块依赖当前 ThesisLedger 合同和单向 Adapter，不反向依赖 DSA 实现细节。
-- DSA 上游同步须通过当前 V3 协议和正向业务检查；协议通过不代表特定来源有权限、完整覆盖或历史可见性。
+- DSA 上游同步须通过现行具名 V1 协议和正向业务检查；协议通过不代表特定来源有权限、完整覆盖或历史可见性。
 - Contract version、Capability、Schema、Token 或来源修订不匹配时阻断发布，不做隐式降级。
 - AI 研究结果须通过自身结构化结果合同校验后写入 `AiRun.result`；Portfolio、Ledger 与其他用户事实保持独立。
 - PostgreSQL 业务任务状态是事实源；队列只负责投递与执行，晚到结果不得覆盖新的 attempt。

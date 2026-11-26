@@ -1,6 +1,7 @@
 import {
   CnNavSimulation,
   deterministicResultChecksum,
+  finishBacktestComputation,
   type CnNavRequest,
   type CnNavSimulationEvent,
   type FrozenNavExecutionModelSegment,
@@ -16,14 +17,14 @@ import {
   navOfflineSettlements,
   type NavOfflineEvent,
 } from './backtest-nav-offline-events.js';
-import { valueNavOfflineResult } from './backtest-nav-offline-valuation.js';
+import { navOfflineValuationSteps } from './backtest-nav-offline-valuation.js';
 
 /** 只消费冻结读回和显式申请；不访问 Reader、队列、数据库或实时钟。 */
-export const runNavOfflineV3 = (
+export function* navOfflineSteps(
   frozen: Parameters<typeof adaptNavDomainInputsV3>[0],
   requests: readonly CnNavRequest[],
   options: { through?: string; signal?: AbortSignal } = {},
-) => {
+) {
   const input = adaptNavDomainInputsV3(frozen);
   const endAt = `${input.plan.runWindow.endDate}T${frozen.context.runConfig.valuationPolicy.dailyValuationTime}:00+08:00`;
   const through = options.through ?? endAt;
@@ -44,6 +45,7 @@ export const runNavOfflineV3 = (
   const events: NavOfflineEvent[] = [];
   const rejects: { eventId: string; requestId?: string; code: string; reason: string }[] = [];
   while (queue.length) {
+    yield;
     if (options.signal?.aborted) throw new Error('NAV 离线执行已取消');
     queue.sort(
       (a, b) =>
@@ -130,10 +132,12 @@ export const runNavOfflineV3 = (
       (request) => !['settled', 'cancelled', 'rejected'].includes(request.status),
     ),
     visibilityDisclosure: input.visibilityDisclosure,
-    ...valueNavOfflineResult(input, initialState, state, through),
+    ...(yield* navOfflineValuationSteps(input, initialState, state, through)),
   };
   return { ...payload, resultChecksum: deterministicResultChecksum(payload) };
-};
+}
+
+export const runNavOfflineV3 = (...input: Parameters<typeof navOfflineSteps>) => finishBacktestComputation(navOfflineSteps(...input));
 
 export const replayNavOfflineEvents = (
   frozen: Parameters<typeof adaptNavDomainInputsV3>[0],

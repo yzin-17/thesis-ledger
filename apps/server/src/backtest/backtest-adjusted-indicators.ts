@@ -7,8 +7,9 @@ import {
   type BooleanExpression,
   type CorporateActionForSeries,
   type NumericExpression,
+  finishBacktestComputation,
 } from '@thesis-ledger/domain';
-import { indicatorSeriesFor } from './backtest-v2-execution-shared.js';
+import { indicatorSeriesForSteps } from './backtest-v2-execution-shared.js';
 
 interface IndicatorTick {
   occurredAt: string;
@@ -73,12 +74,23 @@ const adjustedSourcesAt = (
 };
 
 const pointAtTick = (series: BacktestSeries, tick: IndicatorTick): BacktestSeriesPoint => {
-  const aligned = alignSeriesAt(series, [tick.occurredAt])[0];
+  const strictPoint = series.strictObservations
+    ? [...series.points]
+        .filter((point) => Date.parse(point.occurredAt) <= Date.parse(tick.occurredAt))
+        .at(-1)
+    : undefined;
+  const aligned = series.strictObservations
+    ? { point: strictPoint, reason: '历史窗口观测不可用' }
+    : alignSeriesAt(series, [tick.occurredAt])[0];
   if (aligned?.point) {
     return {
       ...aligned.point,
       occurredAt: tick.occurredAt,
-      availableAt: aligned.point.researchClock ? aligned.point.availableAt : tick.availableAt,
+      valueOccurredAt: aligned.point.valueOccurredAt ?? aligned.point.occurredAt,
+      availableAt:
+        aligned.point.researchClock || series.strictObservations
+          ? aligned.point.availableAt
+          : tick.availableAt,
       ...(aligned.point.researchClock
         ? {
             researchClock: { ...aligned.point.researchClock, decisionAt: tick.occurredAt },
@@ -94,18 +106,20 @@ const pointAtTick = (series: BacktestSeries, tick: IndicatorTick): BacktestSerie
   };
 };
 
-export const buildPointInTimeIndicatorSeries = (input: {
+export function* pointInTimeIndicatorSeriesSteps(input: {
   expressions: readonly (BooleanExpression | NumericExpression)[];
   sourceSeries: ReadonlyMap<string, BacktestSeries>;
   corporateActions: readonly BacktestCorporateActionFact[];
   ticks: readonly IndicatorTick[];
-}): ReadonlyMap<string, BacktestSeries> => {
+}): Generator<void, ReadonlyMap<string, BacktestSeries>, void> {
   const output = new Map<string, BacktestSeries>();
+  const buffers = new Map<string, BacktestSeriesPoint[]>();
   const actions = seriesActions(input.corporateActions);
   const indicatorCache = new Map<string, ReadonlyMap<string, BacktestSeries>>();
   const lastEvaluationAt = input.ticks.at(-1)?.occurredAt;
   if (lastEvaluationAt === undefined) return output;
   for (const tick of input.ticks) {
+    yield;
     const activeActionIndexes = actions.flatMap((action, index) =>
       Date.parse(action.occurredAt) <= Date.parse(tick.occurredAt) &&
       Date.parse(action.availableAt) <= Date.parse(tick.occurredAt)
@@ -123,19 +137,28 @@ export const buildPointInTimeIndicatorSeries = (input: {
         lastEvaluationAt,
       );
       for (const expression of input.expressions) {
-        indicatorSeriesFor(expression, adjustedSources, computed);
+        yield* indicatorSeriesForSteps(expression, adjustedSources, computed);
+      }
+      for (const series of computed.values()) {
+        for (const point of series.points) { Object.freeze(point); yield; }
+        Object.freeze(series.points);
       }
       indicatorCache.set(cacheKey, computed);
       current = computed;
     }
     for (const [key, series] of current) {
-      const existing = output.get(key);
+      const points = buffers.get(key) ?? [];
+      points.push(pointAtTick(series, tick));
+      buffers.set(key, points);
       output.set(key, {
         ...series,
         adjusted: series.adjusted,
-        points: [...(existing?.points ?? []), pointAtTick(series, tick)],
+        points,
       });
+      yield;
     }
   }
   return output;
-};
+}
+
+export const buildPointInTimeIndicatorSeries = (input: Parameters<typeof pointInTimeIndicatorSeriesSteps>[0]) => finishBacktestComputation(pointInTimeIndicatorSeriesSteps(input));

@@ -36,7 +36,7 @@ async function sample(options: Options = {}) {
   const anchorDay = options.anchorDay ?? '2026-10-19';
   const currentDay = options.currentDay ?? '2026-10-20';
   const quote = quoteSchema.parse({
-    version: 3,
+    version: 1,
     symbol: options.wrongQuoteIdentity ? '000001.SZ' : symbol,
     price: options.rawQuote ?? 50,
     open: 100,
@@ -83,7 +83,7 @@ async function sample(options: Options = {}) {
             : at.toISOString(),
       }));
     return barSeriesSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity: options.wrongIdentity && adjusted ? { ...identity, symbol: '000001.SZ' } : identity,
       points,
       coverage: {
@@ -155,7 +155,7 @@ async function sample(options: Options = {}) {
     {
       getFundNav: vi.fn(async () =>
         fundNavSchema.parse({
-          version: 3,
+          version: 1,
           symbol: '161725.OF',
           unitNav: 1,
           navDate: anchorDay + 'T00:00:00Z',
@@ -166,7 +166,7 @@ async function sample(options: Options = {}) {
       ),
       getFundHoldings: vi.fn(async () =>
         fundHoldingsSchema.parse({
-          version: 3,
+          version: 1,
           fundSymbol: '161725.OF',
           provider: 'controlled',
           fetchedAt: at.toISOString(),

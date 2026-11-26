@@ -4,7 +4,7 @@ import { type DesiredProviderPolicyV3, type MarketRouteKeyV3 } from '../src/mark
 
 const oldKey: MarketRouteKeyV3 = { kind: 'data', market: 'CN', assetType: 'STOCK', capability: 'HISTORICAL_TRADING_STATUS' };
 const targets = [{ providerId: 'primary', upstreamSource: 'primary-upstream' }, { providerId: 'backup', upstreamSource: 'backup-upstream' }];
-const policy = (): DesiredProviderPolicyV3 => ({ contractVersion: 3, consumer: 'thesis-ledger', requestId: 'migration-preview',
+const policy = (): DesiredProviderPolicyV3 => ({ contractVersion: 1, consumer: 'thesis-ledger', requestId: 'migration-preview',
   revision: 7, enabled: true, routes: [{ key: oldKey, targets }] });
 const binding = (capability: string, index: number) => ({ from: oldKey, key: { ...oldKey, capability }, target: targets[index]! });
 

@@ -152,7 +152,7 @@ for (const segment of model.segments) {
   }
 }
 const intent = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: randomUUID(),
   adjustment: 'qfq',
   accountingBasis: 'normalized-series',
@@ -222,7 +222,7 @@ else {
     await api(
       '/api/market-data/policy',
       {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: randomUUID(),
         revision: policy.revision + 1,
@@ -249,7 +249,7 @@ else {
   const created = await api(
     '/api/v1/backtests/runs',
     backtestRunCreateSchemaV3.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       strategyVersionId,
       runConfig: prepared.runConfig,
       preparationStamp: prepared.executionPreflight.revisionStamp,

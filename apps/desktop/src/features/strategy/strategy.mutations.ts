@@ -66,6 +66,7 @@ export const useCancelBacktestMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (jobId: string) => cancelBacktest(jobId),
+    onMutate: async () => { await queryClient.cancelQueries({ queryKey: strategyKeys.jobs() }); },
     onSuccess: () => invalidateStrategyData(queryClient),
   });
 };
@@ -74,6 +75,7 @@ export const useRetryBacktestMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (runId: string) => retryBacktest(runId),
+    onMutate: async () => { await queryClient.cancelQueries({ queryKey: strategyKeys.jobs() }); },
     onSuccess: () => invalidateStrategyData(queryClient),
   });
 };

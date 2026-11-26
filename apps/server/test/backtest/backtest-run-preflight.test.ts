@@ -17,7 +17,7 @@ async function fixture() {
   const prisma = {
     strategyVersion: {
       findUnique: vi.fn(async () => ({
-        schemaVersion: 2,
+        schemaVersion: 1,
         schema: structuredClone(h.input.strategy),
       })),
     },
@@ -38,7 +38,7 @@ async function fixture() {
     revisions,
     service,
     request: {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'preflight-test',
       strategyVersionId: '11111111-1111-4111-8111-111111111111',
       runConfig: h.input.runConfig,
@@ -54,7 +54,7 @@ describe('公告创建准备检查', () => {
       failed: 0, matched: 0, downloaded: 0, parsed: 0, errors: [] };
     const guard = new BacktestCreationGuardService(h.prisma as never, h.revisions as never,
       { prepare: vi.fn(async () => progress) } as never);
-    await expect(guard.check({ contractVersion: 3, strategyVersionId: h.request.strategyVersionId,
+    await expect(guard.check({ contractVersion: 1, strategyVersionId: h.request.strategyVersionId,
       runConfig, preparationStamp: preparationStampFor(strategy, runConfig, h.request.strategyVersionId),
       idempotencyKey: 'announcement-pending' }, strategy)).rejects.toMatchObject({
         response: { code: 'ANNOUNCEMENT_DATA_PREPARING' },
@@ -82,7 +82,7 @@ describe('联合运行预检', () => {
     await expect(
       guard.check(
         {
-          contractVersion: 3,
+          contractVersion: 1,
           strategyVersionId,
           runConfig,
           preparationStamp: stamp,
@@ -95,7 +95,7 @@ describe('联合运行预检', () => {
     await expect(
       guard.check(
         {
-          contractVersion: 3,
+          contractVersion: 1,
           strategyVersionId,
           runConfig,
           preparationStamp: stamp,

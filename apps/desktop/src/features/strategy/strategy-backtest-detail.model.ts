@@ -1,4 +1,5 @@
 import type { BacktestExecutionModel } from '@thesis-ledger/schemas';
+import { backtestDailyMatchingSchema } from '@thesis-ledger/schemas';
 import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
 import type { StrategyBacktestGroupPage } from './strategy-optimization.api.js';
 import type {
@@ -185,8 +186,9 @@ export const deriveBacktestRerun = (job: BacktestJob) => {
   if (cash === null) missing.push('初始资金');
 
   const { executionModel, adjustment, validAdjustment } = rerunExecution(input, runConfig);
-  if (runConfig?.schemaVersion === '3' && !validAdjustment) missing.push('价格口径');
+  if (runConfig?.schemaVersion === 'backtest-trade-config-v1' && !validAdjustment) missing.push('价格口径');
   if (missing.length > 0 || !start || !end || cash === null) return { setup: null, missing };
+  const matching = backtestDailyMatchingSchema.safeParse(runConfig?.dailyOrderMatching);
   const setup: BacktestSetupInput = {
     period: { start, end },
     initialCash: cash,
@@ -195,6 +197,7 @@ export const deriveBacktestRerun = (job: BacktestJob) => {
       ? { baseCurrency: currency }
       : {}),
     ...(executionModel ? { executionModel: executionModel as BacktestExecutionModel } : {}),
+    ...(matching.success ? { dailyOrderMatching: matching.data } : {}),
   };
   return { setup, missing: [] };
 };

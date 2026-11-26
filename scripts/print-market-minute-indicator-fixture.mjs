@@ -23,7 +23,7 @@ const cases = ['5m', '15m', '30m', '60m'].map((timeframe) => {
   const aggregationEncoding = JSON.stringify([calendar, timeframe, evaluationAsOf, rawFingerprint, aggregate]);
   const periodContext = { protocol: 'market-period-indicator-v1',
     aggregationFingerprint: hash(aggregationEncoding), pointFingerprint: hash(canonicalBarSeriesEncoding(identity, points)) };
-  const payload = marketPeriodIndicatorRequestSchema.parse({ contractVersion: 3, identity, points,
+  const payload = marketPeriodIndicatorRequestSchema.parse({ contractVersion: 1, identity, points,
     periodContext, inputFingerprint: hash(canonicalMarketPeriodIndicatorEncoding(periodContext)),
     requests: [{ name: 'MA', parameters: { period: 5 } },
       { name: 'MACD', parameters: { fast: 3, slow: 6, signal: 3 } },

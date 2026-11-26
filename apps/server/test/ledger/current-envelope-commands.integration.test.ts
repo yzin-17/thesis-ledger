@@ -172,7 +172,7 @@ function registerLedgerEconomicsAndConcurrencyCases(
     });
     expect(restored.factIds).toEqual(created.factIds);
     const state = await suiteScope.snapshot(id);
-    expect(state.events.map((event) => event.envelopeVersion)).toEqual([3, 3, 3, 3, 3]);
+    expect(state.events.map((event) => event.envelopeVersion)).toEqual([1, 1, 1, 1, 1]);
     expect(state.events.every((event) => event.payloadVersion === 1)).toBe(true);
     expect(state.state).toMatchObject({ ledgerRevision: 5n, projectionGeneration: 5n });
     expect(state.positions[0]?.quantity.toString()).toBe('10');
@@ -273,7 +273,7 @@ function registerLedgerDistributionAndRollbackCases(
     for (const [index, adjustment] of adjustments.entries()) {
       await suiteScope.repository.withAccountWrite(id, async (context) => {
         await suiteScope.repository.appendRevision(context, {
-          version: 3,
+          version: 1,
           eventId: randomUUID(),
           factId: randomUUID(),
           accountId: id,
@@ -310,7 +310,7 @@ function registerLedgerDistributionAndRollbackCases(
     });
     expect(dividend.amount.toString()).toBe('5');
     expect(state.balances[0]?.settledAmount.toString()).toBe('903');
-    expect(state.events.every((event) => event.envelopeVersion === 3)).toBe(true);
+    expect(state.events.every((event) => event.envelopeVersion === 1)).toBe(true);
   });
   it('投影写入失败使新增事件、物化表和账户版本全部回滚', async () => {
     const { id } = await suiteScope.account();
@@ -380,70 +380,10 @@ function registerLedgerImportAndLegacyEnvelopeCases(
       orderBy: { ledgerRevision: 'asc' },
     });
     expect(events[2]).toMatchObject({
-      envelopeVersion: 3,
+      envelopeVersion: 1,
       revisionAction: 'VOID',
       sourceRowId: 'row-1',
       supersedesEventId: events[1]?.id,
-    });
-  });
-  it('账户旧行阻断创建、修订、撤销及 Import 回滚且不改变原状态', async () => {
-    const { id } = await suiteScope.account(false);
-    const oldEvent = await suiteScope.prisma.ledgerEvent.create({
-      data: {
-        accountId: id,
-        type: 'CASH_FLOW',
-        envelopeVersion: null,
-        payloadVersion: 1,
-        payload: { amount: '100' },
-        occurredAt: new Date(occurredAt),
-      },
-    });
-    const draft = await suiteScope.prisma.importDraft.create({
-      data: {
-        accountId: id,
-        source: 'old',
-        status: 'committed',
-        idempotencyKey: randomUUID(),
-        imageHash: 'old',
-        rows: [],
-      },
-    });
-    const before = await suiteScope.snapshot(id);
-    const command = execution(id, 'old-reject');
-    const operations = [
-      () => suiteScope.commands.createExecution(command),
-      () =>
-        suiteScope.commands.replaceExecution({
-          ...command,
-          command: 'REPLACE_EXECUTION',
-          expectedLedgerRevision: '0',
-          supersedesEventId: oldEvent.id,
-          reason: '旧修订',
-        }),
-      () =>
-        suiteScope.commands.voidExecution({
-          command: 'VOID_EXECUTION',
-          accountId: id,
-          expectedLedgerRevision: '0',
-          supersedesEventId: oldEvent.id,
-          reason: '旧撤销',
-          actorId: 'e03-b',
-          source: source('void-old'),
-        }),
-      () =>
-        new ImportRollbackService(suiteScope.prisma as never, suiteScope.repository).rollback(
-          draft.id,
-        ),
-    ];
-    for (const operation of operations)
-      await expect(operation()).rejects.toMatchObject({
-        response: { code: 'UNSUPPORTED_CONTRACT_VERSION' },
-      });
-    expect(await suiteScope.snapshot(id)).toEqual(before);
-    expect(
-      await suiteScope.prisma.importDraft.findUnique({ where: { id: draft.id } }),
-    ).toMatchObject({
-      status: 'committed',
     });
   });
 }

@@ -3,8 +3,8 @@ import {
   backtestModelResolutionRequestSchema,
   backtestModelResolutionResultSchema,
   strategySchema,
-  exchangeExecutionConfigSchema,
   type BacktestModelResolutionResult,
+  type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import { DsaClient } from '../integration/dsa/dsa.client.js';
 import { PrismaService } from '../platform/prisma.service.js';
@@ -25,18 +25,18 @@ export class BacktestModelResolutionService {
     });
     if (!version) throw new NotFoundException('策略版本不存在');
     const parsed = strategySchema.safeParse(version.schema);
+    const strategy = parsed.success ? parsed.data as BacktestStrategy : undefined;
     if (
-      ![2, 3].includes(version.schemaVersion) ||
-      !parsed.success ||
-      !exchangeExecutionConfigSchema.safeParse(parsed.data.execution).success ||
-      parsed.data.executionInstrument.assetType === 'fund'
+      version.schemaVersion !== 1 ||
+      !strategy ||
+      strategy.execution.mode !== 'exchange' ||
+      strategy.executionInstrument.assetType === 'fund'
     )
       return {
         status: 'blocked',
         reasonCode: 'unsupported-strategy',
         message: '请先保存有效的股票或 ETF 策略；基金策略请使用净值回测入口。',
       };
-    const strategy = parsed.data;
     const instrument = strategy.executionInstrument;
     const configuredAt = new Date().toISOString();
     if (request.policy === 'research-defaults') {

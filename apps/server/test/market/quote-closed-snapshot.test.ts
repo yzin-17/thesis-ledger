@@ -14,7 +14,7 @@ const calendar: MarketPeriodCalendarFact = {
   ],
 };
 const quote: Quote = {
-  version: 3, symbol: '510300.SH', price: 4.124, open: 4.113, high: 4.169, low: 4.095,
+  version: 1, symbol: '510300.SH', price: 4.124, open: 4.113, high: 4.169, low: 4.095,
   previousClose: 4.195, volume: null, amount: null, provider: 'tencent', stale: true,
   freshness: 'stale', marketTime: '2026-11-06T08:14:52+00:00', fetchedAt: '2026-11-08T17:32:17Z',
 };

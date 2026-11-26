@@ -29,7 +29,7 @@ docker compose --env-file .env -f compose.yml -f compose.dev.yml exec thesis-led
 
 ## V3 回测与来源故障
 
-先区分协议、来源和业务执行三个层次。infra `scripts/market-v3-contract-test.sh` 只验证 Data/Control V3 与独立鉴权；Control 使用 `/api/v3/thesis-ledger/control/*`，与 Data Token 分开。`scripts/contract-test.sh` 还要求当前 Data 正向读取，来源未准入时失败；两者均不能替代 Server/Worker 与真实客户端验收。
+先区分协议、来源和业务执行三个层次。infra `scripts/market-v3-contract-test.sh` 只验证 `dsa-data-v1` 与 `dsa-control-v1` 的协议及独立鉴权；Control 使用 `/api/v1/thesis-ledger/control/*`，与 Data Token 分开。`scripts/contract-test.sh` 还要求当前 Data 正向读取，来源未准入时失败；两者均不能替代 Server/Worker 与真实客户端验收。
 
 遇到 `NO_ELIGIBLE_PROVIDER`，先核对精确市场、资产、能力、周期、价格口径对应的 Desired/Effective Policy、启用状态及凭据。基础 ETF 日线 `hithink/fund-market-historical` 的 qfq 和 `tencent/tencent` 的 none/qfq/hfq 已按共同能力启用，不要求逐标的、逐窗口或短期有效的人工 RouteAdmission；HiThink 仍须有实际 API Key。日级状态由系统根据实际行情自动整理。其他高级能力仍按自身必要条件检查，不能通过打开 fixture mode 冒充真实来源。
 

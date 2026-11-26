@@ -165,7 +165,7 @@ export class MarketRoutingConfigService {
       throw new ConflictException('请先预览当前草稿后再保存');
     const policy = buildMarketPolicyPayload(
       {
-        contractVersion: 3,
+        contractVersion: 1,
         enabled: true,
         routes: prepared.preview.routes,
         requestId: randomUUID(),

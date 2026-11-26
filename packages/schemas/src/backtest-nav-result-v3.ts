@@ -16,6 +16,7 @@ import {
   positiveDecimalStringSchema,
 } from './monetary-values.js';
 import { compareMarketPitEvidenceInstantStringsV1 } from './market-pit-evidence-instant-v1.js';
+import { researchAnalyticsVersionSchema, validateResearchAnalytics } from './backtest-research-analytics.js';
 
 const text = z.string().trim().min(1);
 const time = z.iso.datetime({ offset: true });
@@ -77,9 +78,10 @@ const visibilityDisclosure = z.discriminatedUnion('classification', [
 const fields = {
   source: z.literal('BACKTEST'),
   inputKind: z.literal('nav'),
-  schemaVersion: z.literal('3'),
-  snapshotVersion: z.literal('snapshot-manifest-v3'),
+  schemaVersion: z.literal('backtest-nav-result-v1'),
+  snapshotVersion: z.literal('backtest-nav-snapshot-manifest-v1'),
   engineVersion: text,
+  analyticsVersion: researchAnalyticsVersionSchema.optional(),
   runId: text,
   strategyVersionId: text,
   snapshotId: hash,
@@ -311,6 +313,7 @@ export const backtestNavResultV3Schema = z.strictObject(fields).superRefine((val
       });
   }
   validateRequests(value, ctx);
+  validateResearchAnalytics(value, ctx);
   validateOutputTimeline(value, ctx);
   validateFillRequests(value, ctx);
 });

@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import type { MouseEventParams, Time } from 'lightweight-charts';
 import { createArenaMarkerPrimitive } from './market-arena-marker-primitive.js';
 
-function fixture() {
+function fixture(width = 400) {
   const points = [
     { id: 'p1', model: '模型甲', side: 'buy' as const },
     { id: 'p2', model: '模型乙', side: 'buy' as const },
@@ -12,7 +12,7 @@ function fixture() {
   let move: ((event: MouseEventParams<Time>) => void) | undefined;
   let offset = 0;
   let spacing = 12;
-  const time = { timeToCoordinate: vi.fn(() => 100 + offset), timeToIndex: () => 0, options: () => ({ barSpacing: spacing }) };
+  const time = { width: () => width, timeToCoordinate: vi.fn(() => 100 + offset), timeToIndex: () => 0, options: () => ({ barSpacing: spacing }) };
   const chart = { timeScale: () => time, options: () => ({ layout: { fontSize: 12 } }),
     subscribeCrosshairMove: vi.fn((handler: typeof move) => { move = handler; }), unsubscribeCrosshairMove: vi.fn() };
   const series = { getPane: () => ({ paneIndex: () => 0, getHeight: () => 200 }), dataByIndex: () => ({ time: '2026-11-06', high: 20, low: 10 }),
@@ -23,7 +23,7 @@ function fixture() {
   const context = { save: vi.fn(), restore: vi.fn(), setLineDash: vi.fn(), beginPath: vi.fn(), closePath: vi.fn(), moveTo: vi.fn<(x: number, y: number) => void>(), lineTo: vi.fn<(x: number, y: number) => void>(),
     strokeStyle: '', stroke: vi.fn(() => { strokes.push(context.strokeStyle); }), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn<(text: string, x: number, y: number) => void>(),
     measureText: (text: string) => ({ width: text.length * 6 }) };
-  const draw = (width = 400) => primitive.paneViews?.()[0]?.renderer()?.draw({
+  const draw = () => primitive.paneViews?.()[0]?.renderer()?.draw({
     useMediaCoordinateSpace: (run: (value: unknown) => void) => run({ context, mediaSize: { width, height: 200 } }),
   } as never);
   return { primitive, chart, series, update, context, strokes, draw, time, hover: (point?: { x: number; y: number }, paneIndex = 0) => {
@@ -69,26 +69,32 @@ it('价格已移出当前视口时不在边缘制造标记', () => {
   expect(f.primitive.hitTest?.(100, 130)).toBeNull();
   f.primitive.detached?.();
 });
-it('文字在右边缘仍居中置于箭头底部，悬浮可见文字同样可查看模型', () => {
-  const f = fixture(); f.draw(107);
+it('箭头保持价格坐标，右边缘的完整文字在重绘前也能悬浮查看', () => {
+  const f = fixture(107); f.draw();
   const label = f.context.fillText.mock.calls.find(call => call[0] === '买（模）');
-  expect(Number(label?.[1]) + 12).toBe(100);
+  expect(Number(label?.[1]) + 24).toBe(107);
   expect(label?.[2]).toBeGreaterThan(133);
+  f.primitive.updateAllViews?.();
   expect(f.primitive.hitTest?.(90, Number(label?.[2]))?.externalId).toBe('arena:2026-11-06:buy');
-  f.hover({ x: 90, y: Number(label?.[2]) }); f.draw(107);
+  f.hover({ x: 90, y: Number(label?.[2]) }); f.draw();
   expect(f.context.fillText).toHaveBeenCalledWith('模型甲', expect.any(Number), expect.any(Number));
   f.primitive.detached?.();
 });
-it.each([-8, 2, 398, 408])('箭头横坐标 %i 位于边缘或视口外时，买卖文字始终跟随箭头中心', x => {
+it.each([-8, 2, 398, 408])('横坐标 %i 的箭头及文字在视口边缘保持可读，视口外隐藏', x => {
   const f = fixture(); f.time.timeToCoordinate.mockReturnValue(x);
   f.primitive.updateAllViews?.(); f.draw();
-  for (const text of ['买（模）', '卖（模）']) {
-    const label = f.context.fillText.mock.calls.find(call => call[0] === text)!;
-    expect(label[1] + f.context.measureText(text).width / 2).toBe(x);
+  const labels = f.context.fillText.mock.calls;
+  if (x < 0 || x >= 400) {
+    expect(labels).toHaveLength(0);
+    expect(f.context.stroke).not.toHaveBeenCalled();
+  } else {
+    expect(labels.map(([text]) => text)).toEqual(['买（模）', '卖（模）']);
+    for (const [text, left] of labels) {
+      expect(left).toBeGreaterThanOrEqual(0);
+      expect(left + f.context.measureText(text).width).toBeLessThanOrEqual(400);
+    }
+    expect(f.context.moveTo).toHaveBeenCalledWith(x, 124);
   }
-  const label = f.context.fillText.mock.calls.find(call => call[0] === '买（模）')!;
-  expect(label[2]).toBeGreaterThan(133);
-  expect(f.primitive.hitTest?.(100, label[2])).toBeNull();
   f.primitive.detached?.();
 });
 it.each([[6, 10], [18, 14], [40, 26]])('间距 %i 的轮廓外尺寸与真实成交标记的 %ipx 一致', (spacing, expected) => {

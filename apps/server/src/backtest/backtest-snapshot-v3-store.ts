@@ -140,7 +140,7 @@ export class LocalSnapshotV3Store {
     return manifest;
   }
 
-  private async comparableDataFingerprint(
+  async comparableDataFingerprint(
     manifest: BacktestSnapshotManifestV3,
     artifacts: readonly ArtifactRef[],
   ): Promise<string> {

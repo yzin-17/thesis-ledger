@@ -7,7 +7,7 @@ mkdirSync(output, { recursive: true });
 
 function sample(symbol, assetType) {
   return {
-    contractVersion: 3, consumer: 'thesis-ledger', requestId: 'controlled', symbol, assetType,
+    contractVersion: 1, consumer: 'thesis-ledger', requestId: 'controlled', symbol, assetType,
     market: symbol.endsWith('.HK') ? 'HK' : 'US', name: symbol === 'SPY.US' ? '标普500 ETF' : '招商银行',
     securityId: '9007199254740993', sharesPerLot: '100', listingDate: '2006-09-22', delisted: false,
     exchange: '受控交易所', provider: 'futu', historicalChanges: 'unverified',

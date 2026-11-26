@@ -44,16 +44,7 @@ export interface AiResearchReportComparisonRead {
   searchStatus: 'complete' | 'truncated' | 'completion_unrecorded';
 }
 
-export interface AiResearchReportAccess extends Pick<
-  AiResearchSubmissionV2Access,
-  'assertSnapshot'
-> {
-  assertLegacy(
-    transaction: Prisma.TransactionClient,
-    ownerId: string,
-    context: unknown,
-  ): Promise<void>;
-}
+export type AiResearchReportAccess = Pick<AiResearchSubmissionV2Access, 'assertSnapshot'>;
 async function authorize(
   transaction: Prisma.TransactionClient,
   row: AiRun,
@@ -61,21 +52,6 @@ async function authorize(
   locator: ResearchReportLocator,
   access: AiResearchReportAccess,
 ): Promise<ResearchReportDetail['historicalScope']> {
-  if (locator.view === 'legacy') {
-    const metadata = row.modelMetadata as Record<string, unknown> | null;
-    if (
-      row.researchOwnerId ||
-      row.promptVersion !== 'research-v1' ||
-      metadata?.optimizationExperimentId
-    )
-      throw new NotFoundException('研究报告不存在或不可访问');
-    const [relation] = await transaction.$queryRaw<Array<{ internal: boolean }>>(
-      Prisma.sql`SELECT EXISTS(SELECT 1 FROM "OptimizationAttempt" WHERE "aiRunId"=${row.id}::uuid) AS "internal"`,
-    );
-    if (!relation || relation.internal) throw new NotFoundException('研究报告不存在或不可访问');
-    await access.assertLegacy(transaction, ownerId, row.context);
-    return { status: 'unrecorded', snapshot: null, label: '历史范围未记录' };
-  }
   const parsed = researchScopeSnapshotV2Schema.safeParse(row.researchScopeSnapshot);
   if (
     row.researchOwnerId !== ownerId ||
@@ -185,16 +161,13 @@ export class AiResearchReportsQuery {
     const row = await transaction.aiRun.findFirst({
       where: {
         id,
-        OR: [{ researchOwnerId: ownerId }, { researchOwnerId: null, promptVersion: 'research-v1' }],
+        researchOwnerId: ownerId,
       },
     });
     if (!row) throw new NotFoundException('研究报告不存在或不可访问');
-    let locator: ResearchReportLocator = { view: 'legacy' };
-    if (row.researchOwnerId) {
-      const scope = researchScopeSnapshotV2Schema.safeParse(row.researchScopeSnapshot);
-      if (!scope.success) throw new NotFoundException('研究报告不存在或不可访问');
-      locator = { view: 'scoped', mode: scope.data.mode, scope: 'all' };
-    }
+    const snapshot = researchScopeSnapshotV2Schema.safeParse(row.researchScopeSnapshot);
+    if (!snapshot.success) throw new NotFoundException('研究报告不存在或不可访问');
+    const locator: ResearchReportLocator = { view: 'scoped', mode: snapshot.data.mode, scope: 'all' };
     const scope = await authorize(transaction, row, ownerId, locator, access);
     return projectResearchReport(transaction, row, scope);
   }
@@ -350,7 +323,7 @@ export class AiResearchReportsQuery {
         if (read.detail.availability !== 'available')
           throw new NotFoundException('研究引用不存在或不可访问');
         const result = read.detail.result;
-        if (result?.version === 2 && read.frozen) {
+        if (result?.version === 'research-report-result-v1' && read.frozen) {
           const binding = result.evidenceBindings.find(
             (entry) => entry.audit.evidenceId === referenceId,
           );
@@ -359,30 +332,14 @@ export class AiResearchReportsQuery {
           );
           if (!binding || !evidence) throw new NotFoundException('研究引用不存在或不可访问');
           return researchReportEvidenceSchema.parse({
-            version: 2,
+            version: 'research-report-evidence-v1',
             runId: id,
             scopeSnapshot: result.scopeSnapshot,
             evidence,
             toolCallId: binding.toolCallId,
           });
         }
-        const call = read.calls.find((entry) => entry.id === referenceId);
-        if (!call) throw new NotFoundException('研究引用不存在或不可访问');
-        return researchReportEvidenceSchema.parse({
-          version: 1,
-          runId: id,
-          historicalScope: read.detail.historicalScope,
-          toolCall: {
-            id: call.id,
-            tool: call.tool,
-            permission: call.permission,
-            status: call.status,
-            provider: call.provider,
-            marketTime: call.marketTime?.toISOString() ?? null,
-            availableAt: call.availableAt?.toISOString() ?? null,
-            fetchedAt: call.fetchedAt?.toISOString() ?? null,
-          },
-        });
+        throw new NotFoundException('研究引用不存在或不可访问');
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

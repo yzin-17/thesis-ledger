@@ -39,13 +39,13 @@ const provider: ProviderManifest = {
   ],
 };
 const policy: MarketPolicyDraftV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   revision: 1,
   enabled: true,
   routes: [{ key, targets: [target] }],
 };
 const catalog: MarketRouteCatalogReadV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   status: 'complete',
   catalogRevision: 1,

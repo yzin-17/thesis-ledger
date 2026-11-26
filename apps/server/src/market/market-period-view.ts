@@ -53,7 +53,7 @@ function periodWindowSeries(
     pointFingerprint: periodContentFingerprint(canonicalBarSeriesEncoding(identity, points)),
   };
   const series = marketPeriodBarSeriesSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     identity,
     points,
     coverage: {

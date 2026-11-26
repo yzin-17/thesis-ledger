@@ -27,7 +27,7 @@ import {
 const text = z.string().trim().min(1);
 const revision = z.number().int().positive();
 export const marketEventErrorV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: text,
   error: z.strictObject({
     code: z.enum([
@@ -49,7 +49,7 @@ const route = z.strictObject({
 });
 
 const scope = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: text,
   symbol: text,
   routeKey: route,

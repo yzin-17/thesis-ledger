@@ -1,4 +1,5 @@
-import { authoringStrategySchema, type AuthoringContent } from '@thesis-ledger/schemas';
+import { authoringStrategyV6Schema, type AuthoringContent } from '@thesis-ledger/schemas';
+import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -43,7 +44,7 @@ export function AuthoringDefinition({
   onChange: (next: AuthoringContent) => void;
   disabled: boolean;
 }) {
-  const parsed = authoringStrategySchema.safeParse(content.definitionText);
+  const parsed = authoringStrategyV6Schema.safeParse(content.definitionText);
   const edit = (definitionText: string) =>
     onChange(editAuthoringDefinition(content, definitionText));
   const updateParameter = (path: string[], value: string, previous: string | number) => {

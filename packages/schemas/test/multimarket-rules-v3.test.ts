@@ -8,7 +8,7 @@ const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../fixtures/m
 
 describe('真实港美收费/盘中状态合同', () => {
   it.each(['HK', 'US'])('%s日线缺日研究假设接受，盘中与其他市场仍拒绝', (market) => {
-    const request = { contractVersion: 3, requestId: 'p6-window', symbol: market === 'HK' ? '00147.HK' : 'GME.US',
+    const request = { contractVersion: 1, requestId: 'p6-window', symbol: market === 'HK' ? '00147.HK' : 'GME.US',
       start: '2024-05-10', end: '2024-05-24', tradabilityMode: 'assume-untradable-no-bar',
       routeKey: { kind: 'bar', market, assetType: 'STOCK', capability: 'DAILY_BAR', timeframe: '1d', adjustment: 'qfq' } };
     expect(marketDataBarSeriesRequestV3Schema.safeParse(request).success).toBe(true);

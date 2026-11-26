@@ -501,7 +501,7 @@ function createAuthoringProvider(scope: {
       ...extra,
     });
     response.write(
-      `data: ${JSON.stringify(frame({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(scope.output) }, finish_reason: null }] }))}\n\n`,
+      `data: ${JSON.stringify(frame({ choices: [{ index: 0, delta: { role: 'assistant', content: typeof scope.output === 'string' ? scope.output : JSON.stringify(scope.output) }, finish_reason: null }] }))}\n\n`,
     );
     response.write(
       `data: ${JSON.stringify(

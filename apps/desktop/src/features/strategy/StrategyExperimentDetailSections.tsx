@@ -1,3 +1,5 @@
+import { isStrategyCapabilityGap } from '@thesis-ledger/schemas';
+import { StrategyCapabilityGap } from './StrategyCapabilityGap.js';
 import type { OptimizationAdoptionContext } from '@thesis-ledger/schemas';
 import { Link, useLocation, useParams } from 'react-router';
 import { ShieldAlert } from 'lucide-react';
@@ -58,7 +60,11 @@ export function ExperimentRunLinks({
           render={
             <Link
               to={strategyCenterPath.job(jobId)}
-              state={experimentId ? backtestExperimentReturnState(experimentId, location.search) : undefined}
+              state={
+                experimentId
+                  ? backtestExperimentReturnState(experimentId, location.search)
+                  : undefined
+              }
             >
               {runSplitLabels[split] ?? '回测详情'}
             </Link>
@@ -81,7 +87,9 @@ function AdoptionDiffGroup({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="font-medium">{title}</div>
-      <div className="mt-2"><ExperimentDefinitionDiffEntries entries={entries} beforeLabel="原值" /></div>
+      <div className="mt-2">
+        <ExperimentDefinitionDiffEntries entries={entries} beforeLabel="原值" />
+      </div>
     </div>
   );
 }
@@ -96,35 +104,35 @@ export function ExperimentAdoptionReview({
   const currentChanged = context.current && context.current.id !== context.baseline.id;
   return (
     <div className="flex min-w-0 flex-col gap-4">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="text-xs text-muted-foreground">实验基线</div>
-            <div className="mt-1 font-medium">v{context.baseline.version}</div>
-          </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="text-xs text-muted-foreground">当前正式版本</div>
-            <div className="mt-1 font-medium">
-              {context.current ? `v${context.current.version}` : '无正式版本'}
-            </div>
-            {currentChanged ? (
-              <Badge className="mt-2" variant="outline">
-                基线已变化
-              </Badge>
-            ) : null}
-          </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="text-xs text-muted-foreground">待采纳候选</div>
-            <div className="mt-1 font-medium">完整候选定义</div>
-          </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="text-xs text-muted-foreground">实验基线</div>
+          <div className="mt-1 font-medium">v{context.baseline.version}</div>
         </div>
-        <AdoptionDiffGroup title="候选相对实验基线" entries={context.candidateVsBaseline} />
-        <AdoptionDiffGroup title="候选相对当前版本" entries={context.candidateVsCurrent} />
-        {acknowledgeExposure ? (
-          <div className="flex gap-2 bg-caution/5 p-3 text-sm">
-            <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            已查看封存测试结果，确认后将记录本次测试后的采纳选择。
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="text-xs text-muted-foreground">当前正式版本</div>
+          <div className="mt-1 font-medium">
+            {context.current ? `v${context.current.version}` : '无正式版本'}
           </div>
-        ) : null}
+          {currentChanged ? (
+            <Badge className="mt-2" variant="outline">
+              基线已变化
+            </Badge>
+          ) : null}
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="text-xs text-muted-foreground">待采纳候选</div>
+          <div className="mt-1 font-medium">完整候选定义</div>
+        </div>
+      </div>
+      <AdoptionDiffGroup title="候选相对实验基线" entries={context.candidateVsBaseline} />
+      <AdoptionDiffGroup title="候选相对当前版本" entries={context.candidateVsCurrent} />
+      {acknowledgeExposure ? (
+        <div className="flex gap-2 bg-caution/5 p-3 text-sm">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          已查看封存测试结果，确认后将记录本次测试后的采纳选择。
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -162,7 +170,9 @@ export function ExperimentRuntimeDetails({
           <Card className="rounded-none border-0 bg-transparent py-0">
             <CardHeader className="px-0">
               <CardDescription>AI 费用（已确认汇总）</CardDescription>
-              <CardTitle className="text-lg">{experimentCostText(experiment.costSummary)}</CardTitle>
+              <CardTitle className="text-lg">
+                {experimentCostText(experiment.costSummary)}
+              </CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -172,12 +182,24 @@ export function ExperimentRuntimeDetails({
         <h3 className="text-xl font-medium">回测交易成本假设</h3>
         <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
           {tradingCostText(experiment.tradingCost).map((line, index) => (
-            <p key={line} className={cn('text-sm leading-relaxed', index === 2 && 'text-xs text-muted-foreground sm:col-span-2')}>{line}</p>
+            <p
+              key={line}
+              className={cn(
+                'text-sm leading-relaxed',
+                index === 2 && 'text-xs text-muted-foreground sm:col-span-2',
+              )}
+            >
+              {line}
+            </p>
           ))}
         </div>
       </section>
       <Separator />
-      <Card role="region" aria-label="模型路由与调用" className="gap-4 rounded-none border-0 bg-transparent py-0">
+      <Card
+        role="region"
+        aria-label="模型路由与调用"
+        className="gap-4 rounded-none border-0 bg-transparent py-0"
+      >
         <CardHeader className="px-0">
           <CardTitle className="text-xl">模型路由与调用</CardTitle>
           <CardDescription>每次尝试独立保留状态、耗时、Token 和脱敏失败信息。</CardDescription>
@@ -193,7 +215,9 @@ export function ExperimentRuntimeDetails({
                 <div className="text-xs text-muted-foreground">第 {attempt.attempt} 次尝试</div>
               </div>
               <Badge variant="outline" className="w-fit">
-                {attemptStatusLabels[attempt.status] ?? '未知状态'}
+                {isStrategyCapabilityGap(attempt.proposal)
+                  ? '能力缺口'
+                  : (attemptStatusLabels[attempt.status] ?? '未知状态')}
               </Badge>
               <div className="min-w-0 break-words text-xs text-muted-foreground">
                 耗时：{attempt.durationMs == null ? '未记录' : `${attempt.durationMs} ms`}
@@ -206,7 +230,12 @@ export function ExperimentRuntimeDetails({
                   }}
                 />
               </div>
-              <div className="min-w-0 break-words text-xs text-muted-foreground">{attempt.error ?? '没有失败信息'}</div>
+              <div className="min-w-0 break-words text-xs text-muted-foreground">
+                {isStrategyCapabilityGap(attempt.proposal)
+                  ? '模型已保存能力报告'
+                  : (attempt.error ?? '没有失败信息')}
+              </div>
+              <StrategyCapabilityGap value={attempt.proposal} />
             </div>
           ))}
           {attempts.length === 0 ? (
@@ -215,7 +244,11 @@ export function ExperimentRuntimeDetails({
         </CardContent>
       </Card>
       <Separator />
-      <Card role="region" aria-label="诊断与复现" className="gap-4 rounded-none border-0 bg-transparent py-0">
+      <Card
+        role="region"
+        aria-label="诊断与复现"
+        className="gap-4 rounded-none border-0 bg-transparent py-0"
+      >
         <CardHeader className="px-0">
           <CardTitle className="text-xl">诊断与复现</CardTitle>
           <CardDescription>内部标识保留在技术区域，不占用默认阅读路径。</CardDescription>

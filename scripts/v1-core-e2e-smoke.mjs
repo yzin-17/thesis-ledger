@@ -339,32 +339,17 @@ try {
       tradePlanId: plan.id,
     }),
   });
-  const completedTrade = {
-    symbol,
-    entryAt: '2025-01-02T09:30:00.000Z',
-    exitAt: '2025-01-06T09:30:00.000Z',
-    pnl: 10,
-    plannedStop: 90,
-    actualExit: 101,
-    plannedHoldingDays: 3,
-    entryPrice: 100,
-    exitPrice: 101,
-    plannedEntry: 100,
-    plannedExit: 110,
-    turnover: 1000,
-    peakWeight: 0.1,
-    targetWeight: 0.1,
-  };
-  await request('/journal/analysis/planned-vs-actual', {
+  const review = await request('/journal/analysis/period', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(completedTrade),
+    body: JSON.stringify({
+      accountId: account.id, mode: 'actual', symbol,
+      start: '2025-01-02T00:00:00.000Z', end: '2025-01-07T00:00:00.000Z',
+    }),
   });
-  await request('/journal/analysis/behavior', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ trades: [completedTrade] }),
-  });
+  if (review.accountId !== account.id || review.symbol !== symbol) {
+    throw new Error('周期复盘返回的对象与请求不一致');
+  }
 
   const strategySchema = {
     version: 1,

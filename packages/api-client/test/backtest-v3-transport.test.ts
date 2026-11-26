@@ -26,7 +26,7 @@ const baseRequest = {
 } as const;
 const requestV3: BacktestRunCreateV3 = backtestRunCreateSchemaV3.parse({
   ...baseRequest,
-  contractVersion: 3,
+  contractVersion: 1,
   preparationStamp: JSON.parse(
     readFileSync(
       new URL('../../schemas/fixtures/backtest-preparation-stamp-v3.json', import.meta.url),
@@ -35,7 +35,7 @@ const requestV3: BacktestRunCreateV3 = backtestRunCreateSchemaV3.parse({
   ),
   runConfig: {
     ...baseRequest.runConfig,
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     executionPriceProtocol: JSON.parse(
       readFileSync(
         new URL('../../schemas/fixtures/execution-price.raw-events.json', import.meta.url),
@@ -51,7 +51,7 @@ const requestV3: BacktestRunCreateV3 = backtestRunCreateSchemaV3.parse({
 const queuedResponse = {
   id: 'run-v3',
   strategyVersionId: baseRequest.strategyVersionId,
-  mode: 'V3',
+  mode: 'frozen',
   status: 'queued',
   stage: 'queued',
   input: requestV3,
@@ -74,13 +74,13 @@ describe('回测客户端版本化传输', () => {
   );
   it('联合预检原样发送固定配置并严格解析修订结果', async () => {
     const request = {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       requestId: 'preflight-transport',
       strategyVersionId: requestV3.strategyVersionId,
       runConfig: requestV3.runConfig,
     };
     const result = {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: request.requestId,
       checkedAt: '2026-09-27T00:00:00Z',
       status: 'ready',
@@ -155,7 +155,7 @@ describe('回测客户端版本化传输', () => {
       vi
         .fn<typeof fetch>()
         .mockResolvedValue(
-          new Response(JSON.stringify({ id: 'run-v3', contractVersion: 3 }), { status: 200 }),
+          new Response(JSON.stringify({ id: 'run-v3', contractVersion: 1 }), { status: 200 }),
         ),
     );
     await expect(client.backtests.createRun(requestV3)).rejects.toBeInstanceOf(

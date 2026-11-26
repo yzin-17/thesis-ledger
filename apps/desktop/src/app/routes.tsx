@@ -3,8 +3,9 @@ import {
   PerformanceWorkspace, ProviderSettings, RiskCenter, StrategyDashboard, MarketDataPage,
 } from './deferred-pages.js';
 import { ArenaLivePage, LegacyArenaRedirect } from '../features/model-arena/ArenaLivePage.js';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useEffect } from 'react';
+import { buttonVariants } from '@/components/ui/button';
 import { desktopPathForView, type DesktopNavigationView } from '../views.js';
 import {
   isPortfolioSummaryConsumerRoute,
@@ -180,6 +181,11 @@ export function AppRoutes() {
           element={
             <JournalReviewWorkspace
               key={portfolioMode}
+              modelWeekliesLink={
+                <Link to="/journal/model-weeklies" className={buttonVariants({ variant: 'outline' })}>
+                  模型周报
+                </Link>
+              }
               mode={portfolioMode}
               accounts={accounts}
               accountsReady={accountsReady}

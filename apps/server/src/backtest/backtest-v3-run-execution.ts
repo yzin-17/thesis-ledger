@@ -13,12 +13,19 @@ import { BacktestSnapshotUnavailableError, asRecord } from './backtest-v3-run-li
 import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot.js';
 import type { LocalSnapshotStore } from './backtest-snapshot.js';
 import type { BacktestV3Runner } from './backtest-v3-runner.js';
+import { snapshotStorageAttempt } from './backtest-job-materialization-input.js';
 
 interface BacktestV3RunExecutionInput {
   job: BacktestJob;
   runner: BacktestV3Runner;
   snapshots: LocalSnapshotStore;
   signal: AbortSignal;
+  onStage?: ((stage: 'simulating' | 'analyzing') => Promise<void>) | undefined;
+}
+
+export function stockSnapshotStoreForJob(job: { id: string; input?: unknown; executionAttempt?: unknown }, snapshots: LocalSnapshotStore): LocalSnapshotStore {
+  const attempt = snapshotStorageAttempt(job.input, job.executionAttempt);
+  return attempt === undefined ? snapshots : snapshots.forAttempt(job.id, attempt);
 }
 
 export type VerifiedBacktestV3Snapshot = BacktestSnapshotManifestV3 & {
@@ -62,7 +69,7 @@ export async function loadVerifiedBacktestV3Snapshot(
 
   let replayed: Awaited<ReturnType<LocalSnapshotStore['v3']['replay']>>;
   try {
-    replayed = await snapshots.v3.replay(job.id);
+    replayed = await stockSnapshotStoreForJob(job, snapshots).v3.replay(job.id);
   } catch {
     throw unavailable('V3 Snapshot 无法通过 Store replay 完整性校验');
   }
@@ -87,6 +94,7 @@ export async function executeBacktestV3Run({
   runner,
   snapshots,
   signal,
+  onStage,
 }: BacktestV3RunExecutionInput): Promise<{
   result: BacktestResultV3;
   resultChecksum: string;
@@ -100,6 +108,7 @@ export async function executeBacktestV3Run({
       artifactRefs: manifest.artifacts,
     },
     signal,
+    { snapshots: stockSnapshotStoreForJob(job, snapshots), ...(onStage ? { onStage } : {}) },
   );
 
   let parsedResult: BacktestResultV3;
@@ -164,14 +173,14 @@ function assertPersistedRunSnapshotIdentity(
   inputRunConfig: RunConfigV3,
 ) {
   if (
-    job.mode !== 'V3' ||
+    job.mode !== 'frozen' ||
     job.strategyVersionId !== manifest.strategyVersionId ||
     manifest.runId !== job.id ||
     manifest.status !== 'finalized' ||
     manifest.quality.completeness !== 'complete' ||
     job.snapshotId !== manifest.contentHash ||
-    input?.contractVersion !== 3 ||
-    input.schemaVersion !== '3' ||
+    input?.contractVersion !== 1 ||
+    input.schemaVersion !== 'backtest-trade-run-v1' ||
     input.strategyVersionId !== manifest.strategyVersionId ||
     input.snapshotId !== manifest.contentHash ||
     input.snapshotVersion !== manifest.manifestVersion ||

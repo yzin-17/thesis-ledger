@@ -21,7 +21,6 @@ import {
 } from '../../components/MobilePrimitives';
 import { ResearchObjects, researchScopeLabels } from './ResearchObjects';
 import { readResearchPending, researchPendingKey, saveResearchPending } from './research-pending';
-import { ResearchRetryScreen } from './ResearchRetryScreen';
 const noRunCodes = new Map([
   ['RESEARCH_V2_WRITES_DISABLED', 400],
   ['RESEARCH_INPUT_BUDGET_EXCEEDED', 400],
@@ -30,9 +29,9 @@ const noRunCodes = new Map([
 ]);
 export function ResearchSubmitScreen() {
   const { params } = useRoute<RouteProp<ResearchStackParams, 'ResearchSubmit'>>();
-  if (params?.retryRunId) return <ResearchRetryScreen runId={params.retryRunId} />;
-  return <ResearchNewScreen key={params?.instrumentId ?? "new"} initialInstrumentId={params?.instrumentId ?? ""} />;
+  return <ResearchNewScreen key={JSON.stringify(params ?? {})} {...params} />;
 }
+
 type ResearchSettings = Awaited<ReturnType<ReturnType<typeof useMobileRuntime>['api']['researchRuns']['settings']>>;
 
 function researchDefaultState(settings: ResearchSettings | undefined) {
@@ -41,7 +40,10 @@ function researchDefaultState(settings: ResearchSettings | undefined) {
   return { model, modelReady: Boolean(model && candidate?.enabled) };
 }
 
-export function ResearchNewScreen({initialInstrumentId = ""}: {initialInstrumentId?: string} = {}) {
+export function ResearchNewScreen({
+  instrumentId = '',
+  prefill,
+}: NonNullable<ResearchStackParams['ResearchSubmit']> = {}) {
   const { api, scope, baseUrl, mode } = useMobileRuntime();
   const client = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<ResearchStackParams>>();
@@ -54,12 +56,12 @@ export function ResearchNewScreen({initialInstrumentId = ""}: {initialInstrument
   });
   const [pending, setPending] = useState<ResearchSubmissionV2 | null>();
   const effectivePending = pending === undefined ? restored.data : pending;
-  const [selection, setSelection] = useState<ResearchSubmissionV2['scope']>({
+  const [selection, setSelection] = useState<ResearchSubmissionV2['scope']>(prefill?.scope ?? {
     scope: 'instrument',
-    instrumentId: initialInstrumentId,
+    instrumentId,
   });
-  const [question, setQuestion] = useState('');
-  const [templateId, setTemplate] = useState('');
+  const [question, setQuestion] = useState(prefill?.question ?? '');
+  const [templateId, setTemplate] = useState(prefill?.templateId ?? '');
   const [message, setMessage] = useState<string | null>(null);
   const capabilities = useQuery({
     queryKey: [...scope, 'research-capabilities'],
@@ -89,7 +91,7 @@ export function ResearchNewScreen({initialInstrumentId = ""}: {initialInstrument
         )
           throw new Error('研究预检未通过，请先核对当前模型与能力。');
         input = normalizeResearchSubmissionV2({
-          version: 2,
+          version: 'research-report-submission-v1',
           submissionId: randomUUID(),
           mode,
           scope: selection,

@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../../src/platform/prisma.service.js';
 import { StrategyOptimizationCandidateService } from '../../src/strategy-optimization/strategy-optimization-candidate.service.js';
@@ -11,6 +10,13 @@ import {
 } from '../../src/strategy-optimization/strategy-optimization-parameters.js';
 import { StrategyOptimizationRunService } from '../../src/strategy-optimization/strategy-optimization-run.service.js';
 import { StrategyOptimizationService } from '../../src/strategy-optimization/strategy-optimization.service.js';
+import {
+  budget,
+  createFormalOptimizationStrategyFixture,
+  createNormalizedRunConfig,
+  split,
+  waitUntil,
+} from './strategy-optimization-postgres-fixtures.js';
 
 const postgresDescribe =
   process.env.RUN_STRATEGY_OPTIMIZATION_POSTGRES_E2E === '1' ? describe : describe.skip;
@@ -22,76 +28,8 @@ const proposal = {
   reason: '恢复已完成 Provider step',
   evidenceRefs: ['postgres-reconciler-e2e'],
 };
-const baselineStrategy = strategySchema.parse({
-  schemaVersion: '2',
-  name: `Reconciler replay ${suffix}`,
-  signalSources: [
-    {
-      id: 'price',
-      asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
-      timeframe: '1d',
-      series: ['open', 'high', 'low', 'close', 'volume'],
-    },
-  ],
-  executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
-  primaryTimeframe: '1d',
-  entry: {
-    type: 'compare',
-    operator: 'gt',
-    left: { type: 'series', sourceId: 'price', field: 'close' },
-    right: { type: 'constant', value: '0' },
-  },
-  exit: {
-    type: 'compare',
-    operator: 'lt',
-    left: { type: 'series', sourceId: 'price', field: 'close' },
-    right: { type: 'constant', value: '999999' },
-  },
-  sizing: { type: 'fixedQuantity', quantity: '100' },
-  risk: [{ type: 'fixedStop', percent: '0.08' }],
-  execution: {
-    mode: 'exchange',
-    orderType: 'market',
-    timeInForce: 'DAY',
-    timing: 'nextEligibleBarOpen',
-  },
-  cost: { commissionRate: '0', slippageRate: '0' },
-}) as BacktestStrategy;
-const runConfig = {
-  startDate: '2026-01-01',
-  endDate: '2026-09-10',
-  dataAsOf: '2026-09-11T08:00:00.000Z',
-  baseCurrency: 'CNY',
-  initialCash: { CNY: '100000' },
-  valuationPolicy: {
-    baseTimezone: 'Asia/Shanghai',
-    dailyValuationTime: '15:00',
-    pricePolicy: 'latestAvailable',
-    fxPolicy: 'latestAvailable',
-  },
-};
-const split = {
-  development: { start: '2026-01-01', end: '2026-04-30' },
-  validation: { start: '2026-05-01', end: '2026-07-31' },
-  test: { start: '2026-08-01', end: '2026-09-10' },
-};
-const budget = {
-  maxAiCalls: 5,
-  maxBacktestRuns: 10,
-  maxInputTokens: 100_000,
-  maxOutputTokens: 10_000,
-  maxCost: '10',
-  maxDurationSeconds: 600,
-};
-
-const waitUntil = async (predicate: () => Promise<boolean>, timeoutMs = 8_000) => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 30));
-  }
-  throw new Error('等待 reconciler 恢复超时');
-};
+const baselineStrategy = createFormalOptimizationStrategyFixture('600519.SH', suffix)('0.08');
+const runConfig = createNormalizedRunConfig();
 
 postgresDescribe('策略优化 succeeded round reconciler PostgreSQL E2E', () => {
   const prisma = new PrismaService();
@@ -142,13 +80,13 @@ postgresDescribe('策略优化 succeeded round reconciler PostgreSQL E2E', () =>
     process.env.STRATEGY_AI_OPTIMIZATION_ENABLED = 'true';
     await prisma.$connect();
     await prisma.strategy.create({
-      data: { id: strategyId, name: `Reconciler replay ${suffix}`, status: 'active', schemaVersion: 2 },
+      data: { id: strategyId, name: `Reconciler replay ${suffix}`, status: 'active', schemaVersion: 3 },
     });
     const baselineVersion = await prisma.strategyVersion.create({
       data: {
         strategyId,
         version: 1,
-        schemaVersion: 2,
+        schemaVersion: 3,
         schema: baselineStrategy as Prisma.InputJsonValue,
       },
     });
@@ -164,7 +102,7 @@ postgresDescribe('策略优化 succeeded round reconciler PostgreSQL E2E', () =>
       data: {
         strategyId,
         version: -1,
-        schemaVersion: 2,
+        schemaVersion: 3,
         schema: candidateStrategy as Prisma.InputJsonValue,
       },
     });
@@ -246,7 +184,8 @@ postgresDescribe('策略优化 succeeded round reconciler PostgreSQL E2E', () =>
   });
 
   it('lease 过期后 reconciler 复用 succeeded step，不重复 Provider、AiRun 或 Candidate', async () => {
-    const runs = new StrategyOptimizationRunService(prisma, backtests as never);
+    const configuredRuns = { assertFrozenResearchBudget: vi.fn(async () => undefined) };
+    const runs = new StrategyOptimizationRunService(prisma, backtests as never, configuredRuns as never);
     const candidateService = new StrategyOptimizationCandidateService(prisma, providers as never, runs);
     const optimizer = new StrategyOptimizationService(
       prisma,
@@ -262,8 +201,13 @@ postgresDescribe('策略优化 succeeded round reconciler PostgreSQL E2E', () =>
     `);
 
     await expect(optimizer.reconcilePending()).resolves.toMatchObject({ scheduled: 1 });
-    await waitUntil(async () => (await readExperiment()).status === 'awaiting_finalization');
+    await waitUntil(async () => {
+      const current = await readExperiment();
+      if (current.status === 'failed') throw new Error(current.stopReason ?? '实验恢复失败');
+      return current.status === 'awaiting_finalization';
+    }, 4_000);
 
+    expect(configuredRuns.assertFrozenResearchBudget).toHaveBeenCalledWith(baselineVersionId, runConfig);
     expect(provider.complete).not.toHaveBeenCalled();
     expect(backtests.createRun).not.toHaveBeenCalled();
     expect(await prisma.aiRun.count({ where: { id: aiRunId } })).toBe(aiRunsBefore);

@@ -12,7 +12,7 @@ it('研究报价消费与提交相同的执行 Reader，保留证据拒绝原因
   expect(result).toMatchObject({ symbol: 'AAPL.US', price: 10,
     execution: { status: 'unavailable', reason: 'live_quote_unqualified' } });
   expect(execution.read).toHaveBeenCalledWith({ symbol: 'AAPL.US', assetType: 'STOCK', market: 'US',
-    currency: 'USD', maxQuoteAgeSeconds: protocol.resources.maxQuoteAgeSeconds, expiresOn: [] });
+    currency: 'USD', maxQuoteAgeSeconds: protocol.resources.maxQuoteAgeSeconds, expiresOn: [], needsBuySettlement: false });
 });
 it('合格执行证据返回自己的价格和来源时点，不暴露完整底层回执', async () => {
   const execution = { read: vi.fn().mockResolvedValue({ status: 'available', evidence: { private: 'raw' },

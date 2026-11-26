@@ -88,4 +88,54 @@ describe.skipIf(!url)('自主委托事务', () => {
     const saved = arenaLiveAccountSchema.parse((await liveAgents(db, a.matchId)).find((r) => r.id === a.agentId)!.account);
     expect(saved.orders[0]?.state).toBe('active'); expect(saved.fills).toEqual([]);
   });
+  it('父单与保护同事务提交；成交事务回滚后恢复，重复领取和并发撮合各只落一次', async () => {
+    const a = await create(), c = await cycle(a.matchId, a.agentId);
+    const d = { ...decision(), orders: [{ ...decision().orders[0]!, quantity: '27', price: '359.50',
+      onFill: { activation: 'on_full_fill', activateOrders: [{ clientId: 'stop', side: 'sell', kind: 'stop_loss', price: '355',
+        quantity: { basis: 'parent_open_quantity' }, reduceOnly: true, validUntil: { kind: 'activation_session_close' } }] } }] };
+    const submitted = await orders.submit(c, 1, d);
+    expect(submitted.orders.map((o) => o.state)).toEqual(['active', 'waiting_parent']);
+    expect(submitted.orders[1]!.clientId).toBe(c + ':stop');
+    const calls = await db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM "ArenaLiveCycle" WHERE "matchId"=${a.matchId}::uuid`;
+    price = '354'; await new Promise((resolve) => setTimeout(resolve, 5)); sampleAt = new Date().toISOString(); quoteAt = sampleAt;
+    const interruptedDb = new Proxy(db, { get(target, key) {
+      if (key === '$transaction') return (work: (tx: unknown) => Promise<unknown>) => target.$transaction(async (tx) => {
+        await work(tx); throw new Error('controlled_process_interruption');
+      });
+      return Reflect.get(target, key);
+    } });
+    await expect(new LiveOrdersRepository(interruptedDb, execution).match(a.matchId)).rejects.toThrow('controlled_process_interruption');
+    const read = async () => arenaLiveAccountSchema.parse((await liveAgents(db, a.matchId)).find((r) => r.id === a.agentId)!.account);
+    expect(await read()).toEqual(submitted);
+    const recovered = new LiveOrdersRepository(db, execution);
+    await Promise.all([recovered.match(a.matchId), recovered.match(a.matchId)]);
+    const entered = await read();
+    expect(entered.fills.map((f) => f.side)).toEqual(['buy']);
+    expect(entered.orders[1]).toMatchObject({ state: 'active', quantity: '27', parentOrderId: entered.orders[0]!.id });
+    expect(entered.positions[0]?.entryOrderId).toBe(entered.orders[0]!.id);
+    await recovered.match(a.matchId); expect(await read()).toEqual(entered);
+    price = '350'; await new Promise((resolve) => setTimeout(resolve, 5)); sampleAt = new Date().toISOString(); quoteAt = sampleAt;
+    await Promise.all([recovered.match(a.matchId), recovered.match(a.matchId)]);
+    expect((await read()).fills.map((f) => [f.side, f.quantity, f.price])).toEqual([['buy', '27', '354'], ['sell', '27', '350']]);
+    expect(await db.$queryRaw`SELECT count(*) AS n FROM "ArenaLiveCycle" WHERE "matchId"=${a.matchId}::uuid`).toEqual(calls);
+  });
+  it('撤父单与成交并发时按账户行锁收敛，最多一次入场且保护不重复', async () => {
+    const a = await create(), c = await cycle(a.matchId, a.agentId);
+    const d = { ...decision(), orders: [{ ...decision().orders[0]!, onFill: { activation: 'on_full_fill', activateOrders: [{
+      clientId: 'stop', side: 'sell', kind: 'stop_loss', price: '9', quantity: { basis: 'parent_open_quantity' },
+      reduceOnly: true, validUntil: { kind: 'activation_session_close' },
+    }] } }] };
+    const submitted = await orders.submit(c, 1, d), cancelCycle = await cycle(a.matchId, a.agentId);
+    await new Promise((resolve) => setTimeout(resolve, 5)); sampleAt = new Date().toISOString(); quoteAt = sampleAt;
+    await Promise.allSettled([orders.match(a.matchId), orders.submit(cancelCycle, 1, {
+      ...decision(), orders: [], cancelOrderIds: [submitted.orders[0]!.id],
+    })]);
+    const saved = arenaLiveAccountSchema.parse((await liveAgents(db, a.matchId)).find((r) => r.id === a.agentId)!.account);
+    expect(saved.orders).toHaveLength(2);
+    if (saved.orders[0]!.state === 'filled') {
+      expect(saved.fills).toHaveLength(1); expect(saved.orders[1]!.state).toBe('active');
+    } else {
+      expect(saved.fills).toEqual([]); expect(saved.orders.map((o) => o.state)).toEqual(['cancelled', 'cancelled']);
+    }
+  });
 });

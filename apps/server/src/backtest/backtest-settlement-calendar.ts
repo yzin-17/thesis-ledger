@@ -1,8 +1,15 @@
 import type { TradingCalendar } from '@thesis-ledger/domain';
 import type { RunConfigV3 } from '@thesis-ledger/schemas';
 import type { DependencyRequest, SnapshotDependencyV3Input } from './backtest-snapshot-v3-dependencies.js';
+import { tradePlanCalendarRange } from './backtest-trade-plan-calendar-range.js';
 
 export type SettlementCalendarPolicy = 'settlement-calendar-v1';
+/** 能力统计读取实际获取窗口的日历；不改变最终候选自身的依赖计划。 */
+export function acquisitionCalendarPlan(plan: SnapshotDependencyV3Input['plan'], startDate: string) {
+  return { ...plan, warmup: { ...plan.warmup, startDate },
+    datasets: plan.datasets.map((dataset) => dataset.purpose === 'calendar'
+      ? { ...dataset, range: { ...dataset.range, startDate } } : dataset) };
+}
 export function parseSettlementCalendarPolicy(value: unknown): SettlementCalendarPolicy | undefined {
   if (value === undefined) return undefined;
   if (value !== 'settlement-calendar-v1') throw new Error('未知结算日历冻结策略');
@@ -20,7 +27,12 @@ export function calendarDependencyRequests(
     invalid('Snapshot V3 Calendar 数据集与依赖计划市场不一致。');
   }
   const policy = parseSettlementCalendarPolicy(input.settlementCalendarPolicy);
-  const range = { ...base, end: policy ? settlementCalendarRequirement(input.runConfig).requestedEnd : base.end };
+  const range = tradePlanCalendarRange(
+    input.strategy,
+    { ...base, end: policy ? settlementCalendarRequirement(input.runConfig).requestedEnd : base.end },
+    input.runConfig.startDate,
+    input.runConfig.endDate,
+  );
   return datasets.map((dataset) => {
     if (dataset.range.startDate !== base.start || dataset.range.endDate !== base.end) {
       invalid(`Snapshot V3 Calendar 请求范围无效: ${dataset.instrument}`);

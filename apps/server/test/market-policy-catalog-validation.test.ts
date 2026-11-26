@@ -22,7 +22,7 @@ const hfq = {
   targets: [{ providerId: 'tencent', upstreamSource: 'tencent' }],
 } satisfies DesiredProviderPolicyV3['routes'][number];
 const saved: DesiredProviderPolicyV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'retained-route-test',
   revision: 8,
@@ -31,7 +31,7 @@ const saved: DesiredProviderPolicyV3 = {
 };
 const desired = { ...saved, revision: 9, routes: [nav, hfq] };
 const catalog: MarketRouteCatalogV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   catalogRevision: 12,
   generatedAt: '2026-10-03T00:00:00Z',

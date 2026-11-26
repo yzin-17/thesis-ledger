@@ -30,7 +30,7 @@ Mobile 继续使用原目录查询和竞态处理，新增可选多选契约及�
 | `pnpm --filter @thesis-ledger/mobile typecheck` | 最终源码通过 |
 | 定向 `pnpm exec eslint --format json` | 本轮 7 个 Mobile 源码和测试文件：0 错误、0 警告；默认文本格式额外输出上游 React Native Flow 解析诊断，退出码仍为 0 |
 | `node scripts/check-boundaries.mjs` | 通过 |
-| `PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright node scripts/local-runtime/instrument-multiselect-mobile-browser.mjs` | 两处 Mobile 实际组件，各在 1440、1024、768、390 宽度通过；连续添加、长名称换行、焦点、已选搜索/取消、再次选择、移除、分组导入及切换市场清空通过；无页面错误、无业务写请求、无页面横向溢出 |
+| `PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright node scripts/local-runtime/browser/instruments/instrument-multiselect-mobile.regression.mjs` | 两处 Mobile 实际组件，各在 1440、1024、768、390 宽度通过；连续添加、长名称换行、焦点、已选搜索/取消、再次选择、移除、分组导入及切换市场清空通过；无页面错误、无业务写请求、无页面横向溢出 |
 | Desktop 既有证据复用 | 本会话 `arena-live-browser.mjs` 已通过四档宽度的框内回显、连续选择、已选搜索、取消/恢复和移除；Desktop 组件及两处消费者本轮未改，无需重跑 |
 | 差异检查 | 本轮文件 `git diff --check` 通过 |
 

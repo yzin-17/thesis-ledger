@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { isBacktestRunUpdateOlder } from '@thesis-ledger/domain';
 import { fetchBacktestJob, fetchBacktestJobs, fetchStrategies, fetchBacktestInstrumentSeries } from './strategy.api.js';
 
 export const strategyKeys = {
@@ -36,7 +37,7 @@ export const useStrategyQueries = () => {
   });
   const jobs = useQuery({
     queryKey: strategyKeys.jobs(),
-    queryFn: () => fetchBacktestJobs(),
+    queryFn: ({ signal }) => fetchBacktestJobs(undefined, signal),
     staleTime: 5_000,
     refetchInterval: (query) => jobFallbackInterval(query.state.data),
   });
@@ -46,7 +47,8 @@ export const useStrategyQueries = () => {
 export const useBacktestJobQuery = (jobId: string | null) =>
   useQuery({
     queryKey: strategyKeys.job(jobId ?? 'closed'),
-    queryFn: () => fetchBacktestJob(jobId ?? ''),
+    queryFn: ({ signal }) => fetchBacktestJob(jobId ?? '', undefined, signal),
+    structuralSharing: (before, after) => isBacktestRunUpdateOlder(before, after) ? before : after,
     enabled: Boolean(jobId),
     refetchInterval: (query) => jobDetailFallbackInterval(query.state.data),
   });

@@ -133,7 +133,7 @@ it.each(samples)('真实 Market HTTP → DsaClient → 受控 HTTP 共享样例�
   });
   expect(calls).toHaveLength(1);
   expect(calls[0]).toMatchObject({
-    path: '/api/v3/thesis-ledger/market/news',
+    path: '/api/v1/thesis-ledger/market/news',
     authorization: 'Bearer controlled-data-token',
     body: { contractVersion: 'news-search-v1', capability: 'NEWS_SEARCH', requestBudgetMs: 500 },
   });
@@ -190,7 +190,7 @@ it('市场快讯通过真实 Market HTTP 和认证 DSA HTTP 消费同版合同',
   });
   expect(calls).toHaveLength(1);
   expect(calls[0]).toMatchObject({
-    path: '/api/v3/thesis-ledger/market/news-feed',
+    path: '/api/v1/thesis-ledger/market/news-feed',
     authorization: 'Bearer controlled-data-token',
     body: { capability: 'NEWS_FEED', providerId: 'cls' },
   });
@@ -268,7 +268,7 @@ it('连接中断不重试，不回退原生分析', async () => {
     errors: [{ code: 'service_unavailable' }],
     upstreamAttempts: null,
   });
-  expect(calls.map((call) => call.path)).toEqual(['/api/v3/thesis-ledger/market/news']);
+  expect(calls.map((call) => call.path)).toEqual(['/api/v1/thesis-ledger/market/news']);
 });
 
 it.each([

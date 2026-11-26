@@ -182,10 +182,11 @@ export function AuthoringConfirmation(props: {
             onChange={(executionMode) => edit({ executionMode })}
             options={[
               { value: 'exchange', label: '信号后下一可交易开盘，市价单' },
+              { value: 'dailyBarOrders', label: '按需求生成日线委托计划' },
               { value: 'nav', label: '下一可用净值，申购与赎回' },
             ]}
           />
-          <FieldDescription>当日收盘撮合不在当前支持范围。</FieldDescription>
+          <FieldDescription>日线委托由模型生成价格、有效期和父单保护，生成后核对完整配置。</FieldDescription>
         </Field>
         <Field>
           <FieldLabel>佣金比例</FieldLabel>

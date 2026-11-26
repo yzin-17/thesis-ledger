@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { stripVTControlCharacters } from 'node:util';
 import { setTimeout as waitForLog } from 'node:timers/promises';
 
-const controlPath = '/api/v3/thesis-ledger/market/cache-context';
-const dataPaths = new Set(['/api/v3/thesis-ledger/market/fund-nav',
-  '/api/v3/thesis-ledger/market/fund-nav/history', '/api/v3/thesis-ledger/market/fund-holdings',
-  '/api/v3/thesis-ledger/market/chip']);
+const controlPath = '/api/v1/thesis-ledger/market/cache-context';
+const dataPaths = new Set(['/api/v1/thesis-ledger/market/fund-nav',
+  '/api/v1/thesis-ledger/market/fund-nav/history', '/api/v1/thesis-ledger/market/fund-holdings',
+  '/api/v1/thesis-ledger/market/chip']);
 
 export class CacheObservationPending extends Error {
   constructor(message) { super(message); this.name = 'CacheObservationPending'; }

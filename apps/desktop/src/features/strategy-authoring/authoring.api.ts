@@ -10,7 +10,7 @@ export type OperationView = Awaited<ReturnType<SharedAuthoring['operation']>>;
 export type ProposalView = Awaited<ReturnType<SharedAuthoring['proposal']>>;
 export type AuthoringModel = Awaited<ReturnType<SharedAuthoring['models']>>[number];
 const shared = () => strategyClients(parsedDesktopRequest()).authoring;
-export const authoringApi = {
+export const authoringApi: Omit<SharedAuthoring, 'models' | 'source'> = {
   list: (cursor?: DraftPage['nextCursor']) => shared().list(cursor).then(omitUndefinedDeep),
   read: (id: string) => shared().read(id),
   create: (content: AuthoringContent) => shared().create(content),

@@ -20,7 +20,7 @@ export async function readStrategyResearchContext(
   });
   if (!version) throw new NotFoundException('策略版本不存在');
   const parsed = strategySchema.safeParse(version.schema);
-  if (!parsed.success || version.schemaVersion !== Number(parsed.data.schemaVersion))
+  if (!parsed.success || version.schemaVersion !== 1)
     throw new BadRequestException({
       code: 'RESEARCH_STRATEGY_DEFINITION_UNSUPPORTED',
       message: '策略版本定义未通过现有合同核验',
@@ -43,7 +43,7 @@ export async function readStrategyResearchContext(
   const fetchedAt = new Date().toISOString();
   return {
     scopeSnapshot: researchScopeSnapshotV2Schema.parse({
-      version: 'research-scope-v2',
+      version: 'research-scope-snapshot-v1',
       scope: 'strategy',
       mode: input.mode,
       confirmedAt: fetchedAt,

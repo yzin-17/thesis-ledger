@@ -97,7 +97,7 @@ export class AiResearchSubmissionV2Store {
       const execution = aiExecutionSummarySchema.parse(seed.sdkExecution);
       if (
         execution.contract.id !== 'research' ||
-        execution.contract.version !== 'research-generation-v2' ||
+        execution.contract.version !== 'research-report-generation-v1' ||
         execution.generationStatus !== 'pending' ||
         execution.requests.length !== 0
       )

@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { MarketQuoteReader } from '../../src/market/market-quote-reader.js';
 import { DsaError } from '../../src/integration/dsa/dsa.client.js';
 
-const quote = { version: 3, symbol: '600519.SH', open: 10, high: 11, low: 9, price: 10,
+const quote = { version: 1, symbol: '600519.SH', open: 10, high: 11, low: 9, price: 10,
   previousClose: 10, volume: 1, amount: 10, marketTime: '2026-09-14T01:00:00Z',
   fetchedAt: '2026-09-14T01:00:01Z', freshness: 'live', stale: false, provider: 'fixture' };
 function harness() {

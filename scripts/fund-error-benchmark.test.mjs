@@ -20,7 +20,7 @@ const plan = () => ({
   format: 'fund-error-benchmark-v1',
   caseId: uuid,
   original: {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: uuid,
     revision: 160,
@@ -28,7 +28,7 @@ const plan = () => ({
     routes: [],
   },
   temporary: {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: uuid,
     revision: 161,

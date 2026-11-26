@@ -44,7 +44,7 @@ const candidateManifest = (
   const { runConfig, strategy, calendar } = input.context;
   const plan = planNavSnapshotInputsV3(input.context);
   const candidate: BacktestNavSnapshotManifestV3 = {
-    manifestVersion: 'snapshot-manifest-v3',
+    manifestVersion: 'backtest-nav-snapshot-manifest-v1',
     inputKind: 'nav',
     status: 'finalized',
     runId: input.runId,
@@ -87,8 +87,14 @@ const candidateManifest = (
 /** NAV 资产适配器与场内 Store 使用相同的目录和物理产物格式；N2 接通创建。 */
 export class LocalNavSnapshotStore {
   readonly artifacts: LocalArtifactStore;
-  constructor(private readonly rootDirectory: string) {
+  constructor(readonly rootDirectory: string) {
     this.artifacts = new LocalArtifactStore(resolve(rootDirectory, 'artifacts'));
+  }
+
+  forAttempt(runId: string, attempt: number): LocalNavSnapshotStore {
+    this.directory(runId);
+    if (!Number.isSafeInteger(attempt) || attempt < 1) navIntegrityFailure('NAV attempt非法');
+    return new LocalNavSnapshotStore(resolve(this.rootDirectory, 'attempts', runId, String(attempt)));
   }
 
   private directory(runId: string): string {

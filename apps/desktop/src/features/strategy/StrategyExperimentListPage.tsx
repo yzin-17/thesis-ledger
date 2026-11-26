@@ -70,6 +70,94 @@ const statusOptions = [
 ] as const;
 
 export function StrategyExperimentListPage() {
+  const control = useStrategyExperimentListPage();
+  const {
+    experiments,
+    savedRename,
+    renameReadFailed,
+    refreshRenamedList,
+    items,
+    trail,
+    goPrevious,
+    goNext,
+  } = control;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <ExperimentListToolbar control={control} />
+      {!experiments.data && experiments.isPending ? (
+        <DataStateBanner state="loading" description="正在读取策略实验列表。" />
+      ) : null}
+      {!experiments.data && experiments.isError ? (
+        <DataStateBanner
+          state="error"
+          description="策略实验列表读取失败，当前筛选和分页范围已保留。"
+          onRetry={() => void experiments.refetch()}
+        />
+      ) : null}
+      {savedRename ? (
+        <DataStateBanner
+          state={renameReadFailed ? 'stale' : 'loading'}
+          description={
+            renameReadFailed
+              ? `实验「${savedRename.name}」已保存；保存后的列表确认读取失败，无需重复提交。`
+              : `实验「${savedRename.name}」已保存，正在重新读取当前列表。`
+          }
+          onRetry={renameReadFailed ? () => void refreshRenamedList(savedRename.id) : undefined}
+        />
+      ) : null}
+      <ListRefreshRegion
+        refreshing={experiments.isRefetching && !!experiments.data}
+        label="正在刷新策略实验"
+      >
+        {experiments.data && items.length === 0 ? (
+          <Empty className="rounded-md border border-border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FlaskConical />
+              </EmptyMedia>
+              <EmptyTitle>没有匹配的实验</EmptyTitle>
+              <EmptyDescription>调整筛选条件，或创建新的策略实验。</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button
+                nativeButton={false}
+                render={<Link to={strategyCenterPath.newExperiment}>新建实验</Link>}
+              />
+            </EmptyContent>
+          </Empty>
+        ) : null}
+        {experiments.data && items.length > 0 ? <ExperimentListTable control={control} /> : null}
+      </ListRefreshRegion>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">
+          {experiments.data ? `共 ${experiments.data.totalCount} 条` : '总数暂不可用'}
+          {trail.length > 0 ? `，第 ${trail.length + 1} 页` : ''}
+        </span>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={trail.length === 0 || experiments.isFetching}
+            onClick={goPrevious}
+          >
+            上一页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!experiments.data?.pageInfo.hasNextPage || experiments.isFetching}
+            onClick={goNext}
+          >
+            下一页
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useStrategyExperimentListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const toast = useToastManager();
@@ -113,9 +201,14 @@ export function StrategyExperimentListPage() {
     queryKey: [...optimizationKey, 'experiments', filters],
     queryFn: () => fetchOptimizationExperiments(filters),
     staleTime: 5_000,
-    refetchInterval: (query) => query.state.data?.items.some((item) =>
-      ['queued', 'running', 'testing', 'awaiting_finalization'].includes(item.status) &&
-      !item.stopReason?.startsWith('final_test_retry_required:')) ? 3_000 : false,
+    refetchInterval: (query) =>
+      query.state.data?.items.some(
+        (item) =>
+          ['queued', 'running', 'testing', 'awaiting_finalization'].includes(item.status) &&
+          !item.stopReason?.startsWith('final_test_retry_required:'),
+      )
+        ? 3_000
+        : false,
   });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: optimizationKey });
   const refreshRenamedList = async (id: string) => {
@@ -225,23 +318,231 @@ export function StrategyExperimentListPage() {
   };
   const items = experiments.data?.items ?? [];
 
+  return {
+    draftSearch,
+    setDraftSearch,
+    sourceMode,
+    updateFilter,
+    status,
+    hasFilters,
+    clearFilters,
+    experiments,
+    savedRename,
+    renameReadFailed,
+    refreshRenamedList,
+    items,
+    renamingId,
+    renameValue,
+    renameMutation,
+    renameFlightRef,
+    setRenameValue,
+    submitRename,
+    cancelRename,
+    setRenamingId,
+    setSavedRename,
+    setRenameReadFailed,
+    cloneMutation,
+    trail,
+    goPrevious,
+    goNext,
+  };
+}
+
+function ExperimentListTable({
+  control,
+}: {
+  control: ReturnType<typeof useStrategyExperimentListPage>;
+}) {
   return (
-    <div className="flex flex-col gap-4">
+    <>
+      <TableContainer>
+        <table className="w-full min-w-[900px] table-fixed text-sm">
+          <TableHeader className="border-b text-left">
+            <tr>
+              <TableHead className="w-[38%]">实验名称 / 来源</TableHead>
+              <TableHead className="w-[19%]">状态</TableHead>
+              <TableHead className="w-[23%]">进展与产出</TableHead>
+              <TableHead className="w-[12%]">更新时间</TableHead>
+              <TableHead data-table-action-static className="w-[8%] text-right">
+                操作
+              </TableHead>
+            </tr>
+          </TableHeader>
+          <tbody>
+            {control.items.map((experiment) => (
+              <tr key={experiment.id} className="border-b last:border-0 hover:bg-muted/20">
+                <td className="px-4 py-3">
+                  {control.renamingId === experiment.id ? (
+                    <div className="flex w-full max-w-sm flex-col items-stretch gap-2">
+                      <Input
+                        autoFocus
+                        className="w-full"
+                        aria-label="新的实验名称"
+                        value={
+                          control.savedRename?.id === experiment.id
+                            ? control.savedRename.name
+                            : control.renameValue
+                        }
+                        disabled={
+                          control.renameMutation.isPending ||
+                          control.savedRename?.id === experiment.id
+                        }
+                        onChange={(event) => {
+                          if (
+                            control.renameFlightRef.current ||
+                            control.savedRename?.id === experiment.id
+                          )
+                            return;
+                          control.setRenameValue(event.target.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            control.submitRename(experiment.id, control.renameValue.trim());
+                          }
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            control.cancelRename();
+                          }
+                        }}
+                      />
+                      {control.savedRename?.id !== experiment.id ? (
+                        <Button
+                          aria-busy={control.renameMutation.isPending}
+                          size="sm"
+                          className="w-fit"
+                          disabled={!control.renameValue.trim() || control.renameMutation.isPending}
+                          onClick={() =>
+                            control.submitRename(experiment.id, control.renameValue.trim())
+                          }
+                        >
+                          {control.renameMutation.isPending && (
+                            <Spinner data-icon="inline-start" aria-hidden="true" />
+                          )}
+                          {control.renameMutation.isPending ? '保存中…' : '保存'}
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-fit"
+                        aria-label="取消重命名"
+                        disabled={control.renameMutation.isPending || control.savedRename !== null}
+                        onClick={control.cancelRename}
+                      >
+                        取消
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Link
+                        className="block truncate font-medium text-foreground hover:text-primary/80"
+                        title={experiment.name}
+                        to={strategyCenterPath.experiment(experiment.id)}
+                      >
+                        {experiment.name}
+                      </Link>
+                      <div
+                        className="mt-1 truncate text-xs text-muted-foreground"
+                        title={experimentSourceLabel(experiment)}
+                      >
+                        {experimentSourceLabel(experiment)}
+                      </div>
+                    </>
+                  )}
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <Badge variant={experimentStatusVariant(experiment.status)}>
+                    {experimentStatusLabel(experiment.status)}
+                  </Badge>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {experimentStageLabel(experiment.stage)}
+                  </p>
+                </td>
+                <td className="px-4 py-3 whitespace-normal text-muted-foreground">
+                  {experimentProgressLabel(experiment)}
+                </td>
+                <td className="px-4 py-3 whitespace-normal text-muted-foreground">
+                  {formatDateTime(experiment.updatedAt, '时间未记录')}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`管理 ${experiment.name}`}
+                          disabled={
+                            control.renamingId === experiment.id &&
+                            (control.renameMutation.isPending ||
+                              control.savedRename?.id === experiment.id)
+                          }
+                        >
+                          <MoreHorizontal />
+                        </Button>
+                      }
+                    />
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem
+                          disabled={
+                            control.renamingId !== null ||
+                            control.renameMutation.isPending ||
+                            control.savedRename !== null
+                          }
+                          onClick={() => {
+                            control.setRenamingId(experiment.id);
+                            control.setRenameValue(experiment.name);
+                            control.setSavedRename(null);
+                            control.setRenameReadFailed(false);
+                          }}
+                        >
+                          <Pencil />
+                          修改名称
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={control.cloneMutation.isPending}
+                          onClick={() => control.cloneMutation.mutate(experiment.id)}
+                        >
+                          <Copy />
+                          克隆实验
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableContainer>
+    </>
+  );
+}
+
+function ExperimentListToolbar({
+  control,
+}: {
+  control: ReturnType<typeof useStrategyExperimentListPage>;
+}) {
+  return (
+    <>
       <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(12rem,1fr)_max-content_max-content_max-content_auto] lg:items-center">
         <StrategyListSearchField
           className="min-w-0 flex-1"
-          value={draftSearch}
-          onChange={setDraftSearch}
+          value={control.draftSearch}
+          onChange={control.setDraftSearch}
           placeholder="实验名称或来源"
           label="搜索实验"
         />
         <Select
-          value={sourceMode}
-          onValueChange={(value) => value && updateFilter('sourceMode', value)}
+          value={control.sourceMode}
+          onValueChange={(value) => value && control.updateFilter('sourceMode', value)}
         >
           <SelectTrigger aria-label="筛选实验来源" className="w-36 shrink-0">
             <SelectValue>
-              {sourceModeOptions.find((option) => option.value === sourceMode)?.label ??
+              {sourceModeOptions.find((option) => option.value === control.sourceMode)?.label ??
                 '全部来源'}
             </SelectValue>
           </SelectTrigger>
@@ -255,10 +556,13 @@ export function StrategyExperimentListPage() {
             </SelectGroup>
           </SelectContent>
         </Select>
-        <Select value={status} onValueChange={(value) => value && updateFilter('status', value)}>
+        <Select
+          value={control.status}
+          onValueChange={(value) => value && control.updateFilter('status', value)}
+        >
           <SelectTrigger aria-label="筛选实验状态" className="w-36 shrink-0">
             <SelectValue>
-              {statusOptions.find((option) => option.value === status)?.label ?? '全部状态'}
+              {statusOptions.find((option) => option.value === control.status)?.label ?? '全部状态'}
             </SelectValue>
           </SelectTrigger>
           <SelectContent className="w-max min-w-(--anchor-width) max-w-(--available-width)">
@@ -273,8 +577,8 @@ export function StrategyExperimentListPage() {
         </Select>
         <FilterReset
           className="shrink-0 justify-self-start"
-          hasConditions={hasFilters}
-          onReset={clearFilters}
+          hasConditions={control.hasFilters}
+          onReset={control.clearFilters}
         />
         <Button
           nativeButton={false}
@@ -286,216 +590,6 @@ export function StrategyExperimentListPage() {
           }
         />
       </div>
-      {!experiments.data && experiments.isPending ? (
-        <DataStateBanner state="loading" description="正在读取策略实验列表。" />
-      ) : null}
-      {!experiments.data && experiments.isError ? (
-        <DataStateBanner
-          state="error"
-          description="策略实验列表读取失败，当前筛选和分页范围已保留。"
-          onRetry={() => void experiments.refetch()}
-        />
-      ) : null}
-      {savedRename ? (
-        <DataStateBanner
-          state={renameReadFailed ? 'stale' : 'loading'}
-          description={
-            renameReadFailed
-              ? `实验「${savedRename.name}」已保存；保存后的列表确认读取失败，无需重复提交。`
-              : `实验「${savedRename.name}」已保存，正在重新读取当前列表。`
-          }
-          onRetry={renameReadFailed ? () => void refreshRenamedList(savedRename.id) : undefined}
-        />
-      ) : null}
-      <ListRefreshRegion refreshing={experiments.isRefetching && !!experiments.data} label="正在刷新策略实验">
-        {experiments.data && items.length === 0 ? (
-          <Empty className="rounded-md border border-border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <FlaskConical />
-              </EmptyMedia>
-              <EmptyTitle>没有匹配的实验</EmptyTitle>
-              <EmptyDescription>调整筛选条件，或创建新的策略实验。</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button
-                nativeButton={false}
-                render={<Link to={strategyCenterPath.newExperiment}>新建实验</Link>}
-              />
-            </EmptyContent>
-          </Empty>
-        ) : null}
-        {experiments.data && items.length > 0 ? (
-          <TableContainer>
-            <table className="w-full min-w-[900px] table-fixed text-sm">
-              <TableHeader className="border-b text-left">
-                <tr>
-                  <TableHead className="w-[38%]">实验名称 / 来源</TableHead>
-                  <TableHead className="w-[19%]">状态</TableHead>
-                  <TableHead className="w-[23%]">进展与产出</TableHead>
-                  <TableHead className="w-[12%]">更新时间</TableHead>
-                  <TableHead data-table-action-static className="w-[8%] text-right">
-                    操作
-                  </TableHead>
-                </tr>
-              </TableHeader>
-              <tbody>
-                {items.map((experiment) => (
-                  <tr key={experiment.id} className="border-b last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3">
-                      {renamingId === experiment.id ? (
-                        <div className="flex w-full max-w-sm flex-col items-stretch gap-2">
-                          <Input
-                            autoFocus
-                            className="w-full"
-                            aria-label="新的实验名称"
-                            value={savedRename?.id === experiment.id ? savedRename.name : renameValue}
-                            disabled={renameMutation.isPending || savedRename?.id === experiment.id}
-                            onChange={(event) => {
-                              if (renameFlightRef.current || savedRename?.id === experiment.id)
-                                return;
-                              setRenameValue(event.target.value);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.preventDefault();
-                                submitRename(experiment.id, renameValue.trim());
-                              }
-                              if (event.key === 'Escape') {
-                                event.preventDefault();
-                                cancelRename();
-                              }
-                            }}
-                          />
-                          {savedRename?.id !== experiment.id ? (
-                            <Button
-                              aria-busy={renameMutation.isPending}
-                              size="sm"
-                              className="w-fit"
-                              disabled={!renameValue.trim() || renameMutation.isPending}
-                              onClick={() => submitRename(experiment.id, renameValue.trim())}
-                            >
-                              {renameMutation.isPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-                              {renameMutation.isPending ? '保存中…' : '保存'}
-                            </Button>
-                          ) : null}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-fit"
-                            aria-label="取消重命名"
-                            disabled={renameMutation.isPending || savedRename !== null}
-                            onClick={cancelRename}
-                          >
-                            取消
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <Link
-                            className="block truncate font-medium text-foreground hover:text-primary/80"
-                            title={experiment.name}
-                            to={strategyCenterPath.experiment(experiment.id)}
-                          >
-                            {experiment.name}
-                          </Link>
-                          <div className="mt-1 truncate text-xs text-muted-foreground" title={experimentSourceLabel(experiment)}>
-                            {experimentSourceLabel(experiment)}
-                          </div>
-                        </>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <Badge variant={experimentStatusVariant(experiment.status)}>
-                        {experimentStatusLabel(experiment.status)}
-                      </Badge>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {experimentStageLabel(experiment.stage)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 whitespace-normal text-muted-foreground">
-                      {experimentProgressLabel(experiment)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-normal text-muted-foreground">
-                      {formatDateTime(experiment.updatedAt, '时间未记录')}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`管理 ${experiment.name}`}
-                              disabled={
-                                renamingId === experiment.id &&
-                                (renameMutation.isPending || savedRename?.id === experiment.id)
-                              }
-                            >
-                              <MoreHorizontal />
-                            </Button>
-                          }
-                        />
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuGroup>
-                            <DropdownMenuItem
-                              disabled={
-                                renamingId !== null ||
-                                renameMutation.isPending ||
-                                savedRename !== null
-                              }
-                              onClick={() => {
-                                setRenamingId(experiment.id);
-                                setRenameValue(experiment.name);
-                                setSavedRename(null);
-                                setRenameReadFailed(false);
-                              }}
-                            >
-                              <Pencil />
-                              修改名称
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={cloneMutation.isPending}
-                              onClick={() => cloneMutation.mutate(experiment.id)}
-                            >
-                              <Copy />
-                              克隆实验
-                            </DropdownMenuItem>
-                          </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableContainer>
-        ) : null}
-      </ListRefreshRegion>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
-          {experiments.data ? `共 ${experiments.data.totalCount} 条` : '总数暂不可用'}
-          {trail.length > 0 ? `，第 ${trail.length + 1} 页` : ''}
-        </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={trail.length === 0 || experiments.isFetching}
-            onClick={goPrevious}
-          >
-            上一页
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!experiments.data?.pageInfo.hasNextPage || experiments.isFetching}
-            onClick={goNext}
-          >
-            下一页
-          </Button>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

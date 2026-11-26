@@ -1,5 +1,24 @@
 {
   "commands": [
+    { "path": "scripts/local-runtime/run-arena-luna-finalize.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-scoped-replay.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-v6-deployment.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-replay-new.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-range-admission.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-event-admission.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-range-preparation.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-isolated-business.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-execution-admission.mjs" },
+    { "path": "scripts/local-runtime/run-arena-historical-execution-check.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-isolated-roundtrip.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-isolated-request.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-backtest-trade-plan-runtime-check.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-authoring-order-validity-target.mjs", "idle": true },
+    { "path": "scripts/local-runtime/strategy-definition-runtime-check.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-strategy-trade-plan-route-upgrade.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-backtest-trade-plan-acceptance.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-research-route-upgrade.mjs", "idle": true },
+    { "path": "scripts/local-runtime/run-arena-contingent-model-acceptance.mjs", "idle": true },
     { "path": "scripts/local-runtime/run-arena-us-model-acceptance.mjs", "idle": true },
     { "path": "scripts/local-runtime/arena-us-acceptance-config.mjs" },
     { "path": "scripts/local-runtime/capture-arena-us-history.mjs" },
@@ -7,6 +26,8 @@
     { "path": "scripts/local-runtime/dsa-forward-image-recovery.mjs", "idle": true },
     { "path": "scripts/local-runtime/dsa-target-recovery.mjs" },
     { "path": "scripts/local-runtime/dsa-target-acceptance.mjs" },
-    { "path": "scripts/local-runtime/arena-research-recovery.mjs" }
+    { "path": "scripts/local-runtime/arena-research-recovery.mjs" },
+    { "path": "scripts/local-runtime/run-arena-luna-admission.mjs", "idle": true },
+    { "path": "scripts/local-runtime/migrate-market-policy-history.mjs" }
   ]
 }

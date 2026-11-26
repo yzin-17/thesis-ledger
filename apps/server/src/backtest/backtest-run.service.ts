@@ -4,17 +4,13 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type BacktestJob } from '@prisma/client';
 import { PrismaService } from '../platform/prisma.service.js';
 import { BacktestQueueService } from './backtest-queue.service.js';
-import {
-  canonicalizeManifest,
-  hashCanonicalManifest,
-  LocalSnapshotStore,
-} from './backtest-snapshot.js';
-import type { ArtifactRow } from './backtest-artifact-store.js';
+import { LocalSnapshotStore } from './backtest-snapshot.js';
+import { fingerprintBacktestRunData, type ComparableDataFingerprintRange } from './backtest-comparable-run-data.js';
 import { runBacktestAttempt } from './backtest-run-attempt.js';
-import { indicatorEngineChanged, indicatorEngineVersionMessage } from './backtest-indicator-engine-version.js';
+import { backtestRunnerIdentity, backtestHasExecutionHistory } from './backtest-indicator-engine-version.js';
 import type {
   BacktestSnapshotV3BuildInput,
   BacktestSnapshotV3BuildResult,
@@ -22,12 +18,13 @@ import type {
 import {
   BacktestSnapshotUnavailableError,
   BacktestV3RunLifecycle,
-  persistedContractVersion,
+  persistedRunContract,
 } from './backtest-v3-run-lifecycle.js';
 import { prepareBacktestManualRetry } from './backtest-retry-budget.js';
 import {
   executeBacktestV3Run,
   loadVerifiedBacktestV3Snapshot,
+  stockSnapshotStoreForJob,
 } from './backtest-v3-run-execution.js';
 import { BACKTEST_V3_RUNNER, type BacktestV3Runner } from './backtest-v3-runner.js';
 import { BacktestCreationGuardService } from './backtest-creation-guard.service.js';
@@ -35,10 +32,12 @@ import { BacktestNavRunExecution } from './backtest-nav-run-execution.js';
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
 import { verifyBacktestRunRetrySnapshot } from './backtest-nav-run-retry.js';
 import { classifyBacktestRunFailure } from './backtest-run-failure.js';
-import { comparableTradabilityWindows } from './backtest-comparable-tradability.js';
+import { materializeStockBacktest } from './backtest-stock-materialization.js';
+import { advanceBacktestStage } from './backtest-materialization-publication.js';
+import { createBacktestRunnerReplay, materializeStockRunnerReplay } from './backtest-runner-replay.js';
 
 export interface BacktestSnapshotBuilder {
-  buildV3(input: BacktestSnapshotV3BuildInput): Promise<BacktestSnapshotV3BuildResult>;
+  buildV3(input: BacktestSnapshotV3BuildInput, snapshots?: LocalSnapshotStore): Promise<BacktestSnapshotV3BuildResult>;
 }
 
 export const BACKTEST_SNAPSHOT_BUILDER = Symbol('BACKTEST_SNAPSHOT_BUILDER');
@@ -48,110 +47,7 @@ export interface BacktestExecutionAttempt {
   maxAttempts: number;
 }
 
-export interface ComparableDataFingerprintRange {
-  start: string;
-  end: string;
-}
-
-const comparableDateFields = ['date', 'tradingDate', 'occurredAt', 'effectiveDate'] as const;
-const comparableTimestampFields = new Set(['occurredAt', 'availableAt']);
-const comparableNumberFields = new Set(['amount']);
-const COMPARABLE_AMOUNT_DECIMAL_PLACES = 6;
-
-const datePart = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') return undefined;
-  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim());
-  return match?.[1];
-};
-
-const rowDates = (row: ArtifactRow): string[] =>
-  comparableDateFields.flatMap((field) => {
-    const value = datePart(row[field]);
-    return value ? [value] : [];
-  });
-
-const inRange = (date: string, range: ComparableDataFingerprintRange) =>
-  date >= range.start && date <= range.end;
-
-const parseJsonValue = (value: ArtifactRow['sessions']): unknown => {
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as unknown;
-  } catch {
-    return value;
-  }
-};
-
-const stringifyJsonValue = (value: unknown): ArtifactRow['sessions'] =>
-  typeof value === 'string' ? value : JSON.stringify(value);
-
-const normalizeComparableField = (
-  key: string,
-  value: ArtifactRow['sessions'],
-  range: ComparableDataFingerprintRange,
-): ArtifactRow['sessions'] => {
-  if (key === 'historicalTradabilityWindows' && typeof value === 'string')
-    return comparableTradabilityWindows(value, range);
-  if (comparableTimestampFields.has(key) && typeof value === 'string') {
-    const timestamp = Date.parse(value);
-    if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString();
-  }
-  if (comparableNumberFields.has(key) && (typeof value === 'string' || typeof value === 'number')) {
-    const number = Number(value);
-    if (Number.isFinite(number))
-      return Number(number.toFixed(COMPARABLE_AMOUNT_DECIMAL_PLACES)).toString();
-  }
-  const parsed = parseJsonValue(value);
-  if (key === 'range' && parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-    return JSON.stringify({ start: range.start, end: range.end });
-  }
-  if (key === 'holidays' && Array.isArray(parsed)) {
-    return stringifyJsonValue(
-      parsed.filter((item) => {
-        const date = datePart(item);
-        return !date || inRange(date, range);
-      }),
-    );
-  }
-  if (key === 'sessionOverrides' && Array.isArray(parsed)) {
-    return stringifyJsonValue(
-      parsed.filter((item) => {
-        if (!item || typeof item !== 'object' || Array.isArray(item)) return true;
-        const date = datePart((item as Record<string, unknown>).date);
-        return !date || inRange(date, range);
-      }),
-    );
-  }
-  return value;
-};
-
-const comparableRow = (
-  row: ArtifactRow,
-  range: ComparableDataFingerprintRange,
-  artifactKey: string,
-): ArtifactRow =>
-  Object.fromEntries(
-    Object.entries(row)
-      .filter(
-        ([key]) =>
-          key !== 'inputFingerprint' &&
-          !(artifactKey.startsWith('calendar/') && key === 'availableAt'),
-      )
-      .map(([key, value]) => [key, normalizeComparableField(key, value, range)]),
-  );
-
-const comparableRows = (
-  rows: readonly ArtifactRow[],
-  range: ComparableDataFingerprintRange,
-  artifactKey: string,
-): ArtifactRow[] =>
-  rows
-    .filter((row) => {
-      const dates = rowDates(row);
-      return dates.length === 0 || dates.some((date) => inRange(date, range));
-    })
-    .map((row) => comparableRow(row, range, artifactKey))
-    .sort((left, right) => canonicalizeManifest(left).localeCompare(canonicalizeManifest(right)));
+export type { ComparableDataFingerprintRange } from './backtest-comparable-run-data.js';
 
 export class BacktestRunService {
   private readonly activeControllers = new Map<string, AbortController>();
@@ -193,7 +89,7 @@ export class BacktestRunService {
       input !== null && typeof input === 'object' && !Array.isArray(input)
         ? (input as Record<string, unknown>)
         : undefined;
-    if (request?.contractVersion !== 3) {
+    if (request?.contractVersion !== 1) {
       throw new BadRequestException({
         code: 'UNSUPPORTED_CONTRACT_VERSION',
         message: '只支持现行回测合同',
@@ -213,18 +109,16 @@ export class BacktestRunService {
     if (!job) throw new NotFoundException('回测 Run 不存在');
     if (job.errorCode === 'PREPARATION_FAILED')
       throw new BadRequestException('准备阶段失败，请返回原策略重新创建回测。');
-    if (persistedContractVersion(job) !== 3)
+    if (!persistedRunContract(job))
       throw new BadRequestException('旧 Run 持久化合同拒绝执行');
     return runBacktestAttempt({
       prisma: this.prisma,
       job,
       ...(execution ? { execution } : {}),
-      runnerId: isNavBacktestInput(job.input)
-        ? (this.navExecution?.runner.navId ?? 'nav-runner-unconfigured')
-        : (this.defaultV3Runner?.id ?? 'current-runner-unconfigured'),
+      runnerId: isNavBacktestInput(job.input) ? this.navExecution?.runner.navId : this.defaultV3Runner?.id,
       activeControllers: this.activeControllers,
       execute: async (attemptJob, signal) => {
-        if (persistedContractVersion(attemptJob) !== 3)
+        if (!persistedRunContract(attemptJob))
           throw new BadRequestException('旧 Run 持久化合同拒绝执行');
         if (isNavBacktestInput(attemptJob.input)) {
           if (!this.navExecution) throw new BacktestSnapshotUnavailableError('NAV Runner 未配置');
@@ -233,11 +127,16 @@ export class BacktestRunService {
         if (!this.defaultV3Runner) {
           throw new BacktestSnapshotUnavailableError('现行 Runner 未配置，Run 未进入执行');
         }
+        const replayed = await materializeStockRunnerReplay({ prisma: this.prisma, job: attemptJob,
+          snapshots: this.snapshotStoreForRun(), signal });
+        const materialized = await materializeStockBacktest({ prisma: this.prisma, job: replayed,
+          snapshots: this.snapshotStoreForRun(), builder: this.snapshotBuilder, guard: this.creationGuard, signal });
         return executeBacktestV3Run({
-          job: attemptJob,
+          job: materialized,
           runner: this.defaultV3Runner,
           snapshots: this.snapshotStoreForRun(),
           signal,
+          onStage: (stage) => advanceBacktestStage(this.prisma, materialized, signal, stage),
         });
       },
       classifyFailure: (error) => classifyBacktestRunFailure(error, execution),
@@ -249,12 +148,14 @@ export class BacktestRunService {
     if (!job) throw new NotFoundException('回测 Run 不存在');
     if (job.errorCode === 'PREPARATION_FAILED')
       throw new BadRequestException('准备阶段失败，请返回原策略重新创建回测。');
-    if (persistedContractVersion(job) !== 3)
+    if (!persistedRunContract(job))
       throw new BadRequestException('旧 Run 持久化合同拒绝重试');
+    if (!['succeeded', 'failed'].includes(job.status)) throw new BadRequestException('只有失败或已完成的Run可以重试');
+    const identity = backtestRunnerIdentity(job.engineVersion, this.runnerIdentityFor(job), backtestHasExecutionHistory(job));
+    if (identity !== 'same' && identity !== 'unbound-new')
+      return createBacktestRunnerReplay({ prisma: this.prisma, job, runnerId: this.runnerIdentityFor(job),
+        snapshots: this.snapshotStoreForRun(), navExecution: this.navExecution, queue: this.queueService });
     if (job.status === 'succeeded') return job;
-    if (job.status !== 'failed') throw new BadRequestException('只有 failed Run 可以 retry');
-    if (indicatorEngineChanged(job.engineVersion, this.defaultV3Runner?.id))
-      throw new BadRequestException({ code: 'INDICATOR_ENGINE_VERSION_CHANGED', message: indicatorEngineVersionMessage });
     await verifyBacktestRunRetrySnapshot({
       job,
       prisma: this.prisma,
@@ -271,7 +172,7 @@ export class BacktestRunService {
       throw new BadRequestException('回测重试预算无效');
     }
     const changed = await this.prisma.backtestJob.updateMany({
-      where: { id, mode: 'V3', status: 'failed', executionAttempt: job.executionAttempt },
+      where: { id, mode: 'frozen', status: 'failed', executionAttempt: job.executionAttempt },
       data: {
         status: 'queued',
         stage: 'queued',
@@ -296,50 +197,29 @@ export class BacktestRunService {
     return this.queueService?.ensureEnqueued(id) ?? retried;
   }
 
+  private runnerIdentityFor(job: Pick<BacktestJob, 'input'>): string {
+    const identity = isNavBacktestInput(job.input) ? this.navExecution?.runner.navId : this.defaultV3Runner?.id;
+    if (!identity) throw new BadRequestException({ code: 'BACKTEST_RUNNER_UNAVAILABLE', message: '当前资产的回测执行器未装配，不能绑定或重试。' });
+    return identity;
+  }
+
   async comparableDataFingerprint(
     runId: string,
     range: ComparableDataFingerprintRange,
   ): Promise<string> {
     const job = await this.prisma.backtestJob.findUnique({ where: { id: runId } });
     if (!job) throw new NotFoundException('回测 Run 不存在');
-    if (persistedContractVersion(job) !== 3)
+    if (!persistedRunContract(job))
       throw new BadRequestException('旧 Run 持久化合同拒绝比较');
     const snapshot = await loadVerifiedBacktestV3Snapshot(job, this.snapshotStoreForRun());
     if (!snapshot) throw new BadRequestException('Run Snapshot 不存在');
     if (snapshot.status !== 'finalized')
       throw new BadRequestException('Run Snapshot 尚未 finalized');
-    const artifacts = [] as Array<{ key: string; rows: ArtifactRow[] }>;
-    for (const artifact of snapshot.artifacts) {
-      const key = artifact.key.startsWith(`${runId}/`)
-        ? artifact.key.slice(runId.length + 1)
-        : artifact.key;
-      if (key.startsWith('metadata/')) continue;
-      const rows: ArtifactRow[] = [];
-      for await (const row of await this.snapshotStoreForRun().artifacts.openRead(artifact))
-        rows.push(row);
-      artifacts.push({ key, rows: comparableRows(rows, range, key) });
-    }
-    artifacts.sort((left, right) => left.key.localeCompare(right.key));
-    return hashCanonicalManifest({
-      version: 'v3-comparable-data-v1',
+    return fingerprintBacktestRunData(
+      runId,
       range,
-      executionPriceProtocol: snapshot.executionPriceProtocol,
-      frozenExecutionWindow: snapshot.frozenExecutionWindow ?? null,
-      actualSources: [
-        ...new Set(
-          snapshot.actualSources.map((source) =>
-            canonicalizeManifest({
-              symbol: source.symbol,
-              routeKey: source.routeKey,
-              provenance: source.provenance,
-              ...(snapshot.frozenExecutionWindow
-                ? {}
-                : { inputFingerprint: source.inputFingerprint }),
-            }),
-          ),
-        ),
-      ].sort(),
-      artifacts,
-    });
+      snapshot,
+      stockSnapshotStoreForJob(job, this.snapshotStoreForRun()).artifacts,
+    );
   }
 }

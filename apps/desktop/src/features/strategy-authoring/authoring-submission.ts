@@ -2,6 +2,7 @@ import { ThesisLedgerApiError } from '@thesis-ledger/api-client';
 import { authoringApi } from './authoring.api.js';
 
 const rejectedBeforeCreation = new Set([
+  'AUTHORING_MODIFICATION_SCOPE_INVALID',
   'AUTHORING_CONDITIONS_INCOMPLETE',
   'AUTHORING_INSTRUMENT_MISMATCH',
   'AUTHORING_MODEL_UNAVAILABLE',

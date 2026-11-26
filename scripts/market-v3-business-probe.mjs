@@ -64,23 +64,23 @@ export async function probeMarketV3Business({ origin, dataToken, barRequest, fet
     if (!result.success) throw new Error(`V3 业务端点响应合同无效：${path}`);
     return result.data;
   };
-  const quotePath = '/api/v3/thesis-ledger/market/quote?symbol=600519.SH';
+  const quotePath = '/api/v1/thesis-ledger/market/quote?symbol=600519.SH';
   const quote = parse(quoteSchema, await call(quotePath), quotePath);
   if (quote.symbol !== '600519.SH') throw new Error('V3 报价标的身份不匹配');
-  const etfQuotePath = '/api/v3/thesis-ledger/market/quote?symbol=510300.SH';
+  const etfQuotePath = '/api/v1/thesis-ledger/market/quote?symbol=510300.SH';
   const etfQuote = parse(quoteSchema, await call(etfQuotePath), etfQuotePath);
   if (etfQuote.symbol !== '510300.SH') throw new Error('V3 ETF 报价标的身份不匹配');
-  const navPath = '/api/v3/thesis-ledger/market/fund-nav?symbol=000001.OF';
+  const navPath = '/api/v1/thesis-ledger/market/fund-nav?symbol=000001.OF';
   const nav = parse(fundNavSchema, await call(navPath), navPath);
   if (nav.symbol !== '000001.OF') throw new Error('V3 基金净值标的身份不匹配');
-  const historyPath = '/api/v3/thesis-ledger/market/fund-nav/history?symbol=000001.OF&limit=5';
+  const historyPath = '/api/v1/thesis-ledger/market/fund-nav/history?symbol=000001.OF&limit=5';
   const history = parse(fundNavHistorySchema, await call(historyPath), historyPath);
   if (history.length === 0 || history.some((point) => point.symbol !== nav.symbol))
     throw new Error('V3 基金净值历史缺失或标的身份不匹配');
-  const holdingsPath = '/api/v3/thesis-ledger/market/fund-holdings?symbol=000001.OF';
+  const holdingsPath = '/api/v1/thesis-ledger/market/fund-holdings?symbol=000001.OF';
   const holdings = parse(fundHoldingsSchema, await call(holdingsPath), holdingsPath);
   if (holdings.fundSymbol !== nav.symbol) throw new Error('V3 基金持仓标的身份不匹配');
-  const fxPath = '/api/v3/thesis-ledger/market/fx-rates?baseCurrency=CNY&currencies=CNY';
+  const fxPath = '/api/v1/thesis-ledger/market/fx-rates?baseCurrency=CNY&currencies=CNY';
   const fx = parse(fxRatesResponseSchema, await call(fxPath), fxPath);
   if (
     fx.baseCurrency !== 'CNY' ||
@@ -93,10 +93,10 @@ export async function probeMarketV3Business({ origin, dataToken, barRequest, fet
     )
   )
     throw new Error('V3 CNY 自身汇率合同不完整');
-  const chipPath = '/api/v3/thesis-ledger/market/chip?symbol=600519.SH';
+  const chipPath = '/api/v1/thesis-ledger/market/chip?symbol=600519.SH';
   const chip = parse(chipDistributionSchema, await call(chipPath), chipPath);
   if (chip.symbol !== quote.symbol) throw new Error('V3 筹码标的身份不匹配');
-  const barsPath = '/api/v3/thesis-ledger/market/bars';
+  const barsPath = '/api/v1/thesis-ledger/market/bars';
   const bars = parse(
     marketDataBarSeriesResponseV3Schema,
     await call(barsPath, {

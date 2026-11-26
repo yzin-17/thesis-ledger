@@ -10,6 +10,7 @@ import type {
   OptimizationTradingCostReadModel,
   ResultReadEligibility,
   InstrumentDirectory,
+  BacktestResultV3,
 } from '@thesis-ledger/schemas';
 
 export type ExperimentRow = {
@@ -140,6 +141,11 @@ export type EvaluationSummary = {
   totalReturn?: string;
   maxDrawdown?: string;
   turnover?: string;
+  turnoverRate?: string;
+  tradedNotional?: string;
+  analyticsVersion?: 'research-analytics-v2';
+  scoreVersion?: 'optimization-score-v2';
+  ruleDiagnostics?: NonNullable<BacktestResultV3['ruleDiagnostics']>;
   score?: number;
   reason?: string;
   failureCategory?:
@@ -148,6 +154,16 @@ export type EvaluationSummary = {
 
 export const optimizationSha256 = (value: unknown) =>
   createHash('sha256').update(canonicalStrategyMonitoringJson(value)).digest('hex');
+
+export function optimizationDataArtifactFingerprint(data: string, result: Record<string, unknown>) {
+  if (result.analyticsVersion !== 'research-analytics-v2') return data;
+  return optimizationSha256({
+    data,
+    analyticsVersion: result.analyticsVersion,
+    scoreVersion: 'optimization-score-v2',
+    engineVersion: result.engineVersion,
+  });
+}
 
 const sameJsonValue = (left: unknown, right: unknown) => {
   try {

@@ -2,9 +2,10 @@ import type { BacktestNavResultV3 } from '@thesis-ledger/schemas';
 import type { ArtifactRef } from './backtest-artifact-store.js';
 import type { LocalNavSnapshotStore } from './backtest-nav-snapshot-store.js';
 import { canonicalizeManifest } from './backtest-snapshot.js';
-import { runNavOfflineStrategyV3 } from './backtest-nav-offline-strategy.js';
+import { navOfflineStrategySteps } from './backtest-nav-offline-strategy.js';
+import { advanceBacktestComputation } from '@thesis-ledger/domain';
 import {
-  projectNavResultV3,
+  navResultV3Steps,
   verifyNavResultV3,
   NAV_V3_RUNNER_VERSION,
 } from './backtest-nav-result-v3.js';
@@ -17,7 +18,12 @@ export interface BacktestNavV3RunnerInput {
 
 export interface BacktestNavV3Runner {
   readonly navId: string;
-  runNav(input: BacktestNavV3RunnerInput, signal: AbortSignal): Promise<BacktestNavResultV3>;
+  runNav(input: BacktestNavV3RunnerInput, signal: AbortSignal, context?: NavRunnerContext): Promise<BacktestNavResultV3>;
+}
+
+export interface NavRunnerContext {
+  snapshots: LocalNavSnapshotStore;
+  onStage?: (stage: 'simulating' | 'analyzing') => Promise<void>;
 }
 
 const notAborted = (signal: AbortSignal) => {
@@ -28,9 +34,9 @@ export class LocalNavSnapshotV3Runner implements BacktestNavV3Runner {
   readonly navId = NAV_V3_RUNNER_VERSION;
   constructor(private readonly snapshots: LocalNavSnapshotStore) {}
 
-  async runNav(input: BacktestNavV3RunnerInput, signal: AbortSignal): Promise<BacktestNavResultV3> {
+  async runNav(input: BacktestNavV3RunnerInput, signal: AbortSignal, context?: NavRunnerContext): Promise<BacktestNavResultV3> {
     notAborted(signal);
-    const frozen = await this.snapshots.replay(input.runId);
+    const frozen = await (context?.snapshots ?? this.snapshots).replay(input.runId);
     notAborted(signal);
     const { manifest } = frozen;
     if (
@@ -53,9 +59,11 @@ export class LocalNavSnapshotV3Runner implements BacktestNavV3Runner {
       })
     )
       throw new Error('NAV Runner Artifact 引用必须与冻结产物完全一致');
-    const output = runNavOfflineStrategyV3(frozen, signal);
+    await context?.onStage?.('simulating');
+    const output = await advanceBacktestComputation(navOfflineStrategySteps(frozen, signal), { signal });
     notAborted(signal);
-    const result = verifyNavResultV3(projectNavResultV3(frozen, output), frozen);
+    await context?.onStage?.('analyzing');
+    const result = verifyNavResultV3(await advanceBacktestComputation(navResultV3Steps(frozen, output), { signal }), frozen);
     notAborted(signal);
     return result;
   }

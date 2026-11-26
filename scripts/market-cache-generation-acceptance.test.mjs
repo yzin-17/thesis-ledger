@@ -5,7 +5,7 @@ import { createCacheGenerationCase, executeCacheGenerationCase, assertCacheGener
 import { countQuoteDataCalls, collectQuoteDataCalls } from './market-cache-generation-acceptance.mjs';
 
 function fixture() {
-  let state = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'baseline',
+  let state = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'baseline',
     revision: 84, enabled: true, routes: [
       { key: cacheRouteKey, enabled: true, targets: [{ providerId: 'hithink', upstreamSource: 'fixture-existing' }] },
       { key: { kind: 'bar', market: 'CN', assetType: 'ETF', capability: 'DAILY_BAR', timeframe: '1d', adjustment: 'qfq' },

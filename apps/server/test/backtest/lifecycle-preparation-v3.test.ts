@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { backtestRunPreparationRequestV3Schema, runConfigSchemaV3 } from '@thesis-ledger/schemas';
-import { lifecycleResponseFixtureV3 } from '../market/lifecycle-response.fixture.js';
+import { lifecycleCapabilitiesFixture, lifecycleResponseFixtureV3 } from '../market/lifecycle-response.fixture.js';
 import {
   deriveLifecyclePreparationV3,
   lifecycleInputHashV3,
@@ -83,7 +83,7 @@ describe('生命周期保留原预热、请求范围与独立来源', () => {
   });
   it('实际源输入变化影响指纹，单纯包装请求号不影响', () => {
     const value = receipt('2026-05-18');
-    const changed = structuredClone(value.response);
+    const changed = lifecycleResponseFixtureV3('000995.SZ', '2026-05-01', '2026-05-22', '2026-05-18');
     changed.requestId = 'another';
     changed.provenance.fetchedAt = '2026-06-02T00:00:00Z';
     expect(lifecycleInputHashV3(changed)).toBe(value.inputHash);
@@ -109,7 +109,7 @@ describe('生命周期保留原预热、请求范围与独立来源', () => {
     config.executionModel!.scope.range.end = config.endDate;
     config.executionModel!.segments.forEach((segment) => (segment.range.end = config.endDate));
     const request = backtestRunPreparationRequestV3Schema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'life-prepare',
       strategyVersionId: '11111111-1111-4111-8111-111111111111',
       adjustment: 'qfq',
@@ -129,7 +129,7 @@ describe('生命周期保留原预热、请求范围与独立来源', () => {
     const ipo = config.startDate;
     const lifecycle = {
       read: vi.fn(async (scope: { symbol: string; start: string; end: string }) =>
-        lifecycleResponseFixtureV3(scope.symbol, scope.start, scope.end, ipo),
+        lifecycleCapabilitiesFixture(scope.symbol, scope.start, scope.end, ipo).read(),
       ),
     };
     let parent: Awaited<ReturnType<typeof makeReaderResult>>;
@@ -166,7 +166,7 @@ describe('生命周期保留原预热、请求范围与独立来源', () => {
     });
     const control = {
       getPolicy: vi.fn(async () => ({
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'policy',
         revision: 7,

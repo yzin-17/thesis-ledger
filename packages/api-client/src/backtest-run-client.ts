@@ -33,7 +33,7 @@ export const backtestRunClient = (request: ParsedRequest, post: ParsedPost) => {
     cancelRun: (runId: string, signal?: AbortSignal) =>
       post(`${path(runId)}/cancel`, {}, bound(runId), signal),
     retryRun: (runId: string, signal?: AbortSignal) =>
-      post(`${path(runId)}/retry`, {}, bound(runId), signal),
+      post(`${path(runId)}/retry`, {}, backtestRunDetailReadSchema.refine((run) => run.id === runId || run.replayOfRunId === runId), signal),
     dispatchRun: (runId: string, signal?: AbortSignal) =>
       post(`${path(runId)}/run`, {}, bound(runId), signal),
   };

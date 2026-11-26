@@ -119,7 +119,7 @@ describe('策略实验工作台 UI 契约', () => {
 
 describe('回测任务状态与失败恢复', () => {
   it('任务表使用中文状态、运行进度和可重试操作', () => {
-    expect(jobStatusLabel('queued')).toBe('排队中');
+    expect(jobStatusLabel('queued')).toBe('等待执行');
     expect(jobStatusLabel('unknown')).toBe('未知状态（unknown）');
     const html = renderToStaticMarkup(
       <StrategyJobs
@@ -163,7 +163,7 @@ describe('回测任务状态与失败恢复', () => {
         jobs={[
           {
             ...job,
-            mode: 'V3',
+            mode: 'frozen',
             status: 'failed',
             stage: 'artifact-read',
             executionAttempt: 2,
@@ -264,18 +264,17 @@ describe('回测及新建策略输入边界', () => {
 
   it('新建策略使用当前合同且不预填标的，比例显示与存储转换一致', () => {
     const emptySchema = createDefaultStrategySchema();
-    expect(emptySchema.schemaVersion).toBe('3');
+    expect(emptySchema.schemaVersion).toBe('strategy-definition-v1');
     expect(emptySchema.description).toContain('示例规则');
     expect(schemaSymbols(emptySchema)).toEqual([]);
     expect(strategySchema.safeParse(emptySchema).success).toBe(false);
     const selectedSchema = setStrategyExecutionSymbol(emptySchema, '600519.SH');
-    expect(strategySchema.safeParse(selectedSchema).success).toBe(true);
+    expect(strategySchema.safeParse(selectedSchema).success).toBe(false);
     const etfSchema = setStrategyExecutionAssetType(selectedSchema, 'etf');
-    expect(strategySchema.safeParse(etfSchema).success).toBe(true);
-    expect(etfSchema.signalSources).toMatchObject([{ asset: { assetType: 'etf' } }]);
-    expect(setStrategyPrimaryTimeframe(selectedSchema, '60m').signalSources).toMatchObject([
-      { timeframe: '60m' },
-    ]);
+    expect(strategySchema.safeParse(etfSchema).success).toBe(false);
+    expect('signalSources' in etfSchema && etfSchema.signalSources).toEqual(emptySchema.signalSources);
+    const changedTimeframe = setStrategyPrimaryTimeframe(selectedSchema, '60m');
+    expect('signalSources' in changedTimeframe && changedTimeframe.signalSources).toEqual(emptySchema.signalSources);
     expect(fractionToPercent(0.125)).toBe('12.5');
     expect(percentToFraction('12.5')).toBeCloseTo(0.125);
     expect(stopLossFieldLabel('atr')).toBe('ATR 倍数');

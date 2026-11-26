@@ -30,6 +30,16 @@ const bar = (
 });
 
 describe('aggregateMinuteBars', () => {
+  it('显式价格研究保留未知量与额，旧读取仍要求量且不把未知补零', () => {
+    const values = Array.from({ length: 5 }, (_, index) => ({
+      ...bar(`2026-09-08T01:3${index}:00.000Z`), volume: index === 2 ? undefined : '100', amount: undefined,
+    }));
+    expect(() => aggregateMinuteBars(values, '5m')).toThrow('OHLCV');
+    const result = aggregateMinuteBars(values, '5m', { preserveUnknownMetrics: true });
+    expect(result[0]).toMatchObject({ open: '10', close: '10', high: '11', low: '9', completeness: 'complete', observedMinutes: 5 });
+    expect(result[0]?.volume).toBeUndefined();
+    expect(result[0]?.amount).toBeUndefined();
+  });
   it('aggregates OHLCV and propagates the latest availability without crossing sessions', () => {
     const bars = [
       bar('2026-09-08T01:30:00.000Z', { open: 10, high: 12, low: 9, close: 11, volume: 100 }),

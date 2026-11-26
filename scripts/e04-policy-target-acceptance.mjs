@@ -86,7 +86,7 @@ try {
  assert(effective);assert.equal(effective.sourceDesiredRevision,policy.revision);
  const catalog=await client.marketRouteCatalogV3();
  assert.equal(catalog.contractVersion,3);assert.equal(catalog.consumer,'thesis-ledger');
- const desired={contractVersion:3,consumer:'thesis-ledger',requestId:effective.requestId,
+ const desired={contractVersion:1,consumer:'thesis-ledger',requestId:effective.requestId,
   revision:policy.revision,enabled:policy.enabled,routes:policy.routes};
  const replay=await client.applyControlPolicyV3(desired);
  assert.equal(replay.idempotent,true);assert.equal(replay.effective.sourceDesiredRevision,policy.revision);
@@ -98,16 +98,16 @@ try {
   return {status:response.status,body:await response.json()};
  };
  for(const version of [1,2]) {
-  const rejected=await call('/api/v3/thesis-ledger/control/policies/apply','POST',{...desired,contractVersion:version});
+  const rejected=await call('/api/v1/thesis-ledger/control/policies/apply','POST',{...desired,contractVersion:version});
   assert.equal(rejected.status,422);assert.equal(rejected.body.detail.code,'CONTROL_CONTRACT_UNSUPPORTED');oldBody+=1;
   for(const path of ['/control/policies/effective','/control/routes/capabilities']) {
-   assert.equal((await call('/api/v3/thesis-ledger'+path+'?contractVersion='+version)).status,422);oldBody+=1;
+   assert.equal((await call('/api/v1/thesis-ledger'+path+'?contractVersion='+version)).status,422);oldBody+=1;
   }
  }
  for(const prefix of ['/api/v1/thesis-ledger','/api/v2/thesis-ledger']) {
   assert.equal((await call(prefix+'/control/policies/apply','POST',desired)).status,404);retired+=1;
   for(const path of ['/control/policies/effective','/control/routes/capabilities']) {
-   assert.equal((await call(prefix+path+'?contractVersion=3')).status,404);retired+=1;
+   assert.equal((await call(prefix+path+'?contractVersion=1')).status,404);retired+=1;
   }
  }
  const invalidInputs=[{...desired,contractVersion:1},{...desired,contractVersion:2},

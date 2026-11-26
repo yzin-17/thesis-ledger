@@ -15,7 +15,7 @@ describe('来源坏响应与协议损坏分别处理', () => {
         502,
         {
           detail: {
-            contractVersion: 3,
+            contractVersion: 1,
             requestId: request.requestId,
             error: { code: 'invalid_response', message: '行情上游响应格式无效' },
           },
@@ -52,7 +52,7 @@ describe('来源坏响应与协议损坏分别处理', () => {
           502,
           {
             detail: {
-              contractVersion: 3,
+              contractVersion: 1,
               requestId: request.requestId,
               error: { code: 'invalid_response', message: '行情上游响应格式无效' },
             },
@@ -78,10 +78,10 @@ describe('来源坏响应与协议损坏分别处理', () => {
           return { ...(await original(path, request)), symbol: '600519.SH' };
         let detail: unknown;
         if (mode === 'malformed') {
-          detail = { contractVersion: 3, requestId: request.requestId, code: 'invalid_response' };
+          detail = { contractVersion: 1, requestId: request.requestId, code: 'invalid_response' };
         } else {
           detail = {
-            contractVersion: 3,
+            contractVersion: 1,
             requestId: mode === 'wrong-request' ? 'wrong-request' : request.requestId,
             error: {
               code: 'invalid_response',

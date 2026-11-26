@@ -29,7 +29,7 @@ export function navPreparationFixture() {
     }
   }
   const request = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     requestId: source.request.requestId,
     strategyVersionId: '11111111-1111-4111-8111-111111111111',
     runConfig: config,

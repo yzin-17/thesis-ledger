@@ -18,7 +18,7 @@ function fixture() {
     modelModulesLoaded: [],
     sourceHashes: { runtime: 'same' },
     body: {
-      contractVersion: 3,
+      contractVersion: 1,
       purpose: 'interactive-chart',
       symbol: '510300.SH',
       requestId: 'case',

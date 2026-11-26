@@ -209,7 +209,7 @@ export class PerformanceSnapshotService {
         disclosureCoverage,
         pricedCoverage,
         idempotencyKey,
-        payloadVersion: 2,
+        payloadVersion: 1,
         payload: {
           ...payload,
           snapshotAt: capturedAt.toISOString(),

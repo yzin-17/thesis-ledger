@@ -8,6 +8,7 @@ export type SnapshotDependencyV3ErrorReason =
   | 'fact_unavailable'
   | 'future_fact'
   | 'model_scope_mismatch'
+  | 'action_announcement_found'
   | 'event_plan_blocked'
   | 'artifact_mismatch';
 

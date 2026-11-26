@@ -74,8 +74,9 @@ describe('NAV 公开结果读取', () => {
 describe('NAV retry 与队列 capability', () => {
   it('NAV retry 只验证 NAV 冻结输入并按 attempt CAS 后派发', async () => {
     const job = navJob({ status: 'failed', executionAttempt: 1 });
+    job.engineVersion = 'nav-runner-test';
     const prisma = mutablePrisma(job);
-    const navExecution = { loadVerified: vi.fn(async () => undefined) };
+    const navExecution = { runner: { navId: 'nav-runner-test' }, loadVerified: vi.fn(async () => undefined) };
     const queue = {
       supportsNavExecution: vi.fn(() => true),
       ensureEnqueued: vi.fn(async () => job),
@@ -97,7 +98,7 @@ describe('NAV retry 与队列 capability', () => {
     expect(queue.ensureEnqueued).toHaveBeenCalledWith(job.id);
     expect(prisma.backtestJob.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: job.id, mode: 'V3', status: 'failed', executionAttempt: 1 },
+        where: { id: job.id, mode: 'frozen', status: 'failed', executionAttempt: 1 },
         data: expect.objectContaining({
           status: 'queued',
           executionAttempt: 2,
@@ -162,7 +163,7 @@ describe('NAV retry 与队列 capability', () => {
     expect(queue.add).toHaveBeenCalledWith(job.id);
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: job.id, mode: 'V3', status: 'queued', executionAttempt: 1 },
+        where: { id: job.id, mode: 'frozen', status: 'queued', executionAttempt: 1 },
         data: expect.objectContaining({ dispatchedAt: expect.any(Date), errorCode: null }),
       }),
     );
@@ -207,7 +208,7 @@ describe('NAV Worker 入口与取消 CAS', () => {
     const job = navJob({
       status: 'queued',
       executionAttempt: 0,
-      input: { contractVersion: 3, schemaVersion: '3', inputKind: 'nav', runConfig: {} },
+      input: { contractVersion: 1, schemaVersion: 'backtest-nav-run-v1', inputKind: 'nav', runConfig: {} },
     });
     const prisma = mutablePrisma(job);
     const exchangeRunner = { id: 'exchange-runner', execute: vi.fn() };
@@ -224,23 +225,16 @@ describe('NAV Worker 入口与取消 CAS', () => {
 
     expect(failed?.status).toBe('failed');
     expect(exchangeRunner.execute).not.toHaveBeenCalled();
-    expect(job.engineVersion).toBe('nav-runner-unconfigured');
+    expect(job.engineVersion).toBeNull();
+    expect(failed?.errorCode).toBe('BACKTEST_RUNNER_UNAVAILABLE');
   });
 
-  it.each(['queued', 'running'] as const)('取消 %s 时用状态和 attempt CAS', async (status) => {
+  it.each(['queued', 'running'] as const)('取消 %s 先登记非终态意图，再由执行归属确认停止', async (status) => {
     const job = navJob({ status, executionAttempt: 2 });
-    const update = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-      Object.assign(job, data);
-      return job;
-    });
+    const prisma = mutablePrisma(job);
     const queue = { remove: vi.fn(async () => undefined) };
     const service = new BacktestQueueService(
-      {
-        backtestJob: {
-          findUnique: vi.fn(async () => job),
-          update,
-        },
-      } as never,
+      prisma as never,
       queue as never,
       { publishJob: vi.fn(async () => undefined) } as never,
       {} as never,
@@ -248,9 +242,10 @@ describe('NAV Worker 入口与取消 CAS', () => {
 
     const cancelled = await service.cancel(job.id);
 
-    expect(update).toHaveBeenCalledWith(
+    expect(prisma.backtestJob.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: job.id, mode: 'V3', status, executionAttempt: 2 },
+        where: expect.objectContaining({ id: job.id, mode: 'frozen',
+          status: { notIn: ['succeeded', 'failed', 'cancelled'] }, cancelRequestedAt: null }),
       }),
     );
     if (status === 'queued') {
@@ -267,7 +262,7 @@ describe('NAV Worker 入口与取消 CAS', () => {
 function navJob(input: { status: string; executionAttempt: number; input?: unknown }) {
   return {
     id: runId,
-    mode: 'V3',
+    mode: 'frozen',
     status: input.status,
     executionAttempt: input.executionAttempt,
     engineVersion: null as string | null,
@@ -276,8 +271,8 @@ function navJob(input: { status: string; executionAttempt: number; input?: unkno
     cancelRequestedAt: null,
     startedAt: null,
     input: input.input ?? {
-      contractVersion: 3,
-      schemaVersion: '3',
+      contractVersion: 1,
+      schemaVersion: 'backtest-nav-run-v1',
       inputKind: 'nav',
       preparationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       preparationHash: 'a'.repeat(64),
@@ -292,13 +287,16 @@ function mutablePrisma(job: ReturnType<typeof navJob>) {
       findUnique: vi.fn(async () => job),
       updateMany: vi.fn(
         async ({ where, data }: { where: Record<string, unknown>; data: object }) => {
-          if (
-            where.id !== job.id ||
-            where.mode !== job.mode ||
-            where.status !== job.status ||
-            (where.executionAttempt !== undefined &&
-              where.executionAttempt !== job.executionAttempt)
-          ) {
+          const matches = Object.entries(where).every(([key, value]) => {
+            const actual = (job as Record<string, unknown>)[key];
+            if (value && typeof value === 'object') {
+              if ('notIn' in value) return !(value.notIn as unknown[]).includes(actual);
+              if ('in' in value) return (value.in as unknown[]).includes(actual);
+              if ('not' in value) return actual !== value.not;
+            }
+            return actual === value;
+          });
+          if (!matches) {
             return { count: 0 };
           }
           Object.assign(job, data);

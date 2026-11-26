@@ -4,7 +4,7 @@ import { additionalCacheDefinitions, createAdditionalCacheCase, assertAdditional
   executeAdditionalCacheCase } from './market-additional-cache-case.mjs';
 
 function fixture() {
-  let state = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'original', revision: 86,
+  let state = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'original', revision: 86,
     enabled: true, routes: [{ key: { kind: 'data', market: 'CN', assetType: 'STOCK', capability: 'REALTIME_QUOTE' },
       targets: [{ providerId: 'hithink', upstreamSource: 'original' }] }],
     syncState: 'applied', effectiveStale: false, dsaRevision: 86 };

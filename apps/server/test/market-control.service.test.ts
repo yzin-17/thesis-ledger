@@ -85,7 +85,7 @@ const makeStore = (
 };
 
 const completeCatalog = () => ({
-  contractVersion: 3 as const,
+  contractVersion: 1 as const,
   consumer: 'thesis-ledger' as const,
   catalogRevision: 9,
   generatedAt: '2026-09-25T04:00:00.000Z',
@@ -101,7 +101,7 @@ const dsaReady = () => ({
     requestId: desired.requestId,
     desired,
     effective: {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       consumer: 'thesis-ledger' as const,
       requestId: desired.requestId,
       revision: desired.revision,
@@ -128,9 +128,9 @@ describe('MarketControlService', () => {
     const store = makeStore(null);
     const dsa = dsaReady();
     const result = await new MarketControlService(store.prisma as never, dsa as never).getPolicy();
-    expect(store.getState()?.routes).toMatchObject({ storageVersion: 3, routes: [] });
+    expect(store.getState()?.routes).toMatchObject({ storageVersion: 'market-routing-policy-v1', routes: [] });
     expect(result).toMatchObject({
-      contractVersion: 3,
+      contractVersion: 1,
       revision: 1,
       routes: [],
       syncState: 'applied',
@@ -163,20 +163,20 @@ describe('MarketControlService', () => {
     const store = makeStore();
     const dsa = dsaReady();
     const result = await new MarketControlService(store.prisma as never, dsa as never).applyPolicy({
-      contractVersion: 3,
+      contractVersion: 1,
       revision: 5,
       enabled: true,
       routes,
     });
     expect(result).toMatchObject({
-      contractVersion: 3,
+      contractVersion: 1,
       revision: 5,
       routes,
       syncState: 'applied',
       effectiveStale: false,
       catalogAudit: { catalogRevision: 9, integrity: 'complete' },
     });
-    expect(store.getState()?.routes).toMatchObject({ storageVersion: 3, routes });
+    expect(store.getState()?.routes).toMatchObject({ storageVersion: 'market-routing-policy-v1', routes });
     expect(dsa.applyControlPolicyV3).toHaveBeenCalledOnce();
   });
 
@@ -192,7 +192,7 @@ describe('MarketControlService', () => {
     };
     const service = new MarketControlService(store.prisma as never, dsa as never);
     const first = await service.applyPolicy({
-      contractVersion: 3,
+      contractVersion: 1,
       revision: 5,
       enabled: true,
       routes,
@@ -215,7 +215,7 @@ describe('MarketControlService', () => {
       routes: encodeMarketPolicyRoutes(routes),
       syncState: 'applied',
       effectiveProjection: {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'previous-policy',
         revision: 3,
@@ -251,7 +251,7 @@ describe("路由回滚与 Provider 删除", () => {
       dsaReady() as never,
     ).rollback(2);
     expect(result).toMatchObject({ rolledBackFrom: 4, rolledBackTo: 2, revision: 5, routes });
-    expect(store.getState()?.routes).toMatchObject({ storageVersion: 3, routes });
+    expect(store.getState()?.routes).toMatchObject({ storageVersion: 'market-routing-policy-v1', routes });
   });
 
   it('删除 Provider 从精确路由移除目标，未生效时不删除 DSA Provider', async () => {
@@ -280,7 +280,7 @@ describe("路由回滚与 Provider 删除", () => {
     expect(result).toMatchObject({
       removed: false,
       policy: {
-        contractVersion: 3,
+        contractVersion: 1,
         revision: 5,
         routes: [{ targets: [{ providerId: 'akshare', upstreamSource: 'eastmoney' }] }],
         syncState: 'rejected',
@@ -312,7 +312,7 @@ describe("凭据结构与输入拒绝", () => {
     const service = new MarketControlService({} as never, dsa as never);
     expect(() => service.saveProvider('tushare', { credential: 'old' })).toThrow();
     expect(() => service.testProvider('tushare', { credential: 'old' })).toThrow();
-    for (const contractVersion of [1, 2]) {
+    for (const contractVersion of [2, 3]) {
       expect(() => service.saveProvider('tushare', { contractVersion })).toThrow();
       expect(() => service.testProvider('tushare', { contractVersion })).toThrow();
     }
@@ -328,7 +328,7 @@ describe("凭据结构与输入拒绝", () => {
     const dsa = { removeControlProvider: vi.fn() };
     const service = new MarketControlService(prisma as never, dsa as never);
     for (const input of [
-      { contractVersion: 1 },
+      { contractVersion: 3 },
       { contractVersion: 2 },
       { consumer: 'other' },
       { requestId: '' },

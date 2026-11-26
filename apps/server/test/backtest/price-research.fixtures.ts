@@ -14,13 +14,14 @@ import type { MarketBarWindowReadInputV3 } from '../../src/market/market-bar-rea
 
 export async function priceResearchFixture(
   options: {
+    assetType?: 'etf' | 'stock';
     missingActualDates?: string[];
     researchScale?: number;
     researchSource?: { providerId: string; upstreamSource: string; routeIndex?: number };
     actualSource?: { providerId: string; upstreamSource: string; routeIndex?: number };
   } = {},
 ) {
-  const f = await completeSnapshotFixture();
+  const f = await completeSnapshotFixture(options.assetType);
   f.input.strategy.entry = {
     type: 'all',
     conditions: [
@@ -87,7 +88,7 @@ export async function priceResearchFixture(
     }
     if (result.selection.response.historicalTradabilityWindows)
       result.selection.response.historicalTradabilityWindows = [
-        tradabilityFixtureV3(tradabilityWindowFromResponseV3(result.selection.response)),
+        tradabilityFixtureV3(tradabilityWindowFromResponseV3(result.selection.response), input.dailyObservationContract),
       ];
     result.evidence.routeKey = input.routeKey;
     result.evidence.sourcePriceBasis = result.selection.response.sourcePriceBasis;
@@ -102,7 +103,7 @@ export async function priceResearchFixture(
   );
   const c = f.input.runConfig;
   const request = backtestRunPreparationRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'price-research-test',
     strategyVersionId: '11111111-1111-4111-8111-111111111111',
     priceResearch: 'price-research-v1',
@@ -121,7 +122,7 @@ export async function priceResearchFixture(
   });
   const control = {
     getPolicy: vi.fn(async () => ({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: 'policy',
       revision: 7,

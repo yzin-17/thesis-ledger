@@ -7,6 +7,7 @@ import type {
   ResultReadEligibility,
   StrategyVersionProvenance,
   InstrumentDirectory,
+  BacktestDailyMatching,
 } from '@thesis-ledger/schemas';
 
 export type StrategyStatus = 'draft' | 'active' | 'archived';
@@ -56,7 +57,8 @@ export interface BacktestJobSummary {
   executionModelDisclosure?: ExecutionModelDisclosure;
   id: string;
   strategyVersionId: string;
-  mode?: 'V3';
+  mode?: 'frozen';
+  replayOfRunId?: string;
   status: BacktestJobStatus | (string & {});
   progress?: number | null;
   period?: { start: string; end: string };
@@ -102,6 +104,7 @@ export interface CreateStrategyVersionInput {
 }
 
 export interface BacktestSetupInput {
+  dailyOrderMatching?: BacktestDailyMatching;
   adjustment?: 'none' | 'qfq' | 'hfq';
   prepared?: Extract<BacktestRunPreparationResultV3, { status: 'prepared' }>;
   executionModel?: BacktestExecutionModel;

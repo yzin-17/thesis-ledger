@@ -16,7 +16,7 @@ const collect = { instrumentId, start: '2026-08-01', end: '2026-10-23', page: 1,
 
 function response(request: ReportMetadataRequest, title = '公司跟踪报告'): ReportMetadataPage {
   return {
-    contractVersion: 3, consumer: 'thesis-ledger', capability: 'RESEARCH_REPORT_METADATA',
+    contractVersion: 1, consumer: 'thesis-ledger', capability: 'RESEARCH_REPORT_METADATA',
     ...reportMetadataCurrentRevisions,
     requestId: request.requestId, symbol: request.symbol, start: request.start, end: request.end,
     page: request.page, pageSize: request.pageSize, totalItems: 1, totalPages: 1, historyComplete: false,
@@ -63,21 +63,21 @@ describe('研报采集、稳定引用与本地历史', () => {
     expect(f.post).toHaveBeenCalledTimes(1);
     expect(f.post.mock.calls[0]?.[1]).toMatchObject({ symbol: '000001.SZ', start: null, end: null });
     expect(saved.request).toMatchObject({ start: null, end: null });
-    expect(saved.page.metadataVersion).toBe('research-report-metadata-v2');
+    expect(saved.page.metadataVersion).toBe('market-external-report-metadata-v1');
     expect((await f.repository.read(saved.snapshotId)).contentHash).toBe(saved.contentHash);
   });
 
-  it('旧版 v1 快照继续本地读取，新业务消费拒绝旧版或错配修订', async () => {
+  it('旧合同快照和错配的来源修订都在现行边界拒绝', async () => {
     const f = fixture();
     const request = reportMetadataRequestSchema.parse({ start: collect.start, end: collect.end,
-      page: 1, pageSize: 1, requestBudgetMs: 3000, contractVersion: 3,
+      page: 1, pageSize: 1, requestBudgetMs: 3000, contractVersion: 1,
       consumer: 'thesis-ledger', requestId: 'legacy', symbol: '600519.SH' });
-    const legacy = correlateReportMetadata(request, { ...response(request), metadataVersion: 'research-report-metadata-v1',
-      adapterRevision: 'eastmoney-report-metadata-page-v1', sourceRevision: 'eastmoney-report-list-single-page-v1' });
-    const saved = await f.repository.record(instrumentId, request, correlateReportMetadata(request, legacy));
-    expect((await f.repository.read(saved.snapshotId)).contentHash).toBe(saved.contentHash);
-    expect(saved.page.metadataVersion).toBe('research-report-metadata-v1');
-    f.post.mockImplementation(async (_path, value) => ({ ...response(value), ...legacy, requestId: value.requestId }));
+    const legacy = { ...response(request), metadataVersion: 'research-report-metadata-v1' };
+    expect(() => correlateReportMetadata(request, legacy)).toThrow();
+    const saved = await f.repository.record(instrumentId, request, response(request));
+    f.rows[0]!.payload = { request, page: legacy };
+    await expect(f.repository.read(saved.snapshotId)).rejects.toThrow('本地研报快照校验失败');
+    f.post.mockImplementation(async (_path, value) => ({ ...response(value), metadataVersion: legacy.metadataVersion } as unknown as ReportMetadataPage));
     await expect(f.service.collect(collect)).rejects.toMatchObject({ code: 'invalid-response' });
     f.post.mockImplementation(async (_path, value) => ({ ...response(value), adapterRevision: 'other' }));
     await expect(f.service.collect(collect)).rejects.toMatchObject({ code: 'invalid-response' });
@@ -89,7 +89,7 @@ describe('研报采集、稳定引用与本地历史', () => {
     const saved = await f.service.collect(collect);
     expect(f.post).toHaveBeenCalledTimes(1);
     const [path, request, attempts, , budget] = f.post.mock.calls[0]!;
-    expect(path).toBe('/api/v3/thesis-ledger/market/research-report-metadata');
+    expect(path).toBe('/api/v1/thesis-ledger/market/research-report-metadata');
     expect(request).toMatchObject({ symbol: '600519.SH', assetType: 'STOCK', pageSize: 1 });
     expect(attempts).toBe(1);
     expect(budget).toBe(3000);

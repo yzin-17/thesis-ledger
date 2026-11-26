@@ -92,7 +92,7 @@ describe('Market Route Contract V3', () => {
   it('生效策略携带 Desired/Effective 修订并约束主备状态', () => {
     const desired = desiredProviderPolicyV3Schema.parse(fixture());
     const effective = {
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: 'effective-fixture',
       revision: 4,
@@ -121,7 +121,7 @@ describe('Market Route Contract V3', () => {
     for (const reason of ['admission_invalid', 'admission_not_yet_valid', 'admission_expired']) {
       const target = { ...desired.routes[0]!.targets[0], routeIndex: 0, eligible: false, reason };
       const effective = {
-        contractVersion: 3, consumer: 'thesis-ledger', requestId: 'admission-status',
+        contractVersion: 1, consumer: 'thesis-ledger', requestId: 'admission-status',
         revision: 1, sourceDesiredRevision: 1, enabled: true,
         routes: [{ key: desired.routes[0]!.key, targets: [target], reason }],
         appliedAt: '2026-10-02T00:00:00Z',

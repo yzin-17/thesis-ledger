@@ -6,6 +6,7 @@ import type {
   BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import { compareMarketPitEvidenceInstantStringsV1 } from '@thesis-ledger/schemas';
+import { tradePlanProtectionRules } from '@thesis-ledger/domain';
 import type {
   BacktestDependencyPlanIssue,
   BacktestEventDependency,
@@ -18,7 +19,7 @@ const instrumentKey = (instrument: AssetSymbolRef) =>
   `${instrument.market}:${instrument.symbol}:${instrument.assetType}`;
 
 export const collectEventTypes = (
-  strategy: Pick<BacktestStrategy, 'entry' | 'exit'>,
+  strategy: Pick<BacktestStrategy, 'entry' | 'exit' | 'tradePlan'>,
 ): CorporateActionFact['type'][] => {
   const types = new Set<CorporateActionFact['type']>();
   const visit = (value: unknown): void => {
@@ -40,6 +41,7 @@ export const collectEventTypes = (
   };
   visit(strategy.entry);
   visit(strategy.exit);
+  for (const { expression } of tradePlanProtectionRules(strategy.tradePlan)) visit(expression);
   return [...types].sort();
 };
 

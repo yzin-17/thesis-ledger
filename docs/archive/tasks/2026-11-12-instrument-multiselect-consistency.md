@@ -15,7 +15,7 @@
   - 完成条件：两处使用共享多选契约，单选及多选定向测试、Mobile 类型检查通过。
 - [x] T03：实际组件浏览器验收与最终一致性核对，记录排查范围、证据类型和验证限制。（AC01–AC05）
   - 依赖：T02；复用 Desktop 本会话已通过的四档宽度和已选搜索证据。
-  - 入口：`instrument-multiselect-mobile-browser.mjs`、Mobile 受控浏览器宿主；检查 1440、1024、768、390 宽度。
+  - 入口：`scripts/local-runtime/browser/instruments/instrument-multiselect-mobile.regression.mjs`、Mobile 受控浏览器宿主；检查 1440、1024、768、390 宽度。
   - 完成条件：Mobile 浏览器交互和布局通过；证据、规格和任务状态一致。
 
 ## 排查结论

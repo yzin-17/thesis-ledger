@@ -1,5 +1,4 @@
 import {
-  backtestExecutionModelSchema,
   backtestExecutionModelSchemaV3,
   type BacktestExecutionModelV3,
 } from '@thesis-ledger/schemas';
@@ -11,12 +10,10 @@ import { BacktestModelDisclosure } from './BacktestModelDisclosure.js';
 import { BacktestBrokerCommissionEditor } from './BacktestBrokerCommissionEditor.js';
 import { BacktestResearchLotSizeEditor } from './BacktestResearchLotSizeEditor.js';
 
-export function parseBacktestModelConfiguration(text: string, version: 2 | 3 = 2) {
+export function parseBacktestModelConfiguration(text: string) {
   if (!text.trim()) return { model: undefined, error: null };
   try {
-    const parsed = (
-      version === 3 ? backtestExecutionModelSchemaV3 : backtestExecutionModelSchema
-    ).safeParse(JSON.parse(text));
+    const parsed = backtestExecutionModelSchemaV3.safeParse(JSON.parse(text));
     if (parsed.success) return { model: parsed.data, error: null };
     return {
       model: undefined,
@@ -35,16 +32,14 @@ export function BacktestModelConfiguration({
   onChange,
   onConfirm,
   onInvalidate,
-  version = 2,
 }: {
   text: string;
   confirmed: boolean;
   onChange: (text: string) => void;
   onConfirm: (model: BacktestExecutionModelV3) => void;
   onInvalidate?: () => void;
-  version?: 2 | 3;
 }) {
-  const { model, error } = parseBacktestModelConfiguration(text, version);
+  const { model, error } = parseBacktestModelConfiguration(text);
   const [modelDraftPending, setModelDraftPending] = useState(false);
   useEffect(() => setModelDraftPending(false), [text]);
   const invalidateModelDraft = () => { setModelDraftPending(true); onInvalidate?.(); };
@@ -59,20 +54,18 @@ export function BacktestModelConfiguration({
         onChange={(event) => onChange(event.target.value)}
       />
       <FieldDescription>
-        {version === 3
-          ? '填写与所选口径匹配的执行模型，确认价格、数量、成本及交易时序假设。复权研究需要显式归一化模型，原有真实价格模型不会自动转换。'
-          : '粘贴完整的 execution-model-v1 配置，检查范围与假设后确认。留空时，数据源必须提供覆盖本次区间的历史执行规则；系统不会自动补充预设。'}
+        填写执行模型，核对价格、数量、成本和交易时序假设后确认。
       </FieldDescription>
       {error && <FieldError>{error}</FieldError>}
       {model && (
         <>
-          {version === 3 && <BacktestBrokerCommissionEditor
+          <BacktestBrokerCommissionEditor
             key={JSON.stringify(model)} model={model} onChange={onChange}
             onDraftChange={invalidateModelDraft}
-          />}
-          {version === 3 && <BacktestResearchLotSizeEditor
+          />
+          <BacktestResearchLotSizeEditor
             key={`lot-${JSON.stringify(model)}`} model={model} onChange={onChange} onDraftChange={invalidateModelDraft}
-          />}
+          />
           <BacktestModelDisclosure disclosure={{ model }} />
           <Button
             type="button"

@@ -307,7 +307,7 @@ const position = {
 
 const response = (symbol: string, dates: string[], close = 10): MarketDetailResponse => {
   const series = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     identity: { symbol, assetType: 'STOCK' as const, timeframe: '1d' as const, adjustment: 'qfq' as const },
     points: dates.map((date) => ({
       timestamp: `${date}T00:00:00.000Z`,
@@ -340,7 +340,7 @@ const response = (symbol: string, dates: string[], close = 10): MarketDetailResp
     inputFingerprint: `input-${dates.at(-1)}`,
   };
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     symbol,
     assetType: 'STOCK',
     identity: { source: 'asset', status: 'confirmed' },
@@ -459,7 +459,7 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
   it('V3 历史扩窗、最新检查和指标重试都读取当前整窗', async () => {
     const current = response(position.symbol, ['2026-09-15', '2026-09-16']);
     const mounted = await mount(current, 'qfq');
-    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({ chartContractVersion: 3, barsLimit: 90 });
+    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({ chartContractVersion: 1, barsLimit: 90 });
     mounted.opening.resolve(current);
     await act(flushAsync);
     requestMarketDetailMock.mockResolvedValue(current);
@@ -468,14 +468,14 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
       await flushAsync();
     });
     await act(flushAsync);
-    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({ chartContractVersion: 3, barsLimit: 180,
+    expect(requestMarketDetailMock.mock.calls.at(-1)?.[0]).toMatchObject({ chartContractVersion: 1, barsLimit: 180,
       calculationAnchor: current.barSeries!.points.at(-1)!.timestamp });
     queryClient.fetchQuery.mockImplementation(({ queryFn }: { queryFn: (context: { signal: AbortSignal }) => Promise<MarketDetailResponse> }) => queryFn({ signal: new AbortController().signal }));
     for (const selector of ['[data-market-section-retry]', '[data-market-retry]']) {
       await act(async () => { mounted.container.querySelector(selector)!.dispatchEvent({ type: 'click' }); await flushAsync(); });
       await act(flushAsync);
       const request = requestMarketDetailMock.mock.calls.at(-1)![0];
-      expect(request).toMatchObject({ chartContractVersion: 3, barsLimit: 180, refresh: true,
+      expect(request).toMatchObject({ chartContractVersion: 1, barsLimit: 180, refresh: true,
         include: [...(selector === '[data-market-retry]' ? ['quote'] : []), 'bars', 'indicator:MA', 'indicator:MACD', 'indicator:RSI'] });
       expect(request.start).toBeUndefined();
       expect(request.end).toBeUndefined();
@@ -545,7 +545,7 @@ describe('MarketDetailDialog 最新端挂载交互', () => {
     const retry = mounted.container.querySelector('[data-market-retry]')!;
     await act(async () => { retry.dispatchEvent({ type: 'click' }); await flushAsync(); });
     expect(requestMarketDetailMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ symbol: position.symbol, chartContractVersion: 3, barsLimit: 90, refresh: true }),
+      expect.objectContaining({ symbol: position.symbol, chartContractVersion: 1, barsLimit: 90, refresh: true }),
       expect.any(AbortSignal),
     );
     expect(requestMarketDetailMock.mock.calls.at(-1)?.[0].start).toBeUndefined();

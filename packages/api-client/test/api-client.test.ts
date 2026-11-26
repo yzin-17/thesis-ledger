@@ -173,7 +173,7 @@ describe('ThesisLedgerApiClient', () => {
           items: [candidate],
           total: 1,
           nextCursor: null,
-          legacyItems: [],
+          unlinkedItems: [],
           instrumentDirectory: { generation: 0, items: [], unresolvedSymbols: [] },
         }),
         {
@@ -362,7 +362,7 @@ describe('共享客户端账本与成交命令', () => {
 describe('共享客户端行情及错误响应', () => {
   it('通过共享 API Client 请求行情详情并保留 AbortSignal', async () => {
     const barSeries = {
-      contractVersion: 3,
+      contractVersion: 1,
       identity: { symbol: '600519.SH', assetType: 'STOCK', timeframe: '1d', adjustment: 'qfq' },
       points: [],
       coverage: {
@@ -385,7 +385,7 @@ describe('共享客户端行情及错误响应', () => {
       inputFingerprint: 'empty-series',
     };
     const detail = {
-      contractVersion: 3,
+      contractVersion: 1,
       symbol: '600519.SH',
       assetType: 'STOCK',
       identity: { source: 'asset', status: 'confirmed' },
@@ -419,13 +419,13 @@ describe('共享客户端行情及错误响应', () => {
         signal,
       }),
     ).resolves.toMatchObject({
-      contractVersion: 3,
+      contractVersion: 1,
       symbol: '600519.SH',
       assetType: 'STOCK',
       barSeries,
     });
     expect(String(fetcher.mock.calls[0]?.[0])).toContain(
-      '/api/market/600519.SH/detail?barsLimit=30&chartContractVersion=3&adjustment=qfq&refresh=1&include=quote%2Cbars',
+      '/api/market/600519.SH/detail?barsLimit=30&chartContractVersion=1&adjustment=qfq&refresh=1&include=quote%2Cbars',
     );
     expect(fetcher.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ signal }));
 
@@ -440,20 +440,20 @@ describe('共享客户端行情及错误响应', () => {
         { status: 200 },
       ),
     );
-    await client.market.getDetail('600519.SH', { chartContractVersion: 3, adjustment: 'hfq' });
+    await client.market.getDetail('600519.SH', { chartContractVersion: 1, adjustment: 'hfq' });
     expect(String(fetcher.mock.calls.at(-1)?.[0])).toContain(
-      'chartContractVersion=3&adjustment=hfq',
+      'chartContractVersion=1&adjustment=hfq',
     );
 
     await client.market.getDetail('600519.SH', { include: ['quote', 'bars'], barsLimit: 30 });
     expect(String(fetcher.mock.calls.at(-1)?.[0])).toContain(
-      '/api/market/600519.SH/detail?barsLimit=30&chartContractVersion=3&include=quote%2Cbars',
+      '/api/market/600519.SH/detail?barsLimit=30&chartContractVersion=1&include=quote%2Cbars',
     );
   });
 
   it('省略复权时保持原 detail 请求，基金净值仍使用 navLimit', async () => {
     const detail = {
-      contractVersion: 3,
+      contractVersion: 1,
       symbol: '510300.OF',
       assetType: 'MUTUAL_FUND',
       identity: { source: 'asset', status: 'confirmed' },
@@ -477,7 +477,7 @@ describe('共享客户端行情及错误响应', () => {
       navLimit: 30,
     });
     expect(String(fetcher.mock.calls[0]?.[0])).toContain(
-      '/api/market/510300.OF/detail?navLimit=30&chartContractVersion=3&include=fund-nav-history',
+      '/api/market/510300.OF/detail?navLimit=30&chartContractVersion=1&include=fund-nav-history',
     );
   });
 

@@ -32,7 +32,7 @@ describe('公共收费主源合同 V3', () => {
     ).toBe('governmentNewsRepublication');
     expect(
       desiredProviderPolicyV3Schema.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'policy',
         revision: 1,

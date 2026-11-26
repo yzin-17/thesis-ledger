@@ -98,7 +98,7 @@ dsaFiles.forEach((path, index) => {
 const samples = [];
 for (const symbol of ['600000.SH', '600519.SH']) {
   const payload = {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: `c31-target-${symbol}`,
     symbol,
     start: '2023-07-08',
@@ -122,7 +122,7 @@ for (const symbol of ['600000.SH', '600519.SH']) {
         `${prefix}dsa-1`,
         'python',
         '-c',
-        'import os,sys,urllib.request; body=sys.stdin.buffer.read(); request=urllib.request.Request("http://127.0.0.1:8000/api/v3/thesis-ledger/market/bars",data=body,headers={"Content-Type":"application/json","Authorization":"Bearer "+os.environ["THESIS_LEDGER_DSA_TOKEN"]}); print(urllib.request.urlopen(request,timeout=90).read().decode())',
+        'import os,sys,urllib.request; body=sys.stdin.buffer.read(); request=urllib.request.Request("http://127.0.0.1:8000/api/v1/thesis-ledger/market/bars",data=body,headers={"Content-Type":"application/json","Authorization":"Bearer "+os.environ["THESIS_LEDGER_DSA_TOKEN"]}); print(urllib.request.urlopen(request,timeout=90).read().decode())',
       ],
       JSON.stringify(payload),
     ),

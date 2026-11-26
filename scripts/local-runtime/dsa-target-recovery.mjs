@@ -68,11 +68,11 @@ def read(path,control=False):
  with opener.open(urllib.request.Request('http://127.0.0.1:8000'+path,headers={'Authorization':'Bearer '+token}),timeout=10) as r:
   assert r.status==200;return json.load(r)
 assert read('/health')['status']=='ok'
-assert read('/api/v3/thesis-ledger/control/providers',True)['contractVersion']==3
+assert read('/api/v1/thesis-ledger/control/providers',True)['contractVersion']==3
 c=sqlite3.connect('file:'+os.environ['DATABASE_PATH']+'?mode=ro',uri=True)
 rows=c.execute('SELECT from_currency,to_currency,rate_date,rate FROM portfolio_fx_rates').fetchall();assert rows
 for a,b,day,rate in rows:
- value=read('/api/v3/thesis-ledger/market/fx-rates?'+urllib.parse.urlencode({'baseCurrency':b,'currencies':a,'asOf':day}))
+ value=read('/api/v1/thesis-ledger/market/fx-rates?'+urllib.parse.urlencode({'baseCurrency':b,'currencies':a,'asOf':day}))
  row=next(v for v in value['rates'] if v['fromCurrency']==a and v['toCurrency']==b)
  assert row['available'] and float(row['rate'])==float(rate) and row['rateDate']==day
 print(json.dumps({'health':200,'controlContractVersion':3,'cachedFxRowsRead':len(rows),'source':'retained-cache-at-original-rate-date'}))`;

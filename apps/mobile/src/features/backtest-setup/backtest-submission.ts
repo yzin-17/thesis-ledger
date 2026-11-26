@@ -30,7 +30,7 @@ export function freezeOrdinarySubmission(
   return {
     kind: 'ordinary',
     body: backtestRunCreateSchemaV3.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       strategyVersionId: versionId,
       runConfig: prepared.runConfig,
       preparationStamp: prepared.executionPreflight.revisionStamp,
@@ -54,7 +54,7 @@ export function freezeNavSubmission(
   return {
     kind: 'nav',
     body: backtestNavRunCreateV3Schema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       preparationId: prepared.receipt.preparationId,
       preparationHash: prepared.receipt.preparationHash,
       idempotencyKey: key,

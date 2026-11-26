@@ -1,6 +1,7 @@
 import { describe,it,expect } from 'vitest';
 import { recoverStrategySave, validatedDefinition, parsePendingStrategySave } from '../../src/features/strategy-editor/strategy-editor-state';
 import { backtestActionRecovered } from '../../src/features/backtest-jobs/backtest-state';
+import { projectStrategyEditorDraft } from '../../src/features/strategy-editor/strategy-editor-state';
 import { freezeOrdinarySubmission, freezeNavSubmission } from '../../src/features/backtest-setup/backtest-submission';
 import { ordinaryPreparationIntent, newBacktestForm } from '../../src/features/backtest-setup/backtest-intent';
 import { mobileEquityChart, mobileEquityCsv } from '../../src/features/backtest-results/backtest-equity';
@@ -10,6 +11,17 @@ import { riskNotificationBody, emptyRiskNotification } from '../../src/features/
 import { candidateAdoptionEligibility, canRevealTestMetrics,canGenerateAuthoringContent,canModifyAuthoringContent,authoringContentSchema } from '@thesis-ledger/schemas';
 import { b4Definition,b4Prepared,b4Strategy,b4StrategyId,b4VersionId,b4Run,b4RunId,b4Risk,b4Draft,fixture } from './batch4-fixture';
 describe('第 4 批冻结、归属与恢复',()=>{
+  it('旧本机编辑草稿按来源版本固定政策，待确认原回执不改写', () => {
+    const baseline: Record<string, unknown> = { ...b4Definition };
+    delete baseline.entryTrigger; delete baseline.tradePlan;
+    const definition = { ...baseline, tradePlan: { version: 1, evaluation: 'barClose', stages: [], initialStop: { kind: 'percent', percent: '0.05' } } };
+    const draft = { text: JSON.stringify(definition), definition, pending: null };
+    const restored = projectStrategyEditorDraft(draft, baseline);
+    expect(restored.definition).toMatchObject({ entryTrigger: 'rising-edge' });
+    expect(JSON.parse(restored.text).entryTrigger).toBe('rising-edge');
+    const pending = { ...draft, pending: { original: true } };
+    expect(projectStrategyEditorDraft(pending, baseline)).toBe(pending);
+  });
   it('完整确认的有效定义允许局部修改，损坏文本或未确认内容仍拒绝',()=>{
     const content=authoringContentSchema.parse({...b4Draft.content,
       requirements:[{id:'confirmed',quote:'已确认需求',interpretation:'保留定义',state:'understood',definitionPaths:['entry']}],
@@ -21,12 +33,14 @@ describe('第 4 批冻结、归属与恢复',()=>{
     expect(canModifyAuthoringContent({...content,confirmation:undefined})).toBe(false);
   });
   it('定义完整保留，非法输入不被示例替换；未知提交只认新且唯一的匹配回执',()=>{
+    expect(()=>validatedDefinition(JSON.stringify({...b4Definition,schemaVersion:'2'}))).toThrow('schemaVersion');
     const schema=validatedDefinition(JSON.stringify(b4Definition));expect(schema).toEqual(b4Definition);
+    const saved = { ...b4Strategy, schemaVersion: 1, versions: b4Strategy.versions.map(version => ({ ...version, schemaVersion: 1, schema })) };
     expect(()=>validatedDefinition('{ broken')).toThrow();
     const pending=parsePendingStrategySave({name:b4Strategy.name,schema,baselineIds:[]});
-    expect(recoverStrategySave(pending,[b4Strategy])).toEqual({strategyId:b4StrategyId,versionId:b4VersionId});
+    expect(recoverStrategySave(pending,[saved])).toEqual({strategyId:b4StrategyId,versionId:b4VersionId});
     expect(recoverStrategySave({...pending,baselineIds:[b4StrategyId]},[b4Strategy])).toBeNull();
-    expect(recoverStrategySave(pending,[b4Strategy,{...b4Strategy,id:b4RunId}])).toBeNull();
+    expect(recoverStrategySave(pending,[saved,{...saved,id:b4RunId}])).toBeNull();
     expect(recoverStrategySave({...pending,strategyId:b4StrategyId,baselineIds:[b4VersionId]},[b4Strategy])).toBeNull();
   });
   it('普通冻结保留预检版本和整个配置，不允许换版本；不完整净值凭证拒绝',()=>{
@@ -52,6 +66,13 @@ describe('第 4 批冻结、归属与恢复',()=>{
     expect(intent.adjustment).toBe('hfq');expect(intent.accountingBasis).toBe('normalized-series');expect(intent.history.basis).toBe('fixed-provider-snapshot');
     expect(()=>ordinaryPreparationIntent({...form,extras:'{"strategyVersionId":"escape"}'},b4VersionId,'i','2026-09-11T00:00:00Z')).toThrow();
     expect(()=>ordinaryPreparationIntent({...form,history:'point-in-time',evidence:''},b4VersionId,'i','2026-09-11T00:00:00Z')).toThrow();
+    const daily = ordinaryPreparationIntent({...form,dailyOrders:true,dailyLiquidity:'perBarCap',dailyQuantity:'100.123456789012345678'},b4VersionId,'daily','2026-09-11T00:00:00Z');
+    expect(daily.runConfig.dailyOrderMatching).toEqual({conflict:'stopFirst',childActivation:'openSameBarRangeNextBar',partialExit:'protectRemaining',liquidity:{kind:'perBarCap',quantity:'100.123456789012345678'}});
+    expect(()=>ordinaryPreparationIntent({...form,dailyOrders:true,dailyLiquidity:'perBarCap'},b4VersionId,'missing','2026-09-11T00:00:00Z')).toThrow();
+    const ordinary = ordinaryPreparationIntent({...form,dailyOrders:true,dailyQuantity:'100'},b4VersionId,'whole','2026-09-11T00:00:00Z');
+    expect(ordinary.runConfig.dailyOrderMatching?.liquidity).toEqual({kind:'wholeOrder'});
+    const unlimited = ordinaryPreparationIntent({...form,dailyOrders:true,dailyLiquidity:'unlimited'},b4VersionId,'unlimited','2026-09-11T00:00:00Z');
+    expect(unlimited.runConfig.dailyOrderMatching?.liquidity).toEqual({kind:'unlimited'});
   });
   it('图表有限值且按时点排序，CSV 保留原始金额与所选范围，不补造现金',()=>{
     const result=b4Run().result!;const csv=mobileEquityCsv(result,'Asia/Shanghai','CNY');
@@ -69,4 +90,9 @@ describe('第 4 批冻结、归属与恢复',()=>{
     expect(riskUpdateSatisfied(b4Risk as never,{expectedRevision:2,enabled:false})).toBe(true);
     expect(riskUpdateSatisfied(b4Risk as never,{expectedRevision:2,enabled:true})).toBe(false);
   });
+});
+it('已成功旧Run的重放待确认不被原成功回执误当新操作完成', () => {
+  const pending = { id: b4Run('succeeded').id, kind: 'ordinary' as const, action: 'retry' as const,
+    expectedAttempt: b4Run('succeeded').executionAttempt ?? null, expectedStatus: 'succeeded' };
+  expect(backtestActionRecovered(pending, b4Run('succeeded'))).toBe(false);
 });

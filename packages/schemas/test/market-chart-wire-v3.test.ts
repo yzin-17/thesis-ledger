@@ -21,7 +21,7 @@ const fixture = () => {
   void _proof;
   const response = { ...base, purpose: 'interactive-chart' as const };
   const request = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     purpose: 'interactive-chart' as const,
     requestId: response.requestId,
     symbol: response.symbol,
@@ -38,11 +38,12 @@ const fixture = () => {
 };
 
 describe('图表交互 V3 契约', () => {
-  it('整窗上限只在显式 V3 开放，旧详情与 NAV 上限不变', () => {
-    expect(marketDetailRequestSchema.safeParse({ symbol: '159516.SZ', barsLimit: 180 }).success).toBe(false);
-    expect(marketDetailRequestSchema.safeParse({ symbol: '159516.SZ', chartContractVersion: 3, barsLimit: 3000 }).success).toBe(true);
-    expect(marketDetailRequestSchema.safeParse({ symbol: '159516.SZ', chartContractVersion: 3, barsLimit: 3001 }).success).toBe(false);
-    expect(marketDetailRequestSchema.safeParse({ symbol: '000001.OF', chartContractVersion: 3, navLimit: 91 }).success).toBe(false);
+  it('行情详情只接受现行合同，整窗和 NAV 分别校验上限', () => {
+    expect(marketDetailRequestSchema.safeParse({ symbol: '159516.SZ', barsLimit: 180 }).success).toBe(true);
+    expect(marketDetailRequestSchema.safeParse({ symbol: '159516.SZ', chartContractVersion: 3 }).success).toBe(false);
+    expect(marketDetailRequestSchema.safeParse({ symbol: '159516.SZ', chartContractVersion: 1, barsLimit: 3000 }).success).toBe(true);
+    expect(marketDetailRequestSchema.safeParse({ symbol: '159516.SZ', chartContractVersion: 1, barsLimit: 3001 }).success).toBe(false);
+    expect(marketDetailRequestSchema.safeParse({ symbol: '000001.OF', chartContractVersion: 1, navLimit: 91 }).success).toBe(false);
   });
   it.each(['incomplete', 'unknown'] as const)('保留 %s 日线且不放松完整窗口', (status) => {
     const { request, response, original } = fixture();

@@ -76,7 +76,7 @@ function response(request: MarketDetailRequest) {
     cacheStatus: 'miss',
   };
   const series = {
-    contractVersion: 3,
+    contractVersion: 1,
     identity: { symbol, assetType: 'STOCK', timeframe, adjustment: request.adjustment ?? 'qfq' },
     points,
     coverage: {
@@ -140,7 +140,7 @@ function response(request: MarketDetailRequest) {
     'indicator:RSI',
   ];
   return marketDisplayDetailResponseSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     symbol,
     assetType: 'STOCK',
     identity: { source: 'asset', status: 'confirmed' },

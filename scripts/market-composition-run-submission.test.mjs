@@ -10,7 +10,7 @@ async function fixture() {
   const protocol = JSON.parse(await fs.readFile(new URL('../packages/schemas/fixtures/execution-price.normalized-snapshot.json', import.meta.url), 'utf8'));
   const request = { strategyVersionId: 'version', idempotencyKey: 'one-submit',
     runConfig: { ...input.intent.runConfig, schemaVersion: '3', executionPriceProtocol: protocol } };
-  const state = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'case', revision: 100,
+  const state = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'case', revision: 100,
     enabled: true, routes: [], dsaRevision: 100, syncState: 'applied', effectiveStale: false };
   const plan = { temporary: state, temporaryFingerprint: policyFingerprint(state), configVersions: { baostock: 0 } };
   const providers = [{ providerId: 'baostock', enabled: true, configVersion: 0 }];

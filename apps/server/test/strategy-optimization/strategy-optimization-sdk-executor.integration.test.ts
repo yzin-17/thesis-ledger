@@ -1,4 +1,8 @@
 import { aiGenerationContracts } from '@thesis-ledger/schemas';
+import { optimizationGenerationContract } from '../../src/strategy-optimization/strategy-optimization-generation-contract.js';
+import { RESEARCH_STRATEGY_SPACE_VERSION } from '../../src/strategy-optimization/strategy-optimization-research.js';
+import { priceResearchFixture } from '../backtest/price-research.fixtures.js';
+import { prepareBacktestRunConfigV3 } from '../../src/backtest/backtest-run-preparation.js';
 import { buildGenerationSchemaPrompt } from '../../src/ai/ai-generation-schema-prompt.js';
 import { createServer, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
@@ -160,9 +164,7 @@ function sdkExecutionContext() {
       {
         role: 'system',
         content: buildGenerationSchemaPrompt(
-          experiment.sourceMode === 'discovery'
-            ? aiGenerationContracts.strategyDiscovery.schema
-            : aiGenerationContracts.parameterOptimization.schema,
+          optimizationGenerationContract(experiment as never).schema,
         ),
       },
       { role: 'user', content: 'Return JSON.' },
@@ -396,7 +398,7 @@ function registerSdkFrozenMetricsAndPricingCases(
     expect(suiteScope.requestCount).toBe(1);
     expect(suiteScope.receivedBody).not.toContain('SEALED_');
     expect(suiteScope.receivedBody).toContain('-0.2');
-    expect(suiteScope.receivedBody).toContain('不得描述为严格无前视样本外');
+    expect(suiteScope.receivedBody).toContain('不得声称严格无前视样本外');
     expect(JSON.parse(suiteScope.receivedBody).messages).toEqual(
       expect.arrayContaining([expect.objectContaining({ role: 'user' })]),
     );
@@ -483,7 +485,27 @@ function registerSdkFrozenMetricsAndPricingCases(
 function registerSdkDiscoveryAndUnknownOutcomeCases(
   suiteScope: ReturnType<typeof sdkExecutionContext>,
 ) {
-  it('discovery 由服务端装配 seed，非法引用保存用量后失败且不重试', async () => {
+  it('能力报告经一次本地 HTTP 生成与结算保存，不冒充失败重试或可回测候选', async () => {
+    const gap = {
+      status: 'unsupported', originalRule: '按历史股票池选十只股票等权买入', reason: '当前仅有单标的执行模型',
+      gaps: [{ path: 'executionInstrument', kind: 'execution', detail: '没有多资产资金分配与组合撮合' }],
+      supportedParts: ['可表达单标的收益率窗口'], evidenceRefs: [],
+    };
+    suiteScope.responseContent = JSON.stringify(gap);
+    await expect(suiteScope.executor().completeProposal(suiteScope.common({ sourceMode: 'discovery' }, {}, aiGenerationContracts.strategyDiscovery.ref) as never))
+      .rejects.toMatchObject({ name: 'StrategyCapabilityGapError', gap });
+    expect(suiteScope.requestCount).toBe(1);
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledTimes(1);
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: expect.objectContaining({ status: 'complete', schemaAccepted: true }), proposal: gap, result: gap,
+      revision: expect.objectContaining({ usage: { status: 'reported', inputTokens: 11, outputTokens: 7 } }),
+    }));
+    expect(suiteScope.executions.markUnknown).not.toHaveBeenCalled();
+    expect(suiteScope.prisma.aiRun.updateMany).not.toHaveBeenCalled();
+    expect(suiteScope.prisma.$executeRaw).toHaveBeenCalledOnce();
+  });
+
+  it('发现生成拒绝旧提议出参，保留单次请求用量', async () => {
     const scope = {
       executionInstrument: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
       primaryTimeframe: '1d',
@@ -503,14 +525,14 @@ function registerSdkDiscoveryAndUnknownOutcomeCases(
         sizing: { type: 'percentOfEquity', percent: '0.5' },
         risk: [],
       },
+      reason: '用于确认非法来源在业务校验被拒绝',
       evidenceRefs: [],
     });
 
     await expect(
       suiteScope.executor().completeProposal(
         suiteScope.common({ sourceMode: 'discovery', discoveryScope: scope }, seed, {
-          id: 'strategy_discovery',
-          version: 'strategy-discovery-v2',
+          ...aiGenerationContracts.strategyDiscovery.ref,
         }) as never,
       ),
     ).rejects.toThrow();
@@ -523,12 +545,45 @@ function registerSdkDiscoveryAndUnknownOutcomeCases(
         }),
         outcome: expect.objectContaining({ status: 'incomplete', schemaAccepted: false }),
         error: expect.objectContaining({
-          code: 'business_invalid',
+          code: 'schema_invalid',
           externalResult: 'complete',
         }),
       }),
     );
-    expect(suiteScope.prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(suiteScope.prisma.$executeRaw.mock.calls)).toContain('modelMetadata');
+  });
+  it.each(['valid', 'semantic', 'structure'])('V6探索只调用一次本地HTTP，原输出和编译产物分别保留，类别=%s', async (kind) => {
+    const invalid = kind !== 'valid';
+    const f = await priceResearchFixture();
+    const scope = { executionInstrument: f.input.strategy.executionInstrument, primaryTimeframe: '1d' as const };
+    const seed = createDiscoverySeed(scope, true);
+    const prepared = await prepareBacktestRunConfigV3({ request: f.request, strategy: seed, control: f.control,
+      reader: f.reader, checkedAt: '2026-06-07T08:00:00Z' });
+    if (prepared.status !== 'prepared') throw new Error(JSON.stringify(prepared));
+    const close = { type: 'series', sourceId: invalid ? 'missing' : 'model-source', field: 'close' };
+    const raw = { strategy: { name: 'V6隔离候选', entryTrigger: 'rising-edge',
+      signalSources: [{ id: 'model-source', timeframe: '1d', priceCoordinate: 'research' }],
+      entry: { type: 'compare', operator: 'gt', left: close, right: { ...close, sourceId: 'model-source' } },
+      exit: seed.exit, sizing: seed.sizing, risk: [] }, reason: '固定源码意图', evidenceRefs: [] };
+    if (kind === 'structure') raw.strategy.entry.right = { type: 'eventValue' } as never;
+    suiteScope.responseContent = JSON.stringify(raw, null, 2);
+    const input = suiteScope.common({ sourceMode: 'discovery', strategySpaceVersion: RESEARCH_STRATEGY_SPACE_VERSION,
+      discoveryScope: scope, runConfig: prepared.runConfig }, seed, aiGenerationContracts.strategyDiscovery.ref);
+    const run = suiteScope.executor().completeProposal(input as never);
+    if (invalid) await expect(run).rejects.toMatchObject({ fact: { code: kind === 'structure' ? 'schema_invalid' : 'business_invalid', externalResult: 'complete' } });
+    else expect((await run).proposal).toHaveProperty('strategy.signalSources.0.series', ['close']);
+    expect(suiteScope.requestCount).toBe(1);
+    const artifacts = (suiteScope.prisma.$executeRaw.mock.calls as unknown[][]).flatMap(([query]) => (query as { values: unknown[] }).values)
+      .filter((value): value is string => typeof value === 'string' && value.includes('strategyGeneration')).map((value) => JSON.parse(value));
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].strategyGeneration.rawOutputText).toBe(suiteScope.responseContent);
+    if (kind === 'structure') expect(artifacts[0].strategyGeneration.diagnostics[0]).toMatchObject({ stage: 'structure', code: 'STRUCTURE_INVALID' });
+    else {
+      expect(artifacts[0].strategyGeneration.rawOutput).toEqual(raw);
+      expect(artifacts[0].strategyGeneration.compilation.status).toBe(invalid ? 'rejected' : 'compiled');
+      if (invalid) expect(artifacts[0].strategyGeneration.compilation.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'UNDECLARED_SOURCE' })]));
+    }
+    expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledOnce();
   });
   it('Provider 已完成但保存失败时转 unknown_outcome，不会重复结算或再请求', async () => {
     suiteScope.responseContent = JSON.stringify({

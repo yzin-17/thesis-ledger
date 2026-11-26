@@ -22,7 +22,7 @@ export function mapKnownCashV3HttpError(status: number, payload: unknown, reques
   const mapped = mapEventV3HttpError(
     status,
     {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId,
       error: { code: error.code, message: '方案来源失败' },
     },

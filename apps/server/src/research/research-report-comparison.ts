@@ -62,7 +62,7 @@ function emptyGroups(): Group[] {
   }));
 }
 function result(source: Source) {
-  if (source.detail.availability !== 'available' || source.detail.result?.version !== 2)
+  if (source.detail.availability !== 'available' || source.detail.result?.version !== 'research-report-result-v1')
     return null;
   return source.detail.result;
 }

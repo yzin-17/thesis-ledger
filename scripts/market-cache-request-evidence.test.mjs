@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import { countObservedCacheRequests, readCompletedCacheRequests, CacheObservationPending } from './market-cache-request-evidence.mjs';
 
 const consumerPath = '/api/market/000001.OF/fund-nav';
-const controlPath = '/api/v3/thesis-ledger/market/cache-context';
-const dataPath = '/api/v3/thesis-ledger/market/fund-nav';
+const controlPath = '/api/v1/thesis-ledger/market/cache-context';
+const dataPath = '/api/v1/thesis-ledger/market/fund-nav';
 const line = (value) => '\u001b[32m[Nest] ' + JSON.stringify({ timestamp: '2026-10-11T00:00:00Z', ...value }) + '\u001b[39m';
 const complete = (traceId = 'one') => line({ operation: 'http.request', traceId, path: consumerPath });
 const transport = (transportId, category, attempt = 1, traceId = 'one') => ['started', 'settled'].map((stage) =>

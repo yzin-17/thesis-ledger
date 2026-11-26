@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { authoringFailureMessage } from './authoring-operation-feedback.js';
+import { AuthoringPlanReview } from './AuthoringPlanReview.js';
 
 const statusLabels: Record<string, string> = {
   queued: '等待领取',
@@ -71,17 +72,25 @@ function OperationProposal({
   return (
     <div className="flex flex-col gap-3">
       <p>修改意图：{proposal.payload.intent}</p>
-      {proposal.payload.differences.map((difference) => (
-        <div key={difference.path} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
-          <p className="text-sm sm:col-span-2">位置：{difference.path}</p>
-          <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
-            原规则：{difference.before}
-          </pre>
-          <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
-            建议：{difference.after}
-          </pre>
-        </div>
-      ))}
+      {proposal.payload.allowedPaths.some(path => ['tradePlan', 'entry', 'exit', 'execution'].includes(path.split('.')[0]!)) ? (
+        <AuthoringPlanReview
+          beforeText={proposal.payload.beforeText}
+          afterText={proposal.payload.afterText}
+          includeRules={proposal.payload.allowedPaths.some(path => ['entry', 'exit', 'execution'].includes(path.split('.')[0]!))}
+        />
+      ) : (
+        proposal.payload.differences.map((difference) => (
+          <div key={difference.path} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
+            <p className="text-sm sm:col-span-2">位置：{difference.path}</p>
+            <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
+              原规则：{difference.before}
+            </pre>
+            <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
+              建议：{difference.after}
+            </pre>
+          </div>
+        ))
+      )}
       {proposal.status === 'pending' && applicable && (
         <div className="flex flex-wrap gap-2">
           <Button disabled={busy} onClick={() => onProposal('apply')}>

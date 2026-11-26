@@ -173,38 +173,12 @@ describe('研究助手只读查询', () => {
     expect(detail).not.toHaveProperty('modelMetadata');
   });
 
-  it('Controller 仅在显式 research view 下启用新语义并严格解析布尔范围', () => {
-    const runs = {
-      listResearchPage: vi.fn(),
-      listPage: vi.fn(),
-      list: vi.fn(),
-    };
+  it('通用运行路由按状态分页与读取单条运行', () => {
+    const runs = { listPage: vi.fn(), resume: vi.fn() };
     const controller = new AiController(runs as never);
-
-    controller.history('50', 'succeeded', undefined, 'research', '风险', 'strategy', 'true');
-    expect(runs.listResearchPage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        view: 'research',
-        limit: '50',
-        includeInternal: true,
-        source: 'strategy',
-      }),
-    );
-    expect(runs.listPage).not.toHaveBeenCalled();
-    expect(() =>
-      controller.history('50', undefined, undefined, 'research', undefined, undefined, 'yes'),
-    ).toThrow();
-
     controller.history('20', 'failed');
     expect(runs.listPage).toHaveBeenCalledWith(20, 'failed', undefined);
-  });
-
-  it('详情 research view 在进入 SQL 查询前拒绝非法 ID', () => {
-    const runs = { researchDetail: vi.fn(), resume: vi.fn() };
-    const controller = new AiController(runs as never);
-    expect(() => controller.resume('not-a-uuid', 'research')).toThrow();
-    expect(runs.researchDetail).not.toHaveBeenCalled();
-    controller.resume(runId, 'research');
-    expect(runs.researchDetail).toHaveBeenCalledWith(runId);
+    controller.resume(runId);
+    expect(runs.resume).toHaveBeenCalledWith(runId);
   });
 });

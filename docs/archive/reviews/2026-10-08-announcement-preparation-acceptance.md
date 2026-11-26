@@ -26,8 +26,8 @@ Schema、Server、API Client、Desktop 构建与 Server/Desktop 类型检查通�
 
 ## 重复验证入口与证据索引
 
-- `scripts/announcement_preparation_target.py`：默认预览；`--run` 创建验收策略和新回测，保留原回测和路由；`--temporary-tencent-route` 在正常结束及异常退出时恢复临时价格选择，不覆盖其他操作已修改的选择。
-- `scripts/announcement_restart_target.py`：配合正式 `sync-code.sh dsa` 在重启前投递任务，验证持久任务标识和最终进度；该脚本不操作 Docker。
+- `scripts/archive/2026-10-08-announcement-preparation/announcement_preparation_target.py`：默认预览；`--run` 创建验收策略和新回测，保留原回测和路由；`--temporary-tencent-route` 在正常结束及异常退出时恢复临时价格选择，不覆盖其他操作已修改的选择。
+- `scripts/archive/2026-10-08-announcement-preparation/announcement_restart_target.py`：配合正式 `sync-code.sh dsa` 在重启前投递任务，验证持久任务标识和最终进度；该脚本不操作 Docker。
 - 当前会话输出：`/tmp/announcement-final-target.json`、`/tmp/announcement-restart-target.json`；日志：`/tmp/announcement-focused-dsa.log`、`/tmp/announcement-focused-server.log`、`/tmp/announcement-desktop-tests.log`、`/tmp/announcement-schema-tests.log`、`/tmp/announcement-final-complexity.log`、`/tmp/announcement-auto-sync.log`、`/tmp/announcement-final-dsa-sync.log`。
 - 浏览器截图：`/tmp/announcement-auto-preparation.png`，可见原有准备按钮和公告准备进度。
 

@@ -45,6 +45,7 @@ export function InstrumentPicker({
   instrumentTypes,
   accepts,
   selection,
+  variant,
 }: {
   purpose?: 'holding' | 'research' | 'watchlist' | 'browse';
   value?: string;
@@ -60,6 +61,7 @@ export function InstrumentPicker({
     items: readonly Pick<InstrumentSearchResult, 'id' | 'symbol' | 'displayName'>[];
     onRemove: (id: string) => void;
   };
+  variant?: 'content' | 'panel';
 }) {
   const { api, scope } = useMobileRuntime();
   const [text, setText] = useState('');
@@ -113,7 +115,7 @@ export function InstrumentPicker({
     return `选择 ${item.displayName}`;
   };
   return (
-    <Section variant={selection ? 'content' : 'panel'} {...(onInputChange ? {} : { title: '选择目录标的' })}>
+    <Section variant={variant ?? (selection ? 'content' : 'panel')} {...(onInputChange ? {} : { title: '选择目录标的' })}>
       {selection ? <MultiSelectField
         label={label} value={input} onChange={setInput} inputRef={inputRef}
         editable={editable && !confirm.isPending}
@@ -140,7 +142,7 @@ export function InstrumentPicker({
         }}
       />
       <Feedback busy={confirm.isPending} message={feedback} error={confirm.isError} />
-      {queryText && current && editable && (
+      {Boolean(queryText) && current && editable && (
         <QueryList
           query={query}
           empty={query.isSuccess && items.length === 0}
@@ -149,7 +151,7 @@ export function InstrumentPicker({
           gap={12}
         >
           {items.map((item) => (
-            <Section key={item.id} variant={selection ? 'content' : 'panel'}>
+            <Section key={item.id} variant={variant ?? (selection ? 'content' : 'panel')}>
               <Copy>
                 {item.displayName} · {item.symbol}
               </Copy>

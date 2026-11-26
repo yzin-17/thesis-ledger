@@ -1,22 +1,24 @@
 import {
   DecimalValue,
-  projectBacktestTrades,
+  projectBacktestTradesSteps,
+  finishBacktestComputation,
+  mapBacktestComputationItems,
   type CnNavSimulationState,
   type SimulationFillRecord,
 } from '@thesis-ledger/domain';
 import { compareNavOfflineTime, type NavOfflineInputs } from './backtest-nav-offline-events.js';
 
-export const valueNavOfflineResult = (
+export function* navOfflineValuationSteps(
   input: NavOfflineInputs,
   initialState: CnNavSimulationState,
   state: CnNavSimulationState,
   through: string,
-) => {
-  const visible = input.facts
-    .flatMap((fact) => {
+) {
+  const visibleGroups = yield* mapBacktestComputationItems(input.facts, (fact) => {
       const value = input.pricingFactAt(fact.valuationDate, through);
       return value ? [value] : [];
-    })
+    });
+  const visible = visibleGroups.flat()
     .sort((a, b) => a.valuationDate.localeCompare(b.valuationDate));
   const latest = visible.at(-1);
   const cash = initialState.ledger.cash.CNY.settled;
@@ -27,7 +29,7 @@ export const valueNavOfflineResult = (
         .toString()
     : undefined;
   const first = visible.find((fact) => fact.valuationDate === input.plan.executionDates[0]);
-  const fills: SimulationFillRecord[] = state.requests.flatMap((request) => {
+  const fillGroups = yield* mapBacktestComputationItems(state.requests, (request): SimulationFillRecord[] => {
     if (
       !request.fillId ||
       !request.nav ||
@@ -51,15 +53,13 @@ export const valueNavOfflineResult = (
       },
     ];
   });
+  const fills = fillGroups.flat();
+  const trades = yield* projectBacktestTradesSteps(fills.map((fill) => ({ ...fill, charges: [...fill.charges] })), {
+    executionSymbol: input.config.executionInstrument.symbol, currency: 'CNY',
+  });
   return {
     fills,
-    trades: projectBacktestTrades(
-      fills.map((fill) => ({ ...fill, charges: [...fill.charges] })),
-      {
-        executionSymbol: input.config.executionInstrument.symbol,
-        currency: 'CNY',
-      },
-    ).trades,
+    trades: trades.trades,
     valuation: {
       evaluatedAt: through,
       initialCash: cash,
@@ -78,4 +78,6 @@ export const valueNavOfflineResult = (
           }
         : { status: 'unavailable' as const, reason: '执行窗口内没有可见基准净值' },
   };
-};
+}
+
+export const valueNavOfflineResult = (...input: Parameters<typeof navOfflineValuationSteps>) => finishBacktestComputation(navOfflineValuationSteps(...input));

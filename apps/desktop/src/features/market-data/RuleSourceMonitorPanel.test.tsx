@@ -290,7 +290,7 @@ function registerRuleMonitorRecoveryCases(suiteScope: ReturnType<typeof ruleMoni
     expect(api.checkRuleSources).not.toHaveBeenCalled();
     await wait(() => expect(suiteScope.host.textContent).toContain('任务已创建'));
   });
-  it('来源修订冲突后重新读取，保留勾选并使用新修订保存', async () => {
+  it('来源修订冲突后保留勾选，人工再次保存使用新修订', async () => {
     api.createRuleMonitorTask.mockRejectedValueOnce(new Error('controlled-revision-conflict'));
     await suiteScope.render();
     await suiteScope.select();
@@ -300,8 +300,7 @@ function registerRuleMonitorRecoveryCases(suiteScope: ReturnType<typeof ruleMoni
       ...suiteScope.status,
       config: { ...suiteScope.status.config, revision: 3 },
     };
-    await click('重新读取任务');
-    await wait(() => expect(button('重新读取任务')).toBeUndefined());
+    expect(button('重新读取任务')).toBeUndefined();
     expect(suiteScope.host.querySelectorAll('[data-slot="combobox-chip"]')).toHaveLength(1);
     await click('创建任务');
     await wait(() => expect(api.createRuleMonitorTask).toHaveBeenCalledTimes(2));

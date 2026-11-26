@@ -12,7 +12,7 @@ const key = {
 };
 const target = { providerId: 'efinance', upstreamSource: 'eastmoney' };
 const identity = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: 'nav',
   symbol: '161725.OF',
   routeKey: key,

@@ -4,7 +4,7 @@ import type { DataQualityService } from '../../src/quality/data-quality.service.
 import { quoteControlFixture } from '../market/quote-control-fixture.js';
 
 export const quoteFixture = {
-  version: 3,
+  version: 1,
   symbol: '600519.SH',
   price: 10,
   open: 10,
@@ -20,7 +20,7 @@ export const quoteFixture = {
   provider: 'fixture',
 };
 export const navFixture = {
-  version: 3,
+  version: 1,
   symbol: '000001.OF',
   unitNav: 1.1,
   navDate: '2026-10-01T00:00:00Z',

@@ -14,6 +14,7 @@ import {
   LocalSnapshotV3Runner,
   type BacktestV3Runner,
   type BacktestV3RunnerInput,
+  type BacktestV3RunnerContext,
 } from '../../src/backtest/backtest-v3-runner.js';
 import type { DsaClient } from '../../src/integration/dsa/dsa.client.js';
 import { completeSnapshotFixture } from './v3-complete-snapshot-fixtures.js';
@@ -83,10 +84,10 @@ const createHarness = async (options: HarnessOptions = {}) => {
   if (options.failFirstRun) {
     runner = {
       id: localRunner.id,
-      run: vi.fn(async (input: BacktestV3RunnerInput, signal: AbortSignal) => {
+      run: vi.fn(async (input: BacktestV3RunnerInput, signal: AbortSignal, context?: BacktestV3RunnerContext) => {
         runnerCalls += 1;
         if (runnerCalls === 1) throw new Error('temporary execution failure');
-        return localRunner.run(input, signal);
+        return localRunner.run(input, signal, context);
       }),
     };
   } else if (options.waitForAbort) {
@@ -121,6 +122,9 @@ const createHarness = async (options: HarnessOptions = {}) => {
       finishedAt: null,
       result: null,
       resultChecksum: null,
+      snapshotId: null,
+      snapshotManifest: null,
+      engineVersion: null,
       ...data,
     };
     return job;
@@ -150,9 +154,9 @@ const createHarness = async (options: HarnessOptions = {}) => {
   );
   const prisma = {
     strategyVersion: {
-      findUnique: vi.fn(async () => ({ schemaVersion: 2, schema: fixture.input.strategy })),
+      findUnique: vi.fn(async () => ({ schemaVersion: 1, schema: fixture.input.strategy })),
     },
-    backtestJob: { findFirst, findUnique, create, updateMany },
+    backtestJob: { findFirst, findUnique, findUniqueOrThrow: findUnique, create, updateMany },
   };
   const queue = {
     ensureEnqueued: vi.fn(async () => job),
@@ -167,7 +171,7 @@ const createHarness = async (options: HarnessOptions = {}) => {
     new BacktestCreationGuardService(prisma as never, revisions as never),
   );
   const request = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     preparationStamp: preparationStampFor(
       fixture.input.strategy,
       fixture.input.runConfig,
@@ -250,11 +254,11 @@ describe("读取期间修订及最终提交门禁", () => {
       }
       return result;
     });
-    await expect(h.service.createRun(h.request)).rejects.toMatchObject({
-      response: { code: 'PREPARATION_STALE' },
-    });
-    expect(h.prisma.backtestJob.create).not.toHaveBeenCalled();
-    expect(h.queue.ensureEnqueued).not.toHaveBeenCalled();
+    const created = await h.service.createRun(h.request);
+    expect(created.status).toBe('queued');
+    expect(await h.service.runCurrent(created.id)).toMatchObject({ status: 'failed', errorCode: 'PREPARATION_STALE' });
+    expect(h.prisma.backtestJob.create).toHaveBeenCalledOnce();
+    expect(h.queue.ensureEnqueued).toHaveBeenCalledOnce();
   });
 
   it('rejects a route change before finalize and removes the unfinished Snapshot', async () => {
@@ -263,16 +267,15 @@ describe("读取期间修订及最终提交门禁", () => {
     h.revisions.readCurrent.mockClear();
     h.revisions.readCurrent
       .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(current)
       .mockResolvedValue({ ...current, catalogRevision: 13 });
-    const finalize = vi.spyOn(h.snapshots.v3, 'finalize');
-    await expect(h.service.createRun(h.request)).rejects.toMatchObject({
-      response: { code: 'PREPARATION_STALE' },
-    });
+    const created = await h.service.createRun(h.request);
+    expect(await h.service.runCurrent(created.id)).toMatchObject({ status: 'failed', errorCode: 'PREPARATION_STALE' });
     const runId = h.buildV3.mock.calls[0]![0].runId;
-    expect(await h.snapshots.v3.load(runId, true)).toBeUndefined();
-    expect(finalize).not.toHaveBeenCalled();
-    expect(h.prisma.backtestJob.create).not.toHaveBeenCalled();
-    expect(h.queue.ensureEnqueued).not.toHaveBeenCalled();
+    expect(await h.snapshots.forAttempt(runId, 1).v3.load(runId, true)).toBeUndefined();
+    expect(h.job()?.snapshotId).toBeNull();
+    expect(h.prisma.backtestJob.create).toHaveBeenCalledOnce();
+    expect(h.queue.ensureEnqueued).toHaveBeenCalledOnce();
   });
 
 });
@@ -288,7 +291,7 @@ describe("既有 Run 与创建身份", () => {
 
   it('rejects a changed strategy before finalize', async () => {
     const h = await createHarness();
-    const version = { schemaVersion: 2, schema: h.fixture.input.strategy };
+    const version = { schemaVersion: 1, schema: h.fixture.input.strategy };
     h.prisma.strategyVersion.findUnique
       .mockResolvedValueOnce(version)
       .mockResolvedValueOnce(version)
@@ -296,12 +299,10 @@ describe("既有 Run 与创建身份", () => {
         ...version,
         schema: { ...version.schema, name: 'changed after preparation' },
       });
-    const finalize = vi.spyOn(h.snapshots.v3, 'finalize');
-    await expect(h.service.createRun(h.request)).rejects.toMatchObject({
-      response: { code: 'PREPARATION_STALE' },
-    });
-    expect(finalize).not.toHaveBeenCalled();
-    expect(h.prisma.backtestJob.create).not.toHaveBeenCalled();
+    const created = await h.service.createRun(h.request);
+    expect(await h.service.runCurrent(created.id)).toMatchObject({ status: 'failed', errorCode: 'PREPARATION_STALE' });
+    expect(h.buildV3).not.toHaveBeenCalled();
+    expect(h.job()?.snapshotId).toBeNull();
   });
 
   it('rejects target sequence replacement and revision query failures', async () => {
@@ -352,19 +353,21 @@ describe("完整快照的创建与执行闭环", () => {
 
     const created = await harness.service.createRun(harness.request);
     assert(created);
-    expect(created).toMatchObject({ mode: 'V3', status: 'queued', input: { contractVersion: 3 } });
+    expect(created).toMatchObject({ mode: 'frozen', status: 'queued', input: { contractVersion: 1 } });
     expect(harness.queue.ensureEnqueued).toHaveBeenCalledWith(created.id);
-    expect(harness.buildV3).toHaveBeenCalledOnce();
-    expect(harness.fixture.reader.readV3).toHaveBeenCalled();
+    expect(harness.buildV3).not.toHaveBeenCalled();
+    expect(harness.fixture.reader.readV3).not.toHaveBeenCalled();
 
     await harness.service.runCurrent(String(harness.job()?.id));
+    expect(harness.buildV3).toHaveBeenCalledOnce();
+    expect(harness.fixture.reader.readV3).toHaveBeenCalled();
     const persisted = await harness.prisma.backtestJob.findUnique({ where: { id: created.id } });
 
     expect(persisted).toMatchObject({
       status: 'succeeded',
       executionAttempt: 1,
       result: {
-        schemaVersion: '3',
+        schemaVersion: 'backtest-trade-result-v1',
         runId: created.id,
         snapshotId: harness.job()?.snapshotId,
         contentHash: harness.job()?.snapshotId,
@@ -383,12 +386,11 @@ describe("冻结重试及幂等竞争", () => {
     const harness = await createHarness({ failFirstRun: true });
     const created = await harness.service.createRun(harness.request);
     assert(created);
+    await harness.service.runCurrent(String(created.id));
+    expect(harness.job()).toMatchObject({ status: 'failed', executionAttempt: 1 });
     const manifest = harness.job()?.snapshotManifest;
     const snapshotId = harness.job()?.snapshotId;
     const readsAfterBuild = harness.fixture.reader.readV3.mock.calls.length;
-
-    await harness.service.runCurrent(String(created.id));
-    expect(harness.job()).toMatchObject({ status: 'failed', executionAttempt: 1 });
 
     await harness.service.retryRun(String(created.id));
     expect(harness.job()).toMatchObject({
@@ -455,10 +457,10 @@ describe("冻结重试及幂等竞争", () => {
     };
     const harness = await createHarness({
       raceExisting: {
-        mode: 'V3',
+        mode: 'frozen',
         input: {
-          contractVersion: 3,
-          schemaVersion: '3',
+          contractVersion: 1,
+          schemaVersion: 'backtest-trade-run-v1',
           runConfig: conflictingRunConfig,
         },
         runConfig: conflictingRunConfig,
@@ -468,7 +470,7 @@ describe("冻结重试及幂等竞争", () => {
     await expect(harness.service.createRun(harness.request)).rejects.toMatchObject({
       response: { code: 'IDEMPOTENCY_KEY_CONFLICT' },
     });
-    expect(harness.buildV3).toHaveBeenCalledOnce();
+    expect(harness.buildV3).not.toHaveBeenCalled();
     expect(harness.queue.ensureEnqueued).not.toHaveBeenCalled();
   });
 

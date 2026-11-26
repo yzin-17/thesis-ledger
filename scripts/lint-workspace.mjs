@@ -28,6 +28,10 @@ for (const file of files) {
   let scope = parts.length > 1 ? parts[0] : 'root';
   if (['apps', 'packages', 'services'].includes(parts[0]) && parts.length > 2) {
     scope = parts.slice(0, 2).join('/');
+    // 源码与测试分组执行，完成后释放各自的 ESLint 分析缓存。
+    if (['apps/server', 'apps/desktop'].includes(scope) && ['src', 'test'].includes(parts[2])) {
+      scope = parts.slice(0, 3).join('/');
+    }
   }
   const entries = groups.get(scope) ?? [];
   entries.push(file);

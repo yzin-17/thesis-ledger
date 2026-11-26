@@ -10,4 +10,4 @@
 
 边界检查：复用 MarketModule 已导出的 MarketPeriodCalendarReader，由 Watchlist 单向消费，无新增反向依赖；同步检查 scripts/check-boundaries.mjs。外部来源实读默认不新增，优先缓存与既有回执。首次 Server 失败的具体原因在证据不足时保留未知。
 
-最新结果与检查命令范围：[验证记录](../evidence/2026-11-07-watchlist-quote-context.md)。本轮无新外部数据调用；原首次中断原因仍未知。原新手引导断言及基金样本字段失败已由最新完整 Desktop 包验证收敛；目标运行态尚未同步，真实页面和来源验收继续独立保留。
+最新结果与检查命令范围见[原验证记录](../evidence/2026-11-07-watchlist-quote-context.md)。2026-11-22 核对报价模块目标产物与宿主一致，在 1440、390 宽度从目标 API 读取实际自选列表。盘口报价数据和盘中正向刷新仍待适用来源及时段，保持真实验收未勾选。 [本次只读验证](../evidence/2026-11-22-active-task-followup.md#收益走势风险自选和竞技场)

@@ -59,7 +59,7 @@ if (process.env.PRICE_RESEARCH_STATUS_SOURCE_ERROR === '1') {
   globalThis.fetch = async (input, init) => {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
     if (
-      url.pathname === '/api/v3/thesis-ledger/market/status-capabilities' &&
+      url.pathname === '/api/v1/thesis-ledger/market/status-capabilities' &&
       typeof init?.body === 'string'
     ) {
       const query = JSON.parse(init.body);
@@ -68,7 +68,7 @@ if (process.env.PRICE_RESEARCH_STATUS_SOURCE_ERROR === '1') {
         return new Response(
           JSON.stringify({
             detail: {
-              contractVersion: 3,
+              contractVersion: 1,
               requestId: query.requestId,
               error: {
                 code: marketDataErrorCodeV3.invalidResponse,

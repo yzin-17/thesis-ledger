@@ -57,10 +57,18 @@ export function ResearchReportScreen() {
             label="比较与复核"
             onPress={() => navigation.navigate('ResearchReview', params)}
           />
-          {['failed', 'cancelled'].includes(report.status) ? (
+          {['failed', 'cancelled'].includes(report.status) && report.submission ? (
             <Action
               label="再次生成预填"
-              onPress={() => navigation.navigate('ResearchSubmit', { retryRunId: report.id })}
+              onPress={() => {
+                const request = report.submission;
+                if (request) navigation.navigate('ResearchSubmit', {
+                  prefill: {
+                    scope: request.scope, question: request.question,
+                    ...(request.templateId ? { templateId: request.templateId } : {}),
+                  },
+                });
+              }}
             />
           ) : null}
           <Section title="工具调用历史">

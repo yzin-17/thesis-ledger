@@ -13,7 +13,7 @@ Risk 的自动消费器持有分布式执行锁：报价类规则消费 Market �
 | Market   | `/api/market/*`、`/api/market-data/*`                        | Market Reader 核验来源、时间、路由、准入和当前证据；Schemas 拥有公开响应与客户端投影                                        |
 | Backtest | `/api/v1/backtests/runs`、`/api/v1/backtests/runs/nav`       | PostgreSQL 当前 Run 状态、attempt CAS 与有界恢复；Exchange/NAV 独立输入与执行；冻结读取守卫绑定配置、快照、模型、结果和 Run |
 | Ledger   | `/api/v1/ledger/*`                                           | Ledger 命令、Repository 和投影只支持持久信封版本 3；账户经济事实与 Backtest SimulationLedger 分开                           |
-| DSA      | `/api/v3/thesis-ledger/*`、`/api/v3/thesis-ledger/control/*` | 专属 Data/Control 当前合同；Provider 适配、SQLite 控制状态与原文证据留在 DSA                                                |
+| DSA      | `/api/v1/thesis-ledger/*`、`/api/v1/thesis-ledger/control/*` | 专属 `dsa-data-v1` 与 `dsa-control-v1` 合同；Provider 适配、SQLite 控制状态与原文证据留在 DSA                                                |
 
 API Client 在传输边界解析响应并绑定请求 Run/Provider/Job 身份。Desktop 使用 TanStack Query 管理当前状态；Policy Desired 与 Effective、目录状态与同步任务分别显示，失败不变成成功或空集合。旧路径、旧 Run、旧 Snapshot 和旧 Ledger 行拒绝读取，不自动升级或重算。
 
@@ -79,7 +79,7 @@ Tushare现金已标准绑定，来源固定guard/SDK/安全回调保持原执行
 
 HiThink现金已绑定同一现金合同，来源固定原文/准入/SDK/安全回调复用原认证、HMAC、金额/日期、全部准入标的范围和精确时钟，原wire及未知覆盖保持。公共事件现金/拆分分派与供应商当前准入特判已退役，目录/修订/策略准入按binding派生。迁移阶段记录的19来源140精确目标各有一个binding；当前清单由来源注册和能力矩阵派生，未新增用户路由/准入或业务资格；不能以本地移植数量代替Provider配置代次、缓存、真实目标消费或新旧冻结验证。
 
-当前报价、场外基金净值/历史/持仓和筹码缓存先经原Data V3只读`market/cache-context`核对控制。有效政策、来源配置/凭据及绑定修订形成不透明代次，fresh/last-valid/flight/锁共用该代次；停用、未选、控制不可用或读取期间变化不消费旧缓存。基金读取由`MarketFundReader`承担，原DsaClient/URL/TTL与可选身份持久化保留。控制投影不执行SDK，原无assetType报价仍由DSA解析；本地回归和目标只读投影已验证，真实切代次/故障及新冻结继续由原Task独立验收。
+当前报价、场外基金净值/历史/持仓和筹码缓存先经现行 `dsa-data-v1` 只读`market/cache-context`核对控制。有效政策、来源配置/凭据及绑定修订形成不透明代次，fresh/last-valid/flight/锁共用该代次；停用、未选、控制不可用或读取期间变化不消费旧缓存。基金读取由`MarketFundReader`承担，原DsaClient/URL/TTL与可选身份持久化保留。控制投影不执行SDK，原无assetType报价仍由DSA解析；本地回归和目标只读投影已验证，真实切代次/故障及新冻结继续由原Task独立验收。
 
 四基金/筹码缓存数据GET与控制cache-context POST在原消费trace内有有界传输观察，记录独立transportId/attempt/开始结束且只含pathname，不含query/body/headers或秘密。GET原2次尝试、控制原1次和错误/超时保持；无trace独立CLI保留原stdout。观察/计数缺完成记录不支持零调用证明，HTTP尝试不等同SDK页数或源执行。真实未选拒绝已核对，临时选择/切代次仍需具体授权；持仓原Reader进程与绩效HTTP证据分别记录。
 
@@ -125,7 +125,7 @@ Yahoo零量私有响应摘要/元信息由源内研究帧适配器解析，Daily
 
 原本地费用/聚合状态的目录就绪经SourceDefinition.catalog_readiness及有限key/target上下文声明，公共入口只依据精确绑定调用/校验bool或None；数据包路径/文件存在与公告库兼容由来源拥有。原140目标观测逐项保持，十二本地目标就绪、其余原配置/准入路径不变；文件存在不授予窗口覆盖/权限。正式目标目录/修订及报价已核对，未启用测试来源。
 
-独立状态能力 API 已与日线共用 API 所有权的 Data V3 安全错误信封投影：固定消息和本次requestId置于标准error对象，真实能力不支持单独使用unsupported_capability。Server共享Schema及Mapper保留强校验，标准可选来源失败可以冻结为组合failed项，平铺V3、错关联或供应商原文继续阻断。该修复不改变SDK、源修订、研究要求或旧冻结；目标部署和真实新业务冻结的完成状态仍以[原Task](../tasks/2026-10-09-unified-data-capability-adapter.md)为准。
+独立状态能力 API 已与日线共用 API 所有权的 `dsa-data-v1` 安全错误信封投影：固定消息和本次requestId置于标准error对象，真实能力不支持单独使用unsupported_capability。Server共享Schema及Mapper保留强校验，标准可选来源失败可以冻结为组合failed项，平铺V3、错关联或供应商原文继续阻断。该修复不改变SDK、源修订、研究要求或旧冻结；目标部署和真实新业务冻结的完成状态仍以[原Task](../tasks/2026-10-09-unified-data-capability-adapter.md)为准。
 
 BaoStock独立状态/粗ST及基础日期经来源专属隔离进程复用原SDK标准化，45秒终止/wait边界避免服务进程内全局连接并发；状态/粗ST仍共享同代次获取，日期独立。原工厂、其他日线、全部公开来源/适配修订保持。Market组合及Snapshot外层复核共用同一政策事实比较，首份完整政策冻结，真实字段变化拒绝。目标H09-K2新Run已生成十产物、五事实/三真实可选失败，并通过原Worker两次断网一致/0网络；数据快照complete、固定两日指标partial保持，[分层证据](../archive/reviews/2026-10-11-unified-data-capability-runtime-evidence.md#record-h09-real-composition-freeze-passed)。H10原浏览器真实保存/关闭/恢复与最终分层Review已完成；K37部分来源正向资格仍独立受外部条件阻塞，不扩大为组合机制失败。
 

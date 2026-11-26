@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AiProviderRecord } from '@thesis-ledger/schemas';
+import { aiProviderConnectionLabel, projectAiProviderStatus } from '@thesis-ledger/domain';
 import { confirmAction, useMobileRuntime } from '../../app/MobileRuntime';
 import type { SettingsStackParams } from '../../app/navigation-types';
 import {
@@ -88,20 +89,12 @@ export function AiProvidersScreen({
           <Section key={row.name} title={row.name}>
             <Copy>
               {row.enabled ? '已启用' : '已停用'} ·{' '}
-              {row.credentialConfigured ? '凭证已配置' : '凭证未配置'} · 健康：{row.health}
+              {row.credentialConfigured ? '凭证已配置' : '凭证未配置'} ·{' '}
+              {aiProviderConnectionLabel(row.health)}
             </Copy>
-            <Copy>
-              模型：{row.models?.join('、') || '尚未选择'}；修订：{row.updatedAt ?? '未记录'}
-            </Copy>
+            <Copy>模型：{row.models?.join('、') || '尚未选择'}</Copy>
             {row.configError ? <Copy>{row.configError}</Copy> : null}
-            {row.executionRoutes?.map((route) => (
-              <Copy key={`${route.model}:${route.contract.id}`}>
-                {route.model} · {route.contract.id} · 就绪 {route.readiness.state}；最近验证{' '}
-                {route.liveValidation.status}；阻断原因 {route.readiness.reasons.join('、') || '无'}
-                ；配置指纹 {route.readiness.configurationFingerprint}；检查时间{' '}
-                {route.liveValidation.checkedAt ?? '未执行'}
-              </Copy>
-            ))}
+            <AiProviderRouteStatus row={row} />
             <Action
               label={`编辑 ${row.name}`}
               onPress={() => navigation.navigate('AiProviderEditor', { name: row.name })}
@@ -178,5 +171,25 @@ export function AiProvidersScreen({
         />
       </Section>
     </Page>
+  );
+}
+
+function AiProviderRouteStatus({ row }: { row: AiProviderRecord }) {
+  const status = projectAiProviderStatus(row.executionRoutes);
+  return (
+    <>
+      <Copy>
+        {status.label} · {status.testLabel}
+      </Copy>
+      {status.routes.map((route, index) => (
+        <Copy key={index}>
+          {route.model} · {route.purpose} {route.version} · {route.readinessLabel}
+          {route.readinessLabel === '配置待处理' && route.budgetPending ? '；待任务费用授权' : ''}
+          {route.validationLabel !== status.testLabel ? `；${route.validationLabel}` : ''}
+          {route.reasons.length > 0 ? `；${route.reasons.join('；')}。` : ''}
+        </Copy>
+      ))}
+      {status.budgetNote ? <Copy muted>{status.budgetNote}</Copy> : null}
+    </>
   );
 }

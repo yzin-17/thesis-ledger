@@ -49,7 +49,7 @@ const snapshot = (page) => page.locator('section[aria-label]').evaluateAll((node
           saves.push(request.postDataJSON());
           if (saves.length === 1) return route.fulfill({ status: 503, json: { message: '受控保存失败' } });
           savedConfig = request.postDataJSON().config;
-          return route.fulfill({ json: { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'controlled-save',
+          return route.fulfill({ json: { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'controlled-save',
             revision: baseline.revision + 1, enabled: true, routes: [], syncState: 'applied',
             effectiveProjection: null, effectiveStale: true } });
         }

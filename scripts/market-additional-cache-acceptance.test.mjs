@@ -48,7 +48,7 @@ test('目标持仓完成证明保持原Reader层，不伪造Server HTTP完成', 
   const row = (value) => JSON.stringify({ timestamp: '2026-10-11T00:00:00Z', ...value });
   const log = ['started', 'settled'].map((stage) => row({ operation: 'dsa.cache-request',
     transportId: 'control', traceId: 'one', category: 'control', attempt: 1, method: 'POST',
-    path: '/api/v3/thesis-ledger/market/cache-context', stage, ...(stage === 'settled' ? { outcome: 'response' } : {}) }));
+    path: '/api/v1/thesis-ledger/market/cache-context', stage, ...(stage === 'settled' ? { outcome: 'response' } : {}) }));
   log.push(row({ operation: 'market.cache-target-reader', stage: 'completed', capability: 'FUND_HOLDINGS', traceId: 'one' }));
   log.push('CACHE_READER_RESULT=[{"rejected":true}]');
   const spawn = (command, args, options) => {

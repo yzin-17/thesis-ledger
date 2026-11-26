@@ -53,7 +53,7 @@ export function compositionFixture(
     ),
   }));
   const policy = effectiveProviderPolicyV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'composition-policy',
     revision: 7,

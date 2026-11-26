@@ -19,4 +19,4 @@
 
 ## 任务与证据
 
-[实施任务](../tasks/2026-11-14-research-journal-reading.md)。
+[归档任务](../archive/tasks/2026-11-14-research-journal-reading.md)。

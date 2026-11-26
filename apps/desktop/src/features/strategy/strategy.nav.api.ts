@@ -13,9 +13,9 @@ export const createNavBacktestRun = (
   input: BacktestNavRunCreateV3,
   client?: DesktopRequestClient,
 ) => runs(client).createNavRun(input);
-export const fetchNavBacktestRun = (id: string, client?: DesktopRequestClient) =>
-  runs(client).getNavRun(id);
-export const fetchNavBacktestRuns = (client?: DesktopRequestClient) => runs(client).listNavRuns();
+export const fetchNavBacktestRun = (id: string, client?: DesktopRequestClient, signal?: AbortSignal) =>
+  runs(client).getNavRun(id, signal);
+export const fetchNavBacktestRuns = (client?: DesktopRequestClient, signal?: AbortSignal) => runs(client).listNavRuns(signal);
 export const cancelNavBacktestRun = (id: string, client?: DesktopRequestClient) =>
   runs(client).cancelNavRun(id);
 export const retryNavBacktestRun = (id: string, client?: DesktopRequestClient) =>

@@ -64,7 +64,7 @@ function fixture(market: 'HK' | 'US' = 'US') {
     adjustment: 'none' as const,
   };
   const source = {
-    contractVersion: 3,
+    contractVersion: 1,
     identity,
     points,
     coverage: {
@@ -124,7 +124,7 @@ describe('分钟展示完整窗口', () => {
       expect(view.visible.series.coverage.hasMoreBefore).toBe(true);
       expect(
         marketPeriodIndicatorRequestSchema.parse({
-          contractVersion: 3,
+          contractVersion: 1,
           identity: view.calculation.series.identity,
           points: view.calculation.series.points,
           inputFingerprint: view.calculation.series.inputFingerprint,

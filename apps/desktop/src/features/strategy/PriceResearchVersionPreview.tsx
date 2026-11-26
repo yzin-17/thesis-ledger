@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { backtestStrategyPlanReadback } from '@thesis-ledger/domain';
 import {
   projectPriceResearchStrategy,
-  priceResearchStrategySummary,
   strategySchema,
   type BacktestStrategy,
 } from '@thesis-ledger/schemas';
@@ -29,7 +29,7 @@ export function PriceResearchVersionPreview({
   const projection = parsed.success
     ? projectPriceResearchStrategy(parsed.data as BacktestStrategy)
     : null;
-  const summary = projection ? priceResearchStrategySummary(projection) : null;
+  const lines = projection ? backtestStrategyPlanReadback(projection) : [];
   const save = useMutation({
     mutationFn: async () => {
       if (!projection) throw new Error('策略定义不可用');
@@ -42,14 +42,12 @@ export function PriceResearchVersionPreview({
     },
     onSettled: () => onBusyChange(false),
   });
-  if (!summary) return null;
+  if (!projection) return null;
   return (
     <Alert>
       <AlertTitle>确认策略的研究口径</AlertTitle>
       <AlertDescription>
-        <p>入场：{summary.entry}</p>
-        <p>退出：{summary.exit}</p>
-        <p>投入：{summary.sizing}，持仓以研究单位计算。</p>
+        {lines.map(line => <p key={line}>{line}</p>)}
         <p>确认后保存为新版本，再准备本次研究。</p>
         <Button type="button" disabled={disabled || save.isPending} onClick={() => save.mutate()}>
           {save.isPending ? '正在保存…' : '采用研究口径并保存新版本'}

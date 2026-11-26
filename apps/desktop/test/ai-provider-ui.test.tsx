@@ -410,10 +410,10 @@ describe('Provider 列表状态与生命周期', () => {
         onCreate={() => undefined}
       />,
     );
-    expect(markup).toContain('连接健康：健康');
-    expect(markup).toContain('接入阻断 1/1');
-    expect(markup).toContain('用途尚未验证');
-    expect(markup).toContain('缺少本地 adapter 契约证据。编辑配置后会重新评估。');
+    expect(markup).toContain('最近连接成功');
+    expect(markup).toContain('配置待处理 1/1');
+    expect(markup).toContain('用途尚未测试');
+    expect(markup).toContain('当前接入方式、用途版本或输出方式未通过兼容检查');
     expect(markup).not.toContain('>ready<');
     expect(markup).not.toContain('>not_run<');
   });

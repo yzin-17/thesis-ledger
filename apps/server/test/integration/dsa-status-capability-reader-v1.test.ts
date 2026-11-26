@@ -14,7 +14,7 @@ describe('原 V3 Market Reader 的独立状态能力', () => {
     const { post, capability } = reader(fixture.result);
     const request = statusCapabilityRequestV1Schema.parse(fixture.request);
     expect(await capability.statusCapability(request)).toEqual(fixture.result);
-    expect(post).toHaveBeenCalledExactlyOnceWith('/api/v3/thesis-ledger/market/status-capabilities', request, expect.any(Function));
+    expect(post).toHaveBeenCalledExactlyOnceWith('/api/v1/thesis-ledger/market/status-capabilities', request, expect.any(Function));
   });
   it.each(['symbol', 'target', 'revision', 'range', 'precision'])('隔离未关联响应 %s', async (field) => {
     const fixture = structuredClone(fixtures.find((item: { name: string }) => item.name === 'RISK_WARNING'));

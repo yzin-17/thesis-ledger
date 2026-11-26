@@ -13,7 +13,7 @@ test('路由应用必须带精确目标、计划和绝对证据路径', () => {
 
 test('Server 与 DSA 的事实一致才允许生成计划', () => {
   const dsa = { previousRevision: 1, previousRoutes: [{ key: 'old' }] };
-  const server = { contractVersion: 3, enabled: true, syncState: 'applied', effectiveStale: false, revision: 1, routes: dsa.previousRoutes };
+  const server = { contractVersion: 1, enabled: true, syncState: 'applied', effectiveStale: false, revision: 1, routes: dsa.previousRoutes };
   assert.equal(withServerPlan(dsa, server).serverRevision, 1);
   for (const patch of [{ revision: 2 }, { routes: [] }, { syncState: 'pending' }, { effectiveStale: true }]) assert.throws(() => withServerPlan(dsa, { ...server, ...patch }));
 });

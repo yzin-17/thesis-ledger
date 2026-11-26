@@ -4,7 +4,7 @@ import { MarketSecurityStaticInfoController } from '../src/market/market-securit
 import type { DsaClient } from '../src/integration/dsa/dsa.client.js';
 
 const response = (requestId: string) => ({
-  contractVersion: 3, consumer: 'thesis-ledger', requestId, symbol: 'SPY.US', assetType: 'ETF',
+  contractVersion: 1, consumer: 'thesis-ledger', requestId, symbol: 'SPY.US', assetType: 'ETF',
   market: 'US', name: 'SPDR S&P 500 ETF', securityId: '9007199254740993', sharesPerLot: '1', listingDate: null,
   delisted: false, exchange: null, provider: 'futu', historicalChanges: 'unverified',
   observedAt: '2026-10-09T01:00:00Z', fetchedAt: '2026-10-09T01:01:00Z', policyRevision: 1,
@@ -22,8 +22,8 @@ describe('当前证券资料独立消费', () => {
   it('绑定证券、类型与请求，保留精确 ID、观察时间和来源', async () => {
     const post = vi.fn(async (_path, request) => response(request.requestId));
     const result = await readSecurityStaticInfo({ post } as unknown as DsaClient, 'SPY.US', 'ETF');
-    expect(post.mock.calls[0]).toEqual(['/api/v3/thesis-ledger/market/security-static-info', {
-      contractVersion: 3, consumer: 'thesis-ledger', requestId: result.requestId, symbol: 'SPY.US', assetType: 'ETF',
+    expect(post.mock.calls[0]).toEqual(['/api/v1/thesis-ledger/market/security-static-info', {
+      contractVersion: 1, consumer: 'thesis-ledger', requestId: result.requestId, symbol: 'SPY.US', assetType: 'ETF',
     }, 1]);
     expect(result.securityId).toBe('9007199254740993');
   });

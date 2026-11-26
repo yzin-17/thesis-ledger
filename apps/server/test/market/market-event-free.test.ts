@@ -99,7 +99,7 @@ describe('生产消费仍服从控制与日历', () => {
   ) {
     const prepared = prepareEventFreeEvidence(fixture());
     const policy = {
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: 'test',
       revision: 188,
@@ -192,6 +192,10 @@ describe('生产消费仍服从控制与日历', () => {
       expect(value?.status).toBe('selected');
       if (value?.status === 'selected') {
         const windows = value.selection.response.historicalTradabilityWindows;
+        expect(windows?.[0]).toMatchObject({
+          contract: 'market-daily-tradability-window-v1',
+          priceOnlyAllowed: false,
+        });
         expect(windows?.[0]?.days.map((d) => d.state)).toEqual([
           'observed-traded',
           'observed-traded',

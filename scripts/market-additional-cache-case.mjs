@@ -5,14 +5,14 @@ import { desiredFromState, policyFingerprint } from './market-route-failover-cas
 
 export const additionalCacheDefinitions = Object.freeze([
   { capability: 'FUND_NAV', assetType: 'MUTUAL_FUND', symbol: '000001.OF',
-    consumerPath: '/api/market/000001.OF/fund-nav', dataPath: '/api/v3/thesis-ledger/market/fund-nav' },
+    consumerPath: '/api/market/000001.OF/fund-nav', dataPath: '/api/v1/thesis-ledger/market/fund-nav' },
   { capability: 'FUND_NAV_HISTORY', assetType: 'MUTUAL_FUND', symbol: '000001.OF',
-    consumerPath: '/api/market/000001.OF/fund-nav/history', dataPath: '/api/v3/thesis-ledger/market/fund-nav/history',
+    consumerPath: '/api/market/000001.OF/fund-nav/history', dataPath: '/api/v1/thesis-ledger/market/fund-nav/history',
     range: { start: '2024-07-15', end: '2024-07-19', limit: 5 } },
   { capability: 'FUND_HOLDINGS', assetType: 'MUTUAL_FUND', symbol: '000001.OF',
-    consumer: 'target-original-reader', dataPath: '/api/v3/thesis-ledger/market/fund-holdings' },
+    consumer: 'target-original-reader', dataPath: '/api/v1/thesis-ledger/market/fund-holdings' },
   { capability: 'CHIP_SUMMARY', assetType: 'STOCK', symbol: '600519.SH',
-    consumerPath: '/api/market/600519.SH/chip', dataPath: '/api/v3/thesis-ledger/market/chip' },
+    consumerPath: '/api/market/600519.SH/chip', dataPath: '/api/v1/thesis-ledger/market/chip' },
 ]);
 const additions = () => additionalCacheDefinitions.map(({ capability, assetType }) => ({
   key: { kind: 'data', market: 'CN', assetType, capability }, enabled: true,

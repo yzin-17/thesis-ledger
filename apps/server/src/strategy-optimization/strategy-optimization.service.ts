@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { StrategyCapabilityGapError } from './strategy-optimization-capability-gap.js';
 import { OptimizationBacktestFailure } from './strategy-optimization-failure.js';
 import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -36,9 +37,7 @@ import {
 } from './strategy-optimization-common.js';
 import { describeStrategyParameters } from './strategy-optimization-parameters.js';
 import { StrategyOptimizationReadService } from './strategy-optimization-read.service.js';
-import {
-  type OptimizationModelRoute,
-} from './strategy-optimization-model-routing.js';
+import { type OptimizationModelRoute } from './strategy-optimization-model-routing.js';
 import {
   assertOptimizationModelConfigCost,
   normalizeCostCurrency,
@@ -46,9 +45,7 @@ import {
 } from './strategy-optimization-cost.js';
 import { StrategyOptimizationRunService } from './strategy-optimization-run.service.js';
 import { StrategyRiskApplicationService } from './strategy-risk-application.service.js';
-import {
-  cloneDiscoveryExperiment,
-} from './strategy-optimization-discovery-store.js';
+import { cloneDiscoveryExperiment } from './strategy-optimization-discovery-store.js';
 import { createOptimizationExperiment } from './strategy-optimization-create.js';
 import { concludeOptimizationProposalStage } from './strategy-optimization-proposal-stage.js';
 import { OptimizationFinalization } from './strategy-optimization-finalization.js';
@@ -96,8 +93,13 @@ export class StrategyOptimizationService implements OnModuleInit {
 
   async create(input: unknown) {
     this.assertEnabled();
-    return createOptimizationExperiment(input, { prisma: this.prisma, providers: this.providers,
-      reads: this.reads, candidates: this.candidateService, process: id => this.process(id) });
+    return createOptimizationExperiment(input, {
+      prisma: this.prisma,
+      providers: this.providers,
+      reads: this.reads,
+      candidates: this.candidateService,
+      process: (id) => this.process(id),
+    });
   }
 
   async clone(id: string, input: unknown) {
@@ -256,6 +258,8 @@ export class StrategyOptimizationService implements OnModuleInit {
       );
       return null;
     } catch (error) {
+      if (error instanceof StrategyCapabilityGapError)
+        return { kind: 'capability-gap' as const, reason: error.message };
       await this.candidateService.recordAttempt({
         experimentId: experiment.id,
         modelKey,
@@ -297,6 +301,10 @@ export class StrategyOptimizationService implements OnModuleInit {
         const state = states.get(modelKey);
         if (!state || state.stopped) continue;
         const blocked = await this.processRound(experiment, baseline, descriptors, route, round);
+        if (blocked && typeof blocked === 'object') {
+          state.stopped = true;
+          continue;
+        }
         if (blocked || (await this.cancelled(experiment.id))) return blocked;
         const currentBest = await this.bestValidationScore(experiment.id, modelKey);
         if (round > roundOffset + 1 && currentBest <= state.bestScore) state.stopped = true;
@@ -317,7 +325,10 @@ export class StrategyOptimizationService implements OnModuleInit {
 
   private async processClaimed(id: string, expectedExecutionAttempt?: number) {
     let experiment = await this.experiment(id);
-    if (expectedExecutionAttempt !== undefined && experiment.executionAttempt !== expectedExecutionAttempt)
+    if (
+      expectedExecutionAttempt !== undefined &&
+      experiment.executionAttempt !== expectedExecutionAttempt
+    )
       throw new Error('实验已被新的执行尝试接管');
     const executionAttempt = experiment.executionAttempt;
     const baselineVersion = await this.prisma.strategyVersion.findUnique({
@@ -331,7 +342,8 @@ export class StrategyOptimizationService implements OnModuleInit {
     experiment = await this.ensureBaselines(experiment);
     await this.setStage(experiment, 'proposing');
     const continuationBlockedReason = await this.processModelRounds(experiment, baseline);
-    if (continuationBlockedReason) return this.fail(id, continuationBlockedReason, executionAttempt);
+    if (continuationBlockedReason)
+      return this.fail(id, continuationBlockedReason, executionAttempt);
     if (!(await this.cancelled(id))) await this.finishProposalStage(id, executionAttempt);
   }
 
@@ -345,7 +357,8 @@ export class StrategyOptimizationService implements OnModuleInit {
         await this.processClaimed(id, executionAttempt);
       }
     } catch (error) {
-      if (executionAttempt !== undefined) await this.fail(id, redactOptimizationError(error), executionAttempt);
+      if (executionAttempt !== undefined)
+        await this.fail(id, redactOptimizationError(error), executionAttempt);
     } finally {
       this.active.delete(id);
     }
@@ -375,8 +388,10 @@ export class StrategyOptimizationService implements OnModuleInit {
       ORDER BY "createdAt" ASC LIMIT ${bounded}
     `);
     rows.forEach((row) => {
-      if (row.stage === 'testing') void this.finalization.resumeTesting(row.id).catch(() => undefined);
-      else if (row.stage === 'awaiting_finalization') void this.finalization.resumeAutomatic(row.id).catch(() => undefined);
+      if (row.stage === 'testing')
+        void this.finalization.resumeTesting(row.id).catch(() => undefined);
+      else if (row.stage === 'awaiting_finalization')
+        void this.finalization.resumeAutomatic(row.id).catch(() => undefined);
       else void this.process(row.id).catch(() => undefined);
     });
     return { scheduled: rows.length };
@@ -403,7 +418,7 @@ export class StrategyOptimizationService implements OnModuleInit {
     const version = await this.prisma.strategyVersion.findUnique({ where: { id } });
     if (!version) throw adoptionRejected('ADOPTION_SOURCE_MISMATCH', '采纳来源版本不存在');
     const parsed = strategySchema.safeParse(version.schema);
-    if (!parsed.success || ![2, 3].includes(version.schemaVersion))
+    if (!parsed.success || version.schemaVersion !== 1)
       throw adoptionRejected('ADOPTION_SOURCE_MISMATCH', '采纳来源不是可审阅的策略定义');
     return {
       id: version.id,
@@ -471,7 +486,9 @@ export class StrategyOptimizationService implements OnModuleInit {
       throw adoptionRejected('ADOPTION_NOT_REVEALED', '封存测试结果尚未明确揭示，不能确认采纳');
     const candidate = detail.candidates.find((item) => item.id === candidateId);
     if (!candidate) throw new NotFoundException('候选不存在');
-    const baseline = await this.adoptionVersionSnapshot(detail.experiment.baselineStrategyVersionId);
+    const baseline = await this.adoptionVersionSnapshot(
+      detail.experiment.baselineStrategyVersionId,
+    );
     const current = await this.currentFormalVersion(baseline.strategyId);
     return this.buildAdoptionContext(
       id,
@@ -485,14 +502,26 @@ export class StrategyOptimizationService implements OnModuleInit {
     return committedOptimizationAdoptionResponse(adoption, async () => {
       const experiment = await this.experiment(adoption.experimentId);
       const context = await this.buildAdoptionContext(
-        adoption.experimentId, adoption.candidateId,
+        adoption.experimentId,
+        adoption.candidateId,
         adoption.baselineStrategyVersionId ?? experiment.baselineStrategyVersionId,
         adoption.confirmedCurrentStrategyVersionId,
       );
-      const monitoringPlan = await this.riskApplications.monitoringPlan(adoption.formalStrategyVersionId);
-      const before = context.current ? await this.riskApplications.monitoringPlan(context.current.id) : null;
-      const riskApplicationDiffs = await this.riskApplications.planDiffsForTargetVersion(adoption.formalStrategyVersionId);
-      return { adoptionContext: context, monitoringPlan, monitoringDiff: { before, after: monitoringPlan }, riskApplicationDiffs };
+      const monitoringPlan = await this.riskApplications.monitoringPlan(
+        adoption.formalStrategyVersionId,
+      );
+      const before = context.current
+        ? await this.riskApplications.monitoringPlan(context.current.id)
+        : null;
+      const riskApplicationDiffs = await this.riskApplications.planDiffsForTargetVersion(
+        adoption.formalStrategyVersionId,
+      );
+      return {
+        adoptionContext: context,
+        monitoringPlan,
+        monitoringDiff: { before, after: monitoringPlan },
+        riskApplicationDiffs,
+      };
     });
   }
 

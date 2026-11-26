@@ -1,191 +1,146 @@
 // @vitest-environment jsdom
-import { webcrypto } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { journalAnalyze } from '@thesis-ledger/domain';
+import {
+  journalDeterministicReviewSchema,
+  journalReviewSnapshotContractSchema,
+} from '@thesis-ledger/schemas';
 import { JournalAiRunPanel } from '../src/features/journal/review/JournalAiRunPanel.js';
-import { JournalAiTaskHistory } from '../src/features/journal/review/JournalAiTaskHistory.js';
+import { JournalSavedAiExplanation } from '../src/features/journal/review/JournalSavedAiExplanation.js';
 import {
-  journalAiReferenceKey,
-  readJournalAiTasks,
-  rememberJournalAiTask,
-} from '../src/features/journal/review/journal-ai-reference.js';
-import {
-  journalButton,
   journalClick,
   journalWait,
+  journalMountedCandidate,
   mountJournal,
 } from './journal-mounted-harness.js';
+import { journalSessionRun as run } from './journal-ai-session.fixture.js';
 
-const api = vi.hoisted(() => ({ explanation: vi.fn(), periodExplanation: vi.fn() }));
+const api = vi.hoisted(() => ({ explanation: vi.fn(), explain: vi.fn() }));
 vi.mock('../src/shared/api/client', () => ({
   getDesktopApiClient: () => ({ journalReviews: api }),
 }));
-const run = {
-  id: '00000000-0000-4000-8000-000000000099',
-  provider: '验收 Provider',
-  model: '已提交模型',
-  promptVersion: '验收-v2',
-  algorithmVersion: 'journal-test',
-  status: 'failed' as const,
-  errorSummary: '进程恢复后收敛到明确终态',
-  result: null,
-};
-describe('刷新后的已提交任务恢复', () => {
+function savedSnapshot() {
+  const candidate = journalMountedCandidate();
+  const result = journalDeterministicReviewSchema.parse(journalAnalyze(candidate));
+  return journalReviewSnapshotContractSchema.parse({
+    id: '00000000-0000-4000-8000-000000000098',
+    inputSnapshot: candidate.input,
+    outputSnapshot: {
+      ...result,
+      aiExplanation: {
+        id: run.id,
+        provider: run.provider,
+        model: run.model,
+        promptVersion: run.promptVersion,
+        status: run.status,
+      },
+    },
+    status: 'CURRENT',
+    createdAt: '2026-10-05T00:00:00Z',
+  });
+}
+describe('保存复盘快照后的 AI 解读读取', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    vi.stubGlobal('crypto', webcrypto);
-    api.explanation.mockResolvedValue(run);
-    api.periodExplanation.mockResolvedValue(run);
   });
-  it.each(['object', 'period'] as const)(
-    '无需重新输入 %s 分析窗口即可读取已提交任务',
-    async (kind) => {
-      const create = vi.fn(async () => run);
-      const original = await mountJournal(
-        <JournalAiRunPanel
-          accountId="账户一"
-          mode="actual"
-          kind={kind}
-          scope={{ input: '冻结输入' }}
-          disabled={false}
-          createRun={create}
-          readRun={async () => run}
-        />,
-      );
-      await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-      await journalClick('开始 AI 解读');
-      await journalWait(() => expect(original.host.textContent).toContain(run.id));
-      await original.dispose();
-      const restored = await mountJournal(
-        <JournalAiTaskHistory accountId="账户一" mode="actual" />,
-      );
-      await journalWait(() =>
-        expect(restored.host.textContent).toContain('进程恢复后收敛到明确终态'),
-      );
-      expect(restored.host.textContent).toContain('已提交模型');
-      expect(restored.host.textContent).not.toContain('开始 AI 解读');
-      expect(create).toHaveBeenCalledTimes(1);
-      const read = kind === 'object' ? api.explanation : api.periodExplanation;
-      expect(read.mock.calls[0]!.slice(0, 2)).toEqual([
-        run.id,
-        { accountId: '账户一', mode: 'actual' },
-      ]);
-      await restored.render(
-        <JournalAiTaskHistory key="account:shadow" accountId="账户一" mode="shadow" />,
-      );
-      await journalWait(() => expect(restored.host.textContent).not.toContain(run.id));
-    },
-  );
-  it('历史引用不可用时可移除本机引用，服务端运行与其他任务不受影响', async () => {
-    const original = await mountJournal(
+  it.each(['object', 'period'] as const)('未保存的%s会话不会在重新挂载时恢复任务', async (kind) => {
+    const create = vi.fn(async () => run),
+      read = vi.fn(async () => run);
+    const first = await mountJournal(
       <JournalAiRunPanel
         accountId="账户一"
         mode="actual"
-        kind="object"
-        scope={{}}
+        kind={kind}
         disabled={false}
-        createRun={async () => run}
-        readRun={async () => run}
+        createRun={create}
+        readRun={read}
       />,
     );
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
     await journalClick('开始 AI 解读');
-    await journalWait(() => expect(original.host.textContent).toContain(run.id));
-    await original.dispose();
-    api.explanation.mockRejectedValueOnce(new Error('引用已不可用'));
-    const restored = await mountJournal(<JournalAiTaskHistory accountId="账户一" mode="actual" />);
-    await journalWait(() => expect(restored.host.textContent).toContain('AI 状态读取失败'));
-    await journalClick('移除任务引用');
-    await journalWait(() => expect(restored.host.textContent).not.toContain('历史任务'));
-    expect(api.explanation).toHaveBeenCalledTimes(1);
-    expect(api.periodExplanation).not.toHaveBeenCalled();
-  });
-
-  const currentAnalysis =
-    (createRun: () => Promise<typeof run>) => (onRunSelected: (id: string | null) => void) => (
+    await journalWait(() => expect(first.host.textContent).toContain(run.id));
+    await first.dispose();
+    const next = await mountJournal(
       <JournalAiRunPanel
         accountId="账户一"
         mode="actual"
-        kind="object"
-        scope={{ object: '当前单笔复盘' }}
+        kind={kind}
         disabled={false}
-        embedded
-        onRunSelected={onRunSelected}
-        createRun={createRun}
-        readRun={async () => run}
-      />
-    );
-
-  it('当前任务与本机历史引用为同一 ID 时仅展示一次，并统一移除引用', async () => {
-    const create = vi.fn(async () => run);
-    const view = await mountJournal(
-      <JournalAiTaskHistory
-        accountId="账户一"
-        mode="actual"
-        kind="object"
-        current={currentAnalysis(create)}
+        createRun={create}
+        readRun={read}
       />,
     );
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    await journalClick('开始 AI 解读');
-    await journalWait(() => expect(view.host.textContent).toContain(run.id));
-    await journalWait(() =>
-      expect(
-        Array.from(view.host.querySelectorAll('button')).some((button) =>
-          button.textContent?.includes('单笔 ·'),
-        ),
-      ).toBe(false),
-    );
-    expect(view.host.querySelectorAll('section[aria-label="AI 解读"]')).toHaveLength(1);
-    expect(
-      Array.from(view.host.querySelectorAll('button')).filter(
-        (button) => button.textContent === '移除任务引用',
-      ),
-    ).toHaveLength(1);
-    expect(view.host.textContent?.split(run.id)).toHaveLength(2);
-    expect(api.explanation).not.toHaveBeenCalled();
-    await journalClick('移除任务引用');
-    const key = await journalAiReferenceKey(JSON.stringify(['tasks', '账户一', 'actual']));
-    await journalWait(() => expect(readJournalAiTasks(key)).toHaveLength(0));
-    expect(view.host.textContent).toContain('开始 AI 解读');
+    expect(next.host.textContent).not.toContain(run.id);
+    expect(next.host.textContent).toContain('开始 AI 解读');
     expect(create).toHaveBeenCalledOnce();
+    expect(read).toHaveBeenCalledOnce();
+    expect(sessionStorage.length).toBe(0);
   });
-
-  it('选择其他历史任务会替换当前详情，返回当前分析不会重复生成', async () => {
-    const oldId = '00000000-0000-4000-8000-000000000098';
-    const key = await journalAiReferenceKey(JSON.stringify(['tasks', '账户一', 'actual']));
-    rememberJournalAiTask(key, { id: oldId, kind: 'object' });
+  it('保存的快照按任务 ID 读取，刷新与账户模式切换不生成新任务', async () => {
+    const snapshot = savedSnapshot();
     api.explanation.mockResolvedValue({
       ...run,
-      id: oldId,
-      model: '之前的模型',
-      errorSummary: '之前的失败原因',
+      reviewObjectId: snapshot.inputSnapshot.reference.reviewObjectId,
+      evidenceFingerprint: snapshot.inputSnapshot.projection.evidenceFingerprint,
+      algorithmVersion: snapshot.outputSnapshot.algorithmVersion,
+      analysisDraft: snapshot.inputSnapshot.analysisDraft,
     });
-    const create = vi.fn(async () => run);
-    const view = await mountJournal(
-      <JournalAiTaskHistory
-        accountId="账户一"
-        mode="actual"
-        kind="object"
-        current={currentAnalysis(create)}
-      />,
+    const first = await mountJournal(
+      <JournalSavedAiExplanation snapshot={snapshot} accountId="账户一" mode="actual" />,
     );
-    await journalWait(() => expect(journalButton('开始 AI 解读').disabled).toBe(false));
-    await journalClick('开始 AI 解读');
-    await journalWait(() => expect(view.host.textContent).toContain(run.id));
-    await journalWait(() => expect(view.host.textContent).toContain('单笔 · 00000098'));
-    await journalClick('单笔 · 00000098');
-    await journalWait(() => expect(view.host.textContent).toContain('之前的失败原因'));
-    expect(view.host.textContent).not.toContain(run.id);
-    expect(view.host.querySelectorAll('section[aria-label="AI 解读"]')).toHaveLength(1);
-    expect(
-      Array.from(view.host.querySelectorAll('button')).filter(
-        (button) => button.textContent === '移除任务引用',
-      ),
-    ).toHaveLength(1);
-    await journalClick('当前分析');
-    await journalWait(() => expect(view.host.textContent).toContain(run.id));
-    expect(view.host.textContent).not.toContain('之前的失败原因');
-    expect(create).toHaveBeenCalledOnce();
+    await journalWait(() => expect(first.host.textContent).toContain('只解读已核对的事实'));
+    expect(first.host.querySelectorAll('section[aria-label="保存时的 AI 解读"]')).toHaveLength(1);
+    await first.dispose();
+    const next = await mountJournal(
+      <JournalSavedAiExplanation snapshot={snapshot} accountId="账户一" mode="actual" />,
+    );
+    await journalWait(() => expect(api.explanation).toHaveBeenCalledTimes(2));
+    expect(api.explanation.mock.calls[1]?.slice(0, 2)).toEqual([
+      run.id,
+      { accountId: '账户一', mode: 'actual' },
+    ]);
+    api.explanation.mockRejectedValueOnce(new Error('账户范围不可用'));
+    await next.render(
+      <JournalSavedAiExplanation snapshot={snapshot} accountId="账户一" mode="shadow" />,
+    );
+    await journalWait(() => expect(next.host.textContent).toContain('保存的 AI 解读读取失败'));
+    expect(next.host.textContent).not.toContain('只解读已核对的事实');
+    expect(api.explain).not.toHaveBeenCalled();
+  });
+  it('保存任务读取失败只能重读，保留快照引用且不重新生成', async () => {
+    const snapshot = savedSnapshot();
+    api.explanation.mockRejectedValue(new Error('引用不可用'));
+    const view = await mountJournal(
+      <JournalSavedAiExplanation snapshot={snapshot} accountId="账户一" mode="actual" />,
+    );
+    await journalWait(() => expect(view.host.textContent).toContain('保存的 AI 解读读取失败'));
+    await journalClick('重新读取');
+    await journalWait(() => expect(api.explanation).toHaveBeenCalledTimes(2));
+    expect(snapshot.outputSnapshot.aiExplanation?.id).toBe(run.id);
+    expect(view.host.textContent).not.toContain('开始 AI 解读');
+    expect(api.explain).not.toHaveBeenCalled();
+  });
+  it.each([
+    { id: 'other-task' },
+    { reviewObjectId: 'other-object' },
+    { evidenceFingerprint: 'other-facts' },
+    { algorithmVersion: 'other-version' },
+    { analysisDraft: { plannedExit: '13' } },
+  ])('保存时的任务、对象、证据、算法或草稿不一致时拒绝展示：%j', async (change) => {
+    const snapshot = savedSnapshot();
+    api.explanation.mockResolvedValue({
+      ...run,
+      reviewObjectId: snapshot.inputSnapshot.reference.reviewObjectId,
+      evidenceFingerprint: snapshot.inputSnapshot.projection.evidenceFingerprint,
+      algorithmVersion: snapshot.outputSnapshot.algorithmVersion,
+      analysisDraft: snapshot.inputSnapshot.analysisDraft,
+      ...change,
+    });
+    const view = await mountJournal(
+      <JournalSavedAiExplanation snapshot={snapshot} accountId="账户一" mode="actual" />,
+    );
+    await journalWait(() => expect(view.host.textContent).toContain('与保存时的复盘证据不一致'));
+    expect(view.host.textContent).not.toContain('只解读已核对的事实');
+    expect(api.explain).not.toHaveBeenCalled();
   });
 });

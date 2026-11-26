@@ -40,7 +40,7 @@ export function useArenaPriceData(bars: MarketChartBar[], owner: string, enabled
     return [...current, ...old];
   }, [enabled, list.data, live.data, symbol]);
   const active = choices.find((m) => m.id === state.match);
-  const isLive = active?.protocol.version === 2;
+  const isLive = active?.protocol.version === 'arena-live-match-protocol-v1';
   const detail = useQuery({
     queryKey: [...root, 'match', state.match], enabled: enabled && Boolean(active),
     queryFn: async ({ signal }) => {

@@ -80,7 +80,7 @@ const url = process.env.ECONOMIC_PRICE_DATABASE_URL;
         repo,
         {
           getPolicy: async () => ({
-            contractVersion: 3,
+            contractVersion: 1,
             consumer: 'thesis-ledger',
             requestId: 'test',
             revision: 188,

@@ -1,14 +1,18 @@
 # 当前实施任务
 
+
+- 策略回测详细方案已[结案归档](../archive/tasks/2026-11-20-backtest-practical-design.md)：T01～T13完成；现行合同保留在Specs，真实模型与目标运行态证据分别保存。
+
+- 策略回测交易计划已[结案归档](../archive/tasks/2026-11-15-backtest-trade-plans.md)：T04d 已通过 24／24，七组保护成对验收通过。
+
+- 竞技场逐次分档退出已[结案归档](../archive/tasks/2026-11-15-arena-staged-partial-exits.md)，现行组合合同见[规格](../specs/2026-11-15-arena-staged-partial-exits.md)。
+
 - [三仓取消 pnpm 版本绑定](2026-11-14-unpinned-pnpm.md)：本地使用已安装版本，CI 与镜像浮动安装，保留依赖锁文件。
 
-- [竞技场条件委托与成交保护](2026-11-13-arena-contingent-orders.md)。按整笔成交保护、部分成交和分批规则分期验收。
+- 竞技场条件委托与成交保护已[结案归档](../archive/tasks/2026-11-13-arena-contingent-orders.md)，现行合同见[规格](../specs/2026-11-13-arena-contingent-orders.md)。
 
 
-- [策略定义统一与双向编辑](2026-11-13-strategy-definition-authoring.md)。双端编辑、AI 确认与历史回放的联合实施入口。
-
-
-
+- 策略定义统一与双向编辑已[结案归档](../archive/tasks/2026-11-13-strategy-definition-authoring.md)。双端编辑、AI 确认、历史回放与能力范围已验收。
 
 
 
@@ -17,7 +21,10 @@
 
 
 
-- [实验重试冻结校验修复](2026-11-12-experiment-retry-catalog-revalidation.md)：代码与真实冻结复验通过；一次原实验重试确认模型地址连接失败，保留候选完整执行验收缺口。
+
+
+
+- [实验重试冻结校验修复](../archive/tasks/2026-11-12-experiment-retry-catalog-revalidation.md)已结案。原实验重试后成功生成候选并自动完成封存测试。
 
 - [开发库不备份升级](2026-11-12-development-upgrade-without-backup.md)：本地与隔离验证完成；仅保留不备份分支真实目标执行缺口，原增列已由并行默认升级完成，不重复执行。
 
@@ -50,7 +57,7 @@
 
 
 
-- [收益趋势粒度与读取反馈](2026-11-06-performance-trend-feedback.md)：代码与受控浏览器验收完成，目标运行态更新状态见 Task。
+- [收益趋势粒度与读取反馈](../archive/tasks/2026-11-06-performance-trend-feedback.md)已通过目标只读接口与四宽度浏览器并归档。
 
 桌面展示与编辑一致性修复及补充窄屏复核已完成，见[归档任务](../archive/tasks/2026-11-05-desktop-presentation-consistency.md)。后台风险估值、指标可见性及收益/目标保存修复已完成并[归档](../archive/README.md)，其产品规格继续有效。历史运行证据不能替代新增场景的验收。
 

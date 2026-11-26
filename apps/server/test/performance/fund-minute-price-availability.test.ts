@@ -15,7 +15,7 @@ const fundSymbol = '161725.OF';
 const holdingSymbol = '600519.SH';
 const at = new Date('2026-10-20T06:00:00Z');
 const baseNav = fundNavSchema.parse({
-  version: 3,
+  version: 1,
   symbol: fundSymbol,
   unitNav: 1,
   navDate: '2026-10-19T00:00:00Z',
@@ -25,7 +25,7 @@ const baseNav = fundNavSchema.parse({
 });
 const holdingQuote = (price: number, freshness: Quote['freshness'] = 'live') =>
   quoteSchema.parse({
-    version: 3,
+    version: 1,
     symbol: holdingSymbol,
     open: 1,
     high: 2,
@@ -76,7 +76,7 @@ async function sample(
       availableAt: at.toISOString(),
     }));
     return barSeriesSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity: input.identity,
       points,
       coverage: {
@@ -144,7 +144,7 @@ async function sample(
       getFundNav: vi.fn(async () => fundNavSchema.parse({ ...baseNav, ...options.nav })),
       getFundHoldings: vi.fn(async () =>
         fundHoldingsSchema.parse({
-          version: 3,
+          version: 1,
           fundSymbol,
           reportPeriod: '2026-Q3',
           disclosureDate: options.disclosureEvidence ? null : '2026-10-19T00:00:00Z',

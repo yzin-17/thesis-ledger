@@ -81,16 +81,16 @@ try {
   const posts=['/market/bars','/market/chart-bars','/market/events','/market/indicators/calculate','/backtest/nav-inputs'];
   for(const path of paths.filter(p=>p!=='/capabilities')) {
     const method=posts.includes(path)?'POST':'GET';
-    assert.equal((await call('/api/v3/thesis-ledger'+path,method,false,method==='POST'?{}:undefined)).status,401,path);
+    assert.equal((await call('/api/v1/thesis-ledger'+path,method,false,method==='POST'?{}:undefined)).status,401,path);
     unauthorized+=1;
   }
   for(const path of posts) {
-    assert.equal((await call('/api/v3/thesis-ledger'+path,'POST',true,{contractVersion:2,requestId:'canonical-old-data'})).status,422,path);
+    assert.equal((await call('/api/v1/thesis-ledger'+path,'POST',true,{contractVersion:2,requestId:'canonical-old-data'})).status,422,path);
     oldBody+=1;
   }
   const client=new DsaClient();
   const capabilities=await client.marketDataCapabilitiesV3();
-  assert.deepEqual(capabilities.dataContractVersions,[3]);
+  assert.equal(capabilities.dataContract,'dsa-data-v1');
   const fx=await client.fxRates({baseCurrency:'CNY',currencies:['CNY'],asOf:'2026-09-30'});
   assert.equal(fx.version,3);assert.equal(fx.baseCurrency,'CNY');
   assert(fx.rates.some(r=>r.fromCurrency==='CNY'&&r.toCurrency==='CNY'&&r.rate===1&&r.available));

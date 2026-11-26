@@ -2,7 +2,7 @@ import { arenaLiveProtocolSchema, type ArenaLiveProtocol } from '@thesis-ledger/
 export function liveProtocolFixture(overrides: Partial<ArenaLiveProtocol> = {}) {
   const budget = { requests: 10, tokens: 100000, costMicros: 1000000 };
   return arenaLiveProtocolSchema.parse({
-    version: 2, title: '隔离自主比赛', market: 'US', currency: 'USD', timeZone: 'America/New_York',
+    version: 'arena-live-match-protocol-v1', title: '隔离自主比赛', market: 'US', currency: 'USD', timeZone: 'America/New_York',
     calendarId: 'fixture', calendarVersion: 'fixture', startsOn: null, endsOn: '2030-12-31',
     universe: 'market', instruments: [], allowWebSearch: false, initialCash: '10000',
     entrants: ['first', 'second'].map((model) => ({ model, providerId: 'fixture', budget, maxInputTokens: 10000, maxOutputTokens: 2000 })),

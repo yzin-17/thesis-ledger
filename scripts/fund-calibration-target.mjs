@@ -86,7 +86,7 @@ export function assertFundRequest(method, path, body, plan, record) {
   const controls = [
     '/api/market-data/policy',
     '/api/market-data/providers',
-    '/api/market-data/routes/capabilities?contractVersion=3',
+    '/api/market-data/routes/capabilities?contractVersion=1',
     '/api/v1/accounts?includeInactive=true',
   ];
   if (method === 'GET') {

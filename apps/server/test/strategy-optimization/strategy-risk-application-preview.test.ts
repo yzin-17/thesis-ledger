@@ -16,7 +16,7 @@ describe('StrategyRiskApplicationService preview', () => {
     } })) };
     const service = new StrategyRiskApplicationService({ strategyVersion: {
       findUnique: vi.fn(async () => ({ id: strategyVersionId, strategyId: accountId,
-        version: 1, schemaVersion: 2, schema: strategy })),
+        version: 1, schemaVersion: 1, schema: strategy })),
     } } as never, contexts as never, {} as never, {} as never);
     const result = await service.preview({ strategyVersionId, accountId, symbol,
       cycleMode: 'existingAndFuture' });
@@ -33,7 +33,7 @@ describe('StrategyRiskApplicationService preview', () => {
           id: strategyVersionId,
           strategyId: '33333333-3333-4333-8333-333333333333',
           version: 1,
-          schemaVersion: 2,
+          schemaVersion: 1,
           schema: strategy,
         })),
       },
@@ -89,7 +89,7 @@ describe('StrategyRiskApplicationService preview', () => {
           id: strategyVersionId,
           strategyId: '33333333-3333-4333-8333-333333333333',
           version: 1,
-          schemaVersion: 2,
+          schemaVersion: 1,
           schema: strategy,
         })),
       },
@@ -160,7 +160,7 @@ describe('StrategyRiskApplicationService preview', () => {
           id: strategyVersionId,
           strategyId: '33333333-3333-4333-8333-333333333333',
           version: 1,
-          schemaVersion: 2,
+          schemaVersion: 1,
           schema: invalidStrategy,
         })),
       },

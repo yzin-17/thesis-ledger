@@ -130,7 +130,7 @@ export const validateProviderRoute = async (
   route: AiProviderExecutionRouteInput,
   fingerprint: string,
   sdk: AiSdkGenerationAdapter,
-  health: ProviderHealthService,
+  health: Pick<ProviderHealthService,'recordHistory'>,
 ): Promise<{ record: VerifiedRoute; costUnknown: boolean }> => {
   const { input } = context;
   const adapter = runtimeAdapterForSelection({

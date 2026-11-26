@@ -1,4 +1,5 @@
 import { createClientRequestId } from '../../lib/client-request-id';
+import { strategyRiskVersionEligibility } from '@thesis-ledger/schemas';
 import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { LoadingState } from '@/components/ui/spinner';
 import { useEffect, useState } from 'react';
@@ -53,12 +54,210 @@ const latestFormalVersion = (
   if (!strategy || !current) return null;
   return (
     strategy.versions
-      .filter((version) => version.version > current.version && version.schemaVersion === 2)
+      .filter((version) => version.version > current.version && strategyRiskVersionEligibility(version).eligible)
       .sort((left, right) => right.version - left.version)[0] ?? null
   );
 };
 
 export function StrategyRiskApplicationsSection({ accounts }: { accounts: Account[] }) {
+  const {
+    applications,
+    strategies,
+    selectedApplicationId,
+    upgradePreview,
+    previewUpgrade,
+    update,
+    closeApplication,
+    openApplication,
+    remove,
+    confirmRemove,
+    confirmUpgrade,
+    setUpgradePreview,
+    feedback,
+  } = useStrategyRiskApplications();
+
+  if (applications.isPending) {
+    return <LoadingState label="正在读取策略来源风险应用" />;
+  }
+  if (applications.isError) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">策略来源风险应用读取失败。</p>
+        <Button size="sm" variant="outline" onClick={() => void applications.refetch()}>
+          重试
+        </Button>
+      </div>
+    );
+  }
+  if ((applications.data?.length ?? 0) === 0) {
+    return (
+      <div className="space-y-2">
+        <div className="font-medium">暂无策略来源风险应用</div>
+        <p className="text-sm text-muted-foreground">
+          从策略库的具体正式版本进入“生成风险规则”，预览并确认后会在这里管理。
+        </p>
+        <Button
+          nativeButton={false}
+          render={<Link to={strategyCenterPath.library}>前往策略库</Link>}
+          size="sm"
+          variant="outline"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <ListRefreshRegion
+        refreshing={applications.isRefetching && !!applications.data}
+        label="正在刷新策略风险应用"
+        className="grid gap-3"
+      >
+        {applications.data?.map((application) => {
+          const { account, source, latest, selected, currentUpgrade } =
+            strategyRiskApplicationMaterials(
+              accounts,
+              strategies.data ?? [],
+              application,
+              selectedApplicationId,
+              upgradePreview,
+            );
+          return (
+            <div
+              id={`strategy-risk-application-${application.id}`}
+              key={application.id}
+              className="space-y-4 rounded-md border border-border bg-card p-4"
+            >
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-semibold">{application.symbol}</span>
+                    <Badge variant="outline">策略来源</Badge>
+                    <Badge variant={application.enabled ? 'default' : 'outline'}>
+                      {application.enabled ? '实际监控中' : '已停用'}
+                    </Badge>
+                    {application.archivedAt ? <Badge variant="secondary">已归档</Badge> : null}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {account?.name ?? application.accountId} · 应用修订 r{application.revision} ·{' '}
+                    {strategyRiskCycleModeLabel(application.cycleMode)} · 覆盖{' '}
+                    {application.coverage.riskMapped}/{application.coverage.riskTotal}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    来源：
+                    {source ? (
+                      <Link
+                        className="ml-1 font-medium text-foreground hover:text-primary/80"
+                        to={strategyCenterPath.strategyVersion(
+                          source.strategy.id,
+                          source.version.id,
+                        )}
+                      >
+                        {source.strategy.name} v{source.version.version}
+                      </Link>
+                    ) : (
+                      <span className="ml-1">版本信息暂不可用</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {latest && !application.archivedAt ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={previewUpgrade.isPending}
+                      onClick={() =>
+                        previewUpgrade.mutate({
+                          applicationId: application.id,
+                          targetVersion: latest,
+                        })
+                      }
+                    >
+                      <GitCompareArrows aria-hidden="true" />
+                      预览升级到 v{latest.version}
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={update.isPending || Boolean(application.archivedAt)}
+                    onClick={() =>
+                      update.mutate({
+                        id: application.id,
+                        revision: application.revision,
+                        enabled: !application.enabled,
+                      })
+                    }
+                  >
+                    {application.enabled ? '停用实际监控' : '启用实际监控'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={Boolean(application.archivedAt)}
+                    onClick={() =>
+                      selected ? closeApplication() : openApplication(application.id)
+                    }
+                  >
+                    {selected ? '收起通知配置' : '编辑通知配置'}
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button size="icon-sm" variant="ghost" aria-label="风险应用更多操作">
+                          <MoreHorizontal aria-hidden="true" />
+                        </Button>
+                      }
+                    />
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={remove.isPending || Boolean(application.archivedAt)}
+                        onClick={() => void confirmRemove(application)}
+                      >
+                        <Trash2 aria-hidden="true" />
+                        删除应用
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+              {selected && !application.archivedAt ? (
+                <RiskApplicationNotificationEditor
+                  application={application}
+                  pending={update.isPending}
+                  onSave={(notification) =>
+                    update.mutate({
+                      id: application.id,
+                      revision: application.revision,
+                      notification,
+                    })
+                  }
+                />
+              ) : null}
+              {currentUpgrade ? (
+                <RiskApplicationUpgradeReview
+                  application={application}
+                  targetVersion={currentUpgrade.targetVersion}
+                  preview={currentUpgrade.data}
+                  pending={confirmUpgrade.isPending}
+                  onConfirm={() => confirmUpgrade.mutate()}
+                  onOpenExisting={(applicationId) => {
+                    setUpgradePreview(null);
+                    openApplication(applicationId);
+                  }}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </ListRefreshRegion>
+      {feedback ? <p className="text-sm text-muted-foreground">{feedback}</p> : null}
+    </div>
+  );
+}
+
+function useStrategyRiskApplications() {
   const queryClient = useQueryClient();
   const { confirm } = useConfirmDialog();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -179,173 +378,34 @@ export function StrategyRiskApplicationsSection({ accounts }: { accounts: Accoun
       return;
     remove.mutate(application);
   };
+  return {
+    applications,
+    strategies,
+    selectedApplicationId,
+    upgradePreview,
+    previewUpgrade,
+    update,
+    closeApplication,
+    openApplication,
+    remove,
+    confirmRemove,
+    confirmUpgrade,
+    setUpgradePreview,
+    feedback,
+  };
+}
 
-  if (applications.isPending) {
-    return <LoadingState label="正在读取策略来源风险应用" />;
-  }
-  if (applications.isError) {
-    return (
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">策略来源风险应用读取失败。</p>
-        <Button size="sm" variant="outline" onClick={() => void applications.refetch()}>
-          重试
-        </Button>
-      </div>
-    );
-  }
-  if ((applications.data?.length ?? 0) === 0) {
-    return (
-      <div className="space-y-2">
-        <div className="font-medium">暂无策略来源风险应用</div>
-        <p className="text-sm text-muted-foreground">
-          从策略库的具体正式版本进入“生成风险规则”，预览并确认后会在这里管理。
-        </p>
-        <Button
-          nativeButton={false}
-          render={<Link to={strategyCenterPath.library}>前往策略库</Link>}
-          size="sm"
-          variant="outline"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <ListRefreshRegion refreshing={applications.isRefetching && !!applications.data} label="正在刷新策略风险应用" className="grid gap-3">
-        {applications.data?.map((application) => {
-          const account = accounts.find((item) => item.id === application.accountId);
-          const source = sourceVersion(strategies.data ?? [], application.strategyVersionId);
-          const latest = latestFormalVersion(source?.strategy, source?.version);
-          const selected = selectedApplicationId === application.id;
-          const currentUpgrade =
-            upgradePreview?.applicationId === application.id ? upgradePreview : null;
-          return (
-            <div
-              id={`strategy-risk-application-${application.id}`}
-              key={application.id}
-              className="space-y-4 rounded-md border border-border bg-card p-4"
-            >
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-semibold">{application.symbol}</span>
-                    <Badge variant="outline">策略来源</Badge>
-                    <Badge variant={application.enabled ? 'default' : 'outline'}>
-                      {application.enabled ? '实际监控中' : '已停用'}
-                    </Badge>
-                    {application.archivedAt ? <Badge variant="secondary">已归档</Badge> : null}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {account?.name ?? application.accountId} · 应用修订 r{application.revision} ·{' '}
-                    {strategyRiskCycleModeLabel(application.cycleMode)} · 覆盖{' '}
-                    {application.coverage.riskMapped}/{application.coverage.riskTotal}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    来源：
-                    {source ? (
-                      <Link
-                        className="ml-1 font-medium text-foreground hover:text-primary/80"
-                        to={strategyCenterPath.strategyVersion(source.strategy.id, source.version.id)}
-                      >
-                        {source.strategy.name} v{source.version.version}
-                      </Link>
-                    ) : (
-                      <span className="ml-1">版本信息暂不可用</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {latest && !application.archivedAt ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={previewUpgrade.isPending}
-                      onClick={() =>
-                        previewUpgrade.mutate({
-                          applicationId: application.id,
-                          targetVersion: latest,
-                        })
-                      }
-                    >
-                      <GitCompareArrows aria-hidden="true" />
-                      预览升级到 v{latest.version}
-                    </Button>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={update.isPending || Boolean(application.archivedAt)}
-                    onClick={() =>
-                      update.mutate({
-                        id: application.id,
-                        revision: application.revision,
-                        enabled: !application.enabled,
-                      })
-                    }
-                  >
-                    {application.enabled ? '停用实际监控' : '启用实际监控'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={Boolean(application.archivedAt)}
-                    onClick={() => (selected ? closeApplication() : openApplication(application.id))}
-                  >
-                    {selected ? '收起通知配置' : '编辑通知配置'}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button size="icon-sm" variant="ghost" aria-label="风险应用更多操作">
-                          <MoreHorizontal aria-hidden="true" />
-                        </Button>
-                      }
-                    />
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        variant="destructive"
-                        disabled={remove.isPending || Boolean(application.archivedAt)}
-                        onClick={() => void confirmRemove(application)}
-                      >
-                        <Trash2 aria-hidden="true" />
-                        删除应用
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-              {selected && !application.archivedAt ? (
-                <RiskApplicationNotificationEditor
-                  application={application}
-                  pending={update.isPending}
-                  onSave={(notification) =>
-                    update.mutate({
-                      id: application.id,
-                      revision: application.revision,
-                      notification,
-                    })
-                  }
-                />
-              ) : null}
-              {currentUpgrade ? (
-                <RiskApplicationUpgradeReview
-                  application={application}
-                  targetVersion={currentUpgrade.targetVersion}
-                  preview={currentUpgrade.data}
-                  pending={confirmUpgrade.isPending}
-                  onConfirm={() => confirmUpgrade.mutate()}
-                  onOpenExisting={(applicationId) => {
-                    setUpgradePreview(null);
-                    openApplication(applicationId);
-                  }}
-                />
-              ) : null}
-            </div>
-          );
-        })}
-      </ListRefreshRegion>
-      {feedback ? <p className="text-sm text-muted-foreground">{feedback}</p> : null}
-    </div>
-  );
+function strategyRiskApplicationMaterials(
+  accounts: Account[],
+  strategies: StrategyRecord[],
+  application: StrategyRiskApplication,
+  selectedApplicationId: string | null,
+  upgradePreview: ReturnType<typeof useStrategyRiskApplications>['upgradePreview'],
+) {
+  const account = accounts.find((item) => item.id === application.accountId);
+  const source = sourceVersion(strategies, application.strategyVersionId);
+  const latest = latestFormalVersion(source?.strategy, source?.version);
+  const selected = selectedApplicationId === application.id;
+  const currentUpgrade = upgradePreview?.applicationId === application.id ? upgradePreview : null;
+  return { account, source, latest, selected, currentUpgrade };
 }

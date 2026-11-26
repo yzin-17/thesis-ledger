@@ -244,7 +244,7 @@ export class LocalSnapshotStore {
   readonly artifacts: LocalArtifactStore;
   readonly v3: LocalSnapshotV3Store;
 
-  constructor(rootDirectory: string) {
+  constructor(readonly rootDirectory: string) {
     this.artifacts = new LocalArtifactStore(resolve(rootDirectory, 'artifacts'));
     this.v3 = new LocalSnapshotV3Store({
       rootDirectory,
@@ -265,5 +265,11 @@ export class LocalSnapshotStore {
       hash: hashCanonicalManifest,
       integrityError: (message) => new SnapshotIntegrityError(message),
     });
+  }
+
+  forAttempt(runId: string, attempt: number): LocalSnapshotStore {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(runId) || !Number.isSafeInteger(attempt) || attempt < 1)
+      throw new Error('Invalid snapshot attempt identity');
+    return new LocalSnapshotStore(resolve(this.rootDirectory, 'attempts', runId, String(attempt)));
   }
 }

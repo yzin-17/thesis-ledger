@@ -326,7 +326,7 @@ T13 当前规则增量：[`回测执行规则与研究假设实施任务`](2026-
     - `node scripts/backtest-v2-t13-gate.mjs`：通过；离线 fixture 覆盖 CN Stock、HK Stock、US ETF 和 CN NAV Golden scenario，未把 HK/US NAV 标成支持。设置 `DSA_V2_CAPABILITIES_URL` 后可追加 DSA 完整 capability 矩阵检查。
     - `node scripts/backtest-v2-isolation-audit.mjs`：通过；扫描 46 个回测/Simulation 源文件，未发现真实 `LedgerEventV2`、`TradeProjection`、`CASH_FLOW` 或真实 Ledger/Portfolio/Journal import。
     - `pnpm --filter @thesis-ledger/schemas exec vitest run test/backtest-v2-t13-golden.test.ts`：2 tests passed；跨仓 Exchange/CN NAV fixture 可解析，HK/US NAV、Limit 和非目标 Risk 在 Schema 层拒绝。
-    - `node scripts/backtest-v1-inventory.mjs`：通过静态盘点；确认 `BacktestJob` 仍保留 V1 mode 默认值和旧队列引用，但当前未提供 `DATABASE_URL`，V1 历史行数仍需数据库只读盘点。
+    - `node scripts/archive/2026-08-28-unified-backtest-v2/backtest-v1-inventory.mjs`：通过静态盘点；确认 `BacktestJob` 仍保留 V1 mode 默认值和旧队列引用，但当前未提供 `DATABASE_URL`，V1 历史行数仍需数据库只读盘点。
     - `pnpm --filter @thesis-ledger/server exec vitest run test/backtest/artifact-store.test.ts test/backtest/snapshot.test.ts test/backtest/v2-run-lifecycle.test.ts test/backtest/v2-run.test.ts`：4 files / 19 tests passed，覆盖 Artifact 缺失/损坏/删除清理、Snapshot hash 与 retry、Runner 终态/取消/旧 attempt 防覆盖。
     - 性能报告：[`统一回测 V2 T13 性能与功能基线`](../../evidence/benchmarks/2026-09-09-unified-backtest-v2-t13.md)；`scripts/backtest-v2-performance-spike.ts` 两次复跑的 `functionalDigest` 一致。该 workload 的 RSS 包含 `parquet-wasm` 初始化，不替代真实 Worker/Docker 基线。
     - 尚未完成：真实 DSA HTTP、PostgreSQL/Redis/Docker Worker、真实账户 Ledger/Revision/Projection/Portfolio/Journal 前后快照、磁盘空间不足注入及 Runner 生产 RSS；T13 保持未勾选。

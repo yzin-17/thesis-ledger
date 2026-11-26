@@ -41,7 +41,7 @@ it.each(['ready', 'disabled', 'revision', 'ineligible', 'provider', 'upstream'] 
       },
     };
     const nav = {
-      version: 3,
+      version: 1,
       symbol,
       unitNav: 0.978,
       navDate: day + 'T00:00:00Z',

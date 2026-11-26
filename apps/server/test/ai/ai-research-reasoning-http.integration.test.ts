@@ -112,8 +112,11 @@ describe('研究推理开关的真实本地 HTTP', () => {
   it('错误用途／接口／兼容配置或与强度并用时发送前拒绝', async () => {
     const before = bodies.length,
       sdk = new AiSdkGenerationAdapter();
+    await expect(sdk.generate({
+      ...request(),
+      contract: { id: 'research', version: 'research-generation-v1' } as never,
+    })).rejects.toThrow('research-report-generation-v1');
     for (const overrides of [
-      { contract: aiGenerationContracts.research.ref },
       { contract: aiGenerationContracts.authoringAnalysis.ref },
       { adapter: 'openai-chat' as const },
       { compatibilityExtensionProfile: undefined },

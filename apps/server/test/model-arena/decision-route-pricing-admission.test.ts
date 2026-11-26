@@ -11,7 +11,7 @@ it.each(['runtime', 'currency', 'price', 'upstream', 'input'] as const)(
   async (invalid) => {
     const budget = { requests: 2, tokens: 50000, costMicros: 1000000000 };
     const protocol = {
-      version: 1,
+      version: 'arena-historical-match-protocol-v1',
       title: '隔离定价门禁',
       market: 'CN',
       currency: 'CNY',

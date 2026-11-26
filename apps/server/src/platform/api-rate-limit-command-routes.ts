@@ -143,6 +143,7 @@ export const commandRoutes = {
     'POST /api/v1/arena-matches/:id/start',
     'POST /api/v1/arena-matches/:id/replay/retry',
     'POST /api/v1/arena-matches/:id/agents/:agentId/retry',
+    'POST /api/v1/arena-matches/:id/agents/:agentId/trigger',
     'POST /api/v1/ai/providers/:name/test',
     'POST /api/v1/ai/providers/test',
     'POST /api/v1/ai/providers/test-and-save',

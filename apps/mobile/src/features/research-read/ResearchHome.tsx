@@ -18,22 +18,18 @@ import { runStatusLabels } from '../journal-ai/JournalAiPanel';
 export function ResearchHome() {
   const { api, scope, mode } = useMobileRuntime();
   const navigation = useNavigation<NativeStackNavigationProp<ResearchStackParams>>();
-  const [view, setView] = useState<'scoped' | 'legacy'>('scoped');
   const [kind, setKind] = useState('all');
   const [status, setStatus] = useState('all');
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
-  const locator: ResearchReportLocatorInput =
-    view === 'legacy'
-      ? { view }
-      : {
-          view,
-          mode,
-          scope: 'all',
-          ...(kind !== 'all'
-            ? { kind: kind as 'instrument' | 'portfolio' | 'account' | 'position' | 'strategy' }
-            : {}),
-        };
+  const locator: ResearchReportLocatorInput = {
+    view: 'scoped',
+    mode,
+    scope: 'all',
+    ...(kind !== 'all'
+      ? { kind: kind as 'instrument' | 'portfolio' | 'account' | 'position' | 'strategy' }
+      : {}),
+  };
   const query = useInfiniteQuery({
     queryKey: [...scope, 'research-list', locator, status, search],
     initialPageParam: undefined as string | undefined,
@@ -61,18 +57,6 @@ export function ResearchHome() {
       <Action label="打开策略与回测" onPress={() => navigation.navigate('Strategy')} />
       <Action label="打开复盘工作区" onPress={() => navigation.navigate('Journal')} />
       <Action label="新建研究" onPress={() => navigation.navigate('ResearchSubmit')} />
-      <Choices
-        label="报告范围"
-        value={view}
-        options={[
-          { value: 'scoped', label: '当前模式报告' },
-          { value: 'legacy', label: '历史兼容报告' },
-        ]}
-        onChange={setView}
-      />
-      {view === 'legacy' ? (
-        <Copy muted>历史范围未记录，不能视为当前账户或模式的研究。</Copy>
-      ) : (
         <Choices
           label="研究类别"
           value={kind}
@@ -86,7 +70,6 @@ export function ResearchHome() {
           }).map(([value, label]) => ({ value, label }))}
           onChange={setKind}
         />
-      )}
       <Choices
         label="研究状态"
         value={status}

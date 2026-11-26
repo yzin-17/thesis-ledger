@@ -1,5 +1,10 @@
 /** 当前市场状态只允许消费事实驱动的共享入口；历史回测保留独立日历输入。 */
 export function marketSessionBoundaryViolation(file, source) {
+  const frozenSession = file === 'apps/server/src/backtest/backtest-session-series.ts'
+    || file === 'packages/domain/src/backtest-session-clock.ts'
+    || file === 'packages/domain/src/backtest-session-vwap.ts';
+  if (frozenSession && /\b(?:MarketSessionReader|MarketService|cnTradingCalendar|hkTradingCalendar|usTradingCalendar|tradingCalendars|openTradingMarketsAt|CnTradingCalendar|HkTradingCalendar|UsTradingCalendar)\b/u.test(source))
+    return '历史会话统计只能消费本次冻结日历，不能读取当前状态或内置年度日历';
   if (file === 'apps/server/src/market/market-us-live-execution.ts' && /\b(?:backtestInstrumentFacts|readComposition)\s*\(/u.test(source))
     return '美国当前执行证据不得回退到历史身份或股票日状态合同';
   const liveServer = /^apps\/server\/src\/(?:market|automation|performance|risk|portfolio|watchlist|model-arena\/live)\//u.test(file);

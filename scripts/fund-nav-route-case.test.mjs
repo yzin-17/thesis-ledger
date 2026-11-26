@@ -13,7 +13,7 @@ import {
 
 const provider = { ...fundTarget, configured: true, enabled: true, configVersion: 0 };
 const initial = () => ({
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'controlled-fund-plan',
   revision: 154,

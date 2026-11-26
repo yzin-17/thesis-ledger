@@ -1,5 +1,8 @@
-import { aiGenerationContracts, optimizationRetryStateSchema } from '@thesis-ledger/schemas';
-import { assertGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
+import { optimizationRetryStateSchema } from '@thesis-ledger/schemas';
+import { materializeEntryPolicy } from '@thesis-ledger/domain';
+import { requireNewStrategyDefinition } from '../backtest/strategy-definition-write.js';
+import { assertStrategyResearchScopeV3 } from '../backtest/backtest-research-data-scope-v3.js';
+import { runConfigSchemaV3 } from '@thesis-ledger/schemas';
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -38,7 +41,7 @@ import {
   type OptimizationStepRow,
 } from './strategy-optimization-attempt-lifecycle.js';
 import { StrategyOptimizationSdkExecutor } from './strategy-optimization-sdk-executor.js';
-import { strategyOptimizationPrompt, STRATEGY_OPTIMIZATION_PROMPT_VERSION } from './strategy-optimization-prompt.js';
+import { prepareOptimizationGeneration, STRATEGY_OPTIMIZATION_PROMPT_VERSION } from './strategy-optimization-prompt.js';
 import {
   reusableOptimizationSdkCache,
   type OptimizationSdkCacheIdentity,
@@ -254,7 +257,9 @@ export class StrategyOptimizationCandidateService {
     round: number,
   ) {
     const modelKey = `${route.provider}:${route.model}`;
-    const messages = await strategyOptimizationPrompt({
+    // 预算、提示与执行共用本次冻结路由，领取后热更新不改写在途快照。
+    const resolved = this.sdkExecutor.resolveRoute(experiment, route);
+    const { messages, inputTokenReservation } = await prepareOptimizationGeneration({
       prisma: this.prisma,
       experiment,
       strategy: baseline.strategy,
@@ -262,9 +267,8 @@ export class StrategyOptimizationCandidateService {
       modelKey,
       round,
       useSdkContract: true,
+      generationMode: resolved.execution.mode,
     });
-    // 领取前最后一步冻结 ready route；领取后的热更新不改写本次在途快照。
-    const resolved = this.sdkExecutor.resolveRoute(experiment, route);
     const sdkCacheIdentity = {
       adapter: resolved.execution.adapter,
       mode: resolved.execution.mode,
@@ -272,8 +276,6 @@ export class StrategyOptimizationCandidateService {
       configurationFingerprint: resolved.execution.readiness.configurationFingerprint,
     };
     const provider = resolved.provider;
-    if (resolved.execution.mode === 'json_validated') assertGenerationSchemaPrompt(experiment.sourceMode === 'discovery' ? aiGenerationContracts.strategyDiscovery.schema : aiGenerationContracts.parameterOptimization.schema, messages);
-    const inputTokenReservation = this.runs.conservativeInputTokenReservation(messages);
     const outputTokenReservation = this.runs.outputTokenReservation(experiment);
     const pricing = optimizationPricingForExperimentRoute(
       experiment.modelConfig,
@@ -338,11 +340,12 @@ export class StrategyOptimizationCandidateService {
     baseline: StrategyVersionRecord,
     strategy: BacktestStrategy,
   ) {
+    requireNewStrategyDefinition(strategy);
     return this.prisma.strategyVersion.create({
       data: {
         strategyId: baseline.strategyId,
         version: await this.nextNegativeVersion(baseline.strategyId),
-        schemaVersion: Number(strategy.schemaVersion),
+        schemaVersion: 1,
         schema: asJson(strategy),
       },
     });
@@ -395,7 +398,7 @@ export class StrategyOptimizationCandidateService {
     modelKey: string,
     proposal: OptimizationProposal | OptimizationDiscoveryProposal,
   ) {
-    const strategy =
+    const candidateDefinition =
       experiment.sourceMode === 'discovery'
         ? discoveryCandidateStrategy(experiment, proposal as OptimizationDiscoveryProposal)
         : applyOptimizationProposal(
@@ -404,6 +407,8 @@ export class StrategyOptimizationCandidateService {
             experiment.allowedParameterIds as string[],
             proposal as OptimizationProposal,
           );
+    const strategy = materializeEntryPolicy(candidateDefinition);
+    assertStrategyResearchScopeV3(strategy, runConfigSchemaV3.parse(experiment.runConfig));
     const executionHash = optimizationSha256(strategy);
     const duplicate = await this.existingByHash(experiment.id, executionHash);
     if (duplicate) return { candidate: duplicate, duplicate: true };

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { strategyCapabilityGapSchema } from '@thesis-ledger/schemas';
+import { strategyCapabilityGapLines } from '@thesis-ledger/domain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
 import { useQuery } from '@tanstack/react-query';
@@ -31,9 +33,18 @@ import {
   type ExperimentAction,
 } from './experiment-actions';
 import { optimizationStatusLabels } from './optimization-labels';
-function buildPendingExperimentAction({ action, id, name, acknowledgeUnknownCost, executionAttempt }: {
+function buildPendingExperimentAction({
+  action,
+  id,
+  name,
+  acknowledgeUnknownCost,
+  executionAttempt,
+}: {
   action: 'rename' | 'clone' | 'cancel' | 'complete' | 'retry';
-  id: string; name: string; acknowledgeUnknownCost: boolean; executionAttempt: number;
+  id: string;
+  name: string;
+  acknowledgeUnknownCost: boolean;
+  executionAttempt: number;
 }): ExperimentAction {
   let entry: unknown;
   if (action === 'rename') entry = { id, action, body: { name } };
@@ -48,9 +59,15 @@ function buildPendingExperimentAction({ action, id, name, acknowledgeUnknownCost
       },
     };
   else if (action === 'cancel') entry = { id, action, body: {} };
-  else if (action === 'retry') entry = { id, action, body: {
-    idempotencyKey: randomUUID(), expectedExecutionAttempt: executionAttempt,
-  } };
+  else if (action === 'retry')
+    entry = {
+      id,
+      action,
+      body: {
+        idempotencyKey: randomUUID(),
+        expectedExecutionAttempt: executionAttempt,
+      },
+    };
   else entry = { id, action: 'complete', body: {} };
   return parseExperimentAction(entry);
 }
@@ -70,7 +87,10 @@ function useOptimizationDetailController({ id }: { id: string }) {
     queryFn: ({ signal }) => optimization.compare(id, signal),
     retry: false,
     refetchInterval: (q) =>
-      q.state.data && ['queued', 'running', 'testing', 'awaiting_finalization'].includes(q.state.data.experiment.status)
+      q.state.data &&
+      ['queued', 'running', 'testing', 'awaiting_finalization'].includes(
+        q.state.data.experiment.status,
+      )
         ? 2000
         : false,
   });
@@ -98,8 +118,15 @@ function useOptimizationDetailController({ id }: { id: string }) {
       if (!entry) {
         if (action === 'resume') throw Error('没有待确认实验操作。');
         if (query.isError) throw Error('请先重新读取实验。');
-        entry = buildPendingExperimentAction({ action, id, name, acknowledgeUnknownCost: ack === 'yes', executionAttempt: current.experiment.executionAttempt });
-        if (action !== 'retry' &&
+        entry = buildPendingExperimentAction({
+          action,
+          id,
+          name,
+          acknowledgeUnknownCost: ack === 'yes',
+          executionAttempt: current.experiment.executionAttempt,
+        });
+        if (
+          action !== 'retry' &&
           !(await confirmAction(
             action === 'complete' ? '重试未完成测试？' : '确认实验操作？',
             action === 'clone'
@@ -192,13 +219,25 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
               费用状态：{data.experiment.costSummary.knownAmount ?? '未知'}{' '}
               {data.experiment.costSummary.currency ?? ''}
             </Copy>
-            <Copy>停止原因 {data.experiment.stopReason ?? '无'} · 模型用量以操作记录为准</Copy>
+            <Copy>
+              停止原因{' '}
+              {data.experiment.stopReason === 'model_capability_gap'
+                ? '模型报告能力缺口，未生成可回测候选'
+                : (data.experiment.stopReason ?? '无')}{' '}
+              · 模型用量以操作记录为准
+            </Copy>
             <Copy>来源 {JSON.stringify(data.experiment.source ?? null)}</Copy>
             <Copy>交易成本假设 {JSON.stringify(data.experiment.tradingCost)}</Copy>
-            {canRetryOptimizationExperiment(data.experiment) ? <>
-              <Action label={command.isPending ? '正在重试' : '失败重试'} disabled={locked} onPress={() => execute('retry')} />
-              <Copy>保留历史和累计用量，按原配置重新请求模型。</Copy>
-            </> : null}
+            {canRetryOptimizationExperiment(data.experiment) ? (
+              <>
+                <Action
+                  label={command.isPending ? '正在重试' : '失败重试'}
+                  disabled={locked}
+                  onPress={() => execute('retry')}
+                />
+                <Copy>保留历史和累计用量，按原配置重新请求模型。</Copy>
+              </>
+            ) : null}
           </Section>
           <Field label="实验新名称或克隆名称" value={name} editable={!locked} onChange={setName} />
           <Action
@@ -229,7 +268,14 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
               <Copy>
                 {
                   (
-                    { clone: '克隆', rename: '改名', cancel: '取消', finalize: '测试恢复', complete: '重试测试', retry: '失败重试' } as const
+                    {
+                      clone: '克隆',
+                      rename: '改名',
+                      cancel: '取消',
+                      finalize: '测试恢复',
+                      complete: '重试测试',
+                      retry: '失败重试',
+                    } as const
                   )[pending.data.action]
                 }{' '}
                 · {id}
@@ -294,7 +340,11 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
                   onPress={() => setPlanVersion(candidate.candidateStrategyVersionId)}
                 />
                 {adoptionReason ? <Copy muted>{adoptionReason}</Copy> : null}
-                {testMetric?.tradeCount === 0 && typeof testMetric.fillCount === 'number' && testMetric.fillCount > 0 ? <Copy muted>期末仍有持仓，收益包含未实现盈亏；暂无已平仓交易。</Copy> : null}
+                {testMetric?.tradeCount === 0 &&
+                typeof testMetric.fillCount === 'number' &&
+                testMetric.fillCount > 0 ? (
+                  <Copy muted>期末仍有持仓，收益包含未实现盈亏；暂无已平仓交易。</Copy>
+                ) : null}
                 <Action
                   label={`审核采用候选 ${candidate.candidateNumber}`}
                   disabled={locked || !!adoptionReason}
@@ -319,22 +369,28 @@ export function OptimizationDetailScreen({ id }: { id: string }) {
             </>
           ) : null}
           <Section title="模型执行与费用记录">
-            {data.attempts.map((attempt) => (
-              <Copy key={attempt.id}>
-                {attempt.modelKey} ·{' '}
-                {(
-                  {
-                    succeeded: '成功',
-                    failed: '失败',
-                    running: '运行中',
-                    queued: '排队中',
-                    cancelled: '已取消',
-                  } as Record<string, string>
-                )[attempt.status] ?? '待核对'}{' '}
-                · 输入 {attempt.inputTokens ?? '未知'} / 输出 {attempt.outputTokens ?? '未知'} ·
-                费用 {attempt.cost ?? '未知'} · {attempt.error ?? ''}
-              </Copy>
-            ))}
+            {data.attempts.map((attempt) => {
+              const gap = strategyCapabilityGapSchema.safeParse(attempt.proposal);
+              return (
+                <Copy key={attempt.id}>
+                  {attempt.modelKey} ·{' '}
+                  {gap.success
+                    ? '能力缺口'
+                    : ((
+                        {
+                          succeeded: '成功',
+                          failed: '失败',
+                          running: '运行中',
+                          queued: '排队中',
+                          cancelled: '已取消',
+                        } as Record<string, string>
+                      )[attempt.status] ?? '待核对')}{' '}
+                  · 输入 {attempt.inputTokens ?? '未知'} / 输出 {attempt.outputTokens ?? '未知'} ·
+                  费用 {attempt.cost ?? '未知'} · {attempt.error ?? ''}
+                  {gap.success ? '\n' + strategyCapabilityGapLines(gap.data).join('\n') : ''}
+                </Copy>
+              );
+            })}
           </Section>
         </>
       ) : null}

@@ -102,7 +102,7 @@ export function ResearchEvidenceRead({
     staleTime: 30_000,
   });
   const evidence = query.data;
-  const material: unknown = evidence?.version === 2 ? evidence.evidence.data : null;
+  const material: unknown = evidence?.version === 'research-report-evidence-v1' ? evidence.evidence.data : null;
   return (
     <section className="flex min-w-0 flex-col gap-3 border-b border-border/70 py-3 last:border-b-0">
       <Button
@@ -124,7 +124,7 @@ export function ResearchEvidenceRead({
           </Button>
         </Alert>
       )}
-      {expanded && !query.isError && evidence?.version === 2 && (
+      {expanded && !query.isError && evidence?.version === 'research-report-evidence-v1' && (
         <div className="flex flex-col gap-3">
           <dl className="grid gap-2 text-xs text-muted-foreground">
             <div>
@@ -165,22 +165,6 @@ export function ResearchEvidenceRead({
             </pre>
           </details>
         </div>
-      )}
-      {expanded && !query.isError && evidence?.version === 1 && (
-        <dl className="grid gap-2 text-sm">
-          <div>
-            <dt>历史来源</dt>
-            <dd>{evidence.toolCall.provider ?? '未记录'}</dd>
-          </div>
-          <div>
-            <dt>抓取时间</dt>
-            <dd>{formatFullDateTime(evidence.toolCall.fetchedAt)}</dd>
-          </div>
-          <div>
-            <dt>关联状态</dt>
-            <dd>已核对属于该研究的读取记录</dd>
-          </div>
-        </dl>
       )}
     </section>
   );

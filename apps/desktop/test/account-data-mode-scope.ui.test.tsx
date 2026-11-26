@@ -50,7 +50,7 @@ const ledgerResponse = (account: Account, symbol: string) => ({
   projectionGeneration: '1',
   events: [
     {
-      version: 3,
+      version: 1,
       eventId:
         account.mode === 'actual'
           ? '33333333-3333-4333-8333-333333333333'

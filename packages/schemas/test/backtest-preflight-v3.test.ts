@@ -25,7 +25,7 @@ const requirement = {
 };
 
 const request = {
-  contractVersion: 3 as const,
+  contractVersion: 1 as const,
   requestId: 'preflight-159516',
   strategyVersionId: 'strategy-version-7',
   strategyContentHash: 'a'.repeat(64),
@@ -139,7 +139,7 @@ describe('backtest preflight V3 contract', () => {
 
   it('separates ready, blocked, and invalid-input result states', () => {
     const common = {
-      contractVersion: 3 as const,
+      contractVersion: 1 as const,
       requestId: request.requestId,
       checkedAt: '2026-05-21T00:00:00Z',
     };

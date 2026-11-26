@@ -33,6 +33,12 @@ describe('预算前的生成 Schema 描述', () => {
     }
     const current = [{ role: 'system', content: buildGenerationSchemaPrompt(schema) }];
     expect(() => assertGenerationSchemaPrompt(schema, current)).not.toThrow();
+    const reused = z.object({ amount: z.string() });
+    const repeated = z.object({ left: reused, right: reused });
+    const compact = [{ role: 'system', content: buildGenerationSchemaPrompt(repeated, 'ref') }];
+    expect(compact[0]!.content).toContain('$defs');
+    expect(() => assertGenerationSchemaPrompt(repeated, compact)).not.toThrow();
+    expect(() => assertGenerationSchemaPrompt(schema, compact)).toThrow('缺少当前输出合同');
   });
   it('完整描述研究必填字段与固定操作数元组', () => {
     expect(document(researchGenerationV2Contract.schema)).toMatchObject({

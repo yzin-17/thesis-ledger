@@ -24,7 +24,7 @@ const instrumentDirectory = {
 };
 
 const event = ledgerEventEnvelopeSchema.parse({
-  version: 3,
+  version: 1,
   eventId: '22222222-2222-4222-8222-222222222222',
   factId: '33333333-3333-4333-8333-333333333333',
   accountId,
@@ -64,7 +64,7 @@ const storedEvent = (value: LedgerEvent) => ({
   economicOrderKey: value.economicOrderKey,
   recordedAt: new Date(value.recordedAt),
   projectionGeneration: 4n,
-  envelopeVersion: 3,
+  envelopeVersion: 1,
   payloadVersion: value.payloadVersion,
   payload: value.revisionAction === 'VOID' ? null : value.payload,
   sourceCategory: value.source.category,
@@ -105,7 +105,7 @@ describe('Ledger 查询 API 服务', () => {
       effective: false,
       events: [
         expect.objectContaining({
-          version: 3,
+          version: 1,
           payload: expect.objectContaining({ quantity: '1.25' }),
         }),
       ],

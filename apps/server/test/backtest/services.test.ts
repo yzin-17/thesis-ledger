@@ -1,14 +1,15 @@
+import { namedStrategyFixture } from './named-v1-strategy.fixture.js';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { BacktestService } from '../../src/backtest/backtest.service.js';
 import { testResultReadPolicy } from './test-result-read-policy.js';
 
-const strategy = JSON.parse(
+const strategy = { ...namedStrategyFixture(JSON.parse(
   readFileSync(
     new URL('../../../../packages/schemas/fixtures/backtest-v2.exchange.json', import.meta.url),
     'utf8',
   ),
-);
+)), entryTrigger: 'rising-edge' as const };
 
 const serviceWith = (prisma: object) => {
   const transaction = { ...prisma, $executeRaw: vi.fn(async () => 1) };
@@ -21,7 +22,7 @@ describe('现行策略创建', () => {
     const create = vi.fn(async ({ data }: { data: object }) => ({ ...data, versions: [{ schema: strategy }] }));
     const createVersion = vi.fn(async ({ data }: { data: object }) => data);
     const service = serviceWith({
-      strategy: { create, findUnique: vi.fn(async () => ({ schemaVersion: 2 })) },
+      strategy: { create, findUnique: vi.fn(async () => ({ schemaVersion: 1 })) },
       strategyVersion: {
         aggregate: vi.fn(async () => ({ _max: { version: 1 } })),
         create: createVersion,
@@ -31,10 +32,10 @@ describe('现行策略创建', () => {
     await service.createStrategy('测试策略', strategy);
     await service.createVersion('11111111-1111-4111-8111-111111111116', strategy);
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ schemaVersion: 2, status: 'draft' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ schemaVersion: 1, status: 'draft' }) }),
     );
     expect(createVersion).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ version: 2, schemaVersion: 2 }) }),
+      expect.objectContaining({ data: expect.objectContaining({ version: 2, schemaVersion: 1 }) }),
     );
   });
 
@@ -50,7 +51,7 @@ describe('现行策略创建', () => {
     const findMany = vi.fn(async () => []);
     const service = serviceWith({
       strategy: {
-        findUnique: vi.fn(async () => ({ schemaVersion: 1 })),
+        findUnique: vi.fn(async () => ({ schemaVersion: 2 })),
         findMany,
       },
       strategyVersion: { aggregate: vi.fn(), create: createVersion },
@@ -62,8 +63,8 @@ describe('现行策略创建', () => {
     await service.listStrategies();
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ schemaVersion: { in: [2, 3] } }),
-        include: { versions: { where: { schemaVersion: { in: [2, 3] } } } },
+        where: expect.objectContaining({ schemaVersion: 1 }),
+        include: { versions: { where: { schemaVersion: 1 } } },
       }),
     );
   });

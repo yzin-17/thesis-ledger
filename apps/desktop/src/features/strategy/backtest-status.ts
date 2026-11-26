@@ -1,7 +1,7 @@
 export const jobStatusLabel = (status: string, cancelRequestedAt?: string | null) => {
-  if (status === 'running' && cancelRequestedAt) return '正在取消';
+  if (['queued', 'running'].includes(status) && cancelRequestedAt) return '正在取消';
   const labels: Record<string, string> = {
-    queued: '排队中',
+    queued: '等待执行',
     running: '运行中',
     succeeded: '已完成',
     failed: '失败',

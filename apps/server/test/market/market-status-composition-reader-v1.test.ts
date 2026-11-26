@@ -79,8 +79,8 @@ describe('组合沿原能力 Reader 读取', () => {
       if (request.routeKey.capability !== 'RISK_WARNING') return original(path, request);
       const error = { code: 'upstream_failure', message: '行情上游暂时不可用' };
       const detail = standard
-        ? { contractVersion: 3, requestId: request.requestId, error }
-        : { contractVersion: 3, requestId: request.requestId, ...error };
+        ? { contractVersion: 1, requestId: request.requestId, error }
+        : { contractVersion: 1, requestId: request.requestId, ...error };
       throw mapDataV3HttpError(503, { detail }, request.requestId);
     });
     const pending = readMarketStatusCompositionV1(c.demands, c.reader, c.readPolicy);

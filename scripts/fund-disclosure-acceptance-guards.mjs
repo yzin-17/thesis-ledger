@@ -123,7 +123,7 @@ export function assertQualifiedDisclosureSource(prior, now = Date.now()) {
     ['fund-holdings', fundHoldingsSchema, holdings],
   ]) {
     const found = prior.source.observations.filter(
-      (o) => o.path === `/api/v3/thesis-ledger/market/${kind}?symbol=161725.OF`,
+      (o) => o.path === `/api/v1/thesis-ledger/market/${kind}?symbol=161725.OF`,
     );
     assert.equal(found.length, 1);
     const raw = schema.parse(found[0].raw),

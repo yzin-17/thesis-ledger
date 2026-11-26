@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { aiGenerationContracts, type AiAdapter } from '@thesis-ledger/schemas';
 import { runProviderConnectionTest } from '../../src/ai/provider-connection-test.js';
+import { researchConnectionProbe } from '../../src/ai/research-connection-probe.js';
 import { buildGenerationSchemaPrompt } from '../../src/ai/ai-generation-schema-prompt.js';
 import {
   AiSdkGenerationAdapter,
@@ -221,9 +222,8 @@ describe('explicit API JSON mode and complete-stream validation', () => {
   });
 
   it('sends the selected purpose effort in the actual SDK HTTP request', async () => {
-    handler = (response) => sendStream(response, [JSON.stringify({
-      conclusion: '通过', evidence: [], risks: [], unknowns: [], disclaimer: '格式测试',
-    })]);
+    const report = researchConnectionProbe(aiGenerationContracts.research.ref);
+    handler = (response) => sendStream(response, [JSON.stringify(report)]);
     await expect(runProviderConnectionTest({
       sdk: adapter, adapter: 'openai-compatible-chat', providerId: 'local-fixture',
       baseURL: `${baseURL}/v1`, authMode: 'none', apiKey: '', model: 'fixture-model',

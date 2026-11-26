@@ -42,6 +42,7 @@ export type BacktestJobSummary = Omit<
   'input' | 'result' | 'runConfig' | 'snapshotManifest'
 > & {
   initialCash: number | null;
+  replayOfRunId?: string;
   resultMetrics: Record<string, unknown> | null;
   readEligibility?: ResultReadEligibility;
   executionModelDisclosure?: ExecutionModelDisclosure;
@@ -78,6 +79,7 @@ export const toBacktestJobSummary = (record: BacktestJobSummaryRecord): Backtest
   const initialCash = Number(initialCashValue);
   return {
     ...summary,
+    ...(typeof currentInput?.replayOfRunId === 'string' ? { replayOfRunId: currentInput.replayOfRunId } : {}),
     initialCash: Number.isFinite(initialCash) ? initialCash : null,
     resultMetrics: resultMetrics(result),
   };

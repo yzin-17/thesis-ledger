@@ -86,7 +86,7 @@ describe.skipIf(!databaseUrl)('隔离 PostgreSQL 复盘解读与快照关联', (
       routing as never,
       new AiResearchReportsQuery(app as never),
     );
-    const ai = new JournalReviewAi(analysis, runs, v2);
+    const ai = new JournalReviewAi(analysis, v2);
     const previousWritePolicy = process.env.AI_RESEARCH_V2_WRITES_ENABLED;
     process.env.AI_RESEARCH_V2_WRITES_ENABLED = 'true';
     const principal = localIdentityPrincipal()!;
@@ -97,8 +97,8 @@ describe.skipIf(!databaseUrl)('隔离 PostgreSQL 复盘解读与快照关联', (
       expect(stored.modelMetadata).toMatchObject({
         researchSettingsRevision: '7',
         frozenResearch: {
-          version: 'frozen-research-v2',
-          prompt: { version: 'journal-review-v5' },
+          version: 'research-frozen-input-v1',
+          prompt: { version: 'journal-object-review-prompt-v1' },
           evidence: [
             {
               audit: { kind: 'journal', providerId: 'thesis-ledger' },
@@ -131,7 +131,7 @@ describe.skipIf(!databaseUrl)('隔离 PostgreSQL 复盘解读与快照关联', (
         id: run.id,
         provider: 'isolated-journal-provider',
         model: 'isolated-model',
-        promptVersion: 'journal-review-v5',
+        promptVersion: 'journal-object-review-prompt-v1',
         status: 'queued',
       });
       await app.aiRun.update({
@@ -163,7 +163,7 @@ describe.skipIf(!databaseUrl)('隔离 PostgreSQL 复盘解读与快照关联', (
           ]),
         ),
       };
-      const periodAi = new JournalPeriodReviewAi(analysis, runs, v2);
+      const periodAi = new JournalPeriodReviewAi(analysis, v2);
       const periodRun = await periodAi.start(periodRequest, principal);
       expect(periodRun.objectFingerprints).toEqual(periodRequest.objectFingerprints);
       await expect(ai.get(periodRun.id, { accountId }, principal)).rejects.toMatchObject({

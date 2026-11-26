@@ -13,17 +13,20 @@ import { MarketBarWindowReaderV3 } from '../../src/market/market-bar-reader-v3.j
 import { marketWindowSeriesVersionV3 } from '../../src/market/market-frozen-window-v3.js';
 import { createBacktestSnapshotV3Source } from '../../src/backtest/backtest-snapshot-v3-source.js';
 import { decodeMarketWindowEvidenceInsert } from './market-window-evidence-v3-sql-mock.js';
+import { tradabilityFixtureV3 } from '../backtest/v3-tradability-fixtures.js';
+import { tradabilityWindowFromResponseV3 } from '../../src/backtest/backtest-snapshot-v3-tradability.js';
 
 const json = (name: string) =>
   JSON.parse(
     readFileSync(new URL(`../../../../packages/schemas/fixtures/${name}`, import.meta.url), 'utf8'),
   );
-const fixture = async (requestWindowBasis = false, multiWindow = false) => {
+const fixture = async (requestWindowBasis = false, multiWindow = false, priceOnly = false) => {
   const parsed = marketDataBarSeriesRequestV3Schema.parse(
     json('market-data-v3.request.etf-qfq.json'),
   );
   const request = {
     ...parsed,
+    ...(priceOnly ? { dailyObservationContract: 'market-daily-tradability-window-v1' as const, tradabilityMode: 'assume-untradable-no-bar' as const } : {}),
     routeTarget: {
       providerId: 'hithink',
       upstreamSource: 'hithink-financial-api',
@@ -43,6 +46,12 @@ const fixture = async (requestWindowBasis = false, multiWindow = false) => {
     };
   }
   if (requestWindowBasis) response.sourcePriceBasis.basisScope = 'request-window';
+  if (priceOnly) {
+    response.bars.forEach((bar) => { bar.volume = null; });
+    const daily = tradabilityFixtureV3(tradabilityWindowFromResponseV3(response), 2);
+    daily.days.forEach((day) => { day.state = 'observed-price-only'; });
+    response.historicalTradabilityWindows = [daily];
+  }
   const rows = new Map<string, Record<string, unknown>>();
   const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
     const id = String(data.identityFingerprint);
@@ -112,11 +121,30 @@ const fixture = async (requestWindowBasis = false, multiWindow = false) => {
     routeKey: request.routeKey,
     window: { start: request.start, end: request.end },
     frozenWindowRef: reference,
+    ...(priceOnly ? { dailyObservationContract: 'market-daily-tradability-window-v1' as const, tradabilityMode: 'assume-untradable-no-bar' as const, priceResearch: true } : {}),
   };
   return { response, reference, input, reader, revisions, repository, rows, create, dsa };
 };
 
 describe('固定Market窗口与子窗读取', () => {
+  it('仅价格日级观察冻结并裁剪重放，常规消费不能借用', async () => {
+    const f = await fixture(false, false, true);
+    expect((await f.repository.findFrozen(f.reference.identityFingerprint))?.request.dailyObservationContract).toBe('market-daily-tradability-window-v1');
+    expect((await f.reader.read(f.input)).status).toBe('selected');
+    const cropped = await f.reader.read({ ...f.input, window: { start: '2026-05-19', end: f.input.window.end } });
+    expect(cropped.status).toBe('selected');
+    if (cropped.status === 'selected') {
+      expect(cropped.request.dailyObservationContract).toBe('market-daily-tradability-window-v1');
+      expect(cropped.selection.response.historicalTradabilityWindows?.[0]?.priceOnlyAllowed).toBe(true);
+      expect(cropped.selection.response.bars.every((bar) => bar.volume === null)).toBe(true);
+    }
+    const { dailyObservationContract: _dailyObservationContract, ...priceAndVolumeInput } = f.input;
+    expect((await f.reader.read(priceAndVolumeInput)).status).toBe('unavailable');
+    expect((await f.reader.read({ ...f.input, priceResearch: false })).status).toBe('unavailable');
+    expect(f.dsa.marketBarsV3).not.toHaveBeenCalled();
+    const legacy = await fixture();
+    expect(legacy.reference.identityFingerprint).not.toBe(f.reference.identityFingerprint);
+  });
   it('多窗口整窗复用保留观测，不请求行情，也不把窗口基准裁剪成新原生窗口', async () => {
     const f = await fixture(false, true);
     const result = await f.reader.read(f.input);

@@ -66,14 +66,14 @@ export async function createDiscoveryExperiment(
         name: `AI 探索种子 ${scope.executionInstrument.symbol}`,
         description: '实验专用隐藏策略，不进入策略库。',
         status: 'experiment-only',
-        schemaVersion: Number(seed.schemaVersion),
+        schemaVersion: 1,
       },
     });
     const version = await transaction.strategyVersion.create({
       data: {
         strategyId: strategy.id,
         version: 0,
-        schemaVersion: Number(seed.schemaVersion),
+        schemaVersion: 1,
         schema: asJson(seed),
       },
     });
@@ -104,14 +104,14 @@ export async function cloneDiscoveryExperiment(
         name: `AI 探索种子 ${scope!.executionInstrument.symbol}`,
         description: '实验专用隐藏策略，不进入策略库。',
         status: 'experiment-only',
-        schemaVersion: Number(seed.schemaVersion),
+        schemaVersion: 1,
       },
     });
     const version = await transaction.strategyVersion.create({
       data: {
         strategyId: strategy.id,
         version: 0,
-        schemaVersion: Number(seed.schemaVersion),
+        schemaVersion: 1,
         schema: asJson(seed),
       },
     });

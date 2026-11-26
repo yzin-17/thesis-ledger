@@ -84,7 +84,7 @@ export function MarketPolicyScreen() {
       await command.submit(async () => {
         if (retry) return api.market.retryPolicy();
         const input = marketPolicySaveInputSchema.parse({
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId: randomUUID(),
           revision: source.revision + 1,

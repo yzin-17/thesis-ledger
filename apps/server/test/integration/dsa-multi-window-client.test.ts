@@ -19,7 +19,8 @@ describe('DSA 多窗口网络能力确认', () => {
     '能力状态为 %s 时执行对应允许或拒绝', async (mode) => {
       const payload = fixture();
       const capabilities = {
-        dataContractVersions: mode === 'wrong-version' ? [1, 2] : [3],
+        dataContract: mode === 'wrong-version' ? 'dsa-data-v3' : 'dsa-data-v1',
+        dailyObservationContract: 'market-daily-tradability-window-v1',
         serviceCapabilities: { fundNav: true },
         ...(mode !== 'absent' ? { multiWindowProtocols: ['market-multi-window-content-v1'] } : {}),
       };
@@ -33,14 +34,14 @@ describe('DSA 多窗口网络能力确认', () => {
         config: { dsaBaseUrl: 'https://dsa.example.test', dsaTimeoutMs: 5000, dsaToken: 'test' },
       }) as DsaClient;
       const result = client.marketBarsV3({
-        contractVersion: 3, requestId: payload.requestId, symbol: payload.symbol,
+        contractVersion: 1, requestId: payload.requestId, symbol: payload.symbol,
         routeKey: payload.routeKey, start: payload.coverage.requestedStart, end: payload.coverage.requestedEnd,
       });
       if (mode === 'supported') await expect(result).resolves.toEqual(payload);
       else await expect(result).rejects.toThrow();
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(fetchMock.mock.calls.map(([url]) => url.pathname)).toEqual([
-        '/api/v3/thesis-ledger/market/bars', '/api/v3/thesis-ledger/capabilities',
+        '/api/v1/thesis-ledger/market/bars', '/api/v1/thesis-ledger/capabilities',
       ]);
     },
   );

@@ -26,7 +26,7 @@ const samples = JSON.parse(
   ),
 ) as { samples: Array<{ name: string; response: MarketNewsResponseV3 | null }> };
 const currentQuote = () => ({
-  version: 3,
+  version: 1,
   symbol: '600519.SH',
   open: 100,
   high: 100,
@@ -89,7 +89,7 @@ export async function createResearchDataHttpFixture() {
     }
     if (url.pathname.endsWith('/fund-nav')) {
       const nav = {
-        version: 3,
+        version: 1,
         symbol: url.searchParams.get('symbol'),
         unitNav: 1.2345,
         navDate: '2026-10-18T00:00:00Z',

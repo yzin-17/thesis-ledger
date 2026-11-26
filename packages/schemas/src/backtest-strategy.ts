@@ -1,274 +1,31 @@
 import { z } from 'zod';
-import type { BacktestDecimalString } from './backtest-values.js';
+import { backtestDailyOrderExecutionSchema } from './backtest-daily-orders.js';
+import { dailyOrderExecutionForStrategySchema } from './backtest-daily-order-validation.js';
+import { validateBooleanExpression, validateExpressionDeclarations } from './backtest-expression-validation.js';
+import { backtestTradePlanSchema, validateTradePlanSources } from './backtest-trade-plan.js';
 import {
-  decimalStringSchema,
   nonNegativeDecimalStringSchema,
   positiveDecimalStringSchema,
   positiveRatioStringSchema,
 } from './monetary-values.js';
-import { corporateActionTypeSchema, type CorporateActionType } from './backtest-data.js';
 import {
   backtestTimeframeSchema,
   backtestCurrencySchema,
-  seriesFieldSchema,
   type Timeframe,
-  type SeriesField,
   assetSymbolRefSchema,
   signalSourceSchema,
+  seriesFieldSchema,
   type SignalSource,
   currencyForMarket,
 } from './backtest-values.js';
-type DecimalString = BacktestDecimalString;
+export { numericExpressionSchema, booleanExpressionSchema, expressionSchema } from './backtest-expression.js';
+export type { PositionStateField, NumericExpression, BooleanExpression, Expression } from './backtest-expression.js';
+import { expressionSchema, type Expression } from './backtest-expression.js';
 const positiveIntegerSchema = z.number().int().positive();
-const indicatorNameSchema = z.enum([
-  'MA',
-  'EMA',
-  'RSI',
-  'MACD',
-  'ATR',
-  'VWAP',
-  'Highest',
-  'Lowest',
-]);
-const indicatorParamSchema = z.union([positiveIntegerSchema, positiveDecimalStringSchema]);
-
-export type PositionStateField = 'isOpen' | 'quantity' | 'averageCost' | 'holdingPeriods';
-export type NumericExpression =
-  | { type: 'constant'; value: DecimalString }
-  | { type: 'series'; sourceId: string; field: SeriesField }
-  | {
-      type: 'indicator';
-      name: z.infer<typeof indicatorNameSchema>;
-      input: NumericExpression;
-      params: Record<string, number | DecimalString>;
-      output?: 'macd' | 'signal' | 'histogram';
-    }
-  | { type: 'positionState'; field: Exclude<PositionStateField, 'isOpen'> };
-export type BooleanExpression =
-  | { type: 'all'; conditions: BooleanExpression[] }
-  | { type: 'any'; conditions: BooleanExpression[] }
-  | { type: 'not'; expression: BooleanExpression }
-  | {
-      type: 'compare';
-      operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
-      left: NumericExpression;
-      right: NumericExpression;
-    }
-  | {
-      type: 'cross';
-      direction: 'above' | 'below';
-      left: NumericExpression;
-      right: NumericExpression;
-    }
-  /**
-   * A point-in-time corporate-action signal dependency. Matching uses the
-   * action's explicit effectiveDate, and visibility requires strategyVisibility;
-   * legacy occurredAt/availableAt alone do not make an action signal-eligible.
-   */
-  | { type: 'corporateActionEvent'; eventType: CorporateActionType }
-  | { type: 'positionState'; field: 'isOpen' };
-export type Expression = NumericExpression | BooleanExpression;
-
-const constantExpressionSchema = z
-  .object({ type: z.literal('constant'), value: decimalStringSchema })
-  .strict();
-const seriesExpressionSchema = z
-  .object({
-    type: z.literal('series'),
-    sourceId: z.string().trim().min(1),
-    field: seriesFieldSchema,
-  })
-  .strict();
-const positionStateExpressionSchema = z
-  .object({
-    type: z.literal('positionState'),
-    field: z.enum(['isOpen', 'quantity', 'averageCost', 'holdingPeriods']),
-  })
-  .strict();
-
-const indicatorExpressionSchema: z.ZodType<NumericExpression> = z.lazy(() =>
-  z
-    .object({
-      type: z.literal('indicator'),
-      name: indicatorNameSchema,
-      input: numericExpressionSchema,
-      params: z.record(z.string(), indicatorParamSchema),
-      output: z.enum(['macd', 'signal', 'histogram']).optional(),
-    })
-    .strict(),
-) as z.ZodType<NumericExpression>;
-
-export const numericExpressionSchema: z.ZodType<NumericExpression> = z.lazy(() =>
-  z.union([
-    constantExpressionSchema,
-    seriesExpressionSchema,
-    indicatorExpressionSchema,
-    positionStateExpressionSchema,
-  ]),
-) as z.ZodType<NumericExpression>;
-
-export const booleanExpressionSchema: z.ZodType<BooleanExpression> = z.lazy(() =>
-  z.union([
-    z
-      .object({ type: z.literal('all'), conditions: z.array(booleanExpressionSchema).min(1) })
-      .strict(),
-    z
-      .object({ type: z.literal('any'), conditions: z.array(booleanExpressionSchema).min(1) })
-      .strict(),
-    z.object({ type: z.literal('not'), expression: booleanExpressionSchema }).strict(),
-    z
-      .object({
-        type: z.literal('compare'),
-        operator: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']),
-        left: numericExpressionSchema,
-        right: numericExpressionSchema,
-      })
-      .strict(),
-    z
-      .object({
-        type: z.literal('cross'),
-        direction: z.enum(['above', 'below']).describe(
-          '以 left 为主语穿越 right：above 为前值 left<=right 且当前 left>right；below 为前值 left>=right 且当前 left<right。交换左右项须反转方向。',
-        ),
-        left: numericExpressionSchema,
-        right: numericExpressionSchema,
-      })
-      .strict(),
-    z
-      .object({
-        type: z.literal('corporateActionEvent'),
-        eventType: corporateActionTypeSchema,
-      })
-      .strict(),
-    z.object({ type: z.literal('positionState'), field: z.literal('isOpen') }).strict(),
-  ]),
-);
-
-export const expressionSchema: z.ZodType<Expression> = z.union([
-  numericExpressionSchema,
-  booleanExpressionSchema,
-]);
 
 const issue = (ctx: z.RefinementCtx, path: (string | number)[], message: string) =>
   ctx.addIssue({ code: 'custom', path, message });
 
-const requiredIndicatorParams: Record<string, string[]> = {
-  MA: ['period'],
-  EMA: ['period'],
-  RSI: ['period'],
-  MACD: ['fastPeriod', 'slowPeriod', 'signalPeriod'],
-  ATR: ['period'],
-  VWAP: ['period'],
-  Highest: ['period'],
-  Lowest: ['period'],
-};
-
-function validateIndicatorParameters(name: string, raw: unknown, ctx: z.RefinementCtx, path: (string | number)[]): void {
-  const params = raw && typeof raw === 'object' && !Array.isArray(raw)
-    ? raw as Record<string, unknown> : {};
-  const required = requiredIndicatorParams[name] ?? [];
-  for (const param of required) {
-    if (!(param in params)) issue(ctx, [...path, 'params', param], '缺少 Indicator 参数');
-  }
-  for (const param of Object.keys(params)) {
-    if (!required.includes(param)) issue(ctx, [...path, 'params', param], '未知 Indicator 参数');
-    const val = params[param];
-    if (typeof val === 'number' && (!Number.isInteger(val) || val <= 0))
-      issue(ctx, [...path, 'params', param], '参数必须是正整数');
-    if (typeof val === 'string' && param.toLowerCase().includes('period') && !/^[1-9]\d*$/.test(val))
-      issue(ctx, [...path, 'params', param], '周期参数必须是正整数');
-  }
-}
-
-function validateIndicatorExpression(node: Record<string, unknown>, sources: Map<string, SignalSource>, ctx: z.RefinementCtx, path: (string | number)[]): void {
-  const name = typeof node.name === 'string' ? node.name : undefined;
-  if (!name || !indicatorNameSchema.options.includes(name as (typeof indicatorNameSchema.options)[number])) {
-    issue(ctx, [...path, 'name'], '未知 Indicator');
-    return;
-  }
-  validateNumericExpression(node.input, sources, ctx, [...path, 'input']);
-  validateIndicatorParameters(name, node.params, ctx, path);
-  if (name === 'MACD' && typeof node.output !== 'string')
-    issue(ctx, [...path, 'output'], 'MACD 必须显式选择 output');
-  if (name !== 'MACD' && node.output !== undefined)
-    issue(ctx, [...path, 'output'], '该 Indicator 不支持 output selector');
-}
-
-const validateNumericExpression = (
-  value: unknown,
-  sources: Map<string, SignalSource>,
-  ctx: z.RefinementCtx,
-  path: (string | number)[],
-): 'numeric' | 'boolean' | 'unknown' => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    issue(ctx, [...path, 'type'], '必须是受支持的 AST 节点');
-    return 'unknown';
-  }
-  const node = value as Record<string, unknown>;
-  if (node.type === 'constant') return 'numeric';
-  if (node.type === 'positionState') {
-    if (node.field === 'isOpen') {
-      issue(ctx, [...path, 'field'], 'isOpen 是布尔值，不能作为数值表达式');
-      return 'boolean';
-    }
-    return 'numeric';
-  }
-  if (node.type === 'series') {
-    const sourceId = typeof node.sourceId === 'string' ? node.sourceId : undefined;
-    const source = sourceId ? sources.get(sourceId) : undefined;
-    if (!source) issue(ctx, [...path, 'sourceId'], '未知 SignalSource');
-    if (
-      source &&
-      typeof node.field === 'string' &&
-      !source.series.includes(node.field as SeriesField)
-    ) {
-      issue(ctx, [...path, 'field'], 'Series 未在 SignalSource 中声明');
-    }
-    return 'numeric';
-  }
-  if (node.type === 'indicator') {
-    validateIndicatorExpression(node, sources, ctx, path);
-    return 'numeric';
-  }
-  issue(ctx, [...path, 'type'], '未知或不支持的数值 AST 节点');
-  return 'unknown';
-};
-
-const validateBooleanExpression = (
-  value: unknown,
-  sources: Map<string, SignalSource>,
-  ctx: z.RefinementCtx,
-  path: (string | number)[],
-): void => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    issue(ctx, [...path, 'type'], '必须是布尔 AST 节点');
-    return;
-  }
-  const node = value as Record<string, unknown>;
-  if (node.type === 'all' || node.type === 'any') {
-    if (!Array.isArray(node.conditions))
-      issue(ctx, [...path, 'conditions'], 'conditions 必须是数组');
-    else
-      node.conditions.forEach((item, index) =>
-        validateBooleanExpression(item, sources, ctx, [...path, 'conditions', index]),
-      );
-    return;
-  }
-  if (node.type === 'not') {
-    validateBooleanExpression(node.expression, sources, ctx, [...path, 'expression']);
-    return;
-  }
-  if (node.type === 'positionState' && node.field === 'isOpen') return;
-  if (node.type === 'corporateActionEvent') return;
-  if (node.type === 'compare' || node.type === 'cross') {
-    const leftType = validateNumericExpression(node.left, sources, ctx, [...path, 'left']);
-    const rightType = validateNumericExpression(node.right, sources, ctx, [...path, 'right']);
-    if (leftType !== 'numeric') issue(ctx, [...path, 'left'], '比较输入必须是数值表达式');
-    if (rightType !== 'numeric') issue(ctx, [...path, 'right'], '比较输入必须是数值表达式');
-    return;
-  }
-  issue(ctx, [...path, 'type'], '未知或不支持的布尔 AST 节点');
-};
 
 export const sizingRuleSchema = z.union([
   z.object({ type: z.literal('fixedAmount'), amount: positiveDecimalStringSchema }).strict(),
@@ -334,16 +91,18 @@ export const navExecutionConfigSchema = z
   .strict();
 export const executionConfigSchema = z.union([
   exchangeExecutionConfigSchema,
+  backtestDailyOrderExecutionSchema,
   navExecutionConfigSchema,
 ]);
 export type ExecutionConfig = z.infer<typeof executionConfigSchema>;
 
-const strategyBaseSchema = z
+export const strategyBaseSchema = z
   .object({
-    schemaVersion: z.enum(['2', '3']),
+    schemaVersion: z.literal('strategy-definition-v1'),
     name: z.string().trim().min(1),
     description: z.string().max(2000).optional(),
-    signalSources: z.array(signalSourceSchema).min(1),
+    signalSources: z.array(signalSourceSchema.extend({ series: z.array(seriesFieldSchema) })),
+    entryTrigger: z.enum(['rising-edge', 'while-flat']).optional(),
     executionInstrument: assetSymbolRefSchema,
     primaryTimeframe: backtestTimeframeSchema,
     // Keep these as unknown at the first parse boundary so semantic AST
@@ -353,6 +112,7 @@ const strategyBaseSchema = z
     exit: z.unknown(),
     sizing: sizingRuleSchema,
     risk: z.array(riskRuleSchema),
+    tradePlan: backtestTradePlanSchema.optional(),
     execution: z.unknown(),
     cost: strategyCostModelSchema,
     benchmark: assetSymbolRefSchema.optional(),
@@ -362,15 +122,11 @@ const strategyBaseSchema = z
 const exchangeTimeframes = new Set<Timeframe>(['1d', '60m', '30m', '15m', '5m', '1m']);
 
 function validateStrategySignalSources(value: z.infer<typeof strategyBaseSchema>, ctx: z.RefinementCtx): Map<string, SignalSource> {
-  if (value.schemaVersion === '3') {
-    value.signalSources.forEach((source, index) => {
-      if (!source.priceCoordinate)
-        issue(ctx, ['signalSources', index, 'priceCoordinate'], '研究策略必须明确价格来源的坐标');
-    });
-  }
   const sourceIds = new Set<string>();
   const sources = new Map<string, SignalSource>();
   for (const [index, source] of value.signalSources.entries()) {
+    if (!source.priceCoordinate)
+      issue(ctx, ['signalSources', index, 'priceCoordinate'], '策略必须明确价格来源的坐标');
     if (sourceIds.has(source.id))
       issue(ctx, ['signalSources', index, 'id'], 'SignalSource id 必须唯一且稳定');
     sourceIds.add(source.id);
@@ -378,6 +134,10 @@ function validateStrategySignalSources(value: z.infer<typeof strategyBaseSchema>
     if (new Set(source.series).size !== source.series.length)
       issue(ctx, ['signalSources', index, 'series'], 'series 不得重复');
     const isFund = source.asset.assetType === 'fund';
+    if (isFund && source.priceCoordinate !== 'native-nav')
+      issue(ctx, ['signalSources', index, 'priceCoordinate'], '基金净值来源必须使用 native-nav 坐标');
+    if (!isFund && source.priceCoordinate === 'native-nav')
+      issue(ctx, ['signalSources', index, 'priceCoordinate'], '股票／ETF 不能使用 native-nav 坐标');
     if (
       isFund &&
       (source.asset.market !== 'CN' ||
@@ -398,9 +158,7 @@ function validateStrategySignalSources(value: z.infer<typeof strategyBaseSchema>
 
 export const strategySchema = strategyBaseSchema.superRefine((value, ctx) => {
   const sources = validateStrategySignalSources(value, ctx);
-  if (!value.signalSources.some((source) => source.timeframe === value.primaryTimeframe)) {
-    issue(ctx, ['primaryTimeframe'], '至少一个 SignalSource 必须使用 primaryTimeframe');
-  }
+  validateTradePlanSources(value.tradePlan, sources, value.executionInstrument,value.primaryTimeframe, ctx);
   const execution = value.executionInstrument;
   const appendSchemaIssues = (
     candidate: unknown,
@@ -431,6 +189,14 @@ export const strategySchema = strategyBaseSchema.superRefine((value, ctx) => {
     issue(ctx, ['executionInstrument'], 'NAV Fund 只支持 CN 日频');
   }
   const executionConfig = executionValid ? (value.execution as ExecutionConfig) : undefined;
+  if (executionConfig?.timing === 'dailyBarOrders') {
+    if (value.primaryTimeframe !== '1d') issue(ctx, ['primaryTimeframe'], '日线委托只支持 1d 主周期');
+    appendSchemaIssues(executionConfig, dailyOrderExecutionForStrategySchema({
+      sources: value.signalSources, instrument: execution, timeframe: value.primaryTimeframe,
+      stageIds: value.tradePlan?.stages.map(stage => stage.id) ?? [],
+      stageSides: Object.fromEntries(value.tradePlan?.stages.map(stage => [stage.id, stage.action.kind === 'add' ? 'buy' : 'sell']) ?? []),
+    }), ['execution']);
+  }
   if (
     executionConfig?.mode === 'nav' &&
     (execution.assetType !== 'fund' || execution.market !== 'CN')
@@ -447,7 +213,9 @@ export const strategySchema = strategyBaseSchema.superRefine((value, ctx) => {
     issue(ctx, ['benchmark'], 'HK/US NAV Fund 不受支持');
   }
   if (entryValid) validateBooleanExpression(value.entry, sources, ctx, ['entry']);
+  else validateExpressionDeclarations(value.entry, sources, ctx, ['entry']);
   if (exitValid) validateBooleanExpression(value.exit, sources, ctx, ['exit']);
+  else validateExpressionDeclarations(value.exit, sources, ctx, ['exit']);
 });
 type BacktestStrategyBase = z.infer<typeof strategyBaseSchema>;
 export type BacktestStrategy = Omit<BacktestStrategyBase, 'entry' | 'exit' | 'execution'> & {

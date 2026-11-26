@@ -315,6 +315,7 @@ function StrategyRiskEditorForm({
       />
       <QueryStatus query={library} retry={() => void library.refetch()} />
       <StrategyVersionPicker
+        riskEligible
         rows={owner ? [owner] : []}
         label="升级目标版本"
         value={target}

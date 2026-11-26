@@ -244,7 +244,7 @@ describe('首次配置与完成状态', () => {
         },
       ],
       policy: {
-        contractVersion: 3 as const,
+        contractVersion: 1 as const,
         consumer: 'thesis-ledger' as const,
         requestId: 'policy-11',
         revision: 11,
@@ -256,7 +256,7 @@ describe('首次配置与完成状态', () => {
           targets: [{ providerId: 'akshare', upstreamSource: 'eastmoney' }],
         }],
         effectiveProjection: {
-          contractVersion: 3 as const,
+          contractVersion: 1 as const,
           consumer: 'thesis-ledger' as const,
           requestId: 'effective-4',
           revision: 4,

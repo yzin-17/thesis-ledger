@@ -4,11 +4,12 @@ import { artifact, frozenExecutionRules, runConfig } from './v2-execution.fixtur
 
 export function exchangeOpenFixture() {
   const exchangeStrategy = strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: '场内次日开盘回测',
     signalSources: [
       {
         id: 'close',
+        priceCoordinate: 'run',
         asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
         timeframe: '1d',
         series: ['open', 'close'],

@@ -1,6 +1,6 @@
 [
   {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "market-data-v3-error-unsupported-version",
     "error": {
       "code": "unsupported_data_contract_version",
@@ -8,7 +8,7 @@
     }
   },
   {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "market-data-v3-error-unsupported-basis",
     "error": {
       "code": "unsupported_price_basis",
@@ -16,7 +16,7 @@
     }
   },
   {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "market-data-v3-error-insufficient-coverage",
     "error": {
       "code": "insufficient_coverage",
@@ -24,7 +24,7 @@
     }
   },
   {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "market-data-v3-error-upstream-failure",
     "error": {
       "code": "upstream_failure",
@@ -32,7 +32,7 @@
     }
   },
   {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "market-data-v3-error-invalid-response",
     "error": {
       "code": "invalid_response",

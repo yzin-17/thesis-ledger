@@ -4,7 +4,7 @@ import { marketRouteCatalogReadClientV3Schema } from '../src/market-client-proje
 const entry = { key: { kind: 'data', market: 'CN', assetType: 'STOCK', capability: 'RISK_WARNING' },
   target: { providerId: 'state', upstreamSource: 'state' }, state: 'ready',
   querySupport: { capability: 'RISK_WARNING', detailKinds: ['coarseST'], riskCategories: [] } };
-const complete = { contractVersion: 3, consumer: 'thesis-ledger', status: 'complete',
+const complete = { contractVersion: 1, consumer: 'thesis-ledger', status: 'complete',
   catalogRevision: 1, generatedAt: '2026-10-11T00:00:00Z', reason: null, entries: [entry] };
 it('精确候选及能力专有参数范围保留，条目额外字段/错绑拒绝', () => {
   expect(marketRouteCatalogReadClientV3Schema.parse(complete).entries).toEqual([entry]);

@@ -9,6 +9,7 @@ import { observationFixture } from './research-observation.fixture.js';
 describe.skipIf(!databaseUrl)('观察版本与提交映射：隔离 PostgreSQL', () => {
   let first: PrismaClient, second: PrismaClient;
   let fixture: ReturnType<typeof observationFixture>;
+  const runIds: string[] = [];
   const store = (client = first) => new ResearchObservationStore(client as never);
   beforeAll(async () => {
     first = new PrismaClient({ datasourceUrl: databaseUrl ?? '' });
@@ -21,12 +22,15 @@ describe.skipIf(!databaseUrl)('观察版本与提交映射：隔离 PostgreSQL',
     await first.researchObservationVersion.deleteMany();
     await first.researchObservation.deleteMany();
     fixture = observationFixture();
+    runIds.push(fixture.report.row.id);
     await first.aiRun.create({ data: fixture.report.row as unknown as Prisma.AiRunCreateInput });
   });
   afterAll(async () => {
     await first?.researchObservationSubmission.deleteMany();
     await first?.researchObservationVersion.deleteMany();
     await first?.researchObservation.deleteMany();
+    await first?.aiRun.deleteMany({ where: { id: { in: runIds } } });
+    expect(await first.aiRun.count({ where: { id: { in: runIds } } })).toBe(0);
     await first?.$disconnect();
     await second?.$disconnect();
   });

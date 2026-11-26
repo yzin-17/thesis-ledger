@@ -26,7 +26,7 @@ describe('backtest data contracts', () => {
       availableAt: '2026-01-01T00:00:00Z',
     };
     const response = {
-      version: 3,
+      version: 1,
       status: 'supported',
       provider: 'fixture',
       providerRevision: 'instrument-v1',
@@ -210,7 +210,7 @@ describe('回测事件与事实可见性合同', () => {
     const coverage = { start: '2024-01-01', end: '2024-03-31', complete: true };
     expect(
       backtestCorporateActionsResponseSchema.parse({
-        version: 3,
+        version: 1,
         status: 'supported',
         provider: 'akshare',
         providerRevision: 'akshare-corporate-actions-v1',
@@ -231,7 +231,7 @@ describe('回测事件与事实可见性合同', () => {
     ).toThrow();
     expect(() =>
       backtestCalendarResponseSchema.parse({
-        version: 3,
+        version: 1,
         status: 'supported',
         provider: 'exchange-calendars',
         providerRevision: 'exchange-calendars-4',
@@ -242,7 +242,7 @@ describe('回测事件与事实可见性合同', () => {
     ).toThrow();
     expect(() =>
       backtestInstrumentFactsResponseSchema.parse({
-        version: 3,
+        version: 1,
         status: 'supported',
         provider: 'market-rules',
         providerRevision: 'cn-stock-v1',

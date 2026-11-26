@@ -1,7 +1,7 @@
 const ids = { match: '11111111-1111-4111-8111-111111111111', a: '22222222-2222-4222-8222-222222222222', b: '33333333-3333-4333-8333-333333333333', cycle: '44444444-4444-4444-8444-444444444444', fill: '55555555-5555-4555-8555-555555555555' };
 function arenaLiveFixture(s) {
   const budget = { requests: 100, tokens: 1000000, costMicros: 1000000 }, at = '2026-11-12T14:30:00.000Z';
-  const protocol = s.arenaLiveProtocolSchema.parse({ version: 2, title: '自主模型对决', market: 'US', currency: 'USD', calendarId: 'US', calendarVersion: 'controlled', timeZone: 'America/New_York',
+  const protocol = s.arenaLiveProtocolSchema.parse({ version: 'arena-live-match-protocol-v1', title: '自主模型对决', market: 'US', currency: 'USD', calendarId: 'US', calendarVersion: 'controlled', timeZone: 'America/New_York',
     startsOn: '2026-11-01', endsOn: '2026-12-31', initialCash: '10000', maxPositionBps: 5000, decisionDeadlineMinutes: 5, maxInfrastructureAttempts: 3,
     universe: 'market', instruments: [], allowWebSearch: true, fees: { version: 'controlled', buyBps: 0, sellBps: 0, minimum: '0', slippageBps: 0 }, benchmarks: ['cash'], budgetCurrency: 'USD', budget,
     resources: { maxActiveSymbols: 50, maxResearchSteps: 20, maxCycleSeconds: 300, quoteIntervalSeconds: 30, maxQuoteAgeSeconds: 60 },

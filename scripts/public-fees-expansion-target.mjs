@@ -29,7 +29,7 @@ const selected = [
 ];
 const update = (current, routes) =>
   api('/api/market-data/policy', {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: randomUUID(),
     revision: current.revision + 1,
@@ -57,10 +57,10 @@ try {
     const program = `
       import assert from 'node:assert/strict';
       import { combinePublicFeesExecutionModelV3 } from './apps/server/dist/src/backtest/backtest-public-fees-model-v3.js';
-      const wire = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'p6-us-expanded-fees-read',
+      const wire = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'p6-us-expanded-fees-read',
         routeKey: ${JSON.stringify(key)}, routeTarget: { ...${JSON.stringify(target)}, routeIndex: 0 },
         symbol: 'GME.US', range: { start: '2024-05-10', end: '2024-05-24' } };
-      const r = await fetch(new URL('/api/v3/thesis-ledger/market/public-fees', process.env.DSA_BASE_URL), {
+      const r = await fetch(new URL('/api/v1/thesis-ledger/market/public-fees', process.env.DSA_BASE_URL), {
         method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + process.env.THESIS_LEDGER_DSA_TOKEN },
         body: JSON.stringify(wire), signal: AbortSignal.timeout(120000) });
       const response = await r.json(); assert.equal(r.status, 200);

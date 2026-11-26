@@ -49,6 +49,6 @@ export function backtestNavRunClient(request: ParsedRequest, post: ParsedPost) {
     cancelNavRun: (id: string, signal?: AbortSignal) =>
       post(path(id) + '/cancel', {}, bound(id), signal),
     retryNavRun: (id: string, signal?: AbortSignal) =>
-      post(path(id) + '/retry', {}, bound(id), signal),
+      post(path(id) + '/retry', {}, backtestNavRunResponseV3Schema.refine((run) => run.id === id || run.replayOfRunId === id), signal),
   };
 }

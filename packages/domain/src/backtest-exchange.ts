@@ -33,7 +33,11 @@ export interface ExchangeBarFact {
   previousCloseAvailableAt: string;
   openResearchClock?: BacktestResearchClock;
   previousCloseResearchClock?: BacktestResearchClock;
+  researchClock?: BacktestResearchClock;
   open: string;
+  high?: string;
+  low?: string;
+  close?: string;
   previousClose: string;
   status?: 'available' | 'unavailable';
   reason?: string;
@@ -563,7 +567,7 @@ const isRuleReject = (
   value: ExecutionRuleDecision | ExchangeRejectPlan,
 ): value is ExchangeRejectPlan => 'status' in value;
 
-const settlementAvailability = (calendar: TradingCalendar, date: string, occurredAt: string) => {
+export const settlementAvailability = (calendar: TradingCalendar, date: string, occurredAt: string) => {
   const firstSession = calendar.sessionsForDate(`${date}T12:00:00.000Z`)[0];
   if (!firstSession) return laterTime(occurredAt, occurredAt);
   const hours = Math.floor(firstSession.start / 60)

@@ -65,9 +65,9 @@ Desktop 通用组件位于 `components/ui/multi-select.tsx`，组合既有 shadc
 
 | 验收脚本或页面 | 结果 |
 | --- | --- |
-| `scripts/local-runtime/multiselect-inline-browser.mjs`，Desktop 六组实际组件 | 24/24 通过；覆盖能力、风险通知、监测来源、竞技场模型及两个既有模型输入 |
+| `scripts/local-runtime/browser/instruments/multiselect-inline.regression.mjs`，Desktop 六组实际组件 | 24/24 通过；覆盖能力、风险通知、监测来源、竞技场模型及两个既有模型输入 |
 | 同脚本，Mobile 三组实际 React Native 组件 | 12/12 通过；覆盖 AI 能力与模型、实验选模、竞技场模型 |
-| `scripts/local-runtime/instrument-multiselect-mobile-browser.mjs` | 两处实际创建页 × 四档宽度，共 8 组通过；包含清空、聚焦、已选搜索与移除、分组导入及市场重置 |
+| `scripts/local-runtime/browser/instruments/instrument-multiselect-mobile.regression.mjs` | 两处实际创建页 × 四档宽度，共 8 组通过；包含清空、聚焦、已选搜索与移除、分组导入及市场重置 |
 | `scripts/local-runtime/arena-live-browser.mjs` | Desktop 四档宽度通过；图表、图例、指标、时间区间、持仓成交、创建和返回等原交互保持 |
 | `apps/desktop/scripts/check-rule-monitor-schedule.cjs` | 四档宽度通过；创建、冲突、来源保留、启停、幂等执行及导航保持；真实写入 0 |
 | `scripts/local-runtime/arena-live-mobile-browser.mjs` | 四档宽度通过；实际图表文档、触摸点位、图例、指标和详情，无页面错误 |

@@ -99,7 +99,7 @@ export const barSeriesCoverageSchema = z.object({
 });
 
 export const barSeriesSchema = z.object({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   identity: barSeriesIdentitySchema,
   points: barPointsSchema,
   coverage: barSeriesCoverageSchema,
@@ -132,7 +132,7 @@ export const refineUniqueIndicatorRequests = (request: { requests: readonly z.in
 };
 
 export const indicatorCalculateRequestSchema = z.object({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   identity: barSeriesIdentitySchema,
   inputFingerprint: z.string().min(1),
   points: barPointsSchema,
@@ -167,7 +167,7 @@ export const marketIndicatorResultSchema = z.object({
 export type MarketIndicatorResult = z.infer<typeof marketIndicatorResultSchema>;
 
 export const indicatorCalculateResponseSchema = z.object({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   engineVersion: z.string().min(1),
   inputFingerprint: z.string().min(1),
   results: z.array(marketIndicatorResultSchema),

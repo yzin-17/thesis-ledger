@@ -70,7 +70,7 @@ export const backtestNavPreparationDiagnosticV3Schema = z.strictObject({
   message: z.string().min(1),
 });
 const base = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: z.string().min(1).max(128),
   checkedAt: instant,
   scope: z.literal('nav-input-plan'),

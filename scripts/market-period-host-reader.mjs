@@ -10,7 +10,7 @@ const symbol = process.env.MARKET_PERIOD_SYMBOL ?? '159516.SZ';
 assert(process.env.THESIS_LEDGER_DSA_TOKEN, '需要既有 DSA 凭据，仅用于请求，不输出');
 const reads = [];
 const calendars = new MarketPeriodCalendarReader({ marketCalendar: async (input) => {
-  const response = await fetch(`${dsaBase}/api/v3/thesis-ledger/market/calendar?${new URLSearchParams(input)}`, {
+  const response = await fetch(`${dsaBase}/api/v1/thesis-ledger/market/calendar?${new URLSearchParams(input)}`, {
     headers: { authorization: `Bearer ${process.env.THESIS_LEDGER_DSA_TOKEN}` }, signal: AbortSignal.timeout(15000),
   });
   assert.equal(response.status, 200);

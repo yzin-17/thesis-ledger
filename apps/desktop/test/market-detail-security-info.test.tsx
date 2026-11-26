@@ -12,7 +12,7 @@ vi.mock('../src/features/market-data/security-static-info.api.js', () => ({ fetc
 const read = vi.mocked(fetchSecurityStaticInfo);
 const stock: MarketDetailPosition = { symbol: '03968.HK', asset: { name: '招商银行', assetType: 'stock' } };
 const info = securityStaticInfoResponseSchema.parse({
-  contractVersion: 3, consumer: 'thesis-ledger', requestId: 'controlled', symbol: stock.symbol, assetType: 'STOCK',
+  contractVersion: 1, consumer: 'thesis-ledger', requestId: 'controlled', symbol: stock.symbol, assetType: 'STOCK',
   market: 'HK', name: '招商银行', securityId: '9007199254740993', sharesPerLot: '100', listingDate: '2006-09-22',
   delisted: false, exchange: 'HKEX', provider: 'futu', historicalChanges: 'unverified',
   observedAt: '2026-11-10T01:00:00Z', fetchedAt: '2026-11-10T01:01:00Z', policyRevision: 1,

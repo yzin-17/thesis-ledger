@@ -1,4 +1,5 @@
 import { backtestBenchmarkCompatibilitySchemaV3 } from '@thesis-ledger/schemas';
+import { backtestMetricUnavailableReason } from '@thesis-ledger/domain';
 import {
   backtestMetricNumber,
   backtestMetricPercent,
@@ -30,7 +31,7 @@ const reasons: Record<string, string> = {
 export const backtestMetricReasonLabel = (metric: unknown) => {
   const reason = backtestMetricReason(metric);
   if (!reason) return null;
-  return reasons[reason] ?? reason;
+  return reasons[reason] ?? backtestMetricUnavailableReason(reason);
 };
 
 /** 只消费服务端收益；展示门控不会改写结果或自行计算收益差。 */
@@ -67,12 +68,14 @@ export const backtestPartialResultSummary = (result: BacktestJobResult) => {
     profitFactor: '利润因子',
     tradeCount: '交易次数',
     turnover: '成交额',
+    tradedNotional: '成交额',
+    turnoverRate: '区间双边资金周转率',
   };
   const entries = Object.entries(labels)
     .filter(([key]) => metrics?.[key] !== undefined)
     .map(([key, label]) => {
       const metric = metrics?.[key];
-      const numeric = ['sharpe', 'profitFactor', 'tradeCount', 'turnover'].includes(key);
+      const numeric = ['sharpe', 'profitFactor', 'tradeCount', 'turnover', 'tradedNotional'].includes(key);
       const available =
         (numeric ? backtestMetricNumber(metric) : backtestMetricPercent(metric)) !== null;
       return { label, metric, available };

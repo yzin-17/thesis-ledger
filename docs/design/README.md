@@ -26,6 +26,7 @@
 - [数据源选择与专业 Provider（已合并）](2026-08-18-provider-selection.md)
 - [风控与通知说明](2026-08-18-risk-and-notifications.md)
 - [策略与回测领域边界](2026-08-18-strategy-and-backtest.md)
+- [研究模拟账户规则](2026-11-23-research-account-policy.md)
 - [Provider 路由与数据可靠性](2026-09-16-provider-routing-and-reliability.md)
 
 ## 架构决策

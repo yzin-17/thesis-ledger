@@ -12,3 +12,11 @@ test('允许事实投影与共享状态消费', () => {
   assert.equal(check('apps/server/src/market/session.ts', 'import { projectMarketSession, tradingCalendarFromFact } from "@thesis-ledger/domain";'), null);
   assert.equal(check('apps/server/src/automation/job.ts', 'import { MarketSessionReader } from "../market/market-session-reader.js";'), null);
 });
+test('会话累计与时钟只读冻结日历，保留其他历史回测入口的独立合同', () => {
+  for (const file of ['apps/server/src/backtest/backtest-session-series.ts',
+    'packages/domain/src/backtest-session-clock.ts', 'packages/domain/src/backtest-session-vwap.ts']) {
+    assert(check(file, 'const calendar = new MarketService();'));
+    assert(check(file, 'const calendar = cnTradingCalendar;'));
+    assert.equal(check(file, 'const calendar = tradingCalendarFromFact(frozen);'), null);
+  }
+});

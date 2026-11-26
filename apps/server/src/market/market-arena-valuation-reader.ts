@@ -79,6 +79,7 @@ export class MarketArenaValuationReader {
             this.actions.read(
               { ...i, market: p.market, previousDay: i.acquiredOn, now: new Date() },
               initial.latestTradingDate ?? initial.date!,
+              p.simulationPolicy,
             ),
           ]);
           evidence[i.symbol] = { quote: q, events };

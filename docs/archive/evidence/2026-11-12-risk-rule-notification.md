@@ -31,9 +31,9 @@
 
 ## 浏览器验收
 
-入口：`apps/desktop/test/browser-strategy-rule-notification.html`；执行工具：`scripts/local-runtime/strategy-rule-notification-browser.mjs`。使用 Microsoft Edge 无头浏览器和现有 `http://127.0.0.1:5173` 开发服务。实际挂载生成抽屉及风险中心通知编辑器，API 路径全部拦截，未向真实业务提交。
+入口：`apps/desktop/test/browser-strategy-rule-notification.html`；执行工具：`scripts/local-runtime/browser/risk/strategy-rule-notification.regression.mjs`。使用 Microsoft Edge 无头浏览器和现有 `http://127.0.0.1:5173` 开发服务。实际挂载生成抽屉及风险中心通知编辑器，API 路径全部拦截，未向真实业务提交。
 
-命令：`PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright node scripts/local-runtime/strategy-rule-notification-browser.mjs`。
+命令：`PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright node scripts/local-runtime/browser/risk/strategy-rule-notification.regression.mjs`。
 
 1440、1024、768、390 四种宽度，各覆盖创建与编辑，共 8 个场景全部通过。检查了无横向溢出、下拉中文回显、键盘聚焦、逐条编辑、越界错误、首次 503 后输入保留、再次提交成功及独立请求内容。实际请求分别包含“成本止损：严重／0 分钟”和“最大持有周期：继承级别／120 分钟”。浏览器无未登记 API 请求或页面异常。截图与结构化结果位于 `/tmp/strategy-rule-notification-qa/`，可由维护脚本重新生成。
 

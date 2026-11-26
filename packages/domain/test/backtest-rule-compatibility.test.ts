@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { strategyRequiredLookback } from '../src/backtest-indicators.js';
 import { executionPriceProtocolSchema } from '../../schemas/src/market-price-protocol.js';
 import { strategySchema, type BacktestStrategy } from '../../schemas/src/backtest-contract.js';
 import {
@@ -166,7 +167,56 @@ const relativeTrend = () => ({
   },
 });
 
+it('日线委托价格检查执行坐标和价格单位，常量明确使用本次坐标并披露尺度依赖', () => {
+  const execution = {
+    mode: 'exchange', timing: 'dailyBarOrders', orders: [
+      { id: 'buy', action: { kind: 'entry' }, order: { kind: 'limit', price: { type: 'constant', value: '9.5' } }, validity: { kind: 'DAY' } },
+      { id: 'exit', action: { kind: 'exit' }, order: { kind: 'market' }, validity: { kind: 'DAY' } },
+    ],
+  };
+  const strategy = makeStrategy({ entry: relativeTrend(), exit: { type: 'positionState', field: 'isOpen' }, execution, sizing: { type: 'percentOfEquity', percent: '0.5' }, risk: [] });
+  const constant = checkBacktestRuleCompatibility(strategy, makeContext());
+  expect(constant.compatible).toBe(true);
+  expect(constant.issues).toContainEqual(expect.objectContaining({ code: 'SCALE_INVARIANCE_UNPROVEN', path: ['execution', 'orders', 0, 'order', 'price'], severity: 'warning' }));
+  const price = { type: 'indicator', name: 'MA', input: priceSeries('execution'), params: { period: 30 } };
+  execution.orders[0]!.order.price = price as never;
+  const indicator = makeStrategy({ ...strategy, execution });
+  expect(strategyRequiredLookback(indicator).required).toBe(30);
+  expect(checkBacktestRuleCompatibility(indicator, makeContext()).compatible).toBe(true);
+  const context = makeContext();
+  context.sourceCoordinates = { ...context.sourceCoordinates, execution: { ...context.executionCoordinate, currency: 'USD' } };
+  expect(checkBacktestRuleCompatibility(indicator, context).issues).toContainEqual(expect.objectContaining({ code: 'CROSS_SEQUENCE_PRICE_COORDINATE_MISMATCH', path: ['execution', 'orders', 0, 'order', 'price'] }));
+  execution.orders[0]!.order.price = priceSeries('execution', 'volume') as never;
+  expect(checkBacktestRuleCompatibility(makeStrategy({ ...strategy, execution }), makeContext()).issues).toContainEqual(expect.objectContaining({ code: 'RULE_UNIT_MISMATCH', path: ['execution', 'orders', 0, 'order', 'price'] }));
+});
+
+  it('当日累计 VWAP 仍检查量价单位，分钟不能和价格比较', () => {
+    const base = makeStrategy();
+    const entry = { type: 'compare', operator: 'gt',
+      left: { type: 'sessionValue', sourceId: 'execution', field: 'vwap' },
+      right: priceSeries('execution') };
+    const strategy = makeStrategy({ primaryTimeframe: '1m',
+      signalSources: base.signalSources.map(source => ({ ...source, timeframe: '1m', series: ['close', 'volume'] })),
+      entry, exit: { type: 'compare', operator: 'eq',
+        left: { type: 'constant', value: '0' }, right: { type: 'constant', value: '1' } },
+    });
+    expect(checkBacktestRuleCompatibility(strategy, makeContext()).issues.map(issue => issue.code))
+      .toContain('VWAP_UNITS_INCOMPATIBLE');
+    const minutes = { type: 'sessionValue', sourceId: 'execution', field: 'elapsedMinutes' };
+    const timed = makeStrategy({ ...strategy, entry: { ...entry, left: minutes,
+      right: { type: 'constant', value: '60' } } });
+    expect(checkBacktestRuleCompatibility(timed, makeContext()).issues).toEqual([]);
+    const mixed = makeStrategy({ ...timed, entry: { ...entry, left: minutes } });
+    expect(checkBacktestRuleCompatibility(mixed, makeContext()).issues.map(issue => issue.code))
+      .toContain('RULE_UNIT_MISMATCH');
+  });
 describe('归一化回测规则单位兼容', () => {
+  it('纯常量比较可表达恒假退出，不给价格或数量常量补单位',()=>{
+    const strategy=structuredClone(typedExchangeStrategy);
+    strategy.exit={type:'compare',operator:'eq',left:{type:'constant',value:'0'},right:{type:'constant',value:'1'}};
+    const report=checkBacktestRuleCompatibility(strategy,makeContext());
+    expect(report.issues.filter(issue=>issue.code==='RULE_UNIT_MISMATCH')).toEqual([]);
+  });
   it('接受同一价格坐标内的趋势、相对突破、资金比例和持有期规则', () => {
     const strategy = makeStrategy({
       entry: {
@@ -402,4 +452,17 @@ describe('归一化回测规则单位兼容', () => {
     expect(report.compatible).toBe(true);
     expect(report.issues).toEqual([]);
   });
+});
+
+it('参考权益坐标下派生价格的零阈值可证尺度不变，非零平移仍拒绝', () => {
+  const context = makeContext();
+  context.executionUnits = { ...context.executionUnits, researchQuantity: 'reference-notional-v1' };
+  const check = (left: unknown) => checkBacktestRuleCompatibility(makeStrategy({
+    entry: { type: 'compare', operator: 'gt', left, right: { type: 'constant', value: '0' } },
+    exit: { type: 'positionState', field: 'isOpen' }, risk: [],
+    sizing: { type: 'percentOfEquity', percent: '0.2' },
+  }), context);
+  const deviation = { type: 'rolling', statistic: 'standardDeviation', periods: 20, ddof: 0, input: priceSeries('execution') };
+  expect(check(deviation).compatible).toBe(true);
+  expect(check({ type: 'absolute', input: { type: 'arithmetic', operator: 'subtract', left: priceSeries('execution'), right: { type: 'constant', value: '100' } } }).compatible).toBe(false);
 });

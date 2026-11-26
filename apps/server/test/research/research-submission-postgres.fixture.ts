@@ -64,11 +64,15 @@ export function controlledRedis() {
 
 export async function createResearchSubmissionPostgresHarness(
   prisma: PrismaClient,
-  dataOverride?: Awaited<ReturnType<typeof createResearchDataHttpFixture>>,
-  dsaTimeoutMs = 2_000,
+  options: {
+    data?: Awaited<ReturnType<typeof createResearchDataHttpFixture>>;
+    dsaTimeoutMs?: number;
+    runs?: AiRunService;
+  } = {},
 ) {
-  const data = dataOverride ?? (await createResearchDataHttpFixture());
+  const data = options.data ?? (await createResearchDataHttpFixture());
   const models = await createResearchExecutionV2Harness(prisma);
+  const dsaTimeoutMs = options.dsaTimeoutMs ?? 2_000;
   const dsa = Object.assign(Object.create(DsaClient.prototype), {
     config: { dsaBaseUrl: data.baseUrl, dsaTimeoutMs, dsaToken: 'controlled-data-token' },
   }) as DsaClient;
@@ -93,7 +97,7 @@ export async function createResearchSubmissionPostgresHarness(
     providers: [
       ResearchSubmissionService,
       AiResearchReportsQuery,
-      { provide: AiRunService, useValue: models.runs },
+      { provide: AiRunService, useValue: options.runs ?? models.runs },
       { provide: AiResearchExecutor, useValue: dispatch },
       { provide: ResearchScopeReader, useValue: scopes },
       { provide: PromptVersionRegistry, useValue: prompts },
@@ -117,7 +121,7 @@ export async function createResearchSubmissionPostgresHarness(
     identities,
     input(revision: string) {
       return {
-        version: 2,
+        version: 'research-report-submission-v1',
         submissionId: randomUUID(),
         mode: 'shadow',
         scope: { scope: 'instrument', instrumentId: '00000000-0000-4000-8000-000000000001' },

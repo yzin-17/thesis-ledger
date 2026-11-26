@@ -72,6 +72,7 @@ export function authoringOperationRejected(error: unknown) {
   return (
     typeof code === 'string' &&
     [
+      'AUTHORING_MODIFICATION_SCOPE_INVALID',
       'AUTHORING_CONDITIONS_INCOMPLETE',
       'AUTHORING_INSTRUMENT_MISMATCH',
       'AUTHORING_MODEL_UNAVAILABLE',

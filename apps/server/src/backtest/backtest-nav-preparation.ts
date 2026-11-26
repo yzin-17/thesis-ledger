@@ -52,7 +52,7 @@ export async function prepareNavRunConfigV3(input: {
     }
   }
   const sourceIntent = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     requestId: request.requestId,
     symbol: request.runConfig.navInput.symbol,
     fundType: request.fundType,
@@ -140,7 +140,7 @@ export async function prepareNavRunConfigV3(input: {
     checkedAt: freezeAt,
   };
   return {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     status: 'prepared' as const,
     scope: 'nav-input-plan' as const,
     requestId: request.requestId,

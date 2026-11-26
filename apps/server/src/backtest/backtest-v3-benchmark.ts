@@ -1,6 +1,5 @@
 import {
   DecimalValue,
-  availabilityForDecision,
   compareBacktestBenchmarkCompatibility,
   type BacktestBenchmarkCompatibilityIdentity,
   type BacktestBenchmarkCompatibilityReport,
@@ -10,7 +9,6 @@ import {
 import {
   backtestBenchmarkCompatibilitySchemaV3,
   backtestSnapshotManifestV3Schema,
-  compareMarketPitEvidenceInstantStringsV1,
   runConfigSchemaV3,
   strategySchema,
   type BacktestSnapshotManifestV3,
@@ -23,7 +21,7 @@ import {
   tradingCalendarFromFact,
   type ExchangeVerticalResult,
 } from './backtest-v2-execution-shared.js';
-import { barResearchClocksV3 } from './backtest-v3-research-clock.js';
+import { valuationCloses } from './backtest-benchmark-valuation-closes.js';
 import { alignBacktestBenchmarkClosesV3 } from './backtest-v3-benchmark-alignment.js';
 import { resolveFrozenBenchmarkCostV3 } from './backtest-v3-benchmark-cost.js';
 import {
@@ -57,14 +55,6 @@ export interface BacktestV3BenchmarkProjection {
     costAssumption: BenchmarkCostReport;
   };
   warnings: string[];
-}
-
-interface ValuationClose {
-  occurredAt: string;
-  availableAt: string;
-  decisionAt: string;
-  close: string;
-  tradingDate: string;
 }
 
 const unavailable = (reason: string): BenchmarkMetric => ({ status: 'unavailable', reason });
@@ -128,8 +118,8 @@ const assertFrozenInputs = (input: BacktestV3BenchmarkInput) => {
     executionSource.symbol !== instrument.symbol ||
     executionSource.routeKey.market !== instrument.market ||
     executionSource.routeKey.assetType !== instrumentRouteType(instrument.assetType) ||
-    executionSource.routeKey.capability !== 'DAILY_BAR' ||
-    executionSource.routeKey.timeframe !== '1d' ||
+    executionSource.routeKey.capability !== (strategy.primaryTimeframe === '1d' ? 'DAILY_BAR' : 'MINUTE_BAR') ||
+    executionSource.routeKey.timeframe !== (strategy.primaryTimeframe === '1d' ? '1d' : '1m') ||
     executionSource.routeKey.adjustment !== runConfig.executionPriceProtocol.priceBasis.adjustment
   ) {
     failIntegrity('唯一 execution 来源与策略标的或 RunConfig 价格协议不一致');
@@ -207,76 +197,6 @@ const inRangeEquityPoints = (
     })
     .sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt));
 
-const valuationCloses = (
-  rows: readonly ArtifactRow[],
-  calendar: ReturnType<typeof tradingCalendarFromFact>,
-  runConfig: RunConfigV3,
-  warnings: Set<string>,
-): ValuationClose[] => {
-  const points: ValuationClose[] = [];
-  const seen = new Set<string>();
-  for (const row of rows) {
-    if (
-      typeof row.occurredAt !== 'string' ||
-      typeof row.availableAt !== 'string' ||
-      typeof row.close !== 'string' ||
-      row.timeframe !== '1d'
-    ) {
-      continue;
-    }
-    let tradingDate: string;
-    try {
-      tradingDate = calendar.status(row.occurredAt).date;
-    } catch {
-      warnings.add('BENCHMARK_INVALID_OBSERVATION_TIME');
-      continue;
-    }
-    if (tradingDate < runConfig.startDate || tradingDate > runConfig.endDate) continue;
-    if (
-      row.quality !== 'complete' ||
-      row.completionStatus !== 'complete' ||
-      row.suspended === true
-    ) {
-      warnings.add('BENCHMARK_INCOMPLETE_VALUATION_CLOSE');
-      continue;
-    }
-    const closeIdentity = tradingDate;
-    if (seen.has(closeIdentity)) {
-      warnings.add('BENCHMARK_DUPLICATE_VALUATION_CLOSE');
-      continue;
-    }
-    seen.add(closeIdentity);
-    try {
-      const close = DecimalValue.from(row.close);
-      if (!close.isPositive()) {
-        warnings.add('BENCHMARK_INVALID_VALUATION_PRICE');
-        continue;
-      }
-      const clocks = barResearchClocksV3(row, calendar, runConfig);
-      const decisionAt = availabilityForDecision({
-        availableAt: row.availableAt,
-        ...(clocks.researchClock ? { researchClock: clocks.researchClock } : {}),
-      });
-      if (
-        !decisionAt ||
-        compareMarketPitEvidenceInstantStringsV1(decisionAt, decisionAt) === undefined
-      ) {
-        warnings.add('BENCHMARK_FUTURE_OBSERVATION');
-        continue;
-      }
-      points.push({
-        occurredAt: row.occurredAt,
-        availableAt: row.availableAt,
-        decisionAt,
-        close: close.toString(),
-        tradingDate,
-      });
-    } catch {
-      warnings.add('BENCHMARK_FUTURE_OBSERVATION');
-    }
-  }
-  return points.sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt));
-};
 
 const finish = (
   strategyIdentity: BacktestBenchmarkCompatibilityIdentity,

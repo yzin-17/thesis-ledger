@@ -7,10 +7,11 @@ import {
 } from '../../src/strategy-optimization/strategy-optimization-parameters.js';
 
 const baseline = strategySchema.parse({
-  schemaVersion: '2',
+  schemaVersion: 'strategy-definition-v1',
   name: '参数优化基线',
   signalSources: [
     {
+      priceCoordinate: 'run',
       id: 'close',
       asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
       timeframe: '1d',

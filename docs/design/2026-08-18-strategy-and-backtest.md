@@ -8,6 +8,8 @@
 
 普通新建股票／ETF 日线采用[策略收益研究](../specs/2026-11-11-backtest-return-research.md)：策略 Schema V3 保存实际价格与研究价格坐标，现有 V3 运行／快照／结果使用显式 `price-research-v1` 子协议。默认后复权计算研究收益，具体价格条件按需绑定不复权参考；两套行情[各自按路由选择并冻结来源](../specs/2026-11-12-independent-research-price-sources.md)，允许不同提供方和上游，后续执行复用各自冻结输入。固定份数只用于计算操作时点的投入金额，持仓采用研究单位。完整权益事件、到账及拆合股持仓还原不是普通研究的共同前置。
 
+股票／ETF 研究模拟账户的可卖日期、成交扣款及卖出款再投资统一由[研究模拟账户规则](2026-11-23-research-account-policy.md)维护，策略回测与自主竞技场按各自功能合同采用。
+
 Schemas 拥有坐标和保存预览投影，Domain 拥有研究投入与记账，Backtest 负责冻结及任务执行。Market 的原价参考来源只允许当前有效原价路由中的精确目标，按该路由独立选择并保留索引；DSA 负责身份、日历和来源事实。两套输入分别冻结后，Worker 离线重放。旧载荷不填新默认值，旧策略经明确确认另存新版本。操作说明见[使用指南](../guides/2026-11-11-backtest-return-research.md)。
 
 AI 实验列表和详情的[当前标的名称](../specs/2026-11-12-experiment-instrument-display.md)由 Market 的 `InstrumentDisplayService` 按页批量投影，响应携带 `executionSymbol` 和限定当前实验范围的 `instrumentDirectory`。该展示投影不改写实验名称、策略定义或历史输入，目录未知时保留完整代码。

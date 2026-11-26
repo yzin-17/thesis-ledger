@@ -5,7 +5,7 @@ export const quoteControlCacheKey = (symbol: string) =>
   `quote:4:${symbol}:inferred:${quoteControlGeneration}`;
 export async function quoteControlFixture(request: MarketCacheContextRequestV3) {
   return {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     consumer: 'thesis-ledger' as const,
     requestId: request.requestId,
     symbol: request.symbol,

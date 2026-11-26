@@ -75,7 +75,7 @@ try {
     const job = await prisma.backtestJob.create({ data: { id: buildInput.runId, strategyVersionId: version.id,
       mode: 'V3', status: 'queued', stage: 'queued', periodStart: new Date(buildInput.runConfig.startDate),
       periodEnd: new Date(buildInput.runConfig.endDate), dataAsOf: new Date(buildInput.runConfig.dataAsOf),
-      input: { contractVersion: 3, schemaVersion: '3', runConfig: buildInput.runConfig },
+      input: { contractVersion: 1, schemaVersion: '3', runConfig: buildInput.runConfig },
       runConfig: buildInput.runConfig, engineVersion: runner.id } });
     const request = { runId: job.id, snapshotRef: built.snapshotRef, artifactRefs: built.artifactRefs };
     const finished = await runBacktestAttempt({ prisma, job, runnerId: runner.id, activeControllers: new Map(),

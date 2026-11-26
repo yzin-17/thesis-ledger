@@ -13,14 +13,16 @@ import {
 } from '@thesis-ledger/schemas';
 import { BacktestRunService } from '../../src/backtest/backtest-run.service.js';
 import { hashCanonicalManifest } from '../../src/backtest/backtest-snapshot.js';
+import { createdSnapshotManifest, runExecutionRouteKey, snapshotSourcePurposes } from '../../src/backtest/backtest-v3-run-lifecycle.js';
 
 const strategyVersionId = '11111111-1111-4111-8111-111111111111';
 
 const strategy = strategySchema.parse({
-  schemaVersion: '2',
+  schemaVersion: 'strategy-definition-v1',
   name: 'V3 lifecycle',
   signalSources: [
     {
+      priceCoordinate: 'run',
       id: 'execution',
       asset: { symbol: '159516.SZ', market: 'CN', assetType: 'etf' },
       timeframe: '1d',
@@ -58,7 +60,7 @@ const lifecycleModel = {
   })),
 };
 const runConfig = runConfigSchemaV3.parse({
-  schemaVersion: '3',
+  schemaVersion: 'backtest-trade-config-v1',
   startDate: '2026-05-18',
   endDate: '2026-05-20',
   dataAsOf: '2026-08-10T00:00:00.000Z',
@@ -161,7 +163,7 @@ const createTestRunService = (...args: ConstructorParameters<typeof BacktestRunS
   );
 
 const request = (idempotencyKey = 'v3-lifecycle-once') => ({
-  contractVersion: 3 as const,
+  contractVersion: 1 as const,
   preparationStamp: preparationStampFor(strategy, runConfig, strategyVersionId),
   strategyVersionId,
   runConfig,
@@ -174,7 +176,7 @@ const prismaHarness = (existing: unknown = null) => {
   const findUnique = vi.fn(async () => existing);
   const prisma = {
     strategyVersion: {
-      findUnique: vi.fn(async () => ({ schemaVersion: 2, schema: strategy })),
+      findUnique: vi.fn(async () => ({ schemaVersion: 1, schema: strategy })),
     },
     backtestJob: { findFirst, findUnique, create, updateMany: vi.fn() },
   };
@@ -182,6 +184,31 @@ const prismaHarness = (existing: unknown = null) => {
 };
 
 describe('V3 Run lifecycle boundary', () => {
+  it.each([true, false])('正式创建先持久化意图，不构建快照；队列装配=%s', async (withQueue) => {
+    const state = prismaHarness();
+    const builder = { buildV3: vi.fn() };
+    const queue = { ensureEnqueued: vi.fn() };
+    const service = createTestRunService(state.prisma as never, withQueue ? queue as never : undefined, undefined, builder);
+    const created = await service.createRun(request());
+    expect(created).toMatchObject({ status: 'queued', stage: 'queued', progress: 0,
+      input: { materialization: { version: 'backtest-job-input-v1', kind: 'configured',
+        strategyVersionHash: hashCanonicalManifest(strategy) }, runConfig } });
+    expect(created.snapshotId).toBeUndefined();
+    expect(builder.buildV3).not.toHaveBeenCalled();
+    expect(queue.ensureEnqueued).toHaveBeenCalledTimes(withQueue ? 1 : 0);
+    if (withQueue) expect(state.create.mock.invocationCallOrder[0]).toBeLessThan(queue.ensureEnqueued.mock.invocationCallOrder[0]!);
+  });
+
+  it.each(['startDate', 'endDate'] as const)('Worker仍拒绝自洽但%s偏离请求的快照', async (field) => {
+    const built = await buildResult('test-run', { strategyVersionId, strategy, runConfig }, 'complete');
+    built.manifest.dateRange[field] = field === 'startDate' ? '2026-05-19' : '2026-05-21';
+    built.manifest.contentHash = hashCanonicalManifest(built.manifest);
+    built.snapshotRef = { snapshotId: built.manifest.contentHash, contentHash: built.manifest.contentHash };
+    expect(() => createdSnapshotManifest(built, { request: request(), strategy, runConfig, runId: 'test-run',
+      executionRouteKey: runExecutionRouteKey(strategy, runConfig), expectedSourcePurposes: snapshotSourcePurposes(strategy, runConfig) }))
+      .toThrow('manifest、身份或 contentHash 不一致');
+  });
+
   it('缺少当前创建合同要求的执行模型时仍在冻结前拒绝', async () => {
     const state = prismaHarness();
     const builder = { buildV3: vi.fn() };
@@ -212,192 +239,12 @@ describe('V3 Run lifecycle boundary', () => {
 
 });
 
-describe("冻结快照与入队资格", () => {
-  it('persists the V3 contract and partial manifest as failed without enqueueing', async () => {
-    const state = prismaHarness();
-    const builder = {
-      build: vi.fn(),
-      buildV3: vi.fn(async (input) => buildResult(input.runId, input)),
-    };
-    const queue = { ensureEnqueued: vi.fn() };
-    const service = createTestRunService(state.prisma as never, queue as never, undefined, builder);
-
-    const created = await service.createRun(request());
-
-    expect(created).toMatchObject({
-      mode: 'V3',
-      status: 'failed',
-      errorCode: 'DATA_UNAVAILABLE',
-      diagnostics: { code: 'SNAPSHOT_DEPENDENCIES_INCOMPLETE' },
-      input: {
-        contractVersion: 3,
-        schemaVersion: '3',
-        runConfig,
-        snapshotVersion: 'snapshot-manifest-v3',
-      },
-      runConfig,
-      snapshotManifest: {
-        manifestVersion: 'snapshot-manifest-v3',
-        quality: { completeness: 'partial' },
-      },
-    });
-    expect(builder.buildV3).toHaveBeenCalledWith(
-      expect.objectContaining({
-        runId: expect.any(String),
-        strategyVersionId,
-        executionRouteKey: {
-          kind: 'bar',
-          market: 'CN',
-          assetType: 'ETF',
-          capability: 'DAILY_BAR',
-          timeframe: '1d',
-          adjustment: 'none',
-        },
-      }),
-    );
-    expect(state.findFirst).toHaveBeenCalledWith({
-      where: { strategyVersionId, idempotencyKey: request().idempotencyKey },
-    });
-    expect(queue.ensureEnqueued).not.toHaveBeenCalled();
-
-    const retryService = createTestRunService(
-      { backtestJob: { findUnique: vi.fn(async () => created) } } as never,
-      queue as never,
-    );
-    await expect(
-      retryService.retryRun(String((created as { id: string }).id)),
-    ).rejects.toMatchObject({
-      response: {
-        code: 'DATA_UNAVAILABLE',
-        message: 'Snapshot V3 依赖闭包不完整，当前 Run 不能 retry',
-      },
-    });
-    expect(queue.ensureEnqueued).not.toHaveBeenCalled();
-  });
-
-  it('queues only a finalized complete V3 Snapshot when the runner is configured', async () => {
-    const state = prismaHarness();
-    const builder = {
-      build: vi.fn(),
-      buildV3: vi.fn(async (input) => buildResult(input.runId, input, 'complete')),
-    };
-    const queue = { ensureEnqueued: vi.fn(async () => undefined) };
-    const runner = { id: 'runner-v3', run: vi.fn() };
-    const service = createTestRunService(
-      state.prisma as never,
-      queue as never,
-      undefined,
-      builder,
-      runner as never,
-    );
-
-    const created = await service.createRun(request());
-
-    expect(created).toMatchObject({
-      mode: 'V3',
-      status: 'queued',
-      input: {
-        contractVersion: 3,
-        schemaVersion: '3',
-        runConfig,
-        snapshotVersion: 'snapshot-manifest-v3',
-      },
-      runConfig,
-      snapshotManifest: { quality: { completeness: 'complete' } },
-    });
-    expect(state.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ status: 'queued', snapshotManifest: expect.anything() }),
-    });
-    expect(queue.ensureEnqueued).toHaveBeenCalledWith(expect.any(String));
-  });
-
-  it.each(['startDate', 'endDate'] as const)(
-    'rejects a self-consistent Snapshot whose %s differs from the requested interval',
-    async (field) => {
-      const state = prismaHarness();
-      const builder = {
-        build: vi.fn(),
-        buildV3: vi.fn(async (input) => {
-          const built = await buildResult(input.runId, input, 'complete');
-          built.manifest.dateRange[field] = field === 'startDate' ? '2026-05-19' : '2026-05-21';
-          const contentHash = hashCanonicalManifest(built.manifest);
-          built.manifest.contentHash = contentHash;
-          built.snapshotRef = { snapshotId: contentHash, contentHash };
-          return built;
-        }),
-      };
-      const queue = { ensureEnqueued: vi.fn() };
-      const service = createTestRunService(
-        state.prisma as never,
-        queue as never,
-        undefined,
-        builder,
-        { id: 'runner-v3', run: vi.fn() },
-      );
-
-      await expect(service.createRun(request())).resolves.toMatchObject({
-        status: 'failed',
-        errorCode: 'DATA_UNAVAILABLE',
-        errorSummary: 'Snapshot V3 Builder 返回的 manifest、身份或 contentHash 不一致',
-      });
-      expect(queue.ensureEnqueued).not.toHaveBeenCalled();
-    },
-  );
-
-});
-
-describe("执行依赖缺失的失败收敛", () => {
-  it('keeps a complete V3 Snapshot failed when the runner is missing', async () => {
-    const state = prismaHarness();
-    const builder = {
-      build: vi.fn(),
-      buildV3: vi.fn(async (input) => buildResult(input.runId, input, 'complete')),
-    };
-    const queue = { ensureEnqueued: vi.fn() };
-    const service = createTestRunService(state.prisma as never, queue as never, undefined, builder);
-
-    const created = await service.createRun(request());
-
-    expect(created).toMatchObject({
-      status: 'failed',
-      diagnostics: { code: 'V3_RUNNER_UNAVAILABLE' },
-      snapshotManifest: { quality: { completeness: 'complete' } },
-    });
-    expect(queue.ensureEnqueued).not.toHaveBeenCalled();
-  });
-
-  it('keeps a complete V3 Snapshot failed when the queue is missing', async () => {
-    const state = prismaHarness();
-    const builder = {
-      build: vi.fn(),
-      buildV3: vi.fn(async (input) => buildResult(input.runId, input, 'complete')),
-    };
-    const runner = { id: 'runner-v3', run: vi.fn() };
-    const service = createTestRunService(
-      state.prisma as never,
-      undefined,
-      undefined,
-      builder,
-      runner as never,
-    );
-
-    const created = await service.createRun(request());
-
-    expect(created).toMatchObject({
-      status: 'failed',
-      diagnostics: { code: 'QUEUE_UNAVAILABLE' },
-      snapshotManifest: { quality: { completeness: 'complete' } },
-    });
-  });
-
-});
-
 describe("幂等身份与 attempt CAS", () => {
   it('returns an idempotent V3 job only for the same contract and RunConfig', async () => {
     const existing = {
-      mode: 'V3',
+      mode: 'frozen',
       status: 'failed',
-      input: { contractVersion: 3, schemaVersion: '3', runConfig },
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', runConfig },
       runConfig,
     };
     const state = prismaHarness(existing);
@@ -453,82 +300,4 @@ describe("幂等身份与 attempt CAS", () => {
     });
   });
 
-  it('fails a queued partial V3 item under the existing attempt CAS before calling the V2 runner', async () => {
-    const runId = '22222222-2222-4222-8222-222222222222';
-    const built = await buildResult(runId, { strategyVersionId, strategy, runConfig }, 'partial');
-    let job: Record<string, unknown> = {
-      id: runId,
-      mode: 'V3',
-      status: 'queued',
-      periodStart: new Date(`${runConfig.startDate}T00:00:00.000Z`),
-      periodEnd: new Date(`${runConfig.endDate}T00:00:00.000Z`),
-      dataAsOf: new Date(runConfig.dataAsOf),
-      stage: 'queued',
-      executionAttempt: 0,
-      input: { contractVersion: 3, schemaVersion: '3', runConfig },
-      runConfig,
-      snapshotId: built.snapshotRef.snapshotId,
-      snapshotManifest: built.manifest,
-      cancelRequestedAt: null,
-      startedAt: null,
-    };
-    const updateMany = vi.fn(
-      async ({
-        where,
-        data,
-      }: {
-        where: Record<string, unknown>;
-        data: Record<string, unknown>;
-      }) => {
-        const statuses = where.status as { in?: string[] } | string | undefined;
-        if (typeof statuses === 'string' && job.status !== statuses) return { count: 0 };
-        if (
-          typeof statuses === 'object' &&
-          statuses?.in &&
-          !statuses.in.includes(String(job.status))
-        )
-          return { count: 0 };
-        const attempts = where.executionAttempt as { lt?: number } | number | undefined;
-        if (typeof attempts === 'number' && job.executionAttempt !== attempts) return { count: 0 };
-        if (
-          typeof attempts === 'object' &&
-          attempts?.lt !== undefined &&
-          Number(job.executionAttempt) >= attempts.lt
-        )
-          return { count: 0 };
-        job = { ...job, ...data };
-        return { count: 1 };
-      },
-    );
-    const prisma = {
-      backtestJob: {
-        findUnique: vi.fn(async () => job),
-        updateMany,
-      },
-    };
-    const runner = { id: 'v2-runner', run: vi.fn() };
-    const service = createTestRunService(prisma as never);
-
-    await expect(service.runCurrent(runId, { attempt: 1, maxAttempts: 3 })).rejects.toThrow(
-      '现行 Runner 未配置，Run 未进入执行',
-    );
-
-    expect(runner.run).not.toHaveBeenCalled();
-    expect(job).toMatchObject({
-      status: 'failed',
-      stage: 'failed',
-      errorCode: 'DATA_UNAVAILABLE',
-      diagnostics: { code: 'DATA_UNAVAILABLE' },
-    });
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: runId,
-          mode: 'V3',
-          status: 'running',
-          executionAttempt: 1,
-        }),
-      }),
-    );
-  });
 });

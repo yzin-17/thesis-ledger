@@ -12,6 +12,10 @@ import { AiResearchSdkExecution } from '../../src/ai/ai-research-sdk-execution.j
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { createAiTimeoutPolicy } from '../../src/ai/timeout/ai-timeout-policy.js';
 import { researchExecutionDeadline } from '../../src/ai/timeout/ai-execution-clock.js';
+import { sealAiFrozenResearchV2 } from '../../src/ai/ai-research-frozen-integrity-v2.js';
+import { researchOutputSchemaV2 } from '../../src/ai/ai-research-output-schema-v2.js';
+import { traceContent } from './ai-trace.fixture.js';
+import { submissionV2Fixture } from './research-submission-v2.fixture.js';
 
 export const policy: AiResearchPolicyV1 = {
   version: 'research-policy-v1' as const,
@@ -51,14 +55,10 @@ export const summary = (
   continuationBlockedReason: null,
 });
 
-const researchContent = JSON.stringify({
-  conclusion: '本地研究结果',
-  evidence: [],
-  risks: [],
-  unknowns: [],
-  disclaimer: 'test',
-  signals: [],
-});
+const researchContent = traceContent;
+const frozenResearch = sealAiFrozenResearchV2(submissionV2Fixture().frozen);
+const researchPrompt = buildGenerationSchemaPrompt(researchOutputSchemaV2(frozenResearch));
+const executionRoute = { adapter: 'openai-compatible-chat', mode: 'json_validated' } as const;
 
 /** 慢流每块的间隔；总时长必然超过用例给出的 Provider 级超时。 */
 const SLOW_STREAM_CHUNK_GAP_MS = 400;
@@ -266,7 +266,7 @@ export class ResearchSdkHttpFixture {
         created: 1,
         model: 'fixture-model',
       };
-      const pieces = researchContent.match(/.{1,24}/gu) ?? [];
+      const pieces = researchContent.match(/.{1,80}/gu) ?? [];
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       pieces.forEach((piece, index) => {
         setTimeout(() => {
@@ -336,8 +336,7 @@ export class ResearchSdkHttpFixture {
   ) => ({
     provider: this.provider(id, path, pricing, timeouts),
     execution: {
-      adapter: 'openai-compatible' as const,
-      mode: 'json_validated' as const,
+      ...executionRoute,
       readiness: { configurationFingerprint: `${id}-fingerprint` },
       ...(timeouts.firstOutputTimeoutMs === undefined
         ? {}
@@ -357,17 +356,20 @@ export class ResearchSdkHttpFixture {
     provider: 'primary',
     model: 'fixture-model',
     modelMetadata: {
+      frozenResearch,
       sdkExecution: execution,
       researchRoutes: [
         {
           provider: 'primary',
           model: 'fixture-model',
+          ...executionRoute,
           configurationFingerprint: 'primary-fingerprint',
           ...(frozenPricing === undefined ? {} : { pricing: frozenPricing }),
         },
         {
           provider: 'fallback',
           model: 'fixture-model',
+          ...executionRoute,
           configurationFingerprint: 'fallback-fingerprint',
         },
       ],
@@ -409,7 +411,7 @@ export class ResearchSdkHttpFixture {
     await service.execute({
       ownership: { runId: '11111111-1111-4111-8111-111111111111', executionAttempt: 1 },
       run: this.run(execution, options.frozenPricing),
-      messages: [{ role: 'system', content: buildGenerationSchemaPrompt(aiGenerationContracts.research.schema) }, { role: 'user', content: 'Return research JSON.' }],
+      messages: [{ role: 'system', content: researchPrompt }, { role: 'user', content: 'Return research JSON.' }],
       startedAt: Date.now(),
       signal,
       buildResult: (output, selectedProvider) => ({ ...output, provider: selectedProvider }),

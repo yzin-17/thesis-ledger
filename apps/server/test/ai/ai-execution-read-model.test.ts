@@ -49,7 +49,7 @@ const request = (input: {
     ? {
         status: 'complete' as const,
         finishReason: 'stop',
-        contract: { id: 'research' as const, version: 'research-generation-v1' as const },
+        contract: { id: 'research' as const, version: 'research-report-generation-v1' as const },
         schemaAccepted: true,
       }
     : null,
@@ -87,7 +87,7 @@ const request = (input: {
 
 const execution = (usageCompleteness: 'reported' | 'partial' | 'unknown', requests: unknown[]) => ({
   version: 'sdk-execution-v1' as const,
-  contract: { id: 'research' as const, version: 'research-generation-v1' as const },
+  contract: { id: 'research' as const, version: 'research-report-generation-v1' as const },
   frozenPolicy: {
     version: 'research-policy-v1' as const,
     maxAiCalls: 2,

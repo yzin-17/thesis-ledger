@@ -34,7 +34,7 @@ const fixture = async (partition: boolean) => {
   };
   const { input: snapshotInput } = await buildInput();
   const runConfig = runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: f.input.request.start,
     endDate: f.input.request.end,
     dataAsOf: f.input.dataAsOf,

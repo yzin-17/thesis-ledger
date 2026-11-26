@@ -205,9 +205,14 @@ describe('backtest V3 Snapshot source builder', () => {
       'request_unpinned',
     );
     expectSourceError(
-      () => createBacktestSnapshotV3Source(planFor(readResult, { purpose: 'signal' }), readResult),
+      () =>
+        createBacktestSnapshotV3Source(planFor(readResult, { purpose: 'benchmark' }), readResult),
       'unsupported_purpose',
     );
+    expect(
+      createBacktestSnapshotV3Source(planFor(readResult, { purpose: 'signal' }), readResult)
+        .actualSource.purpose,
+    ).toBe('signal');
     expectSourceError(
       () =>
         createBacktestSnapshotV3Source(planFor(readResult, { symbol: '600519.SH' }), readResult),

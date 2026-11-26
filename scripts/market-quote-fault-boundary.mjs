@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 export function quoteFaultFetch(original, proof) {
   return async (input, options) => {
     const url = new URL(String(input));
-    if (url.pathname === '/api/v3/thesis-ledger/market/quote' &&
+    if (url.pathname === '/api/v1/thesis-ledger/market/quote' &&
       url.searchParams.get('symbol') === '600519.SH' && (options?.method ?? 'GET') === 'GET') {
       proof.injected += 1;
       assert.equal(proof.injected, 1, '原报价显式一次GET，不允许重复故障/重试');

@@ -13,7 +13,7 @@ const scope = {
 };
 
 const input = (overrides: Record<string, unknown> = {}) => ({
-  contractVersion: 3,
+  contractVersion: 1,
   sourceMode: 'discovery',
   discoveryScope: scope,
   models: [{ provider: 'provider-a', model: 'model-a' }],

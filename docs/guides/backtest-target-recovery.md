@@ -31,6 +31,8 @@ node ../thesis-ledger/scripts/local-runtime/backtest-production-compose-smoke.mj
 
 脚本创建独立项目、四个专属卷和专属空库，复用当前目标镜像 ID，不拉取或发布镜像。先执行镜像内全部 migration 和应用角色初始化，再启动 Server/Worker。验证正确结构 head、预期表数、五服务健康及宿主机临时回环端口的 API 返回 200。
 
+可通过 `--sync-payload <本地绝对载荷目录>` 将 `local-deployment.sh sync-payload` 生成的四组产物只读挂载到隔离 Server／Worker 镜像。该模式用于验证当前载荷在生产身份及依赖下能启动。
+
 所有卷都必须属于本次独立项目，不能连接共享外部卷；只有这个专属环境会使用 `down --volumes` 清理。完成后再次核对原共享目标健康、身份和受保护摘要。此项记录生产配置启动；共享目标部署使用 `./scripts/update.sh thesis-ledger`，保留数据升级使用该入口的 `DEV_DATABASE_MODE=upgrade` 及精确目标确认、备份和演练要求。
 
 基础 Compose 的 Server 在容器内监听 `0.0.0.0`，宿主机端口默认绑定 `127.0.0.1`。容器内健康和宿主机映射 API 都必须通过。只检查容器内健康不足以证明 Desktop 可以访问 API。

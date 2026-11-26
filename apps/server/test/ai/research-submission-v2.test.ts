@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { ForbiddenException } from '@nestjs/common';
+import { aiGenerationContracts } from '@thesis-ledger/schemas';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AiResearchSubmissionV2Store,
@@ -171,12 +172,12 @@ describe('V2 研究提交身份与受权找回', () => {
     expect(rows.size).toBe(2);
   });
 
-  it('不完整旧快照或错误执行版本均拒绝，V1 执行配置不能用于新 V2', async () => {
+  it('拒绝不完整的快照和用途不符的执行合同', async () => {
     const { store, rows, create } = stack();
     const owner = randomUUID();
     const { input, frozen } = submissionV2Fixture();
     const seed = submissionV2Execution();
-    seed.sdkExecution.contract = { id: 'research', version: 'research-generation-v1' };
+    seed.sdkExecution.contract = aiGenerationContracts.parameterOptimization.ref;
     await expect(store.submit(owner, frozen, async () => seed)).rejects.toThrow(
       '尚未执行的 V2 配置',
     );

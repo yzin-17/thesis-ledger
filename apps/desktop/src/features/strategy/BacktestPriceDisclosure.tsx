@@ -36,7 +36,7 @@ export function BacktestPriceDisclosure({ result }: { result: unknown }) {
     return (
       <Alert variant="destructive">
         <AlertTitle>运行协议无法读取</AlertTitle>
-        <AlertDescription>结果未通过V3合同校验，无法确认来源与比较语义。</AlertDescription>
+        <AlertDescription>回测结果校验失败，无法确认价格来源与可比性。</AlertDescription>
       </Alert>
     );
   const value = parsed.data;

@@ -10,6 +10,7 @@ import type { PrismaService } from '../../src/platform/prisma.service.js';
 import {
   MarketWindowEvidenceV3IdentityConflictError,
   MarketWindowEvidenceV3Repository,
+  readMarketWindowMigrationCandidate,
   type PinnedMarketWindowRequestV3,
 } from '../../src/market/market-window-evidence-v3.repository.js';
 import { createMarketSeriesIdentity } from '../../src/market/market-series-identity.js';
@@ -146,6 +147,27 @@ beforeEach(() => {
   });
 
 describe("冻结窗口写入与载荷读回", () => {
+
+  it('离线迁移预览和仓库读取使用同一归档身份校验', async () => {
+    const f = createRepository();
+    const stored = await f.repository.record(makeInput());
+    const id = stored.identityFingerprint;
+    const row = f.rows.get(id)!;
+    const candidate = {
+      ...row,
+      requestedStart: row.requestedStart.toISOString(),
+      requestedEnd: row.requestedEnd.toISOString(),
+      fetchedAt: row.fetchedAt.toISOString(),
+      catalogRevision: row.catalogRevision.toString(),
+    };
+    expect(readMarketWindowMigrationCandidate(candidate, id)).toEqual(await f.repository.findFrozen(id));
+    expect(() => readMarketWindowMigrationCandidate({
+      ...candidate, completeResponseHash: '0'.repeat(64),
+    }, id)).toThrow(MarketWindowEvidenceV3IdentityConflictError);
+    expect(readMarketWindowMigrationCandidate({
+      ...candidate, completeResponse: null, completeResponseHash: null,
+    }, id)).toBeNull();
+  });
 
   it('多窗口完整写入并离线读回，改写子观测后拒绝', async () => {
     const golden = readFixture<{

@@ -1,18 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { strategySchema } from '@thesis-ledger/schemas';
+import { strategySchema, projectPriceResearchStrategy } from '@thesis-ledger/schemas';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AiProviderRegistry } from '../../src/ai/provider-registry.js';
 import { PrismaService } from '../../src/platform/prisma.service.js';
 import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
 import { StrategyOptimizationReadService } from '../../src/strategy-optimization/strategy-optimization-read.service.js';
 import { StrategyOptimizationService } from '../../src/strategy-optimization/strategy-optimization.service.js';
-import {
-  createStrategyFixture,
-  runConfig,
-  split,
-  budget,
-} from './strategy-optimization-postgres-fixtures.js';
+import { createStrategyFixture, split, budget } from './strategy-optimization-postgres-fixtures.js';
+import { completedOptimizationRun } from './strategy-optimization-postgres-run.fixture.js';
+
+import { optimizationResearchRunConfig } from './optimization-research-fixtures.js';
+
+const runConfig = optimizationResearchRunConfig();
 
 const isolatedDescribe =
   process.env.RUN_STRATEGY_CENTER_T01_POSTGRES === '1' ? describe : describe.skip;
@@ -22,7 +22,9 @@ const symbol = '600519.SH';
 isolatedDescribe('T01 isolated PostgreSQL contract', () => {
   const prisma = new PrismaService();
   const providers = new AiProviderRegistry();
-  const strategy = createStrategyFixture(symbol, suffix)('0.05', '0.12');
+  const strategy = projectPriceResearchStrategy(
+    createStrategyFixture(symbol, suffix)('0.05', '0.12'),
+  );
   let baselineStrategyId = '';
   let baselineVersionId = '';
   let experimentId = '';
@@ -30,29 +32,13 @@ isolatedDescribe('T01 isolated PostgreSQL contract', () => {
   const groupedJobIds: string[] = [];
 
   beforeAll(async () => {
-    providers.register({
-      id: `t01-provider-${suffix}`,
-      models: ['t01-model'],
-      metadata: {
-        costPer1kInput: 0,
-        costPer1kOutput: 0,
-        costCurrency: 'USD',
-        pricingVersion: 't01-test-v1',
-      },
-      complete: async () => ({
-        content: {},
-        inputTokens: 0,
-        outputTokens: 0,
-        cost: 0,
-        costKnown: true,
-      }),
-    });
+    registerT01Provider(providers);
     const createdStrategy = await prisma.strategy.create({
       data: {
         name: strategy.name,
         description: strategy.description ?? null,
         status: 'draft',
-        schemaVersion: 2,
+        schemaVersion: 3,
       },
     });
     baselineStrategyId = createdStrategy.id;
@@ -60,7 +46,7 @@ isolatedDescribe('T01 isolated PostgreSQL contract', () => {
       data: {
         strategyId: baselineStrategyId,
         version: 1,
-        schemaVersion: 2,
+        schemaVersion: 3,
         schema: strategy as unknown as Prisma.InputJsonValue,
       },
     });
@@ -89,6 +75,7 @@ isolatedDescribe('T01 isolated PostgreSQL contract', () => {
       undefined;
 
     const created = await optimization.create({
+      contractVersion: 1,
       name: 'T01 原始实验',
       sourceMode: 'existing',
       strategyVersionId: baselineVersionId,
@@ -109,7 +96,7 @@ isolatedDescribe('T01 isolated PostgreSQL contract', () => {
       strategyId: baselineStrategyId,
       strategyVersionId: baselineVersionId,
       version: 1,
-      schemaVersion: 2,
+      schemaVersion: 3,
     });
 
     const frozenBefore = await prisma.$queryRaw<
@@ -196,7 +183,7 @@ isolatedDescribe('T01 isolated PostgreSQL contract', () => {
       data: {
         strategyId: baselineStrategyId,
         version: 0,
-        schemaVersion: 2,
+        schemaVersion: 3,
         schema: strategySchema.parse(strategy) as unknown as Prisma.InputJsonValue,
       },
     });
@@ -207,14 +194,15 @@ isolatedDescribe('T01 isolated PostgreSQL contract', () => {
       groupedJobIds.push(id);
       await prisma.backtestJob.create({
         data: {
-          id,
-          strategyVersionId: baselineVersionId,
-          mode: 'V2',
-          status: 'succeeded',
+          ...completedOptimizationRun({
+            id,
+            strategyVersionId: index === 2 ? candidateVersionId : baselineVersionId,
+            idempotencyKey: `t01:${suffix}:${index}`,
+            runConfig,
+          }),
           periodStart: new Date('2026-01-01T00:00:00.000Z'),
           periodEnd: new Date('2026-09-01T00:00:00.000Z'),
           dataAsOf: new Date('2026-09-18T00:00:00.000Z'),
-          input: {},
           createdAt: groupTime,
           updatedAt: groupTime,
         },
@@ -248,3 +236,23 @@ isolatedDescribe('T01 isolated PostgreSQL contract', () => {
     ).toBe(true);
   });
 });
+
+function registerT01Provider(providers: AiProviderRegistry) {
+  providers.register({
+    id: `t01-provider-${suffix}`,
+    models: ['t01-model'],
+    metadata: {
+      costPer1kInput: 0,
+      costPer1kOutput: 0,
+      costCurrency: 'USD',
+      pricingVersion: 't01-test-v1',
+    },
+    complete: async () => ({
+      content: {},
+      inputTokens: 0,
+      outputTokens: 0,
+      cost: 0,
+      costKnown: true,
+    }),
+  });
+}

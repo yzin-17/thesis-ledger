@@ -28,6 +28,7 @@ const preparationConfigSchema = z
     executionPriceProtocol: true,
     priceInputBindings: true,
     frozenExecutionWindow: true,
+    signalPriceWindows: true,
     frozenWarmupBudgetSessions: true,
     frozenPriceWarmupPolicy: true,
     lifecyclePreparation: true,
@@ -48,13 +49,13 @@ const preparationConfigSchema = z
 
 /** User intent only; source basis/revision and signal bindings belong to Server resolution. */
 const preparationIntentFields = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: z.string().trim().min(1).max(200),
   runConfig: preparationConfigSchema,
   adjustment: priceAdjustmentSchema,
   accountingBasis: accountingBasisSchema,
   priceResearch: z.literal(priceResearchProtocolV1).optional(),
-  priceResearchReference: z.literal('freeze').optional(),
+  priceResearchReference: z.enum(['freeze', 'optional']).optional(),
   history: historyInputSchema,
   cashEventResearch: z.literal('ex-date-entitlement-payment-date-cash-v1').optional(),
   knownCashResearch: backtestKnownCashResearchPolicyV3Schema.optional(),
@@ -194,7 +195,7 @@ export const backtestRunPreparationRequestV3Schema = preparationIntentFields
 export type BacktestRunPreparationRequestV3 = z.infer<typeof backtestRunPreparationRequestV3Schema>;
 
 const responseBase = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: z.string().trim().min(1),
   checkedAt: z.iso.datetime({ offset: true }),
   scope: z.literal('execution-window'),

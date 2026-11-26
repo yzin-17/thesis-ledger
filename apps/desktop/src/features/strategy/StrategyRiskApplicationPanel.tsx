@@ -4,7 +4,7 @@ import { ListRefreshRegion } from '@/components/ui/list-refresh-region';
 import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { strategySchema } from '@thesis-ledger/schemas';
+import { strategySchema, strategyRiskVersionEligibility } from '@thesis-ledger/schemas';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,7 +71,7 @@ export function StrategyRiskApplicationPanel({ strategies }: { strategies: Strat
         <CardHeader>
           <CardTitle>策略风险规则</CardTitle>
           <CardDescription>
-            至少需要一个正式 V2 策略版本后才能生成实际风险监控规则。
+            需要具有可转换风险规则的正式策略版本。
           </CardDescription>
         </CardHeader>
       </Card>
@@ -91,7 +91,7 @@ function useRiskApplicationPanel(strategies: StrategyRecord[]) {
     () =>
       strategies.flatMap((strategy) =>
         strategy.versions
-          .filter((version) => version.version > 0 && version.schemaVersion === 2 && version.schema)
+          .filter((version) => strategyRiskVersionEligibility(version).eligible)
           .map((version) => ({ strategy, version })),
       ),
     [strategies],
@@ -297,8 +297,7 @@ function RiskPanelConfiguration({ state }: { state: RiskPanelState }) {
       <CardHeader>
         <CardTitle>策略风险规则</CardTitle>
         <CardDescription>
-          手动创建或 AI 采纳的正式 V2
-          策略版本都使用同一确定性编译器生成监控规则；创建前先用当前账户持仓、成本与已完成行情做预览。
+          预览使用当前账户的持仓、成本与已完成行情。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -761,6 +760,6 @@ function riskUpgradeChangeLabel(change: RiskApplicationUpgradePreview['diff'][nu
 
 function newestRiskSourceVersion(source: RiskPanelState['versions'][number] | undefined) {
   return source?.strategy.versions
-    .filter((version) => version.version > 0 && version.schemaVersion === 2)
+    .filter((version) => strategyRiskVersionEligibility(version).eligible)
     .sort((left, right) => right.version - left.version)[0];
 }

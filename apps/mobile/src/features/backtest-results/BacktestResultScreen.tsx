@@ -1,9 +1,13 @@
 import { useState } from 'react';
+import { backtestMetricDisplay, backtestStageDisplay, isBacktestRunUpdateOlder } from '@thesis-ledger/domain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery } from '@tanstack/react-query';
-import { useRoute, type RouteProp } from '@react-navigation/native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { resultReadEligibilitySchema, type BacktestResultV3 } from '@thesis-ledger/schemas';
 import { PriceResearchResult } from './PriceResearchResult';
+import { BacktestDailyOrders } from './BacktestDailyOrders';
+import { BacktestRuleObservations } from './BacktestRuleObservations';
 import { confirmAction, useMobileRuntime } from '../../app/MobileRuntime';
 import { useMobileCommand } from '../../app/query/mobile-queries';
 import type { StrategyStackParams } from '../../app/strategy-navigation';
@@ -31,7 +35,9 @@ import {
 import { mobileEquityChart, mobileEquityCsv } from './backtest-equity';
 function useBacktestResultController() {
   const { params } = useRoute<RouteProp<StrategyStackParams, 'BacktestResult'>>();
+  const navigation = useNavigation<NativeStackNavigationProp<StrategyStackParams>>();
   const { api, scope, baseUrl } = useMobileRuntime();
+  const client = useQueryClient();
   const runs = api.backtests;
   const [message, setMessage] = useState<string | null>(null);
   const [evidence, setEvidence] = useState(false);
@@ -46,6 +52,7 @@ function useBacktestResultController() {
         ? runs.getRun(params.id, signal)
         : runs.getNavRun(params.id, signal),
     retry: false,
+    structuralSharing: (before, after) => isBacktestRunUpdateOlder(before, after) ? before : after,
     refetchInterval: (q) => (q.state.data && isBacktestActive(q.state.data.status) ? 2000 : false),
   });
   const pending = useQuery({
@@ -67,9 +74,9 @@ function useBacktestResultController() {
         if (action === 'recover') throw Error('没有待确认操作。');
         if (
           action === 'retry' &&
-          (current.status !== 'failed' || current.executionAttempt === undefined)
+          (!['failed', 'succeeded'].includes(current.status) || current.executionAttempt === undefined)
         )
-          throw Error('仅可重试轮次明确的失败 Run。');
+          throw Error('仅可对轮次明确的失败或已完成Run使用冻结输入重试。');
         if (action === 'cancel' && !isBacktestActive(current.status))
           throw Error('当前 Run 已终止，请重新读取。');
         if (
@@ -84,6 +91,7 @@ function useBacktestResultController() {
           kind: params.kind,
           action,
           expectedAttempt: current.executionAttempt ?? null,
+          expectedStatus: current.status,
         };
         await AsyncStorage.setItem(key, JSON.stringify(body));
         await pending.refetch();
@@ -93,13 +101,21 @@ function useBacktestResultController() {
       else if (action === 'recover') {
         throw Error('原操作尚未确认，可显式原样重试；查询失败不会补投。');
       } else {
-        if (body.action === 'retry' && current.status !== 'failed')
+        if (body.action === 'retry' && !['failed', 'succeeded'].includes(current.status))
           throw Error('当前状态不能重试，请读取原 Run。');
+        await client.cancelQueries({ queryKey: [...scope, 'backtest-run', params.kind, params.id] });
+        let receipt: MobileBacktestRun;
         if (params.kind === 'ordinary') {
-          if (body.action === 'retry') await runs.retryRun(params.id);
-          else await runs.cancelRun(params.id);
-        } else if (body.action === 'retry') await runs.retryNavRun(params.id);
-        else await runs.cancelNavRun(params.id);
+          if (body.action === 'retry') receipt = await runs.retryRun(params.id);
+          else receipt = await runs.cancelRun(params.id);
+        } else if (body.action === 'retry') receipt = await runs.retryNavRun(params.id);
+        else receipt = await runs.cancelNavRun(params.id);
+        client.setQueryData([...scope, 'backtest-run', params.kind, receipt.id], receipt);
+        if (receipt.id !== params.id) {
+          await AsyncStorage.removeItem(key);
+          navigation.replace('BacktestResult', { id: receipt.id, kind: params.kind });
+          return;
+        }
         setMessage('请求已确认，终态以重新读取结果为准。');
       }
       await AsyncStorage.removeItem(key);
@@ -134,6 +150,7 @@ function useBacktestResultController() {
   const controls = backtestActionControls(run, {busy:command.isPending,readFailed:query.isError,
     pending:Boolean(pending.data),pendingKnown:pending.isSuccess,reading:query.isFetching});
   return {
+    openRun: (id: string) => navigation.navigate('BacktestResult', { id, kind: params.kind }),
     controls,
     params,
     query,
@@ -179,7 +196,7 @@ export function BacktestResultScreen() {
       <QueryStatus query={pending} retry={() => void pending.refetch()} />
       {run ? (
         <>
-          <Section title={backtestStatusLabels[run.status]}>
+          <Section title={run.cancelRequestedAt && isBacktestActive(run.status) ? '正在取消' : backtestStatusLabels[run.status]}>
             <Copy>Run {run.id}</Copy>
             <Copy>策略版本 {run.strategyVersionId}</Copy>
             <Copy>
@@ -188,6 +205,9 @@ export function BacktestResultScreen() {
               · 执行轮次 {run.executionAttempt ?? '未记录'}
             </Copy>
             <Copy>冻结快照 {run.snapshotId ?? '尚未生成'}</Copy>
+            <Copy>{backtestStageDisplay(run.stage)}</Copy>
+            {run.replayOfRunId ? <Copy>冻结输入原Run：{run.replayOfRunId}</Copy> : null}
+            {run.replayOfRunId ? <Action label="查看原冻结输入Run" onPress={() => state.openRun(run.replayOfRunId!)} /> : null}
             {run.errorCode ? (
               <Copy>
                 {run.errorCode}：{run.errorSummary ?? '请查看运行诊断'}
@@ -218,7 +238,7 @@ export function BacktestResultScreen() {
             onPress={() => execute('cancel')}
           />
           <Action
-            label="重试失败回测"
+            label="使用冻结输入重试"
             disabled={!controls.retry}
             onPress={() => execute('retry')}
           />
@@ -274,6 +294,7 @@ function BacktestEconomicResult({
         <Copy key={i}>{v}</Copy>
       ))}
       {research && <PriceResearchResult result={result as BacktestResultV3} currency={currency} />}
+      <BacktestDailyOrders key={state.params.id} value={'dailyOrders' in result ? result.dailyOrders : undefined} unit={research ? '研究单位' : '实际股／份'} />
       <Choices
         label="权益曲线范围"
         value={range}
@@ -291,11 +312,11 @@ function BacktestEconomicResult({
       <Section title="回测指标">
         {Object.entries(result.metrics).map(([name, metric]) => (
           <Copy key={name}>
-            {name}：{metric.value ?? '不可用'}
-            {metric.reason ? ` · ${metric.reason}` : ''}
+            {backtestMetricDisplay(name, metric, currency).label}：{backtestMetricDisplay(name, metric, currency).value}
           </Copy>
         ))}
       </Section>
+      <BacktestRuleObservations value={'ruleDiagnostics' in result ? result.ruleDiagnostics : undefined} />
       <Action
         label="导出权益 CSV"
         disabled={exportCommand.isPending || query.isError}

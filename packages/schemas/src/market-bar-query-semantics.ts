@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /** 可执行日线的标准事实；覆盖、配置与本次结果仍分别验证。 */
 export const marketBarQuerySemanticsV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   operation: z.literal('query'),
   adjustment: z.enum(['none', 'qfq', 'hfq']),
   priceBasis: z.literal('provider-native'),

@@ -34,7 +34,7 @@ it.each(samples)('同版 N1 样例经实际新闻 reader：$name', async (sample
   const input = marketNewsRequestV3Schema.parse(sample.request);
   expect(await reader.news(input)).toEqual(sample.response);
   expect(post).toHaveBeenCalledOnce();
-  expect(post.mock.calls[0]?.[0]).toBe('/api/v3/thesis-ledger/market/news');
+  expect(post.mock.calls[0]?.[0]).toBe('/api/v1/thesis-ledger/market/news');
 });
 
 it.each(['id', 'evidenceGroupId'] as const)('拒绝格式合法但哈希错绑的 %s', (field) => {
@@ -59,7 +59,7 @@ function client() {
 it('DsaClient 使用 Data Token、单次 POST 和受请求预算约束的期限', async () => {
   const deadline = vi.spyOn(AbortSignal, 'timeout');
   const fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
-    expect(String(url)).toBe('https://dsa.example.test/api/v3/thesis-ledger/market/news');
+    expect(String(url)).toBe('https://dsa.example.test/api/v1/thesis-ledger/market/news');
     expect(init?.method).toBe('POST');
     expect((init?.headers as Record<string, string>).authorization).toBe(
       'Bearer controlled-data-token',

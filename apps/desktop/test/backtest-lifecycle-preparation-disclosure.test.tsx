@@ -1,26 +1,31 @@
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { runConfigSchemaV3 } from '@thesis-ledger/schemas';
+import {
+  marketLifecycleStatusEvidenceV1Schema,
+  runConfigSchemaV3,
+  type MarketLifecycleStatusEvidenceV1,
+} from '@thesis-ledger/schemas';
 import { BacktestLifecyclePreparationDisclosure } from '../src/features/strategy/BacktestLifecyclePreparationDisclosure.js';
 import { BacktestLifecycleResearchChoice } from '../src/features/strategy/BacktestLifecycleResearchChoice.js';
 import { lifecyclePreparationDiagnosticExport } from '../src/features/strategy/backtest-lifecycle-preparation-diagnostics.js';
-const config = () => {
+const config = (composition?: MarketLifecycleStatusEvidenceV1) => {
   const read = (name: string) =>
     JSON.parse(
       readFileSync(new URL(`../../../packages/schemas/fixtures/${name}`, import.meta.url), 'utf8'),
     );
   const model = read('backtest-execution-model.cn-2024q1.json');
+  const range = composition?.range ?? { start: '2026-05-10', end: '2026-05-22' };
   model.scope = {
     ...model.scope,
     market: 'CN',
-    symbol: '000995.SZ',
+    symbol: composition?.symbol ?? '000995.SZ',
     instrumentType: 'STOCK',
-    range: { start: '2026-05-10', end: '2026-05-22' },
+    range,
   };
   model.segments.forEach(
     (segment: { range: { start: string; end: string }; execution: Record<string, unknown> }) => {
-      segment.range = { start: '2026-05-10', end: '2026-05-22' };
+      segment.range = range;
       segment.execution.price = { kind: 'noDailyLimit', reason: '受控归一化研究' };
       segment.execution.normalizedExecution = {
         priceCoordinate: 'continuous-decimal',
@@ -33,9 +38,9 @@ const config = () => {
     },
   );
   const value = {
-    schemaVersion: '3',
-    startDate: '2026-05-10',
-    endDate: '2026-05-22',
+    schemaVersion: 'backtest-trade-config-v1',
+    startDate: range.start,
+    endDate: range.end,
     dataAsOf: '2026-06-01T00:00:00Z',
     baseCurrency: 'CNY',
     initialCash: { CNY: '100000' },
@@ -55,7 +60,7 @@ const config = () => {
   };
   value.lifecyclePreparation = {
     version: 'listed-bars-warmup-v1',
-    response: JSON.parse(
+    response: composition ?? JSON.parse(
       readFileSync(
         new URL(
           '../../../packages/schemas/fixtures/market-basic-lifecycle-v3.response.json',
@@ -67,7 +72,7 @@ const config = () => {
     inputHash: 'a'.repeat(64),
     priceResponseHash: 'b'.repeat(64),
     requiredWarmupBars: 2,
-    signalStartDate: '2026-05-20',
+    signalStartDate: composition?.range.start ?? '2026-05-20',
   };
   return runConfigSchemaV3.parse(value);
 };
@@ -96,6 +101,55 @@ describe('生命周期协议选择、结果和诊断披露', () => {
       requiredWarmupBars: 2,
       inputHash: 'a'.repeat(64),
       priceResponseHash: 'b'.repeat(64),
+    });
+  });
+  it('分别披露组合后的交易状态与基础日期来源', () => {
+    const { valid } = JSON.parse(readFileSync(new URL(
+      '../../../packages/schemas/test/fixtures/market-status-capabilities-v1.shared.json',
+      import.meta.url,
+    ), 'utf8'));
+    const status = valid.find((sample: { name: string }) => sample.name === 'DAILY_TRADING_STATUS');
+    const dates = valid.find((sample: { name: string }) => sample.name === 'SECURITY_BASIC_DATES');
+    dates.request.routeTarget.providerId = dates.result.routeTarget.providerId = 'fixture-dates';
+    const samples = [status, dates];
+    const evidence = marketLifecycleStatusEvidenceV1Schema.parse({
+      contract: 'market-lifecycle-status-evidence-v1',
+      symbol: status.result.symbol,
+      range: status.result.range,
+      basicLifecycle: dates.result.dates,
+      days: status.result.days,
+      composition: {
+        version: 'market-status-composition-v1',
+        policy: {
+          contractVersion: 1,
+          consumer: 'thesis-ledger',
+          requestId: 'controlled-life-policy',
+          revision: 7,
+          sourceDesiredRevision: 7,
+          enabled: true,
+          appliedAt: '2024-07-15T00:00:00Z',
+          routes: samples.map(({ request }) => ({
+            key: request.routeKey,
+            enabled: true,
+            reason: null,
+            targets: [{ ...request.routeTarget, eligible: true, reason: null }],
+          })),
+        },
+        entries: samples.map(({ request, result }) => {
+          const { routeTarget, policyRevision, ...query } = request;
+          return { query, requirement: 'optional', status: 'included', request, result };
+        }),
+      },
+    });
+    const value = config(evidence);
+    const html = renderToStaticMarkup(<BacktestLifecyclePreparationDisclosure config={value} />);
+    expect(html).toContain('日级交易状态 fixture-status / fixture-upstream');
+    expect(html).toContain('证券基础日期 fixture-dates / fixture-upstream');
+    expect(lifecyclePreparationDiagnosticExport(value, String)).toMatchObject({
+      lifecycleSources: [
+        { capability: 'DAILY_TRADING_STATUS', providerId: 'fixture-status' },
+        { capability: 'SECURITY_BASIC_DATES', providerId: 'fixture-dates' },
+      ],
     });
   });
 });

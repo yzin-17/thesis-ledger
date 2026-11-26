@@ -22,7 +22,7 @@ export class MarketReportMetadataService {
     if (identity.market !== 'CN' || identity.assetType !== 'STOCK' || !/^[0-9]{6}\.(SH|SZ)$/.test(identity.symbol))
       throw new BadRequestException('当前研报元数据只接收目录中的沪深股票');
     const request = {
-      ...query, contractVersion: 3 as const, consumer: 'thesis-ledger' as const,
+      ...query, contractVersion: 1 as const, consumer: 'thesis-ledger' as const,
       requestId: randomUUID(), symbol: identity.symbol, assetType: 'STOCK' as const,
     };
     const page = await readReportMetadata(this.dsa, request);

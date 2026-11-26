@@ -70,6 +70,8 @@ describe('保留数据升级计划', () => {
       '20261112020000_optimization_manual_retry',
       '20261112030000_arena_replay_timeline',
       '20261114010000_journal_period_review_snapshots',
+      '20261124143000_named_v1_ledger_envelope',
+      '20261124162500_named_v1_contract_boundary',
     ]);
   });
   it('仅列出当前 head 后的迁移且保留完整链摘要', () => {

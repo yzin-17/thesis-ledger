@@ -1,4 +1,8 @@
-export { canSelectCandidateForTest, canRevealTestMetrics, candidateAdoptionEligibility } from '@thesis-ledger/schemas';
+export {
+  canSelectCandidateForTest,
+  canRevealTestMetrics,
+  candidateAdoptionEligibility,
+} from '@thesis-ledger/schemas';
 import type {
   OptimizationCostSummary,
   OptimizationTradingCostReadModel,
@@ -37,7 +41,6 @@ export const metricRecord = (value: unknown) => {
 export const candidateMetric = (candidate: OptimizationCandidate, split: 'validation' | 'test') =>
   metricRecord(metricRecord(candidate.metrics)[split]);
 
-
 export const metricValue = (
   metrics: Record<string, unknown>,
   keys: string[],
@@ -51,8 +54,6 @@ export const metricValue = (
   }
   return '不可用';
 };
-
-
 
 export const experimentCostText = (summary: OptimizationCostSummary) => {
   const amount = summary.knownAmount;
@@ -105,6 +106,7 @@ export const experimentStopReasonText = (reason: string) => {
   if (reason === 'no_valid_candidate') return '所有候选均未通过验证';
   if (reason === 'model_format_failure') return '模型输出格式无效，未生成候选';
   if (reason === 'model_generation_failed') return '模型未生成可验证候选';
+  if (reason === 'model_capability_gap') return '模型报告能力缺口，未生成可回测候选';
   if (reason === 'user_cancelled') return '用户已取消实验';
   if (reason.startsWith('final_test_retry_required:')) return '封存测试部分发生技术失败';
   return `实验因技术或预算限制停止：${reason}`;
@@ -139,7 +141,11 @@ export function latestExperimentAdoption(
     const found = findStrategyVersion(strategies, candidate.adoptedStrategyVersionId);
     if (!found || found.version.version <= 0) continue;
     if (!latest || found.version.version > latest.version) {
-      latest = { id: found.version.id, strategyId: found.strategy.id, version: found.version.version };
+      latest = {
+        id: found.version.id,
+        strategyId: found.strategy.id,
+        version: found.version.version,
+      };
     }
   }
   return latest;

@@ -81,7 +81,7 @@ export async function executeFrozenResearchV2(input: Input) {
     return correlateResearchResultV2(
       authoritative,
       {
-        version: 2,
+        version: 'research-report-result-v1',
         inputFingerprint: authoritative.inputFingerprint,
         scopeSnapshot: authoritative.scopeSnapshot,
         createdAt: new Date().toISOString(),
@@ -105,7 +105,6 @@ export async function executeFrozenResearchV2(input: Input) {
     messages,
     startedAt: input.startedAt,
     signal: input.signal,
-    contractVersion: 'research-generation-v2',
     buildResult,
   });
 }

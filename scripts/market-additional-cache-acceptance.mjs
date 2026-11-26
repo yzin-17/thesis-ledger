@@ -108,7 +108,7 @@ async function main() {
     return;
   }
   const [state, providers, catalog] = await Promise.all([api.get('/api/market-data/policy'),
-    api.get('/api/market-data/providers'), api.get('/api/market-data/routes/capabilities?contractVersion=3')]);
+    api.get('/api/market-data/providers'), api.get('/api/market-data/routes/capabilities?contractVersion=1')]);
   const plan = createAdditionalCacheCase(state, providers.providers, catalog);
   if (!args.includes('--execute')) {
     console.log(JSON.stringify({ mode: 'read-only-preview', expectedPolicy: plan.baseline.revision,

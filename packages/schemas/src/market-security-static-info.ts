@@ -6,7 +6,7 @@ export const securityStaticSymbolSchema = marketQuoteSymbolSchema
   .refine(value => !value.startsWith('^') && (value.endsWith('.HK') || value.endsWith('.US')), '静态资料仅接入港美股票或 ETF');
 export const securityStaticAssetTypeSchema = z.enum(['STOCK', 'ETF']);
 export const securityStaticInfoRequestSchema = z.strictObject({
-  contractVersion: z.literal(3), consumer: z.literal('thesis-ledger'),
+  contractVersion: z.literal(1), consumer: z.literal('thesis-ledger'),
   requestId: z.string().trim().min(1), symbol: securityStaticSymbolSchema,
   assetType: securityStaticAssetTypeSchema,
 });

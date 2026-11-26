@@ -1,4 +1,8 @@
 import { DecimalValue } from './decimal.js';
+import { directionalIndicatorSteps } from './backtest-directional-indicator.js';
+import { finishBacktestComputation, mapBacktestComputationItems } from './backtest-computation.js';
+import type { BacktestTradePlan } from './backtest-trade-plan-contract.js';
+import { tradePlanProtectionRules } from './backtest-trade-protection.js';
 import { mergeBacktestAvailability } from './backtest-observation-clock.js';
 import {
   type BacktestSeriesPoint,
@@ -13,15 +17,9 @@ import {
 } from './backtest-contract.js';
 
 export type BacktestIndicatorName =
-  | 'MA'
-  | 'EMA'
-  | 'RSI'
-  | 'MACD'
-  | 'ATR'
-  | 'VWAP'
-  | 'Highest'
-  | 'Lowest';
-export type BacktestIndicatorOutput = 'value' | 'macd' | 'signal' | 'histogram';
+  'MA' | 'EMA' | 'RSI' | 'MACD' | 'ATR' | 'VWAP' | 'Highest' | 'Lowest' | 'ADX';
+export type BacktestIndicatorOutput =
+  'value' | 'macd' | 'signal' | 'histogram' | 'adx' | 'plusDI' | 'minusDI';
 
 export interface IndicatorPoint extends BacktestSeriesPoint {
   value?: string;
@@ -105,22 +103,26 @@ const stableOutput = (value: DecimalValue) => {
   return DecimalValue.from(`${integer}.${fraction.slice(0, DIVISION_SCALE)}`);
 };
 
-const rolling = (
+function* rolling(
   points: readonly BacktestSeriesPoint[],
   period: number,
   operation: (values: readonly DecimalValue[]) => DecimalValue,
-): IndicatorPoint[] =>
-  points.map((point, index) => {
+): Generator<void, IndicatorPoint[], void> {
+  return yield* mapBacktestComputationItems(points, (point, index) => {
     const window = contiguousWindow(points, index, period);
     if (!window) return unavailable(point, `warmup 或输入缺失：需要连续 ${period} 个值`);
     return available(point, operation(window.map((item) => numeric(item)!)), window);
   });
+}
 
-const ema = (points: readonly BacktestSeriesPoint[], period: number): IndicatorPoint[] => {
+function* ema(points: readonly BacktestSeriesPoint[], period: number): Generator<void, IndicatorPoint[], void> {
   const alpha = DecimalValue.from('2').dividedBy(String(period + 1), DIVISION_SCALE);
-  const output: IndicatorPoint[] = points.map((point) => unavailable(point, `warmup：需要 ${period} 个值`));
+  const output: IndicatorPoint[] = yield* mapBacktestComputationItems(points, (point) =>
+    unavailable(point, `warmup：需要 ${period} 个值`),
+  );
   let previous: IndicatorPoint | undefined;
   for (let index = 0; index < points.length; index += 1) {
+    yield;
     const window = contiguousWindow(points, index, period);
     if (!window) {
       previous = undefined;
@@ -134,20 +136,29 @@ const ema = (points: readonly BacktestSeriesPoint[], period: number): IndicatorP
       continue;
     }
     const value = previous
-      ? current.times(alpha).plus(DecimalValue.from(previous.value!).times(DecimalValue.from('1').minus(alpha)))
+      ? current
+          .times(alpha)
+          .plus(DecimalValue.from(previous.value!).times(DecimalValue.from('1').minus(alpha)))
       : average(window.map((item) => numeric(item)!));
-    output[index] = available(points[index]!, value, previous ? [points[index]!, previous] : window);
+    output[index] = available(
+      points[index]!,
+      value,
+      previous ? [points[index]!, previous] : window,
+    );
     previous = output[index];
   }
   return output;
-};
+}
 
-const rsi = (points: readonly BacktestSeriesPoint[], period: number): IndicatorPoint[] => {
-  const output: IndicatorPoint[] = points.map((point) => unavailable(point, `warmup：需要 ${period + 1} 个值`));
+function* rsi(points: readonly BacktestSeriesPoint[], period: number): Generator<void, IndicatorPoint[], void> {
+  const output: IndicatorPoint[] = yield* mapBacktestComputationItems(points, (point) =>
+    unavailable(point, `warmup：需要 ${period + 1} 个值`),
+  );
   let averageGain: DecimalValue | undefined;
   let averageLoss: DecimalValue | undefined;
   let previous: IndicatorPoint | undefined;
   for (let index = 0; index < points.length; index += 1) {
+    yield;
     const window = points.slice(index - period, index + 1);
     if (window.length !== period + 1 || window.some((point) => numeric(point) === undefined)) {
       averageGain = undefined;
@@ -156,13 +167,25 @@ const rsi = (points: readonly BacktestSeriesPoint[], period: number): IndicatorP
       output[index] = unavailable(points[index]!, `warmup 或输入缺失：需要连续 ${period + 1} 个值`);
       continue;
     }
-    const changes = window.slice(1).map((point, offset) =>
-      numeric(point)!.minus(numeric(window[offset]!)!),
-    );
+    const changes = window
+      .slice(1)
+      .map((point, offset) => numeric(point)!.minus(numeric(window[offset]!)!));
     const gains = changes.map((change) => (change.isPositive() ? change : DecimalValue.from('0')));
-    const losses = changes.map((change) => (change.isNegative() ? change.times('-1') : DecimalValue.from('0')));
-    averageGain = averageGain ? averageGain.times(String(period - 1)).plus(gains.at(-1)!).dividedBy(String(period), DIVISION_SCALE) : average(gains);
-    averageLoss = averageLoss ? averageLoss.times(String(period - 1)).plus(losses.at(-1)!).dividedBy(String(period), DIVISION_SCALE) : average(losses);
+    const losses = changes.map((change) =>
+      change.isNegative() ? change.times('-1') : DecimalValue.from('0'),
+    );
+    averageGain = averageGain
+      ? averageGain
+          .times(String(period - 1))
+          .plus(gains.at(-1)!)
+          .dividedBy(String(period), DIVISION_SCALE)
+      : average(gains);
+    averageLoss = averageLoss
+      ? averageLoss
+          .times(String(period - 1))
+          .plus(losses.at(-1)!)
+          .dividedBy(String(period), DIVISION_SCALE)
+      : average(losses);
     const value = averageLoss.isZero()
       ? DecimalValue.from('100')
       : DecimalValue.from('100').minus(
@@ -171,48 +194,57 @@ const rsi = (points: readonly BacktestSeriesPoint[], period: number): IndicatorP
             DIVISION_SCALE,
           ),
         );
-    output[index] = available(points[index]!, value,
-      previous && period > 1 ? [previous, points[index - 1]!, points[index]!] : window);
+    output[index] = available(
+      points[index]!,
+      value,
+      previous && period > 1 ? [previous, points[index - 1]!, points[index]!] : window,
+    );
     previous = output[index];
   }
   return output;
-};
+}
 
 const trueRange = (points: readonly BacktestSeriesPoint[], index: number) => {
   const point = points[index]!;
   if (point.status === 'unavailable') return undefined;
   try {
-  const high = point.high ? DecimalValue.from(point.high) : numeric(point);
-  const low = point.low ? DecimalValue.from(point.low) : numeric(point);
-  const close = point.close ? DecimalValue.from(point.close) : numeric(point);
-  if (!high || !low || !close) return undefined;
-  if (high.isNegative() || low.isNegative() || close.isNegative() || high.compareTo(low) < 0) return undefined;
-  if (index === 0) return high.minus(low);
-  const previous = points[index - 1]!;
-  if (previous.status === 'unavailable') return undefined;
-  const previousClose = previous.close ? DecimalValue.from(previous.close) : numeric(previous);
-  if (!previousClose || previousClose.isNegative()) return undefined;
-  const highLow = high.minus(low);
-  const highPrevious = absolute(high.minus(previousClose));
-  const lowPrevious = absolute(low.minus(previousClose));
-  return [highLow, highPrevious, lowPrevious].sort((left, right) => right.compareTo(left))[0]!;
+    const high = point.high ? DecimalValue.from(point.high) : numeric(point);
+    const low = point.low ? DecimalValue.from(point.low) : numeric(point);
+    const close = point.close ? DecimalValue.from(point.close) : numeric(point);
+    if (!high || !low || !close) return undefined;
+    if (high.isNegative() || low.isNegative() || close.isNegative() || high.compareTo(low) < 0)
+      return undefined;
+    if (index === 0) return high.minus(low);
+    const previous = points[index - 1]!;
+    if (previous.status === 'unavailable') return undefined;
+    const previousClose = previous.close ? DecimalValue.from(previous.close) : numeric(previous);
+    if (!previousClose || previousClose.isNegative()) return undefined;
+    const highLow = high.minus(low);
+    const highPrevious = absolute(high.minus(previousClose));
+    const lowPrevious = absolute(low.minus(previousClose));
+    return [highLow, highPrevious, lowPrevious].sort((left, right) => right.compareTo(left))[0]!;
   } catch {
     return undefined;
   }
 };
 
-const atr = (points: readonly BacktestSeriesPoint[], period: number): IndicatorPoint[] => {
-  const ranges = points.map((point, index) => {
+function* atr(points: readonly BacktestSeriesPoint[], period: number): Generator<void, IndicatorPoint[], void> {
+  const ranges = yield* mapBacktestComputationItems(points, (point, index) => {
     const value = trueRange(points, index);
-    return value ? { ...point, value: value.toString(), status: 'available' as const,
-      ...mergeBacktestAvailability(index === 0 ? [point] : [points[index - 1]!, point]),
-    } : unavailable(point, 'OHLC 输入 unavailable');
+    return value
+      ? {
+          ...point,
+          value: value.toString(),
+          status: 'available' as const,
+          ...mergeBacktestAvailability(index === 0 ? [point] : [points[index - 1]!, point]),
+        }
+      : unavailable(point, 'OHLC 输入 unavailable');
   });
-  return rolling(ranges, period, average);
-};
+  return yield* rolling(ranges, period, average);
+}
 
-const vwap = (points: readonly BacktestSeriesPoint[], period: number): IndicatorPoint[] =>
-  points.map((point, index) => {
+function* vwap(points: readonly BacktestSeriesPoint[], period: number): Generator<void, IndicatorPoint[], void> {
+  return yield* mapBacktestComputationItems(points, (point, index) => {
     const window = contiguousWindow(points, index, period);
     if (!window || window.some((item) => !item.volume)) {
       return unavailable(point, `warmup 或 volume 缺失：需要连续 ${period} 个值`);
@@ -222,32 +254,32 @@ const vwap = (points: readonly BacktestSeriesPoint[], period: number): Indicator
     const totalValue = sum(window.map((item) => numeric(item)!.times(item.volume!)));
     return available(point, totalValue.dividedBy(totalVolume, DIVISION_SCALE), window);
   });
+}
 
-const macd = (
+function* macd(
   points: readonly BacktestSeriesPoint[],
   params: Record<string, number | string>,
   output: Exclude<BacktestIndicatorOutput, 'value'>,
-): IndicatorPoint[] => {
+): Generator<void, IndicatorPoint[], void> {
   const fastPeriod = periodValue(params, 'fastPeriod');
   const slowPeriod = periodValue(params, 'slowPeriod');
   const signalPeriod = periodValue(params, 'signalPeriod');
   if (fastPeriod >= slowPeriod) throw new Error('MACD fastPeriod 必须小于 slowPeriod');
-  const fast = ema(points, fastPeriod);
-  const slow = ema(points, slowPeriod);
-  const line: IndicatorPoint[] = points.map((point, index) => {
+  const fast = yield* ema(points, fastPeriod);
+  const slow = yield* ema(points, slowPeriod);
+  const line: IndicatorPoint[] = yield* mapBacktestComputationItems(points, (point, index) => {
     const fastPoint = fast[index];
     const slowPoint = slow[index];
     if (fastPoint?.status !== 'available' || slowPoint?.status !== 'available') {
       return unavailable(point, `warmup：需要 ${slowPeriod} 个值`);
     }
-    return available(
-      point,
-      DecimalValue.from(fastPoint.value!).minus(slowPoint.value!),
-      [fastPoint, slowPoint],
-    );
+    return available(point, DecimalValue.from(fastPoint.value!).minus(slowPoint.value!), [
+      fastPoint,
+      slowPoint,
+    ]);
   });
-  const signal = ema(line, signalPeriod);
-  return points.map((point, index) => {
+  const signal = yield* ema(line, signalPeriod);
+  return yield* mapBacktestComputationItems(points, (point, index) => {
     const linePoint = line[index]!;
     const signalPoint = signal[index]!;
     if (linePoint.status !== 'available' || signalPoint.status !== 'available') {
@@ -265,9 +297,14 @@ const macd = (
   });
 };
 
-const requiredIndicatorLookback = (name: BacktestIndicatorName, period: number, params: Record<string, number | string>) => {
+const requiredIndicatorLookback = (
+  name: BacktestIndicatorName,
+  period: number,
+  params: Record<string, number | string>,
+) => {
   if (name === 'RSI' || name === 'ATR') return period + 1;
-  if (name === 'MACD') return periodValue(params, 'slowPeriod') + periodValue(params, 'signalPeriod') - 1;
+  if (name === 'MACD')
+    return periodValue(params, 'slowPeriod') + periodValue(params, 'signalPeriod') - 1;
   return period;
 };
 
@@ -275,49 +312,60 @@ export const indicatorRequiredLookback = (
   name: BacktestIndicatorName,
   params: Record<string, number | string>,
 ) => {
+  if (name === 'ADX') return periodValue(params, 'period') * 2;
   if (name === 'MACD') return requiredIndicatorLookback(name, 1, params);
   return requiredIndicatorLookback(name, periodValue(params, 'period'), params);
 };
 
-export const evaluateIndicator = (
+export function* evaluateIndicatorSteps(
   name: BacktestIndicatorName,
   points: readonly BacktestSeriesPoint[],
   params: Record<string, number | string>,
   options: EvaluateIndicatorOptions = {},
-): IndicatorResult => {
-  const ordered = [...points].sort((left, right) => dateValue(left.occurredAt) - dateValue(right.occurredAt));
-  const period = name === 'MACD' ? periodValue(params, 'slowPeriod') : periodValue(params, 'period');
+): Generator<void, IndicatorResult, void> {
+  const ordered = [...points].sort(
+    (left, right) => dateValue(left.occurredAt) - dateValue(right.occurredAt),
+  );
+  const period =
+    name === 'MACD' ? periodValue(params, 'slowPeriod') : periodValue(params, 'period');
   const output = options.output ?? 'value';
   let values: IndicatorPoint[];
   switch (name) {
+    case 'ADX':
+      values = yield* mapBacktestComputationItems(yield* directionalIndicatorSteps(
+        ordered,
+        period,
+        output === 'plusDI' || output === 'minusDI' ? output : 'adx',
+      ), (point) => ({ ...point, status: point.status ?? 'unavailable' }));
+      break;
     case 'MA':
-      values = rolling(ordered, period, average);
+      values = yield* rolling(ordered, period, average);
       break;
     case 'EMA':
-      values = ema(ordered, period);
+      values = yield* ema(ordered, period);
       break;
     case 'RSI':
-      values = rsi(ordered, period);
+      values = yield* rsi(ordered, period);
       break;
     case 'ATR':
-      values = atr(ordered, period);
+      values = yield* atr(ordered, period);
       break;
     case 'VWAP':
-      values = vwap(ordered, period);
+      values = yield* vwap(ordered, period);
       break;
     case 'Highest':
-      values = rolling(ordered, period, (items) =>
+      values = yield* rolling(ordered, period, (items) =>
         items.reduce((highest, item) => (highest.compareTo(item) >= 0 ? highest : item)),
       );
       break;
     case 'Lowest':
-      values = rolling(ordered, period, (items) =>
+      values = yield* rolling(ordered, period, (items) =>
         items.reduce((lowest, item) => (lowest.compareTo(item) <= 0 ? lowest : item)),
       );
       break;
     case 'MACD': {
       const selectedOutput = output === 'value' ? 'macd' : output;
-      values = macd(ordered, params, selectedOutput);
+      values = yield* macd(ordered, params, selectedOutput);
       break;
     }
   }
@@ -330,7 +378,9 @@ export const evaluateIndicator = (
       ? values.filter((point) => dateValue(point.occurredAt) >= dateValue(options.startDate!))
       : values,
   };
-};
+}
+
+export const evaluateIndicator = (...input: Parameters<typeof evaluateIndicatorSteps>) => finishBacktestComputation(evaluateIndicatorSteps(...input));
 
 export const evaluateIndicatorWithWarmup = (
   name: BacktestIndicatorName,
@@ -346,8 +396,42 @@ export const evaluateIndicatorWithWarmup = (
 };
 
 const expressionLookback = (expression: Expression): number => {
-  if (expression.type === 'constant' || expression.type === 'series' || expression.type === 'positionState') return 1;
-  if (expression.type === 'corporateActionEvent') return 1;
+  if (expression.type === 'confirmedPivot')
+    return (
+      Math.max(
+        expressionLookback(expression.input),
+        expression.sample ? expressionLookback(expression.sample) : 1,
+      ) +
+      expression.leftBars +
+      expression.rightBars +
+      expression.offset * (expression.leftBars + 1)
+    );
+  if (expression.type === 'eventValue') return 1;
+  if (expression.type === 'sequence')
+    return (
+      Math.max(
+        temporalConditionLookback(expression.trigger),
+        temporalConditionLookback(expression.confirm),
+        temporalConditionLookback(expression.invalidation),
+        expression.capture ? expressionLookback(expression.capture) : 1,
+      ) + expression.within
+    );
+  if (expression.type === 'countTrue' || expression.type === 'consecutive')
+    return temporalConditionLookback(expression.condition) + expression.periods - 1;
+  if (expression.type === 'rolling')
+    return expressionLookback(expression.input) + expression.periods - 1;
+  if (expression.type === 'cumulative') return expressionLookback(expression.input);
+  if (expression.type === 'arithmetic')
+    return Math.max(expressionLookback(expression.left), expressionLookback(expression.right));
+  if (expression.type === 'absolute') return expressionLookback(expression.input);
+  if (expression.type === 'lag') return expressionLookback(expression.input) + expression.periods;
+  if (
+    expression.type === 'constant' ||
+    expression.type === 'series' ||
+    expression.type === 'positionState'
+  )
+    return 1;
+  if (expression.type === 'corporateActionEvent' || expression.type === 'sessionValue') return 1;
   if (expression.type === 'all' || expression.type === 'any') {
     return Math.max(...expression.conditions.map(expressionLookback));
   }
@@ -361,6 +445,14 @@ const expressionLookback = (expression: Expression): number => {
 };
 
 export const requiredLookback = expressionLookback;
+function temporalConditionLookback(expression: BooleanExpression): number {
+  if (expression.type === 'cross')
+    return Math.max(expressionLookback(expression.left), expressionLookback(expression.right)) + 1;
+  if (expression.type === 'all' || expression.type === 'any')
+    return Math.max(...expression.conditions.map(temporalConditionLookback));
+  if (expression.type === 'not') return temporalConditionLookback(expression.expression);
+  return expressionLookback(expression);
+}
 export const requiredLookbackForExpression = expressionLookback;
 
 export interface ExpressionLookback {
@@ -372,15 +464,41 @@ export interface ExpressionLookback {
 export const strategyRequiredLookback = (strategy: {
   entry: Expression;
   exit: Expression;
+  tradePlan?: BacktestTradePlan | undefined;
+  execution?: unknown;
 }): ExpressionLookback => {
   const entry = expressionLookback(strategy.entry);
   const exit = expressionLookback(strategy.exit);
-  return { entry, exit, required: Math.max(entry, exit) };
+  const stop = strategy.tradePlan?.initialStop;
+  const trailing = strategy.tradePlan?.trailing;
+  const conditions = tradePlanProtectionRules(strategy.tradePlan).map(({ expression }) =>
+    expressionLookback(expression),
+  );
+  return {
+    entry,
+    exit,
+    required: Math.max(
+      entry,
+      exit,
+      ...conditions,
+      ...dailyOrderPriceExpressions(strategy.execution).map(({ expression }) =>
+        expressionLookback(expression),
+      ),
+      stop?.kind === 'entryAtr' ? indicatorRequiredLookback('ATR', { period: stop.period }) : 1,
+      trailing?.kind === 'currentAtr'
+        ? indicatorRequiredLookback('ATR', { period: trailing.period })
+        : 1,
+      (strategy.tradePlan?.volatilityTarget?.returnPeriods ?? 0) + 1,
+    ),
+  };
 };
 
-export const indicatorPointToSeriesPoint = (point: IndicatorPoint): BacktestSeriesPoint => ({ ...point });
+export const indicatorPointToSeriesPoint = (point: IndicatorPoint): BacktestSeriesPoint => ({
+  ...point,
+});
 
 // Keep the imported BooleanExpression visible in the public type surface for
 // consumers that narrow AST expressions before calling requiredLookback.
 export type BacktestBooleanExpression = BooleanExpression;
 export type BacktestNumericExpression = NumericExpression;
+import { dailyOrderPriceExpressions } from './backtest-daily-order-expressions.js';

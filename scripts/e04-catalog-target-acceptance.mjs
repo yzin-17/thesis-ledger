@@ -130,10 +130,10 @@ try {
    ...(body===undefined?{}:{body:JSON.stringify(body)})});return response.status;
  };
  for(const cursor of ['0','generation:0','v2:1'])for(const kind of ['snapshot','delta']) {
-  assert.equal(await call('/api/v3/thesis-ledger/catalog/'+kind+'?cursor='+encodeURIComponent(cursor),'GET',undefined,false),409);oldCursor+=1;
+  assert.equal(await call('/api/v1/thesis-ledger/catalog/'+kind+'?cursor='+encodeURIComponent(cursor),'GET',undefined,false),409);oldCursor+=1;
  }
  for(const contractVersion of [1,2])for(const action of ['jobs','ack']) {
-  assert.equal(await call('/api/v3/thesis-ledger/control/catalog/'+action,'POST',{contractVersion,consumer:'thesis-ledger',requestId:'reject-old',generation:snapshot.generation,checksum:snapshot.checksum}),422);oldBody+=1;
+  assert.equal(await call('/api/v1/thesis-ledger/control/catalog/'+action,'POST',{contractVersion,consumer:'thesis-ledger',requestId:'reject-old',generation:snapshot.generation,checksum:snapshot.checksum}),422);oldBody+=1;
  }
  for(const prefix of ['/api/v1/thesis-ledger','/api/v2/thesis-ledger']) {
   for(const suffix of ['/catalog/snapshot','/catalog/delta?cursor='+encodeURIComponent(snapshot.cursor),'/control/catalog/jobs/'+job.id]) {

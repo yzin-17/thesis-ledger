@@ -5,6 +5,7 @@ import { PrismaService } from '../../src/platform/prisma.service.js';
 import { StrategyRiskContextService } from '../../src/risk/strategy-risk-context.service.js';
 import { StrategyRiskApplicationService } from '../../src/strategy-optimization/strategy-risk-application.service.js';
 import { StrategyRiskApplicationStoreService } from '../../src/strategy-optimization/strategy-risk-application-store.service.js';
+import { controlledMarketSession } from '../market/market-session.fixture.js';
 import { createStrategyFixture } from './strategy-optimization-postgres-fixtures.js';
 
 const databaseUrl = process.env.RISK_ADOPTION_TEST_DATABASE_URL;
@@ -29,23 +30,32 @@ function riskAdoptionContext() {
     datasources: { db: { url: databaseUrl ?? 'postgresql://localhost/risk_adoption_fixture' } },
   });
   const bars = {
-    read: vi.fn(async () => ({
-      provenance: { providerId: 'fixture' },
-      points: [
-        {
-          timestamp: '2026-09-08T00:00:00Z',
-          availableAt: '2026-09-08T07:00:00Z',
-          open: '184',
-          high: '184',
-          low: '184',
-          close: '184',
-          volume: '100',
-          amount: '18400',
+    readV3: vi.fn(async () => ({
+      status: 'selected',
+      selection: {
+        response: {
+          provenance: { providerId: 'fixture' },
+          bars: [
+            {
+              timestamp: '2026-09-08T00:00:00Z',
+              availableAt: '2026-09-08T07:00:00Z',
+              open: '184',
+              high: '184',
+              low: '184',
+              close: '184',
+              volume: '100',
+              amount: '18400',
+            },
+          ],
         },
-      ],
+      },
     })),
   };
-  const contexts = new StrategyRiskContextService(prisma, bars as never);
+  const contexts = new StrategyRiskContextService(
+    prisma,
+    bars as never,
+    { getSession: controlledMarketSession } as never,
+  );
   const store = new StrategyRiskApplicationStoreService(prisma);
   const service = new StrategyRiskApplicationService(prisma, contexts, store, {} as never);
   const accountId = randomUUID();
@@ -202,7 +212,8 @@ function riskAdoptionContext() {
 
 function registerRiskAdoptionCostAndRevision(suiteContext: ReturnType<typeof riskAdoptionContext>) {
   it('以实际成本评价并持久化百分比规则，不改写真实持仓和账本', async () => {
-    const { prisma, bars, store, service, accountId, symbol, strategyVersionId, witness } = suiteContext;
+    const { prisma, bars, store, service, accountId, symbol, strategyVersionId, witness } =
+      suiteContext;
 
     const before = await witness();
     const input = { accountId, symbol, strategyVersionId, cycleMode: 'existingAndFuture' };
@@ -228,8 +239,10 @@ function registerRiskAdoptionCostAndRevision(suiteContext: ReturnType<typeof ris
     expect(rules[0]!.threshold.toString()).toBe('-0.08');
     expect(JSON.stringify(rules)).not.toContain('1000000');
     expect(await witness()).toEqual(before);
-    expect(bars.read).toHaveBeenCalledWith(
-      expect.objectContaining({ identity: expect.objectContaining({ adjustment: 'none' }) }),
+    expect(bars.readV3).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeKey: expect.objectContaining({ adjustment: 'none', capability: 'DAILY_BAR' }),
+      }),
     );
   });
   it('真实成本变化使旧预览失效，拒绝新增或覆盖既有规则', async () => {

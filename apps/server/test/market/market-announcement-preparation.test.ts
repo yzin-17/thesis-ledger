@@ -9,7 +9,7 @@ const pending = { status: 'preparing', total: 1, completed: 0, failed: 0, matche
 const fixture = () => {
   const dsa = {
     effectiveControlPolicyV3: vi.fn(async () => ({ projection: { effective: { enabled: true,
-      routes: [{ key: { market: 'CN', assetType: 'STOCK', capability: 'HISTORICAL_TRADING_STATUS' },
+      routes: [{ key: { market: 'CN', assetType: 'STOCK', capability: 'DAILY_PRICE_RULE' },
         targets: [{ providerId: 'official-states', upstreamSource: 'cn-stock-risk-price-limits', eligible: true }] }] } } })),
     control: vi.fn<(path: string, init: { body: string }) => Promise<typeof pending>>(async () => pending),
   };

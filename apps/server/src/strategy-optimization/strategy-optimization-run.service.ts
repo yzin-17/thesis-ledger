@@ -5,10 +5,12 @@ import { evaluateOptimizationResult, invalidOptimizationComparison } from './str
 export { calculateOptimizationScore } from './strategy-optimization-evaluation.js';
 import { BacktestService } from '../backtest/backtest.service.js';
 import { assertCurrentRunForRead } from '../backtest/backtest-current-run-read.js';
+import { requireOptimizationPriceResearch, RESEARCH_STRATEGY_SPACE_VERSION } from './strategy-optimization-research.js';
 import { BacktestConfiguredRunService } from '../backtest/backtest-configured-run.service.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import {
   optimizationRemainingDurationMs,
+  optimizationDataArtifactFingerprint,
   toRecord,
   type EvaluationSummary,
   type ExperimentRow,
@@ -36,6 +38,11 @@ export class StrategyOptimizationRunService {
 
   async assertFrozenResearchBudget(experiment: ExperimentRow) {
     if (!this.configuredRuns) throw new BadRequestException('配置预检服务未就绪');
+    const config = runConfigSchemaV3.parse(experiment.runConfig);
+    if (config.priceResearch) requireOptimizationPriceResearch(config, {
+      legacy: !config.priceResearch.dataScope && experiment.strategySpaceVersion !== RESEARCH_STRATEGY_SPACE_VERSION,
+      strategySpaceVersion: experiment.strategySpaceVersion,
+    });
     await this.configuredRuns.assertFrozenResearchBudget(experiment.baselineStrategyVersionId, experiment.runConfig);
   }
 
@@ -77,10 +84,6 @@ export class StrategyOptimizationRunService {
     `);
     if (updated !== 1)
       throw new BadRequestException('优化实验预算或最长运行时长已耗尽，或实验已取消');
-  }
-
-  conservativeInputTokenReservation(messages: unknown[]) {
-    return Buffer.byteLength(JSON.stringify(messages), 'utf8');
   }
 
   outputTokenReservation(experiment: ExperimentRow) {
@@ -262,8 +265,9 @@ export class StrategyOptimizationRunService {
     return terminal;
   }
 
-  dataArtifactFingerprint(job: BacktestJob, range: { start: string; end: string }) {
-    return this.backtests.comparableDataFingerprint(job.id, range);
+  async dataArtifactFingerprint(job: BacktestJob, range: { start: string; end: string }) {
+    const data = await this.backtests.comparableDataFingerprint(job.id, range);
+    return optimizationDataArtifactFingerprint(data, toRecord(job.result));
   }
 
   async requireCompletedRun(id: string, label: string) {

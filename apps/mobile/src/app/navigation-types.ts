@@ -104,6 +104,6 @@ export type ResearchStackParams = {
   JournalEvidence: JournalScope & { kind: 'object' | 'period'; runId: string; toolCallId: string };
   ResearchReport: ReportScope;
   ResearchEvidence: ReportScope & { referenceId: string };
-  ResearchSubmit: { retryRunId?: string; instrumentId?: string } | undefined;
+  ResearchSubmit: { prefill?: Pick<import('@thesis-ledger/schemas').ResearchSubmissionV2, 'scope' | 'question' | 'templateId'>; instrumentId?: string } | undefined;
   ResearchReview: ReportScope;
 };

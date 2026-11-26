@@ -8,7 +8,7 @@ import { marketRouteTargetSchema } from './market-route-target.js';
 
 /** Independent Control endpoint. Data contract negotiation remains on its own wire. */
 export const marketRouteCatalogGetEndpointV3 =
-  '/api/v3/thesis-ledger/control/routes/capabilities?contractVersion=3';
+  '/api/v1/thesis-ledger/control/routes/capabilities?contractVersion=1';
 
 const catalogEntry = marketRouteCapabilityV3Schema.safeExtend({
   target: marketRouteTargetSchema.strict(),
@@ -39,7 +39,7 @@ const entries = z.array(catalogEntry).superRefine((capabilities, context) => {
 
 /** `partial` rows remain descriptive evidence, but cannot be consumed as readiness. */
 export const marketRouteCatalogV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   catalogRevision: z.number().int().positive(),
   generatedAt: z.iso.datetime({ offset: true }),

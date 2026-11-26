@@ -1,4 +1,7 @@
-import { arenaGenerationContracts, arenaGenerationRefSchemas } from './arena-generation-contracts.js';
+import {
+  arenaGenerationContracts,
+  arenaGenerationRefSchemas,
+} from './arena-generation-contracts.js';
 import { z } from 'zod';
 import { aiTimeoutDecisionSchema } from './ai-timeout-decision.js';
 import { aiModelRequestOptionsSchema } from './ai-model-request-options.js';
@@ -33,18 +36,16 @@ export {
 import { nonNegativeDecimalStringSchema } from './monetary-values.js';
 import {
   authoringAnalysisOutputSchema,
-  authoringGenerationOutputSchema,
-  authoringModificationOutputSchema,
 } from './strategy-authoring-generation.js';
 import { aiResearchContextSchema, aiResearchTemplateIdSchema } from './ai.js';
-import {
-  optimizationDiscoveryGenerationOutputSchema,
-  optimizationProposalSchema,
-} from './strategy-optimization.js';
+import { researchGenerationV2Contract } from './research-result-v2.js';
+import { optimizationProposalSchema } from './strategy-optimization.js';
+import { authoringGenerationOutputV6Schema, authoringModificationOutputV6Schema,
+  discoveryGenerationResultV6Schema } from './strategy-generation-v6.js';
 
 export const AI_PARAMETER_OPTIMIZATION_CONTRACT_VERSION = 'optimization-parameter-v1' as const;
-export const AI_STRATEGY_DISCOVERY_CONTRACT_VERSION = 'strategy-discovery-v2' as const;
-export const AI_RESEARCH_GENERATION_CONTRACT_VERSION = 'research-generation-v1' as const;
+export const AI_STRATEGY_DISCOVERY_CONTRACT_VERSION = 'strategy-discovery-generation-v1' as const;
+export const AI_RESEARCH_GENERATION_CONTRACT_VERSION = researchGenerationV2Contract.ref.version;
 
 export const aiLegacyAdapterSchema = z.enum(['openrouter', 'openai-compatible']);
 export type AiLegacyAdapter = z.infer<typeof aiLegacyAdapterSchema>;
@@ -61,7 +62,15 @@ export type AiAdapter = z.infer<typeof aiAdapterSchema>;
 export const aiGenerationModeSchema = z.enum(['native_schema', 'json_validated', 'json_mode']);
 export type AiGenerationMode = z.infer<typeof aiGenerationModeSchema>;
 
-export const aiReasoningEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+export const aiReasoningEffortSchema = z.enum([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+]);
 
 export const aiAuthModeSchema = z.enum(['api_key', 'none']);
 export type AiAuthMode = z.infer<typeof aiAuthModeSchema>;
@@ -89,19 +98,19 @@ export const aiGenerationContractRefSchema = z.discriminatedUnion('id', [
   z
     .object({
       id: z.literal('strategy_authoring_analysis'),
-      version: z.literal('authoring-analysis-v1'),
+      version: z.literal('strategy-authoring-analysis-v1'),
     })
     .strict(),
   z
     .object({
       id: z.literal('strategy_authoring_generation'),
-      version: z.enum(['authoring-generation-v1', 'authoring-generation-v2']),
+      version: z.literal('strategy-authoring-generation-v1'),
     })
     .strict(),
   z
     .object({
       id: z.literal('strategy_authoring_modification'),
-      version: z.enum(['authoring-modification-v1', 'authoring-modification-v2']),
+      version: z.literal('strategy-authoring-modification-v1'),
     })
     .strict(),
   z
@@ -120,14 +129,14 @@ export const aiGenerationContractRefSchema = z.discriminatedUnion('id', [
   z
     .object({
       id: z.literal('research'),
-      version: z.enum([AI_RESEARCH_GENERATION_CONTRACT_VERSION, 'research-generation-v2']),
+      version: z.literal(AI_RESEARCH_GENERATION_CONTRACT_VERSION),
     })
     .strict(),
 ]);
 export type AiGenerationContractRef = z.infer<typeof aiGenerationContractRefSchema>;
 
 export const aiParameterOptimizationGenerationSchema = optimizationProposalSchema;
-export const aiStrategyDiscoveryGenerationSchema = optimizationDiscoveryGenerationOutputSchema;
+export const aiStrategyDiscoveryGenerationSchema = discoveryGenerationResultV6Schema;
 
 export const aiResearchGenerationCitationSchema = z
   .object({
@@ -168,23 +177,23 @@ export const aiGenerationContracts = {
   authoringAnalysis: {
     ref: {
       id: 'strategy_authoring_analysis',
-      version: 'authoring-analysis-v1',
+      version: 'strategy-authoring-analysis-v1',
     } satisfies AiGenerationContractRef,
     schema: authoringAnalysisOutputSchema,
   },
   authoringGeneration: {
     ref: {
       id: 'strategy_authoring_generation',
-      version: 'authoring-generation-v2',
+      version: 'strategy-authoring-generation-v1',
     } satisfies AiGenerationContractRef,
-    schema: authoringGenerationOutputSchema,
+    schema: authoringGenerationOutputV6Schema,
   },
   authoringModification: {
     ref: {
       id: 'strategy_authoring_modification',
-      version: 'authoring-modification-v2',
+      version: 'strategy-authoring-modification-v1',
     } satisfies AiGenerationContractRef,
-    schema: authoringModificationOutputSchema,
+    schema: authoringModificationOutputV6Schema,
   },
   parameterOptimization: {
     ref: {
@@ -201,13 +210,7 @@ export const aiGenerationContracts = {
     } satisfies AiGenerationContractRef,
     schema: aiStrategyDiscoveryGenerationSchema,
   },
-  research: {
-    ref: {
-      id: 'research',
-      version: AI_RESEARCH_GENERATION_CONTRACT_VERSION,
-    } satisfies AiGenerationContractRef,
-    schema: aiResearchGenerationSchema,
-  },
+  research: researchGenerationV2Contract,
 } as const;
 
 export const aiUsageStatusSchema = z.enum(['reported', 'partial', 'unknown']);
@@ -451,10 +454,14 @@ export const aiProviderModelExecutionSchema = z
   .strict()
   .superRefine((value, context) => {
     if (value.reasoningEnabled !== undefined && value.reasoningEffort !== undefined)
-      context.addIssue({ code: 'custom', path: ['reasoningEffort'], message: '推理开关和推理强度不能同时指定' });
+      context.addIssue({
+        code: 'custom',
+        path: ['reasoningEffort'],
+        message: '推理开关和推理强度不能同时指定',
+      });
     if (
       value.reasoningEnabled !== undefined &&
-      (value.contract.id !== 'research' || value.contract.version !== 'research-generation-v2')
+      (value.contract.id !== 'research' || value.contract.version !== 'research-report-generation-v1')
     )
       context.addIssue({
         code: 'custom',

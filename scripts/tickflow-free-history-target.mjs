@@ -69,7 +69,7 @@ if (!process.argv.includes('--run')) {
   const index = routes.findIndex(route => marketRouteKeyIdV3(route.key) === marketRouteKeyIdV3(key));
   if (index < 0) routes.push(desired); else routes[index] = desired;
   const writePolicy = (revision, selected) => api('/api/market-data/policy', {
-    contractVersion: 3, consumer: 'thesis-ledger', requestId: randomUUID(), revision,
+    contractVersion: 1, consumer: 'thesis-ledger', requestId: randomUUID(), revision,
     enabled: previous.enabled, routes: selected,
   }, 'PUT');
   let policyAttempted = false;
@@ -98,7 +98,7 @@ if (!process.argv.includes('--run')) {
     assert.equal(capture.prepared.status, 'prepared', '实际准备未通过，保留原回执');
     const prepared = capture.prepared;
     const queued = await api('/api/v1/backtests/runs', backtestRunCreateSchemaV3.parse({
-      contractVersion: 3, strategyVersionId, runConfig: prepared.runConfig,
+      contractVersion: 1, strategyVersionId, runConfig: prepared.runConfig,
       preparationStamp: prepared.executionPreflight.revisionStamp,
       idempotencyKey: `tickflow-free-history-${randomUUID()}`,
     }));

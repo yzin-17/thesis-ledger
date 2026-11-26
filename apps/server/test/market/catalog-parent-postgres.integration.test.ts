@@ -15,7 +15,7 @@ const item = {
   displayName: '贵州茅台',
 };
 const snapshot = (generation: number, items = [item]) => ({
-  contractVersion: 3,
+  contractVersion: 1,
   generation,
   checksum: stableCatalogChecksum(items),
   cursor: `generation:${generation}`,
@@ -90,7 +90,7 @@ function registerCatalogPublicationAndSearch(
     const service = new InstrumentSearchService(isolated.prisma);
     const get = vi
       .fn()
-      .mockResolvedValue({ contractVersion: 3, providerId: 'hithink', items: [similar, etf] });
+      .mockResolvedValue({ contractVersion: 1, providerId: 'hithink', items: [similar, etf] });
     const dsa = { get } as never;
     for (const query of ['510300.sh', '510300', '沪深300ETF']) {
       const result = await service.searchForPicker(query, 20, dsa);
@@ -102,7 +102,7 @@ function registerCatalogPublicationAndSearch(
       });
     }
     expect(get).toHaveBeenCalledExactlyOnceWith(
-      '/api/v3/thesis-ledger/instruments/search?query=510300.SH',
+      '/api/v1/thesis-ledger/instruments/search?query=510300.SH',
       1,
     );
     expect(await catalog.latestGeneration()).toMatchObject({ generation: 2, instrumentCount: 1 });
@@ -113,8 +113,8 @@ function registerCatalogPublicationAndSearch(
     const service = new InstrumentSearchService(isolated.prisma);
     const get = vi
       .fn()
-      .mockResolvedValueOnce({ contractVersion: 3, providerId: 'hithink', items: [item] })
-      .mockResolvedValueOnce({ contractVersion: 3, providerId: 'hithink', items: [] })
+      .mockResolvedValueOnce({ contractVersion: 1, providerId: 'hithink', items: [item] })
+      .mockResolvedValueOnce({ contractVersion: 1, providerId: 'hithink', items: [] })
       .mockRejectedValueOnce(new Error('来源不可用'));
     const dsa = { get } as never;
     expect(await service.searchForPicker('茅台集团', 20, dsa)).toMatchObject([

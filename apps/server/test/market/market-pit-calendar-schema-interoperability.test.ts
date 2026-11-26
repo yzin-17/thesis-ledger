@@ -110,7 +110,7 @@ const fixture = () => {
   );
   response.sourcePriceBasis.anchor = '2026-05-18';
   const request = marketDataBarSeriesRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: response.requestId,
     symbol: response.symbol,
     routeKey: response.routeKey,

@@ -4,6 +4,7 @@
  * independent from Zod.
  */
 
+import type { BacktestTradePlan } from './backtest-trade-plan-contract.js';
 export type BacktestTimeframe = '1d' | '60m' | '30m' | '15m' | '5m' | '1m';
 export type BacktestMarket = 'CN' | 'HK' | 'US';
 export type BacktestAssetType = 'stock' | 'etf' | 'fund';
@@ -18,6 +19,7 @@ export interface BacktestAssetSymbolRef {
 
 export interface BacktestSignalSource {
   id: string;
+  priceCoordinate?: 'research' | 'actual' | 'run' | 'native-nav';
   asset: BacktestAssetSymbolRef;
   timeframe: BacktestTimeframe;
   series: BacktestSeriesField[];
@@ -37,18 +39,58 @@ export interface BacktestMoney {
 export type BacktestCorporateActionEventType = 'CASH_DIVIDEND' | 'SPLIT' | 'REVERSE_SPLIT';
 
 export type NumericExpression =
+  | {
+      type: 'confirmedPivot';
+      side: 'low' | 'high';
+      leftBars: number;
+      rightBars: number;
+      offset: 0 | 1;
+      input: NumericExpression;
+      sample?: NumericExpression | undefined;
+    }
+  | { type: 'eventValue' }
+  | {
+      type: 'rolling';
+      statistic: 'sum' | 'standardDeviation' | 'quantile';
+      periods: number;
+      input: NumericExpression;
+      ddof?: 0 | 1 | undefined;
+      quantile?: string | undefined;
+    }
+  | { type: 'cumulative'; statistic: 'sum' | 'max'; anchorAt: string; input: NumericExpression }
+  | { type: 'countTrue'; periods: number; condition: BooleanExpression }
+  | {
+      type: 'arithmetic';
+      operator: 'add' | 'subtract' | 'multiply' | 'divide' | 'min' | 'max';
+      left: NumericExpression;
+      right: NumericExpression;
+    }
+  | { type: 'absolute'; input: NumericExpression }
+  | { type: 'lag'; periods: number; input: NumericExpression }
+  | { type: 'sessionValue'; sourceId: string; field: 'vwap' | 'elapsedMinutes' }
   | { type: 'constant'; value: BacktestDecimalString }
   | { type: 'series'; sourceId: string; field: BacktestSeriesField }
   | {
       type: 'indicator';
-      name: 'MA' | 'EMA' | 'RSI' | 'MACD' | 'ATR' | 'VWAP' | 'Highest' | 'Lowest';
+      name: 'MA' | 'EMA' | 'RSI' | 'MACD' | 'ATR' | 'VWAP' | 'Highest' | 'Lowest' | 'ADX';
       input: NumericExpression;
       params: Record<string, number | BacktestDecimalString>;
-      output?: 'macd' | 'signal' | 'histogram';
+      output?: 'macd' | 'signal' | 'histogram' | 'adx' | 'plusDI' | 'minusDI';
     }
   | { type: 'positionState'; field: 'quantity' | 'averageCost' | 'holdingPeriods' };
 
 export type BooleanExpression =
+  | {
+      type: 'sequence';
+      trigger: BooleanExpression;
+      confirm: BooleanExpression;
+      invalidation: BooleanExpression;
+      within: number;
+      allowSameBar: boolean;
+      repeat: boolean;
+      capture?: NumericExpression | undefined;
+    }
+  | { type: 'consecutive'; periods: number; condition: BooleanExpression }
   | { type: 'all'; conditions: BooleanExpression[] }
   | { type: 'any'; conditions: BooleanExpression[] }
   | { type: 'not'; expression: BooleanExpression }
@@ -70,7 +112,9 @@ export type BooleanExpression =
 export type Expression = NumericExpression | BooleanExpression;
 
 export interface BacktestStrategy {
-  schemaVersion: '2';
+  entryTrigger?: 'rising-edge' | 'while-flat' | undefined;
+  tradePlan?: BacktestTradePlan | undefined;
+  schemaVersion: 'strategy-definition-v1';
   name: string;
   description?: string;
   signalSources: BacktestSignalSource[];
@@ -89,6 +133,7 @@ export interface BacktestStrategy {
     | { type: 'maxHoldingPeriod'; periods: number }
   >;
   execution:
+    | BacktestDailyOrderExecution
     | { mode: 'exchange'; orderType: 'market'; timeInForce: 'DAY'; timing: 'nextEligibleBarOpen' }
     | { mode: 'nav'; requestTypes: Array<'subscribe' | 'redeem'>; timing: 'nextAvailableNav' };
   cost: {
@@ -108,6 +153,8 @@ export const expressionOutputKind = (expression: Expression): 'numeric' | 'boole
     case 'compare':
     case 'cross':
     case 'corporateActionEvent':
+    case 'consecutive':
+    case 'sequence':
       return 'boolean';
     default:
       return expression.type === 'positionState' && expression.field === 'isOpen'
@@ -115,3 +162,4 @@ export const expressionOutputKind = (expression: Expression): 'numeric' | 'boole
         : 'numeric';
   }
 };
+import type { BacktestDailyOrderExecution } from './backtest-order-contract.js';

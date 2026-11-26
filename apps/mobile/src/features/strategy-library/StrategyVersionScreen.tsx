@@ -4,12 +4,23 @@ import type { StrategyStackParams } from '../../app/strategy-navigation';
 import { Action, Copy, Page, QueryStatus, Section } from '../../components/MobilePrimitives';
 import { useStrategyLibrary } from './useStrategyLibrary';
 import { strategyInstrumentLabel } from './strategy-instrument-display';
+import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
+import { backtestStrategyPlanReadback } from '@thesis-ledger/domain';
 export function StrategyVersionScreen() {
   const { params } = useRoute<RouteProp<StrategyStackParams, 'StrategyVersion'>>();
   const navigation = useNavigation<NativeStackNavigationProp<StrategyStackParams>>();
   const query = useStrategyLibrary();
   const strategy = query.data?.find((v) => v.id === params.strategyId);
   const version = strategy?.versions.find((v) => v.id === params.versionId);
+  const parsed = strategySchema.safeParse(version?.schema);
+  const definition = parsed.success ? (parsed.data as BacktestStrategy) : null;
+  const planLines =
+    definition
+      ? backtestStrategyPlanReadback(
+          definition,
+          undefined,
+        )
+      : [];
   return (
     <Page title={strategy?.name ?? '策略版本'}>
       <QueryStatus query={query} retry={() => void query.refetch()} />
@@ -49,6 +60,9 @@ export function StrategyVersionScreen() {
             onPress={() => navigation.navigate('StrategyRisk', { versionId: version.id })}
           />
           <Section title="完整策略定义">
+            {planLines.map((line) => (
+              <Copy key={line}>{line}</Copy>
+            ))}
             <Copy>{JSON.stringify(version.schema ?? null, null, 2)}</Copy>
           </Section>
         </>

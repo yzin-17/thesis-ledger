@@ -43,7 +43,7 @@ describe('基金估值公共客户端', () => {
 });
 
 it('基金区间读取传递日期和取消信号，拒绝跨标的历史', async () => {
-  const point = { version: 3, symbol: '000001.OF', navDate: '2026-11-06T00:00:00Z', unitNav: 1.2,
+  const point = { version: 1, symbol: '000001.OF', navDate: '2026-11-06T00:00:00Z', unitNav: 1.2,
     provider: 'fixture', fetchedAt: '2026-11-08T00:00:00Z', freshness: 'delayed' };
   const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify([point])));
   const client = new ThesisLedgerApiClient('http://fixture.invalid', fetcher);

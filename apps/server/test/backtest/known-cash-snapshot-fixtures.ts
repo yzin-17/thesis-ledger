@@ -77,7 +77,7 @@ export async function knownCashSnapshotFixture(buffered = false) {
   const config = runConfigSchemaV3.parse({ ...known.runConfig, frozenExecutionWindow: reference });
   const base = await completeSnapshotFixture();
   base.dsa.backtestInstrumentFacts.mockImplementation(async (request) => ({
-    version: 3,
+    version: 1,
     status: 'supported',
     provider: 'fixture-instrument',
     providerRevision: 'instrument-v1',

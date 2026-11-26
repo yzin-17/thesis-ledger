@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fundValuationSchema } from '@thesis-ledger/schemas';
 import { FundValuationPointRepository } from '../../src/market/fund-valuation-point.repository.js';
+import { discoverDatabaseStructure } from '../../src/platform/database-structure.js';
 
 const url = process.env.PORTFOLIO_VALUATION_DATABASE_URL;
 const prisma = new PrismaClient({ datasourceUrl: url ?? 'postgresql://unused:unused@127.0.0.1:1/unused' });
@@ -22,7 +23,9 @@ describe.skipIf(!url)('基金分钟事实 PostgreSQL', () => {
     const identity = await prisma.$queryRaw<Array<{ database: string; owner: string }>>`SELECT current_database() AS database, current_user AS owner`;
     expect(identity).toEqual([{ database: 'portfolio_valuation_fixture', owner: 'fixture_owner' }]);
     const head = await prisma.schemaVersion.findUniqueOrThrow({ where: { id: 1 } });
-    expect(head.version).toBe('20261104010000_fund_intraday_valuation');
+    const source = await discoverDatabaseStructure();
+    expect(source.expectedTables).toContain('FundValuationPoint');
+    expect(head.version).toBe(source.currentHead);
   });
   afterAll(async () => { await prisma.$disconnect(); });
 

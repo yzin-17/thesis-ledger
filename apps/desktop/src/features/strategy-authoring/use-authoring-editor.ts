@@ -2,7 +2,7 @@ import { createClientRequestId } from '../../lib/client-request-id';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  authoringStrategySchema,
+  authoringStrategyV6Schema,
   canGenerateAuthoringContent as canGenerate,
   type AuthoringContent,
   type AuthoringModificationTarget,
@@ -254,7 +254,7 @@ function availableActions(
       Boolean(selected?.available.modify) &&
       generationReady &&
       Boolean(intent.trim()) &&
-      authoringStrategySchema.safeParse(content.definitionText).success,
+      authoringStrategyV6Schema.safeParse(content.definitionText).success,
   };
 }
 

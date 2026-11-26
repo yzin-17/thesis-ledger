@@ -69,7 +69,7 @@ function projectEvidence(
   )
     issues.push('FROZEN_INVALID');
   let evidence: ResearchAuditTraceV1['evidence'] = null;
-  if (record(run.result).version === 2 && !frozen.success) issues.push('V2_FROZEN_MISSING');
+  if (record(run.result).version === 'research-report-result-v1' && !frozen.success) issues.push('V2_FROZEN_MISSING');
   if (frozen.success) {
     if (scope === null || JSON.stringify(scope) !== JSON.stringify(frozen.data.scopeSnapshot))
       issues.push('SCOPE_MISMATCH');
@@ -163,7 +163,7 @@ function consumerForRun(
     execution.success &&
     run.promptVersion === frozen.data.prompt.version &&
     execution.data.contract.id === 'research' &&
-    execution.data.contract.version === 'research-generation-v2' &&
+    execution.data.contract.version === 'research-report-generation-v1' &&
     researchScopeSnapshotV2Schema.safeParse(run.researchScopeSnapshot).success
   )
     return 'research';

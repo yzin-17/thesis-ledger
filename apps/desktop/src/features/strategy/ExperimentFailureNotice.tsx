@@ -5,10 +5,9 @@ import { canRetryOptimizationExperiment } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { useToastManager } from '@/components/ui/toast';
-import { requestFailureMessage } from '@/shared/api/request-error';
 import { createClientRequestId } from '../../lib/client-request-id';
 import { experimentStopReasonText } from './strategy-experiment-detail.model';
+import { useExperimentOperationFeedback } from './useExperimentOperationFeedback';
 import {
   retryOptimizationExperiment,
   type OptimizationExperimentSummary,
@@ -23,12 +22,14 @@ export function ExperimentFailureNotice({
   disabled?: boolean;
   onRetried: () => Promise<void>;
 }) {
-  const toast = useToastManager();
+  const { notifySuccess, clearOperationError, reportOperationError } =
+    useExperimentOperationFeedback();
   const intent = useRef({
     attempt: experiment.executionAttempt ?? 0,
     key: createClientRequestId(),
   });
   const retry = useMutation({
+    onMutate: () => clearOperationError('retry'),
     mutationFn: () => {
       const attempt = experiment.executionAttempt ?? 0;
       if (intent.current.attempt !== attempt)
@@ -39,15 +40,10 @@ export function ExperimentFailureNotice({
       });
     },
     onSuccess: async () => {
-      toast.add({ title: '已受理原实验重试' });
+      notifySuccess({ title: '已受理原实验重试' });
       await onRetried();
     },
-    onError: (error) =>
-      toast.add({
-        title: '实验重试失败',
-        description: requestFailureMessage(error, '请稍后重试'),
-        type: 'error',
-      }),
+    onError: (error) => reportOperationError('retry', '实验重试失败', error),
   });
   if (!experiment.stopReason && experiment.status !== 'failed') return null;
   const canRetry = canRetryOptimizationExperiment(experiment);
@@ -55,7 +51,9 @@ export function ExperimentFailureNotice({
     <Alert variant="destructive">
       <AlertTitle>实验已停止</AlertTitle>
       <AlertDescription>
-        <p>{experiment.stopReason ? experimentStopReasonText(experiment.stopReason) : '实验执行失败'}</p>
+        <p>
+          {experiment.stopReason ? experimentStopReasonText(experiment.stopReason) : '实验执行失败'}
+        </p>
         {canRetry ? (
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <Button

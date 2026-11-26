@@ -17,16 +17,16 @@ const RealDate=Date,epoch=RealDate.parse('2026-10-12T10:57:44.604Z');let tick=ep
 globalThis.Date=class extends RealDate{constructor(...args){if(args.length)super(...args);else super(tick);}static now(){return tick;}};
 globalThis.fetch=()=>{throw new Error('禁止网络');};
 const key={kind:'data',market:'CN',assetType:'ETF',capability:'SPLIT_EVENT'},target={providerId:'akshare',upstreamSource:'eastmoney'};
-const catalog=()=>({contractVersion:3,consumer:'thesis-ledger',catalogRevision:4494082701661225,generatedAt:new Date().toISOString(),integrity:'complete',entries:[{key,target,state:'ready'}]});
+const catalog=()=>({contractVersion:1,consumer:'thesis-ledger',catalogRevision:4494082701661225,generatedAt:new Date().toISOString(),integrity:'complete',entries:[{key,target,state:'ready'}]});
 const admission=()=>({consumer:'thesis-ledger',routeKey:key,target,status:'admitted',admissionState:'admitted',recordVersion:mode==='admission-changed'&&controls===2?2:1,evidenceRef:'sha256:'+digest,evidenceSha256:digest,scopeSymbols:['159516.SZ'],scopeDateFrom:'2026-03-30',scopeDateTo:'2026-07-10',adapterRevision:'dsa-eastmoney-fund-split-mapped-v1',sourceRevision:'eastmoney-fund-cf-pageinfo-json-v1',credentialRevision:'not-required',validFrom:'2026-10-12T10:53:01.391764+00:00',validUntil:'2026-10-13T10:53:01.391764+00:00',recordedAt:'2026-10-12T10:53:01.403099+00:00',invalidatedAt:null,invalidationReason:null});
 globalThis.MockDsaClient=class{
 get timeoutMs(){return 5000;}
 async effectiveControlPolicyV3(){controls++;if(controls===2)tick=mode==='late'?epoch+5000:tick+100;
-return{projection:{effective:{contractVersion:3,consumer:'thesis-ledger',requestId:'offline-policy',revision:mode==='changed'&&controls===2?113:112,sourceDesiredRevision:112,enabled:true,appliedAt:mode==='applied-clock'?new Date().toISOString():'2026-10-12T10:57:44.000Z',routes:[{key,reason:null,targets:[{...target,routeIndex:0,eligible:true,reason:null}]}]}}};}
+return{projection:{effective:{contractVersion:1,consumer:'thesis-ledger',requestId:'offline-policy',revision:mode==='changed'&&controls===2?113:112,sourceDesiredRevision:112,enabled:true,appliedAt:mode==='applied-clock'?new Date().toISOString():'2026-10-12T10:57:44.000Z',routes:[{key,reason:null,targets:[{...target,routeIndex:0,eligible:true,reason:null}]}]}}};}
 async marketRouteCatalogV3(){return catalog();}
 async control(path,init,attempts){if(!path.endsWith('&eventAdmissions=v1')||init!==undefined||attempts!==1)throw new Error('只读视图入口不符');return{protocolVersion:'event-admission-catalog-v1',catalog:catalog(),admissions:[admission()]};}
-async marketEventsV3(request){return this.post('/api/v3/thesis-ledger/market/events',request,1);}
-async post(path,request,attempts){if(path!=='/api/v3/thesis-ledger/market/events'||attempts!==1)throw new Error('预算不符');
+async marketEventsV3(request){return this.post('/api/v1/thesis-ledger/market/events',request,1);}
+async post(path,request,attempts){if(path!=='/api/v1/thesis-ledger/market/events'||attempts!==1)throw new Error('预算不符');
 if(mode==='source-error'){const error=new Error('private-token-fixture');error.code='invalid-response';error.status=503;error.response={body:'private-token-fixture'};throw error;}
 tick=epoch+400;const observedAt=new Date().toISOString();tick+=50;
 return{...request,providerRevision:'offline-clock-fixture',fetchedAt:new Date().toISOString(),

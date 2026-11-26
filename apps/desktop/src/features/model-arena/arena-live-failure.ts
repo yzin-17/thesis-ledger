@@ -39,6 +39,10 @@ function orderContractFailure(rawIssue: unknown): string | null {
   )
     return null;
   const index = Number(path[2]) + 1;
+  if (path[3] === 'onFill') {
+    const field = path.slice(3).filter((part) => typeof part === 'string' || Number.isInteger(part)).join('.');
+    return `第 ${index} 笔委托的成交后保护配置 ${field} 未通过校验；当前支持买入全部成交后激活一张固定价格止损，子单须指定有效期并仅退出本批持仓。`;
+  }
   if (path[3] === 'exitGroup')
     return `第 ${index} 笔委托的 exitGroup 无效：买入单不能与止损单组成配对退出组；exitGroup 仅用于成对的卖出止盈、止损委托。`;
   if (path[3] === 'expiresOn')

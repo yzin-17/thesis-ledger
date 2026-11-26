@@ -68,7 +68,9 @@ it('不完整、不可用、无资格目录不猜频率；报价请求限额仍�
 });
 it('混合页只读取到期来源，手动刷新读取显式集合；下一次返回新来源后重算', async () => {
   const items = [item('a'), item('b')];
-  const read = vi.fn<(ids: string[]) => Promise<WatchlistPrice[]>>().mockResolvedValue([row('a', 'day')]);
+  const read = vi
+    .fn<(ids: string[]) => Promise<WatchlistPrice[]>>()
+    .mockResolvedValue([row('a', 'day')]);
   const previous = { rows: [row('a', 'minute'), row('b', 'day')], checkedAt: { a: 0, b: 0 } };
   const result = await readDueWatchlistPrices(previous, items, catalog, read, false, 60_000);
   expect(read).toHaveBeenCalledWith(['a']);
@@ -77,6 +79,42 @@ it('混合页只读取到期来源，手动刷新读取显式集合；下一次�
   expect(nextQuoteCheck(result, items, catalog)).toBe(86400_000);
   await readDueWatchlistPrices(result, items, catalog, read, true, 61_000);
   expect(read).toHaveBeenLastCalledWith(['a', 'b']);
+});
+it('自动刷新只消费已确认且未过期的账号资格，首次尝试资格不能认证刷新频率', () => {
+  const source = { provider: 'minute', upstreamSource: 'minute' };
+  const access = {
+    state: 'allowed',
+    attempted: true,
+    checkedAt: '2026-11-09T00:00:00Z',
+    validUntil: '2026-11-10T00:00:00Z',
+    configVersion: 1,
+  } as const;
+  const withAccess = (accountAccess: (typeof catalog.entries)[number]['accountAccess']) => ({
+    ...catalog,
+    entries: [{ ...catalog.entries[0]!, accountAccess }],
+  });
+  expect(
+    watchlistSourceCadence(item('a'), source, withAccess(access), Date.parse(access.checkedAt))
+      ?.seconds,
+  ).toBe(60);
+  expect(
+    watchlistSourceCadence(item('a'), source, withAccess(access), Date.parse(access.validUntil)),
+  ).toBeNull();
+  for (const state of [
+    'unknown',
+    'not_included',
+    'permission_missing',
+    'credential_invalid',
+  ] as const) {
+    expect(
+      watchlistSourceCadence(
+        item('a'),
+        source,
+        withAccess({ ...access, state }),
+        Date.parse(access.checkedAt),
+      ),
+    ).toBeNull();
+  }
 });
 it('休市到开市再检查，过去边界和失败不会造成一秒重试循环', () => {
   const close = {

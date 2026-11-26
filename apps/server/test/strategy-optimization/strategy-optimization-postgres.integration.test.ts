@@ -566,7 +566,7 @@ function registerOptimizationAdoptionCase(
 function registerOptimizationLeaseRecoveryCase(
   suiteScope: ReturnType<typeof optimizationPostgresContext>,
 ) {
-  it('过期 Experiment 由 reconciler 恢复到候选与封存测试，再正式采纳并返回风险应用差异', async () => {
+  it('过期 Experiment 由 reconciler 恢复并自动完成封存测试，再正式采纳并返回风险应用差异', async () => {
     suiteScope.provider.complete.mockImplementation(async () => ({
       content: proposal,
       inputTokens: 31,
@@ -609,29 +609,36 @@ function registerOptimizationLeaseRecoveryCase(
     await waitUntil(async () => {
       const current = await suiteScope.readExperiment(experimentId);
       if (current.status === 'failed') throw new Error(current.stopReason ?? '实验恢复失败');
-      return current.status === 'awaiting_finalization';
-    });
+      return current.status === 'succeeded';
+    }, 4_000);
+    const finalized = await suiteScope.readExperiment(experimentId);
+    expect(suiteScope.configuredRuns.assertFrozenResearchBudget).toHaveBeenCalledWith(
+      suiteScope.version2Id,
+      finalized.runConfig,
+    );
     const candidates = await reads.candidates(experimentId);
     expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({
-      validationStatus: 'restricted',
-      readEligibility: { code: 'TEST_NOT_REVEALED' },
-    });
+    const finalizedCandidate = candidates[0]!;
     const stored = await suiteScope.prisma.$queryRaw<
-      Array<{ validationStatus: string }>
+      Array<{ validationStatus: string; runRefs: unknown }>
     >(Prisma.sql`
-      SELECT "validationStatus" FROM "OptimizationCandidate" WHERE "id"=${candidates[0]!.id}::uuid
+      SELECT "validationStatus", "runRefs" FROM "OptimizationCandidate" WHERE "id"=${finalizedCandidate.id}::uuid
     `);
-    expect(stored[0]?.validationStatus).toBe('valid');
-
-    await optimizer.finalize(experimentId, {
-      candidateIds: [candidates[0]!.id],
-      selectedCandidateId: candidates[0]!.id,
-      expectedStage: 'awaiting_finalization',
+    expect(stored[0]).toMatchObject({
+      validationStatus: 'test_valid',
+      runRefs: {
+        development: expect.any(String),
+        validation: expect.any(String),
+        test: expect.any(String),
+      },
     });
-    const finalized = await suiteScope.readExperiment(experimentId);
-    expect(finalized).toMatchObject({ status: 'succeeded', stage: 'completed' });
-    const finalizedCandidate = (await reads.candidates(experimentId))[0]!;
+    expect(finalized).toMatchObject({
+      status: 'succeeded',
+      stage: 'completed',
+      lockedCandidateIds: [finalizedCandidate.id],
+      selectedCandidateId: null,
+      exposure: { testRevealed: true },
+    });
     expect(finalizedCandidate.validationStatus).toBe('test_valid');
 
     const adoptionInput = {
@@ -639,8 +646,12 @@ function registerOptimizationLeaseRecoveryCase(
       candidateHash: finalizedCandidate.executionHash,
       expectedStrategyVersion: 2,
       idempotencyKey: `postgres-e2e-adoption-${suffix}-recovery`,
-      acknowledgeTestExposure: false,
+      acknowledgeTestExposure: true,
     };
+    await expect(optimizer.adopt(experimentId, {
+      ...adoptionInput,
+      acknowledgeTestExposure: false,
+    })).rejects.toThrow('需要明确确认测试暴露');
     const adopted = await optimizer.adopt(experimentId, adoptionInput);
     expect(adopted.strategyVersion?.version).toBe(3);
     const repeated = await optimizer.adopt(experimentId, adoptionInput);

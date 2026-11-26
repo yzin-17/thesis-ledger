@@ -93,7 +93,7 @@ async function main() {
     const controls = [
       '/api/market-data/policy',
       '/api/market-data/providers',
-      '/api/market-data/routes/capabilities?contractVersion=3',
+      '/api/market-data/routes/capabilities?contractVersion=1',
       '/api/v1/accounts?includeInactive=true',
     ];
     if (method === 'GET') assert(controls.includes(path));
@@ -136,7 +136,7 @@ async function main() {
     const [policy, providers, catalog] = await Promise.all([
       api('GET', '/api/market-data/policy'),
       api('GET', '/api/market-data/providers'),
-      api('GET', '/api/market-data/routes/capabilities?contractVersion=3'),
+      api('GET', '/api/market-data/routes/capabilities?contractVersion=1'),
     ]);
     const plan = {
       ...createDisclosurePlan(policy, providers.providers, catalog, readTarget()),

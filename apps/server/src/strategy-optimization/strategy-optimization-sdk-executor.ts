@@ -11,6 +11,8 @@ import {
   type OptimizationDiscoveryProposal,
   type OptimizationProposal,
   type BacktestStrategy,
+  strategyCapabilityGapSchema,
+  isStrategyCapabilityGap,
 } from '@thesis-ledger/schemas';
 import { AiExecutionStateStore } from '../ai/ai-execution-state.store.js';
 import { AiSdkGenerationAdapter, AiSdkGenerationError } from '../ai/ai-sdk-generation.adapter.js';
@@ -18,6 +20,7 @@ import { AiProviderRegistry } from '../ai/provider-registry.js';
 import { PrismaService } from '../platform/prisma.service.js';
 import { optimizationModelConcurrency } from './strategy-optimization-concurrency.js';
 import { assembleDiscoveryGeneration } from './strategy-optimization-discovery.js';
+import { StrategyCapabilityGapError } from './strategy-optimization-capability-gap.js';
 import {
   markOptimizationKnownFailure,
   markOptimizationUnknownOutcome,
@@ -33,6 +36,8 @@ import {
 } from './strategy-optimization-cost.js';
 import { toRecord, type ExperimentRow } from './strategy-optimization-common.js';
 import type { OptimizationModelRoute } from './strategy-optimization-model-routing.js';
+import { optimizationGenerationContract } from './strategy-optimization-generation-contract.js';
+import type { compileBacktestStrategy } from '../backtest/backtest-strategy-compiler.js';
 
 type ResolvedOptimizationRoute = ReturnType<AiProviderRegistry['strictReadyContract']>;
 
@@ -52,10 +57,7 @@ export type OptimizationSdkExecutionInput = {
 
 const decimalString = (value: number | string) => new Prisma.Decimal(value).toFixed();
 
-const contractFor = (experiment: ExperimentRow) =>
-  experiment.sourceMode === 'discovery'
-    ? aiGenerationContracts.strategyDiscovery
-    : aiGenerationContracts.parameterOptimization;
+const contractFor = optimizationGenerationContract;
 
 const paidBudgetAuthorized = (experiment: ExperimentRow) => {
   const maxCost = toRecord(experiment.budget).maxCost;
@@ -227,9 +229,10 @@ export class StrategyOptimizationSdkExecutor {
     experiment: ExperimentRow,
     baseline: BacktestStrategy,
     value: unknown,
+    onCompilation?: (compilation: ReturnType<typeof compileBacktestStrategy>) => void,
   ): OptimizationProposal | OptimizationDiscoveryProposal {
     if (experiment.sourceMode === 'discovery')
-      return assembleDiscoveryGeneration(experiment, baseline, value);
+      return assembleDiscoveryGeneration(experiment, baseline, value, onCompilation);
     return aiGenerationContracts.parameterOptimization.schema.parse(value);
   }
 
@@ -240,6 +243,16 @@ export class StrategyOptimizationSdkExecutor {
       cost: input.cost,
       recordedAt: (input.recordedAt ?? new Date()).toISOString(),
     };
+  }
+
+  private async recordGenerationArtifact(input: OptimizationSdkExecutionInput, requestId: string, usage: AiUsageFacts, artifact: unknown) {
+    try {
+      const written = await this.prisma.$executeRaw(Prisma.sql`
+        UPDATE "AiRun" SET "modelMetadata"=COALESCE("modelMetadata", '{}'::jsonb) || ${JSON.stringify({ strategyGeneration: artifact })}::jsonb
+        WHERE "id"=${input.step.aiRunId}::uuid AND "status"='running' AND "executionAttempt"=1
+      `);
+      if (written !== 1) throw new Error('候选生成回执已失去执行权');
+    } catch (error) { throw persistenceFailure(requestId, usage, error); }
   }
 
   private async settleKnownFailure(
@@ -255,8 +268,12 @@ export class StrategyOptimizationSdkExecutor {
       attemptId: input.step.id,
       revision: this.revision({
         usage: error.usage,
-        cost: completedCost(error.completion?.providerCost ?? null,
-          error.completion?.providerCostCurrency ?? null, error.usage, this.pricing(input)),
+        cost: completedCost(
+          error.completion?.providerCost ?? null,
+          error.completion?.providerCostCurrency ?? null,
+          error.usage,
+          this.pricing(input),
+        ),
       }),
       outcome: {
         status: 'incomplete',
@@ -275,7 +292,11 @@ export class StrategyOptimizationSdkExecutor {
     const runtime = input.resolved.provider.sdkRuntime?.();
     if (!runtime) throw new Error('AI Provider 缺少 SDK 运行配置');
     const startedAt = Date.now();
-    if (input.resolved.execution.mode === 'json_validated') assertGenerationSchemaPrompt(contractFor(input.experiment).schema, input.messages as { role: string; content: unknown }[]);
+    if (input.resolved.execution.mode === 'json_validated')
+      assertGenerationSchemaPrompt(
+        contractFor(input.experiment).schema,
+        input.messages as { role: string; content: unknown }[],
+      );
     const ownership = await this.initialize(input, requestId);
     let generation: Awaited<ReturnType<AiSdkGenerationAdapter['generate']>> | undefined;
     try {
@@ -322,7 +343,23 @@ export class StrategyOptimizationSdkExecutor {
           signal: AbortSignal.timeout(input.requestTimeoutMs),
         }),
       );
-      const proposal = this.output(input.experiment, input.baseline, generation.output);
+      const reportedGap =
+        input.experiment.sourceMode === 'discovery'
+          ? strategyCapabilityGapSchema.safeParse(generation.output)
+          : undefined;
+      let compilation: ReturnType<typeof compileBacktestStrategy> | undefined;
+      let proposal;
+      try {
+        proposal = reportedGap?.success ? reportedGap.data
+          : this.output(input.experiment, input.baseline, generation.output, (value) => { compilation = value; });
+      } finally {
+        if (contractFor(input.experiment).ref.version === 'strategy-discovery-generation-v1') {
+          const artifact = { contract: contractFor(input.experiment).ref, rawOutput: generation.output,
+            ...(generation.rawOutputText === undefined ? {} : { rawOutputText: generation.rawOutputText }),
+            ...(compilation ? { compilation } : {}) };
+          await this.recordGenerationArtifact(input, requestId, generation.usage, artifact);
+        }
+      }
       const cost = completedCost(
         generation.providerCost,
         generation.providerCostCurrency,
@@ -361,6 +398,7 @@ export class StrategyOptimizationSdkExecutor {
           generation.usage,
           new Error('优化结果提交已失去执行权'),
         );
+      if (isStrategyCapabilityGap(proposal)) throw new StrategyCapabilityGapError(proposal);
       return {
         proposal,
         aiRunId: input.step.aiRunId,
@@ -368,7 +406,13 @@ export class StrategyOptimizationSdkExecutor {
         continuationBlockedReason: settled.continuationBlockedReason,
       };
     } catch (error) {
+      if (error instanceof StrategyCapabilityGapError) throw error;
       if (error instanceof AiSdkGenerationError) {
+        if (contractFor(input.experiment).ref.version === 'strategy-discovery-generation-v1' && error.fact.code === 'schema_invalid' && error.completion?.rawOutputText !== undefined) {
+          await this.recordGenerationArtifact(input, requestId, error.usage, { contract: contractFor(input.experiment).ref,
+            rawOutputText: error.completion.rawOutputText, diagnostics: [{ stage: 'structure', code: 'STRUCTURE_INVALID',
+              path: [], message: error.fact.summary, details: error.fact.diagnostic }] });
+        }
         if (error.fact.externalResult === 'unknown' || error.fact.code === 'persistence_failed') {
           await this.executions.markUnknown(ownership, requestId, error.fact);
           await markOptimizationUnknownOutcome(

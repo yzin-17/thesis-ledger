@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { isEqual } from 'es-toolkit';
-import { type AuthoringContent } from '@thesis-ledger/schemas';
+import { type AuthoringContent, type BacktestStrategy, authoringStrategyV6Schema, authoringModificationOutputSchema } from '@thesis-ledger/schemas';
 import type { PrismaService } from '../platform/prisma.service.js';
 import type { StrategyCreationService } from '../backtest/strategy-creation.service.js';
 import type { InstrumentService } from '../market/instrument.service.js';
@@ -12,7 +12,8 @@ import {
   authoringConflict,
   requireAuthoringOwner,
 } from './authoring-store.js';
-import { validateAuthoringGeneration } from './authoring-semantics.js';
+import { validateAuthoringOutput } from './authoring-semantics.js';
+import { requireNewStrategyDefinition } from '../backtest/strategy-definition-write.js';
 
 export class AuthoringSaveService {
   constructor(
@@ -31,12 +32,15 @@ export class AuthoringSaveService {
         message: '请先修正当前定义',
       });
     }
-    return validateAuthoringGeneration(content, {
+    // 审核保存按当前定义检查结构与确认范围，保留的说明不能覆盖已确认配置。
+    const output = {
       definition,
       coverage: content.requirements
         .filter((item) => item.state === 'understood')
         .map((item) => ({ requirementId: item.id, definitionPaths: item.definitionPaths })),
-    });
+    };
+    return validateAuthoringOutput(content, { definition: authoringStrategyV6Schema.parse(content.definitionText) as BacktestStrategy,
+        coverage: authoringModificationOutputSchema.shape.coverage.parse(output.coverage) });
   }
   async review(owner: string, id: string) {
     const ownerId = requireAuthoringOwner(owner);
@@ -46,7 +50,7 @@ export class AuthoringSaveService {
       const rows = await tx.$queryRaw<{ content: AuthoringContent }[]>(
         Prisma.sql`SELECT content FROM "StrategyAuthoringRevision" WHERE "draftId"=${id}::uuid AND "ownerId"=${ownerId} AND revision=${draft.revision}`,
       );
-      const { definition } = this.validated(rows[0]!.content);
+      const definition = requireNewStrategyDefinition(this.validated(rows[0]!.content).definition);
       return {
         revision: draft.revision,
         definition,
@@ -90,7 +94,7 @@ export class AuthoringSaveService {
         Prisma.sql`SELECT content FROM "StrategyAuthoringRevision" WHERE "draftId"=${id}::uuid AND "ownerId"=${ownerId} AND revision=${draft.revision}`,
       );
       const content = rows[0]!.content;
-      const { definition } = this.validated(content);
+      const definition = requireNewStrategyDefinition(this.validated(content).definition);
       if (this.creation.definitionFingerprint(definition) !== request.reviewedDefinitionHash)
         return authoringConflict('AUTHORING_REVISION_CONFLICT', '当前定义与已审核定义不同');
       const instrument = await this.instruments.resolveTradableInstrument(

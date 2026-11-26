@@ -7,7 +7,7 @@ import {
 
 const accountId = '11111111-1111-4111-8111-111111111111';
 const event = {
-  version: 3,
+  version: 1,
   eventId: '22222222-2222-4222-8222-222222222222',
   factId: '33333333-3333-4333-8333-333333333333',
   accountId,
@@ -45,11 +45,11 @@ describe('Ledger 当前信封传输', () => {
         : { ...envelope(version), effective: false, asOfLedgerRevision: '1' };
     const current = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(new Response(JSON.stringify(response(3))));
+      .mockResolvedValue(new Response(JSON.stringify(response(1))));
     await expect(
       invoke(new ThesisLedgerApiClient('https://fixture.test/api/v1', current)),
-    ).resolves.toMatchObject({ events: [{ version: 3, payloadVersion: 1 }] });
-    const old = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(response(2))));
+    ).resolves.toMatchObject({ events: [{ version: 1, payloadVersion: 1 }] });
+    const old = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(response(3))));
     await expect(
       invoke(new ThesisLedgerApiClient('https://fixture.test/api/v1', old)),
     ).rejects.toBeInstanceOf(ThesisLedgerContractError);

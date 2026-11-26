@@ -116,6 +116,39 @@ describe('双价格的独立来源选择', () => {
     },
   );
 
+  it('AC03：必需原价整窗缺失时指出实际价格阈值的路径、字段和请求窗口', async () => {
+    const actualSource = { providerId: 'tushare', upstreamSource: 'tushare', routeIndex: 0 };
+    const f = await priceResearchFixture({ researchSource, actualSource });
+    f.input.strategy.sizing = { type: 'fixedAmount', amount: '1000' };
+    f.input.strategy.signalSources = [{ id: 'actualClose', asset: f.input.strategy.executionInstrument,
+      priceCoordinate: 'actual', timeframe: '1d', series: ['close'] }];
+    f.input.strategy.entry = { type: 'compare', operator: 'lt',
+      left: { type: 'series', sourceId: 'actualClose', field: 'close' },
+      right: { type: 'constant', value: '4' } };
+    const strategy = structuredClone(f.input.strategy);
+    const read = f.reader.readV3.getMockImplementation()!;
+    f.reader.readV3.mockImplementation(async (input) => {
+      if (input.routeKey.adjustment === 'none') return {
+        status: 'unavailable',
+        selection: { status: 'unavailable', reason: 'primary_unavailable', primaryFailure: 'missing_window' },
+      } as never;
+      return read(input);
+    });
+
+    const prepared = await prepare(f);
+    const reads = f.reader.readV3.mock.calls.map(([input]) => input);
+    expect(reads.map((input) => input.routeKey.adjustment)).toEqual(['hfq', 'none']);
+    const reference = reads[1]!;
+    expect(prepared).toMatchObject({ status: 'blocked', diagnostics: [{
+      missingFields: ['close'], incompatibleRules: ['entry.left'], symbol: reference.symbol,
+      routeKey: reference.routeKey, targetSources: [actualSource],
+      dateRange: { startDate: reference.window.start, endDate: reference.window.end },
+      message: expect.stringContaining(`entry.left 需要不复权字段 close。`),
+    }] });
+    expect(JSON.stringify(prepared)).toContain('missing_window');
+    expect(f.input.strategy).toEqual(strategy);
+  });
+
   it.each(['symbol', 'market', 'window'] as const)(
     '不同源仍拒绝原价 %s 与计划不匹配',
     async (field) => {

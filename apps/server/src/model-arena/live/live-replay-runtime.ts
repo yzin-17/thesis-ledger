@@ -6,6 +6,7 @@ import {
   arenaDueWakeups,
   arenaEqualWeightBook,
   arenaMatchOrders,
+  arenaExpireOrders,
   DecimalValue,
   marketCivilInstant,
 } from '@thesis-ledger/domain';
@@ -68,21 +69,11 @@ export class LiveReplayRuntime {
     if (match.state !== 'running' || clock.status === 'blocked') return true;
     const p = arenaLiveProtocolSchema.parse(match.protocol);
     await this.initial(id, p, clock.originAt);
-    if (
-      !clock.pendingAt &&
-      (await liveAgents(this.db, id)).some(
-        (a) => a.state === 'needs_attention' || a.state === 'budget_exhausted',
-      )
-    ) {
+    if (!clock.pendingAt && (await liveAgents(this.db, id)).some(unresolvedResearchOutcome)) {
       await this.db.$transaction(async (tx) => {
-        const current = await liveMatch(tx, id, undefined, true),
-          latest = await liveTimeline(tx, id);
-        if (current.state === 'running' && latest?.phase === 'replay' && !latest.pendingAt)
-          await saveLiveTimeline(tx, id, {
-            ...latest,
-            status: 'blocked',
-            reason: 'replay_research_attention',
-          });
+        const current = await liveMatch(tx, id, undefined, true), latest = await liveTimeline(tx, id);
+        if (current.state === 'running' && latest?.status === 'ready' && !latest.pendingAt)
+          await saveLiveTimeline(tx, id, { ...latest, status: 'blocked', reason: 'replay_research_attention' });
       });
       return true;
     }
@@ -95,16 +86,13 @@ export class LiveReplayRuntime {
           LiveCycleRow[]
         >`SELECT * FROM "ArenaLiveCycle" WHERE "matchId"=${id}::uuid AND state IN ('pending','running')`;
         if (active.length) return;
-        const agents = await liveAgents(tx, id, true);
-        const attention = agents.some(
-          (a) => a.state === 'needs_attention' || a.state === 'budget_exhausted',
-        );
+        const uncertain = (await liveAgents(tx, id, true)).some(unresolvedResearchOutcome);
         await saveLiveTimeline(tx, id, {
           ...timeline,
-          status: attention ? 'blocked' : 'ready',
-          cursorAt: attention ? timeline.cursorAt : timeline.pendingAt!,
-          pendingAt: attention ? timeline.pendingAt : null,
-          reason: attention ? 'replay_research_attention' : null,
+          status: uncertain ? 'blocked' : 'ready',
+          cursorAt: uncertain ? timeline.cursorAt : timeline.pendingAt!,
+          pendingAt: uncertain ? timeline.pendingAt : null,
+          reason: uncertain ? 'replay_research_attention' : null,
         });
       });
       return true;
@@ -246,7 +234,7 @@ export class LiveReplayRuntime {
         return {
           ...agent,
           account: arenaLiveAccountSchema.parse(
-            arenaMatchOrders(book, observed.context, observed.session.state === 'open'),
+            arenaExpireOrders(arenaMatchOrders(book, observed.context, observed.session.state === 'open'), observed.at),
           ),
         };
       });
@@ -302,12 +290,6 @@ export class LiveReplayRuntime {
     let pending = false;
 
     const book = agent.account;
-    for (const order of book.orders)
-      if (order.state === 'active' && Date.parse(order.expiresAt) <= Date.parse(observed.at)) {
-        order.state = 'expired';
-        order.reason = 'order_expired';
-        book.revision++;
-      }
     if (agent.state === 'waiting' && observed.session.state === 'open') {
       const fired = arenaDueWakeups(
         book.wakeups,
@@ -333,6 +315,10 @@ export class LiveReplayRuntime {
       VALUES (${randomUUID()}::uuid,${id}::uuid,${new Date(value.at)},${JSON.stringify(value)}::jsonb,${JSON.stringify(evidence)}::jsonb)
       ON CONFLICT ("matchId",at) DO NOTHING`;
   }
+}
+
+function unresolvedResearchOutcome(agent: { state: string; reason: string | null }) {
+  return agent.state === 'needs_attention' && ['request_outcome_unknown', 'unknown_usage'].includes(agent.reason ?? '');
 }
 
 function replayEnd(p: ArenaLiveProtocol) {

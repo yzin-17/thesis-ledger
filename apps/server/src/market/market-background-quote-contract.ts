@@ -17,14 +17,14 @@ export async function readBackgroundQuote(
   signal?: AbortSignal,
 ) {
   const request = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     consumer: 'thesis-ledger' as const,
     requestId: crypto.randomUUID(),
     symbol: plan.symbol,
     assetType: plan.assetType,
   };
   const raw = await dsa.post<Record<string, unknown>>(
-    '/api/v3/thesis-ledger/market/background-quote',
+    '/api/v1/thesis-ledger/market/background-quote',
     { ...request, generation: plan.generation },
     1,
     undefined,

@@ -10,6 +10,7 @@ import { PrismaService } from '../../platform/prisma.service.js';
 import { MarketService } from '../../market/market.service.js';
 import { MarketLiveExecutionReader } from '../../market/market-live-execution-reader.js';
 import { MarketArenaReplayReader } from '../../market/market-arena-replay-reader.js';
+import { MarketArenaValuationReader } from '../../market/market-arena-valuation-reader.js';
 
 function executionScopeSymbols(
   books: readonly ArenaLiveAccount[],
@@ -32,28 +33,25 @@ function executionScopeSymbols(
 }
 function needsExecutionQuote(
   symbol: string,
-  hasHeld: number,
   books: readonly ArenaLiveAccount[],
   decision: ArenaLiveDecision | undefined,
   additionalSymbols: readonly string[],
 ) {
   return (
-    hasHeld ||
-    books.some((b) => b.orders.some((o) => o.symbol === symbol && o.state === 'active')) ||
+    (!decision && books.some((b) => b.orders.some((o) => o.symbol === symbol && o.state === 'active'))) ||
     decision?.orders.some((o) => o.symbol === symbol) ||
     additionalSymbols.includes(symbol)
   );
 }
 function executionExpiryDates(
-  books: readonly ArenaLiveAccount[],
   decision: ArenaLiveDecision | undefined,
+  symbol?: string,
 ) {
   return [
     ...new Set([
-      ...books.flatMap((b) =>
-        b.orders.filter((o) => o.state === 'active' && o.expiresOn).map((o) => o.expiresOn!),
-      ),
-      ...(decision?.orders.flatMap((o) => (o.expiresOn ? [o.expiresOn] : [])) ?? []),
+      ...(decision?.orders.filter(o => !symbol || o.symbol === symbol).flatMap((o) => (o.expiresOn ? [o.expiresOn] : [])) ?? []),
+      ...(decision?.orders.filter(o => !symbol || o.symbol === symbol).flatMap((o) => o.onFill?.activateOrders.flatMap((child) =>
+        child.validUntil.kind === 'date' ? [child.validUntil.expiresOn] : []) ?? []) ?? []),
     ]),
   ];
 }
@@ -68,6 +66,9 @@ export class LiveExecutionContext {
     @Optional()
     @Inject(MarketArenaReplayReader)
     private readonly replay?: Pick<MarketArenaReplayReader, 'observe'>,
+    @Optional()
+    @Inject(MarketArenaValuationReader)
+    private readonly valuation?: Pick<MarketArenaValuationReader, 'read'>,
   ) {}
   async build(
     p: ArenaLiveProtocol,
@@ -100,6 +101,20 @@ export class LiveExecutionContext {
     const quotes: ArenaPaperQuote[] = [];
     const missing: Record<string, string> = {};
     const ends = new Map<string, string>();
+    const valuationPrices = new Map<string, string>();
+    const needsNav = decision ? decision.orders.some(o => o.side === 'buy')
+      : books.some(b => b.orders.some(o => o.state === 'active' && o.side === 'buy'));
+    if (needsNav && this.valuation) {
+      const instruments = directory.flatMap(item => {
+        const symbol = item.canonicalCode + '.' + item.market;
+        const held = books.flatMap(b => b.positions).filter(s => s.symbol === symbol);
+        return held.length ? [{ symbol, assetType: item.instrumentType as 'STOCK' | 'ETF',
+          acquiredOn: held.map(s => s.acquiredOn).sort()[0]!, lastFillAt: null }] : [];
+      });
+      const valued = instruments.length ? await this.valuation.read(p, instruments) : null;
+      if (valued && !('failure' in valued))
+        for (const [symbol, price] of valued.prices) valuationPrices.set(symbol, price);
+    }
     for (const item of directory) {
       const symbol = item.canonicalCode + '.' + item.market;
       const correctMarket =
@@ -114,13 +129,12 @@ export class LiveExecutionContext {
       if (held.length) allowed.add(symbol);
       const needsQuote = needsExecutionQuote(
         symbol,
-        held.length,
         books,
         decision,
         additionalSymbols,
       );
       if (!needsQuote) continue;
-      const expiresOn = executionExpiryDates(books, decision);
+      const expiresOn = executionExpiryDates(decision, symbol);
       try {
         const read = await this.reader.read({
           symbol,
@@ -128,7 +142,10 @@ export class LiveExecutionContext {
           market: p.market,
           currency: p.currency,
           maxQuoteAgeSeconds: p.resources.maxQuoteAgeSeconds,
+          ...(p.simulationPolicy ? { simulationPolicy: p.simulationPolicy } : {}),
           expiresOn,
+          needsBuySettlement: decision ? decision.orders.some(o => o.symbol === symbol && o.side === 'buy')
+            : books.some(b => b.orders.some(o => o.symbol === symbol && o.state === 'active' && o.side === 'buy')),
           ...(held.length ? { previousDay: held.map((s) => s.acquiredOn).sort()[0]! } : {}),
         });
         if (read.status === 'unavailable') {
@@ -136,6 +153,7 @@ export class LiveExecutionContext {
           continue;
         }
         quotes.push(read.observation);
+        valuationPrices.set(symbol, read.observation.price);
         for (const [day, end] of read.ends) ends.set(day, end);
       } catch {
         missing[symbol] = 'execution_evidence_unavailable';
@@ -156,10 +174,7 @@ export class LiveExecutionContext {
       }
       const date = requested ?? day;
       if (p.endsOn && date > p.endsOn) throw new Error('expiry_outside_season');
-      const candidates = [...ends]
-        .filter(([d]) => d <= date && d >= day)
-        .sort(([a], [b]) => a.localeCompare(b));
-      const end = candidates.at(-1)?.[1];
+      const end = ends.get(date);
       if (!end) throw new Error('expiry_calendar_unavailable');
       return end;
     };
@@ -170,10 +185,12 @@ export class LiveExecutionContext {
       at: at.toISOString(),
       tradingDate: day ?? '',
       fees: p.fees,
+      matching: p.matching,
       maxPositionBps: p.maxPositionBps,
       maxActiveSymbols: p.resources.maxActiveSymbols,
       allowedSymbols: allowed,
       quotes: fresh,
+      valuationPrices,
       expiresAt: expiry,
       newId: randomUUID,
     };
@@ -188,7 +205,7 @@ export class LiveExecutionContext {
   ) {
     if (!this.replay) throw new Error('replay_prices_unavailable');
     const executionSymbols = [
-      ...books.flatMap((b) => b.orders.filter((o) => o.state === 'active').map((o) => o.symbol)),
+      ...(!decision ? books.flatMap((b) => b.orders.filter((o) => o.state === 'active').map((o) => o.symbol)) : []),
       ...(decision?.orders.map((o) => o.symbol) ?? []),
     ];
     return {
@@ -198,6 +215,10 @@ export class LiveExecutionContext {
         symbols,
         books.flatMap((b) => b.positions),
         executionSymbols,
+        executionExpiryDates(decision),
+        decision ? decision.orders.filter(o => o.side === 'buy').map(o => o.symbol)
+          : books.flatMap(b => b.orders.filter(o => o.state === 'active' && o.side === 'buy').map(o => o.symbol)),
+        !decision || decision.orders.length > 0,
       )),
       missing: {} as Record<string, string>,
     };

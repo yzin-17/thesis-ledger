@@ -51,6 +51,7 @@ export function preparedRunConfigV3(
   >,
   signalIds: string[],
   actualSourceIds: readonly string[] = [],
+  dailyObservationContract: 'market-daily-tradability-window-v1' = 'market-daily-tradability-window-v1',
 ) {
   const { knownCashPreparation, lifecyclePreparation, ...required } = resolved;
   return runConfigSchemaV3.safeParse({
@@ -61,8 +62,8 @@ export function preparedRunConfigV3(
       ? { frozenPriceWarmupPolicy: 'cash-reference-calendar-buffer-v1' }
       : {}),
     ...(lifecyclePreparation ? { lifecyclePreparation } : {}),
-    schemaVersion: '3',
-    ...(request.priceResearch ? { priceResearch: { protocolVersion: request.priceResearch } } : {}),
+    schemaVersion: 'backtest-trade-config-v1',
+    ...(request.priceResearch ? { priceResearch: { protocolVersion: request.priceResearch, dailyObservationContract } } : {}),
     ...(request.warmupBudgetSessions !== undefined
       ? { frozenWarmupBudgetSessions: request.warmupBudgetSessions }
       : {}),

@@ -26,7 +26,7 @@ export type MarketRouteCatalogReadReasonV3 =
   | 'control_unavailable';
 
 export type MarketRouteCatalogReadV3 = {
-  contractVersion: 3;
+  contractVersion: 1;
   consumer: 'thesis-ledger';
   status: 'complete' | 'partial' | 'unavailable';
   catalogRevision: number | null;
@@ -71,7 +71,7 @@ const catalogError = (
 ) => ({ code, message, issues, ...audit });
 
 const addCatalogAudit = (storedRoutes: unknown, audit: CatalogAudit) => {
-  if (!isRecord(storedRoutes) || storedRoutes.storageVersion !== 3) return storedRoutes;
+  if (!isRecord(storedRoutes) || storedRoutes.storageVersion !== 'market-routing-policy-v1') return storedRoutes;
   return { ...storedRoutes, catalogAudit: audit };
 };
 
@@ -135,7 +135,7 @@ const safeDsaError = (error: unknown) => ({
 const routeCatalogUnavailable = (
   reason: Exclude<MarketRouteCatalogReadReasonV3, 'catalog_partial'>,
 ): MarketRouteCatalogReadV3 => ({
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   status: 'unavailable',
   catalogRevision: null,
@@ -172,7 +172,7 @@ export const readMarketRouteCatalogV3 = async (
   const catalog = parsed.data;
   if (catalog.integrity === 'partial') {
     return {
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       status: 'partial',
       catalogRevision: catalog.catalogRevision,
@@ -183,7 +183,7 @@ export const readMarketRouteCatalogV3 = async (
   }
 
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     status: 'complete',
     catalogRevision: catalog.catalogRevision,
@@ -244,7 +244,7 @@ const applyResponseMatches = (
   });
 };
 
-/** Recheck a Desired V3 against a live, strictly parsed DSA catalog before applying it. */
+/** 保存前按严格解析的实时能力目录校验期望路由。 */
 export const applyDesiredProviderPolicyV3 = async (
   prisma: PrismaService,
   dsa: CatalogDsaClient,
@@ -262,7 +262,7 @@ export const applyDesiredProviderPolicyV3 = async (
   try {
     const parsed = marketRouteCatalogV3Schema.safeParse(await dsa.marketRouteCatalogV3());
     if (!parsed.success) {
-      throw new DsaError('DSA Control V3 精确路由能力目录响应无效', 'invalid-response');
+      throw new DsaError('dsa-control-v1 精确路由能力目录响应无效', 'invalid-response');
     }
     catalog = parsed.data;
   } catch (error) {
@@ -286,8 +286,8 @@ export const applyDesiredProviderPolicyV3 = async (
     const lastError = catalogError(
       catalog.integrity === 'partial' ? 'route_catalog_partial' : 'route_not_ready',
       catalog.integrity === 'partial'
-        ? 'DSA Control V3 精确路由能力目录尚未完整'
-        : 'Desired Policy V3 包含未就绪的精确路由目标',
+        ? 'dsa-control-v1 精确路由能力目录尚未完整'
+        : 'market-routing-policy-v1 包含未就绪的精确路由目标',
       issues,
       audit,
     );
@@ -302,10 +302,10 @@ export const applyDesiredProviderPolicyV3 = async (
     const parsed = marketControlPolicyApplyResponseV3Schema.safeParse(
       await dsa.applyControlPolicyV3(policy),
     );
-    if (!parsed.success) throw new DsaError('DSA Control V3 Policy 响应无效', 'invalid-response');
+    if (!parsed.success) throw new DsaError('dsa-control-v1 策略响应无效', 'invalid-response');
     const applied = parsed.data;
     if (!applyResponseMatches(policy, applied)) {
-      throw new DsaError('DSA Control V3 Desired/Effective 响应身份不匹配', 'invalid-response');
+      throw new DsaError('dsa-control-v1 期望策略与生效策略身份不匹配', 'invalid-response');
     }
     return persistCatalogDecision(prisma, policy, attemptId, current.routes, {
       audit,
@@ -342,7 +342,7 @@ export const retryDesiredProviderPolicyV3 = (
   if (current.syncState === 'applied' && response.effectiveStale === false)
     return Promise.resolve(response);
   const policy = desiredProviderPolicyV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: randomUUID(),
     revision: current.revision,

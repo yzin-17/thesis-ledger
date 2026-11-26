@@ -54,7 +54,7 @@ export function assertResearchResultModelBindingV2(
     !parsed.success ||
     parsed.data.generationStatus !== 'complete' ||
     parsed.data.contract.id !== 'research' ||
-    parsed.data.contract.version !== 'research-generation-v2'
+    parsed.data.contract.version !== 'research-report-generation-v1'
   )
     throw new AiFrozenResearchError('V2 实际模型缺少完整研究执行审计');
   const request = parsed.data.requests.at(-1);
@@ -64,7 +64,7 @@ export function assertResearchResultModelBindingV2(
     request.outcome?.status !== 'complete' ||
     !request.outcome.schemaAccepted ||
     request.outcome.contract.id !== 'research' ||
-    request.outcome.contract.version !== 'research-generation-v2'
+    request.outcome.contract.version !== 'research-report-generation-v1'
   )
     throw new AiFrozenResearchError('V2 实际模型缺少匹配的最终成功请求审计');
   if (model.modelId !== (request.outcome.actualModel ?? run.model))

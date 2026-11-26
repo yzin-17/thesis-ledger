@@ -59,6 +59,6 @@ export const arenaPointSchema = z.strictObject({
 });
 export type ArenaPoint = z.infer<typeof arenaPointSchema>;
 export const arenaLivePointSchema = arenaPointSchema.omit({ roundId: true }).extend({
-  protocolVersion: z.literal(2), roundId: z.null(),
+  protocolVersion: z.literal('arena-live-match-protocol-v1'), roundId: z.null(),
 });
 export type ArenaPricePoint = ArenaPoint | z.infer<typeof arenaLivePointSchema>;

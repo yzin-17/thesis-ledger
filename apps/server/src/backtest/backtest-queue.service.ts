@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, Optional } from '@nestjs/common'
 import { PrismaService } from '../platform/prisma.service.js';
 import { StructuredLogger } from '../platform/structured-logger.js';
 import { requestBacktestCancellation } from './backtest-run-cancellation.js';
-import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { persistedRunContract } from './backtest-v3-run-lifecycle.js';
 import { BACKTEST_QUEUE_NAME } from './backtest-bull-queue.js';
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
 import { BacktestNavRunExecution } from './backtest-nav-run-execution.js';
@@ -48,7 +48,7 @@ export class BacktestQueueService {
         message: 'NAV Runner 未配置，Run 未进入执行队列',
       });
     }
-    if (persistedContractVersion(job) !== 3) return job;
+    if (!persistedRunContract(job)) return job;
 
     const persistDispatch = async (data: {
       dispatchedAt: Date | null;
@@ -59,7 +59,7 @@ export class BacktestQueueService {
         const updated = await this.prisma.backtestJob.update({
           where: {
             id: job.id,
-            mode: 'V3',
+            mode: 'frozen',
             status: job.status,
             executionAttempt: job.executionAttempt,
           },

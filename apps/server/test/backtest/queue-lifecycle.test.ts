@@ -24,8 +24,8 @@ describe('Backtest BullMQ 生命周期', () => {
   it('Redis 暂时不可用时保留 queued 任务并记录可恢复错误', async () => {
     let state = {
       id: '11111111-1111-4111-8111-111111111117',
-      mode: 'V3',
-      input: { contractVersion: 3, schemaVersion: '3' },
+      mode: 'frozen',
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1' },
       status: 'queued',
       executionAttempt: 0,
       dispatchedAt: null,
@@ -62,8 +62,8 @@ describe('Backtest BullMQ 生命周期', () => {
   it('queued 取消立即进入终态并移除等待消息', async () => {
     let state = {
       id: '11111111-1111-4111-8111-111111111118',
-      mode: 'V3',
-      input: { contractVersion: 3, schemaVersion: '3' },
+      mode: 'frozen',
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1' },
       status: 'queued',
       executionAttempt: 0,
       dispatchedAt: new Date('2025-01-03'),
@@ -76,9 +76,10 @@ describe('Backtest BullMQ 生命周期', () => {
     const prisma = {
       backtestJob: {
         findUnique: vi.fn(async () => state),
-        update: vi.fn(async ({ data }: { data: Partial<typeof state> }) => {
+        updateMany: vi.fn(async ({ where, data }: { where: { status?: unknown }; data: Partial<typeof state> }) => {
+          if (typeof where.status === 'string' && where.status !== state.status) return { count: 0 };
           state = { ...state, ...data };
-          return state;
+          return { count: 1 };
         }),
       },
     };
@@ -96,17 +97,18 @@ describe('Backtest BullMQ 生命周期', () => {
   it('running 取消只登记请求，由 Worker 在安全边界收敛终态', async () => {
     let state = {
       id: '11111111-1111-4111-8111-111111111119',
-      mode: 'V3',
-      input: { contractVersion: 3, schemaVersion: '3' },
+      mode: 'frozen',
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1' },
       status: 'running',
       cancelRequestedAt: null as Date | null,
     };
     const prisma = {
       backtestJob: {
         findUnique: vi.fn(async () => state),
-        update: vi.fn(async ({ data }: { data: Partial<typeof state> }) => {
+        updateMany: vi.fn(async ({ where, data }: { where: { status?: unknown }; data: Partial<typeof state> }) => {
+          if (typeof where.status === 'string' && where.status !== state.status) return { count: 0 };
           state = { ...state, ...data };
-          return state;
+          return { count: 1 };
         }),
       },
     };

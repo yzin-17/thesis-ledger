@@ -32,7 +32,7 @@ const barPath = `/api/market/${symbol}/bars?${new URLSearchParams({ ...window, a
 export async function observeCase(api) {
   const [state, providerResponse, catalog] = await Promise.all([
     api.get('/api/market-data/policy'), api.get('/api/market-data/providers'),
-    api.get('/api/market-data/routes/capabilities?contractVersion=3'),
+    api.get('/api/market-data/routes/capabilities?contractVersion=1'),
   ]);
   return createFailoverPlan(state, providerResponse.providers, catalog);
 }

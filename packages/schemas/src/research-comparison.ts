@@ -83,8 +83,8 @@ export const researchReportComparisonSchema = z
     const reject = (message: string) => context.addIssue({ code: 'custom', message });
     if (value.status === 'compared') {
       if (
-        value.current.resultVersion !== 2 ||
-        value.previous?.resultVersion !== 2 ||
+        value.current.resultVersion !== 'research-report-result-v1' ||
+        value.previous?.resultVersion !== 'research-report-result-v1' ||
         value.current.historicalScope.status !== 'known' ||
         value.previous.historicalScope.status !== 'known' ||
         !value.frozenFingerprints.before ||

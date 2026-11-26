@@ -528,7 +528,7 @@ try {
     '/backtests/run-config/prepare',
     201,
     {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: `${tag}-prepare`,
       strategyVersionId: saved.versionId,
       runConfig,
@@ -548,7 +548,7 @@ try {
     bob.token,
   );
   const runInput = {
-    contractVersion: 3,
+    contractVersion: 1,
     strategyVersionId: saved.versionId,
     runConfig: prepared.runConfig,
     preparationStamp: prepared.executionPreflight.revisionStamp,

@@ -46,7 +46,7 @@ function protocolInput() {
     messages: [],
     startedAt: 0,
     signal: new AbortController().signal,
-    contractVersion: 'research-generation-v2' as const,
+    contractVersion: 'research-report-generation-v1' as const,
     buildResult: () => ({}),
   };
 }
@@ -69,13 +69,10 @@ it.each([
   input.run.modelMetadata.researchRoutes = routes;
   expect(() => researchSdkProtocol(input)).toThrow('缺少完整的冻结执行路由');
 });
-it('V1/V2 输入与保存的合同版本必须一致', () => {
+it('冻结资料与保存的生成合同必须一致', () => {
   const input = protocolInput();
   expect(researchSdkProtocol(input).contract.ref).toEqual(researchGenerationV2Contract.ref);
-  expect(() =>
-    researchSdkProtocol({ ...input, contractVersion: 'research-generation-v1' }),
-  ).toThrow('冻结版本不一致');
-  input.run.modelMetadata.sdkExecution.contract = aiGenerationContracts.research.ref;
+  input.run.modelMetadata.sdkExecution.contract = aiGenerationContracts.parameterOptimization.ref;
   expect(() => researchSdkProtocol(input)).toThrow('冻结版本不一致');
 });
 it('反证研究冻结模板决定收窄输出 Schema，SDK 与提示词使用相同合同', () => {
@@ -99,7 +96,7 @@ it('反证研究冻结模板决定收窄输出 Schema，SDK 与提示词使用�
   expect(output.properties.numericClaims.maxItems).toBe(0);
 });
 
-it('readiness 显式识别 V2，V1 默认合同保持原版本且没有实时验证事实', () => {
+it('就绪判断使用具名研究合同并保留实时校验状态', () => {
   const result = evaluateAiProviderReadiness(
     {
       providerId: 'controlled',
@@ -122,5 +119,5 @@ it('readiness 显式识别 V2，V1 默认合同保持原版本且没有实时验
   expect(result.readiness.state).toBe('ready');
   expect(result.contract).toEqual(researchGenerationV2Contract.ref);
   expect(result.liveValidation.status).toBe('not_run');
-  expect(aiGenerationContracts.research.ref.version).toBe('research-generation-v1');
+  expect(aiGenerationContracts.research.ref).toEqual(researchGenerationV2Contract.ref);
 });

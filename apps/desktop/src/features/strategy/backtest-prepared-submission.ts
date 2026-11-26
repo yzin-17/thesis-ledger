@@ -20,7 +20,7 @@ export function preparedBacktestSubmission(
   )
     throw new Error('准备结果与当前回测配置不一致，请重新准备');
   return backtestRunCreateSchemaV3.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     strategyVersionId,
     runConfig: config,
     preparationStamp: prepared.executionPreflight.revisionStamp,

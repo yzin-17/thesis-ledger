@@ -82,7 +82,7 @@ await receipt('policy-before', policy);
 const results = [];
 let attempted = false;
 const writePolicy = (revision, nextRoutes) => api('/api/market-data/policy', {
-  contractVersion: 3, consumer: 'thesis-ledger', requestId: randomUUID(), revision,
+  contractVersion: 1, consumer: 'thesis-ledger', requestId: randomUUID(), revision,
   enabled: policy.enabled, routes: nextRoutes,
 }, 'PUT');
 try {

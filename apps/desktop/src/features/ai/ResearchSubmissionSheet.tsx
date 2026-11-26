@@ -194,7 +194,7 @@ function useResearchSubmissionSheet({
   const submit = () => {
     if (!selection || !canSubmit || !settings.data) return;
     submission.submit({
-      version: 2,
+      version: 'research-report-submission-v1',
       mode,
       scope: selection,
       question: draft.question.trim(),

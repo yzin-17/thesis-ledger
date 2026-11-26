@@ -56,13 +56,13 @@ async function save() {
 
 it.each([
   ['510300.SH', 'CN', 'etf'], ['00700.HK', 'HK', 'stock'], ['02800.HK', 'HK', 'etf'], ['AAPL.US', 'US', 'stock'], ['SPY.US', 'US', 'etf'],
-])('默认空策略可直接选择 %s，保存完整目录身份', async (symbol, market, assetType) => {
+])('选择 %s 后显式复制到来源，保存完整目录身份', async (symbol, market, assetType) => {
   await mount();
   expect(host.querySelector('#strategy-asset-type')).toBeNull();
-  expect(host.textContent).not.toContain('中国内地');
   await search('目录');
   expect(document.querySelectorAll('[role="option"]')).toHaveLength(5);
   await select(symbol);
+  await act(async () => { [...host.querySelectorAll('button')].find(el => el.textContent === '使用执行标的')!.click(); });
   await save();
   expect(saved).toHaveBeenCalledTimes(1);
   expect(saved.mock.calls[0]![0]).toMatchObject({ executionInstrument: { symbol, market, assetType }, signalSources: [{ id: 'execution', asset: { symbol, market, assetType } }] });

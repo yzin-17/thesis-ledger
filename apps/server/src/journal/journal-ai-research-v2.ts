@@ -63,10 +63,10 @@ export class JournalAiResearchV2 {
     const now = new Date().toISOString();
     const data = JSON.parse(JSON.stringify(checked)) as JournalData;
     const frozen = sealAiFrozenResearchV2({
-      version: 'frozen-research-v2',
-      resultVersion: 2,
+      version: 'research-frozen-input-v1',
+      resultVersion: 'research-report-result-v1',
       request: {
-        version: 2,
+        version: 'research-report-submission-v1',
         submissionId: randomUUID(),
         mode: scope.mode,
         scope: { scope: 'account', accountId: scope.accountId },
@@ -74,7 +74,7 @@ export class JournalAiResearchV2 {
         researchSettingsRevision: revision,
       },
       scopeSnapshot: {
-        version: 'research-scope-v2',
+        version: 'research-scope-snapshot-v1',
         scope: 'account',
         accountId: scope.accountId,
         mode: scope.mode,
@@ -147,7 +147,7 @@ export class JournalAiResearchV2 {
     if (sourceScope?.accountId !== scope.accountId || sourceScope.mode !== scope.mode)
       throw journalNotFound();
     const result: ResearchResultV2 | null =
-      detail.availability === 'available' && detail.result?.version === 2 ? detail.result : null;
+      detail.availability === 'available' && detail.result?.version === 'research-report-result-v1' ? detail.result : null;
     return {
       row,
       result,

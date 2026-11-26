@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { compositionRoutes, createCompositionCase, executeCompositionCase } from './market-composition-target-case.mjs';
 
 function harness() {
-  let state = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'original', revision: 95,
+  let state = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'original', revision: 95,
     enabled: true, routes: [], dsaRevision: 95, syncState: 'applied', effectiveStale: false };
   const providers = ['baostock', 'official-states'].map((providerId) => ({ providerId, enabled: true, configVersion: 0 }));
   const catalog = { status: 'complete', entries: compositionRoutes.map((r) => ({ key: r.key,

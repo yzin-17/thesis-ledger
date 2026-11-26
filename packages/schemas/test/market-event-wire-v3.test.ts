@@ -5,7 +5,7 @@ import {
 } from '../src/market-event-wire-v3.js';
 
 const request = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: 'events-1',
   symbol: '510300.SH',
   routeKey: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'CASH_DISTRIBUTION' },

@@ -17,7 +17,7 @@ export type MarketChartPlanV3 = z.infer<typeof marketChartPlanV3Schema>;
 
 export const marketChartOptionsV3Schema = z
   .strictObject({
-    contractVersion: z.literal(3),
+    contractVersion: z.literal(1),
     symbol: z.string().min(1),
     mode: z.enum(['legacy', 'v3', 'unknown']),
     timeframe: z.enum(['1m', '5m', '15m', '30m', '60m', '1d']).optional(),

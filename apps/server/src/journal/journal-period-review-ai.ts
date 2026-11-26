@@ -1,15 +1,12 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  aiResearchContextSchema,
   journalPeriodAiExplanationSchema,
   journalPeriodAiFrozenEvidenceSchema,
   journalPeriodExplanationRequestSchema,
   journalSnapshotDetailQuerySchema,
   journalSnapshotIdSchema,
-  researchResultSchema,
   type IdentityPrincipal,
 } from '@thesis-ledger/schemas';
-import { AiRunService } from '../ai/ai-run.service.js';
 import { JournalAiResearchV2 } from './journal-ai-research-v2.js';
 import { JournalReviewAnalysis } from './journal-review-analysis.js';
 import { journalReviewObjectFacts } from './journal-review-evidence.js';
@@ -19,7 +16,6 @@ import { journalPeriodReviewPrompt } from './journal-review-prompt.js';
 export class JournalPeriodReviewAi {
   constructor(
     private readonly analysis: JournalReviewAnalysis,
-    private readonly runs: AiRunService,
     private readonly v2: JournalAiResearchV2,
   ) {}
   async start(raw: unknown, principal: IdentityPrincipal) {
@@ -102,48 +98,6 @@ export class JournalPeriodReviewAi {
         createdAt: row.createdAt.toISOString(),
       });
     }
-    const run = await this.runs.resume(runId);
-    if (!run) throw notFound();
-    let frozen;
-    try {
-      frozen = await this.runs.frozenEvidence(run.id);
-    } catch {
-      throw notFound();
-    }
-    const parsed = journalPeriodAiFrozenEvidenceSchema.safeParse(frozen?.source.evidence.data);
-    const context = aiResearchContextSchema.safeParse(run.context);
-    if (
-      !parsed.success ||
-      !context.success ||
-      context.data.scope !== 'account' ||
-      context.data.accountId !== scope.accountId ||
-      parsed.data.request.accountId !== scope.accountId ||
-      parsed.data.request.mode !== scope.mode ||
-      frozen?.source.tool !== 'getJournalPeriodReview' ||
-      frozen.source.permission !== 'journal:read' ||
-      frozen.prompt.version !== run.promptVersion
-    )
-      throw notFound();
-    const request = parsed.data.request;
-    const result = researchResultSchema.safeParse(run.result);
-    return journalPeriodAiExplanationSchema.parse({
-      id: run.id,
-      ...scope,
-      symbol: request.symbol ?? null,
-      start: request.start,
-      end: request.end,
-      ledgerRevision: request.expectedLedgerRevision,
-      projectionGeneration: request.expectedProjectionGeneration,
-      objectFingerprints: request.objectFingerprints,
-      provider: run.provider,
-      model: run.model,
-      promptVersion: run.promptVersion,
-      algorithmVersion: parsed.data.result.algorithmVersion,
-      status: run.status,
-      errorCode: run.errorCode,
-      errorSummary: run.errorSummary,
-      result: result.success ? result.data : null,
-      createdAt: run.createdAt.toISOString(),
-    });
+    throw notFound();
   }
 }

@@ -106,7 +106,7 @@ describe('复盘分析的权威输入与 Schema 输出', () => {
       end: '2026-01-04T09:00:00Z',
     };
     const result = await service.period(request);
-    expect(readContext).toHaveBeenCalledWith(request);
+    expect(readContext).toHaveBeenCalledWith(request, undefined);
     expect(result.result.tradeCycles.includedObjectIds).toEqual(['TRADE_CYCLE:trade-1']);
     expect(result.result.closeSlices.includedObjectIds).toEqual(['CLOSE_SLICE:slice-1']);
     await expect(service.period({ ...request, trades: [{ pnl: 999 }] })).rejects.toThrow();

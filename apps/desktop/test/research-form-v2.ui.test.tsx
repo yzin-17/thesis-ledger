@@ -16,6 +16,7 @@ import {
 import { ResearchSubmissionSheet } from '../src/features/ai/ResearchSubmissionSheet.js';
 import type { AiRoutingSettings } from '../src/features/ai/ai.types.js';
 import {
+  browserResearchAccounts,
   createResearchBrowserApi,
   type ResearchBrowserScenario,
   type ResearchBrowserExamples,
@@ -39,6 +40,7 @@ function Form() {
   return (
     <>
       <output aria-label="当前模式">{mode.mode}</output>
+      <button onClick={() => setOpen(true)}>打开研究表单</button>
       <ResearchSubmissionSheet
         open={open}
         onOpenChange={setOpen}
@@ -200,10 +202,11 @@ async function type(selector: string, value: string) {
     );
   });
 }
-async function select(label: string, text: string) {
-  const trigger = document.querySelector<HTMLButtonElement | HTMLInputElement>(`[aria-label="${label}"]`);
-  expect(trigger).toBeTruthy();
-  await act(async () => trigger?.click());
+async function select(label: string, text: string, excludedText?: string) {
+  const selector = `[aria-label="${label}"]`;
+  const trigger = () => document.querySelector<HTMLButtonElement | HTMLInputElement>(selector);
+  await wait(() => expect(trigger()?.disabled).toBe(false));
+  await act(async () => trigger()?.click());
   await wait(() =>
     expect(
       [...document.querySelectorAll<HTMLElement>('[role="option"]')].some((item) =>
@@ -211,7 +214,9 @@ async function select(label: string, text: string) {
       ),
     ).toBe(true),
   );
-  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) =>
+  const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+  if (excludedText) expect(options.some((item) => item.textContent?.includes(excludedText))).toBe(false);
+  const option = options.find((item) =>
     item.textContent?.includes(text),
   );
   await act(async () => option?.click());
@@ -390,7 +395,7 @@ it('独立标的使用目录 ID 且不确认资产、不带账户；真正点击
   await click('准备并提交研究');
   await wait(() => expect(stub.created).toHaveBeenCalledOnce());
   expect(controlled.latest()).toMatchObject({
-    version: 2,
+    version: 'research-report-submission-v1',
     mode: 'shadow',
     scope: { scope: 'instrument' },
   });
@@ -414,7 +419,7 @@ it.each(['portfolio', 'account', 'position', 'strategy'] as const)(
           document.querySelector<HTMLButtonElement>('button[aria-label="研究账户"]')?.disabled,
         ).toBe(false),
       );
-      await select('研究账户', '受控模拟账户');
+      await select('研究账户', '受控模拟账户', '受控实际账户');
     }
     if (scope === 'position') {
       await wait(() =>
@@ -435,6 +440,10 @@ it.each(['portfolio', 'account', 'position', 'strategy'] as const)(
     await click('准备并提交研究');
     await wait(() => expect(stub.created).toHaveBeenCalledOnce());
     expect(controlled.latest()).toMatchObject({ mode: 'shadow', scope: { scope } });
+    if (scope === 'account' || scope === 'position') {
+      expect(controlled.latest()?.scope).toMatchObject({ accountId: browserResearchAccounts[1].id });
+    }
+    if (scope === 'strategy') expect(controlled.latest()?.scope).not.toHaveProperty('accountId');
     expect(JSON.parse(controlled.stats()).created).toBe(1);
   },
 );
@@ -469,5 +478,8 @@ it('全局模式切换可取消并保留草稿；接受切换才关闭当前范�
   await click('放弃修改并切换');
   await expect(transition).resolves.toBe(true);
   expect(document.querySelector('output')?.textContent).toBe('actual');
+  await click('打开研究表单');
+  await click('账户');
+  await select('研究账户', '受控实际账户', '受控模拟账户');
   expect(JSON.parse(controlled.stats()).submitAttempts).toBe(0);
 });

@@ -7,14 +7,9 @@ import { AiProviderSaveService } from '../../src/ai/ai-provider-save.service.js'
 import { AiProviderController } from '../../src/ai/ai-provider.controller.js';
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { aiProviderInputSchema } from '../../src/ai/ai-provider.contracts.js';
+import { researchConnectionProbe } from '../../src/ai/research-connection-probe.js';
 
-const report = {
-  conclusion: '受控样例',
-  evidence: [],
-  risks: [],
-  unknowns: [],
-  disclaimer: '仅验证格式',
-};
+const report = researchConnectionProbe(aiGenerationContracts.research.ref)!;
 const stream = (response: ServerResponse, output: unknown, finishReason = 'stop') => {
   response.writeHead(200, { 'content-type': 'text/event-stream' });
   const chunk = (content: string) => ({

@@ -76,7 +76,7 @@ describe('Backtest V3 price input bindings', () => {
 
   it('keeps bindings optional in V3 and rejects the extension in V2', () => {
     const legacyV3 = {
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       ...runConfigFields,
       executionPriceProtocol,
     };

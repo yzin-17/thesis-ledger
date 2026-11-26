@@ -53,7 +53,7 @@ try {
     const stamp = spec.timeframe === '1d' ? `${day}T00:00:00+08:00`
       : new Date(Date.parse(known?.endAt ?? '') - 60_000).toISOString();
     assert(Number.isFinite(Date.parse(stamp)), '缺少受控分钟样本对应的已知会话');
-    const input = { contractVersion: 3, purpose: 'interactive-chart', requestId: 'runtime-first', symbol: spec.symbol,
+    const input = { contractVersion: 1, purpose: 'interactive-chart', requestId: 'runtime-first', symbol: spec.symbol,
       routeKey: route.key, routeTarget: { providerId: target.providerId, upstreamSource: target.upstreamSource,
         routeIndex: target.routeIndex }, start: day, end: day };
     const scope = await controls.read({ capability: spec.capability, symbol: spec.symbol, purpose: 'interactive-chart',
@@ -63,7 +63,7 @@ try {
       loadCalls++;
       const at = new Date().toISOString();
       return marketChartBarsResponseV3Schema.parse({
-        contractVersion: 3, purpose: request.purpose, requestId: request.requestId, symbol: request.symbol, routeKey: request.routeKey,
+        contractVersion: 1, purpose: request.purpose, requestId: request.requestId, symbol: request.symbol, routeKey: request.routeKey,
         bars: [{ ...fixture.bars[0], timestamp: stamp, availableAt: at, completionStatus: 'unknown' }],
         coverage: { requestedStart: day, requestedEnd: day, actualStart: stamp, actualEnd: stamp,
           hasMoreBefore: false, latestCompleteTradingDate: null },

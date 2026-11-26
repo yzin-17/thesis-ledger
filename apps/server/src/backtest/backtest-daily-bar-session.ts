@@ -1,8 +1,10 @@
 import type { TradingCalendar } from '@thesis-ledger/domain';
 
-const localParts = (value: Date, timezone: string) =>
-  Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
+const localFormatters = new Map<string, Intl.DateTimeFormat>();
+const localParts = (value: Date, timezone: string) => {
+  let formatter = localFormatters.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       year: 'numeric',
       month: '2-digit',
@@ -10,11 +12,15 @@ const localParts = (value: Date, timezone: string) =>
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',
-    })
-      .formatToParts(value)
+    });
+    localFormatters.set(timezone, formatter);
+  }
+  return Object.fromEntries(
+    formatter.formatToParts(value)
       .filter((part) => part.type !== 'literal')
       .map((part) => [part.type, part.value]),
   );
+};
 
 const utcForLocalMinute = (date: string, minute: number, timezone: string): Date => {
   const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = date.split('-').map(Number);

@@ -30,7 +30,7 @@ describe('NAV Run 历史列表', () => {
       }),
       row('cccccccc-cccc-4ccc-8ccc-cccccccccccc', config, { mode: 'V2' }),
       row('dddddddd-dddd-4ddd-8ddd-dddddddddddd', config, {
-        input: { contractVersion: 3, schemaVersion: '2', inputKind: 'nav', runConfig: config },
+        input: { contractVersion: 1, schemaVersion: '2', inputKind: 'nav', runConfig: config },
       }),
       row('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', config, {
         runConfig: {},
@@ -63,7 +63,7 @@ describe('NAV Run 历史列表', () => {
       const body = (await response.json()) as Array<Record<string, unknown>>;
       expect(body).toHaveLength(2);
       expect(body[0]).toEqual({
-        contractVersion: 3,
+        contractVersion: 1,
         inputKind: 'nav',
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         strategyVersionId,
@@ -71,6 +71,7 @@ describe('NAV Run 历史列表', () => {
         status: 'queued',
         stage: 'queued',
         progress: 0,
+        cancelRequestedAt: null,
         periodStart: new Date(`${config.startDate}T00:00:00.000Z`).toISOString(),
         periodEnd: new Date(`${config.endDate}T00:00:00.000Z`).toISOString(),
         errorCode: null,
@@ -84,15 +85,15 @@ describe('NAV Run 历史列表', () => {
       expect(findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            mode: 'V3',
+            mode: 'frozen',
             strategyVersion: {
               strategy: {
                 OR: [{ ownerId: null }, { ownerId: '4cb546a5-b04f-4c0a-9d3b-6a53fdb74f57' }],
               },
             },
             AND: [
-              { input: { path: ['contractVersion'], equals: 3 } },
-              { input: { path: ['schemaVersion'], equals: '3' } },
+              { input: { path: ['contractVersion'], equals: 1 } },
+              { input: { path: ['schemaVersion'], equals: 'backtest-nav-run-v1' } },
               { input: { path: ['inputKind'], equals: 'nav' } },
             ],
           },
@@ -111,7 +112,7 @@ function row(id: string, runConfig: unknown, overrides: Record<string, unknown> 
   return {
     id,
     strategyVersionId: '11111111-1111-4111-8111-111111111111',
-    mode: 'V3',
+    mode: 'frozen',
     status: 'queued',
     stage: 'queued',
     progress: 0,
@@ -121,7 +122,7 @@ function row(id: string, runConfig: unknown, overrides: Record<string, unknown> 
     errorSummary: null,
     createdAt: new Date('2026-09-30T10:00:00.000Z'),
     updatedAt: new Date('2026-09-30T10:00:00.000Z'),
-    input: { contractVersion: 3, schemaVersion: '3', inputKind: 'nav', runConfig },
+    input: { contractVersion: 1, schemaVersion: 'backtest-nav-run-v1', inputKind: 'nav', runConfig },
     runConfig,
     ...overrides,
   };

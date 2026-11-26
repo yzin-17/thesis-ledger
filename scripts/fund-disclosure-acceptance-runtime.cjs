@@ -34,8 +34,8 @@ async function main() {
         if (input.phase === 'prepare') {
           assert(
             [
-              '/api/v3/thesis-ledger/market/fund-nav?symbol=161725.OF',
-              '/api/v3/thesis-ledger/market/fund-holdings?symbol=161725.OF',
+              '/api/v1/thesis-ledger/market/fund-nav?symbol=161725.OF',
+              '/api/v1/thesis-ledger/market/fund-holdings?symbol=161725.OF',
             ].includes(path),
           );
           assert(
@@ -43,7 +43,7 @@ async function main() {
           );
         } else {
           const parsed = new URL(path, 'http://dsa');
-          assert.equal(parsed.pathname, '/api/v3/thesis-ledger/market/quote');
+          assert.equal(parsed.pathname, '/api/v1/thesis-ledger/market/quote');
           assert(
             input.source.holdings.holdings.some(
               (h) => h.weight > 0 && h.symbol === parsed.searchParams.get('symbol'),

@@ -117,7 +117,7 @@ async function main() {
         [
           '/api/market-data/policy',
           '/api/market-data/providers',
-          '/api/market-data/routes/capabilities?contractVersion=3',
+          '/api/market-data/routes/capabilities?contractVersion=1',
           historyPath,
         ].includes(path),
       );
@@ -155,7 +155,7 @@ async function main() {
     const [state, p, catalog] = await Promise.all([
       api('GET', '/api/market-data/policy'),
       api('GET', '/api/market-data/providers'),
-      api('GET', '/api/market-data/routes/capabilities?contractVersion=3'),
+      api('GET', '/api/market-data/routes/capabilities?contractVersion=1'),
     ]);
     assert(
       state.syncState === 'applied' &&

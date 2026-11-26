@@ -25,11 +25,13 @@ export class MarketAnnouncementPreparationService {
       const policy = (await this.dsa.effectiveControlPolicyV3()).projection?.effective;
       const selected = policy?.enabled && policy.routes.some((route) =>
         route.key.market === 'CN' && route.key.assetType === 'STOCK' &&
-        route.key.capability === 'HISTORICAL_TRADING_STATUS' && route.targets.some((target) =>
+        route.enabled !== false && route.targets.some((target) =>
           target.eligible && target.providerId === 'official-states' &&
-          ['cn-stock-daily-suspension', 'cn-stock-risk-price-limits'].includes(target.upstreamSource)));
+          ((route.key.capability === 'DAILY_TRADING_STATUS' && target.upstreamSource === 'cn-stock-daily-suspension') ||
+            (['DAILY_PRICE_RULE', 'RISK_WARNING'].includes(route.key.capability) &&
+              target.upstreamSource === 'cn-stock-risk-price-limits'))));
       if (!selected) return undefined;
-      const result = await this.dsa.control<unknown>('/api/v3/thesis-ledger/control/announcements/prepare', {
+      const result = await this.dsa.control<unknown>('/api/v1/thesis-ledger/control/announcements/prepare', {
         method: 'POST', body: JSON.stringify({ symbols: [window.symbol], start: window.start, end: window.end }),
       });
       return marketAnnouncementPreparationSchema.parse(result);

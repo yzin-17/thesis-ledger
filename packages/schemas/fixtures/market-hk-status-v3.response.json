@@ -1,6 +1,6 @@
 {
   "request": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "consumer": "thesis-ledger",
     "requestId": "p6-wire-contract",
     "routeKey": {
@@ -21,7 +21,7 @@
     }
   },
   "response": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "consumer": "thesis-ledger",
     "requestId": "p6-wire-contract",
     "routeKey": {

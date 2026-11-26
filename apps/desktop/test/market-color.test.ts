@@ -21,10 +21,15 @@ describe('Desktop 涨跌配色契约', () => {
   it('金融颜色与固定状态颜色使用不同语义变量', () => {
     const tokens = readFileSync(new URL('../src/styles/tokens.css', import.meta.url), 'utf8');
     const base = readFileSync(new URL('../src/styles/base.css', import.meta.url), 'utf8');
-    const chart = readFileSync(
-      new URL('../src/features/market-detail/MarketPriceLightweightChart.tsx', import.meta.url),
-      'utf8',
-    );
+    const chart =
+      readFileSync(
+        new URL('../src/features/market-detail/MarketPriceLightweightChart.tsx', import.meta.url),
+        'utf8',
+      ) +
+      readFileSync(
+        new URL('../src/features/market-detail/market-price-chart-series.ts', import.meta.url),
+        'utf8',
+      );
     expect(tokens).toContain('--color-market-up');
     expect(tokens).toContain('--color-market-down');
     expect(base).not.toMatch(/\.(market-positive|market-negative|status-positive)\s*\{/);

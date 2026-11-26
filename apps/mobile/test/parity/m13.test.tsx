@@ -45,7 +45,7 @@ const detail = (count: number) => {
     availableAt: '2026-10-23T01:00:00Z',
   }));
   const series = {
-    contractVersion: 3,
+    contractVersion: 1,
     identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
     points,
     coverage: {
@@ -68,7 +68,7 @@ const detail = (count: number) => {
     inputFingerprint: 'fixture-window',
   };
   return marketDisplayDetailResponseSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     symbol: '510300.SH',
     assetType: 'ETF',
     identity: { source: 'asset', status: 'confirmed' },

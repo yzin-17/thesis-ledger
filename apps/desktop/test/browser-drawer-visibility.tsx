@@ -24,8 +24,8 @@ import { fundInvestmentKeys } from '../src/features/account-data/account-data.fu
 import { CashObservationSheet } from '../src/features/account-data/AccountDataCashObservationSheet.js';
 import { CashDepositSheet } from '../src/features/account-data/AccountDataCashDepositSheet.js';
 import { CashTransferSheet } from '../src/features/account-data/AccountDataCashTransferSheet.js';
-import { EvidenceEditorSheet } from '../src/features/journal/EvidenceEditorSheet.js';
-import { AdvancedJsonSheet } from '../src/features/journal/AdvancedJsonSheet.js';
+import { EvidenceEditorSheet } from './fixtures/journal/EvidenceEditorSheet.js';
+import { AdvancedJsonSheet } from './fixtures/journal/AdvancedJsonSheet.js';
 import type { Account } from '../src/features/portfolio/portfolio.types.js';
 import '../src/ui/styles.css';
 

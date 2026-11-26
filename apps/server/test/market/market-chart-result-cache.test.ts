@@ -198,7 +198,7 @@ describe('交互基础行情60秒缓存', () => {
 
   it('实际图表读取在DSA基础调用之前复用，并将来源时点与缓存状态投影给消费者', async () => {
     const env = setup();
-    const desired = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'policy', revision: 1,
+    const desired = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'policy', revision: 1,
       enabled: true, routes: [{ key: request.routeKey, targets: [{ providerId: 'futu', upstreamSource: 'futu' }] }] };
     const effective = { ...desired, sourceDesiredRevision: 1, appliedAt: '2026-11-11T14:00:00Z',
       routes: [{ key: request.routeKey, targets: [{ ...request.routeTarget, eligible: true, reason: null }], reason: null }] };

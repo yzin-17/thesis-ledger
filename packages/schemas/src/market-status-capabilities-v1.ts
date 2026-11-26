@@ -15,7 +15,7 @@ const key = <T extends StatusCapabilityNameV1>(capability: T) => z.strictObject(
   kind: z.literal('data'), market, assetType: z.literal('STOCK'), capability: z.literal(capability),
 });
 const envelope = {
-  contractVersion: z.literal(3), capabilityVersion: z.literal(1), consumer: z.literal('thesis-ledger'),
+  contractVersion: z.literal(1), capabilityVersion: z.literal(1), consumer: z.literal('thesis-ledger'),
   requestId: text, symbol, routeTarget: marketDataRouteTargetPinV3Schema,
   policyRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 };
@@ -79,7 +79,9 @@ const coverage = z.strictObject({
 const day = { date, evidenceRefs: references };
 const tradingDay = z.strictObject({
   ...day, state: z.enum(['trading', 'suspended', 'unknown']),
-  intradayHalts: z.array(z.strictObject({ startedAt: instant, endedAt: instant.nullable() })
+  intradayHalts: z.array(z.strictObject({
+    startedAt: instant, endedAt: instant.nullable(), reason: text.nullable().optional(),
+  })
     .refine((value) => value.endedAt === null || Date.parse(value.startedAt) < Date.parse(value.endedAt))),
 });
 const riskDay = z.strictObject({

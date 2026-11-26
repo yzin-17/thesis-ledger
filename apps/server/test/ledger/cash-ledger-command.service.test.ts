@@ -28,7 +28,7 @@ const storedFromEvent = (event: LedgerEvent) => ({
   economicOrderKey: event.economicOrderKey,
   recordedAt: new Date(event.recordedAt),
   projectionGeneration: BigInt(event.ledgerRevision),
-  envelopeVersion: 3,
+  envelopeVersion: 1,
   payloadVersion: event.payloadVersion,
   payload: event.revisionAction === 'VOID' ? null : event.payload,
   sourceCategory: event.source.category,

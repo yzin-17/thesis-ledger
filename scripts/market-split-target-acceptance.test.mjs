@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { executeSplitCase, splitPlan } from './market-split-target-acceptance.mjs';
 
-const baseline = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'baseline', revision: 111, enabled: true,
+const baseline = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'baseline', revision: 111, enabled: true,
   routes: [{ key: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'CASH_DISTRIBUTION' },
     targets: [{ providerId: 'hithink', upstreamSource: 'fund-corporate-actions-dividends' }, { providerId: 'official-dividends', upstreamSource: 'cn-etf-cash-notices' }] }],
   syncState: 'applied', effectiveStale: false, dsaRevision: 111 };

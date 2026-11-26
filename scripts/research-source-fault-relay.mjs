@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 
 export const sourceFaultModel = '@cf/qwen/qwen3.8-27b';
-export const sourceFaultNewsPath = '/api/v3/thesis-ledger/market/news';
+export const sourceFaultNewsPath = '/api/v1/thesis-ledger/market/news';
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const dateInShanghai = (value) =>
   new Date(Date.parse(value) + 8 * 3600000).toISOString().slice(0, 10);
@@ -72,8 +72,8 @@ export async function createSourceFaultRelay({
       } else {
         assert(
           [
-            '/api/v3/thesis-ledger/market/cache-context',
-            '/api/v3/thesis-ledger/market/quote',
+            '/api/v1/thesis-ledger/market/cache-context',
+            '/api/v1/thesis-ledger/market/quote',
           ].includes(path),
           '中继路径不在只读白名单',
         );

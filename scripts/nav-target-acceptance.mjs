@@ -90,7 +90,7 @@ const created = requireStatus(
 const strategyVersionId = created.versions?.at(-1)?.id;
 if (!strategyVersionId) throw new Error('创建策略未返回版本身份');
 const intent = {
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: `nav-target-${randomUUID()}`,
   strategyVersionId,
   fundType,
@@ -142,7 +142,7 @@ if (preparation.status !== 'prepared')
 if (!preparation.receipt) throw new Error('目标准备未返回持久化凭证');
 const preparationMs = Date.now() - prepareStarted;
 const createBody = {
-  contractVersion: 3,
+  contractVersion: 1,
   preparationId: preparation.receipt.preparationId,
   preparationHash: preparation.receipt.preparationHash,
   idempotencyKey: `nav-target-${randomUUID()}`,

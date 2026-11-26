@@ -1,10 +1,11 @@
 import type { ArenaLiveDetail } from '@thesis-ledger/schemas';
-import { arenaAppointmentLabel, arenaLiveLabel, formatDecimalNumber } from '@thesis-ledger/domain';
+import { arenaAppointmentLabel, arenaLiveLabel } from '@thesis-ledger/domain';
 import { useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { formatDateTimeWithLocalZone } from '@/lib/date-display';
 import { arenaResearchFailureDetail } from './arena-live-failure.js';
 import { ArenaDisclosure } from './ArenaDisclosure.js';
+import { ArenaPlanReadback } from './ArenaPlanReadback.js';
 
 export function ArenaLiveDecisions({ detail, agentId }: { detail: ArenaLiveDetail; agentId: string }) {
   const [params, setParams] = useSearchParams();
@@ -22,11 +23,10 @@ export function ArenaLiveDecisions({ detail, agentId }: { detail: ArenaLiveDetai
     <div className="grid divide-y divide-border">{cycles.slice((page - 1) * 10, page * 10).map((cycle) => <article key={cycle.id} className="grid min-w-0 gap-3 py-5 first:pt-0">
       <header className="flex flex-wrap items-center justify-between gap-2 text-sm"><strong>{arenaLiveLabel(cycle.state)}</strong><span className="text-xs text-muted-foreground">{time(cycle.asOf ?? cycle.createdAt)}</span></header>
       {cycle.decision ? <>
-        <p className="text-sm whitespace-pre-wrap wrap-anywhere">{cycle.decision.summary}</p>
+        <p className="text-sm whitespace-pre-wrap wrap-anywhere"><span className="text-xs text-muted-foreground">模型摘要 · </span>{cycle.decision.summary}</p>
         <div className="grid gap-2 text-sm">
-          {cycle.decision.orders.map((order) => <p key={order.clientId}>{order.side === 'buy' ? '买入' : '卖出'} {name(order.symbol)} · {formatDecimalNumber(order.quantity)} · {arenaLiveLabel(order.kind)}{order.price && ' ' + formatDecimalNumber(order.price)}</p>)}
+          <ArenaPlanReadback decision={cycle.decision} name={name} book={agent?.account} />
           {!cycle.decision.orders.length && <p className="text-xs text-muted-foreground">本次未新增委托</p>}
-          {cycle.decision.cancelOrderIds.length > 0 && <p>撤销委托 · {cycle.decision.cancelOrderIds.length} 笔</p>}
           {cycle.decision.wakeups.map((wakeup, index) => <p key={index} className="wrap-anywhere">{wakeup.kind === 'time' ? '预约时间 · ' + time(wakeup.at) : arenaAppointmentLabel(wakeup, name)}</p>)}
           {cycle.decision.watchedSymbols.length > 0 && <p className="text-xs text-muted-foreground wrap-anywhere">观察标的：{cycle.decision.watchedSymbols.map(name).join('、')}</p>}
         </div>

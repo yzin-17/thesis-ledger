@@ -58,10 +58,10 @@ export const baseInput = (
   ...overrides,
 });
 
-export const exchangeRules = () =>
+export const exchangeRules = (calendar = cnTradingCalendar) =>
   new VersionedExecutionRules({
     version: 'cn-execution-1',
-    calendar: cnTradingCalendar,
+    calendar,
     calendarProvider: 'fixture',
     calendarProviderRevision: 'calendar-1',
     calendarAvailableAt: '2026-09-01T00:00:00.000Z',

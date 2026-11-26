@@ -14,7 +14,7 @@ import { localOrigin } from './market-status-functional-acceptance.mjs';
 export function responseRequests(plan) {
   return compositionRoutes.map((route) => {
     const capability = route.key.capability;
-    const query = { contractVersion: 3, capabilityVersion: 1, consumer: 'thesis-ledger',
+    const query = { contractVersion: 1, capabilityVersion: 1, consumer: 'thesis-ledger',
       requestId: randomUUID(), symbol: compositionScope.symbol, routeKey: route.key,
       routeTarget: { ...route.targets[0], routeIndex: 0 }, policyRevision: plan.temporary.revision };
     if (capability !== 'SECURITY_BASIC_DATES')
@@ -32,7 +32,7 @@ let text=''; for await(const chunk of process.stdin) text+=chunk;
 const requests=JSON.parse(text), client=new DsaClient(), original=globalThis.fetch, observations=[];
 globalThis.fetch=async (...args)=>{
  const response=await original(...args);
- if(new URL(String(args[0])).pathname==='/api/v3/thesis-ledger/market/status-capabilities'){
+ if(new URL(String(args[0])).pathname==='/api/v1/thesis-ledger/market/status-capabilities'){
   const request=JSON.parse(args[1].body), raw=await response.clone().json();
   const parsed=marketDataErrorEnvelopeV3Schema.safeParse(raw.detail);
   observations.push({requestId:request.requestId,capability:request.routeKey.capability,httpStatus:response.status,
@@ -57,7 +57,7 @@ async function main() {
   const api = createLocalApi(origin);
   const plan = createCompositionCase(await api.get('/api/market-data/policy'),
     (await api.get('/api/market-data/providers')).providers,
-    await api.get('/api/market-data/routes/capabilities?contractVersion=3'));
+    await api.get('/api/market-data/routes/capabilities?contractVersion=1'));
   const requests = responseRequests(plan);
   if (!args.includes('--execute')) {
     console.log(JSON.stringify({ mode: 'read-only-preview', revisions: [plan.baseline.revision,

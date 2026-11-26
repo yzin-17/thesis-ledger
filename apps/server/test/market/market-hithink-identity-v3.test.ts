@@ -42,7 +42,7 @@ describe('HiThink 分红在线与离线原字节校验', () => {
       scope,
       read,
       effective: {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'synthetic-hithink-policy',
         revision: 1,
@@ -67,7 +67,7 @@ describe('HiThink 分红在线与离线原字节校验', () => {
         ],
       },
       catalog: {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         catalogRevision: 1,
         generatedAt: '2026-09-28T11:00:00Z',

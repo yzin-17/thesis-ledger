@@ -30,10 +30,10 @@ Desktop 普通规则与策略应用的创建、编辑均接入提供方选择；
 
 工具统一使用 Microsoft Edge；真实 API 被拦截，不提交真实业务或发送通知，不调用行情 Provider。
 
-- Desktop：`PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright node scripts/local-runtime/risk-notification-unification-browser.mjs`。在现有 5173 开发服务实际挂载普通规则创建/编辑、策略应用创建/编辑和 RiskCenter 通知页，1440、1024、768、390 四宽度共 20 场景通过。验证默认/旧值、具体提供方选择、零冷却、首次 503 后输入保留、再次保存和重新打开回显，通知页无全局输入及保存按钮。产物 `/tmp/risk-notification-unification-qa/`。
-- Mobile：`PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright node scripts/local-runtime/risk-notification-mobile-browser.mjs`。React Native Web 实际挂载普通 RiskRuleForm、策略 RiskNotificationFields 及对应序列化，四宽度共 12 场景通过。覆盖普通创建、编辑与策略通知字段，503 后保留输入、重新核对及保存。产物 `/tmp/risk-notification-mobile-qa/`。隔离 Runtime 提供原生导航等环境边界，不作为实体设备验收；未修改原生工程，不触发 Native compile。
+- Desktop：`PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright node scripts/local-runtime/browser/risk/risk-notification-unification.regression.mjs`。在现有 5173 开发服务实际挂载普通规则创建/编辑、策略应用创建/编辑和 RiskCenter 通知页，1440、1024、768、390 四宽度共 20 场景通过。验证默认/旧值、具体提供方选择、零冷却、首次 503 后输入保留、再次保存和重新打开回显，通知页无全局输入及保存按钮。产物 `/tmp/risk-notification-unification-qa/`。
+- Mobile：`PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright node scripts/local-runtime/browser/risk/risk-notification-mobile.regression.mjs`。React Native Web 实际挂载普通 RiskRuleForm、策略 RiskNotificationFields 及对应序列化，四宽度共 12 场景通过。覆盖普通创建、编辑与策略通知字段，503 后保留输入、重新核对及保存。产物 `/tmp/risk-notification-mobile-qa/`。隔离 Runtime 提供原生导航等环境边界，不作为实体设备验收；未修改原生工程，不触发 Native compile。
 
-临时 Mobile 服务使用独立 5196 端口和缓存，结束后关闭。初次样本扫描到历史发布目录后已限定入口；编辑恢复样本补齐旧规则读取结果。旧关闭回归工具首次遇到开发服务重载，之后发现共用临时 Playwright 目录缺少包入口，改用任务独立临时目录 `/tmp/thesis-risk-notification-qa/` 安装同版本 `playwright@1.65.0` 后继续；未更改仓库 manifest 或 lockfile。最终使用 `PLAYWRIGHT_MODULE=/tmp/thesis-risk-notification-qa/node_modules/playwright RISK_RULE_QA_OUTPUT=/tmp/risk-unification-regression-qa node scripts/local-runtime/strategy-rule-notification-browser.mjs`，四宽度共 20 个保存、关闭、取消及指定路由导航场景全部通过。
+临时 Mobile 服务使用独立 5196 端口和缓存，结束后关闭。初次样本扫描到历史发布目录后已限定入口；编辑恢复样本补齐旧规则读取结果。旧关闭回归工具首次遇到开发服务重载，之后发现共用临时 Playwright 目录缺少包入口，改用任务独立临时目录 `/tmp/thesis-risk-notification-qa/` 安装同版本 `playwright@1.65.0` 后继续；未更改仓库 manifest 或 lockfile。最终使用 `PLAYWRIGHT_MODULE=/tmp/thesis-risk-notification-qa/node_modules/playwright RISK_RULE_QA_OUTPUT=/tmp/risk-unification-regression-qa node scripts/local-runtime/browser/risk/strategy-rule-notification.regression.mjs`，四宽度共 20 个保存、关闭、取消及指定路由导航场景全部通过。
 
 ## 本地部署验收
 

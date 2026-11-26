@@ -15,6 +15,7 @@ import { LocalSnapshotStore } from './backtest-snapshot.js';
 import type { ArtifactRow } from './backtest-artifact-store.js';
 import { ArtifactNotFoundError } from './backtest-artifact-store.js';
 import { isBacktestEvidenceAfterDataAsOfV3 } from './backtest-v3-evidence-clock.js';
+import { stockSnapshotStoreForJob } from './backtest-v3-run-execution.js';
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -87,6 +88,7 @@ export class BacktestInstrumentSeriesService {
       manifest.dataAsOf,
       config,
       dateKey,
+      stockSnapshotStoreForJob({ id: runId, input: job.input, executionAttempt: job.executionAttempt }, this.snapshots).artifacts,
     );
     if (!Array.isArray(points)) return points;
     if (!points.some((point) => point.close !== null))
@@ -119,12 +121,13 @@ export class BacktestInstrumentSeriesService {
     dataAsOf: string,
     config: RunConfigV3,
     dateKey: (timestamp: string) => string,
+    artifacts: LocalSnapshotStore['artifacts'],
   ): Promise<SeriesPoint[] | Extract<BacktestInstrumentSeries, { status: 'unavailable' }>> {
     const points: SeriesPoint[] = [];
     const seen = new Set<number>();
     let count = 0;
     try {
-      for await (const row of await this.snapshots.artifacts.openRead(artifact)) {
+      for await (const row of await artifacts.openRead(artifact)) {
         if (++count > 100_000)
           return unavailable(runId, 'SERIES_TOO_LARGE', '冻结标的序列超出当前展示上限。');
         if (!isFrozenExecutionBar(row, source, routeKey, dataAsOf))

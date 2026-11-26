@@ -10,7 +10,7 @@ function input() {
   const raw = fixture('backtest-v2.exchange.json');
   const asset = { market: 'US', symbol: 'GME.US', assetType: 'stock' };
   raw.executionInstrument = asset;
-  raw.signalSources = [{ id: 'execution', asset, timeframe: '1d', series: ['close'] }];
+  raw.signalSources = [{ id: 'execution', priceCoordinate: 'run', asset, timeframe: '1d', series: ['close'] }];
   const series = { type: 'series', sourceId: 'execution', field: 'close' };
   raw.entry = { type: 'compare', operator: 'lte', left: series,
     right: { type: 'indicator', name: 'MA', input: series, params: { period: 2 } } };

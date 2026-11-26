@@ -4,7 +4,7 @@
 
 日期：2026-11-14。基线为当前含大量未提交修改的本地工作区；没有重置、暂存、提交、推送、Docker 操作、业务库写入或真实 Provider 请求。
 
-需求与当前状态分别由 [Spec](../specs/2026-11-14-research-journal-reading.md)、[Task](../tasks/2026-11-14-research-journal-reading.md) 维护。
+需求见[现行规格](../specs/2026-11-14-research-journal-reading.md)，结案见[归档任务](../archive/tasks/2026-11-14-research-journal-reading.md)。
 
 ## 实际入口与实现
 

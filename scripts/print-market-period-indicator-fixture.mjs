@@ -50,7 +50,7 @@ const cases = ['5d', '1w', '1mo', '1y'].map((timeframe) => {
     pointFingerprint: digest(canonicalBarSeriesEncoding(identity, points)),
   };
   const payload = marketPeriodIndicatorRequestSchema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     identity,
     points,
     periodContext,

@@ -14,18 +14,18 @@ function fixture() {
   const key = { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'SPLIT_EVENT' } as const;
   const target = { providerId: 'akshare', upstreamSource: 'eastmoney' };
   const scope = {
-    contractVersion: 3 as const, requestId: 'ed92afdb-5f4b-4d6c-8f95-d8acf8dc08cf', routeKey: key,
+    contractVersion: 1 as const, requestId: 'ed92afdb-5f4b-4d6c-8f95-d8acf8dc08cf', routeKey: key,
     symbol: '159516.SZ', start: '2026-03-30', end: '2026-07-10',
     desiredRevision: 112, effectivePolicyRevision: 112, catalogRevision: 4494082701661225,
     dataAsOf: '2026-10-12T10:57:44.604Z',
   };
   const effective = {
-    contractVersion: 3, consumer: 'thesis-ledger', requestId: 'offline-policy', revision: 112,
+    contractVersion: 1, consumer: 'thesis-ledger', requestId: 'offline-policy', revision: 112,
     sourceDesiredRevision: 112, enabled: true, appliedAt: '2026-10-12T10:57:44.000Z',
     routes: [{ key, reason: null, targets: [{ ...target, routeIndex: 0, eligible: true, reason: null }] }],
   };
   const catalog = {
-    contractVersion: 3, consumer: 'thesis-ledger', catalogRevision: scope.catalogRevision,
+    contractVersion: 1, consumer: 'thesis-ledger', catalogRevision: scope.catalogRevision,
     generatedAt: '2026-10-12T10:57:44.000Z', integrity: 'complete',
     entries: [{ key, target, state: 'ready' }],
   };

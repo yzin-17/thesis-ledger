@@ -99,7 +99,7 @@ function sourceLabel(kind: string) {
 
 export function BacktestRunDisclosure({ job }: { job: BacktestJob }) {
   const result = job.result;
-  const isV3 = result && 'schemaVersion' in result && result.schemaVersion === '3';
+  const isV3 = result && 'schemaVersion' in result && result.schemaVersion === 'backtest-trade-result-v1';
   const parsed = (
     isV3 ? executionModelDisclosureSchemaV3 : executionModelDisclosureSchema
   ).safeParse(result?.executionModelDisclosure ?? job.executionModelDisclosure);

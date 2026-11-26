@@ -74,7 +74,7 @@ function harness() {
     resolveFx: vi.fn(async () => ({
       rates: new Map([['CNY', 1]]),
       meta: {
-        version: 3,
+        version: 1,
         evidenceVersion: 'fx-cny-1',
         enabled: true,
         status: 'not_needed',

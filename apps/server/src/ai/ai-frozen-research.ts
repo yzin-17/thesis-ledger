@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { AiTool } from './contracts.js';
 
 export const aiFrozenResearchSchema = z
   .object({
@@ -27,30 +26,6 @@ export const aiFrozenResearchSchema = z
       .strict(),
   })
   .strict();
-export type AiFrozenResearch = z.infer<typeof aiFrozenResearchSchema>;
 export class AiFrozenResearchError extends Error {
   readonly errorCode = 'research_frozen_evidence_invalid';
-}
-
-export function readFrozenResearch(metadata: unknown) {
-  if (
-    metadata === null ||
-    typeof metadata !== 'object' ||
-    Array.isArray(metadata) ||
-    !('frozenResearch' in metadata)
-  )
-    return null;
-  const parsed = aiFrozenResearchSchema.safeParse(metadata.frozenResearch);
-  if (!parsed.success) throw new AiFrozenResearchError('任务冻结证据格式无效');
-  return parsed.data;
-}
-export function frozenResearchTool(frozen: AiFrozenResearch): AiTool {
-  return {
-    name: frozen.source.tool,
-    permission: frozen.source.permission,
-    execute: (_input, signal) => {
-      if (signal.aborted) return Promise.reject(new DOMException('解读已取消', 'AbortError'));
-      return Promise.resolve(structuredClone(frozen.source.evidence));
-    },
-  };
 }

@@ -11,7 +11,7 @@ import { mapDataV3HttpError } from '/app/apps/server/dist/src/integration/dsa/ds
 import { marketDataErrorEnvelopeV3Schema, statusCapabilityRequestV1Schema } from '@thesis-ledger/schemas';
 let text=''; for await (const chunk of process.stdin) text+=chunk;
 const {revision}=JSON.parse(text), client=new DsaClient();
-const request=statusCapabilityRequestV1Schema.parse({contractVersion:3,capabilityVersion:1,
+const request=statusCapabilityRequestV1Schema.parse({contractVersion:1,capabilityVersion:1,
  consumer:'thesis-ledger',requestId:crypto.randomUUID(),symbol:'600519.SH',
  routeKey:{kind:'data',market:'CN',assetType:'STOCK',capability:'SECURITY_BASIC_DATES'},
  routeTarget:{providerId:'baostock',upstreamSource:'baostock',routeIndex:0},policyRevision:revision});
@@ -19,11 +19,11 @@ const proofs=[];
 for (const invalid of [false,true]) {
  const body=invalid?{...request,range:{start:'2026-10-08',end:'2026-10-09'}}:request;
  let observed;
- try { await client.post('/api/v3/thesis-ledger/market/status-capabilities',body,1,(status,payload)=>{
+ try { await client.post('/api/v1/thesis-ledger/market/status-capabilities',body,1,(status,payload)=>{
   const parsed=marketDataErrorEnvelopeV3Schema.safeParse(payload?.detail);
   console.log('STATUS_ERROR_OBSERVATION='+JSON.stringify({invalid,status,standard:parsed.success,
     hasDetail:!!payload?.detail, hasError:!!payload?.error,
-    detailVersion3:payload?.detail?.contractVersion===3,detailHasError:!!payload?.detail?.error,
+    detailVersion3:payload?.detail?.contractVersion===1,detailHasError:!!payload?.detail?.error,
     detailCorrelated:payload?.detail?.requestId===request.requestId,
     ...(parsed.success?{detail:parsed.data}: {})}));
   const detail=marketDataErrorEnvelopeV3Schema.parse(payload?.detail);

@@ -1,8 +1,9 @@
 import { DecimalValue as D } from './decimal.js';
+import { arenaRemainingQuantity } from './arena-live-fill-quantity.js';
 import type { ArenaPaperAccount, ArenaPaperQuote, ArenaPaperWakeup } from './arena-live-types.js';
 
 export function arenaReservedCash(account: ArenaPaperAccount) {
-  return account.orders.filter((o) => o.state === 'active')
+  return account.orders.filter((o) => o.state === 'active' || o.state === 'waiting_entry')
     .reduce((sum, o) => sum.plus(o.reservedCash), D.from('0')).toString();
 }
 export function arenaAvailableCash(account: ArenaPaperAccount, day: string) {
@@ -11,16 +12,17 @@ export function arenaAvailableCash(account: ArenaPaperAccount, day: string) {
   return D.from(account.cash).minus(arenaReservedCash(account)).minus(unsettled).toString();
 }
 export function arenaAvailableShares(account: ArenaPaperAccount, symbol: string, day: string) {
-  let quantity = account.positions.filter((p) => p.symbol === symbol && p.availableOn <= day)
+  const protectedEntries = new Set(account.orders.filter((o) => o.parentOrderId && o.state === 'active').map((o) => o.parentOrderId));
+  let quantity = account.positions.filter((p) => p.symbol === symbol && p.availableOn <= day && !protectedEntries.has(p.entryOrderId))
     .reduce((sum, p) => sum.plus(p.quantity), D.from('0'));
   const groups = new Set<string>();
   for (const order of account.orders) {
-    if (order.state !== 'active' || order.side !== 'sell' || order.symbol !== symbol) continue;
+    if (order.state !== 'active' || order.side !== 'sell' || order.symbol !== symbol || order.parentOrderId) continue;
     if (order.exitGroup) {
       if (groups.has(order.exitGroup)) continue;
       groups.add(order.exitGroup);
     }
-    quantity = quantity.minus(order.quantity);
+    quantity = quantity.minus(arenaRemainingQuantity(account, order));
   }
   return quantity.toString();
 }

@@ -5,6 +5,7 @@ import {
 } from '@thesis-ledger/domain';
 import type { RunConfigV3 } from '@thesis-ledger/schemas';
 import { dailyBarSessionWindow } from './backtest-daily-bar-session.js';
+import { intradayBarSessionWindow } from './backtest-intraday-bar-session.js';
 
 /** Attaches a separate research clock without modifying the source observation. */
 export const barResearchClocksV3 = (
@@ -13,10 +14,10 @@ export const barResearchClocksV3 = (
   runConfig?: RunConfigV3,
 ): { researchClock?: BacktestResearchClock; openResearchClock?: BacktestResearchClock } => {
   if (runConfig?.executionPriceProtocol.history.basis !== 'fixed-provider-snapshot') return {};
-  if (row.timeframe !== '1d' || typeof row.availableAt !== 'string') {
-    throw new Error('DATA_UNAVAILABLE: V3 研究时钟需要完整日线及真实观测时间');
+  if (typeof row.availableAt !== 'string') {
+    throw new Error('DATA_UNAVAILABLE: V3 研究时钟需要真实观测时间');
   }
-  const session = dailyBarSessionWindow(row, calendar);
+  const session = row.timeframe === '1d' ? dailyBarSessionWindow(row, calendar) : intradayBarSessionWindow(row, calendar);
   const researchClock: BacktestResearchClock = {
     basis: 'fixed-provider-snapshot',
     dataAsOf: runConfig.dataAsOf,

@@ -1,4 +1,6 @@
 import { Spinner } from '@/components/ui/spinner';
+import { backtestStageDisplay } from '@thesis-ledger/domain';
+import { jobStatusLabel } from './backtest-status.js';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -171,7 +173,7 @@ function NavRunHeader({
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-xl font-semibold tracking-tight">基金净值回测任务</h2>
           <Badge variant={run.status === 'failed' ? 'destructive' : 'secondary'}>
-            {statusLabel(run.status)}
+            {jobStatusLabel(run.status, run.cancelRequestedAt)}
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -214,8 +216,8 @@ function NavRunActions({
   onCancel: () => void;
   onRetry: () => void;
 }) {
-  const cancellable = run.status === 'queued' || run.status === 'running';
-  const retryable = run.status === 'failed';
+  const cancellable = (run.status === 'queued' || run.status === 'running') && !run.cancelRequestedAt;
+  const retryable = run.status === 'failed' || run.status === 'succeeded';
   return (
     <div className="flex flex-wrap gap-2">
       <Button
@@ -243,7 +245,7 @@ function NavRunActions({
       {retryable ? (
         <Button aria-busy={retryPending} type="button" disabled={actionPending} onClick={onRetry}>
           {retryPending && <Spinner data-icon="inline-start" aria-hidden="true" />}
-          {retryPending ? '正在重试…' : '重试 NAV 任务'}
+          {retryPending ? '正在重试…' : '使用冻结输入重试'}
         </Button>
       ) : null}
     </div>
@@ -343,24 +345,7 @@ function NavRunResult({
   return <ErrorAlert title="NAV 任务结果暂不可用" message="请重新读取任务，稍后再查看完整结果。" />;
 }
 
-function statusLabel(status: string) {
-  if (status === 'queued') return '排队中';
-  if (status === 'running') return '运行中';
-  if (status === 'succeeded') return '已完成';
-  if (status === 'failed') return '失败';
-  if (status === 'cancelled') return '已取消';
-  return '状态未知';
-}
-
-function stageLabel(stage: string | null) {
-  if (!stage) return '等待任务启动';
-  if (stage === 'queued') return '等待执行';
-  if (stage === 'loading-snapshot') return '准备运行数据';
-  if (stage === 'executing') return '模拟申购与赎回';
-  if (stage === 'persisting-result') return '保存结果';
-  if (stage === 'completed') return '已完成';
-  return '执行阶段已更新';
-}
+const stageLabel = backtestStageDisplay;
 
 function errorText(error: unknown, fallback: string) {
   if (error instanceof Error && error.message.trim()) return error.message;

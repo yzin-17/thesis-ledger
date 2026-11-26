@@ -2,8 +2,13 @@ import {
   backtestRunPreparationIntentV3Schema,
   backtestRunPreparationRequestV3Schema,
   createNavPreparationRequest,
+  type BacktestDailyMatching,
 } from '@thesis-ledger/schemas';
+import { dailyBacktestMatchingPolicy } from '@thesis-ledger/domain';
 export type BacktestForm = {
+  dailyOrders?: boolean;
+  dailyLiquidity?: BacktestDailyMatching['liquidity']['kind'];
+  dailyQuantity?: string;
   priceResearch?: boolean;
   start: string;
   end: string;
@@ -43,6 +48,10 @@ export function newBacktestForm(symbol: string, now = new Date()): BacktestForm 
   };
 }
 function common(form: BacktestForm, nav: boolean, now: string) {
+  const kind = form.dailyLiquidity ?? 'wholeOrder';
+  const liquidity: BacktestDailyMatching['liquidity'] = kind === 'perBarCap'
+    ? { kind, quantity: form.dailyQuantity ?? '' }
+    : { kind };
   return {
     startDate: form.start,
     endDate: form.end,
@@ -58,6 +67,7 @@ function common(form: BacktestForm, nav: boolean, now: string) {
       fxPolicy: 'latestAvailable',
     },
     executionModel: JSON.parse(form.model) as unknown,
+    ...(!nav && form.dailyOrders ? { dailyOrderMatching: dailyBacktestMatchingPolicy(liquidity) } : {}),
   };
 }
 export function ordinaryPreparationIntentBase(form: BacktestForm, requestId: string, now: string) {
@@ -72,7 +82,7 @@ export function ordinaryPreparationIntentBase(form: BacktestForm, requestId: str
     throw Error('研究选项只能包含已支持的预热设置。');
   return backtestRunPreparationIntentV3Schema.parse({
     ...extras,
-    contractVersion: 3,
+    contractVersion: 1,
     requestId,
     ...(form.priceResearch ? { priceResearch: 'price-research-v1' } : {}),
     adjustment: form.adjustment,
@@ -105,7 +115,7 @@ export function navPreparationIntent(
 ) {
   const config = {
     ...common(form, true, now),
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     navInput: { kind: 'nav', symbol: form.symbol },
   };
   // 由现行 Schema 校验完整净值配置，不补造来源、可见时点或日历决策。

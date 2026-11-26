@@ -20,7 +20,7 @@ export const marketRouteAdmissionV3Schema = z
     sourceRevision: text,
     credentialRevision: text,
     validFrom: z.iso.datetime({ offset: true }),
-    validUntil: z.iso.datetime({ offset: true }),
+    validUntil: z.iso.datetime({ offset: true }).nullable(),
     recordVersion: z.number().int().positive(),
     recordedAt: z.iso.datetime({ offset: true }),
     invalidatedAt: z.null(),
@@ -30,10 +30,22 @@ export const marketRouteAdmissionV3Schema = z
     if (value.scopeDateFrom > value.scopeDateTo) {
       ctx.addIssue({ code: 'custom', path: ['scopeDateTo'], message: '准入日期范围无效' });
     }
-    if (Date.parse(value.validFrom) >= Date.parse(value.validUntil)) {
+    if (value.validUntil === null && !(value.routeKey.kind === 'data' &&
+      value.routeKey.market === 'CN' && ['STOCK', 'ETF'].includes(value.routeKey.assetType) &&
+      value.routeKey.capability === 'HISTORICAL_EXECUTION_CONTEXT' &&
+      value.target.providerId === 'historical-execution-archive' &&
+      value.target.upstreamSource === 'qualified-cn-execution')) {
+      ctx.addIssue({ code: 'custom', path: ['validUntil'], message: '只有本地历史执行归档允许按修订有效' });
+    }
+    if (value.validUntil !== null && Date.parse(value.validFrom) >= Date.parse(value.validUntil)) {
       ctx.addIssue({ code: 'custom', path: ['validUntil'], message: '准入有效期无效' });
     }
     if (new Set(value.scopeSymbols).size !== value.scopeSymbols.length) {
       ctx.addIssue({ code: 'custom', path: ['scopeSymbols'], message: '准入标的重复' });
     }
   });
+
+/** 实时、事件与净值来源继续使用有限时间有效期。 */
+export const timedMarketRouteAdmissionV3Schema = marketRouteAdmissionV3Schema.safeExtend({
+  validUntil: z.iso.datetime({ offset: true }),
+});

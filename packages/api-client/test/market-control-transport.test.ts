@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ThesisLedgerApiClient, ThesisLedgerContractError } from '../src/index.js';
 
 const probe = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   providerId: 'tushare',
   requestId: 'probe-current',
@@ -11,17 +11,30 @@ const probe = {
   capabilityResults: { DAILY_BAR: { status: 'unconfigured', readOnly: true, attempted: false } },
 };
 describe('Market 控制客户端当前传输', () => {
+  it('读取行情能力目录使用当前请求版本且不接受旧响应', async () => {
+    const catalog = { contractVersion: 1, consumer: 'thesis-ledger', status: 'complete',
+      catalogRevision: 1, generatedAt: '2026-11-25T00:00:00Z', entries: [], reason: null };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(catalog))
+      .mockResolvedValueOnce(Response.json({ ...catalog, contractVersion: 3 }));
+    const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
+    await expect(client.market.routeCapabilities()).resolves.toEqual(catalog);
+    expect(String(fetcher.mock.calls[0]?.[0])).toBe(
+      'https://thesis-ledger.test/api/market-data/routes/capabilities?contractVersion=1',
+    );
+    await expect(client.market.routeCapabilities()).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  });
   it('解析当前 Registry 空列表，缺信封或缺字段不能升级为空成功', async () => {
     const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ contractVersion: 3, consumer: 'thesis-ledger', providers: [] }),
+          JSON.stringify({ contractVersion: 1, consumer: 'thesis-ledger', providers: [] }),
         ),
       );
     const client = new ThesisLedgerApiClient('https://thesis-ledger.test/api/v1', fetcher);
     expect((await client.market.getProviderRegistry()).providers).toEqual([]);
-    for (const raw of [{ providers: [] }, { contractVersion: 3, consumer: 'thesis-ledger' }]) {
+    for (const raw of [{ providers: [] }, { contractVersion: 1, consumer: 'thesis-ledger' }]) {
       fetcher.mockResolvedValueOnce(new Response(JSON.stringify(raw)));
       await expect(client.market.getProviderRegistry()).rejects.toBeInstanceOf(
         ThesisLedgerContractError,

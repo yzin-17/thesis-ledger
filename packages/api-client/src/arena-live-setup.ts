@@ -1,4 +1,4 @@
-import { arenaLiveDefaults, arenaLiveProtocolSchema, type ArenaLiveProtocol, type AiProviderRecord } from '@thesis-ledger/schemas';
+import { aiGenerationContracts, arenaLiveDefaults, arenaLiveMatchProtocolVersion, arenaLiveProtocolSchema, type ArenaLiveProtocol, type AiProviderRecord } from '@thesis-ledger/schemas';
 import { arenaInitialForm, arenaSetupFields, copyArenaGroup, type ArenaForm, type ArenaChoice, type ArenaBinding } from './arena-setup.js';
 import type { ThesisLedgerApiClient } from './index.js';
 import { arenaSetupDateOrderFields, arenaSetupIssueFields, ArenaSetupValidationError, type ArenaSetupErrors } from './arena-setup-validation.js';
@@ -31,7 +31,8 @@ export function arenaLiveFieldPlaceholder(key: string) {
 }
 export function arenaLiveModels(providers: AiProviderRecord[]): ArenaBinding[] {
   return providers.filter((p) => p.enabled).flatMap((p) => [...new Set((p.executionRoutes ?? []).filter((r) => {
-    if (r.contract.id !== 'arena_live_research' || r.contract.version !== 'arena-live-research-v2') return false;
+    // 合同兼容性由服务端 readiness 判定，客户端只限定自主研究用途。
+    if (r.contract.id !== aiGenerationContracts.arenaLiveResearch.ref.id) return false;
     const price = p.modelPricing?.[r.model];
     return r.readiness.state === 'ready' || r.liveValidation.status === 'passed' &&
       r.readiness.reasons.every((reason) => reason === 'budget_not_authorized') &&
@@ -59,7 +60,7 @@ export function validateArenaLiveSetup(f: ArenaLiveForm, pool: ArenaChoice[], mo
   const budget = { requests: optionalInteger(f.requests), tokens: optionalInteger(f.tokens), costMicros: optionalMicros(f.cost) };
   const resources = { ...Object.fromEntries(arenaResourceFields.map(([key]) => [key, defaultInteger(f[key])])),
     maxResearchSteps: optionalInteger(f.maxResearchSteps), maxCycleSeconds: optionalInteger(f.maxCycleSeconds) };
-  const checked = arenaLiveProtocolSchema.safeParse({ version: 2, title: defaultText(f.title), ...options,
+  const checked = arenaLiveProtocolSchema.safeParse({ version: arenaLiveMatchProtocolVersion, title: defaultText(f.title), ...options,
     currency: { CN: 'CNY', HK: 'HKD', US: 'USD' }[market],
     timeZone: { CN: 'Asia/Shanghai', HK: 'Asia/Hong_Kong', US: 'America/New_York' }[market],
     calendarId: market, calendarVersion: null, startsOn: f.startsOn.trim() || null, endsOn: f.endsOn.trim() || null, initialCash: defaultText(f.initialCash),

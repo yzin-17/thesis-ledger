@@ -1,4 +1,4 @@
-import { formatDecimalRatioPercent } from '@thesis-ledger/domain';
+import { backtestMetricDisplay, formatDecimalRatioPercent } from '@thesis-ledger/domain';
 import type { BacktestNavResultV3 } from '@thesis-ledger/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -13,35 +13,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatDateOnly, formatDateTime } from '@/lib/date-display';
-
-const metricLabels: Record<string, string> = {
-  cumulativeReturn: '累计收益',
-  totalReturn: '累计收益',
-  cagr: '年化收益',
-  annualizedReturn: '年化收益',
-  maxDrawdown: '最大回撤',
-  volatility: '波动率',
-  sharpe: '夏普比率',
-  tradeWinRate: '交易胜率',
-  winRate: '胜率',
-  profitFactor: '利润因子',
-  turnover: '换手率',
-  tradeCount: '已平仓交易数',
-  basicPeriodReturn: '区间收益',
-};
-
-const percentageMetrics = new Set([
-  'cumulativeReturn',
-  'totalReturn',
-  'cagr',
-  'annualizedReturn',
-  'maxDrawdown',
-  'volatility',
-  'tradeWinRate',
-  'winRate',
-  'turnover',
-  'basicPeriodReturn',
-]);
 
 export function NavBacktestResult({ result }: { result: BacktestNavResultV3 }) {
   const pendingCount = result.pendingRequestIds.length;
@@ -154,8 +125,8 @@ export function NavBacktestResult({ result }: { result: BacktestNavResultV3 }) {
       <ExecutionModelResult result={result} />
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <MetricCard title="策略权益指标" metrics={result.metrics} />
-        <MetricCard title="NAV 基准指标" metrics={result.benchmark} />
+        <MetricCard title="策略权益指标" metrics={result.metrics} currency={result.cash.currency} />
+        <MetricCard title="NAV 基准指标" metrics={result.benchmark} currency={result.cash.currency} />
       </div>
 
       <EquityCurveCard result={result} />
@@ -176,9 +147,11 @@ function Value({ label, value }: { label: string; value: string }) {
 function MetricCard({
   title,
   metrics,
+  currency,
 }: {
   title: string;
   metrics: BacktestNavResultV3['metrics'];
+  currency: string;
 }) {
   const entries = Object.entries(metrics);
   return (
@@ -190,11 +163,11 @@ function MetricCard({
       <CardContent>
         {entries.length > 0 ? (
           <dl className="grid gap-3 sm:grid-cols-2">
-            {entries.map(([key, metric], index) => (
+            {entries.map(([key, metric]) => (
               <Value
                 key={key}
-                label={metricLabels[key] ?? `其他指标 ${index + 1}`}
-                value={metricValue(key, metric)}
+                label={backtestMetricDisplay(key, metric, currency).label}
+                value={backtestMetricDisplay(key, metric, currency).value}
               />
             ))}
           </dl>
@@ -348,17 +321,6 @@ function ExecutionModelResult({ result }: { result: BacktestNavResultV3 }) {
       </CardContent>
     </Card>
   );
-}
-
-function metricValue(key: string, metric: BacktestNavResultV3['metrics'][string]) {
-  if (metric.status !== 'available' || metric.value === undefined) {
-    let state = '不可用';
-    if (metric.status === 'warning') state = '有提示';
-    return `${state}：${metric.reason ?? '本次结果没有提供原因'}`;
-  }
-  if (!percentageMetrics.has(key)) return metric.value;
-  const formatted = formatDecimalRatioPercent(metric.value);
-  return formatted === '—' ? metric.value : formatted;
 }
 
 function sampledPoints<T>(values: T[], limit: number) {

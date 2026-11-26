@@ -350,16 +350,16 @@ describe('账户数据页面契约', () => {
       }),
     ).toBe(account.id);
   });
-
 });
 
 describe('账户类型、设置与读取状态', () => {
   it('现金账户只显示现金页签，并阻止成交和持仓入口', () => {
     const markup = renderPage('?tab=transactions&entry=execution', [cashAccount], false);
-    const pageSource = readFileSync(
-      new URL('../src/features/account-data/AccountDataPage.tsx', import.meta.url),
-      'utf8',
-    );
+    const pageSource = ['AccountDataPage.tsx', 'useAccountDataWorkspace.tsx']
+      .map((file) =>
+        readFileSync(new URL(`../src/features/account-data/${file}`, import.meta.url), 'utf8'),
+      )
+      .join('\n');
 
     expect(markup).toContain('现金账户 · 现金 · CNY · 实际');
     expect(markup).toContain('现金');
@@ -440,7 +440,6 @@ describe('账户类型、设置与读取状态', () => {
     expect(emptyMarkup).toContain('账户管理');
     expect(emptyMarkup).toContain('创建账户');
   });
-
 });
 
 describe('成交表单和快照页签语义', () => {
@@ -449,6 +448,7 @@ describe('成交表单和快照页签语义', () => {
     const markup = renderPage('?entry=execution', [{ ...account, name: fullAccountName }]);
     const accountDataSource = [
       'AccountDataPage.tsx',
+      'useAccountDataWorkspace.tsx',
       'AccountDataExecutionSheet.tsx',
       'use-execution-form.ts',
       'ExecutionTradeFields.tsx',
@@ -462,13 +462,23 @@ describe('成交表单和快照页签语义', () => {
         readFileSync(new URL(`../src/features/account-data/${fileName}`, import.meta.url), 'utf8'),
       )
       .join('\n');
-    const executionSource = ['AccountDataExecutionSheet.tsx', 'use-execution-form.ts',
-      'ExecutionTradeFields.tsx', 'ExecutionCharges.tsx', 'account-data.execution-submit.ts']
-      .map(file => readFileSync(new URL('../src/features/account-data/' + file, import.meta.url), 'utf8')).join('\n');
-    const dateInputMarkup = renderToStaticMarkup(<>
-      <DateInput type="date" />
-      <DateInput type="datetime-local" />
-    </>);
+    const executionSource = [
+      'AccountDataExecutionSheet.tsx',
+      'use-execution-form.ts',
+      'ExecutionTradeFields.tsx',
+      'ExecutionCharges.tsx',
+      'account-data.execution-submit.ts',
+    ]
+      .map((file) =>
+        readFileSync(new URL('../src/features/account-data/' + file, import.meta.url), 'utf8'),
+      )
+      .join('\n');
+    const dateInputMarkup = renderToStaticMarkup(
+      <>
+        <DateInput type="date" />
+        <DateInput type="datetime-local" />
+      </>,
+    );
 
     expect(markup).toContain('录入成交');
     expect(markup).toContain(fullAccountName);
@@ -508,7 +518,11 @@ describe('成交表单和快照页签语义', () => {
     expect(executionSource).not.toContain('实际成交');
     expect(executionSource).toMatch(/\{(?:control\.)?accountSummary\}/);
     expect(executionSource).toContain('accountTypeLabel(account.type)');
-    expect(['securities', 'fund', 'cash'].map(type => `${accountTypeLabel(type as 'securities' | 'fund' | 'cash')}账户`)).toEqual(['证券账户', '基金账户', '现金账户']);
+    expect(
+      ['securities', 'fund', 'cash'].map(
+        (type) => `${accountTypeLabel(type as 'securities' | 'fund' | 'cash')}账户`,
+      ),
+    ).toEqual(['证券账户', '基金账户', '现金账户']);
     expect(executionSource).not.toContain('{category}');
     expect(executionSource).not.toContain('<Separator />');
     expect(executionSource).toContain('min-h-0 flex-1 overflow-y-auto');

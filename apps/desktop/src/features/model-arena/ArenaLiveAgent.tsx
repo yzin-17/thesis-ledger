@@ -26,6 +26,7 @@ import { ArenaFacts, ArenaModelHeader } from './ArenaDetailShell.js';
 import { ArenaSections } from './ArenaSections.js';
 import { ArenaDisclosure } from './ArenaDisclosure.js';
 import { EmptyTableRow } from '../shared/EmptyStates.js';
+import { ArenaLiveOrders } from './ArenaLiveOrders.js';
 
 type ArenaLiveAgentProps = {
   detail: ArenaLiveDetail;
@@ -157,37 +158,7 @@ function ArenaLiveAgentContent(
           </Table>
         </TabsContent>
         <TabsContent value="orders" className="min-w-0">
-          <Table aria-label="委托列表">
-            <TableHeader>
-              <TableRow>
-                {['标的', '方向与类型', '数量', '价格', '状态', '有效至'].map((s) => (
-                  <TableHead key={s}>{s}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...book.orders].reverse().map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell>{name(o.symbol)}</TableCell>
-                  <TableCell>
-                    {o.side === 'buy' ? '买入' : '卖出'} · {arenaLiveLabel(o.kind)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatDecimalNumber(o.quantity)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {o.price ? formatDecimalNumber(o.price) : '市价'}
-                  </TableCell>
-                  <TableCell>
-                    {arenaLiveLabel(o.state)}
-                    {o.reason && ' · ' + arenaLiveLabel(o.reason)}
-                  </TableCell>
-                  <TableCell>{time(o.expiresAt)}</TableCell>
-                </TableRow>
-              ))}
-              {!book.orders.length && <EmptyTableRow colSpan={6} label="暂无委托" />}
-            </TableBody>
-          </Table>
+          <ArenaLiveOrders book={book} day={agent.availability.tradingDate} name={name} time={time} matching={detail.protocol.matching} />
         </TabsContent>
         <TabsContent value="fills" className="min-w-0">
           <Table aria-label="成交列表">

@@ -96,7 +96,7 @@ describe.skipIf(!databaseUrl)('基金研究准备：真实数据库资格与受�
     expect(frozen.evidence[0]).toMatchObject({
       usable: true,
       status: 'partial',
-      audit: { contractVersion: 'market-fund-nav-v3', publishedAt: null, availableAt: null },
+      audit: { contractVersion: 'dsa-data-v1', publishedAt: null, availableAt: null },
       data: {
         price: 1.2345,
         valuationDate: '2026-10-18T00:00:00Z',

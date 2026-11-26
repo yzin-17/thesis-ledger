@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { StrategyDefinitionRead } from '@thesis-ledger/schemas';
+import { strategyRiskVersionEligibility } from '@thesis-ledger/schemas';
 import { Choices, Field } from '../../components/MobilePrimitives';
 export function StrategyVersionPicker({
   rows,
@@ -7,17 +8,19 @@ export function StrategyVersionPicker({
   onChange,
   disabled = false,
   label = '策略版本',
+  riskEligible = false,
 }: {
   rows: StrategyDefinitionRead[];
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
   label?: string;
+  riskEligible?: boolean;
 }) {
   const [search, setSearch] = useState('');
   const all = rows.flatMap((s) =>
     s.versions
-      .filter((v) => v.version > 0)
+      .filter((v) => v.version > 0 && (!riskEligible || strategyRiskVersionEligibility(v).eligible))
       .map((v) => ({ value: v.id, label: `${s.name} · 版本 ${v.version}` })),
   );
   const matches = all.filter(

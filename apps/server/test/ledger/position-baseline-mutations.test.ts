@@ -250,7 +250,7 @@ describe('Ledger position baseline composite mutations', () => {
 
     harness.transaction.ledgerEvent.findFirst.mockResolvedValueOnce({
       occurredAt: new Date('2026-09-15T07:54:18.000Z'),
-      envelopeVersion: 3,
+      envelopeVersion: 1,
       payload: { symbol: '600519.SH', quantity: '0.00' },
     });
 

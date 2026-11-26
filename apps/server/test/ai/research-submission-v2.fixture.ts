@@ -24,7 +24,7 @@ export function submissionV2Execution(): AiResearchSubmissionV2Execution {
     model: 'controlled-model',
     sdkExecution: {
       version: 'sdk-execution-v1',
-      contract: { id: 'research', version: 'research-generation-v2' },
+      contract: { id: 'research', version: 'research-report-generation-v1' },
       frozenPolicy: loadAiResearchPolicy(),
       deadlineAt: '2026-10-19T00:10:00Z',
       generationStatus: 'pending',

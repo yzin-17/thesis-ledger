@@ -28,7 +28,7 @@ export function routePlan(args) {
 }
 
 export function withServerPlan(dsa, server) {
-  assert(server.contractVersion === 3 && server.enabled && server.syncState === 'applied' && server.effectiveStale === false, 'Server 原策略尚未稳定应用');
+  assert(server.contractVersion === 1 && server.enabled && server.syncState === 'applied' && server.effectiveStale === false, 'Server 原策略尚未稳定应用');
   assert.equal(server.revision, dsa.previousRevision, 'Server 与 DSA 原策略修订不同');
   assert.deepEqual(server.routes, dsa.previousRoutes, 'Server 与 DSA 原策略路由不同');
   return { dsa, serverRevision: server.revision, serverRoutes: server.routes, enabled: server.enabled };
@@ -73,7 +73,7 @@ export async function main(args) {
         const revision = current.serverRevision + 1;
         const ownedPlan = plan.ownedPlan ? JSON.parse(readFileSync(plan.ownedPlan, 'utf8')) : null;
         const routes = mergedReferenceRoutes(current, ownedPlan);
-        const applied = await api('PUT', { contractVersion: 3, consumer: 'thesis-ledger', requestId: randomUUID(),
+        const applied = await api('PUT', { contractVersion: 1, consumer: 'thesis-ledger', requestId: randomUUID(),
           revision, expectedRevision: current.serverRevision, enabled: current.enabled, routes });
         assert.equal(applied.revision, revision);
         const after = withServerPlan(readDsa(), await api());

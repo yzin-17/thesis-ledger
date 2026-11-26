@@ -35,12 +35,12 @@ describe("已有评价的冻结 Run 事实读取", () => {
     );
     job = {
       id: input.runId,
-      mode: "V3",
+      mode: 'frozen',
       status: "succeeded",
       strategyVersionId: input.strategyVersionId,
       input: {
-        contractVersion: 3,
-        schemaVersion: "3",
+        contractVersion: 1,
+        schemaVersion: "backtest-trade-run-v1",
         runConfig: input.runConfig,
         snapshotId: built.snapshotRef.snapshotId,
         snapshotVersion: built.manifest.manifestVersion,

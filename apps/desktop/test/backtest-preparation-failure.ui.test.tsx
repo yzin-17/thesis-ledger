@@ -13,14 +13,14 @@ import type { BacktestJob } from '../src/features/strategy/strategy.types.js';
 const model = JSON.parse(readFileSync('../../packages/schemas/fixtures/backtest-execution-model.cn-2024q1.json', 'utf8'));
 const version = '11111111-1111-4111-8111-111111111111';
 const preparation = backtestRunPreparationRequestV3Schema.parse({
-  contractVersion: 3, requestId: 'failure-ui', strategyVersionId: version,
+  contractVersion: 1, requestId: 'failure-ui', strategyVersionId: version,
   adjustment: 'none', accountingBasis: 'raw-events', history: { basis: 'fixed-provider-snapshot' },
   runConfig: { startDate: '2024-01-02', endDate: '2024-03-29', dataAsOf: '2026-11-08T00:00:00Z',
     baseCurrency: 'CNY', initialCash: { CNY: '100000.1234567890123456789' },
     valuationPolicy: { baseTimezone: 'Asia/Shanghai', dailyValuationTime: '16:00', pricePolicy: 'latestAvailable', fxPolicy: 'latestAvailable' }, executionModel: model },
 });
-const job: BacktestJob = { id: version, strategyVersionId: version, mode: 'V3', status: 'failed',
-  errorSummary: '行情读取未完成', input: { contractVersion: 3, schemaVersion: '3', kind: 'preparation-failure', submissionId: version, preparation } };
+const job: BacktestJob = { id: version, strategyVersionId: version, mode: 'frozen', status: 'failed',
+  errorSummary: '行情读取未完成', input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1', kind: 'preparation-failure', submissionId: version, preparation } };
 let root: Root | undefined;
 let client: QueryClient;
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });

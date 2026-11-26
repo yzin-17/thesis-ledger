@@ -12,6 +12,7 @@ import { MarketBarWindowReaderV3 } from '../../src/market/market-bar-reader-v3.j
 import { MarketFrozenWindowReaderV3 } from '../../src/market/market-frozen-window-reader-v3.js';
 import { MarketRouteRevisionService } from '../../src/market/market-route-revision.service.js';
 import { MarketWindowEvidenceV3Repository } from '../../src/market/market-window-evidence-v3.repository.js';
+import { convertObservation } from '../../src/platform/named-v1-market-window-conversion.js';
 import { decodeMarketWindowEvidenceInsert } from '../market/market-window-evidence-v3-sql-mock.js';
 import { completeSnapshotFixture } from './v3-complete-snapshot-fixtures.js';
 
@@ -22,15 +23,24 @@ const evidenceJson = (name: string) =>
 
 export async function capturedResearchFixture(symbol: string) {
   const saved = evidenceJson('2026-10-06-research-listing-c22b2a-input.json');
-  const samples = saved.samples as unknown[];
+  const samples = saved.samples as {
+    request: Record<string, unknown>;
+    response: Record<string, unknown> & { historicalTradabilityWindows: Record<string, unknown>[] };
+  }[];
   const sample = samples
-    .map((value) => marketDataBarSeriesRequestResponseV3Schema.parse(value))
+    .map(({ request, response }) => marketDataBarSeriesRequestResponseV3Schema.parse({
+      request: { ...request, contractVersion: 1 },
+      response: { ...response, contractVersion: 1,
+        historicalTradabilityWindows: response.historicalTradabilityWindows.map(convertObservation) },
+    }))
     .find((value) => value.request.symbol === symbol);
   if (!sample) throw new Error('保存行情缺少指定标的');
   const dependencies = evidenceJson('2026-10-06-research-prepare-c22b2b-dependencies.json');
-  const calendar = backtestCalendarResponseSchema.parse(dependencies.calendar);
-  const instruments = dependencies.instruments as Record<string, unknown>;
-  const instrument = backtestInstrumentFactsResponseSchema.parse(instruments[symbol]);
+  const calendar = backtestCalendarResponseSchema.parse({
+    ...dependencies.calendar as Record<string, unknown>, version: 1,
+  });
+  const instruments = dependencies.instruments as Record<string, Record<string, unknown>>;
+  const instrument = backtestInstrumentFactsResponseSchema.parse({ ...instruments[symbol], version: 1 });
   const feeErrors = dependencies.feeErrors as Array<{
     symbol: string;
     routeTarget: { providerId: string; upstreamSource: string; routeIndex: number };
@@ -50,7 +60,7 @@ export async function capturedResearchFixture(symbol: string) {
   };
   for (const segment of model.segments) segment.range = model.scope.range;
   const request = backtestRunPreparationRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: `captured-prepare-${symbol}`,
     strategyVersionId: '11111111-1111-4111-8111-111111111111',
     adjustment: 'qfq',
@@ -80,7 +90,7 @@ export async function capturedResearchFixture(symbol: string) {
     .filter((error) => error.symbol === symbol)
     .map((error) => error.routeTarget);
   const desired = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'captured-policy',
     revision: 7,
@@ -111,12 +121,12 @@ export async function capturedResearchFixture(symbol: string) {
   };
   const dsa = {
     effectiveControlPolicyV3: vi.fn(async () => ({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       projection: { effective },
     })),
     marketRouteCatalogV3: vi.fn(async () => ({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       catalogRevision: 12,
       generatedAt: sample.response.sourcePriceBasis.observedAt,
@@ -130,7 +140,8 @@ export async function capturedResearchFixture(symbol: string) {
       ],
     })),
     marketDataCapabilitiesV3: vi.fn(async () => ({
-      dataContractVersions: [3],
+      dataContract: 'dsa-data-v1',
+      dailyObservationContract: 'market-daily-tradability-window-v1',
       serviceCapabilities: { fundNav: true },
     })),
     marketBarsV3: vi.fn(
@@ -183,7 +194,7 @@ export async function capturedResearchFixture(symbol: string) {
   const rows = new Map<string, Record<string, unknown>>();
   const prisma = {
     strategyVersion: {
-      findUnique: vi.fn(async () => ({ schemaVersion: 2, schema: input.strategy })),
+      findUnique: vi.fn(async () => ({ schemaVersion: 1, schema: input.strategy })),
     },
     backtestJob: { create: vi.fn() },
     marketBarWindowEvidenceV3: {

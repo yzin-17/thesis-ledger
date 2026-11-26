@@ -40,7 +40,7 @@ export const optimizationPreparationRouteRevisionsSchema = z.strictObject({
 });
 
 const responseFields = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: z.string().min(1),
   checkedAt: z.iso.datetime({ offset: true }),
   scope: z.literal('baseline-window'),

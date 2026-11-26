@@ -42,7 +42,7 @@ describe('公开派生 bars/指标的实际装配 HTTP 链', () => {
     calculateIndicators: vi.fn(),
     calculatePeriodIndicators: vi.fn(
       async (input: Parameters<DsaClient['calculatePeriodIndicators']>[0]) => ({
-        contractVersion: 3,
+        contractVersion: 1,
         inputFingerprint: input.inputFingerprint,
         engineVersion: DSA_MARKET_INDICATOR_ENGINE_VERSION,
         results: input.requests.map((request) => ({

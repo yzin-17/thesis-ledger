@@ -19,7 +19,7 @@ export interface BacktestMinuteBar {
   high: string;
   low: string;
   close: string;
-  volume: string;
+  volume?: string | undefined;
   amount?: string | undefined;
   provider?: string;
   providerRevision?: string;
@@ -37,8 +37,8 @@ export interface DerivedBacktestBar {
   high: string;
   low: string;
   close: string;
-  volume: string;
-  amount: string;
+  volume?: string | undefined;
+  amount?: string | undefined;
   provider?: string;
   providerRevision?: string;
   quality: BacktestBarQuality;
@@ -52,6 +52,7 @@ export interface DerivedBacktestBar {
 export interface AggregateMinuteBarsOptions {
   calendar?: TradingCalendar;
   includePartialTail?: boolean;
+  preserveUnknownMetrics?: boolean;
 }
 
 interface LocalInstant {
@@ -142,14 +143,14 @@ const bucketFor = (
 const bucketKey = (bucket: Bucket) =>
   `${bucket.date}:${bucket.session.start}-${bucket.session.end}:${bucket.start}-${bucket.end}`;
 
-const validateBar = (bar: BacktestMinuteBar) => {
+const validateBar = (bar: BacktestMinuteBar, preserveUnknownMetrics: boolean) => {
   if (bar.timeframe !== '1m') throw new Error('分钟聚合只接受 1m Bar');
   try {
     DecimalValue.from(bar.open);
     DecimalValue.from(bar.high);
     DecimalValue.from(bar.low);
     DecimalValue.from(bar.close);
-    DecimalValue.from(bar.volume);
+    if (!preserveUnknownMetrics || bar.volume !== undefined) DecimalValue.from(bar.volume!);
   } catch {
     throw new Error('Bar OHLCV 必须是规范十进制字符串');
   }
@@ -162,6 +163,7 @@ const aggregateBucket = (
   bucket: Bucket,
   interval: number,
   calendar: TradingCalendar,
+  preserveUnknownMetrics: boolean,
 ): DerivedBacktestBar => {
   const bars = sortedBars(bucket.bars);
   const observed = new Set<number>();
@@ -179,10 +181,10 @@ const aggregateBucket = (
   else if (bars.some((bar) => bar.quality === 'stale')) quality = 'stale';
   else if (bars.some((bar) => bar.quality === 'unknown')) quality = 'unknown';
   else if (missingMinutes > 0 || bars.some((bar) => bar.quality === 'partial')) quality = 'partial';
-  const amount = bars.reduce(
-    (sum, bar) => sum.plus(bar.amount ?? DecimalValue.from(bar.close).times(bar.volume)),
+  const amount = bars.every((bar) => bar.amount !== undefined || (!preserveUnknownMetrics && bar.volume !== undefined)) ? bars.reduce(
+    (sum, bar) => sum.plus(bar.amount ?? DecimalValue.from(bar.close).times(bar.volume!)),
     DecimalValue.from('0'),
-  );
+  ) : undefined;
   const high = bars.reduce((best, bar) => {
     const value = DecimalValue.from(bar.high);
     return value.compareTo(best) > 0 ? value : best;
@@ -191,7 +193,8 @@ const aggregateBucket = (
     const value = DecimalValue.from(bar.low);
     return value.compareTo(best) < 0 ? value : best;
   }, DecimalValue.from(bars[0]!.low));
-  const volume = bars.reduce((sum, bar) => sum.plus(bar.volume), DecimalValue.from('0'));
+  const volume = bars.every((bar) => bar.volume !== undefined)
+    ? bars.reduce((sum, bar) => sum.plus(bar.volume!), DecimalValue.from('0')) : undefined;
   const outputEnd = utcForLocalMinute(bucket.date, bucket.end, calendar.timezone).toISOString();
   const result: DerivedBacktestBar = {
     symbol: lastInput.symbol,
@@ -206,8 +209,8 @@ const aggregateBucket = (
     high: high.toString(),
     low: low.toString(),
     close: lastInput.close,
-    volume: volume.toString(),
-    amount: amount.toString(),
+    ...(volume ? { volume: volume.toString() } : {}),
+    ...(amount ? { amount: amount.toString() } : {}),
     quality,
     completeness: quality === 'complete' ? 'complete' : 'partial',
     expectedMinutes,
@@ -239,7 +242,7 @@ export const aggregateMinuteBars = (
   if (!interval) throw new Error(`不支持派生周期: ${timeframe}`);
   const first = bars[0]!;
   for (const bar of bars) {
-    validateBar(bar);
+    validateBar(bar, options.preserveUnknownMetrics === true);
     if (bar.market !== first.market || bar.symbol !== first.symbol) {
       throw new Error('同一聚合批次不能混合市场或标的');
     }
@@ -266,7 +269,7 @@ export const aggregateMinuteBars = (
       const rightAt = utcForLocalMinute(right.date, right.end, calendar.timezone).getTime();
       return leftAt - rightAt;
     })
-    .map((bucket) => aggregateBucket(bucket, interval, calendar));
+    .map((bucket) => aggregateBucket(bucket, interval, calendar, options.preserveUnknownMetrics === true));
   if (options.includePartialTail === false) return result.filter((bar) => !bar.isTail);
   return result;
 };

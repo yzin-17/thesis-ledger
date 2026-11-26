@@ -21,7 +21,7 @@ function row() {
     createdAt: result.createdAt,
     updatedAt: result.createdAt,
     historicalScope: { status: 'known', snapshot: result.scopeSnapshot },
-    resultVersion: 2,
+    resultVersion: result.version,
     availability: 'available',
     summary: result.inference.conclusion,
     quality: result.quality,
@@ -122,7 +122,7 @@ it('不把自身、旧 V1 或没有证据的响应包装为成功比较', async 
     setup(empty).api.compare(id, { ...scoped, beforeId: value.previous!.id }),
   ).rejects.toBeInstanceOf(ThesisLedgerContractError);
   const legacy = structuredClone(value);
-  legacy.previous!.resultVersion = 1;
+  Object.assign(legacy.previous!, { resultVersion: 2 });
   legacy.previous!.historicalScope = {
     status: 'unrecorded',
     snapshot: null,
@@ -134,7 +134,7 @@ it('不把自身、旧 V1 或没有证据的响应包装为成功比较', async 
 });
 it('创建能力只读且保留取消信号；未知范围不能成为可创建权限', async () => {
   const capabilities = {
-    version: 'research-capabilities-v2',
+    version: 'research-capabilities-v1',
     canCreate: false,
     scopes: ['instrument', 'strategy'],
   };
@@ -171,7 +171,7 @@ it('大小写输入与服务端规范收据关联一致', async () => {
   if (result.scopeSnapshot.scope !== 'instrument') throw new Error('规范标的样例缺失');
   const scopeSnapshot = { ...result.scopeSnapshot, scope: 'position', accountId: canonical };
   const { api, fetcher } = setup({
-    version: 2,
+    version: 'research-report-submission-v1',
     runId: id,
     submissionId: canonical,
     status: 'queued',
@@ -194,9 +194,7 @@ it('研究列表绑定模式并保留取消信号；历史不能混入默认范�
   await expect(
     setup(page).api.list({ ...scoped, mode: scoped.mode === 'actual' ? 'shadow' : 'actual' }),
   ).rejects.toBeInstanceOf(ThesisLedgerContractError);
-  await expect(setup(page).api.list({ view: 'legacy' })).rejects.toBeInstanceOf(
-    ThesisLedgerContractError,
-  );
+  expect(() => setup(page).api.list({ view: 'legacy' } as never)).toThrow();
 });
 it('详情核对任务、对象及模式，不把可信范围改为当前范围', async () => {
   const detail = { ...row(), result, submission: input };
@@ -212,7 +210,7 @@ it('引用核对实际证据标识、父任务和范围', async () => {
   const binding = result.evidenceBindings[0]!;
   const evidenceId = binding.audit.evidenceId;
   const value = {
-    version: 2,
+    version: 'research-report-evidence-v1',
     runId: id,
     scopeSnapshot: result.scopeSnapshot,
     evidence: sample.frozen.evidence[0],
@@ -224,15 +222,13 @@ it('引用核对实际证据标识、父任务和范围', async () => {
   await expect(setup(value).api.evidence(id, id, scoped)).rejects.toBeInstanceOf(
     ThesisLedgerContractError,
   );
-  await expect(
-    setup(value).api.evidence(id, evidenceId, { view: 'legacy' }),
-  ).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  expect(() => setup(value).api.evidence(id, evidenceId, { view: 'legacy' } as never)).toThrow();
 });
 it.each(['submit', 'find', 'cancel'] as const)(
   '提交收据核对标识和冻结范围且不丢取消信号：%s',
   async (action) => {
     const receipt = {
-      version: 2,
+      version: 'research-report-submission-v1',
       runId: id,
       submissionId: input.submissionId,
       status: 'queued',

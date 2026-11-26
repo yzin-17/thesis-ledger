@@ -1,5 +1,6 @@
 import {
   backtestDailyTradabilityEvidenceV3Schema,
+  MARKET_DAILY_TRADABILITY_CONTRACT,
   marketDataBarSeriesResponseV3Schema,
   type MarketDataBarSeriesResponseV3,
 } from '@thesis-ledger/schemas';
@@ -22,7 +23,8 @@ export function withEventFreeTradability(
     provenance: response.provenance,
   };
   const evidence = backtestDailyTradabilityEvidenceV3Schema.parse({
-    contractVersion: 1,
+    contract: MARKET_DAILY_TRADABILITY_CONTRACT,
+    priceOnlyAllowed: false,
     symbol: response.symbol,
     market: response.routeKey.market,
     instrumentType: response.routeKey.assetType,

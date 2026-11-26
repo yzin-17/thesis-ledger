@@ -57,7 +57,7 @@ isolated('用途取消：公开 HTTP、真实 SDK、本机 SSE 与隔离 Postgre
             model: 'model',
             mode: 'native_schema',
             outputPolicy: 'auto',
-            contract: { id: 'research', version: 'research-generation-v2' },
+            contract: { id: 'research', version: 'research-report-generation-v1' },
           },
         ],
       });

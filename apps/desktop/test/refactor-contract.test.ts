@@ -16,13 +16,6 @@ import { fetchImportDrafts, uploadScreenshotImport } from '../src/features/impor
 import { importKeys } from '../src/features/import/import.queries.js';
 import { createAiRun, fetchAiRuns } from '../src/features/ai/ai.api.js';
 import { resolveAiRunsLoadState } from '../src/features/ai/ai.queries.js';
-import { createJournalReviewActions } from '../src/features/journal/journal.actions.js';
-import { reviewBehavior, reviewSingleTrade } from '../src/features/journal/journal.api.js';
-import type {
-  BehaviorReviewResult,
-  JournalReviewResult,
-  ReviewTrade,
-} from '../src/features/journal/journal.types.js';
 import {
   cancelBacktest,
   createStrategy,
@@ -51,31 +44,6 @@ const makeClient = (response: unknown) => {
     void path;
     void init;
     return response as T;
-  });
-  return { client: { request } as unknown as DesktopRequestClient, request };
-};
-
-const reviewTradeFixture: ReviewTrade = {
-  symbol: '600519.SH',
-  entryAt: '2026-01-02T09:30:00.000Z',
-  exitAt: '2026-01-06T09:30:00.000Z',
-  pnl: -120,
-  plannedStop: 1400,
-  actualExit: 1388,
-};
-
-const makeJournalClient = () => {
-  const request = vi.fn(async <T>(path: string) => {
-    if (path === '/journal/analysis/planned-vs-actual') return { deviation: -12 } as T;
-    if (path === '/journal/analysis/behavior') return { discipline: 'needs-review' } as T;
-    if (path === '/journal/analysis/counterfactual') return { avoidedLoss: 120 } as T;
-    if (path === '/journal/analysis/review') return { windowDays: 4 } as T;
-    return {
-      id: '33333333-3333-4333-8333-333333333333',
-      provider: 'mock',
-      model: 'behavior-review-default',
-      promptVersion: 'journal-review-v1',
-    } as T;
   });
   return { client: { request } as unknown as DesktopRequestClient, request };
 };
@@ -276,7 +244,7 @@ describe('拆分后的领域请求契约', () => {
   });
 });
 
-describe('AI 与 Journal 行为契约', () => {
+describe('AI 行为契约', () => {
   it('Strategy/AI 写请求集中生成既有 payload', async () => {
     const aiResult = {
       id: '22222222-2222-4222-8222-222222222222',
@@ -352,96 +320,7 @@ describe('AI 与 Journal 行为契约', () => {
     ).toBe('ready');
   });
 
-  it('Journal 单笔分析成功返回确定性结果和 AI 运行记录', async () => {
-    const { client, request } = makeJournalClient();
 
-    await expect(reviewSingleTrade(reviewTradeFixture, client)).resolves.toEqual({
-      plannedVsActual: { deviation: -12 },
-      behavior: { discipline: 'needs-review' },
-      counterfactual: { avoidedLoss: 120 },
-      aiRun: {
-        id: '33333333-3333-4333-8333-333333333333',
-        provider: 'mock',
-        model: 'behavior-review-default',
-        promptVersion: 'journal-review-v1',
-      },
-    });
-    expect(request).toHaveBeenCalledTimes(4);
-  });
-
-  it('Journal 行为分析成功返回指标、时间窗口和 AI 运行记录', async () => {
-    const { client, request } = makeJournalClient();
-
-    await expect(reviewBehavior([reviewTradeFixture], client)).resolves.toEqual({
-      metrics: { discipline: 'needs-review' },
-      window: { windowDays: 4 },
-      aiRun: {
-        id: '33333333-3333-4333-8333-333333333333',
-        provider: 'mock',
-        model: 'behavior-review-default',
-        promptVersion: 'journal-review-v1',
-      },
-    });
-    expect(request).toHaveBeenCalledTimes(3);
-  });
-
-  it('Journal 单笔和行为分析失败时均不产生结果', async () => {
-    const singleRequest = vi.fn().mockRejectedValue(new Error('single analysis unavailable'));
-    const singleClient = { request: singleRequest } as unknown as DesktopRequestClient;
-    await expect(reviewSingleTrade(reviewTradeFixture, singleClient)).rejects.toThrow(
-      'single analysis unavailable',
-    );
-
-    const behaviorRequest = vi.fn().mockRejectedValue(new Error('behavior analysis unavailable'));
-    const behaviorClient = { request: behaviorRequest } as unknown as DesktopRequestClient;
-    await expect(reviewBehavior([reviewTradeFixture], behaviorClient)).rejects.toThrow(
-      'behavior analysis unavailable',
-    );
-  });
-
-  it('Journal 成功后更新展示结果，后续失败保留上一次结果', async () => {
-    const singleResult: JournalReviewResult = {
-      plannedVsActual: { deviation: -12 },
-      behavior: { discipline: 'needs-review' },
-      counterfactual: { avoidedLoss: 120 },
-      aiRun: null,
-    };
-    const behaviorResult: BehaviorReviewResult = {
-      metrics: { discipline: 'needs-review' },
-      window: { windowDays: 4 },
-      aiRun: null,
-    };
-    let displayedSingle: JournalReviewResult | null = null;
-    let displayedBehavior: BehaviorReviewResult | null = null;
-    const singleMutation = { mutateAsync: vi.fn().mockResolvedValue(singleResult) };
-    const behaviorMutation = { mutateAsync: vi.fn().mockResolvedValue(behaviorResult) };
-    const actions = createJournalReviewActions({
-      singleReviewMutation: singleMutation,
-      behaviorReviewMutation: behaviorMutation,
-      setSingleReview: (result) => {
-        displayedSingle = result;
-      },
-      setBehaviorReview: (result) => {
-        displayedBehavior = result;
-      },
-    });
-
-    await expect(actions.reviewSingleTrade(reviewTradeFixture)).resolves.toBe(singleResult);
-    await expect(actions.reviewBehavior([reviewTradeFixture])).resolves.toBe(behaviorResult);
-    expect(displayedSingle).toBe(singleResult);
-    expect(displayedBehavior).toBe(behaviorResult);
-
-    singleMutation.mutateAsync.mockRejectedValueOnce(new Error('single retry failed'));
-    behaviorMutation.mutateAsync.mockRejectedValueOnce(new Error('behavior retry failed'));
-    await expect(actions.reviewSingleTrade(reviewTradeFixture)).rejects.toThrow(
-      'single retry failed',
-    );
-    await expect(actions.reviewBehavior([reviewTradeFixture])).rejects.toThrow(
-      'behavior retry failed',
-    );
-    expect(displayedSingle).toBe(singleResult);
-    expect(displayedBehavior).toBe(behaviorResult);
-  });
 });
 
 describe('Strategy 任务行为契约', () => {
@@ -467,7 +346,7 @@ describe('Strategy 任务行为契约', () => {
       .mockResolvedValue({
         id: 'job/1',
         strategyVersionId: 'version-1',
-        mode: 'V3',
+        mode: 'frozen',
         status: 'queued',
       });
     await createStrategy(
@@ -536,7 +415,7 @@ describe('Strategy 任务行为契约', () => {
     const detailClient = makeClient({
       id: 'job/1',
       strategyVersionId: 'version-1',
-      mode: 'V3',
+      mode: 'frozen',
       status: 'queued',
     });
     await fetchBacktestJob('job/1', detailClient.client);
@@ -546,11 +425,11 @@ describe('Strategy 任务行为契约', () => {
     expect(
       applyBacktestJobSummaryEvent(existing, {
         id: 'job-1',
-        mode: 'V3',
+        mode: 'frozen',
         strategyVersionId: 'version-1',
         status: 'running',
       }),
-    ).toEqual([{ id: 'job-1', mode: 'V3', strategyVersionId: 'version-1', status: 'running' }]);
+    ).toEqual([{ id: 'job-1', mode: 'frozen', strategyVersionId: 'version-1', status: 'running' }]);
     expect(
       applyBacktestJobSummaryEvent(existing, {
         id: 'old-job',

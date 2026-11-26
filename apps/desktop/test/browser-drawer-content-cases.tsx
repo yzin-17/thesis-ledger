@@ -8,7 +8,7 @@ import { ResearchDetailSheet } from '../src/features/ai/AiResearchDetailView.js'
 import { EvidenceChainSheet } from '../src/features/ai/EvidenceChainSheet.js';
 import { ImportDraftReviewSheet } from '../src/features/import/ImportDraftReviewSheet.js';
 import { ImportReview } from '../src/features/import/ImportReview.js';
-import { RawEvidenceSheet } from '../src/features/journal/JournalReviewResults.js';
+import { RawEvidenceSheet } from './fixtures/journal/RawEvidenceSheet.js';
 import { JournalDraftSheet } from '../src/features/journal/review/JournalDraftSheet.js';
 import { MarketReferenceSheet } from '../src/features/market-data/MarketReferenceSheet.js';
 import { MarketNewsSheet } from '../src/features/market-data/MarketNewsSheet.js';

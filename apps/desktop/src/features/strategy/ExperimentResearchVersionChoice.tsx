@@ -13,7 +13,7 @@ export function ExperimentResearchVersionChoice({
   onAdopt: (version: StrategyVersion) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
-  if (!entry || entry.version.schema?.schemaVersion === '3') return null;
+  if (!entry || isPriceResearchStrategyDefinition(entry.version.schema)) return null;
   return (
     <PriceResearchVersionPreview
       key={entry.version.id}
@@ -25,3 +25,4 @@ export function ExperimentResearchVersionChoice({
     />
   );
 }
+import { isPriceResearchStrategyDefinition } from '@thesis-ledger/domain';

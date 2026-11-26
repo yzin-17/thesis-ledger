@@ -188,22 +188,20 @@ function useNavBacktestSetupState({
   const receipt = prepared?.receipt;
   const receiptExpired = receipt ? Date.parse(receipt.expiresAt) <= Date.now() : false;
   const reviewed = reviewedForKey === setupKey;
-  const canPrepare = Boolean(
-    symbol &&
-    versionId &&
-    fundType &&
-    startDate &&
-    endDate &&
-    initialCash.trim() &&
-    calendarDecision.trim() &&
-    calendarDecisionConfirmed &&
-    model &&
-    (fundType !== 'domestic' ||
-      (domesticRuleDecision.trim() &&
-        domesticRuleDecisionConfirmed &&
-        domesticRuleRange.startDate &&
-        domesticRuleRange.endDate)),
-  );
+  const { canPrepare } = navSetupCanPrepare({
+    symbol,
+    versionId,
+    fundType,
+    startDate,
+    endDate,
+    initialCash,
+    calendarDecision,
+    calendarDecisionConfirmed,
+    model,
+    domesticRuleDecision,
+    domesticRuleDecisionConfirmed,
+    domesticRuleRange,
+  });
 
   const invalidatePreparation = () => {
     setPreparedForKey(null);
@@ -244,19 +242,20 @@ function useNavBacktestSetupState({
     prepareMutation.reset();
     createMutation.reset();
     try {
-      const request=createNavPreparationRequest(
-          buildNavPreparationIntent({
-            versionId,
-            symbol,
-            fundType,
-            startDate,
-            endDate,
-            initialCash,
-            calendarDecision,
-            domesticRuleDecision,
-            domesticRuleRange,
-            model,
-          }));
+      const request = createNavPreparationRequest(
+        buildNavPreparationIntent({
+          versionId,
+          symbol,
+          fundType,
+          startDate,
+          endDate,
+          initialCash,
+          calendarDecision,
+          domesticRuleDecision,
+          domesticRuleRange,
+          model,
+        }),
+      );
       await prepareMutation.mutateAsync(request);
     } catch (error) {
       setFormError(errorText(error, 'NAV 配置准备失败，请检查输入后重试。'));
@@ -270,7 +269,7 @@ function useNavBacktestSetupState({
     setFormError(null);
     try {
       const run = await createMutation.mutateAsync({
-        contractVersion: 3,
+        contractVersion: 1,
         preparationId: receipt.preparationId,
         preparationHash: receipt.preparationHash,
         idempotencyKey: `nav-${receipt.preparationId}`,
@@ -367,7 +366,7 @@ function buildNavPreparationIntent(input: {
     requestId: createClientRequestId(),
     strategyVersionId: input.versionId,
     runConfig: {
-      schemaVersion: '3',
+      schemaVersion: 'backtest-nav-config-v1',
       startDate: input.startDate,
       endDate: input.endDate,
       baseCurrency: 'CNY',
@@ -400,4 +399,50 @@ function buildNavPreparationIntent(input: {
     };
   }
   return { ...base, fundType: input.fundType, domesticRuleDecisionRaw: null };
+}
+
+function navSetupCanPrepare({
+  symbol,
+  versionId,
+  fundType,
+  startDate,
+  endDate,
+  initialCash,
+  calendarDecision,
+  calendarDecisionConfirmed,
+  model,
+  domesticRuleDecision,
+  domesticRuleDecisionConfirmed,
+  domesticRuleRange,
+}: {
+  symbol: string | null;
+  versionId: string | null;
+  fundType: FundType | null;
+  startDate: string;
+  endDate: string;
+  initialCash: string;
+  calendarDecision: string;
+  calendarDecisionConfirmed: boolean;
+  model: BacktestExecutionModelV3 | null;
+  domesticRuleDecision: string;
+  domesticRuleDecisionConfirmed: boolean;
+  domesticRuleRange: NavResearchRuleRange;
+}) {
+  const canPrepare = Boolean(
+    symbol &&
+    versionId &&
+    fundType &&
+    startDate &&
+    endDate &&
+    initialCash.trim() &&
+    calendarDecision.trim() &&
+    calendarDecisionConfirmed &&
+    model &&
+    (fundType !== 'domestic' ||
+      (domesticRuleDecision.trim() &&
+        domesticRuleDecisionConfirmed &&
+        domesticRuleRange.startDate &&
+        domesticRuleRange.endDate)),
+  );
+  return { canPrepare };
 }

@@ -20,6 +20,9 @@ import { LiveResearchBudget } from './live-research-budget.js';
 import { planLiveCall } from './live-call-limits.js';
 import { liveCallFailureDiagnostics } from './live-call-diagnostics.js';
 import { liveCallCostMicros } from './live-call-cost.js';
+import { liveResearchContract } from './live-research-contract.js';
+import { assertGenerationSchemaPrompt } from '../../ai/ai-generation-schema-prompt.js';
+import { invalidDecisionForCorrection } from './live-invalid-decision.js';
 
 @Injectable()
 export class LiveResearchCall {
@@ -46,11 +49,10 @@ export class LiveResearchCall {
     const binding = p.entrants.find(
       (e) => e.providerId === agent.providerId && e.model === agent.model,
     )!;
-    const contract = aiGenerationContracts.arenaLiveResearch;
     const route = this.registry.strictReadyContract({
       providerId: binding.providerId,
       model: binding.model,
-      contract: contract.ref,
+      contract: aiGenerationContracts.arenaLiveResearch.ref,
       budgetAuthorized: true,
     });
     const { runtime, price, inputPrice, outputPrice } = liveCallPricing(
@@ -58,6 +60,12 @@ export class LiveResearchCall {
       binding.model,
       p.budgetCurrency,
     );
+    const frozen = cycle.input as { protocol: unknown; replay?: boolean };
+    const contract = liveResearchContract({
+      protocol: arenaLiveProtocolSchema.parse(frozen.protocol),
+      replay: frozen.replay === true,
+    });
+    assertGenerationSchemaPrompt(contract.schema, messages);
     const limits = planLiveCall({
       inputEstimate: Buffer.byteLength(JSON.stringify(messages), 'utf8') + 256,
       maxInputTokens: binding.maxInputTokens,
@@ -74,6 +82,7 @@ export class LiveResearchCall {
     await this.budget.reserve(id, attempt, requestId, limits.amount, {
       messages,
       contract: contract.ref,
+      capabilities: contract.capabilities,
       requestedModel: binding.model,
       budgetCurrency: p.budgetCurrency,
       limits: {
@@ -97,7 +106,17 @@ export class LiveResearchCall {
       }
       const signals = liveResearchSignals(signal, ms);
       const result = await this.sdk.generate(
-        liveResearchRequest({ requestId, route, binding, runtime, messages, limits, ms, signals }),
+        liveResearchRequest({
+          requestId,
+          route,
+          binding,
+          runtime,
+          messages,
+          contract,
+          limits,
+          ms,
+          signals,
+        }),
       );
       const accounting = aiProviderTestSuccessFacts(
         { modelPricing: { [binding.model]: price } },
@@ -119,10 +138,11 @@ export class LiveResearchCall {
       return result.output;
     } catch (error) {
       if (error instanceof AiSdkGenerationError) {
+        const diagnostics = liveCallFailureDiagnostics(error, contract.schema, runtime.apiKey);
         receipt = {
           error: error.fact,
           usage: error.usage,
-          diagnostics: liveCallFailureDiagnostics(error, contract.schema, runtime.apiKey),
+          diagnostics,
         };
         if (error.fact.externalResult === 'not_sent')
           used = { requests: 0, tokens: 0, costMicros: 0 };
@@ -141,6 +161,13 @@ export class LiveResearchCall {
           );
           const costMicros = liveCallCostMicros(facts.cost, p.budgetCurrency);
           used = knownLiveCallUsage(facts.usage, costMicros);
+        }
+        const invalid = used ? invalidDecisionForCorrection(error.fact, diagnostics, contract.schema) : null;
+        if (invalid) {
+          const proof = await identity.verify(error.completion?.actualModel ?? diagnostics.response?.modelId ?? null);
+          receipt.modelIdentity = proof;
+          if (!proof.accepted) throw new Error('model_identity_unverified');
+          throw invalid;
         }
         throw new Error(used ? 'model_output_invalid' : 'unknown_usage');
       }
@@ -191,12 +218,12 @@ function liveResearchRequest(i: {
   binding: ReturnType<typeof arenaLiveProtocolSchema.parse>['entrants'][number];
   runtime: ReturnType<typeof liveCallPricing>['runtime'];
   messages: { role: string; content: string }[];
+  contract: ReturnType<typeof liveResearchContract>;
   limits: ReturnType<typeof planLiveCall>;
   ms: number | null;
   signals: AbortSignal[];
 }) {
-  const { requestId, route, binding, runtime, messages, limits, ms, signals } = i;
-  const contract = aiGenerationContracts.arenaLiveResearch;
+  const { requestId, route, binding, runtime, messages, contract, limits, ms, signals } = i;
   return {
     requestId,
     adapter: route.execution.adapter,

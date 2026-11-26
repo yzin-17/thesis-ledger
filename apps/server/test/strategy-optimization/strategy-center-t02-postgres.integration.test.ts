@@ -6,6 +6,8 @@ import { BacktestService } from '../../src/backtest/backtest.service.js';
 import { PrismaService } from '../../src/platform/prisma.service.js';
 import { ResultReadPolicyService } from '../../src/platform/result-read-policy.service.js';
 import { StrategyOptimizationReadService } from '../../src/strategy-optimization/strategy-optimization-read.service.js';
+import { completedOptimizationRun } from './strategy-optimization-postgres-run.fixture.js';
+import { createNormalizedRunConfig } from './strategy-optimization-postgres-fixtures.js';
 
 const isolatedDescribe =
   process.env.RUN_STRATEGY_CENTER_T02_POSTGRES === '1' ? describe : describe.skip;
@@ -78,16 +80,17 @@ isolatedDescribe('T02 isolated PostgreSQL read eligibility', () => {
     for (const id of [testRunId, validationRunId]) {
       await prisma.backtestJob.create({
         data: {
-          id,
-          strategyVersionId: id === testRunId ? candidateVersionId : baselineVersionId,
+          ...completedOptimizationRun({
+            id,
+            strategyVersionId: id === testRunId ? candidateVersionId : baselineVersionId,
+            idempotencyKey: `t02:${id}`,
+            runConfig: createNormalizedRunConfig(),
+            metrics: { score: { status: 'available', value: id === testRunId ? '99' : '1' } },
+          }),
           idempotencyKey: `optimization:${experimentId}:${id === testRunId ? 'candidate' : 'baseline'}:test`,
-          mode: 'V2',
-          status: 'succeeded',
           periodStart: new Date('2026-01-01T00:00:00.000Z'),
           periodEnd: new Date('2026-09-01T00:00:00.000Z'),
           dataAsOf: new Date('2026-09-18T00:00:00.000Z'),
-          input: {},
-          result: { metrics: { score: id === testRunId ? 99 : 1 } },
           diagnostics: { internal: 'diagnostic' },
         },
       });
@@ -177,7 +180,9 @@ isolatedDescribe('T02 isolated PostgreSQL read eligibility', () => {
     expect(revealed.candidates[0]?.runRefs).toHaveProperty('test', testRunId);
     expect(revealed.candidates[0]?.metrics).toHaveProperty('test.score', 88);
     const direct = await backtests.statusForRead(testRunId);
-    expect(direct?.result).toMatchObject({ metrics: { score: 99 } });
+    expect(direct?.result).toMatchObject({
+      metrics: { score: { status: 'available', value: '99' } },
+    });
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE "OptimizationExperiment" SET "baselineRunRefs"='{}'::jsonb
@@ -205,6 +210,24 @@ isolatedDescribe('T02 isolated PostgreSQL read eligibility', () => {
     expect(unknown.experiment.readEligibility).toMatchObject({
       state: 'restricted',
       code: 'HISTORICAL_REVEAL_UNKNOWN',
+    });
+  });
+
+  it('旧回测仍被读取门禁拒绝，不因现行样本修复而放行', async () => {
+    const legacy = await prisma.backtestJob.create({
+      data: {
+        strategyVersionId: baselineVersionId,
+        mode: 'V2',
+        status: 'succeeded',
+        periodStart: new Date('2026-01-01T00:00:00.000Z'),
+        periodEnd: new Date('2026-09-01T00:00:00.000Z'),
+        dataAsOf: new Date('2026-09-18T00:00:00.000Z'),
+        input: {},
+        result: { metrics: { score: 99 } },
+      },
+    });
+    await expect(backtests.statusForRead(legacy.id)).rejects.toMatchObject({
+      response: { code: 'UNSUPPORTED_CONTRACT_VERSION' },
     });
   });
 });

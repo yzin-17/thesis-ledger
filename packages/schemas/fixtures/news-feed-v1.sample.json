@@ -1,6 +1,6 @@
 {
   "request": {
-    "version": 3,
+    "version": 1,
     "requestId": "controlled-feed-contract",
     "publishedStart": null,
     "publishedEnd": null,
@@ -58,7 +58,7 @@
       "missingReasons": ["market_feed_first_page_not_exhaustive", "published_time_unknown"]
     },
     "errors": [],
-    "version": 3,
+    "version": 1,
     "contractVersion": "news-feed-v1",
     "capability": "NEWS_FEED",
     "market": "CN"

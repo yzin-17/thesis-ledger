@@ -10,7 +10,7 @@
 
 ## 修复合同
 
-按[规格](../specs/2026-11-12-experiment-retry-catalog-revalidation.md)实施，状态由[任务](../tasks/2026-11-12-experiment-retry-catalog-revalidation.md)维护。
+按[现行规格](../specs/2026-11-12-experiment-retry-catalog-revalidation.md)实施，结案见[归档任务](../archive/tasks/2026-11-12-experiment-retry-catalog-revalidation.md)。
 
 - Market 对只有 Catalog 全局变化的父窗重新确认当前精确来源准入，并追加使用当前 Catalog 的独立证据；父引用、原始响应、观测时间及旧证据不变。预检与快照继续使用一致的选择和证据 context。
 - Desired／Effective 变化、选中来源/位置变化、来源不就绪、引用或哈希错误、窗口与预热不足继续阻断；冻结路径不回退到线上取价。
@@ -58,3 +58,24 @@ Market 包 112 个测试文件、1233 项通过，10 文件／45 项按环境跳
 本次仅清理代码与同步说明，不执行真实实验、快照复算或部署；此前记录继续表示当时证据，不冒充清理后的目标运行态验证。
 
 清理后定向检查：`strategy-optimization-continuation.test.ts` 3 项、`optimization-retry.test.ts` 2 项通过；修改的服务与测试 ESLint 无错误，`.mjs` 按现有配置被忽略，另以 `node --check` 检查语法通过。可执行代码中无已删除入口的残留引用，统一执行前冻结检查只保留一个调用点，`git diff --check` 通过。没有重复全包构建或浏览器验证。
+
+## 2026-11-22 连接复查
+
+从当时的目标 Server 对原模型地址 `192.168.5.20:6789` 做一次三秒边界内的纯 TCP 连接，返回成功，进程退出 0。该次检查限于连通性，原连接失败保留在上节。完整业务终态见下节。
+
+## 2026-11-22 真实终态只读验收
+
+收到一次人工重试、最多两次模型请求的授权后，先读取目标库。原实验 `91a69058-9dc7-4d12-9cb3-68b38356d54a` 已于北京时间 11 月 12 日 18:25:52 到达 `succeeded / completed`，最终执行 attempt 为 12。正式重试只接受失败态。本轮重试提交、模型请求、探针、采纳和业务库写入均为 0。
+
+目标库的最后一次人工受理发生在同日 18:22:56，原停止原因为 `no_valid_candidate`，轮次偏移为 5。用原实验的累计预算、两轮上限、原 `lmstudio` 路由和 `qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive@q4_k_m` 绑定完成后续执行。该次受理的两条 SDK 回执各有一次派发和结算，均为 `completed`、用量已报告、`fallbackUsed=false`，记账费用均为 0 USD。
+
+| 原执行轮 | SDK 请求 | 候选结论 |
+| --- | --- | --- |
+| 6 | `2bde7509-7d57-49c1-9122-a459b5387fce` | 候选 2 保留为 `invalid` |
+| 7 | `c1bfe4d3-9269-4e07-a1b6-e74911f81030` | 候选 3 `e619dd99-868b-4ec2-880c-982c6edc0a05` 进入自动封存，最终为 `test_valid` |
+
+对原基线和候选 3 的开发、验证、封存测试共 6 份 Run 进行目标库只读比对。全部为 `succeeded`，日期、原 `dataAsOf`、两套冻结父窗对象及预热预算与实验绑定相符。执行使用后复权 `futu/futu`，原价使用 `hithink/hithink-financial-api`，对应路由一致。6 份快照内容哈希和结果校验和均与各自持久记录一致。
+
+正式 HTTP 读取实验详情、结果比较、候选 3 的封存回测及采纳状态均返回 200。封存窗口为 2026-08-14 至 2026-11-11，候选 Run 为 `9672934a-521f-41e5-bf42-7caa3fd90c1b`，返回 `READABLE`，结果校验和前缀为 `6e34ebf35ac677fa`。最终只锁定候选 3，`selectedCandidateId` 为空，采纳接口空响应、采纳记录为 0，候选仍为实验版本 -3。
+
+目标库保留 5 条原人工受理历史和 7 条模型尝试。第 1、2 轮原连接超时仍为 `unknown_outcome`，第 2 轮原请求 `d364773b-3d03-4d4b-bb3d-a8d470fd33b4` 仍保存 `provider_connect_timeout`。原预热失败及其他未通过候选均可追溯。本轮通过数据库只读事务与正式 GET 对账，沿用原真实成功回执完成 T6。

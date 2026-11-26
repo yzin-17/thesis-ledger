@@ -4,14 +4,14 @@ import { createFailoverPlan, primary, backup, routeKey, policyFingerprint, resto
 import { createLocalApi, executeCase } from './market-route-failover-acceptance.mjs';
 
 function fixture() {
-  const policy = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'initial', revision: 74, enabled: true,
+  const policy = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'initial', revision: 74, enabled: true,
     routes: [{ key: routeKey, targets: [{ ...primary }] },
       { key: { kind: 'data', market: 'CN', assetType: 'STOCK', capability: 'HISTORICAL_TRADING_STATUS' },
         targets: [{ providerId: 'baostock', upstreamSource: 'baostock' }] }],
     syncState: 'applied', effectiveStale: false, dsaRevision: 74 };
   const providers = [{ ...primary, enabled: true, configured: true, configVersion: 3, privateSecret: 'never-copy' },
     { ...backup, enabled: true, configured: true, configVersion: 0 }];
-  const barQuery = { contractVersion: 3, operation: 'query', adjustment: 'qfq', priceBasis: 'provider-native',
+  const barQuery = { contractVersion: 1, operation: 'query', adjustment: 'qfq', priceBasis: 'provider-native',
     readScope: 'single-target-whole-window', coverageValidation: 'per-request', transportProtocol: 'fixture-v1' };
   const catalog = { status: 'complete', entries: [primary, backup].map((target) => ({ key: routeKey, target, state: 'ready', barQuery })) };
   return { policy, providers, catalog };
@@ -19,7 +19,7 @@ function fixture() {
 
 function series(target, index, revision) {
   const dates = [15, 16, 17, 18, 19].map((day) => `2024-07-${day}T07:00:00Z`);
-  return { contractVersion: 3, identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
+  return { contractVersion: 1, identity: { symbol: '510300.SH', assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
     points: dates.map((timestamp) => ({ timestamp, open: 1, high: 1, low: 1, close: 1, volume: null, amount: null,
       completionStatus: 'complete', availableAt: timestamp })),
     coverage: { actualStart: dates[0], actualEnd: dates.at(-1), hasMoreBefore: false, latestCompleteTradingDate: '2024-07-19' },

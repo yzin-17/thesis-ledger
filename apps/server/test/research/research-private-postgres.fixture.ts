@@ -91,16 +91,16 @@ export async function seedResearchPrivateRows(prisma: PrismaClient, ownerId: str
   ) as { strategy: unknown };
   const definition = researchStrategyMaterialV2Schema.parse(raw.strategy).definition;
   const strategy = await prisma.strategy.create({
-    data: { name: '受控研究策略', schemaVersion: 2, ownerId },
+    data: { name: '受控研究策略', schemaVersion: 1, ownerId },
   });
   const foreign = await prisma.strategy.create({
-    data: { name: '受控他人策略', schemaVersion: 2, ownerId: randomUUID() },
+    data: { name: '受控他人策略', schemaVersion: 1, ownerId: randomUUID() },
   });
   const version = await prisma.strategyVersion.create({
     data: {
       strategyId: strategy.id,
       version: 1,
-      schemaVersion: 2,
+      schemaVersion: 1,
       schema: definition as Prisma.InputJsonValue,
     },
   });
@@ -108,7 +108,7 @@ export async function seedResearchPrivateRows(prisma: PrismaClient, ownerId: str
     data: {
       strategyId: foreign.id,
       version: 1,
-      schemaVersion: 2,
+      schemaVersion: 1,
       schema: definition as Prisma.InputJsonValue,
     },
   });
@@ -169,7 +169,7 @@ export function useResearchPrivatePostgresFixture() {
         displayName: '受控目录标的',
         generation: 1,
       },
-      update: { active: true, generation: 1 },
+      update: { active: true, generation: 1, displayName: '受控目录标的' },
     });
     rows = await seedResearchPrivateRows(prisma, localIdentityPrincipal()!.id);
     harness.data.setMode('available');

@@ -1,34 +1,41 @@
 import { Prisma } from '@prisma/client';
-import { buildGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
+import { assertGenerationSchemaPrompt, buildDiscoveryTextSchemaPrompt, buildGenerationSchemaPrompt } from '../ai/ai-generation-schema-prompt.js';
+import { generationInputBytes } from '../ai/ai-generation-output.js';
 import {
-  aiGenerationContracts,
   optimizationObjectiveSchema,
   optimizationDiscoveryScopeSchema,
   type StrategyParameterDescriptor,
   type BacktestStrategy,
+  type AiGenerationMode,
 } from '@thesis-ledger/schemas';
 import type { PrismaService } from '../platform/prisma.service.js';
 import type { ExperimentRow } from './strategy-optimization-common.js';
 import { discoveryGenerationPrompt, discoveryPrompt } from './strategy-optimization-discovery.js';
+import { optimizationGenerationContract } from './strategy-optimization-generation-contract.js';
 import {
   optimizationModelDiff,
   optimizationModelMetrics,
   optimizationModelResearchNotice,
 } from './strategy-optimization-model-feedback.js';
 
-export const STRATEGY_OPTIMIZATION_PROMPT_VERSION = 'strategy-optimization-v2';
+import { RESEARCH_STRATEGY_SPACE_VERSION } from './strategy-optimization-research.js';
 
-const outputInstructions = (sourceMode: ExperimentRow['sourceMode'], useSdkContract: boolean) => {
+export const STRATEGY_OPTIMIZATION_PROMPT_VERSION = 'strategy-optimization-v28-comparison-readback';
+
+const outputInstructions = (
+  experiment: ExperimentRow,
+  useSdkContract: boolean,
+  generationMode: AiGenerationMode,
+) => {
   if (!useSdkContract) return '';
-  const contract =
-    sourceMode === 'discovery'
-      ? aiGenerationContracts.strategyDiscovery
-      : aiGenerationContracts.parameterOptimization;
-  return (
-    '\n只输出满足以下合同的 JSON，不添加合同外字段或 Markdown。' +
-    `\nOUTPUT_CONTRACT:${contract.ref.id}/${contract.ref.version}` +
-    `\n${buildGenerationSchemaPrompt(contract.schema)}`
-  );
+  const contract = optimizationGenerationContract(experiment);
+  const header = `\nOUTPUT_CONTRACT:${contract.ref.id}/${contract.ref.version}\n`;
+  if (experiment.sourceMode === 'discovery') {
+    if (generationMode === 'native_schema') return header;
+    if (generationMode === 'json_validated') return header + buildDiscoveryTextSchemaPrompt(contract.schema);
+    return header + buildGenerationSchemaPrompt(contract.schema, 'ref');
+  }
+  return header + buildGenerationSchemaPrompt(contract.schema);
 };
 
 const priorFeedback = async (prisma: PrismaService, experimentId: string, modelKey: string) => {
@@ -48,6 +55,7 @@ export const strategyOptimizationPrompt = async (input: {
   modelKey: string;
   round: number;
   useSdkContract: boolean;
+  generationMode?: AiGenerationMode;
 }) => {
   const priorRows = await priorFeedback(input.prisma, input.experiment.id, input.modelKey);
   const allowed = new Set(input.experiment.allowedParameterIds as string[]);
@@ -56,10 +64,13 @@ export const strategyOptimizationPrompt = async (input: {
     diff: optimizationModelDiff(row.diff, authorized, input.experiment.sourceMode === 'discovery'),
     metrics: optimizationModelMetrics(row.metrics),
   }));
-  const notice = optimizationModelResearchNotice(input.experiment.runConfig);
+  const dataScopeInRequest = input.useSdkContract && input.experiment.sourceMode === 'discovery'
+    && input.experiment.strategySpaceVersion === RESEARCH_STRATEGY_SPACE_VERSION;
+  const notice = optimizationModelResearchNotice(input.experiment.runConfig, dataScopeInRequest);
   const contractInstructions = outputInstructions(
-    input.experiment.sourceMode,
+    input.experiment,
     input.useSdkContract,
+    input.generationMode ?? 'json_validated',
   );
   const objective = optimizationObjectiveSchema.parse(input.experiment.objective);
   if (input.experiment.sourceMode === 'discovery')
@@ -76,6 +87,7 @@ export const strategyOptimizationPrompt = async (input: {
             input.strategy,
             input.round,
             priorCandidates,
+            input.generationMode,
           )
         : discoveryPrompt(
             {
@@ -91,7 +103,7 @@ export const strategyOptimizationPrompt = async (input: {
           )
     ).map((message, index) =>
       index === 0
-        ? { ...message, content: `${message.content}\n${notice}${contractInstructions}` }
+        ? { ...message, content: `${contractInstructions}\n${message.content}\n${notice}` }
         : message,
     );
   return [
@@ -120,4 +132,18 @@ export const strategyOptimizationPrompt = async (input: {
       })}`,
     },
   ];
+};
+
+/** 在预算预留前，以本次冻结的模式准备消息与完整输入估算。 */
+export const prepareOptimizationGeneration = async (
+  input: Parameters<typeof strategyOptimizationPrompt>[0] & { generationMode: AiGenerationMode },
+) => {
+  const messages = await strategyOptimizationPrompt(input);
+  const contract = optimizationGenerationContract(input.experiment);
+  if (input.generationMode === 'json_validated')
+    assertGenerationSchemaPrompt(contract.schema, messages);
+  const inputTokenReservation = await generationInputBytes(
+    messages, input.generationMode, contract.schema, contract.ref,
+  );
+  return { messages, inputTokenReservation };
 };

@@ -63,7 +63,7 @@
 
 - schemas 包测试：147 文件、1597 测试通过；后续主语歧义收敛后定向交叉语义测试 7 项再次通过，包 build 通过。
 - 最终生成相关回归：`pnpm --filter @thesis-ledger/server exec vitest run test/strategy-authoring test/strategy-optimization`：47 文件通过、19 跳过；249 测试通过、99 跳过。跳过项未作为隔离 PostgreSQL 通过证据。
-- `node --test scripts/local-runtime/strategy-cross-repair.test.mjs`：2 项通过，验证只交换授权项、保持输入不变及拒绝无明确修复依据。
+- `node --test scripts/archive/2026-11-12-strategy-cross-direction/strategy-cross-repair.test.mjs`：2 项通过，验证只交换授权项、保持输入不变及拒绝无明确修复依据。
 - 修改的 TypeScript 文件定向 ESLint 通过；两个本地运行 mjs 文件被仓库 ESLint 配置忽略，另由 Node 测试验证。`check-boundaries.mjs` 通过；文件尺寸检查报告 5 个存量警告、无本次新增超限。
 - 全量 Server 测试：552 文件通过、7 文件失败、109 跳过；4384 测试通过、12 失败、505 跳过。包含 Arena 时间线夹具、数据库 migration head／列表断言和回测用例失败；共享工作区有同期修改，未通过回滚他人代码构造纯净基线，也不宣称全量通过。定向范围以本节最终结果为准。
 - 第二轮构建曾遇到共享 dist 并发清理的 ENOTEMPTY；停止同输入重试，确认构建结束后成功。随后共享工作区的 MarketController 重构出现两处函数调用前多余分号，已作两行调用语法修正，保留其他改动；6 个 MarketController 消费测试文件、59 项测试及 Server typecheck 通过。
@@ -75,7 +75,7 @@
 可重复入口（默认只预览，`--apply` 明确新增；复用已存在的相同修正版和幂等回测）：
 
 ```sh
-node scripts/local-runtime/strategy-cross-repair.mjs \
+node scripts/archive/2026-11-12-strategy-cross-direction/strategy-cross-repair.mjs \
   --strategy-id 55f66224-9c77-4773-99c0-630850b47a7d \
   --source-version-id e0137741-0f5d-4da1-808b-8eb8852717b8 \
   --source-run-id a20a39e3-620e-4fb0-ad31-14b6dfa91758 \

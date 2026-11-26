@@ -66,7 +66,7 @@ export class MarketFundReader {
       if (cached) return this.checked(scope, parseCurrentFundNav({ ...JSON.parse(cached), servedFromCache: true }, symbol), options.allowStale, options.signal);
     }
     try {
-      const path = `/api/v3/thesis-ledger/market/fund-nav?symbol=${encodeURIComponent(symbol)}`;
+      const path = `/api/v1/thesis-ledger/market/fund-nav?symbol=${encodeURIComponent(symbol)}`;
       const raw = options.signal
         ? await this.dsa.get<Record<string, unknown>>(path, 1, undefined, options.signal)
         : await this.dsa.get<Record<string, unknown>>(path);
@@ -136,7 +136,7 @@ export class MarketFundReader {
             if (range.start) query.set('start', range.start);
             if (range.end) query.set('end', range.end);
             const raw = await this.dsa.get<unknown[]>(
-              `/api/v3/thesis-ledger/market/fund-nav/history?${query.toString()}`,
+              `/api/v1/thesis-ledger/market/fund-nav/history?${query.toString()}`,
             );
             const points = await readWithDataQuality(this.quality, {
               capability: 'FUND_NAV_HISTORY', provider: 'dsa', symbol, scope: JSON.stringify(scope.context.routeKey),
@@ -221,7 +221,7 @@ export class MarketFundReader {
             );
         }
         const raw = await this.dsa.get<Record<string, unknown>>(
-          `/api/v3/thesis-ledger/market/fund-holdings?symbol=${encodeURIComponent(symbol)}`,
+          `/api/v1/thesis-ledger/market/fund-holdings?symbol=${encodeURIComponent(symbol)}`,
         );
         const holdings = await readWithDataQuality(this.quality, {
           capability: 'FUND_HOLDINGS', provider: 'dsa', symbol, scope: JSON.stringify(scope.context.routeKey),

@@ -5,6 +5,7 @@ import {
   evaluateStatusCompositionV1,
   type BacktestStatusCompositionV1,
   type BacktestSnapshotManifestV3,
+  type MarketStatusCompositionV1,
   type RunConfigV3,
   type StatusCompositionDemandV1,
   type StatusCapabilityNameV1,
@@ -14,20 +15,16 @@ import { DsaV3ProtocolError } from '../integration/dsa/dsa-v3-protocol.js';
 import { readMarketStatusCompositionV1, sameStatusCompositionPolicyV1 } from '../market/market-status-composition-reader-v1.js';
 import type { ArtifactRow } from './backtest-artifact-store.js';
 import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot.js';
-import { collectSnapshotTradingStatusV3 } from './backtest-trading-status-snapshot-v3.js';
+import { freezePreparedTradingStatusV3 } from './backtest-trading-status-snapshot-v3.js';
 
 type Dsa = Partial<
-  Pick<DsaClient, 'effectiveControlPolicyV3' | 'dataCapabilities' | 'marketTradingStatusV3'>
+  Pick<DsaClient, 'effectiveControlPolicyV3' | 'dataCapabilities'>
 >;
 
-/** 新交易状态被明确选择才替代旧聚合；其他新事实不删除已有交易约束。 */
 export async function collectSnapshotStatusInputsV1(config: RunConfigV3, dsa?: Dsa) {
   const statusComposition = await collectSnapshotStatusCompositionV1(config, dsa);
-  const ownsTrading = statusComposition?.composition.entries.some(
-    (item) => item.query.routeKey.capability === 'DAILY_TRADING_STATUS',
-  );
-  const tradingStatus = ownsTrading ? undefined : await collectSnapshotTradingStatusV3(config, dsa);
-  if (statusComposition && dsa?.effectiveControlPolicyV3) {
+  const tradingStatus = freezePreparedTradingStatusV3(config);
+  if (statusComposition && !config.lifecyclePreparation && dsa?.effectiveControlPolicyV3) {
     const after = (await dsa.effectiveControlPolicyV3()).projection?.effective;
     if (!sameStatusCompositionPolicyV1(after, statusComposition.composition.policy))
       throw new DsaV3ProtocolError('冻结状态读取期间政策变化', 'stale-revision');
@@ -41,10 +38,15 @@ export async function collectSnapshotStatusCompositionV1(
   dsa?: Dsa,
 ): Promise<BacktestStatusCompositionV1 | undefined> {
   const scope = config.executionModel?.scope;
+  const lifecycle = config.lifecyclePreparation?.response;
+  if (lifecycle) {
+    return 'composition' in lifecycle
+      ? freezeComposition(config, lifecycle.composition)
+      : undefined;
+  }
   if (
     !scope ||
     scope.instrumentType !== 'STOCK' ||
-    config.lifecyclePreparation ||
     config.executionPriceProtocol.history.basis !== 'fixed-provider-snapshot' ||
     !dsa?.dataCapabilities ||
     !dsa.effectiveControlPolicyV3
@@ -74,7 +76,7 @@ export async function collectSnapshotStatusCompositionV1(
   ] as const) {
     if (!enabled.has(capability)) continue;
     const base = {
-      contractVersion: 3,
+      contractVersion: 1,
       capabilityVersion: 1,
       consumer: 'thesis-ledger',
       requestId: crypto.randomUUID(),
@@ -112,6 +114,10 @@ export async function collectSnapshotStatusCompositionV1(
   );
   if (!sameStatusCompositionPolicyV1(policy, composition.policy))
     throw new DsaV3ProtocolError('冻结前独立功能选择变化', 'stale-revision');
+  return freezeComposition(config, composition);
+}
+
+function freezeComposition(config: RunConfigV3, composition: MarketStatusCompositionV1) {
   return backtestStatusCompositionV1Schema.parse({
     freezeVersion: statusCompositionFreezeVersionV1,
     runConfigChecksum: hashCanonicalManifest(config),
@@ -160,10 +166,12 @@ export function readSnapshotStatusCompositionV1(
   )
     throw new Error('交易状态重复登记');
   const scope = config.executionModel?.scope;
+  const lifecycle = config.lifecyclePreparation?.response;
   if (
     value.runConfigChecksum !== hashCanonicalManifest(config) ||
     !scope ||
-    config.lifecyclePreparation ||
+    (lifecycle && (!('composition' in lifecycle) ||
+      canonicalizeManifest(lifecycle.composition) !== canonicalizeManifest(value.composition))) ||
     scope.instrumentType !== 'STOCK' ||
     config.executionPriceProtocol.history.basis !== 'fixed-provider-snapshot' ||
     value.freezeVersion !== manifest.statusComposition.freezeVersion ||
@@ -172,7 +180,8 @@ export function readSnapshotStatusCompositionV1(
         item.query.symbol !== scope.symbol ||
         item.query.routeKey.market !== scope.market ||
         ('range' in item.query &&
-          (item.query.range.start !== config.startDate || item.query.range.end !== config.endDate)),
+          (item.query.range.start !== (lifecycle?.range.start ?? config.startDate) ||
+            item.query.range.end !== config.endDate)),
     ) ||
     value.adoption.observedAfterPriceCutoff !==
       value.composition.entries.some(

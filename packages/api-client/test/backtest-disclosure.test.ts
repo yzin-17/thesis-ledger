@@ -12,7 +12,7 @@ describe('回测客户端披露', () => {
     const payload = {
       id: 'run',
       strategyVersionId: 'version',
-      mode: 'V3',
+      mode: 'frozen',
       status: 'failed',
       errorCode: 'DATA_UNAVAILABLE',
       errorSummary: 'historical status unavailable',

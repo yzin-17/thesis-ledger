@@ -14,4 +14,4 @@
 
 ## 所有权与边界
 
-Market 拥有父窗口校验和当前准入证据；Backtest 消费一致的选择与证据 context，不重新定义来源规则；StrategyOptimization 在执行模型前统一复核冻结输入。现有 Schema 与表结构沿用，原数据和已有证据保持不变，只追加必要的当前校验证据。实现按[任务](../tasks/2026-11-12-experiment-retry-catalog-revalidation.md)推进。
+Market 拥有父窗口校验和当前准入证据；Backtest 消费一致的选择与证据 context，不重新定义来源规则；StrategyOptimization 在执行模型前统一复核冻结输入。现有 Schema 与表结构沿用，原数据和已有证据保持不变，只追加必要的当前校验证据。实施及验收见[归档任务](../archive/tasks/2026-11-12-experiment-retry-catalog-revalidation.md)。

@@ -67,7 +67,7 @@ node scripts/local-runtime/provider-health-record-maintenance.mjs --target thesi
 ```sh
 PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright \
 PROVIDER_HEALTH_QA_OUTPUT=/Users/yzin/code/thesis-ledger-workspace/thesis-ledger/.recovery-artifacts/provider-health-records-20261112-browser-final \
-node scripts/local-runtime/provider-health-record-browser.mjs
+node scripts/local-runtime/browser/providers/provider-health-record.regression.mjs
 ```
 
 使用 Microsoft Edge，真实 `http://localhost:5173/providers` 页面、真实本地 API。1440、1024、768、390 宽度均显示 20 行健康历史，无读取失败、页面错误、失败历史请求或页面横向溢出。1440 宽度下一页、上一页通过；390 宽度表格容器内横向滚动通过。已人工查看桌面和窄屏截图。

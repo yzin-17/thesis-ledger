@@ -4,7 +4,6 @@ import {
   researchReportDetailSchema,
   researchReportSummarySchema,
   researchFrozenEvidenceV2Schema,
-  researchResultSchema,
   type ResearchSubmissionV2,
   type ResearchResultV2,
   type ResearchReportDetail,
@@ -44,7 +43,7 @@ function snapshot(input: ResearchSubmissionV2, result: ResearchResultV2): Resear
   if (result.scopeSnapshot.scope !== 'instrument') throw new Error('浏览器规范标的样例缺失');
   const instrument = result.scopeSnapshot.instrument;
   const base = {
-    version: 'research-scope-v2' as const,
+    version: 'research-scope-snapshot-v1' as const,
     mode: input.mode,
     confirmedAt: result.scopeSnapshot.confirmedAt,
   };
@@ -97,7 +96,7 @@ function report(
     createdAt: savedResult.createdAt,
     updatedAt: savedResult.createdAt,
     historicalScope: { status: 'known', snapshot: frozenScope },
-    resultVersion: 2,
+    resultVersion: 'research-report-result-v1',
     availability: pending ? 'pending' : 'available',
     summary: pending ? null : savedResult.inference.conclusion,
     quality: savedResult.quality,
@@ -115,11 +114,7 @@ const response = (value: unknown, status = 200) =>
 const absent = () =>
   response({ error: 'not_found', message: '受控记录不存在或不属于当前范围' }, 404);
 
-function seedReports(
-  scenario: ResearchBrowserScenario,
-  sample: ResearchBrowserExamples,
-  result: ResearchResultV2,
-) {
+function seedReports(sample: ResearchBrowserExamples, result: ResearchResultV2) {
   const reports = new Map<string, ResearchReportDetail>();
   for (const mode of ['shadow', 'actual'] as const) {
     const input = normalizeResearchSubmissionV2({
@@ -132,47 +127,6 @@ function seedReports(
     const row = report(input, false, result);
     reports.set(row.id, row);
   }
-  if (scenario !== 'registered') {
-    const old = researchResultSchema.parse({
-      version: 1,
-      provider: 'controlled-history',
-      createdAt: '2026-10-18T12:00:00Z',
-      conclusion: '这是受控旧报告正文，范围和引用归属尚待核验。',
-      evidence: [
-        {
-          claim: '合成历史陈述',
-          citations: [
-            {
-              tool: 'portfolio',
-              sourceId: 'controlled-history',
-              provider: 'controlled-history',
-              observedAt: '2026-10-18T12:00:00Z',
-            },
-          ],
-        },
-      ],
-      risks: ['合成风险'],
-      unknowns: ['历史模式未知'],
-      disclaimer: '仅为浏览器合成样例',
-    });
-    const row = researchReportDetailSchema.parse({
-      id: crypto.randomUUID(),
-      status: 'succeeded',
-      question: '受控历史兼容报告',
-      createdAt: old.createdAt,
-      updatedAt: old.createdAt,
-      historicalScope: { status: 'unrecorded', snapshot: null, label: '历史范围未记录' },
-      resultVersion: 1,
-      availability: 'pending_verification',
-      summary: old.conclusion,
-      quality: null,
-      errorCode: null,
-      errorSummary: null,
-      result: old,
-      submission: null,
-    });
-    reports.set(row.id, row);
-  }
   return reports;
 }
 
@@ -180,7 +134,7 @@ function receipt(row: ResearchReportDetail, reused: boolean) {
   if (!row.submission || row.historicalScope.status !== 'known')
     throw new Error('受控提交收据缺失');
   return {
-    version: 2,
+    version: 'research-report-submission-v1',
     runId: row.id,
     submissionId: row.submission.submissionId,
     status: row.status,
@@ -198,7 +152,7 @@ export function createResearchBrowserApi(
   if (result.scopeSnapshot.scope !== 'instrument') throw new Error('浏览器规范标的样例缺失');
   const instrument = result.scopeSnapshot.instrument;
   const evidence = researchFrozenEvidenceV2Schema.parse(sample.frozen.evidence[0]);
-  const reports = seedReports(scenario, sample, result);
+  const reports = seedReports(sample, result);
   const submitted = new Map<string, string>();
   const listeners = new Set<() => void>();
   const stats = {
@@ -288,7 +242,7 @@ export function createResearchBrowserApi(
     }
     if (url.pathname === '/api/v1/research/capabilities')
       return response({
-        version: 'research-capabilities-v2',
+        version: 'research-capabilities-v1',
         canCreate: scenario !== 'closed',
         scopes,
       });
@@ -413,7 +367,7 @@ function researchBrowserReportReader(
   evidence: ReturnType<typeof researchFrozenEvidenceV2Schema.parse>,
 ) {
   const matches = (row: ResearchReportDetail, params: URLSearchParams) => {
-    if (params.get('view') === 'legacy') return row.historicalScope.status === 'unrecorded';
+    if (params.get('view') !== 'scoped') return false;
     if (row.historicalScope.status !== 'known') return false;
     return (
       row.historicalScope.snapshot.mode === params.get('mode') &&
@@ -425,10 +379,10 @@ function researchBrowserReportReader(
     const row = reports.get(parts[5] ?? '');
     if (!row || !matches(row, url.searchParams)) return absent();
     if (parts[6] !== 'evidence') return response(row);
-    if (row.result?.version !== 2 || row.result.evidenceBindings[0]?.audit.evidenceId !== parts[7])
+    if (row.result?.evidenceBindings[0]?.audit.evidenceId !== parts[7])
       return absent();
     return response({
-      version: 2,
+      version: 'research-report-evidence-v1',
       runId: row.id,
       scopeSnapshot: row.result.scopeSnapshot,
       evidence,

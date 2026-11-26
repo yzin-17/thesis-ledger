@@ -20,6 +20,17 @@ const serverProvidersPrefix = 'apps/server/src/providers/';
 const serverBacktestPrefix = 'apps/server/src/backtest/';
 const serverBacktestTestPrefix = 'apps/server/test/backtest/';
 const forbiddenFeatureDependencies = [
+  ['apps/server/src/backtest/backtest-processor.module.ts', 'apps/server/src/market/market.module', '回测Worker只导入输入读取模块，不启动完整Market后台维护'],
+  ['apps/server/src/backtest/backtest-processor.module.ts', 'apps/server/src/backtest/backtest.module', '回测Worker不得装配HTTP应用及队列协调器'],
+  ...['catalog-readiness', 'fund-daily-error', 'market.module'].map(target => [
+    'apps/server/src/market/market-backtest-input.module.ts', `apps/server/src/market/${target}`,
+    '回测输入模块不包含目录同步、基金定时计算或完整Market生命周期',
+  ]),
+  ...['backtest-expression', 'backtest-trade-plan', 'backtest-indicators', 'backtest-values'].flatMap(source =>
+    ['backtest-contract', 'backtest-strategy', 'index'].map(target => [
+      `packages/schemas/src/${source}.ts`, `packages/schemas/src/${target}`,
+      '基础表达式、指标及交易计划不得反向依赖策略根或聚合出口，避免运行时循环加载',
+    ])),
   ['apps/desktop/src/features/risk/RiskCenter.tsx', 'apps/desktop/src/features/risk/RiskNotificationProviderPicker', '通知提供方选择归单条规则创建和编辑，通知记录页不得恢复全局配置入口'],
   [
     'apps/server/src/backtest/strategy-version-publication.ts',
@@ -242,12 +253,12 @@ const forbiddenFeatureDependencies = [
     'packages/api-client/',
     '比例单位合同不得依赖请求适配层',
   ],
-  ...['decimal.ts', 'decimal-number-display.ts', 'risk/threshold-format.ts'].flatMap((file) => [
-    [`packages/domain/src/${file}`, 'apps/', '十进制表示与风险阈值展示不得依赖应用编排'],
+  ...['decimal.ts', 'decimal-number-display.ts', 'risk/threshold-format.ts', 'ai-provider-status.ts'].flatMap((file) => [
+    [`packages/domain/src/${file}`, 'apps/', '领域展示投影不得依赖应用编排'],
     [
       `packages/domain/src/${file}`,
       'packages/api-client/',
-      '十进制表示与风险阈值展示不得依赖请求适配层',
+      '领域展示投影不得依赖请求适配层',
     ],
   ]),
   [

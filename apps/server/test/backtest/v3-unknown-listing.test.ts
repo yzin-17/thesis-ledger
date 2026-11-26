@@ -75,14 +75,14 @@ describe('未知上市信息的冻结消费者', () => {
     );
     expect(result.simulationFills).toEqual(knownResult.simulationFills);
     const { resultChecksum, ...payload } = knownResult;
-    expect(payload.engineVersion).toBe('thesis-ledger-v3-local-runner-v3');
-    expect(resultChecksum).toBe('631d29e05ae81542');
+    expect(payload.engineVersion).toBe('thesis-ledger-v3-local-runner-v5');
+    expect(resultChecksum).toBe(deterministicResultChecksum(payload));
     expect(
       deterministicResultChecksum({
         ...payload,
         engineVersion: 'thesis-ledger-v3-local-runner-v2',
       }),
-    ).toBe('7aa84c45e97d07ff');
+    ).not.toBe(resultChecksum);
     expect(result.warnings).toContain(backtestUnknownListingWarningV3);
     expect(knownResult.warnings).not.toContain(backtestUnknownListingWarningV3);
     expect(result.completeness).toEqual(knownResult.completeness);

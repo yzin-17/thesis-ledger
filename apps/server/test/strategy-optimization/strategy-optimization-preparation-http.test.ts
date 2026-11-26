@@ -20,7 +20,7 @@ describe('实验配置准备HTTP', () => {
     const config = f.input.runConfig;
     const prisma = {
       strategyVersion: {
-        findUnique: vi.fn().mockResolvedValue({ schemaVersion: 3, schema: f.input.strategy }),
+        findUnique: vi.fn().mockResolvedValue({ schemaVersion: 1, schema: f.input.strategy }),
       },
       backtestJob: { create: vi.fn() },
     };
@@ -42,7 +42,7 @@ describe('实验配置准备HTTP', () => {
     app.useGlobalFilters(new ApiExceptionFilter());
     await app.listen(0, '127.0.0.1');
     const intent = {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'prepare-experiment',
       warmupBudgetSessions: 60,
       adjustment: 'hfq',
@@ -104,6 +104,26 @@ describe('实验配置准备HTTP', () => {
       expect(prisma.strategyVersion.findUnique).toHaveBeenCalledOnce();
       expect(f.reader.readV3.mock.calls.filter(([input]) => input.frozenWindowRef)).toHaveLength(2);
       expect(prisma.backtestJob.create).not.toHaveBeenCalled();
+      const selected = f.reader.readV3.getMockImplementation()!;
+      f.reader.readV3.mockClear();
+      f.reader.readV3.mockImplementation(async (input) => input.routeKey.adjustment === 'none'
+        ? { status: 'unavailable', selection: { status: 'unavailable', reason: 'route_not_configured' } } as never
+        : selected(input));
+      const restricted = await fetch(endpoint, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ target: { sourceMode: 'discovery', discoveryScope: {
+          executionInstrument: f.input.strategy.executionInstrument, primaryTimeframe: '1d',
+        } }, intent: { ...intent, priceResearchReference: 'optional' } }),
+      });
+      expect(restricted.status).toBe(201);
+      const limited = await restricted.json();
+      expect(limited).toMatchObject({ status: 'prepared', runConfig: { priceResearch: { dataScope: {
+        priceCoordinates: ['research'], sizingModes: ['fixedAmount', 'equityRatio'],
+        unavailableCapabilities: [{ capability: 'actual-price', code: 'route_not_configured' }],
+      } } } });
+      expect(limited.runConfig.priceResearch).not.toHaveProperty('actualPriceWindow');
+      expect(f.reader.readV3.mock.calls.filter(([input]) => !input.frozenWindowRef)
+        .map(([input]) => input.routeKey.adjustment)).toEqual(['hfq', 'none']);
       const invalid = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

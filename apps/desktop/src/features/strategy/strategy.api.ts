@@ -14,10 +14,10 @@ const definitions = (client?: DesktopRequestClient) =>
 const runs = (client?: DesktopRequestClient) => backtestClients(parsedDesktopRequest(client));
 export const fetchStrategies = (client?: DesktopRequestClient): Promise<StrategyRecord[]> =>
   definitions(client).list().then(omitUndefinedDeep);
-export const fetchBacktestJobs = (client?: DesktopRequestClient): Promise<BacktestJobSummary[]> =>
-  runs(client).listRuns().then(omitUndefinedDeep);
-export const fetchBacktestJob = (id: string, client?: DesktopRequestClient): Promise<BacktestJob> =>
-  runs(client).getRun(id).then(omitUndefinedDeep);
+export const fetchBacktestJobs = (client?: DesktopRequestClient, signal?: AbortSignal): Promise<BacktestJobSummary[]> =>
+  runs(client).listRuns(signal).then(omitUndefinedDeep);
+export const fetchBacktestJob = (id: string, client?: DesktopRequestClient, signal?: AbortSignal): Promise<BacktestJob> =>
+  runs(client).getRun(id, signal).then(omitUndefinedDeep);
 export const fetchBacktestInstrumentSeries = (id: string, signal?: AbortSignal, client?: DesktopRequestClient) =>
   runs(client).getInstrumentSeries(id, signal);
 export const createStrategy = (

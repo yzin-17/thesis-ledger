@@ -26,7 +26,7 @@ async function choose(page, name, option) {
 }
 function savedPolicy(view, preview) {
   const policy = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'controlled-inheritance',
     revision: view.revision + 1,

@@ -40,3 +40,22 @@ describe('实验候选阶段终态分类', () => {
     expect(proposalStageFailureReason([{ validationStatus: 'valid' }], [])).toBeNull();
   });
 });
+
+it('全部能力报告保留独立结束原因，有有效候选时仍可完成正常评估', () => {
+  const attempts = [
+    {
+      status: 'succeeded',
+      errorCode: null,
+      proposal: {
+        status: 'unsupported',
+        originalRule: '行业中性组合',
+        reason: '缺行业历史与多资产账本',
+        gaps: [{ path: 'executionInstrument', kind: 'execution', detail: '当前仅单标的' }],
+        supportedParts: [],
+        evidenceRefs: [],
+      },
+    },
+  ];
+  expect(proposalStageFailureReason([], attempts)).toBe('model_capability_gap');
+  expect(proposalStageFailureReason([{ validationStatus: 'valid' }], attempts)).toBeNull();
+});

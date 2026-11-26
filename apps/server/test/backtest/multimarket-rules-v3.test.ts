@@ -7,7 +7,7 @@ import {
   marketTradingStatusResponseV3Schema,
 } from '@thesis-ledger/schemas';
 import { combinePublicFeesExecutionModelV3 } from '../../src/backtest/backtest-public-fees-model-v3.js';
-import { intradayStatusInterpretationV3 } from '../../src/backtest/backtest-intraday-status-v3.js';
+import { interpretDailyStatusHaltsV1, intradayStatusInterpretationV3 } from '../../src/backtest/backtest-intraday-status-v3.js';
 import { instrumentFact } from '../../src/backtest/backtest-v2-execution-shared.js';
 import { executionBarRowsV3 } from '../../src/backtest/backtest-v3-execution-bar-rows.js';
 import { makeReaderResult } from './v3-snapshot-fixtures.js';
@@ -150,7 +150,8 @@ describe('港美股有界消费者', () => {
   it('冻结零量观察不形成可执行价，原字段和摘要保留并对用户披露', async () => {
     const { config } = await input('HK');
     const evidence = {
-      contractVersion: 1,
+      contract: 'market-daily-tradability-window-v1',
+      priceOnlyAllowed: false,
       symbol: '00147.HK',
       market: 'HK',
       instrumentType: 'STOCK',
@@ -221,9 +222,28 @@ describe('港美股有界消费者', () => {
     const result = intradayStatusInterpretationV3(config, response, rows);
     expect(result?.excludedDates).toEqual([market === 'HK' ? '2025-08-07' : '2024-05-13']);
     expect(response).toEqual(original);
+    const current = {
+      contractVersion: 1, capabilityVersion: 1, policyRevision: 203,
+      consumer: response.consumer, requestId: response.requestId, routeTarget: response.routeTarget,
+      routeKey: { ...response.routeKey, capability: 'DAILY_TRADING_STATUS' },
+      symbol: response.symbol, range: response.range,
+      provenance: { adapterRevision: 'bounded-multimarket-rules-adapter-v1', sourceRevision: response.provenance.providerRevision },
+      clock: { observedAt: response.provenance.fetchedAt, upstreamAt: null,
+        timezone: response.provenance.timezone, basis: 'sessionDate' },
+      evidence: response.sourceDocuments.map((doc) => ({ id: doc.id, kind: 'document',
+        sha256: doc.sha256, hashScope: 'originalBytes', reference: doc.url,
+        observedAt: doc.observedAt, availableAt: null })),
+      days: response.days.map((day) => ({ date: day.date, state: day.state,
+        intradayHalts: day.intradayHalts?.map((halt) => ({ ...halt, endedAt: halt.endedAt ?? null })) ?? [],
+        evidenceRefs: day.sourceDocumentIds ?? [] })),
+      coverage: { range: response.range, expectedDates: [], unknownDates: [],
+        calendarUnknownDates: response.days.map((day) => day.date), calendarEvidenceRefs: [], complete: false },
+    };
+    expect(interpretDailyStatusHaltsV1(config, current, rows)).toEqual(result);
     const execution = config.executionModel!.segments[0]!.execution;
     if (execution.mode === 'exchange') delete execution.statusPolicy;
     expect(intradayStatusInterpretationV3(config, response, rows)?.policy).toBe('not-modeled');
+    expect(interpretDailyStatusHaltsV1(config, current, rows)?.excludedDates).toEqual([]);
   });
   it('拒绝错误市场、时区、观察时钟或缺少原件摘要', async () => {
     const { config, response, rows } = await input('HK');

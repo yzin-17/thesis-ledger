@@ -15,6 +15,8 @@ import { type LiveCycleRow } from './live-storage.js';
 import { LiveResearchControl } from './live-research-control.js';
 import { buildLiveResearchMessages } from './live-research-messages.js';
 import { liveDecisionFeedback } from './live-decision-feedback.js';
+import { liveResearchContract } from './live-research-contract.js';
+import { LiveInvalidDecisionError } from './live-invalid-decision.js';
 
 @Injectable()
 export class LiveResearchRunner {
@@ -49,6 +51,7 @@ export class LiveResearchRunner {
     };
     const p = arenaLiveProtocolSchema.parse(frozen.protocol),
       account = arenaLiveAccountSchema.parse(frozen.account);
+    const contract = liveResearchContract({ protocol: p, replay: frozen.replay === true });
     const messages = buildLiveResearchMessages({
       protocol: p,
       account,
@@ -68,9 +71,20 @@ export class LiveResearchRunner {
         step++
       ) {
         control.signal.throwIfAborted();
-        const answer = arenaLiveResearchStepSchema.parse(
-          await this.call.generate(id, attempt, messages, control.signal),
-        );
+        let answer: ReturnType<typeof contract.schema.parse>;
+        try {
+          answer = contract.schema.parse(await this.call.generate(id, attempt, messages, control.signal));
+        } catch (error) {
+          const feedback = error instanceof LiveInvalidDecisionError
+            ? liveDecisionFeedback(error, frozen.replay ? frozen.asOf : new Date().toISOString()) : null;
+          if (!feedback || decisionCorrections >= 1 ||
+            (p.resources.maxResearchSteps !== null && step + 1 >= p.resources.maxResearchSteps)) throw error;
+          control.signal.throwIfAborted();
+          decisionCorrections++;
+          messages.push({ role: 'assistant', content: error instanceof LiveInvalidDecisionError ? error.reply : '' },
+            { role: 'user', content: JSON.stringify(feedback) });
+          continue;
+        }
         control.signal.throwIfAborted();
         messages.push({ role: 'assistant', content: JSON.stringify(answer) });
         if (answer.action === 'decision') {

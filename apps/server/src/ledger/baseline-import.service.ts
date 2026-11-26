@@ -127,7 +127,7 @@ export class BaselineImportService {
         for (const [index, observation] of observations.entries()) {
           events.push(
             await this.repository.appendRevision(context, {
-              version: 3,
+              version: 1,
               eventId: randomUUID(),
               factId: randomUUID(),
               accountId: command.accountId,

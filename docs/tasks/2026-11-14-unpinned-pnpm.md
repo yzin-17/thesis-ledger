@@ -13,10 +13,12 @@ ThesisLedger：根清单、四份 GitHub 工作流、Server Dockerfile、开发�
 - [x] 更新当前说明，保留历史证据和业务依赖锁文件。
 - [x] 验证 JSON、YAML、Docker 输入顺序与本地 pnpm 解析；记录结果。
 
-## 外部验证边界
+## 外部验证与接续
 
-- [ ] GitHub Actions 真实执行：未触发，不作为本轮本地验证通过项。
-- [ ] Docker 镜像构建与运行态更新：未执行，后续需要时经 infra 正式 `update.sh thesis-ledger` 入口完成。
+- [x] GitHub Actions 已实际执行，主仓四个已执行任务的浮动 pnpm 安装和冻结依赖通过，infra 的浮动安装通过。
+- [x] 复用 11 月 19 日的正式镜像构建。infra `DEV_DATABASE_MODE=check ./scripts/update.sh thesis-ledger` 退出 0，构建使用浮动安装的 pnpm 12.21.0，当前 Server、Worker 均使用该镜像。
+- [x] 主仓 Lint 堆内存修复已通过本地验收。Server、Desktop 的源码与测试使用独立 ESLint 进程。Node 24 在 4 GiB 堆上限下执行正式 Lint 和复杂度、文件尺寸门禁均通过，文件清单逐路径一致。 [复现与验收](../evidence/2026-11-22-active-task-followup.md#主仓-ci-lint-堆内存复验)
+- [ ] 修复后的远端完整门禁回执待验。主仓策略优化集成夹具、infra 镜像复用测试和主仓 Lint 修复已有本地通过证据。原远端失败保留。 [原 CI 结果](../evidence/2026-11-22-active-task-followup.md#工程与外部条件)
 
 ## 验证记录
 
@@ -26,4 +28,4 @@ ThesisLedger：根清单、四份 GitHub 工作流、Server Dockerfile、开发�
 - infra 根目录 `pnpm check`：宿主环境通过，退出码 0；运行时、部署依赖边界和兼容合同检查均通过。最初沙箱调用停留在 pnpm 12 的在线依赖策略校验，已停止该次调用；未降低策略或修改配置，改由宿主完整执行验证。
 - 三仓当前可执行配置复扫：无精确 pnpm 版本绑定；检查无新增 `_tmp_*` 残留。
 - 主仓 `git diff --check`：通过。DSA 未写入文件；infra 既有未提交修改保持原样。
-- 未执行依赖安装、真实 GitHub Actions、镜像构建或目标部署；历史运行版本证据保持原文。
+- 上述为 11 月 14 日本地验证记录。后续真实 CI 与镜像回执见上节。

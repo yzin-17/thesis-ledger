@@ -10,8 +10,8 @@ const manifest = JSON.parse(
 );
 const result = {
   source: 'BACKTEST',
-  schemaVersion: '3',
-  snapshotVersion: 'snapshot-manifest-v3',
+  schemaVersion: 'backtest-trade-result-v1',
+  snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
   runId: 'run-1',
   strategyVersionId: 'version-1',
   snapshotId: 'snapshot',
@@ -35,7 +35,7 @@ const result = {
 const row = {
   id: result.runId,
   strategyVersionId: result.strategyVersionId,
-  mode: 'V3',
+  mode: 'frozen',
   status: 'succeeded',
   snapshotId: result.snapshotId,
   resultChecksum: result.resultChecksum,
@@ -51,10 +51,18 @@ function setup(value: unknown) {
   };
 }
 describe('回测管理共享合同', () => {
+  it('重试只接受原Run或明确关联原Run的新回执，拒绝其他Run', async () => {
+    const parent = '11111111-1111-4111-8111-111111111111';
+    const linked = { id: 'new', strategyVersionId: 'v', mode: 'frozen', status: 'queued', stage: 'preparing', replayOfRunId: parent };
+    await expect(setup(linked).api.retryRun(parent)).resolves.toMatchObject(linked);
+    await expect(setup({ ...linked, replayOfRunId: '22222222-2222-4222-8222-222222222222' }).api.retryRun(parent))
+      .rejects.toBeInstanceOf(ThesisLedgerContractError);
+    await expect(setup(linked).api.cancelRun(parent)).rejects.toBeInstanceOf(ThesisLedgerContractError);
+  });
   it('列表与详情传递取消信号，保留服务端状态和来源', async () => {
     const controller = new AbortController(),
       { api, fetcher } = setup([
-        { id: 'run-1', strategyVersionId: 'version-1', mode: 'V3', status: 'running', progress: 0 },
+        { id: 'run-1', strategyVersionId: 'version-1', mode: 'frozen', status: 'running', progress: 0 },
       ]);
     await api.listRuns(controller.signal);
     expect(fetcher.mock.calls[0]?.[1]?.signal).toBe(controller.signal);

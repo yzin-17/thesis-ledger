@@ -137,7 +137,7 @@ describe('G3 失败响应脱敏诊断', () => {
     },
   );
 
-  it('仅为 research V2 增补诊断，原合同与计量不变', () => {
+  it('现行研究合同记录失败诊断与原计量，其他用途保留自身错误事实', () => {
     const error = objectError('{');
     const usage = { status: 'reported' as const, inputTokens: 1, outputTokens: 2 };
     const requestId = randomUUID();
@@ -160,16 +160,16 @@ describe('G3 失败响应脱敏诊断', () => {
     });
     expect(failure.usage).toEqual(usage);
     expect(failure.cause).toBe(error);
-    const legacy = schemaGenerationFailure(
+    const other = schemaGenerationFailure(
       error,
       {
         requestId,
-        contract: aiGenerationContracts.research.ref,
+        contract: aiGenerationContracts.authoringAnalysis.ref,
         mode: 'native_schema',
       },
       usage,
     );
-    expect(legacy.fact).not.toHaveProperty('diagnostic');
+    expect(other.fact).not.toHaveProperty('diagnostic');
   });
 
   it('错误文本未留存时仍能标记错误类别', () => {

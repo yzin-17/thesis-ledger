@@ -58,17 +58,27 @@ export async function runUpgradeIsolationSql(
   const env = appRole ? { ...process.env, POSTGRES_OWNER_USER: target.ownerName,
     POSTGRES_APP_USER: appRole.name, POSTGRES_APP_PASSWORD: appRole.password } : process.env;
   const child = spawn('docker', ['exec', '-i', ...environmentArgs, container, 'psql', '-U', target.ownerName, '-d', target.databaseName,
-    '-Atq', '-v', 'ON_ERROR_STOP=1'], { stdio: ['pipe', 'pipe', 'ignore'], env });
+    '-Atq', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=sqlstate'], { stdio: ['pipe', 'pipe', 'pipe'], env });
   let output = '';
   let overflow = false;
+  let sqlState: string | undefined;
+  let inputError: Error | undefined;
+  child.stderr.setEncoding('utf8').on('data', (chunk: string) => {
+    sqlState ??= /(?:^|\n)(?:ERROR|FATAL|PANIC):\s+([A-Z0-9]{5})\b/u.exec(chunk)?.[1];
+  });
   child.stdout.on('data', (chunk: Buffer) => {
     if (output.length + chunk.length > 65536) { overflow = true; child.kill('SIGKILL'); }
     else output += chunk.toString('utf8');
   });
   const completion = new Promise<void>((resolve, reject) => {
     child.once('error', reject);
-    child.stdin.once('error', reject);
-    child.once('close', (code) => code === 0 && !overflow ? resolve() : reject(new Error('隔离 SQL 执行失败')));
+    child.stdin.once('error', (error) => { inputError = error; });
+    child.once('close', (code) => code === 0 && !overflow && !inputError
+      ? resolve()
+      : reject(new Error(
+        `隔离 SQL 执行失败${sqlState ? `（SQLSTATE ${sqlState}，完成 ${output.split('\n').length - 1} 项输出）` : ''}`,
+        inputError ? { cause: inputError } : undefined,
+      )));
   });
   const timeout = setTimeout(() => child.kill('SIGKILL'), 15 * 60 * 1000);
   try {

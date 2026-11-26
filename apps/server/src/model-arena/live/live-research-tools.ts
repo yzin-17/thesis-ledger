@@ -11,7 +11,7 @@ import { MarketResearchSeriesReader } from '../../market/market-research-series-
 import { MarketNewsReader } from '../../market/market-news-reader.js';
 import { ResearchPublicSearch } from '../../ai/research-public-search.js';
 import { MarketLiveExecutionReader } from '../../market/market-live-execution-reader.js';
-import { readLiveResearchQuote } from './live-research-quote.js';
+import { readLiveResearchQuote, type LiveResearchExecution } from './live-research-quote.js';
 
 @Injectable()
 export class LiveResearchTools {
@@ -30,7 +30,7 @@ export class LiveResearchTools {
     >,
     @Optional()
     @Inject(MarketLiveExecutionReader)
-    private readonly execution?: Pick<MarketLiveExecutionReader, 'read'>,
+    private readonly execution?: LiveResearchExecution,
   ) {}
   async execute(
     protocol: ArenaLiveProtocol,

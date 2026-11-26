@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { riskKeys } from '../src/features/risk/risk.queries';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CashObservationSheet } from '../src/features/account-data/AccountDataCashObservationSheet';
-import { AdvancedJsonSheet } from '../src/features/journal/AdvancedJsonSheet';
+import { AdvancedJsonSheet } from './fixtures/journal/AdvancedJsonSheet.js';
 import { RiskRuleEditorSheet } from '../src/features/risk/RiskRuleEditorSheet';
 import type { RiskRuleRecord } from '../src/features/risk/risk.types';
 
@@ -22,6 +24,7 @@ vi.mock('../src/features/market-data/InstrumentOptionField', () => ({
 
 let root: Root;
 let host: HTMLDivElement;
+let client: QueryClient;
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -41,14 +44,22 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  client.setQueryData(riskKeys.riskNotificationRouting(), {
+    availableRoutes: [],
+    selectedProviders: [],
+  });
 });
 afterEach(async () => {
   await act(async () => root.unmount());
+  client.clear();
   host.remove();
   vi.unstubAllGlobals();
 });
 async function render(node: ReactNode) {
-  await act(async () => root.render(node));
+  await act(async () =>
+    root.render(<QueryClientProvider client={client}>{node}</QueryClientProvider>),
+  );
 }
 async function fill(selector: string, value: string) {
   const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!;

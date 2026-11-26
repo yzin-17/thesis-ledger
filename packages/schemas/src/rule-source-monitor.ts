@@ -9,7 +9,6 @@ const identity = z.string().min(1).max(2048);
 const sourceId = z.string().regex(/^[a-z0-9-]+\/[a-z0-9-]+$/);
 const sourceIds = z
   .array(sourceId)
-  .max(9)
   .refine((value) => new Set(value).size === value.length, '来源不得重复');
 export const ruleMonitorJobIdSchema = z.uuid();
 export const ruleMonitorConfigSchema = z
@@ -107,10 +106,9 @@ export const ruleMonitorStatusSchema = z.strictObject({
         name: z.string().min(1),
         datasetId: z.string().min(1),
         packHash: hash,
-        documentCount: z.number().int().min(1).max(24),
+        documentCount: z.number().int().min(1),
       }),
-    )
-    .max(10),
+    ),
   latestRun: ruleMonitorJobSchema.nullable(),
   observations: z
     .array(
@@ -171,8 +169,7 @@ export const ruleMonitorHistorySchema = z.strictObject({
               name: z.string().min(1),
               errorCode: error.unwrap(),
             }),
-          )
-          .max(33),
+          ),
       }),
     )
     .max(100),

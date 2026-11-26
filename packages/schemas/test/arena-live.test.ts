@@ -4,7 +4,7 @@ import { arenaLiveBudgetSchema, arenaLiveRemainingBudgetSchema } from '../src/ar
 
 const budget = { requests: 20, tokens: 100000, costMicros: 1000000 };
 const protocol = {
-  version: 2, title: '自主比赛', market: 'US', currency: 'USD', timeZone: 'America/New_York',
+  version: 'arena-live-match-protocol-v1', title: '自主比赛', market: 'US', currency: 'USD', timeZone: 'America/New_York',
   calendarId: 'NASDAQ', calendarVersion: 'fixture', startsOn: '2026-11-12', endsOn: '2026-12-01',
   universe: 'market', instruments: [], allowWebSearch: false, initialCash: '100000',
   entrants: ['甲', '乙'].map((model) => ({ model, providerId: 'fixture', budget, maxInputTokens: 10000, maxOutputTokens: 2000 })),

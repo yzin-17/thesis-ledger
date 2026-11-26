@@ -9,7 +9,7 @@ let text = ''; for await (const chunk of process.stdin) text += chunk;
 const request = JSON.parse(text);
 assert(request.symbol === '600519.SH' && typeof request.traceId === 'string');
 const redis = new RedisService(), client = new DsaClient(), reader = new MarketQuoteReader(client, redis);
-const contextRequest = () => ({ contractVersion: 3, consumer: 'thesis-ledger', requestId: crypto.randomUUID(),
+const contextRequest = () => ({ contractVersion: 1, consumer: 'thesis-ledger', requestId: crypto.randomUUID(),
   capability: 'REALTIME_QUOTE', symbol: request.symbol });
 const stable = (value) => { const copy = structuredClone(value); delete copy.requestId; return copy; };
 const originalFetch = globalThis.fetch, proof = { injected: 0 };

@@ -23,7 +23,7 @@ const scope = {
 
 describe("策略发现方向及固定空间", () => {
 
-  it('精简与完整生成边界均拒绝价格交叉说明反向，保留正确的修正版', () => {
+  it('精简与完整生成边界保留结构化交叉方向，不根据模型说明拒绝或修正', () => {
     const seed = createDiscoverySeed(scope);
     const price = { type: 'series', sourceId: 'discovery-primary', field: 'close' } as const;
     const ema = { type: 'indicator', name: 'EMA', input: price, params: { period: 20 } } as const;
@@ -33,11 +33,11 @@ describe("策略发现方向及固定空间", () => {
       entry: { type: 'cross', direction: 'above', left: ema, right: price } as const,
       exit: { type: 'cross', direction: 'below', left: ema, right: price } as const,
     };
-    expect(() => parseDiscoveryProposal({ strategy }, scope)).toThrow('交叉方向与说明不一致');
+    expect(parseDiscoveryProposal({ strategy }, scope).strategy.entry).toEqual(strategy.entry);
     const { name, description, entry, exit, sizing, risk } = strategy;
     const generated = { strategy: { name, description, entry, exit, sizing, risk, series: ['close'] } };
-    expect(() => assembleDiscoveryGeneration({ discoveryScope: scope } as never, seed, generated))
-      .toThrow('交叉方向与说明不一致');
+    expect(assembleDiscoveryGeneration({ discoveryScope: scope } as never, seed, generated).strategy.entry)
+      .toEqual(strategy.entry);
     generated.strategy.entry = { ...entry, left: price, right: ema } as never;
     generated.strategy.exit = { ...exit, left: price, right: ema } as never;
     expect(assembleDiscoveryGeneration({ discoveryScope: scope } as never, seed, generated).strategy.entry)
@@ -249,7 +249,7 @@ describe("策略发现响应与提示边界", () => {
           },
         },
       }),
-    ).toThrow(/冻结的 SignalSource ID/);
+    ).toThrow(/已声明的同标的 SignalSource ID/);
   });
 
   it('精简 discovery prompt 不携带完整 seed 或响应模板', () => {
@@ -272,14 +272,14 @@ describe("策略发现响应与提示边界", () => {
     expect(request).not.toHaveProperty('seedStrategy');
     expect(request).not.toHaveProperty('responseTemplate');
     expect(request).toHaveProperty('frozenSource.id', 'discovery-primary');
-    expect(String(messages[0]!.content)).toContain('不得输出 schemaVersion');
+    expect(String(messages[0]!.content)).toContain('不带schemaVersion');
   });
 });
 
 describe('AI discovery persistence', () => {
   it('uses the persisted BacktestStrategy seed for the experiment fingerprint', async () => {
     const input = optimizationExperimentCreateSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       sourceMode: 'discovery',
       discoveryScope: scope,
       models: [{ provider: 'fixture', model: 'discovery-model' }],

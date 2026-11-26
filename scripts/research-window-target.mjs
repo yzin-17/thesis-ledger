@@ -63,7 +63,7 @@ rawModel.segments[0].execution.normalizedExecution = {
 };
 const executionModel = backtestExecutionModelSchemaV3.parse(rawModel);
 const intent = backtestRunPreparationIntentV3Schema.parse({
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: randomUUID(),
   adjustment: 'qfq',
   accountingBasis: 'normalized-series',
@@ -134,7 +134,7 @@ if (!process.argv.includes('--run')) {
   const queued = await api(
     '/api/v1/backtests/runs',
     backtestRunCreateSchemaV3.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       strategyVersionId,
       runConfig: prepared.runConfig,
       preparationStamp: prepared.executionPreflight.revisionStamp,

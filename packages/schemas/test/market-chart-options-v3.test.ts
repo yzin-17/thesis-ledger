@@ -5,7 +5,7 @@ import {
 } from '../src/market-chart-options-v3.js';
 
 const options = {
-  contractVersion: 3,
+  contractVersion: 1,
   symbol: '159516.SZ',
   mode: 'v3',
   options: [

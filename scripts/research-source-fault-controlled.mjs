@@ -15,7 +15,7 @@ export async function createSourceFaultControlled(generationSample, newsSample) 
       };
       if (path.endsWith('/cache-context'))
         return send({
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId: input.requestId,
           symbol: input.symbol,

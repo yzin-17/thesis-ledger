@@ -1,5 +1,5 @@
 import type { ArenaLiveDetail } from '@thesis-ledger/schemas';
-import { formatDecimalNumber } from '@thesis-ledger/domain';
+import { arenaDecisionPlanLines, formatDecimalNumber } from '@thesis-ledger/domain';
 import { Button } from '@/components/ui/button';
 import { formatDateTimeWithLocalZone } from '@/lib/date-display';
 
@@ -38,11 +38,11 @@ export function ArenaLiveRecentDecisions({
         )}
       </div>
       {recent.length === 0 ? (
-        <p className="rounded-md border border-dashed p-5 text-sm text-muted-foreground">
+        <p className="py-5 text-sm text-muted-foreground">
           暂无已生成的模型决策，研究完成后将在这里展示。
         </p>
       ) : (
-        <div className="min-w-0 divide-y divide-border overflow-hidden rounded-md border border-border">
+        <div className="min-w-0 divide-y divide-border overflow-hidden">
           {recent.map(({ agent, cycle }) => {
             const decision = cycle.decision!;
             return (
@@ -76,6 +76,7 @@ export function ArenaLiveRecentDecisions({
                   {decision.summary}
                 </p>
                 <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>{arenaDecisionPlanLines(decision)[0]}</span>
                   {decision.orders.length > 0 ? (
                     <>
                       {decision.orders.slice(0, 2).map((order) => (

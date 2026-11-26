@@ -189,7 +189,7 @@ function createBrowserFixtures(schemas) {
     if (endpoint === '/api/market-data/providers') return { providers: [] };
     if (endpoint === '/api/market-data/policy') {
       return checked('marketPolicyClientResponseSchema', {
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId: 'controlled-policy',
         revision: 1,
@@ -198,7 +198,7 @@ function createBrowserFixtures(schemas) {
         syncState: 'applied',
         effectiveStale: false,
         effectiveProjection: {
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId: 'controlled-policy',
           revision: 1,

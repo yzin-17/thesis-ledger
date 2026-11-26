@@ -13,8 +13,9 @@ import { requestBacktestCancellation } from './backtest-run-cancellation.js';
 import { backtestJobSummarySelect, toBacktestJobSummary } from './backtest-summary.js';
 import { BacktestRunService } from './backtest-run.service.js';
 import type { ComparableDataFingerprintRange } from './backtest-run.service.js';
-import { persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { persistedRunContract } from './backtest-v3-run-lifecycle.js';
 import { assertCurrentRunForRead, isCurrentRunForRead } from './backtest-current-run-read.js';
+import { withBacktestModelDisclosure } from './backtest-model-disclosure.js';
 import { isNavBacktestInput } from './backtest-nav-run-read.js';
 import { visibleStrategyOwners } from './strategy-access.service.js';
 import { StrategyCreationService } from './strategy-creation.service.js';
@@ -66,8 +67,8 @@ export class BacktestService {
 
   async listStrategies(ownerId?: string | null) {
     const strategies = await this.prisma.strategy.findMany({
-      where: { schemaVersion: { in: [2, 3] }, status: { not: 'experiment-only' }, ...visibleStrategyOwners(ownerId) },
-      include: { versions: { where: { schemaVersion: { in: [2, 3] } } } },
+      where: { schemaVersion: 1, status: { not: 'experiment-only' }, ...visibleStrategyOwners(ownerId) },
+      include: { versions: { where: { schemaVersion: 1 } } },
       orderBy: { updatedAt: 'desc' },
     });
     const versions = await nameStrategyVersions(strategies.flatMap((row) => row.versions), this.display);
@@ -77,7 +78,7 @@ export class BacktestService {
 
   async listCurrentRunSummaries(ownerId?: string | null) {
     const jobs = await this.prisma.backtestJob.findMany({
-      where: { mode: 'V3', strategyVersion: { strategy: visibleStrategyOwners(ownerId) } },
+      where: { mode: 'frozen', strategyVersion: { strategy: visibleStrategyOwners(ownerId) } },
       orderBy: { createdAt: 'desc' },
       take: 100,
       select: backtestJobSummarySelect,
@@ -94,7 +95,7 @@ export class BacktestService {
   async statusForRead(id: string): Promise<ReadableBacktestJob | null> {
     const job = await this.status(id);
     if (!job) return job;
-    if (persistedContractVersion(job) !== 3) {
+    if (!persistedRunContract(job)) {
       throw new ConflictException({
         code: 'UNSUPPORTED_CONTRACT_VERSION',
         message: '旧回测记录不支持读取或操作',
@@ -105,7 +106,7 @@ export class BacktestService {
       job,
       await this.resultReadPolicy.run(id),
     );
-    return protectedJob;
+    return withBacktestModelDisclosure(protectedJob);
   }
 
   private async requireCurrentRun(id: string): Promise<void> {
@@ -113,7 +114,7 @@ export class BacktestService {
       where: { id },
     });
     if (!job) throw new NotFoundException('回测 Run 不存在');
-    if (persistedContractVersion(job) !== 3) {
+    if (!persistedRunContract(job)) {
       throw new ConflictException({
         code: 'UNSUPPORTED_CONTRACT_VERSION',
         message: '旧回测记录不支持读取或操作',
@@ -147,7 +148,7 @@ export class BacktestService {
   async runCurrent(id: string, execution?: BacktestExecutionAttempt) {
     const job = await this.prisma.backtestJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('回测 Run 不存在');
-    if (persistedContractVersion(job) !== 3) {
+    if (!persistedRunContract(job)) {
       throw new ConflictException({
         code: 'UNSUPPORTED_CONTRACT_VERSION',
         message: '旧回测记录不支持读取或操作',
@@ -179,7 +180,7 @@ export class BacktestService {
     if (this.queueService) {
       const cancelled = await this.queueService.cancel(id);
       if (
-        cancelled?.mode === 'V3' &&
+        cancelled?.mode === 'frozen' &&
         cancelled.status === 'running' &&
         cancelled.cancelRequestedAt
       ) {
@@ -190,7 +191,7 @@ export class BacktestService {
     const result = await requestBacktestCancellation(this.prisma, id);
     if (!result.job) throw new NotFoundException('回测任务不存在');
     if (result.job.status === 'running' && result.job.cancelRequestedAt) {
-      if (result.job.mode === 'V3') this.runs?.abortActiveRun(id);
+      if (result.job.mode === 'frozen') this.runs?.abortActiveRun(id);
     }
     return result.job;
   }
@@ -200,8 +201,8 @@ export class BacktestService {
     return this.protectMutationResult(job);
   }
 
-  private async protectMutationResult<T extends { id: string } | null>(job: T) {
+  private async protectMutationResult<T extends { id: string; input?: unknown } | null>(job: T) {
     if (!job) return job;
-    return this.resultReadPolicy.protectBacktestJob(job, await this.resultReadPolicy.run(job.id));
+    return withBacktestModelDisclosure(this.resultReadPolicy.protectBacktestJob(job, await this.resultReadPolicy.run(job.id)));
   }
 }

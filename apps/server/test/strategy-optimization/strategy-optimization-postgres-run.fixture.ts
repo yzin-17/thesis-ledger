@@ -6,6 +6,7 @@ import {
   backtestResultSchemaV3,
   backtestSnapshotManifestV3Schema,
   runConfigSchemaV3,
+  type BacktestResultV3,
 } from '@thesis-ledger/schemas';
 import { assertCurrentRunForRead } from '../../src/backtest/backtest-current-run-read.js';
 import { hashCanonicalManifest } from '../../src/backtest/backtest-snapshot.js';
@@ -28,6 +29,7 @@ export function completedOptimizationRun(input: {
   strategyVersionId: string;
   idempotencyKey: string;
   runConfig: unknown;
+  metrics?: BacktestResultV3['metrics'];
 }) {
   const id = input.id ?? randomUUID();
   const config = runConfigSchemaV3.parse(input.runConfig);
@@ -44,7 +46,17 @@ export function completedOptimizationRun(input: {
       endDate: config.endDate,
       warmupStartDate: config.startDate,
     },
+    ...(config.priceResearch
+      ? { priceResearch: { protocolVersion: config.priceResearch.protocolVersion } }
+      : {}),
     executionPriceProtocol: config.executionPriceProtocol,
+    actualSources: template.actualSources.map((source) => ({
+      ...source,
+      routeKey:
+        source.purpose === 'execution'
+          ? { ...source.routeKey, adjustment: config.executionPriceProtocol.priceBasis.adjustment }
+          : source.routeKey,
+    })),
     executionModel: {
       schemaVersion: 'execution-model-v1',
       id: model.id,
@@ -72,6 +84,15 @@ export function completedOptimizationRun(input: {
     executionModelDisclosure: { model, contentHash: modelHash },
     comparableDataFingerprint: manifest.comparableDataFingerprint,
     actualSources: manifest.actualSources,
+    ...(manifest.priceResearch
+      ? {
+          priceResearch: {
+            ...manifest.priceResearch,
+            fundsBalance: { amount: config.initialCash.CNY, currency: 'CNY' },
+            positionUnits: '0',
+          },
+        }
+      : {}),
     warnings: [],
     rejectedOrders: [],
     simulationFills: [],
@@ -81,6 +102,7 @@ export function completedOptimizationRun(input: {
       totalReturn: { status: 'available', value: '0.10' },
       maxDrawdown: { status: 'available', value: '-0.02' },
       turnover: { status: 'available', value: '0.01' },
+      ...input.metrics,
     },
   });
   const { resultChecksum: placeholder, ...facts } = payload;
@@ -94,7 +116,7 @@ export function completedOptimizationRun(input: {
     errorCode: null,
     errorSummary: null,
     input: {
-      contractVersion: 3,
+      contractVersion: 1,
       schemaVersion: '3',
       runConfig: config,
       snapshotId: manifest.contentHash,

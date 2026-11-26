@@ -15,7 +15,7 @@ export async function currentBacktestGroupRecords(
 ) {
   const records = await prisma.backtestJob.findMany({
     where: {
-      mode: 'V3',
+      mode: 'frozen',
       strategyVersion: { strategy: visibleStrategyOwners(ownerId) },
       ...(input.jobId ? { id: input.jobId } : {}),
       ...(input.status ? { status: input.status } : {}),

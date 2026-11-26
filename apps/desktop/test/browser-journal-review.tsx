@@ -89,7 +89,7 @@ globalThis.fetch = async (input, init) => {
     if (page instanceof Response) return page;
     const response = json({
       ...page,
-      legacyItems: ['legacy', 'legacy-ambiguous'].includes(journalBrowserStateFixture.state)
+      unlinkedItems: ['legacy', 'legacy-ambiguous'].includes(journalBrowserStateFixture.state)
         ? [browserJournalLegacy(scope, scope === shadow.id ? 'shadow' : 'actual')]
         : [],
       ledgerRevision: '12',

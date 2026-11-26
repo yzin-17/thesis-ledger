@@ -24,6 +24,7 @@ import {
 import { requireAuthoringGeneration } from './authoring-semantics.js';
 import { InstrumentService } from '../market/instrument.service.js';
 import { isEqual } from 'es-toolkit';
+import { orderValidityPromptVersion } from './authoring-order-validity.js';
 import { AUTHORING_PROMPT_VERSION } from './authoring-prompt.js';
 
 export const authoringSubmitSchema = z
@@ -109,6 +110,9 @@ export class AuthoringSubmitService {
         code: 'AUTHORING_MODEL_UNVERIFIED',
         message: '所选模型的当前编写用途尚未通过实际验证',
       });
+    const validity = request.modificationTarget === 'entryOrderValidity';
+    if (validity && route.execution.mode !== 'native_schema')
+      throw new BadRequestException({ code: 'AUTHORING_MODEL_UNAVAILABLE', message: '买单有效期短输出需要原生结构化修改路由' });
     const estimate = authoringCost(route.provider, request.model, {
       status: 'reported',
       inputTokens: Math.ceil(Buffer.byteLength(JSON.stringify(draft.content), 'utf8')) + 4096,
@@ -127,7 +131,8 @@ export class AuthoringSubmitService {
       ...request,
       cost: estimate,
       capabilityVersion: AUTHORING_CAPABILITY_VERSION,
-      promptVersion: AUTHORING_PROMPT_VERSION,
+      promptVersion: validity ? orderValidityPromptVersion : AUTHORING_PROMPT_VERSION,
+      generationContract: contract.ref,
       configurationFingerprint: route.execution.readiness.configurationFingerprint,
       pricingFingerprint: authoringPricingFingerprint(route.provider, request.model),
     });

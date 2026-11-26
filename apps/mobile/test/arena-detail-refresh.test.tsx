@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMobileTheme } from '../src/theme';
 import { ArenaScreen } from '../src/features/model-arena/ArenaScreen';
 import { ArenaWeekScreen } from '../src/features/model-arena/ArenaWeekScreen';
+import { failureMessage } from '../src/components/MobilePrimitives';
 
 const runtime = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
 vi.mock('react-native', () => vi.importActual('react-native-web'));
@@ -115,6 +116,13 @@ const indicators = () => host.querySelectorAll('[role="progressbar"]');
 const label = () => indicators()[0]?.getAttribute('aria-label');
 
 describe('移动竞技场与周报后台读取', () => {
+  it('原生网络断开显示可操作的提示', () => {
+    const error = new Error(
+      'fetch failed: UnexpectedException: The network connection was lost. (at ExpoModulesCore/Promise.swift:56)',
+    );
+    expect(failureMessage(error)).toBe('网络连接失败，请检查服务地址和网络后重试。');
+  });
+
   for (const kind of ['detail', 'round'] as const) {
     it.each([false, true])(
       `${kind}保留原内容，等待两种响应顺序且只有一个圈：%s`,

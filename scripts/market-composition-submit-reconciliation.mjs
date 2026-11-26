@@ -20,7 +20,7 @@ assert(record.origin === origin && record.owned === false && record.phase === 'r
   (!record.runId || responseSource) && typeof record.idempotencyKey === 'string', '只读补证不能改写已有Run或不明恢复');
 const api = createLocalApi(origin), state = await api.get('/api/market-data/policy');
 const providers = await api.get('/api/market-data/providers');
-const catalog = await api.get('/api/market-data/routes/capabilities?contractVersion=3');
+const catalog = await api.get('/api/market-data/routes/capabilities?contractVersion=1');
 const plan = createCompositionCase(state, providers.providers, catalog);
 const job = await findSubmittedCompositionRun(api, { strategyVersionId: record.strategyVersionId,
   idempotencyKey: record.idempotencyKey, runConfig: record.preparation?.runConfig });

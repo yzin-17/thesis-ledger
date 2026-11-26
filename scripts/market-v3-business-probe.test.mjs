@@ -107,12 +107,12 @@ test('V3 业务探针验证真实读取所需的当前 Data 路径与完整 Bar 
   assert.equal(result.barCount, 3);
   assert.equal(f.calls.length, 8);
   assert.ok(f.calls.every((call) => call.headers.authorization === 'Bearer local-fixture-data'));
-  assert.ok(f.calls.every((call) => call.path.startsWith('/api/v3/thesis-ledger/')));
+  assert.ok(f.calls.every((call) => call.path.startsWith('/api/v1/thesis-ledger/')));
   assert.ok(
     f.calls.every((call) => call.redirect === 'error' && call.signal instanceof AbortSignal),
   );
   const barCall = f.calls.at(-1);
-  assert.equal(barCall.path, '/api/v3/thesis-ledger/market/bars');
+  assert.equal(barCall.path, '/api/v1/thesis-ledger/market/bars');
   assert.equal(JSON.parse(barCall.body).routeTarget.providerId, 'hithink');
 });
 

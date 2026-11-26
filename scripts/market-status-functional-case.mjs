@@ -33,7 +33,7 @@ export function createFunctionalCase(state, providers, catalog) {
 
 export function functionalRequests(plan) {
   return definitions.map(([capability, providerId, upstreamSource, symbol, day, parameters]) => statusCapabilityRequestV1Schema.parse({
-    contractVersion: 3, capabilityVersion: 1, consumer: 'thesis-ledger', requestId: `${plan.caseId}:${capability}`,
+    contractVersion: 1, capabilityVersion: 1, consumer: 'thesis-ledger', requestId: `${plan.caseId}:${capability}`,
     symbol, routeKey: { kind: 'data', market: 'CN', assetType: 'STOCK', capability },
     routeTarget: { providerId, upstreamSource, routeIndex: 0 }, policyRevision: plan.temporary.revision,
     ...(day ? { range: { start: day, end: day } } : {}), ...parameters,

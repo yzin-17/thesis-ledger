@@ -1,5 +1,13 @@
 import { z } from 'zod';
 import {
+  announcementAssumptionSource,
+  announcementEvidenceKind,
+  parseAnnouncementEvidence,
+  readAnnouncementEvidence,
+  usesAnnouncementAssumption,
+} from './backtest-announcement-events.js';
+import type { DsaClient } from '../integration/dsa/dsa.client.js';
+import {
   marketEventExchangeV3Schema,
   type BacktestCorporateActionsResponse,
 } from '@thesis-ledger/schemas';
@@ -54,12 +62,16 @@ function eventIdentity(input: SnapshotDependencyV3Input, request: EventRequest) 
   };
 }
 
-/** 离线重建领域投影，证据始终保存完整 V3 exchange，不持久化合成 V2 响应。 */
+/** 用冻结的事件 exchange 或公告目录重建领域投影。 */
 export function validateSnapshotEventsV3(
   input: SnapshotDependencyV3Input,
   request: EventRequest,
   value: unknown,
 ) {
+  if (value && typeof value === 'object' && 'kind' in value && value.kind === announcementEvidenceKind) {
+    const bundle = parseAnnouncementEvidence(input, request, value);
+    return projectEvents(input, request, bundle, announcementAssumptionSource, []);
+  }
   const parsed = bundleSchema.safeParse(value);
   if (!parsed.success) return fail('Snapshot V3 事件 exchange 或准入快照无效。');
   const bundle = parsed.data;
@@ -97,13 +109,19 @@ export function validateSnapshotEventsV3(
       return fail('Snapshot V3 事件范围、版本或覆盖不满足依赖计划。');
     }
   }
+  return projectEvents(input, request, bundle, 'event-v3-composite',
+    bundle.exchanges.flatMap((exchange) => exchange.response.facts));
+}
+
+function projectEvents(input: SnapshotDependencyV3Input, request: EventRequest, bundle: unknown,
+  provider: string, facts: BacktestCorporateActionsResponse['facts']) {
   const response: BacktestCorporateActionsResponse = {
-    version: 3,
+    version: 1,
     status: 'supported',
-    provider: 'event-v3-composite',
+    provider,
     providerRevision: hashCanonicalManifest(bundle),
     coverage: { ...request.range, complete: true },
-    facts: bundle.exchanges.flatMap((exchange) => exchange.response.facts),
+    facts,
   };
   const validated = validateSnapshotDependencyResponseV3(input, request, response);
   const evidence = {
@@ -117,12 +135,18 @@ export async function collectSnapshotEventsV3(
   input: SnapshotDependencyV3Input,
   request: EventRequest,
   dsa: Parameters<typeof readBacktestEventObservationsV3>[2],
+  announcements?: Pick<DsaClient, 'get'>,
 ) {
   const result = await readBacktestEventObservationsV3(
     eventIdentity(input, request),
     request.dependencies,
     dsa,
   );
+  if (announcements && usesAnnouncementAssumption(input, request) && result.status === 'unavailable' &&
+      result.observations.every(({ result: event }) => event.status === 'unavailable' && event.reason === 'not_admitted')) {
+    const bundle = await readAnnouncementEvidence(request, announcements);
+    return validateSnapshotEventsV3(input, request, bundle);
+  }
   if (result.status !== 'complete') throw new SnapshotEventObservationError(result.observations);
   const exchanges = result.observations.map(({ result: observation }) => {
     if (observation.status !== 'observed') return fail('Snapshot V3 缺少事件观测。');

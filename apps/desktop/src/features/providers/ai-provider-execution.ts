@@ -5,8 +5,8 @@ import {
   aiGenerationContracts,
   aiGenerationContractRefSchema,
   type AiGenerationContractRef,
-  type AiProviderModelExecution,
 } from '@thesis-ledger/schemas';
+import { aiProviderPurposeOptions } from '@thesis-ledger/domain';
 import type {
   AiProviderExecutionRouteConfig,
   AiProviderExecutionRouteDraft,
@@ -15,16 +15,7 @@ import type {
 export const aiContractOptions: Array<{
   value: AiGenerationContractRef['id'];
   label: string;
-}> = [
-  { value: 'strategy_authoring_analysis', label: '策略需求分析' },
-  { value: 'strategy_authoring_generation', label: '策略定义生成' },
-  { value: 'strategy_authoring_modification', label: '策略局部修改' },
-  { value: 'research', label: '研究报告' },
-  { value: 'parameter_optimization', label: '参数优化' },
-  { value: 'arena_decision', label: '模拟交易决策' },
-  { value: 'arena_live_research', label: '竞技场自主研究' },
-  { value: 'strategy_discovery', label: '策略发现' },
-];
+}> = [...aiProviderPurposeOptions];
 
 const contractRefs: Record<AiGenerationContractRef['id'], AiGenerationContractRef> = {
   strategy_authoring_analysis: aiGenerationContracts.authoringAnalysis.ref,
@@ -144,34 +135,4 @@ export const aiProviderExecutionTimeoutLabel = (
 ) => {
   if (value.trim()) return '当前用途覆盖';
   return scope === 'provider' ? '系统默认' : '继承 Provider 默认；未设置时使用系统默认';
-};
-
-export const aiReadinessReasonLabels: Record<
-  AiProviderModelExecution['readiness']['reasons'][number],
-  string
-> = {
-  configuration_invalid: '配置不完整',
-  provider_disabled: 'Provider 已停用',
-  provider_down: '连接状态不可用',
-  adapter_contract_evidence_missing: '缺少本地 adapter 契约证据',
-  budget_not_authorized: '费用预算未授权',
-  capability_revoked: '该配置组合的能力已撤销',
-};
-
-export const aiReadinessReasonLabel = (
-  reason: AiProviderModelExecution['readiness']['reasons'][number],
-) => aiReadinessReasonLabels[reason];
-
-export const aiExecutionReadinessLabel = (routes: AiProviderModelExecution[] | undefined) => {
-  if (!routes || routes.length === 0) return '未配置执行路由';
-  const ready = routes.filter((route) => route.readiness.state === 'ready').length;
-  if (ready === routes.length) return `接入就绪 ${ready}/${routes.length}`;
-  return `接入阻断 ${routes.length - ready}/${routes.length}`;
-};
-
-export const aiLiveValidationLabel = (routes: AiProviderModelExecution[] | undefined) => {
-  if (!routes || routes.length === 0) return '用途尚未验证';
-  if (routes.some((route) => route.liveValidation.status === 'failed')) return '用途验证未通过';
-  if (routes.every((route) => route.liveValidation.status === 'passed')) return '用途验证通过';
-  return '用途尚未验证';
 };

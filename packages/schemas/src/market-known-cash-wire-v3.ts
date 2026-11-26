@@ -15,7 +15,7 @@ const text = z.string().trim().min(1);
 const timestamp = z.iso.datetime({ offset: true });
 const revision = z.number().int().positive();
 const scope = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   protocolVersion: z.literal('known-cash-observations-v1'),
   requestId: text,
   symbol: z.string().regex(/^\d{6}\.(SH|SZ)$/),
@@ -49,7 +49,7 @@ export function validateMarketKnownCashScopeV3(
       message: '方案请求控制版本未一致',
     });
 }
-export const marketKnownCashEndpointV3 = '/api/v3/thesis-ledger/market/events';
+export const marketKnownCashEndpointV3 = '/api/v1/thesis-ledger/market/events';
 export const marketKnownCashFailureReasonV3Schema = z.enum([
   'credential_missing',
   'provider_unavailable',
@@ -84,7 +84,7 @@ export const marketKnownCashFailureReasonV3Schema = z.enum([
   'missing_credentials',
 ]);
 export const marketKnownCashErrorV3Schema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   protocolVersion: z.literal('known-cash-observations-v1'),
   requestId: text,
   error: z.strictObject({

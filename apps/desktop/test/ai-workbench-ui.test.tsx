@@ -188,7 +188,7 @@ describe('研究工作台 UI 契约', () => {
     expect(source).toContain('provider.action');
     expect(source).toContain('data-ai-provider-status');
     expect(controllerSource).toContain("label: '服务已就绪'");
-    expect(newResearchSource).toContain('模型提供方、工具和执行服务已就绪。');
+    expect(newResearchSource).toContain('正在核对创建资格和研究默认模型');
     expect(controllerSource).not.toContain("label: 'Provider 已就绪'");
     expect(source).toContain('onClick={() => openNewResearch()}');
     expect(listSource).not.toContain('onCreateResearch');
@@ -199,13 +199,13 @@ describe('研究工作台 UI 契约', () => {
     expect(listSource).toContain("?? '全部来源'");
   });
 
-  it('再次生成表单由服务端预填并区分普通失败与未知结果风险', () => {
+  it('当前研究表单为结果未确认的提交提供找回、原样重试与明确取消', () => {
     const source = readNewResearchImplementation();
-    expect(source).toContain('useAiResearchRetryPrefillQuery');
-    expect(source).toContain('原研究对象已失效，请显式重新选择研究范围或对象');
-    expect(source).toContain('我已核对预填的问题、研究对象和问题模板');
-    expect(source).toContain('我理解原请求可能仍在外部执行');
-    expect(source).toContain('acknowledgeUnknownOutcomeRisk: unknownRiskConfirmed');
+    expect(source).toContain('提交尚未确认');
+    expect(source).toContain('找回原提交');
+    expect(source).toContain('原样重试');
+    expect(source).toContain('取消已提交任务');
+    expect(source).toContain('原提交标识和输入会保留');
   });
 
 });
@@ -352,5 +352,7 @@ describe('研究详情和失败恢复', () => {
 });
 
 function readNewResearchImplementation() {
-return ["NewResearchSheet.tsx", "use-new-research-sheet.ts", "new-research-readiness.ts", "NewResearchObjectFields.tsx"].map(file => readFileSync(new URL("../src/features/ai/" + file, import.meta.url), "utf8")).join("\n");
+  return ['ResearchSubmissionSheet.tsx', 'ResearchCreationReadiness.tsx']
+    .map((file) => readFileSync(new URL('../src/features/ai/' + file, import.meta.url), 'utf8'))
+    .join('\n');
 }

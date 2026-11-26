@@ -19,7 +19,7 @@ const fixture = async () => {
   const { input, reader } = await completeSnapshotFixture();
   const config = input.runConfig;
   const request = backtestRunPreparationRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'prepare-test',
     strategyVersionId: '11111111-1111-4111-8111-111111111111',
     adjustment: 'qfq',
@@ -37,12 +37,12 @@ const fixture = async () => {
   });
   const prisma = {
     strategyVersion: {
-      findUnique: vi.fn(async () => ({ schemaVersion: 2, schema: input.strategy })),
+      findUnique: vi.fn(async () => ({ schemaVersion: 1, schema: input.strategy })),
     },
     backtestJob: { create: vi.fn() },
   };
   const policy = {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: 'policy',
     revision: 7,

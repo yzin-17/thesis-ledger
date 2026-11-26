@@ -12,6 +12,7 @@ import {
 import { MarketWindowEvidenceV3Repository } from '../../src/market/market-window-evidence-v3.repository.js';
 import type { PrismaService } from '../../src/platform/prisma.service.js';
 import type { MarketBarWindowReadInputV3 } from '../../src/market/market-bar-reader-v3.js';
+import { parseMultiWindowResponseV3 } from '../../src/integration/dsa/dsa-multi-window-v3-protocol.js';
 import { makeMultiWindowResponseV3 } from './v3-multi-window-fixtures.js';
 import { buildInput, makeReaderResult } from './v3-snapshot-fixtures.js';
 
@@ -63,6 +64,7 @@ const databaseName = process.env.MULTI_WINDOW_TEST_DATABASE_NAME;
           timeframe: '1d',
           adjustment: 'qfq',
         },
+        tradabilityMode: 'assume-untradable-no-bar',
         window: { start: '2026-04-24', end: '2026-05-20' },
       });
       if (baseline.status !== 'selected') throw new Error('缺少多窗口基线');
@@ -82,6 +84,9 @@ const databaseName = process.env.MULTI_WINDOW_TEST_DATABASE_NAME;
           end: response.coverage.requestedEnd,
         });
         response.requestId = selected.request.requestId;
+        expect(
+          parseMultiWindowResponseV3(response, selected.request, 'market-multi-window-content-v1'),
+        ).toEqual(response);
         const seriesVersion = marketWindowSeriesVersionV3(selected.request, response);
         const stored = await repository.record({
           request: selected.request,
@@ -90,6 +95,7 @@ const databaseName = process.env.MULTI_WINDOW_TEST_DATABASE_NAME;
           desiredRevision: selected.selection.desiredRevision,
           effectivePolicyRevision: response.provenance.effectivePolicyRevision,
           catalogRevision: selected.selection.catalogRevision,
+          fetchedAt: new Date('2026-05-20T07:02:00Z'),
         });
         frozenIdentity = stored.identityFingerprint;
         const frozen = await repository.findFrozen(frozenIdentity);

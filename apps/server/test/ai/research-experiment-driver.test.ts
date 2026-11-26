@@ -10,6 +10,7 @@ import {
   experimentFingerprint,
   type ResearchExperimentStage,
 } from '../../src/ai/research-experiment-protocol.js';
+import { currentExperimentFrozenFixture } from './research-experiment-contract.fixture.js';
 
 const fixed = JSON.parse(
   readFileSync(
@@ -18,7 +19,17 @@ const fixed = JSON.parse(
   ),
 );
 function fixture(firstOnly = false) {
-  const protocol = researchExperimentProtocolSchema.parse(structuredClone(fixed));
+  const cases = (fixed.cases as Array<{
+    frozen: Parameters<typeof currentExperimentFrozenFixture>[0];
+    controlledResponses: Record<string, Record<string, unknown>>;
+  }>).map((entry) => ({
+    ...entry,
+    frozen: currentExperimentFrozenFixture(entry.frozen),
+    controlledResponses: Object.fromEntries(Object.entries(entry.controlledResponses).map(
+      ([stage, response]) => [stage, { ...response, version: 'research-report-generation-v1' }],
+    )),
+  }));
+  const protocol = researchExperimentProtocolSchema.parse({ ...fixed, cases });
   if (firstOnly) protocol.cases = protocol.cases.slice(0, 1);
   const contexts: Array<{
     caseId: string;

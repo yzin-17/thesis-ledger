@@ -9,6 +9,11 @@ import {
   arenaBudgetCountLabel,
   arenaBudgetCostLabel,
   formatDecimalNumber,
+  arenaDecisionPlanLines,
+  arenaOrderProtectionText,
+  arenaOrderQuantityText,
+  arenaMatchingText,
+  arenaProtectionValidityText,
 } from '@thesis-ledger/domain';
 import type { ArenaLiveDetail } from '@thesis-ledger/schemas';
 import {
@@ -62,6 +67,7 @@ export function ArenaLiveAccount({
         剩余请求 {arenaBudgetCountLabel(agent.remaining.requests, ' 次')} · 剩余模型费用{' '}
         {arenaBudgetCostLabel(agent.remaining.costMicros, detail.protocol.budgetCurrency)}
       </Copy>
+      <Copy muted>{arenaMatchingText(detail.protocol.matching)}</Copy>
       <Copy muted>
         单次输入上限 {arenaBudgetCountLabel(binding.maxInputTokens)} · 单次输出上限{' '}
         {arenaBudgetCountLabel(binding.maxOutputTokens)}
@@ -191,7 +197,8 @@ function AccountDetail({
           )}
           {agent.cycles.map((c) => (
             <Section key={c.id} title={arenaLiveLabel(c.state) + ' · ' + time(c.createdAt)}>
-              {c.decision && <Copy>{c.decision.summary}</Copy>}
+              {c.decision && <Copy>模型摘要 · {c.decision.summary}</Copy>}
+              {c.decision && arenaDecisionPlanLines(c.decision, name, book).map((line, index) => <Copy key={index}>{line}</Copy>)}
               {c.reason && <Copy>{arenaLiveLabel(c.reason)}</Copy>}
               {c.requestId && (
                 <>
@@ -227,11 +234,12 @@ function AccountDetail({
             <Section key={o.id} title={name(o.symbol)}>
               <Copy>
                 {o.side === 'buy' ? '买入' : '卖出'} · {arenaLiveLabel(o.kind)} ·{' '}
-                {formatDecimalNumber(o.quantity)} 股 × {o.price ?? '市价'}
+                {arenaOrderQuantityText(book, o)} · 价格 {o.price ?? '市价'}
               </Copy>
               <Copy>
-                {arenaLiveLabel(o.state)} · 有效至 {time(o.expiresAt)}
+                {arenaLiveLabel(o.state)} · {o.state === 'waiting_parent' && o.validUntil ? arenaProtectionValidityText(o.validUntil) : '有效至 ' + time(o.expiresAt)}
               </Copy>
+              {o.parentOrderId && <Copy muted>{arenaOrderProtectionText(book, o, agent.availability.tradingDate)}</Copy>}
               {o.reason && <Copy muted>{arenaLiveLabel(o.reason)}</Copy>}
             </Section>
           ))}

@@ -4,8 +4,7 @@ import { booleanExpressionSchema } from './backtest-strategy.js';
 export const STRATEGY_CROSS_SEMANTICS_PROMPT =
   'cross 的方向以 left 为主语：above 是前值 left<=right 且当前 left>right，below 是前值 left>=right 且当前 left<right。' +
   '价格上穿 EMA 买入必须 left=价格、right=EMA、direction=above；价格下穿 EMA 卖出必须 left=价格、right=EMA、direction=below。' +
-  '若交换 left/right，必须同时反转 direction 才等价。均线上穿价格表示价格下穿均线，不能写成价格上穿。' +
-  '输出前逐项核对入场、退出的主语、参照与方向，description、reason 和用户确认规则必须与 AST 一致。';
+  '交换 left/right 必须同时反转 direction；均线上穿价格=价格下穿。说明、确认与AST方向一致。';
 
 type Direction = 'above' | 'below';
 type Rule = 'entry' | 'exit';

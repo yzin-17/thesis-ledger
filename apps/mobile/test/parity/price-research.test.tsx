@@ -19,7 +19,7 @@ describe('手机收益研究的明确版本确认', () => {
       ...b4Strategy.versions[0]!,
       id: '44444444-4444-4444-8444-444444444444',
       version: 2,
-      schemaVersion: 3,
+      schemaVersion: 1,
       schema: projectPriceResearchStrategy(b4Definition as BacktestStrategy),
     };
     const requests: { path: string; body: Record<string, unknown> }[] = [];

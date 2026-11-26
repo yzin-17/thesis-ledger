@@ -16,8 +16,6 @@ import type {
   MarketCacheContextResponseV3,
   MarketPublicFeesRequestV3,
   MarketPublicFeesResponseV3,
-  MarketTradingStatusRequestV3,
-  MarketTradingStatusResponseV3,
   MarketChartBarsRequestV3,
   MarketChartBarsResponseV3,
   MarketDataBarSeriesResponseV3,
@@ -37,6 +35,7 @@ import {
   backtestInstrumentFactsResponseSchema,
   backtestInstrumentFactsRequestSchema,
   fxRatesResponseSchema,
+  DSA_CONTROL_CONTRACT,
   marketControlHandshakeRequestV3Schema,
   marketControlPolicyApplyRequestV3Schema,
   marketRouteCatalogGetEndpointV3,
@@ -73,6 +72,7 @@ import {
   parseCatalogDelta,
 } from './dsa-catalog-v3.js';
 import { currentTraceId } from '../../platform/structured-logger.js';
+import { readHistoricalExecution } from './dsa-historical-execution.js';
 import { fetchObservedCacheRequest } from './dsa-cache-request-observation.js';
 import {
   DsaError,
@@ -90,6 +90,11 @@ const requestSignal = (timeoutMs: number, signal?: AbortSignal) => signal ? Abor
 @Injectable()
 export class DsaClient {
   private readonly config = loadConfig();
+  historicalExecution(input: Parameters<typeof readHistoricalExecution>[0]) {
+    return readHistoricalExecution(input,
+      () => this.effectiveControlPolicyV3().then(result => result.projection?.effective ?? null),
+      (path, body) => this.post(path, body, 1, (status, payload) => mapDataV3HttpError(status, payload, body.requestId)));
+  }
   get dataCapabilities() {
     return new DsaDataCapabilityReaderV3(
       (path, request, mapper, budgetMs, signal) => this.post<unknown>(path, request, 1, mapper, budgetMs, signal),
@@ -272,7 +277,7 @@ export class DsaClient {
   }): Promise<BacktestCalendarResponse> {
     const params = new URLSearchParams(input);
     return this.get<unknown>(
-      `/api/v3/thesis-ledger/backtest/calendar?${params.toString()}`,
+      `/api/v1/thesis-ledger/backtest/calendar?${params.toString()}`,
       1,
     ).then((raw) => backtestCalendarResponseSchema.parse(raw));
   }
@@ -284,7 +289,7 @@ export class DsaClient {
     dataAsOf: string;
   }): Promise<BacktestCalendarResponse> {
     const params = new URLSearchParams(input);
-    return this.get<unknown>(`/api/v3/thesis-ledger/market/calendar?${params.toString()}`, 1).then(
+    return this.get<unknown>(`/api/v1/thesis-ledger/market/calendar?${params.toString()}`, 1).then(
       (raw) => backtestCalendarResponseSchema.parse(raw),
     );
   }
@@ -299,13 +304,13 @@ export class DsaClient {
         .map(([key, value]) => [key, String(value)]),
     );
     return this.get<unknown>(
-      `/api/v3/thesis-ledger/backtest/instrument-facts?${params.toString()}`,
+      `/api/v1/thesis-ledger/backtest/instrument-facts?${params.toString()}`,
       1,
     ).then((raw) => backtestInstrumentFactsResponseSchema.parse(raw));
   }
 
   marketDataCapabilitiesV3(): Promise<MarketDataContractCapabilitiesV3> {
-    return this.get<unknown>('/api/v3/thesis-ledger/capabilities', 1, (status, payload) =>
+    return this.get<unknown>('/api/v1/thesis-ledger/capabilities', 1, (status, payload) =>
       mapDataV3HttpError(status, payload),
     ).then((raw) => parseV3Response(() => parseDataCapabilitiesV3(raw)));
   }
@@ -346,26 +351,20 @@ export class DsaClient {
     return this.dataCapabilities.publicFees(input);
   }
 
-  marketTradingStatusV3(
-    input: MarketTradingStatusRequestV3,
-  ): Promise<MarketTradingStatusResponseV3> {
-    return this.dataCapabilities.tradingStatus(input);
-  }
-
   calculateIndicators(input: {
     identity: BarSeries['identity'];
     inputFingerprint: string;
     points: BarSeries['points'];
     requests: Array<{ name: 'MA' | 'MACD' | 'RSI'; parameters: Record<string, number> }>;
   }): Promise<IndicatorCalculateResponse> {
-    const request = indicatorCalculateRequestSchema.parse({ contractVersion: 3, ...input });
-    return this.post<unknown>('/api/v3/thesis-ledger/market/indicators/calculate', request, 1).then(
+    const request = indicatorCalculateRequestSchema.parse({ contractVersion: 1, ...input });
+    return this.post<unknown>('/api/v1/thesis-ledger/market/indicators/calculate', request, 1).then(
       (raw) => indicatorCalculateResponseSchema.parse(raw),
     );
   }
 
   marketPeriodIndicatorCapabilities(): Promise<MarketPeriodIndicatorCapabilities> {
-    return this.get<unknown>('/api/v3/thesis-ledger/market/indicators/capabilities', 1).then(
+    return this.get<unknown>('/api/v1/thesis-ledger/market/indicators/capabilities', 1).then(
       (raw) => marketPeriodIndicatorCapabilitiesSchema.parse(raw),
     );
   }
@@ -373,8 +372,8 @@ export class DsaClient {
   calculatePeriodIndicators(
     input: Omit<MarketPeriodIndicatorRequest, 'contractVersion'>,
   ): Promise<IndicatorCalculateResponse> {
-    const request = marketPeriodIndicatorRequestSchema.parse({ ...input, contractVersion: 3 });
-    return this.post<unknown>('/api/v3/thesis-ledger/market/indicators/calculate', request, 1).then(
+    const request = marketPeriodIndicatorRequestSchema.parse({ ...input, contractVersion: 1 });
+    return this.post<unknown>('/api/v1/thesis-ledger/market/indicators/calculate', request, 1).then(
       (raw) =>
         indicatorCalculateResponseSchema
           .refine(
@@ -397,7 +396,7 @@ export class DsaClient {
       currencies: [...new Set(input.currencies)].join(','),
     });
     if (input.asOf) params.set('asOf', input.asOf.slice(0, 10));
-    return this.get<unknown>(`/api/v3/thesis-ledger/market/fx-rates?${params.toString()}`).then(
+    return this.get<unknown>(`/api/v1/thesis-ledger/market/fx-rates?${params.toString()}`).then(
       (raw) => fxRatesResponseSchema.parse(raw),
     );
   }
@@ -406,13 +405,13 @@ export class DsaClient {
     requestId: string = crypto.randomUUID(),
   ): Promise<MarketControlHandshakeResponseV3> {
     const request = marketControlHandshakeRequestV3Schema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId,
-      supportedVersions: [3],
+      contract: DSA_CONTROL_CONTRACT,
     });
     return this.control<unknown>(
-      '/api/v3/thesis-ledger/control/handshake',
+      '/api/v1/thesis-ledger/control/handshake',
       {
         method: 'POST',
         headers: { 'x-request-id': request.requestId },
@@ -424,19 +423,19 @@ export class DsaClient {
   }
 
   controlProviders() {
-    return this.control<unknown>('/api/v3/thesis-ledger/control/providers').then(
+    return this.control<unknown>('/api/v1/thesis-ledger/control/providers').then(
       parseProviderRegistry,
     );
   }
 
   async longbridgeOAuth(action: ProviderOAuthAction) {
-    let path = '/api/v3/thesis-ledger/control/providers/longbridge/oauth/sessions';
+    let path = '/api/v1/thesis-ledger/control/providers/longbridge/oauth/sessions';
     let init: RequestInit = {};
     if (action.kind === 'create') {
       init = {
         method: 'POST',
         body: JSON.stringify({
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId: crypto.randomUUID(),
           clientId: action.clientId,
@@ -451,7 +450,7 @@ export class DsaClient {
         init = {
           method: 'POST',
           body: JSON.stringify({
-            contractVersion: 3,
+            contractVersion: 1,
             consumer: 'thesis-ledger',
             requestId: crypto.randomUUID(),
           }),
@@ -475,12 +474,12 @@ export class DsaClient {
   ) {
     const requestId = input.requestId ?? crypto.randomUUID();
     return this.control<unknown>(
-      `/api/v3/thesis-ledger/control/providers/${encodeURIComponent(providerId)}/config`,
+      `/api/v1/thesis-ledger/control/providers/${encodeURIComponent(providerId)}/config`,
       {
         method: 'POST',
         body: JSON.stringify({
           ...input,
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId,
         }),
@@ -495,12 +494,12 @@ export class DsaClient {
     const requestId = input.requestId ?? crypto.randomUUID();
     const budget: [] | [number, undefined, number] = input.purpose === 'account_access' ? [1, undefined, 22_000] : [];
     return this.control<unknown>(
-      `/api/v3/thesis-ledger/control/providers/${encodeURIComponent(providerId)}/test`,
+      `/api/v1/thesis-ledger/control/providers/${encodeURIComponent(providerId)}/test`,
       {
         method: 'POST',
         body: JSON.stringify({
           ...input,
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId,
         }),
@@ -512,11 +511,11 @@ export class DsaClient {
   removeControlProvider(providerId: string, input: { requestId?: string; reason?: string } = {}) {
     const requestId = input.requestId ?? crypto.randomUUID();
     return this.control<unknown>(
-      `/api/v3/thesis-ledger/control/providers/${encodeURIComponent(providerId)}/remove`,
+      `/api/v1/thesis-ledger/control/providers/${encodeURIComponent(providerId)}/remove`,
       {
         method: 'POST',
         body: JSON.stringify({
-          contractVersion: 3,
+          contractVersion: 1,
           consumer: 'thesis-ledger',
           requestId,
           reason: input.reason ?? 'removed_by_consumer',
@@ -530,7 +529,7 @@ export class DsaClient {
   ): Promise<MarketControlPolicyApplyResponseV3> {
     const request = marketControlPolicyApplyRequestV3Schema.parse(policy);
     return this.control<unknown>(
-      '/api/v3/thesis-ledger/control/policies/apply',
+      '/api/v1/thesis-ledger/control/policies/apply',
       {
         method: 'POST',
         headers: { 'x-request-id': request.requestId },
@@ -543,7 +542,7 @@ export class DsaClient {
 
   effectiveControlPolicyV3(): Promise<EffectivePolicyEnvelopeV3> {
     return this.control<unknown>(
-      '/api/v3/thesis-ledger/control/policies/effective?contractVersion=3',
+      '/api/v1/thesis-ledger/control/policies/effective?contractVersion=1',
       undefined,
       1,
       (status, payload) => mapControlV3HttpError(status, payload),
@@ -551,10 +550,10 @@ export class DsaClient {
   }
 
   triggerCatalogJob(requestId = crypto.randomUUID(), scope?: 'CN' | 'HK_US') {
-    return this.control<unknown>('/api/v3/thesis-ledger/control/catalog/jobs', {
+    return this.control<unknown>('/api/v1/thesis-ledger/control/catalog/jobs', {
       method: 'POST',
       body: JSON.stringify({
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId,
         ...(scope ? { scope } : {}),
@@ -564,15 +563,15 @@ export class DsaClient {
 
   catalogJob(jobId: string) {
     return this.control<unknown>(
-      `/api/v3/thesis-ledger/control/catalog/jobs/${encodeURIComponent(jobId)}`,
+      `/api/v1/thesis-ledger/control/catalog/jobs/${encodeURIComponent(jobId)}`,
     ).then((raw) => parseCatalogJob(raw, { id: jobId }));
   }
 
   acknowledgeCatalog(generation: number, checksum: string, requestId = crypto.randomUUID()) {
-    return this.control('/api/v3/thesis-ledger/control/catalog/ack', {
+    return this.control('/api/v1/thesis-ledger/control/catalog/ack', {
       method: 'POST',
       body: JSON.stringify({
-        contractVersion: 3,
+        contractVersion: 1,
         consumer: 'thesis-ledger',
         requestId,
         generation,
@@ -583,14 +582,14 @@ export class DsaClient {
 
   catalogSnapshot(cursor?: string) {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-    return this.get<unknown>(`/api/v3/thesis-ledger/catalog/snapshot${query}`, 1).then(
+    return this.get<unknown>(`/api/v1/thesis-ledger/catalog/snapshot${query}`, 1).then(
       parseCatalogSnapshot,
     );
   }
 
   catalogDelta(cursor: string) {
     return this.get<unknown>(
-      `/api/v3/thesis-ledger/catalog/delta?cursor=${encodeURIComponent(cursor)}`,
+      `/api/v1/thesis-ledger/catalog/delta?cursor=${encodeURIComponent(cursor)}`,
       1,
     ).then((raw) => parseCatalogDelta(raw, cursor));
   }

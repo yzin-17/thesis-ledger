@@ -68,7 +68,7 @@ export class MarketPeriodIndicatorReader {
     if (!view.calculation.series.points.length)
       return { status: 'unavailable', reason: 'indicator_input_empty' };
     const input = marketPeriodIndicatorRequestSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity: view.calculation.series.identity,
       points: view.calculation.series.points,
       periodContext: view.calculation.periodContext,

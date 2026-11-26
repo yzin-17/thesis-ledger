@@ -9,7 +9,7 @@ export function cancelledResearchMetadataV2(value: unknown, now: Date) {
   const execution = aiExecutionSummarySchema.parse(metadata.sdkExecution);
   if (
     execution.contract.id !== 'research' ||
-    execution.contract.version !== 'research-generation-v2'
+    execution.contract.version !== 'research-report-generation-v1'
   )
     throw new Error('取消入口只接受 V2 研究任务');
   const requests = execution.requests.map((request) => {

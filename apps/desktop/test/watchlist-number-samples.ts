@@ -30,7 +30,7 @@ export function watchlistNumberSample(name: string) {
   });
   const quote = sample
     ? {
-        version: 3,
+        version: 1,
         symbol,
         price: sample.price,
         previousClose: sample.previousClose,
@@ -55,7 +55,7 @@ export function watchlistNumberSample(name: string) {
     price = {
       kind: 'nav',
       nav: {
-        version: 3,
+        version: 1,
         symbol,
         unitNav: 1e-7,
         navDate: '2026-11-06T00:00:00Z',

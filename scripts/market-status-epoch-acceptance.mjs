@@ -20,7 +20,7 @@ async function main() {
   }
   const api = { get: (endpoint) => request('GET', endpoint), put: (endpoint, body) => request('PUT', endpoint, body) };
   let plan = createEpochCase(await api.get('/api/market-data/policy'), (await api.get('/api/market-data/providers')).providers,
-    await api.get('/api/market-data/routes/capabilities?contractVersion=3'));
+    await api.get('/api/market-data/routes/capabilities?contractVersion=1'));
   const resumedFrom = args.find((arg) => arg.startsWith('--resume-case='))?.slice('--resume-case='.length);
   if (resumedFrom) {
     const record = JSON.parse(await fs.readFile(resumedFrom, 'utf8'));

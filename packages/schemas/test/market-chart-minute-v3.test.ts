@@ -27,7 +27,7 @@ const fixture = () => {
       actualStart: bars[0].timestamp, actualEnd: bars[1].timestamp,
       hasMoreBefore: false, latestCompleteTradingDate: null },
   };
-  const request = { contractVersion: 3, purpose: 'interactive-chart', requestId: response.requestId,
+  const request = { contractVersion: 1, purpose: 'interactive-chart', requestId: response.requestId,
     symbol: response.symbol, routeKey: response.routeKey, start: '2026-05-18', end: '2026-05-18',
     routeTarget: { providerId: response.provenance.providerId, upstreamSource: response.provenance.upstreamSource,
       routeIndex: response.provenance.routeIndex } };

@@ -1,8 +1,10 @@
+import { MARKET_DAILY_TRADABILITY_CONTRACT } from "@thesis-ledger/schemas";
 import { describe, expect, it } from "vitest";
 import { comparableTradabilityWindows } from "../../src/backtest/backtest-comparable-tradability.js";
 
 const evidence = (start: string) => ({
-  contractVersion: 1,
+  contract: MARKET_DAILY_TRADABILITY_CONTRACT,
+  priceOnlyAllowed: false,
   symbol: "00700.HK",
   market: "HK",
   instrumentType: "STOCK",

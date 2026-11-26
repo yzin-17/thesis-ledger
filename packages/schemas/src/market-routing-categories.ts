@@ -91,6 +91,7 @@ const categoryCapabilities: Record<MarketPolicyCategory, readonly string[]> = {
     'REFERENCE_CHINABOND_CURVES',
   ],
   rules: [
+    'HISTORICAL_EXECUTION_CONTEXT',
     'HISTORICAL_TRADING_STATUS',
     'DAILY_TRADING_STATUS',
     'RISK_WARNING',

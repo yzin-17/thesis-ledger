@@ -53,7 +53,8 @@ export const tradabilityWindowFromResponseV3 = (
     routeIndex: response.provenance.routeIndex,
   },
   coverageProof: response.coverageProof,
-  barDates: response.bars.map((bar) => bar.timestamp.slice(0, 10)),
+  barDates: response.routeKey.timeframe === '1d' ? response.bars.map((bar) => bar.timestamp.slice(0, 10))
+    : [...new Set(response.bars.map((bar) => bar.timestamp.slice(0, 10)))],
   ...(response.historicalTradabilityWindows
     ? { historicalTradabilityWindows: response.historicalTradabilityWindows }
     : {}),
@@ -69,9 +70,14 @@ export const tradabilityWindowFromArtifactsV3 = (
     if (typeof evidence[key] !== 'string') fail(`冻结行情缺少 ${key}`);
     return JSON.parse(evidence[key]) as unknown;
   };
+  const routeKey = marketDataBarRouteKeyV3Schema.parse(json('routeKey'));
+  const barDates = bars.map((bar) => {
+    if (typeof bar.occurredAt !== 'string') fail('冻结 Bar 缺少交易日');
+    return bar.occurredAt.slice(0, 10);
+  });
   return {
     symbol,
-    routeKey: marketDataBarRouteKeyV3Schema.parse(json('routeKey')),
+    routeKey,
     target: marketDataRouteTargetPinV3Schema.parse(json('target')),
     coverageProof: marketCoverageProofV3Schema.parse(json('coverageProof')),
     ...(evidence.historicalTradabilityWindows === undefined
@@ -81,10 +87,7 @@ export const tradabilityWindowFromArtifactsV3 = (
             String(evidence.historicalTradabilityWindows),
           ) as BacktestDailyTradabilityEvidenceV3[],
         }),
-    barDates: bars.map((bar) => {
-      if (typeof bar.occurredAt !== 'string') fail('冻结 Bar 缺少交易日');
-      return bar.occurredAt.slice(0, 10);
-    }),
+    barDates: routeKey.timeframe === '1d' ? barDates : [...new Set(barDates)],
   };
 };
 
@@ -123,6 +126,8 @@ export const validateSnapshotTradabilityV3 = (
     fail('逐日可交易性身份、范围或来源与冻结行情不一致');
   }
   for (const evidence of windows) {
+    if (evidence.priceOnlyAllowed !== (window.routeKey.timeframe === '1d' && config.priceResearch?.dailyObservationContract !== undefined))
+      fail('日级观察版本与运行配置不一致');
     const timestamps = [
       evidence.barSource.observedAt,
       evidence.calendar.source.availableAt,
@@ -139,12 +144,15 @@ export const validateSnapshotTradabilityV3 = (
   }
   let observed: string[];
   try {
-    observed = observedTradabilityDatesV3(windows, window);
+    observed = observedTradabilityDatesV3(windows, { ...window,
+      allowPriceOnly: config.priceResearch?.dailyObservationContract !== undefined &&
+        config.executionPriceProtocol.accountingBasis === 'normalized-series' });
   } catch (error) {
     fail(String(error));
   }
   if (!same(observed, window.barDates)) fail('逐日可交易性状态与实际冻结 Bar 日期不一致');
-  if (response.facts.some((fact) => fact.tradable !== observed.length > 0)) {
+  const traded = windows.some((evidence) => evidence.days.some((day) => day.state === 'observed-traded'));
+  if (response.facts.some((fact) => fact.tradable !== traded)) {
     fail('标的 tradable 汇总与逐日状态不一致');
   }
 };
@@ -169,6 +177,7 @@ export const freezeTradabilityRowsV3 = (
 export const tradabilityExpectedBarDatesV3 = (
   facts: readonly ArtifactRow[],
   expectedDates: readonly string[],
+  allowPriceOnly = false,
 ): readonly string[] => {
   const values = facts
     .map((fact) => fact.historicalTradabilityWindows ?? fact.historicalTradability)
@@ -196,7 +205,8 @@ export const tradabilityExpectedBarDatesV3 = (
   return [
     ...new Set(
       evidence[0]!.flatMap((window) =>
-        window.days.filter((day) => day.state === 'observed-traded').map((day) => day.date),
+        window.days.filter((day) => day.state === 'observed-traded' ||
+          (allowPriceOnly && window.priceOnlyAllowed && day.state === 'observed-price-only')).map((day) => day.date),
       ),
     ),
   ].sort();

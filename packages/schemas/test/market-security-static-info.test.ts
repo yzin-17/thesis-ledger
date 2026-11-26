@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { securityStaticInfoResponseSchema, securityStaticInfoRequestSchema } from '../src/index.js';
 
 export const staticInfoFixture = {
-  contractVersion: 3, consumer: 'thesis-ledger', requestId: 'static-test', symbol: '00700.HK', assetType: 'STOCK',
+  contractVersion: 1, consumer: 'thesis-ledger', requestId: 'static-test', symbol: '00700.HK', assetType: 'STOCK',
   market: 'HK', name: '腾讯控股', securityId: '9007199254740993', sharesPerLot: '100', listingDate: '2004-06-16',
   delisted: false, exchange: 'HK_MAIN', provider: 'futu', historicalChanges: 'unverified',
   observedAt: '2026-10-09T01:00:00Z', fetchedAt: '2026-10-09T01:01:00Z', policyRevision: 1,
@@ -22,7 +22,7 @@ it.each([
   expect(securityStaticInfoResponseSchema.safeParse({ ...staticInfoFixture, ...change }).success).toBe(false);
 });
 it('禁止历史参数和不支持的证券类型', () => {
-  const request = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'r', symbol: 'SPY.US', assetType: 'ETF' };
+  const request = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'r', symbol: 'SPY.US', assetType: 'ETF' };
   expect(securityStaticInfoRequestSchema.safeParse(request).success).toBe(true);
   expect(securityStaticInfoRequestSchema.safeParse({ ...request, asOf: '2020-01-01' }).success).toBe(false);
   expect(securityStaticInfoRequestSchema.safeParse({ ...request, assetType: 'OPTION' }).success).toBe(false);

@@ -8,6 +8,7 @@ type Prepared = Extract<
   { status: 'prepared' }
 >;
 export function PreparedPriceSources({ value }: { value: Prepared }) {
+  const scope = backtestResearchScopeDisplay(value.runConfig.priceResearch?.dataScope);
   const sources = [
     {
       label: value.runConfig.priceResearch ? '后复权来源' : '实际来源',
@@ -18,6 +19,11 @@ export function PreparedPriceSources({ value }: { value: Prepared }) {
     sources.push({ label: '不复权来源', source: value.actualPriceSource });
   return (
     <>
+      {scope && <section className="flex flex-col gap-1" aria-label="本次研究范围">
+        <p>可用投入方式：{scope.sizing}</p>
+        {scope.inputs.map((input) => <p key={input}>{input}</p>)}
+        {scope.limits.map((limit) => <p key={limit}>{limit}</p>)}
+      </section>}
       {sources.map(({ label, source }) => (
         <p key={label} className="break-words">
           {label}：{source.provenance.providerId} / {source.provenance.upstreamSource} ·{' '}
@@ -30,3 +36,4 @@ export function PreparedPriceSources({ value }: { value: Prepared }) {
     </>
   );
 }
+import { backtestResearchScopeDisplay } from '@thesis-ledger/domain';

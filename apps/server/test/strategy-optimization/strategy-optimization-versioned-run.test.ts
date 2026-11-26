@@ -9,7 +9,7 @@ const fixture = async () => {
   const config = f.input.runConfig;
   const versionId = '11111111-1111-4111-8111-111111111111';
   const input = {
-    contractVersion: 3,
+    contractVersion: 1,
     strategyVersionId: versionId,
     runConfig: config,
     preparationStamp: preparationStampFor(f.input.strategy, config, versionId),
@@ -34,6 +34,20 @@ const fixture = async () => {
 };
 
 describe('优化分段运行版本分派', () => {
+  it('新旧分析与完整引擎身份不混排，旧冻结数据指纹保持原值', async () => {
+    const backtests = { comparableDataFingerprint: vi.fn().mockResolvedValue('frozen-data') };
+    const service = new StrategyOptimizationRunService({} as never, backtests as never);
+    const range = { start: '2026-01-01', end: '2026-01-31' };
+    const legacy = { id: 'run', result: { engineVersion: 'old' } };
+    expect(await service.dataArtifactFingerprint(legacy as never, range)).toBe('frozen-data');
+    const current = { ...legacy, result: { analyticsVersion: 'research-analytics-v2', engineVersion: 'engine-5' } };
+    const fingerprint = await service.dataArtifactFingerprint(current as never, range);
+    expect(fingerprint).not.toBe('frozen-data');
+    expect(await service.dataArtifactFingerprint(current as never, range)).toBe(fingerprint);
+    expect(await service.dataArtifactFingerprint({ ...current, result: {
+      ...current.result, engineVersion: 'engine-6',
+    } } as never, range)).not.toBe(fingerprint);
+  });
   it('旧运行配置在预检与预算申请前拒绝', async () => {
     const f = await fixture();
     const oldExperiment = {

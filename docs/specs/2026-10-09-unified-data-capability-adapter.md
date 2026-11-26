@@ -126,7 +126,7 @@ Tushare 权限以用户指定的[积分权限表](https://docs.qq.com/sheet/DT0F
 
 主仓已有 `DsaDataCapabilityReaderV3` 集中处理部分能力请求与响应解析，认证、期限和传输继续归 DsaClient；优先演进这条接缝，不另建平行网关。[S3] Server 基础价格备用仍包含 CN ETF 的 HiThink/腾讯以及港美的富途/长桥/Yahoo 名单，是本次去供应商特判的实际迁移点。[S4]
 
-保留并增量调整现有 Data/Control V3、Desired/Effective Policy、RouteTarget、来源记录、凭据生命周期、Market Reader 和冻结仓储。不另建平行路由、凭据或数据事实系统；不将 DSA 原生分析的隐式备用链合并到 ThesisLedger 路径。
+保留并增量调整现有 `dsa-data-v1` 与 `dsa-control-v1`、Desired/Effective Policy、RouteTarget、来源记录、凭据生命周期、Market Reader 和冻结仓储。不另建平行路由、凭据或数据事实系统；不将 DSA 原生分析的隐式备用链合并到 ThesisLedger 路径。
 
 现有主备顺序、目标数量限制及用户停用语义保持。不得因注册新来源就自动加入用户路由；用户选择主源和备用源的权利保留。本地任务中的路由修订和账号状态仅为其观察时点，本文不将其复制成当前运行态事实。
 
@@ -218,7 +218,7 @@ ThesisLedger 页面 / 研究 / 风险等消费者
 
 ### 6.1 目录日线语义的增量发布合同（2026-10-10）
 
-精确目录条目可追加 `barQuery`：Data V3 合同版本、query 操作、精确价格口径、供应商原生价格基准、单目标整窗读取、每次请求覆盖校验与实际传输协议。该对象由可执行绑定/既有有界适配事实派生，不是供应商自声明的备用许可；静态字段不证明某次查询成功、算法等价或历史可见性。无此对象的旧目录仍可读取，但不能据此新增基础备用资格。
+精确目录条目可追加 `barQuery`：`dsa-data-v1` 合同版本、query 操作、精确价格口径、供应商原生价格基准、单目标整窗读取、每次请求覆盖校验与实际传输协议。该对象由可执行绑定/既有有界适配事实派生，不是供应商自声明的备用许可；静态字段不证明某次查询成功、算法等价或历史可见性。无此对象的旧目录仍可读取，但不能据此新增基础备用资格。
 
 基础备用仍受当前消费者范围约束：CN ETF、港美 STOCK/ETF 日线，以及明确选择基础价格研究/图表的入口；CN STOCK 不因本增量跳过 `invalid_proof`，严格或事件/数量敏感研究不新增资格。消费者必须找到两个不同目标的精确目录事实，备用的配置与目录就绪，校验单次响应、同一价格口径与整窗，沿现有切源责任返回实际来源。不同来源同名复权不等于算法等价。
 
@@ -432,11 +432,11 @@ const stream = market.orderBook.watch(
 
 全来源差异及精确组合以[来源与路由矩阵](../reviews/2026-10-10-provider-adaptation-and-route-matrix.md)为正文。首批拆分为 DAILY_TRADING_STATUS、RISK_WARNING、DAILY_PRICE_RULE、SECURITY_BASIC_DATES、LISTING_PHASE，均为 query；没有真实来源和生产需求的 ORDER_BOOK 继续只用于隔离测试。旧 HISTORICAL_TRADING_STATUS 保留至消费者迁移完成，不把原上游登记为每项均支持，也不重复执行旧聚合请求与新独立请求。
 
-H06 按共享合同 → DSA 同义校验 → 政策兼容拆分：新增能力合同版本 1 沿用现有 Data V3 envelope 与 RouteTarget；请求具有独立能力标识和专有参数，结果保留请求身份、实际目标、原适配/上游修订、观察时钟、逐项覆盖及证据引用。基础日期使用独立 symbol 请求，不要求价格窗口，也不增加最后交易日推断字段；窗口能力保留日期范围和未知项。粗 ST、细分风险、比例规则、精确价格、无价格限制明确区分。返回结果必须与请求/绑定关联，不能靠 Schema 合法就宣称目标正确。
+H06 按共享合同 → DSA 同义校验 → 政策兼容拆分：新增能力合同版本 1 沿用现有 `dsa-data-v1` envelope 与 RouteTarget；请求具有独立能力标识和专有参数，结果保留请求身份、实际目标、原适配/上游修订、观察时钟、逐项覆盖及证据引用。基础日期使用独立 symbol 请求，不要求价格窗口，也不增加最后交易日推断字段；窗口能力保留日期范围和未知项。粗 ST、细分风险、比例规则、精确价格、无价格限制明确区分。返回结果必须与请求/绑定关联，不能靠 Schema 合法就宣称目标正确。
 
 风险请求明确 coarseST 或非空的细分风险类别集合；覆盖只对本次必需类别判定，其他字段仍保留 unknown。价格规则请求区分 rule 与 exactPrices，比例不能满足精确限价需求。证据区分 originalBytes、normalizedResponse 与 unknown；旧公告只有链接时保留未知摘要/观察时间，不将数据包或规范化响应摘要冒充原文摘要。功能结果与本次专有参数也须关联。
 
-现有 Control V3 的 route 增加可选 enabled 字段（原对象不注入默认字段，保持旧序列化与冻结读法）；缺省值仅在执行判定中解释为旧功能已启用。新拆分能力须显式给出 enabled，首次建立默认为 false。禁用 route 保留 targets，Effective 的禁用原因沿用 disabled；旧客户端/旧文件不自动写入新字段。新增组合冻结使用独立版本，在 H09 定义完整独立事实并验证旧版本读法，不能仅升级 Schema 名称后改写历史载荷。
+现有 `dsa-control-v1` 的 route 增加可选 enabled 字段（原对象不注入默认字段，保持旧序列化与冻结读法）；缺省值仅在执行判定中解释为旧功能已启用。新拆分能力须显式给出 enabled，首次建立默认为 false。禁用 route 保留 targets，Effective 的禁用原因沿用 disabled；旧客户端/旧文件不自动写入新字段。新增组合冻结使用独立版本，在 H09 定义完整独立事实并验证旧版本读法，不能仅升级 Schema 名称后改写历史载荷。
 
 纯政策迁移预览按实际来源支持映射，并保留无法映射的旧行；预览不提交配置。保存、目标变更和真实启停验收另外使用原 expectedRevision/expectedConfigVersion CAS 与具体授权；H01 已完成的单次 ETF 故障验收不扩张此授权。现有研究模型的必需输入、冲突与 invalid_proof 继续 fail closed。
 

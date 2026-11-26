@@ -7,7 +7,7 @@ import {
 } from '../src/model-arena.js';
 const budget = { requests: 20, tokens: 100000, costMicros: 200000 };
 const protocol = {
-  version: 1,
+  version: 'arena-historical-match-protocol-v1',
   title: '两模型实验',
   market: 'CN',
   currency: 'CNY',

@@ -10,7 +10,7 @@ import {
 } from '../../src/market/market-policy-storage.js';
 
 const policy: DesiredProviderPolicyV3 = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'isolated-policy',
   revision: 5,
@@ -18,7 +18,7 @@ const policy: DesiredProviderPolicyV3 = {
   routes: [],
 };
 const catalog = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   catalogRevision: 1,
   generatedAt: '2026-10-02T00:00:00Z',
@@ -31,7 +31,7 @@ const applied = (desired: DesiredProviderPolicyV3) => ({
   requestId: desired.requestId,
   desired,
   effective: {
-    contractVersion: 3,
+    contractVersion: 1,
     consumer: 'thesis-ledger',
     requestId: desired.requestId,
     revision: desired.revision,

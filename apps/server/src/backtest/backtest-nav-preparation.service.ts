@@ -45,7 +45,7 @@ export class BacktestNavPreparationService {
     });
     if (!version) throw new NotFoundException('策略版本不存在');
     const strategy = strategySchema.safeParse(version.schema);
-    if (version.schemaVersion !== 2 || !strategy.success) {
+    if (version.schemaVersion !== 1 || !strategy.success) {
       throw new UnprocessableEntityException({
         code: 'STRATEGY_INVALID',
         message: '策略版本不符合净值准备合同',
@@ -63,7 +63,7 @@ export class BacktestNavPreparationService {
       });
       const definition = strategySchema.safeParse(current?.schema);
       if (
-        current?.schemaVersion !== 2 ||
+        (current?.schemaVersion ?? 0) !== 1 ||
         !definition.success ||
         hashCanonicalManifest(definition.data) !== prepared.binding.strategyContentHash
       ) {
@@ -74,7 +74,7 @@ export class BacktestNavPreparationService {
       const diagnostic = navPreparationDiagnostic(error);
       if (!diagnostic) throw error;
       return backtestNavPreparationBlockedResultV3Schema.parse({
-        contractVersion: 3,
+        contractVersion: 1,
         status: 'blocked',
         scope: 'nav-input-plan',
         requestId: request.requestId,

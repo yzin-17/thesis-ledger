@@ -3,7 +3,7 @@ import { ThesisLedgerApiClient, ThesisLedgerContractError } from '../src/index.j
 
 const window = { start: '2026-05-01', end: '2026-05-20' };
 const response = () => ({
-  contractVersion: 3,
+  contractVersion: 1,
   symbol: '159516.SZ',
   mode: 'v3',
   window,

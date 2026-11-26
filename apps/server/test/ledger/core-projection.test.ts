@@ -38,7 +38,7 @@ const execution = (input: {
   sourceTimezone: 'UTC',
   economicOrderKey: `execution:${input.revision}`,
   recordedAt: new Date(input.occurredAt),
-  envelopeVersion: 3,
+  envelopeVersion: 1,
   payloadVersion: 1,
   payload: {
     symbol: 'AAPL.US',
@@ -142,12 +142,12 @@ describe('core ledger projection', () => {
         direction: 'INFLOW',
         amount: '75',
       }),
-    ])).toThrow('旧账本事件不支持读取或修订');
+    ])).toThrow('账本事件须使用 ledger-event-envelope-v1');
   });
 
   it('当前事件载荷解析失败时显式中止现金投影', () => {
     const malformed: StoredCashEvent = {
-      envelopeVersion: 3,
+      envelopeVersion: 1,
       id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
       accountId,
       type: 'CASH_FLOW',
@@ -245,7 +245,7 @@ describe("现金结算和快照重放边界", () => {
       sourceTimezone: 'Asia/Shanghai',
       economicOrderKey: 'desktop-cash-deposit:future-1',
       recordedAt: new Date('2026-08-03T01:00:00.000Z'),
-      envelopeVersion: 3,
+      envelopeVersion: 1,
       payloadVersion: 1,
       payload: {
         direction: 'INFLOW',
@@ -548,7 +548,7 @@ describe("持仓物化与跨币种完整性", () => {
         sourceTimezone: 'UTC',
         economicOrderKey: 'cash:1',
         recordedAt: new Date('2026-08-01T00:00:00.000Z'),
-        envelopeVersion: 3,
+        envelopeVersion: 1,
         payloadVersion: 1,
         payload: {
           currency: 'USD',

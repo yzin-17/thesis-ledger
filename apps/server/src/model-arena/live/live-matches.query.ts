@@ -27,7 +27,7 @@ export class LiveMatchesQuery {
       ORDER BY (f.fill->>'marketTime')::timestamptz,a.id,f.fill->>'id'`;
     return rows.map((row) => {
       const f = arenaLiveAccountSchema.shape.fills.element.parse(row.fill);
-      return arenaLivePointSchema.parse({ protocolVersion: 2, id: f.id, arenaId: id, roundId: null,
+      return arenaLivePointSchema.parse({ protocolVersion: 'arena-live-match-protocol-v1', id: f.id, arenaId: id, roundId: null,
         entrantId: row.agentId, model: row.model, symbol: f.symbol, day: row.day,
         executedAt: f.marketTime, side: f.side, price: f.price, quantity: f.quantity });
     });

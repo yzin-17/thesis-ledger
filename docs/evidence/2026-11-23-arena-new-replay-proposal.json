@@ -1,0 +1,63 @@
+{
+  "executionAuthorized": false,
+  "protocol": {
+    "fees": {
+      "buyBps": 0,
+      "minimum": "0",
+      "sellBps": 0,
+      "version": "fixed-v1",
+      "slippageBps": 0
+    },
+    "title": "自主比赛 · 全市场回放验收 · 1123",
+    "budget": {
+      "tokens": null,
+      "requests": 50,
+      "costMicros": null
+    },
+    "endsOn": null,
+    "market": "CN",
+    "version": 2,
+    "currency": "CNY",
+    "entrants": [
+      {
+        "model": "qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive@q4_k_m",
+        "budget": {
+          "tokens": null,
+          "requests": 50,
+          "costMicros": null
+        },
+        "providerId": "lmstudio",
+        "maxInputTokens": null,
+        "maxOutputTokens": null
+      }
+    ],
+    "startsOn": "2026-11-02",
+    "timeZone": "Asia/Shanghai",
+    "universe": "market",
+    "resources": {
+      "maxCycleSeconds": null,
+      "maxActiveSymbols": 50,
+      "maxResearchSteps": null,
+      "maxQuoteAgeSeconds": 60,
+      "quoteIntervalSeconds": 30
+    },
+    "benchmarks": [
+      "cash"
+    ],
+    "calendarId": "CN",
+    "initialCash": "100000",
+    "instruments": [],
+    "allowWebSearch": true,
+    "budgetCurrency": "CNY",
+    "maxPositionBps": 10000,
+    "calendarVersion": null,
+    "decisionDeadlineMinutes": null,
+    "maxInfrastructureAttempts": 3,
+    "simulationPolicy": "sampled-v1"
+  },
+  "maxCalls": 50,
+  "maxRunSeconds": 1800,
+  "configurationFingerprint": "3f3ab07495dc884f33a35753a81a7b4208ef93be64d27190d753c12aa9d8f96b",
+  "expectedProviderRevision": "2026-11-23T15:21:23.124Z",
+  "queueOwnerReceipt": ".recovery-artifacts/arena-v6-deployment-20261117/queue-owner.json"
+}

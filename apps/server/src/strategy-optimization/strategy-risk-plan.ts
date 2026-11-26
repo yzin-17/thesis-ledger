@@ -15,10 +15,10 @@ export function validatedRiskStrategy(
   schemaVersion: number,
   version: number,
 ): BacktestStrategy {
-  if (![2, 3].includes(schemaVersion) || version <= 0)
-    throw new BadRequestException('风险应用只能来源于正式 V2 或 V3 策略版本');
+  if (schemaVersion !== 1 || version <= 0)
+    throw new BadRequestException('风险应用需要现行正式策略版本');
   const parsed = strategySchema.safeParse(schema);
-  if (!parsed.success || Number(parsed.data.schemaVersion) !== schemaVersion)
+  if (!parsed.success)
     throw new BadRequestException({
       errorCode: 'STRATEGY_RISK_APPLICATION_INVALID_STRATEGY',
       message: '正式策略定义与结构版本不一致或无效，无法安全编译风险监控规则',

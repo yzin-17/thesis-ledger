@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { Prisma } from '@prisma/client';
 import { journalAnalyzePeriod } from '@thesis-ledger/domain';
-import { journalStoredPeriodSnapshotSchema } from '@thesis-ledger/schemas';
+import { journalStoredPeriodSnapshotSchema, researchResultV2Schema } from '@thesis-ledger/schemas';
 import { JournalPeriodReviewSnapshots } from '../../src/journal/journal-period-review-snapshots.js';
 
 const accountId = '00000000-0000-4000-8000-000000000001';
 const aiRunId = '00000000-0000-4000-8000-000000000002';
 const start = '2026-01-01T09:00:00.000Z';
 const end = '2026-01-04T09:00:00.000Z';
+const researchSample = researchResultV2Schema.parse(JSON.parse(readFileSync(new URL(
+  '../../../../packages/schemas/fixtures/research-v2.samples.json', import.meta.url,
+), 'utf8')).result);
 const analysis = () => ({
   accountId,
   mode: 'actual' as const,
@@ -45,14 +49,23 @@ const finishedAi = () => ({
   errorCode: null,
   errorSummary: null,
   result: {
-    version: 1,
-    provider: 'fixture',
-    conclusion: '保存的中文周期复盘',
-    evidence: [],
-    risks: [],
-    unknowns: [],
-    disclaimer: '研究用途',
-    signals: [],
+    ...researchSample,
+    scopeSnapshot: {
+      version: 'research-scope-snapshot-v1',
+      mode: 'actual',
+      scope: 'account',
+      accountId,
+      confirmedAt: end,
+      instruments: [],
+    },
+    inference: {
+      ...researchSample.inference,
+      conclusion: '保存的中文周期复盘',
+      claims: [],
+      invalidationConditions: [],
+      nextSteps: [],
+    },
+    dataCutoffAt: end,
     createdAt: '2026-01-05T10:00:00Z',
   },
   createdAt: '2026-01-05T10:00:00Z',
@@ -113,11 +126,15 @@ describe('周期复盘快照：显式冻结而非任务绑定', () => {
   it('保存成功 AI 的冻结副本，而不是任务绑定指针', async () => {
     const { service, create, get } = harness();
     const snapshot = await service.save({ ...request(), aiRunId }, {} as never);
-    expect(snapshot.aiExplanation?.result).toMatchObject({ conclusion: '保存的中文周期复盘' });
+    expect(snapshot.aiExplanation?.result).toMatchObject({
+      inference: { conclusion: '保存的中文周期复盘' },
+    });
     expect(create.mock.calls[0]![0].data).toMatchObject({
       aiExplanation: expect.objectContaining({
         id: aiRunId,
-        result: expect.objectContaining({ conclusion: '保存的中文周期复盘' }),
+        result: expect.objectContaining({
+          inference: expect.objectContaining({ conclusion: '保存的中文周期复盘' }),
+        }),
       }),
     });
     expect(create.mock.calls[0]![0].data).not.toHaveProperty('aiRunId');

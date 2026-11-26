@@ -6,7 +6,7 @@ const route = [
   { providerId: 'fixture', upstreamSource: 'fixture', routeIndex: 0, eligible: true, reason: null },
 ];
 const quote = {
-  version: 3,
+  version: 1,
   symbol: '600519.SH',
   open: 10,
   high: 12,
@@ -22,7 +22,7 @@ const quote = {
   freshness: 'live' as const,
 };
 const chip = {
-  version: 3,
+  version: 1,
   symbol: '600519.SH',
   averageCost: 10,
   profitRatio: 0.5,
@@ -47,7 +47,7 @@ const makeControl = () => ({
     revision: 1,
     dsaRevision: 1,
     effectiveProjection: {
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       requestId: 'fixture',
       revision: 1,

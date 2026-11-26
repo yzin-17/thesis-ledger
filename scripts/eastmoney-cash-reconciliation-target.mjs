@@ -17,7 +17,7 @@ if (!target) throw new Error('当前政策没有用户已选东财现金来源')
 const researchPolicy = {version:'known-announced-cash-events-v1',entitlement:'settled-record-date-holdings',receivable:'ex-date',settlement:'assume-scheduled-payment-date',missingEvents:'excluded-with-unknown-coverage',usage:'accounting-only',splitEvents:'not-modelled',historicalAvailability:'notVerified',uncertainRecords:'exclude'};
 const rows=[];
 for (const [symbol,start,end] of [['510300.SH','2025-06-01','2026-02-01'],['510050.SH','2024-11-01','2026-02-01'],['510880.SH','2026-01-01','2026-02-01']]) {
-  const request = {contractVersion:3,protocolVersion:'known-cash-observations-v1',requestId:crypto.randomUUID(),symbol,routeKey:key,routeTarget:{providerId:target.providerId,upstreamSource:target.upstreamSource,routeIndex:target.routeIndex},desiredRevision:policy.sourceDesiredRevision,effectivePolicyRevision:policy.revision,catalogRevision:catalog.catalogRevision,start,end,dataAsOf:new Date(Date.now()+60000).toISOString(),currency:'CNY',researchPolicy};
+  const request = {contractVersion:1,protocolVersion:'known-cash-observations-v1',requestId:crypto.randomUUID(),symbol,routeKey:key,routeTarget:{providerId:target.providerId,upstreamSource:target.upstreamSource,routeIndex:target.routeIndex},desiredRevision:policy.sourceDesiredRevision,effectivePolicyRevision:policy.revision,catalogRevision:catalog.catalogRevision,start,end,dataAsOf:new Date(Date.now()+60000).toISOString(),currency:'CNY',researchPolicy};
   try { rows.push({request,response:await client.dataCapabilities.knownCash(request)}); }
   catch(error) { rows.push({request,error:{code:error.code??'unknown',reason:error.sourceReason??'unknown'}}); break; }
 }

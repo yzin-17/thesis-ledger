@@ -41,7 +41,7 @@ describe('图表请求到共享客户端的实际适配', () => {
       await requestMarketDetail({
         symbol: '159516.SZ',
         adjustment,
-        chartContractVersion: 3,
+        chartContractVersion: 1,
         barsLimit: 180,
         indicatorParams: { period: 60 },
         refresh: true,
@@ -50,7 +50,7 @@ describe('图表请求到共享客户端的实际适配', () => {
         '159516.SZ',
         expect.objectContaining({
           adjustment,
-          chartContractVersion: 3,
+          chartContractVersion: 1,
           barsLimit: 180,
           indicatorParams: { period: 60 },
           refresh: true,
@@ -71,13 +71,13 @@ describe('图表请求到共享客户端的实际适配', () => {
     const params = getDetail.mock.calls[0]![1] as Record<string, unknown>;
     expect(params.navLimit).toBe(20);
     expect(params.adjustment).toBeUndefined();
-    expect(params.chartContractVersion).toBe(3);
+    expect(params.chartContractVersion).toBe(1);
     expect(getPlannedChartOptions).not.toHaveBeenCalled();
   });
   it('规划失败不发起行情请求，也不按旧口径回退', async () => {
     getPlannedChartOptions.mockRejectedValue(new Error('plan unavailable'));
     await expect(
-      requestMarketDetail({ symbol: '159516.SZ', chartContractVersion: 3 }),
+      requestMarketDetail({ symbol: '159516.SZ', chartContractVersion: 1 }),
     ).rejects.toThrow('plan unavailable');
     expect(getDetail).not.toHaveBeenCalled();
   });
@@ -88,7 +88,7 @@ describe('图表请求到共享客户端的实际适配', () => {
       options: [],
     });
     await expect(
-      requestMarketDetail({ symbol: '159516.SZ', chartContractVersion: 3 }),
+      requestMarketDetail({ symbol: '159516.SZ', chartContractVersion: 1 }),
     ).rejects.toThrow('价格口径不可用');
     expect(getDetail).not.toHaveBeenCalled();
   });
@@ -99,7 +99,7 @@ describe('图表请求到共享客户端的实际适配', () => {
     await expect(
       requestMarketDetail({
         symbol: '159516.SZ',
-        chartContractVersion: 3,
+        chartContractVersion: 1,
         include: ['bars'],
         end: '2026-05-20',
       }),

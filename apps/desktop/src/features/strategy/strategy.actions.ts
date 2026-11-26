@@ -256,8 +256,9 @@ export const createStrategyActionHandlers = (dependencies: Dependencies) => {
     if (busyAction) return;
     setBusyAction(`retry:${jobId}`);
     try {
-      await dependencies.retryMutation.mutateAsync(jobId);
-      toastManager.add({ title: '回测已重新排队', type: 'success', timeout: 2800 });
+      const retried = await dependencies.retryMutation.mutateAsync(jobId);
+      dependencies.onJobQueued?.(retried);
+      toastManager.add({ title: retried.id !== jobId ? '已创建冻结输入重放任务' : '已找回回测任务', type: 'success', timeout: 2800 });
       await load();
     } catch {
       errorToast(toastManager, '回测重试失败', '请检查任务状态、快照和服务连接。');

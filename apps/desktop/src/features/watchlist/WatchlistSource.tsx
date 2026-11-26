@@ -21,6 +21,10 @@ export function WatchlistSource({
   const [open, setOpen] = useState(false);
   const value = watchlistPriceDisplay(snap?.price, snap?.quoteContext);
   const cadence = quoteCadence(item, snap, catalog);
+  const pauseReason =
+    catalog?.status === 'complete' && snap?.price.kind === 'quote' && snap.price.quote.upstreamSource
+      ? '当前报价来源缺少可用的原生 K 线周期，自动报价检查暂停'
+      : '来源周期待确认，自动报价检查暂停';
   const snapshot = snap?.price.kind === 'quote' && snap.quoteContext?.session === 'closed_snapshot';
   let status = value.status;
   const source =
@@ -54,7 +58,7 @@ export function WatchlistSource({
             <strong className="text-sm font-medium">来源与检查信息</strong>
             {value.fetched && <span>读取时间 {value.fetched}</span>}
             <span>
-              {cadence ? `检查周期：${cadence.label}` : '来源周期待确认，自动报价检查暂停'}
+              {cadence ? `检查周期：${cadence.label}` : pauseReason}
             </span>
             {snap?.minRefreshSeconds && snap.minRefreshSeconds > 60 ? (
               <span>请求间隔至少 {snap.minRefreshSeconds / 60} 分钟</span>

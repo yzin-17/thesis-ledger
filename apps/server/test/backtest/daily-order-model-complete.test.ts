@@ -1,0 +1,35 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, it } from 'vitest';
+import { strategySchema, type BacktestStrategy } from '@thesis-ledger/schemas';
+import { backtestStrategyPlanReadback } from '@thesis-ledger/domain';
+import { tradePlanSnapshot } from './trade-plan-snapshot.fixture.js';
+import { dailyPolicy } from './daily-order-worker.fixture.js';
+
+const capture = process.env.BACKTEST_DAILY_COMPLETE_CAPTURE_DIR;
+it.skipIf(!capture)('原样实际全成模型配置：开盘一次全成即建保护，随后行情退出并完整回放', async () => {
+  const root = resolve(capture!);
+  const sample = JSON.parse(readFileSync(resolve(root, 'full-fill.json'), 'utf8'));
+  expect(sample.category).toBe('passed');
+  const strategy = strategySchema.parse(sample.configuration) as BacktestStrategy;
+  const original = JSON.stringify(strategy);
+  const policy = { ...dailyPolicy, liquidity: { kind: 'perBarCap' as const, quantity: '50000' } };
+  const data = { dates: ['2026-05-18', '2026-05-19', '2026-05-20'], opens: [10, 9.2, 8.5], closes: [10, 10, 10], intrabarRange: 0.1, dailyOrderMatching: policy };
+  const f = await tradePlanSnapshot(resolve(root, 'full-fill-complete-snapshot-cap50000'), strategy, data);
+  const result = await f.run(), replay = await f.run();
+  writeFileSync(resolve(root, 'full-fill-complete-attempt-cap50000.json'), JSON.stringify({ marketData: data, result }, null, 2), { mode: 0o600, flag: 'wx' });
+  expect(result.completeness).toBe('complete');
+  expect(replay).toEqual(result);
+  const parent = result.dailyOrders!.orders.find(o => o.action.kind === 'entry')!;
+  const child = result.dailyOrders!.orders.find(o => o.action.kind === 'stopLoss')!;
+  expect(parent.state).toBe('filled');
+  expect(parent.fills).toHaveLength(1);
+  expect(child.parent?.activation).toBe('fullFill');
+  expect(child.activatedBarIndex).toBe(parent.fills[0]!.at.barIndex);
+  expect(child.eligibleFrom).toEqual({ barIndex: parent.fills[0]!.at.barIndex, phase: 'range' });
+  expect(child.state).toBe('filled');
+  expect(child.filledQuantity).toBe(parent.filledQuantity);
+  expect(result.simulationFills.map(fill => [fill.side, fill.occurredAt.slice(0, 10)])).toEqual([['buy', '2026-05-19'], ['sell', '2026-05-20']]);
+  expect(JSON.stringify(strategy)).toBe(original);
+  writeFileSync(resolve(root, 'full-fill-complete.json'), JSON.stringify({ source: 'full-fill.json', newModelCalls: 0, configurationUnchanged: true, category: 'passed', marketData: data, readback: backtestStrategyPlanReadback(strategy), result, replayEqual: true }, null, 2), { mode: 0o600, flag: 'wx' });
+});

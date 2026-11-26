@@ -76,7 +76,7 @@ else {
     const index = routes.findIndex(route => marketRouteKeyIdV3(route.key) === marketRouteKeyIdV3(next.key));
     if (index < 0) routes.push(next); else routes[index] = next;
   }
-  const writePolicy = (revision, selected) => api('/api/market-data/policy', { contractVersion: 3, consumer: 'thesis-ledger',
+  const writePolicy = (revision, selected) => api('/api/market-data/policy', { contractVersion: 1, consumer: 'thesis-ledger',
     requestId: randomUUID(), revision, enabled: policy.enabled, routes: selected }, 'PUT');
   let attempted = false;
   try {
@@ -88,7 +88,7 @@ else {
     const prepared = backtestRunPreparationResultV3Schema.parse(await api('/api/v1/backtests/run-config/prepare',
       backtestRunPreparationRequestV3Schema.parse({ ...intent, strategyVersionId })));
     console.error(JSON.stringify({ stage: 'prepared', response: prepared })); assert.equal(prepared.status, 'prepared');
-    const created = await api('/api/v1/backtests/runs', backtestRunCreateSchemaV3.parse({ contractVersion: 3, strategyVersionId,
+    const created = await api('/api/v1/backtests/runs', backtestRunCreateSchemaV3.parse({ contractVersion: 1, strategyVersionId,
       runConfig: prepared.runConfig, preparationStamp: prepared.executionPreflight.revisionStamp, idempotencyKey: `p6-hk-lots-${randomUUID()}` }));
     console.error(JSON.stringify({ stage: 'queued', jobId: created.id }));
     let job = created; const deadline = Date.now() + 180000;

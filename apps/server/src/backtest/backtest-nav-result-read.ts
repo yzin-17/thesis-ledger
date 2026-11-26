@@ -30,7 +30,7 @@ export function verifyNavResultForRead(
   if (job.status !== 'succeeded' || !frozen) return invalid();
 
   try {
-    const result = verifyNavResultV3(job.result, frozen);
+    const result = verifyNavResultV3(job.result, frozen, job.engineVersion ?? '');
     if (
       result.engineVersion !== job.engineVersion ||
       result.resultChecksum !== job.resultChecksum

@@ -15,7 +15,7 @@ describe('MarketDetailRequestCoordinator', () => {
     const fetcher: MarketDetailFetcher = vi.fn(() => Promise.resolve(response));
     await Promise.all([
       coordinator.request(request, fetcher),
-      coordinator.request({ ...request, chartContractVersion: 3 }, fetcher),
+      coordinator.request({ ...request, chartContractVersion: 1 }, fetcher),
     ]);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });

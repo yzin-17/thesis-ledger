@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { formatMobileDateTime } from '../../app/date-display';
+import { backtestStageDisplay } from '@thesis-ledger/domain';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -55,13 +57,14 @@ export function BacktestJobsScreen() {
         label="正在刷新回测任务"
       >
         {rows.map((run) => (
-          <Section key={run.id} title={backtestStatusLabels[run.status]}>
+          <Section key={run.id} title={run.cancelRequestedAt && isBacktestActive(run.status) ? '正在取消' : backtestStatusLabels[run.status]}>
             <Copy>Run {run.id}</Copy>
             <Copy>策略版本 {run.strategyVersionId}</Copy>
+            <Copy>{backtestStageDisplay(run.stage)}</Copy>
             <Copy>
               进度{' '}
               {run.progress === undefined || run.progress === null ? '未记录' : `${run.progress}%`} ·{' '}
-              {run.createdAt ?? '创建时间未记录'}
+              创建于{formatMobileDateTime(run.createdAt)}（北京时间）
             </Copy>
             <Action
               label={`查看回测 ${run.id}`}

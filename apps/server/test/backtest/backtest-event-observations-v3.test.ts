@@ -22,20 +22,20 @@ function fixture() {
   }));
   const targets = keys.map((_, index) => ({ providerId: `source-${index}`, upstreamSource: `endpoint-${index}` }));
   const effective = {
-    contractVersion: 3 as const, consumer: 'thesis-ledger' as const, requestId: 'policy',
+    contractVersion: 1 as const, consumer: 'thesis-ledger' as const, requestId: 'policy',
     revision: 2, sourceDesiredRevision: 2, enabled: true, appliedAt: '2026-09-26T00:00:00Z',
     routes: keys.map((key, index) => ({ key, reason: null, targets: [{
       ...targets[index]!, routeIndex: 0, eligible: true, reason: null,
     }] })),
   };
   const catalog = {
-    contractVersion: 3 as const, consumer: 'thesis-ledger' as const, catalogRevision: 3,
+    contractVersion: 1 as const, consumer: 'thesis-ledger' as const, catalogRevision: 3,
     generatedAt: '2026-09-26T00:00:00Z', integrity: 'complete' as const,
     entries: keys.map((key, index) => ({ key, target: targets[index]!, state: 'ready' as const })),
   };
   const dsa = {
     effectiveControlPolicyV3: vi.fn(async () => ({
-      contractVersion: 3 as const, consumer: 'thesis-ledger' as const, projection: { effective },
+      contractVersion: 1 as const, consumer: 'thesis-ledger' as const, projection: { effective },
     })),
     marketRouteCatalogV3: vi.fn(async () => catalog),
     marketEventsV3: vi.fn(async (request: MarketEventRequestV3): Promise<MarketEventResponseV3> => ({

@@ -19,7 +19,6 @@ const createTransaction = (
   accountLedgerState: { update: vi.fn(async ({ data }: { data: object }) => data) },
   ledgerEvent: {
     create: vi.fn(async ({ data }: { data: object }) => data),
-    findFirst: vi.fn(async () => null as { id: string } | null),
   },
 });
 
@@ -30,7 +29,6 @@ const createRepository = (
   const prisma = {
     $transaction: (operation: (client: typeof transaction) => unknown) => operation(transaction),
     ledgerEvent: {
-      findFirst: vi.fn(async () => null as { id: string } | null),
       findMany: vi.fn(async () => storedEvents),
     },
   };
@@ -38,7 +36,7 @@ const createRepository = (
 };
 
 const createEvent = (revision: string, overrides: Record<string, unknown> = {}) => ({
-  version: 3,
+  version: 1,
   eventId: '22222222-2222-4222-8222-222222222222',
   factId: '33333333-3333-4333-8333-333333333333',
   accountId,
@@ -130,16 +128,16 @@ describe('Ledger V2 不可变持久化', () => {
 });
 
 describe("锁定修订与有效事实读取", () => {
-  it('旧账本行存在时，在执行写入操作前拒绝', async () => {
+  it('拒绝追加旧信封，账户修订保持原值', async () => {
     const transaction = createTransaction([{ ledgerRevision: 1n, projectionGeneration: 1n }]);
-    transaction.ledgerEvent.findFirst.mockResolvedValueOnce({ id: createEvent('1').eventId });
     const { repository } = createRepository(transaction);
-    const operation = vi.fn(async () => ({ value: 'unused', advanceRevision: true }));
 
-    await expect(repository.withAccountWrite(accountId, operation)).rejects.toMatchObject({
-      response: { code: 'UNSUPPORTED_CONTRACT_VERSION' },
-    });
-    expect(operation).not.toHaveBeenCalled();
+    await expect(
+      repository.withAccountWrite(accountId, async (context) => ({
+        value: await repository.appendRevision(context, createEvent('2', { version: 3 })),
+        advanceRevision: true,
+      })),
+    ).rejects.toMatchObject({ name: 'ZodError' });
     expect(transaction.ledgerEvent.create).not.toHaveBeenCalled();
     expect(transaction.accountLedgerState.update).not.toHaveBeenCalled();
   });
@@ -177,7 +175,7 @@ describe("锁定修订与有效事实读取", () => {
       sourceTimezone: 'Asia/Shanghai',
       economicOrderKey: 'a0',
       recordedAt: new Date('2026-08-26T02:31:00.000Z'),
-      envelopeVersion: 3,
+      envelopeVersion: 1,
       payloadVersion: 1,
       payload: createEvent('1').payload,
       sourceCategory: 'MANUAL',
@@ -220,7 +218,7 @@ describe("锁定修订与有效事实读取", () => {
       sourceTimezone: 'Asia/Shanghai',
       economicOrderKey: 'a0',
       recordedAt: new Date('2026-08-26T02:31:00.000Z'),
-      envelopeVersion: 3,
+      envelopeVersion: 1,
       payloadVersion: 1,
       payload: createEvent('1').payload,
       sourceCategory: 'MIGRATION',
@@ -258,7 +256,7 @@ describe("锁定修订与有效事实读取", () => {
     await repository.appendRevision(context, event);
 
     expect(transaction.ledgerEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ sourceRowId: 'row-2', envelopeVersion: 3 }),
+      data: expect.objectContaining({ sourceRowId: 'row-2', envelopeVersion: 1 }),
     });
     const effective = await repository.readEffectiveEvents(accountId);
     expect(effective.find((item) => item.eventId === importedStored.id)?.source.sourceRowId).toBe(
@@ -287,15 +285,19 @@ describe("旧 envelope 拒绝与不可变账本", () => {
     });
   });
 
-  it('无 factId 的旧行也阻断有效事件读取', async () => {
-    const transaction = createTransaction([]);
-    const { repository, prisma } = createRepository(transaction);
-    prisma.ledgerEvent.findFirst.mockResolvedValueOnce({ id: createEvent('1').eventId });
+  it('现行迁移校验全部旧行，并要求后续写入显式提供当前信封', async () => {
+    const sql = await readFile(
+      new URL(
+        '../../prisma/migrations/20261124143000_named_v1_ledger_envelope/migration.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    );
 
-    await expect(repository.readEffectiveEvents(accountId, '1')).rejects.toMatchObject({
-      response: { code: 'UNSUPPORTED_CONTRACT_VERSION' },
-    });
-    expect(prisma.ledgerEvent.findMany).not.toHaveBeenCalled();
+    expect(sql).toContain('SELECT 1 FROM "LedgerEvent" WHERE "envelopeVersion" IS DISTINCT FROM 3');
+    expect(sql).toContain('"nextEnvelopeVersion" INTEGER NOT NULL');
+    expect(sql).toContain('ALTER COLUMN "envelopeVersion" DROP DEFAULT');
+    expect(sql).toContain('CHECK ("envelopeVersion" = 1)');
   });
 
   it('current baseline 通过触发器禁止 LedgerEvent 修改和删除', async () => {

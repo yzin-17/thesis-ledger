@@ -121,6 +121,7 @@ export async function createCorrectnessHttpFixture() {
       prisma.ledgerEvent.create({
         data: {
           accountId,
+          envelopeVersion: 1,
           type: 'CASH_FLOW',
           occurredAt: new Date('2025-06-01T00:00:00Z'),
           payload: {

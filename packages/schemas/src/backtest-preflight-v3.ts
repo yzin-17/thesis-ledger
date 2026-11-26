@@ -95,7 +95,7 @@ export const backtestPreflightDiagnosticV3Schema = z
 export type BacktestPreflightDiagnosticV3 = z.infer<typeof backtestPreflightDiagnosticV3Schema>;
 
 const resultBase = {
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   requestId: text,
   checkedAt: isoDateTime,
 };

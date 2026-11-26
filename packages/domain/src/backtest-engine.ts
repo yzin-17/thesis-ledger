@@ -4,6 +4,15 @@ import {
   type BacktestCorporateActionFact,
 } from './backtest-corporate-actions.js';
 import { DecimalValue } from './decimal.js';
+import { dailyExchangeSimulationSteps } from './backtest-daily-engine.js';
+import { advanceBacktestComputation, finishBacktestComputation, type BacktestComputationOptions } from './backtest-computation.js';
+import type { BacktestDailyMatching, BacktestDailyOrderExecution } from './backtest-order-contract.js';
+import type { BacktestDailyMatchState } from './backtest-daily-matching.js';
+import { BacktestTradePlanRuntime } from './backtest-trade-plan-runtime.js';
+import { activeBacktestTradePlan } from './backtest-trade-plan-contract.js';
+import { tradePlanSizing } from './backtest-trade-plan-sizing.js';
+import type { TradePlanCalendar } from './backtest-trade-plan-calendar.js';
+import type { BacktestSeries } from './backtest-series.js';
 import {
   resolveNormalizedExecutionModelSegment,
   type FrozenExecutionModel,
@@ -13,13 +22,15 @@ import type { SimulationAccountingBasis } from './backtest-normalized-accounting
 import { createExchangeSizingAdapter } from './backtest-sizing-risk-adapter.js';
 import type { SizingInput } from './backtest-sizing.js';
 import {
-  runDeterministicSimulation,
+  DeterministicSimulationEngine,
   type SimulationEngineInput,
   type SimulationFillRecord,
   type SimulationMutationCommand,
   type SimulationMutationDecision,
   type SimulationRunResult,
   type SimulationTargetIntent,
+  type SimulationExpressionContext,
+  type SignalEvaluationResult,
 } from './backtest-simulation.js';
 import type { VersionedExecutionRules } from './execution-rules.js';
 import type {
@@ -35,6 +46,9 @@ export interface ExchangeSimulationRunInput {
   ledger: SimulationLedger;
   accountingBasis: SimulationAccountingBasis;
   exchange: {
+    dailyOrders?: { execution: BacktestDailyOrderExecution; matching: BacktestDailyMatching };
+    tradePlanPrices?: BacktestSeries;
+    tradePlanCalendar?: TradePlanCalendar;
     cashEntitlementFor?: (fact: BacktestCorporateActionFact) => string;
     rules: VersionedExecutionRules;
     calendar: TradingCalendar;
@@ -48,6 +62,8 @@ export interface ExchangeSimulationRunInput {
 }
 
 export interface ExchangeSimulationRunResult extends SimulationRunResult {
+  dailyOrders?: BacktestDailyMatchState;
+  tradePlan?: { memory: ReturnType<BacktestTradePlanRuntime['snapshot']>; diagnostics: string[] };
   ledger: SimulationLedgerState;
   ledgerMutations: readonly LedgerMutationResult[];
 }
@@ -127,15 +143,20 @@ const sellableQuantityAt = (
 };
 
 /** 连接现行事件引擎、单标的 Exchange 与模拟账本。 */
-export const runExchangeSimulation = (
+export function* exchangeSimulationSteps(
   input: ExchangeSimulationRunInput,
-): ExchangeSimulationRunResult => {
+): Generator<void, ExchangeSimulationRunResult, void> {
   assertExchangeSimulationInput(input);
+  if (input.exchange.dailyOrders) return yield* dailyExchangeSimulationSteps(input);
   const { ledger } = input;
+  const config = activeBacktestTradePlan(input.simulation.strategy.tradePlan);
+  if (config && !input.exchange.tradePlanPrices) throw new Error('TRADE_PLAN_PRICE_SOURCE_MISSING');
+  const tradePlan = config ? new BacktestTradePlanRuntime(config, input.exchange.tradePlanPrices!, [...new Set(input.simulation.ticks.map(t => t.occurredAt))], input.accountingBasis === 'raw-events' ? input.exchange.rules.instrumentFact.lotSize : undefined, input.exchange.tradePlanCalendar, intent => sizingInputForIntent(intent, ledger.snapshot())) : undefined;
   const { rules, calendar, bars, costs, executionModel, dataAsOf } = input.exchange;
   const currency = rules.instrumentCurrency;
   const ledgerMutations: LedgerMutationResult[] = [];
   const pendingPositionSettlements = new Map<string, { quantity: string; availableAt: string }>();
+  const pendingEntries = new Set<string>();
   const sizingInputForIntent = (
     intent: SimulationTargetIntent,
     state: SimulationLedgerState,
@@ -174,6 +195,7 @@ export const runExchangeSimulation = (
     };
   };
   const adapter = createExchangeSizingAdapter({
+    ...(tradePlan && config ? { transformSizing: (intent, sizing, result) => tradePlanSizing(config, tradePlan.action(intent), sizing, result) } satisfies Partial<Parameters<typeof createExchangeSizingAdapter>[0]> : {}),
     sizingForIntent: (intent) => sizingInputForIntent(intent, ledger.snapshot()),
     orderDefaults: () => ({
       market: rules.instrumentFact.market,
@@ -247,6 +269,10 @@ export const runExchangeSimulation = (
         fill.availableAt,
       );
       ledgerMutations.push(result);
+      if (result.applied) {
+        pendingEntries.delete(fill.orderId);
+        tradePlan?.accept(fill, result.state.position.quantity, result.realizedPnl);
+      }
       if (!result.applied && plan.cashReservation) {
         ledger.releaseCash(plan.cashReservation.reservationId);
       }
@@ -270,6 +296,7 @@ export const runExchangeSimulation = (
     if (command.type !== 'corporateAction') return;
     const ledgerEvent = (command.payload as unknown as CorporateActionMutation).ledgerEvent;
     if (ledgerEvent.type !== 'split') return;
+    tradePlan?.applySplit(ledgerEvent.payload.ratio);
     const ratio = DecimalValue.from(ledgerEvent.payload.ratio);
     for (const [sourceEventId, settlement] of pendingPositionSettlements) {
       pendingPositionSettlements.set(sourceEventId, {
@@ -292,6 +319,12 @@ export const runExchangeSimulation = (
   };
   const execution = {
     ...adapter.port,
+    toOrder: (intent: SimulationTargetIntent) => {
+      const order = adapter.port.toOrder!(intent);
+      if (intent.side === 'buy') pendingEntries.add(order.orderId);
+      tradePlan?.registerOrder(order.orderId, intent.signalId); return order;
+    },
+    onOrderRejected: (id: string) => { pendingEntries.delete(id); tradePlan?.reject(id); },
     applyMutation: onMutation,
     onMutation: observeMutation,
     scheduledMutationsForFill: (fill: SimulationFillRecord) => {
@@ -316,8 +349,12 @@ export const runExchangeSimulation = (
       }));
     },
   };
-  const result = runDeterministicSimulation({
+  const result = yield* new DeterministicSimulationEngine().steps({
     ...input.simulation,
+    ...(tradePlan ? { selectSignal: (context: SimulationExpressionContext, selection: SignalEvaluationResult) =>
+      tradePlan.select(context, selection, input.simulation.strategy.entryTrigger !== undefined) } : {}),
+    ...(input.simulation.strategy.entryTrigger ? { entryEligible: (context: SimulationExpressionContext) => (input.simulation.entryEligible?.(context) ?? true) && pendingEntries.size === 0 &&
+      DecimalValue.from(ledger.availableCash(currency)).isPositive() } : {}),
     positionStateAt,
     corporateActionPort: createCorporateActionPort(
       ledger,
@@ -332,5 +369,9 @@ export const runExchangeSimulation = (
     ),
     execution,
   });
-  return { ...result, ledger: ledger.snapshot(), ledgerMutations };
-};
+  return { ...result, ledger: ledger.snapshot(), ledgerMutations, ...(tradePlan ? { tradePlan: { memory: tradePlan.snapshot(), diagnostics: tradePlan.diagnostics } } : {}) };
+}
+
+export const runExchangeSimulation = (input: ExchangeSimulationRunInput) => finishBacktestComputation(exchangeSimulationSteps(input));
+export const runExchangeSimulationCooperatively = (input: ExchangeSimulationRunInput, options: BacktestComputationOptions) =>
+  advanceBacktestComputation(exchangeSimulationSteps(input), options);

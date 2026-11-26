@@ -215,7 +215,7 @@ export async function formalizeOptimizationCandidate(
       data: {
         strategyId: candidate.candidateStrategyId,
         version: expectedVersion + 1,
-        schemaVersion: Number(candidateStrategy.schemaVersion),
+        schemaVersion: 1,
         schema: candidateStrategy as Prisma.InputJsonValue,
         source: { kind: 'experiment', referenceId: experimentId },
       },
@@ -261,8 +261,7 @@ function candidateAdoptionStrategy(candidate: CandidateWithFacts) {
   const candidateStrategy = strategySchema.safeParse(candidate.candidateSchema);
   if (
     !candidateStrategy.success ||
-    ![2, 3].includes(candidate.candidateSchemaVersion) ||
-    candidate.candidateSchemaVersion !== Number(candidateStrategy.data.schemaVersion)
+    candidate.candidateSchemaVersion !== 1
   )
     throw adoptionRejected('ADOPTION_NOT_ELIGIBLE', '候选不是可入库的正式策略定义');
   if (optimizationSha256(candidateStrategy.data) !== candidate.executionHash)

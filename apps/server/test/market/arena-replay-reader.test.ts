@@ -8,6 +8,17 @@ import { arenaLiveAccountSchema, type ArenaLiveDecision } from '@thesis-ledger/s
 const at = '2026-11-02T14:31:00.000Z';
 const point = { timestamp: at, availableAt: at, open: 10, high: 10, low: 10, close: 10, volume: 1, amount: 10, completionStatus: 'complete' as const };
 describe('历史观察来源准入', () => {
+  it('显式保护期限扩展历史日历请求，未读取的日期拒绝解析', async () => {
+    const calendars = { read: vi.fn(async () => ({ status: 'ready' as const, calendar: { market: 'US' as const, timezone: 'America/New_York', revision: 'controlled',
+      availableAt: '2026-01-01T00:00:00.000Z', coverageStart: '2026-10-01', coverageEnd: '2026-12-01',
+      sessions: [{ tradingDate: '2026-11-02', startAt: '2026-11-02T14:30:00.000Z', endAt: '2026-11-02T21:00:00.000Z' },
+        { tradingDate: '2026-12-01', startAt: '2026-12-01T14:30:00.000Z', endAt: '2026-12-01T21:00:00.000Z' }] } })) };
+    const reader = new MarketArenaReplayReader(calendars, { readRetainedResearch: vi.fn() }, { backtestInstrumentFacts: vi.fn() }, { readComposition: vi.fn() }, { read: vi.fn() });
+    const read = await reader.observe(liveProtocolFixture(), at, [], [], [], ['2026-12-01']);
+    expect(calendars.read).toHaveBeenCalledWith(expect.objectContaining({ end: '2026-12-01', evaluationAsOf: at }));
+    expect(read.context.expiresAt('2026-12-01', 'stop_loss')).toBe('2026-12-01T21:00:00.000Z');
+    expect(() => read.context.expiresAt('2026-12-02', 'stop_loss')).toThrow('expiry_calendar_unavailable');
+  });
   it('研究价格与可成交证据分别表达，观察不依赖成交规则；真实委托仍拒绝', async () => {
     const calendars = { read: vi.fn(async () => ({ status: 'ready' as const, calendar: { market: 'US' as const, timezone: 'America/New_York', revision: 'controlled',
       availableAt: '2026-01-01T00:00:00.000Z', coverageStart: '2026-10-01', coverageEnd: '2026-12-01',

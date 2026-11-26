@@ -27,7 +27,7 @@ async function readRule() {
     const target = route?.targets.find((t) => t.routeIndex === 0);
     if (!policy?.enabled || !target?.eligible || target.providerId !== 'local-materials')
       throw Object.assign(new Error('当前主规则来源未就绪或已变化'), { sourceReason: 'configured_rule_source_unavailable' });
-    request = { contractVersion: 3, consumer: 'thesis-ledger', requestId: crypto.randomUUID(), symbol,
+    request = { contractVersion: 1, consumer: 'thesis-ledger', requestId: crypto.randomUUID(), symbol,
       routeKey: route.key, routeTarget: { providerId: target.providerId, upstreamSource: target.upstreamSource, routeIndex: 0 },
       range: { start: day, end: day } };
     receipt.dataReads = 1;

@@ -25,7 +25,7 @@ const catalog = (
   integrity: MarketRouteCatalogV3['integrity'],
   entries: MarketRouteCatalogV3['entries'] = [readyEntry],
 ): MarketRouteCatalogV3 => ({
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   catalogRevision: 12,
   generatedAt: '2026-09-25T04:00:00.000Z',
@@ -34,7 +34,7 @@ const catalog = (
 });
 
 describe('MarketRouteCatalogReadV3', () => {
-  it('publishes a stable no-store GET route and requires contractVersion 3', async () => {
+  it('publishes a stable no-store GET route and requires the current capability catalog version', async () => {
     const control = { routeCapabilitiesV3: vi.fn(async () => ({ status: 'complete' })) };
     const controller = new MarketDataController(control as never, {} as never, {} as never);
     const handler = MarketDataController.prototype.routeCapabilities;
@@ -42,11 +42,11 @@ describe('MarketRouteCatalogReadV3', () => {
     expect(Reflect.getMetadata('path', MarketDataController)).toBe('api/market-data');
     expect(Reflect.getMetadata('path', handler)).toBe('routes/capabilities');
     expect(Reflect.getMetadata('method', handler)).toBe(RequestMethod.GET);
-    await expect(controller.routeCapabilities('3')).resolves.toEqual({ status: 'complete' });
+    await expect(controller.routeCapabilities('1')).resolves.toEqual({ status: 'complete' });
     expect(control.routeCapabilitiesV3).toHaveBeenCalledOnce();
 
-    expect(() => controller.routeCapabilities()).toThrow('contractVersion 必须为 3');
-    expect(() => controller.routeCapabilities('2')).toThrow('contractVersion 必须为 3');
+    expect(() => controller.routeCapabilities()).toThrow('contractVersion 必须为 1');
+    expect(() => controller.routeCapabilities('3')).toThrow('contractVersion 必须为 1');
     expect(control.routeCapabilitiesV3).toHaveBeenCalledOnce();
   });
 
@@ -59,7 +59,7 @@ describe('MarketRouteCatalogReadV3', () => {
     const service = new MarketControlService(prisma as never, dsa as never);
 
     await expect(service.routeCapabilitiesV3()).resolves.toEqual({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       status: 'complete',
       catalogRevision: 12,
@@ -102,7 +102,7 @@ describe('MarketRouteCatalogReadV3', () => {
     const result = await new MarketControlService({} as never, dsa as never).routeCapabilitiesV3();
 
     expect(result).toEqual({
-      contractVersion: 3,
+      contractVersion: 1,
       consumer: 'thesis-ledger',
       status: 'unavailable',
       catalogRevision: null,

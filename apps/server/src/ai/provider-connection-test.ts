@@ -2,7 +2,6 @@ import { buildGenerationSchemaPrompt, assertGenerationSchemaPrompt } from './ai-
 import { randomUUID } from 'node:crypto';
 import {
   aiGenerationContracts,
-  researchGenerationV2Contract,
   type AiAdapter,
   type AiAuthMode,
   type AiGenerationContractRef,
@@ -30,6 +29,7 @@ import { aiRouteReasoningFields } from './ai-route-reasoning-options.js';
 import type { ReasoningEffort } from './ai-provider.contracts.js';
 import { authoringConnectionProbe } from './authoring-connection-probe.js';
 import { researchConnectionProbe } from './research-connection-probe.js';
+import { strategyDiscoveryConnectionProbe } from './strategy-discovery-connection-probe.js';
 
 const connectionProbeSchema = z.object({ ok: z.literal(true) }).strict();
 const CONNECTION_PROBE_MAX_OUTPUT_TOKENS = 1_024;
@@ -73,7 +73,7 @@ const contractForPurpose = (
   reference?: AiGenerationContractRef,
 ) => {
   if (reference !== undefined) {
-    const selected = [...Object.values(aiGenerationContracts), researchGenerationV2Contract].find(
+    const selected = Object.values(aiGenerationContracts).find(
       (contract) => contract.ref.id === reference.id && contract.ref.version === reference.version,
     );
     if (!selected || reference.id !== purpose)
@@ -106,7 +106,7 @@ export const probeMessages = (
   const contract = contractForPurpose(purpose, reference);
   if (purpose === undefined)
     return [{ role: 'user', content: 'Return exactly this JSON object: {"ok":true}.\n' + buildGenerationSchemaPrompt(connectionProbeSchema) }];
-  const example = authoringConnectionProbe(purpose) ?? researchConnectionProbe(contract.ref);
+  const example = authoringConnectionProbe(purpose) ?? researchConnectionProbe(contract.ref) ?? strategyDiscoveryConnectionProbe(purpose);
   if (example)
     return [
       {

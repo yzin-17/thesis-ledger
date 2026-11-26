@@ -2,7 +2,11 @@
 
 ## 备份与恢复
 
-`bash scripts/backup-db.sh [目录]` 使用 `pg_dump --format=custom` 生成带应用版本和 UTC 时间的备份，并写入 SHA-256 校验文件。`bash scripts/restore-db.sh <文件.dump>` 会先校验 checksum，再恢复到 `DATABASE_URL`，执行 Prisma migration，最后运行 integrity check 与核心 E2E。生产恢复前必须停写、保留当前数据库快照并记录 traceId；脚本不会自动删除未知目标数据库。
+`bash scripts/backup-db.sh [目录]` 使用 `pg_dump --format=custom` 生成带应用版本和 UTC 时间的备份，并写入 SHA-256 校验文件。`bash scripts/restore-db.sh <文件.dump>` 默认只检查 checksum、归档预期表及 `DATABASE_URL` 的实际数据库/owner，输出预检报告，不写入数据库。依赖 Node.js 24、`pg_restore` 和 `psql`，具体合同见[数据库工具说明](../../scripts/database/README.md)。
+
+显式恢复必须先保留目标当前快照，经正式维护入口停止 Server、全部 Worker 及其他消费者，再执行 `bash scripts/restore-db.sh <文件.dump> --apply --confirm-database <实际数据库名> --confirm-owner <实际owner>`。连接用户必须为数据库 owner；未精确确认或仍有其他连接时拒绝恢复。仅接受与当前源码结构一致的可信备份，替换备份内的 `public` 对象和数据；恢复与 Prisma/raw-owned 全表及当前 SchemaVersion 检查位于同一事务，错误会整体回滚。
+
+脚本不执行 Prisma migration、应用 integrity check 或核心 E2E，不自动停止消费者、不操作 Docker volume。恢复后应按对应运维任务独立验证应用角色权限、Server/Worker、队列、健康与业务功能，再决定恢复服务；结构通过不能代替这些验收。历史版本升级和正式发布的保留数据迁移需要另行准备兼容、备份与回滚流程。
 
 备份保留策略由部署环境设置：至少保留最近 7 个日备份、4 个周备份和 3 个版本备份。DSA 镜像使用 `DSA_VERSION` 标签，应用与 migration 版本必须一起记录；出现兼容问题时先回滚应用到上一版本，再按 migration 兼容矩阵恢复数据。
 

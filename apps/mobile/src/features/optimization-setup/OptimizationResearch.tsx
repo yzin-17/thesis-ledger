@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { backtestStrategyPlanReadback } from '@thesis-ledger/domain';
 import { useQuery } from '@tanstack/react-query';
 import {
   optimizationModelResolutionRequestSchema,
@@ -38,10 +39,10 @@ export function useOptimizationResearch(input: {
     adopted?.id === input.versionId
       ? adopted
       : owner?.versions.find((version) => version.id === input.versionId);
-  const ready = input.source === 'discovery' || version?.schema?.schemaVersion === '3';
+  const ready = input.source === 'discovery' || isPriceResearchStrategyDefinition(version?.schema);
   const parsed = strategySchema.safeParse(version?.schema);
   const projection =
-    parsed.success && !ready ? projectPriceResearchStrategy(parsed.data as BacktestStrategy) : null;
+    parsed.success && !ready && (parsed.data as BacktestStrategy).execution.mode === 'exchange' ? projectPriceResearchStrategy(parsed.data as BacktestStrategy) : null;
   let discoveryScope: unknown;
   try {
     discoveryScope = JSON.parse(input.discovery);
@@ -80,10 +81,12 @@ export function useOptimizationResearch(input: {
   );
   return {
     ready,
+    dailyOrders: input.source === 'existing' && parsed.success && (parsed.data as BacktestStrategy).execution.timing === 'dailyBarOrders',
     model,
     adopt,
     requestValid: request.success,
     summary: projection ? priceResearchStrategySummary(projection) : null,
+    readback: projection ? backtestStrategyPlanReadback(projection) : [],
   };
 }
 
@@ -99,9 +102,7 @@ export function OptimizationResearchChoice({
       <Section title="确认策略的研究口径">
         {value.summary && (
           <>
-            <Copy>入场：{value.summary.entry}</Copy>
-            <Copy>退出：{value.summary.exit}</Copy>
-            <Copy>投入：{value.summary.sizing}</Copy>
+            {value.readback.map(line => <Copy key={line}>{line}</Copy>)}
           </>
         )}
         <Action
@@ -141,3 +142,4 @@ export function OptimizationResearchChoice({
     </Section>
   );
 }
+import { isPriceResearchStrategyDefinition } from '@thesis-ledger/domain';

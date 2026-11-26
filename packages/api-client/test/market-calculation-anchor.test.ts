@@ -8,7 +8,7 @@ it('规划使用同一市场截止日，detail保留精确锚点', async () => {
     if (url.pathname.endsWith('/chart-options'))
       return new Response(
         JSON.stringify({
-          contractVersion: 3,
+          contractVersion: 1,
           symbol: '159516.SZ',
           mode: 'v3',
           window: { start: '2025-01-01', end: '2026-11-04' },
@@ -22,7 +22,7 @@ it('规划使用同一市场截止日，detail保留精确锚点', async () => {
       );
     return new Response(
       JSON.stringify({
-        contractVersion: 3,
+        contractVersion: 1,
         symbol: '159516.SZ',
         assetType: 'ETF',
         identity: { source: 'asset', status: 'confirmed' },
@@ -40,7 +40,7 @@ it('规划使用同一市场截止日，detail保留精确锚点', async () => {
   await requestPlannedMarketDetail(client.market, {
     symbol: '159516.SZ',
     include: ['bars'],
-    chartContractVersion: 3,
+    chartContractVersion: 1,
     barsLimit: 180,
     calculationAnchor: anchor,
   });

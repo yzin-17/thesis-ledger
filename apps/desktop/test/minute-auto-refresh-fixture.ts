@@ -37,7 +37,7 @@ export async function requestMarketDetail(
     ],
   };
   const series = {
-    contractVersion: 3 as const,
+    contractVersion: 1 as const,
     identity: {
       symbol: input.symbol,
       assetType: 'STOCK' as const,
@@ -77,7 +77,7 @@ export async function requestMarketDetail(
     inputFingerprint: `controlled-${fixture.chartSequence}`,
   };
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     symbol: input.symbol,
     assetType: 'STOCK',
     identity: { source: 'asset', status: 'confirmed' },
@@ -92,7 +92,7 @@ export async function requestMarketDetail(
         capability: 'quote',
         status: 'ready',
         data: {
-          version: 3,
+          version: 1,
           symbol: input.symbol,
           price,
           open: 43,

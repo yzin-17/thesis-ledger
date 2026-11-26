@@ -5,7 +5,7 @@ import type { MarketPolicyDraftV3 } from './market-data.types.js';
 export function configuredPolicyDraftV3(policy: MarketPolicyDraftV3): MarketPolicyDraftV3 {
   const routes = policy.enabled ? policy.routes.filter((route) => route.enabled !== false) : [];
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     revision: policy.revision,
     enabled: true,
     routes: routes

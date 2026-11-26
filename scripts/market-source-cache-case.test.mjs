@@ -4,7 +4,7 @@ import { createSourceCacheCase, executeSourceCacheCase } from './market-source-c
 import { cacheRouteKey } from './market-cache-generation-case.mjs';
 
 function fixture() {
-  const policy = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'base', revision: 97,
+  const policy = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'base', revision: 97,
     enabled: true, syncState: 'applied', effectiveStale: false, dsaRevision: 97,
     routes: [{ key: cacheRouteKey, targets: [{ providerId: 'hithink', upstreamSource: 'a-share-prices-snapshot' }] }] };
   const source = { providerId: 'hithink', enabled: true, credentialConfigured: true, configVersion: 5 };

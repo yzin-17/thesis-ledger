@@ -66,8 +66,8 @@ const protocol = {
 };
 export const researchResult = backtestResultSchemaV3.parse({
   source: 'BACKTEST',
-  schemaVersion: '3',
-  snapshotVersion: 'snapshot-manifest-v3',
+  schemaVersion: 'backtest-trade-result-v1',
+  snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
   runId: '33333333-3333-4333-8333-333333333333',
   strategyVersionId: researchVersion.id,
   snapshotId: manifest.contentHash,
@@ -118,7 +118,7 @@ export const researchResult = backtestResultSchemaV3.parse({
 export const researchJob = {
   id: researchResult.runId,
   strategyVersionId: researchVersion.id,
-  mode: 'V3',
+  mode: 'frozen',
   status: 'succeeded',
   readEligibility: {
     state: 'readable',

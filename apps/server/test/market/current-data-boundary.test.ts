@@ -12,7 +12,7 @@ const cases = [
     symbol: equity,
     key: quoteControlCacheKey(equity),
     value: {
-      version: 3,
+      version: 1,
       symbol: equity,
       open: 10,
       high: 11,
@@ -33,7 +33,7 @@ const cases = [
     symbol: fund,
     key: `fund-nav:4:${fund}:${quoteControlGeneration}`,
     value: {
-      version: 3,
+      version: 1,
       symbol: fund,
       unitNav: 1.1,
       navDate: now,
@@ -47,7 +47,7 @@ const cases = [
     symbol: fund,
     key: `fund-holdings:4:${fund}:${quoteControlGeneration}`,
     value: {
-      version: 3,
+      version: 1,
       fundSymbol: fund,
       reportPeriod: '2026-Q3',
       disclosureDate: null,
@@ -62,7 +62,7 @@ const cases = [
     symbol: equity,
     key: `chip:4:${equity}:${quoteControlGeneration}`,
     value: {
-      version: 3,
+      version: 1,
       symbol: equity,
       averageCost: 10,
       profitRatio: 0.5,
@@ -108,7 +108,7 @@ describe('当前 Data 缓存与旧事实边界', () => {
       await expect(h.read(item)).rejects.toThrow();
     }
     const h = harness(new Map([[key, JSON.stringify(item.value)]]));
-    await expect(h.read(item)).resolves.toMatchObject({ version: 3, servedFromCache: true });
+    await expect(h.read(item)).resolves.toMatchObject({ version: 1, servedFromCache: true });
     expect(h.dsa.get).not.toHaveBeenCalled();
   });
 
@@ -122,7 +122,7 @@ describe('当前 Data 缓存与旧事实边界', () => {
       }
       const h = harness(new Map([[key, JSON.stringify(item.value)]]));
       await expect(h.read(item, true)).resolves.toMatchObject({
-        version: 3,
+        version: 1,
         servedFromCache: true,
       });
     },

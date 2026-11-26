@@ -15,7 +15,6 @@ import {
   aiProviderExecutionRouteDraftFromConfig,
   aiProviderExecutionRouteInputFromDraft,
 } from '../src/features/providers/ai-provider-execution.js';
-import { AiProviderResearchVersionField } from '../src/features/providers/AiProviderResearchVersionField.js';
 import { withAiProviderModels } from '../src/features/providers/ai-provider-model-selection.js';
 import { saveWithValidation } from '../src/features/providers/ai-provider-validated-save.js';
 import { useAiProviderEditor } from '../src/features/providers/useAiProviderEditor.js';
@@ -38,25 +37,20 @@ const draft = () => ({
 });
 
 describe('模型请求参数的父级草稿', () => {
-  it('V2用途在普通编辑往返中保留，研究版本可显式选择', () => {
+  it('普通编辑往返保留现行研究生成合同，旧合同不能保存', () => {
     const stored = {
       model: 'm',
       mode: 'json_mode' as const,
-      contract: { id: 'research' as const, version: 'research-generation-v2' as const },
+      contract: { id: 'research' as const, version: 'research-report-generation-v1' as const },
     };
     const value = aiProviderExecutionRouteDraftFromConfig(stored);
     expect(aiProviderExecutionRouteInputFromDraft(value).contract).toEqual(stored.contract);
-    expect(
+    expect(() =>
       aiProviderExecutionRouteInputFromDraft({
         ...value,
-        contractVersion: 'research-generation-v1',
-      }).contract.version,
-    ).toBe('research-generation-v1');
-    const html = renderToStaticMarkup(
-      <AiProviderResearchVersionField route={value} onChange={() => undefined} />,
-    );
-    expect(html).toContain('证据研究 V2');
-    expect(html).not.toContain('>research-generation-v2<');
+        contractVersion: 'research-generation-v2',
+      }),
+    ).toThrow();
   });
   it('保存／重开回显参数，修改其他默认字段保持原参数', () => {
     const input = aiProviderInputFromDraft(draft());

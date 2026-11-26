@@ -72,7 +72,7 @@ export async function runCompositionBusiness(api, post, input, journal, pause = 
   await journal({ phase: 'prepared_response', preparation: prepared });
   assert.equal(prepared.status, 'prepared', '原准备未通过，保留结果并恢复政策');
   assert.deepEqual(prepared.runConfig.executionModel, input.intent.runConfig.executionModel);
-  const body = backtestRunCreateSchemaV3.parse({ contractVersion: 3, strategyVersionId,
+  const body = backtestRunCreateSchemaV3.parse({ contractVersion: 1, strategyVersionId,
     runConfig: prepared.runConfig, preparationStamp: prepared.executionPreflight.revisionStamp,
     idempotencyKey: `unified-composition-${randomUUID()}` });
   await journal({ phase: 'run_submission_prepared', idempotencyKey: body.idempotencyKey });
@@ -93,7 +93,7 @@ async function main() {
   const args = process.argv.slice(2), origin = localOrigin(process.env.API_BASE_URL ?? 'http://127.0.0.1:3000');
   const api = createLocalApi(origin);
   const [state, providers, catalog] = await Promise.all([api.get('/api/market-data/policy'),
-    api.get('/api/market-data/providers'), api.get('/api/market-data/routes/capabilities?contractVersion=3')]);
+    api.get('/api/market-data/providers'), api.get('/api/market-data/routes/capabilities?contractVersion=1')]);
   const plan = createCompositionCase(state, providers.providers, catalog);
   let input = await createCompositionTargetInput();
   const resumeIndex = args.indexOf('--resume-record');

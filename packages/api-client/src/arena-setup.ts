@@ -1,4 +1,5 @@
 import {
+  arenaHistoricalProtocolVersion,
   arenaProtocolSchema,
   type ArenaProtocol,
   type AiProviderRecord,
@@ -120,7 +121,7 @@ export function validateArenaSetup(
   const market = instruments[0] ? arenaChoiceMarket(instruments[0].symbol) : 'CN';
   const currency = { CN: 'CNY', HK: 'HKD', US: 'USD' }[market];
   const raw = {
-    version: 1,
+    version: arenaHistoricalProtocolVersion,
     title: f.title,
     market,
     currency,

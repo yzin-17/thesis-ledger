@@ -1,5 +1,6 @@
 import type { StrategyBacktestGroupPage } from './strategy-optimization.api.js';
 import type { BacktestJobSummary } from './strategy.types.js';
+import { isBacktestRunUpdateOlder } from '@thesis-ledger/domain';
 
 export function applyBacktestGroupEvent(current: unknown, incoming: BacktestJobSummary): unknown {
   if (!current || typeof current !== 'object' || !('items' in current)) return current;
@@ -9,7 +10,7 @@ export function applyBacktestGroupEvent(current: unknown, incoming: BacktestJobS
     ...page,
     items: page.items.map((group) => ({
       ...group,
-      jobs: group.jobs.map((job) => (job.id === incoming.id ? { ...job, ...incoming } : job)),
+      jobs: group.jobs.map((job) => (job.id === incoming.id && !isBacktestRunUpdateOlder(job, incoming) ? { ...job, ...incoming } : job)),
     })),
   };
 }

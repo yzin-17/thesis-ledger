@@ -17,7 +17,7 @@ import { TradeQueryService } from '../ledger/trade-query.service.js';
 import { journalReviewAssociation, journalReviewNoteView } from './journal-review-association.js';
 import { journalReviewCandidate } from './journal-review-candidate.js';
 import { journalReviewPage } from './journal-review-page.js';
-import { journalReviewLegacy } from './journal-review-legacy.js';
+import { journalUnlinkedReviews } from './journal-review-unlinked.js';
 import { journalReviewEvidenceFingerprint } from './journal-review-evidence.js';
 
 function snapshotFingerprints(rows: readonly JournalReviewSnapshot[]) {
@@ -109,7 +109,7 @@ export class JournalReviewQuery {
           })
         : await Promise.all([planRequest, entryRequest, snapshotRequest]);
     const fingerprints = snapshotFingerprints(snapshots);
-    const legacyItems = journalReviewLegacy({
+    const unlinkedItems = journalUnlinkedReviews({
       accountId: query.accountId,
       mode: query.mode,
       ...(query.symbol === undefined ? {} : { symbol: query.symbol }),
@@ -118,8 +118,8 @@ export class JournalReviewQuery {
         .filter((row) => row.accountId === query.accountId)
         .map(journalReviewNoteView),
     });
-    const legacyEntryIds = new Set(
-      legacyItems
+    const unlinkedEntryIds = new Set(
+      unlinkedItems
         .filter((row) => row.reason === 'SELL_MAPPING_AMBIGUOUS')
         .map((row) => row.journalEntry.id),
     );
@@ -137,7 +137,7 @@ export class JournalReviewQuery {
       const association = journalReviewAssociation({
         trade,
         plans,
-        entries: entries.filter((row) => !legacyEntryIds.has(row.id)),
+        entries: entries.filter((row) => !unlinkedEntryIds.has(row.id)),
       });
       return [undefined, ...trade.closeSlices.map((row) => row.id)].map((closeSliceId) => {
         const reference = journalReviewObjectReference(trade, closeSliceId);
@@ -181,14 +181,14 @@ export class JournalReviewQuery {
         errorCode: 'PROJECTION_GENERATION_CONFLICT',
         message: '复盘投影已更新，请刷新后重试',
       });
-    return { candidates, query, version: projection.version, legacyItems };
+    return { candidates, query, version: projection.version, unlinkedItems };
   }
 
   async list(raw: unknown) {
     const loaded = await this.load(raw);
     return {
       ...journalReviewPage(loaded.candidates, loaded.query, loaded.version),
-      legacyItems: loaded.legacyItems,
+      unlinkedItems: loaded.unlinkedItems,
     };
   }
 

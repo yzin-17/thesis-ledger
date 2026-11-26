@@ -75,7 +75,7 @@ if (!process.argv.includes('--run')) {
     if (index < 0) routes.push(next); else routes[index] = next;
   }
   const writePolicy = (revision, selected) => api('/api/market-data/policy', {
-    contractVersion: 3, consumer: 'thesis-ledger', requestId: randomUUID(), revision,
+    contractVersion: 1, consumer: 'thesis-ledger', requestId: randomUUID(), revision,
     enabled: policy.enabled, routes: selected,
   }, 'PUT');
   let attempted = false;
@@ -96,7 +96,7 @@ if (!process.argv.includes('--run')) {
     console.error(JSON.stringify({ stage: 'prepared', response: prepared }));
     assert.equal(prepared.status, 'prepared');
     const created = await api('/api/v1/backtests/runs', backtestRunCreateSchemaV3.parse({
-      contractVersion: 3, strategyVersionId, runConfig: prepared.runConfig,
+      contractVersion: 1, strategyVersionId, runConfig: prepared.runConfig,
       preparationStamp: prepared.executionPreflight.revisionStamp, idempotencyKey: `p6-us-shares-${randomUUID()}`,
     }));
     console.error(JSON.stringify({ stage: 'queued', jobId: created.id }));

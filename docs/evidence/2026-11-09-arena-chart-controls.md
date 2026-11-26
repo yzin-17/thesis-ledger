@@ -1,6 +1,6 @@
 # 模型点位下拉框与空心箭头验证
 
-对应[规格](../specs/2026-11-09-arena-chart-controls.md)及[当前任务](../tasks/2026-11-09-arena-chart-controls.md)。本轮仅修改 Desktop 共享展示，不写业务数据、不调用模型、不更新服务端。
+对应[规格](../specs/2026-11-09-arena-chart-controls.md)及[归档任务](../archive/tasks/2026-11-09-arena-chart-controls.md)。本任务的应用写集在 Desktop，使用目标竞技场只读接口和冻结行情。
 
 ## 已实现行为
 
@@ -31,4 +31,8 @@
 
 `ArenaPriceLayer.tsx` 及其测试、新增 `ArenaPointDetails.tsx`、`market-trading-overlay-resources.ts` 及其测试、新增 `market-arena-marker-primitive.ts` 及其测试，以及本 Spec/Task/证据。成交明细本次仅变更前三个文件与对应文档；已检查共享资源的股票/ETF 和基金净值消费者，基金不提供模型点位，不会分配新增标记资源。原有未提交修改保留，未提交 Git 变更。
 
-本轮完成展示实施与本地验证；四宽实际浏览器验收仍由任务 C3 持有，不能据此宣布视觉验收完成。历史回放的真实成交及接口证据继续沿用[独立记录](2026-11-09-cmb-historical-arena-replay.md)，不重新生成或改写成交。
+## 2026-11-22 实际浏览器收尾
+
+- 浏览器定位到交叉线事件可在坐标重算后、画布重绘前到达，此时原实现清除了文字的命中区，悬浮提示可能立即消失。用同一文字宽度在布局阶段重算命中区，画布采用相同边界。窄屏右边缘的买卖文字保持完整，箭头仍锚定原价格和交易日。移出视口的点位不绘制。对照样本继续验证箭头尺寸、买卖方向及颜色。
+- 390 宽长比赛名原先把标的弹窗内的图表撑宽，已将交易点位区域的网格限制在可用宽度。受控 50 笔样本通过两方向箭头、长名称、窄屏视口、弹层内滚动、零笔日期及查看全部。组件回归覆盖重复日期、精度、退出弹层及清除筛选。
+- 当前应用用 Playwright Chromium 通过四宽的[招商银行真实回放](2026-11-09-cmb-historical-arena-replay.md#2026-11-22-实际浏览器验收)。主仓根目录执行 `node .recovery-artifacts/arena-closeout-20261122/desktop.mjs` 退出 0。回执及截图位于同目录的 `cmb-final-verified.log`、`cmb-*-detail.png`、`cmb-*-hover.png`、`cmb-*-round.png` 和 `controlled-390-long-list.png`。最终四文件定向 29 项、修改文件 ESLint、Desktop 类型／构建及仓库边界与依赖门禁通过。C3 完成。

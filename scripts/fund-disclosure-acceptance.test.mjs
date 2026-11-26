@@ -20,7 +20,7 @@ import {
 
 const requestId = '11111111-1111-4111-8111-111111111111';
 const state = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId,
   revision: 158,
@@ -158,11 +158,11 @@ const qualifiedSource = () => {
       holdings: { ...holdings, servedFromCache: false },
       observations: [
         {
-          path: '/api/v3/thesis-ledger/market/fund-nav?symbol=161725.OF',
+          path: '/api/v1/thesis-ledger/market/fund-nav?symbol=161725.OF',
           raw: structuredClone(nav),
         },
         {
-          path: '/api/v3/thesis-ledger/market/fund-holdings?symbol=161725.OF',
+          path: '/api/v1/thesis-ledger/market/fund-holdings?symbol=161725.OF',
           raw: structuredClone(holdings),
         },
       ],

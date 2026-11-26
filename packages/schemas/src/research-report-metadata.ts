@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const reportMetadataEndpoint = '/api/v3/thesis-ledger/market/research-report-metadata';
+export const reportMetadataEndpoint = '/api/v1/thesis-ledger/market/research-report-metadata';
 const symbol = z.string().regex(/^[0-9]{6}\.(SH|SZ)$/);
 const text = z.string().min(1);
 const optionalDate = z.iso.date().nullable().optional().default(null);
@@ -8,13 +8,13 @@ const orderedDates = (value: { start: string | null; end: string | null }) =>
   value.start === null || value.end === null || value.start <= value.end;
 
 export const reportMetadataCurrentRevisions = {
-  metadataVersion: 'research-report-metadata-v2',
+  metadataVersion: 'market-external-report-metadata-v1',
   adapterRevision: 'eastmoney-report-metadata-page-v2',
   sourceRevision: 'eastmoney-report-list-single-page-v2',
 } as const;
 
 export const reportMetadataRequestSchema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   requestId: text.max(128),
   symbol,
@@ -40,10 +40,10 @@ export const reportMetadataItemSchema = z.strictObject({
 });
 
 export const reportMetadataPageSchema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   capability: z.literal('RESEARCH_REPORT_METADATA'),
-  metadataVersion: z.enum(['research-report-metadata-v1', 'research-report-metadata-v2']),
+  metadataVersion: z.literal(reportMetadataCurrentRevisions.metadataVersion),
   adapterRevision: text,
   sourceRevision: text,
   requestId: text.max(128),
@@ -65,8 +65,7 @@ export const reportMetadataPageSchema = z.strictObject({
   const pages = Math.ceil(page.totalItems / page.pageSize);
   const expectedRows = Math.max(0, Math.min(page.pageSize, page.totalItems - (page.page - 1) * page.pageSize));
   if ((page.totalPages !== pages && !(page.totalItems === 0 && page.totalPages === 1))
-    || page.items.length !== expectedRows || !orderedDates(page)
-    || (page.metadataVersion === 'research-report-metadata-v1' && (page.start === null || page.end === null))) {
+    || page.items.length !== expectedRows || !orderedDates(page)) {
     context.addIssue({ code: 'custom', message: '研报分页总数、页内条数或窗口不一致' });
   }
   const ids = new Set(page.items.map((item) => item.sourceReportId));

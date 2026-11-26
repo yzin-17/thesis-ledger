@@ -49,7 +49,7 @@ async function run(browser, width, version, schemas) {
       actualPriceSource.routeKey.adjustment = 'none';
       actualPriceSource.provenance = { ...actualPriceSource.provenance, providerId: 'hithink', upstreamSource: 'hithink-financial-api', routeIndex: 1 };
       const prepared = {
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: intent.requestId,
         checkedAt: new Date().toISOString(),
         scope: 'baseline-window',

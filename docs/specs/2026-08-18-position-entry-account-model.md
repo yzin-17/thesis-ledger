@@ -12,7 +12,7 @@
 
 账户模型还把 `shadow` 与证券、基金、现金放在同一类型枚举中，无法表达影子证券账户等组合。基金账户缺少独立净值契约，持仓草稿需要可靠的并发冲突基线。
 
-正式 DSA Fork 位于三仓工作区的同级仓库 `daily-stock-analysis`。本功能遵循 ADR-014 的仓库边界，由正式 DSA Data/Control V3 合同提供基金净值能力。
+正式 DSA Fork 位于三仓工作区的同级仓库 `daily-stock-analysis`。本功能遵循 ADR-014 的仓库边界，由正式 DSA `dsa-data-v1` 合同提供基金净值能力。
 
 ## 目标
 
@@ -111,7 +111,7 @@ Import Draft 保存 Ledger 基线与草稿修订。提交携带打开草稿时�
 
 ### `daily-stock-analysis`
 
-- 通过 `/api/v3/thesis-ledger` Data/Control V3 合同提供 `FUND_NAV`、`FUND_NAV_HISTORY`；当前净值入口为 `GET /market/fund-nav?symbol=000001.OF`，历史入口为 `GET /market/fund-nav/history`。
+- 通过 `/api/v1/thesis-ledger` 下的 `dsa-data-v1` 合同提供 `FUND_NAV`、`FUND_NAV_HISTORY`；当前净值入口为 `GET /market/fund-nav?symbol=000001.OF`，历史入口为 `GET /market/fund-nav/history`。
 - 使用真实基金净值 Provider，返回稳定的来源、净值日期、抓取时间和结构化错误。
 - 提供确定性 fixture、接口测试、能力声明、Contract 文档和 `docs/CHANGELOG.md` 更新；不改写 DSA 原生 API。
 
@@ -119,7 +119,7 @@ Import Draft 保存 Ledger 基线与草稿修订。提交携带打开草稿时�
 
 - 锁定兼容的主系统镜像、DSA 镜像和数据库迁移版本。
 - 同级源码开发通过显式 override 开启；生产使用不可变镜像 digest。
-- 启动与发布门禁分别检查主系统版本、完整 migration 派生的数据库结构 head，以及 DSA Data/Control V3、运行配置和所需净值能力。
+- 启动与发布门禁分别检查主系统版本、完整 migration 派生的数据库结构 head，以及 `dsa-data-v1` 和 `dsa-control-v1`、运行配置和所需净值能力。
 
 ## API 与兼容性
 

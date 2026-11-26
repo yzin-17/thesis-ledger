@@ -113,7 +113,7 @@ export function NavBacktestJobsTable({ runs }: { runs: BacktestNavRunSummaryV3[]
                   <TableCell>
                     <div className="flex flex-col items-start gap-1">
                       <Badge variant={run.status === 'failed' ? 'destructive' : 'secondary'}>
-                        {statusLabel(run.status)}
+                        {jobStatusLabel(run.status, run.cancelRequestedAt)}
                       </Badge>
                       {run.status === 'queued' || run.status === 'running' ? (
                         <span className="text-xs text-muted-foreground">
@@ -149,21 +149,9 @@ export function NavBacktestJobsTable({ runs }: { runs: BacktestNavRunSummaryV3[]
   );
 }
 
-function statusLabel(status: BacktestNavRunSummaryV3['status']) {
-  if (status === 'queued') return '排队中';
-  if (status === 'running') return '运行中';
-  if (status === 'succeeded') return '已完成';
-  if (status === 'failed') return '失败';
-  return '已取消';
-}
-
-function stageLabel(stage: string | null) {
-  if (!stage || stage === 'queued') return '等待执行';
-  if (stage === 'loading-snapshot') return '准备运行数据';
-  if (stage === 'executing') return '模拟申购与赎回';
-  if (stage === 'persisting-result') return '整理回测结果';
-  return '正在运行';
-}
+import { backtestStageDisplay } from '@thesis-ledger/domain';
+import { jobStatusLabel } from './backtest-status.js';
+const stageLabel = backtestStageDisplay;
 
 function errorText(error: unknown, fallback: string) {
   if (error instanceof Error && error.message.trim()) return error.message;

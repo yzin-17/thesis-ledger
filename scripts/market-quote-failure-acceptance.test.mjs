@@ -22,7 +22,7 @@ test('维护故障模块与原目标驱动拼接语法有效，独立进程绑�
   assert.equal(check.status, 0, check.stderr);
   const isolated = quoteFailureProcessSource(`import assert from 'node:assert/strict';
     const proof={injected:0}; const read=quoteFaultFetch(()=>assert.fail('不能发送真实HTTP'),proof);
-    const response=await read('http://dsa/api/v3/thesis-ledger/market/quote?symbol=600519.SH');
+    const response=await read('http://dsa/api/v1/thesis-ledger/market/quote?symbol=600519.SH');
     assert.equal(response.status,503);assert.equal(proof.injected,1);`);
   const result = spawnSync(process.execPath, ['--input-type=module', '-e', isolated], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);

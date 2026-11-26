@@ -30,7 +30,7 @@ const fixture = (name: string) =>
   );
 const request = () =>
   backtestRunPreparationRequestV3Schema.parse({
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'prepare-1',
     strategyVersionId: '11111111-1111-4111-8111-111111111111',
     adjustment: 'none',
@@ -52,7 +52,7 @@ const request = () =>
     },
   });
 const blocked = () => ({
-  contractVersion: 3,
+  contractVersion: 1,
   requestId: 'prepare-1',
   checkedAt: '2026-09-11T00:00:00Z',
   scope: 'execution-window',
@@ -84,8 +84,8 @@ const result = () => {
     strategyVersionId: 'version',
     snapshotId: 'snapshot',
     engineVersion: 'v3',
-    schemaVersion: '3',
-    snapshotVersion: 'snapshot-manifest-v3',
+    schemaVersion: 'backtest-trade-result-v1',
+    snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
     marketRuleVersion: 'v1',
     calendarVersion: 'v1',
     aggregationVersion: 'v1',
@@ -106,7 +106,7 @@ const result = () => {
 
 describe('公告自动准备展示', () => {
   it('公告获取中返回进度，不提前运行预检，中文状态展示不增加按钮', async () => {
-    const pending = { contractVersion: 3, requestId: 'prepare-1', checkedAt: '2026-09-11T00:00:00Z',
+    const pending = { contractVersion: 1, requestId: 'prepare-1', checkedAt: '2026-09-11T00:00:00Z',
       scope: 'execution-window', status: 'preparing', announcementPreparation: {
         status: 'preparing', jobIds: ['a'.repeat(64)], total: 2, completed: 1, failed: 0,
         matched: 3, downloaded: 2, parsed: 1, errors: [] } };
@@ -126,7 +126,7 @@ describe('普通回测配置准备与披露', () => {
     const stamp = { desiredRevision: 7, effectiveRevision: 1, catalogRevision: 12 };
     function Guard() { return <span>{String(usePreparationRouteStale(stamp, 100))}</span>; }
     const read = () => renderToStaticMarkup(<QueryClientProvider client={client}><Guard /></QueryClientProvider>);
-    const policy = { contractVersion: 3, revision: 7, dsaRevision: 1, syncState: 'applied', effectiveStale: false };
+    const policy = { contractVersion: 1, revision: 7, dsaRevision: 1, syncState: 'applied', effectiveStale: false };
     client.setQueryData(marketDataKeys.policy(), { ...policy, revision: 6 }, { updatedAt: 50 });
     expect(read()).toContain('false');
     client.setQueryData(marketDataKeys.policy(), { ...policy, revision: 8 }, { updatedAt: 75 });
@@ -161,21 +161,21 @@ describe('普通回测配置准备与披露', () => {
     };
     const stamp = fixture('backtest-preparation-stamp-v3.json');
     const prepared = backtestRunPreparationResultV3Schema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: 'prepare-1',
       checkedAt: blocked().checkedAt,
       scope: 'execution-window',
       status: 'prepared',
       runConfig: {
         ...request().runConfig,
-        schemaVersion: '3',
+        schemaVersion: 'backtest-trade-config-v1',
         executionModel: model,
         executionPriceProtocol: manifest.executionPriceProtocol,
         priceInputBindings: { signals: [], benchmark: { binding: 'execution-series' } },
       },
       actualSource: manifest.actualSources[0],
       executionPreflight: {
-        contractVersion: 3,
+        contractVersion: 1,
         requestId: 'prepare-1',
         checkedAt: blocked().checkedAt,
         status: 'ready',
@@ -213,10 +213,17 @@ describe('普通回测配置准备与披露', () => {
       retryMutation: { mutateAsync: vi.fn() },
       load,
     });
+    const definition = setStrategyExecutionSymbol(createDefaultStrategySchema('回测策略'), '600519.SH');
     const version = {
       id: stamp.strategyVersionId,
       version: 1,
-      schema: setStrategyExecutionSymbol(createDefaultStrategySchema('回测策略'), '600519.SH'),
+      schema: {
+        ...definition,
+        signalSources: (definition.signalSources as Array<Record<string, unknown>>).map((source) => ({
+          ...source,
+          asset: definition.executionInstrument,
+        })),
+      },
     };
     expect(await handlers.startBacktest({ ...version, schema: { schemaVersion: '1' } }, setup)).toBe(
       false,
@@ -225,7 +232,7 @@ describe('普通回测配置准备与披露', () => {
     expect(await handlers.startBacktest(version, setup)).toBe(true);
     await vi.waitFor(() => expect(queueMutation.mutateAsync).toHaveBeenCalledOnce());
     expect(queueMutation.mutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ contractVersion: 3, preparationStamp: stamp }),
+      expect.objectContaining({ contractVersion: 1, preparationStamp: stamp }),
     );
     await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
     queueMutation.mutateAsync.mockRejectedValueOnce(new Error('creation-response-lost'));

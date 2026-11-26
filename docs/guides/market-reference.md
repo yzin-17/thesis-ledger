@@ -57,7 +57,7 @@
 
 各主要来源的实际已验能力、未测范围及首批备用路径差异见[来源覆盖与备用源核对](../reviews/2026-11-04-astock-source-coverage.md)。采证通过本身不改变来源选择；是否已用于产品读取，以当前配置、精确路由及对应产品验收为准。
 
-产品入口为 `POST /api/market-data/reference`；DSA 使用独立的 Data V3 市场资料入口。资料类型、列、单位及作用域由[当前规格](../specs/2026-11-03-market-reference-data.md)与共享合同维护，不接受任意 URL 或字段。
+产品入口为 `POST /api/market-data/reference`；DSA 使用独立的 `dsa-data-v1` 市场资料入口。资料类型、列、单位及作用域由[当前规格](../specs/2026-11-03-market-reference-data.md)与共享合同维护，不接受任意 URL 或字段。
 
 目标仅做代码更新时使用 infra 的 `scripts/sync-code.sh`，保留其兼容性预检。新资料路由由 infra 的 `scripts/market-reference-routes.mjs` 先生成只读计划，再通过前端同一 Server 策略 API 按期望修订应用；撤销本轮取消项须额外提供首次创建计划，不能删除原有路由。代码快更位于容器可写层，镜像重建后需要重新更新。
 

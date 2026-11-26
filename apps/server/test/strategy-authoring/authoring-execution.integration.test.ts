@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import 'reflect-metadata';
 import { describe, expect, it, vi } from 'vitest';
 import { registerAuthoringAnalysisCases } from './authoring-execution-analysis.cases.js';
+import { registerOrderValidityReplay } from './order-validity-replay.cases.js';
 import { registerAuthoringSaveCases } from './authoring-execution-save.cases.js';
 import { authoringExecutionContext } from './authoring-execution.fixture.js';
 
@@ -513,4 +514,5 @@ function registerAuthoringRecoveryCases(suiteScope: ReturnType<typeof authoringE
     expect(facts.map((fact) => fact.kind)).toEqual(['not_sent']);
   });
   registerAuthoringSaveCases(suiteScope.caseContext);
+  registerOrderValidityReplay(suiteScope.caseContext);
 }

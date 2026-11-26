@@ -9,21 +9,22 @@ import {
   type CnNavRequest,
   type NumericEvaluation,
   type SimulationEngineInput,
+  finishBacktestComputation,
 } from '@thesis-ledger/domain';
 import { adaptNavDomainInputsV3 } from './backtest-nav-domain-input.js';
 import { compareNavOfflineTime } from './backtest-nav-offline-events.js';
-import { runNavOfflineV3 } from './backtest-nav-offline.js';
+import { navOfflineSteps } from './backtest-nav-offline.js';
 import { numericExpressionsIn } from './backtest-v2-execution-shared.js';
 import {
   navOfflineHoldingPeriods,
-  navOfflineSignalInputs,
+  navOfflineSignalInputsSteps,
 } from './backtest-nav-offline-signals.js';
 
 /** 日频决策使用冻结估值时刻；预热只更新指标与 cross 历史，不消耗执行窗口的 entry edge。 */
-export const runNavOfflineStrategyV3 = (
+export function* navOfflineStrategySteps(
   frozen: Parameters<typeof adaptNavDomainInputsV3>[0],
   signal?: AbortSignal,
-) => {
+) {
   const input = adaptNavDomainInputsV3(frozen);
   const { strategy, runConfig } = frozen.context;
   const requests: CnNavRequest[] = [];
@@ -34,10 +35,11 @@ export const runNavOfflineStrategyV3 = (
   const previousNumeric = new Map<string, NumericEvaluation>();
   let sequence = 0;
   for (const date of input.plan.expectedValuationDates) {
+    yield;
     if (signal?.aborted) throw new Error('NAV 离线执行已取消');
     const at = `${date}T${runConfig.valuationPolicy.dailyValuationTime}:00+08:00`;
-    const { latest, sourceSeries, indicatorSeries } = navOfflineSignalInputs(input, strategy, at);
-    const current = runNavOfflineV3(frozen, requests, {
+    const { latest, sourceSeries, indicatorSeries } = yield* navOfflineSignalInputsSteps(input, strategy, at);
+    const current = yield* navOfflineSteps(frozen, requests, {
       through: at,
       ...(signal ? { signal } : {}),
     });
@@ -81,6 +83,8 @@ export const runNavOfflineStrategyV3 = (
       indicatorSeries,
       positionState,
       risk: (context) => risk.asSimulationRisk(context),
+      ...(strategy.entryTrigger ? { entryEligible: () => current.pendingRequests.length === 0 &&
+        DecimalValue.from(current.state.ledger.cash.CNY.settled).isPositive() } : {}),
     };
     const evaluated = evaluateSignalAt(engine, tick, edge, sequence++, previousNumeric);
     const context = { tick, sourceSeries, indicatorSeries, positionState, previousNumeric };
@@ -93,8 +97,11 @@ export const runNavOfflineStrategyV3 = (
         previousNumeric.set(numericExpressionKey(expression), value);
     }
     if (date < input.plan.runWindow.startDate || !input.config.calendar.isTradingDay(at)) continue;
-    // 等待中保留信号 edge，待结算后仍能消费尚未执行的信号。
-    if (current.pendingRequests.length) continue;
+    // 新政策独立推进条件；旧合同等待期间保留原来未消费的edge。
+    if (current.pendingRequests.length) {
+      if (strategy.entryTrigger && evaluated.state.entry !== undefined) edge = { ...edge, entry: evaluated.state.entry };
+      continue;
+    }
     edge = evaluated.state;
     if (!evaluated.signal || !latest) continue;
     const value = evaluated.signal;
@@ -137,10 +144,12 @@ export const runNavOfflineStrategyV3 = (
     } else sizingRejects.push({ occurredAt: at, code: request.reasonCode, reason: request.reason });
   }
   return {
-    ...runNavOfflineV3(frozen, requests, signal ? { signal } : {}),
+    ...(yield* navOfflineSteps(frozen, requests, signal ? { signal } : {})),
     requests,
     sizingRejects,
     valuations,
     requestReasons,
   };
-};
+}
+
+export const runNavOfflineStrategyV3 = (...input: Parameters<typeof navOfflineStrategySteps>) => finishBacktestComputation(navOfflineStrategySteps(...input));

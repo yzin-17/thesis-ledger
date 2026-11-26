@@ -31,7 +31,7 @@ export function NavBacktestModel({
   onChange: (text: string) => void;
   onConfirm: (model: BacktestExecutionModelV3) => void;
 }) {
-  const parsed = parseBacktestModelConfiguration(text, 3);
+  const parsed = parseBacktestModelConfiguration(text);
   const model = parsed.model;
   const compatibilityError = model
     ? navModelCompatibilityError(model, symbol, startDate, endDate)

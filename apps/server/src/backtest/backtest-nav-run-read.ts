@@ -15,6 +15,12 @@ import {
 } from './backtest-snapshot.js';
 import type { LocalNavSnapshotStore } from './backtest-nav-snapshot-store.js';
 import { verifyNavResultForRead } from './backtest-nav-result-read.js';
+import { readBacktestMaterialization, snapshotStorageAttempt } from './backtest-job-materialization-input.js';
+
+export function navSnapshotStoreForJob(job: { id: string; input: unknown; executionAttempt: number }, snapshots: LocalNavSnapshotStore) {
+  const attempt = snapshotStorageAttempt(job.input, job.executionAttempt);
+  return attempt === undefined ? snapshots : snapshots.forAttempt(job.id, attempt);
+}
 
 type NavJobRecord = {
   id: string;
@@ -41,6 +47,7 @@ type NavJobRecord = {
   updatedAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
+  cancelRequestedAt?: Date | null;
 };
 
 type NavPreparationRecord = {
@@ -65,8 +72,7 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
 
 export const isNavBacktestInput = (input: unknown): boolean => {
   const value = record(input);
-  const runConfig = record(value?.runConfig);
-  return value?.inputKind === 'nav' || runConfig?.navInput !== undefined;
+  return value?.schemaVersion === 'backtest-nav-run-v1' && value.inputKind === 'nav';
 };
 
 const invalid = (): never => {
@@ -86,9 +92,9 @@ function storedRunConfig(job: NavJobRecord): StoredRunConfig {
   if (typeof preparationId !== 'string' || typeof preparationHash !== 'string') return invalid();
   if (!job.idempotencyKey) return invalid();
   if (
-    job.mode !== 'V3' ||
-    input?.contractVersion !== 3 ||
-    input.schemaVersion !== '3' ||
+    job.mode !== 'frozen' ||
+    input?.contractVersion !== 1 ||
+    input.schemaVersion !== 'backtest-nav-run-v1' ||
     input.inputKind !== 'nav'
   ) {
     return invalid();
@@ -111,7 +117,7 @@ function assertPreparationBinding(
   if (
     stored.preparationId !== preparation.id ||
     stored.preparationHash !== preparation.preparationHash ||
-    preparation.consumedRunId !== job.id ||
+    preparation.consumedRunId !== (record(job.input)?.preparationRunId ?? job.id) ||
     preparation.strategyVersionId !== job.strategyVersionId ||
     prepared.binding.strategyVersionId !== job.strategyVersionId ||
     prepared.binding.preparationHash !== preparation.preparationHash
@@ -207,12 +213,15 @@ async function replayManifest(
   const hasSnapshotId = job.snapshotId !== null;
   const hasManifest = job.snapshotManifest !== null && job.snapshotManifest !== undefined;
   if (!hasSnapshotId && !hasManifest) {
+    const pending = readBacktestMaterialization(job.input);
+    if (pending && job.status !== 'succeeded' && job.result == null && job.resultChecksum == null)
+      return null;
     if (job.errorCode === 'NAV_SNAPSHOT_INVALID' && job.status === 'failed') return null;
     return invalid();
   }
   if (!hasSnapshotId || !hasManifest) return invalid();
   try {
-    return await snapshots.replay(job.id);
+    return await navSnapshotStoreForJob(job, snapshots).replay(job.id);
   } catch (error) {
     const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
     if (
@@ -235,8 +244,8 @@ function responseForRead(
   result: ReturnType<typeof verifyNavResultForRead>,
 ): BacktestNavRunResponseV3 {
   const response = {
-    contractVersion: 3,
-    schemaVersion: '3',
+    contractVersion: 1,
+    schemaVersion: 'backtest-nav-run-v1',
     inputKind: 'nav',
     id: job.id,
     strategyVersionId: job.strategyVersionId,
@@ -244,6 +253,8 @@ function responseForRead(
     preparationHash: stored.preparationHash,
     idempotencyKey: stored.idempotencyKey,
     status: job.status,
+    ...(typeof record(job.input)?.replayOfRunId === 'string' ? { replayOfRunId: record(job.input)!.replayOfRunId } : {}),
+    ...(job.cancelRequestedAt !== undefined ? { cancelRequestedAt: job.cancelRequestedAt?.toISOString() ?? null } : {}),
     stage: job.stage,
     progress: job.progress,
     periodStart: job.periodStart.toISOString(),
@@ -279,6 +290,8 @@ export async function verifyNavRunForRead(input: {
 }): Promise<BacktestNavRunResponseV3> {
   const { job, preparation, prepared, snapshots } = input;
   const stored = storedRunConfig(job);
+  const materialization = readBacktestMaterialization(job.input);
+  if (materialization && materialization.strategyVersionHash !== prepared.binding.strategyContentHash) invalid();
   assertPreparationBinding(job, preparation, prepared, stored);
   assertRunConfigBinding(job, prepared, stored);
   const replay = await replayManifest(job, snapshots);

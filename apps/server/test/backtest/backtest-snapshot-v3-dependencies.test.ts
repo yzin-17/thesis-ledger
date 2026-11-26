@@ -58,10 +58,11 @@ const normalizedModel = () =>
 
 const strategyValue = (overrides: Record<string, unknown> = {}): BacktestStrategy =>
   strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: 'snapshot dependency fixture',
     signalSources: [
       {
+        priceCoordinate: 'run',
         id: 'close',
         asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
         timeframe: '1d',
@@ -94,7 +95,7 @@ const runConfigValue = (
 ): RunConfigV3 => {
   const normalized = options.normalized ?? false;
   return runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: '2024-02-01',
     endDate: '2024-02-29',
     dataAsOf: '2024-03-04T16:00:00+08:00',
@@ -154,7 +155,7 @@ const calendarResponse = (
     fact?: Partial<BacktestCalendarResponse['facts'][number]>;
   } = {},
 ): BacktestCalendarResponse => ({
-  version: 3,
+  version: 1,
   status: options.status ?? 'supported',
   provider: 'fixture-calendar',
   providerRevision: 'calendar-r1',
@@ -182,7 +183,7 @@ const instrumentFactsResponse = (
     facts?: BacktestInstrumentFactsResponse['facts'];
   } = {},
 ): BacktestInstrumentFactsResponse => ({
-  version: 3,
+  version: 1,
   status: 'supported',
   provider: 'fixture-instruments',
   providerRevision: 'instrument-envelope-r1',
@@ -262,6 +263,22 @@ describe('Snapshot V3 dependency artifacts', () => {
         : item,
     );
     expect(() => validateSnapshotDependencyArtifactsV3(input, changed)).toThrow();
+  });
+
+  it('混合事件的 Parquet 空列可回读，篡改拆分比例仍拒绝', async () => {
+    const input = inputFor();
+    const base = { symbol: '600519.SH', market: 'CN', instrumentType: 'STOCK', effectiveDate: '2024-02-20',
+      occurredAt: '2024-02-20T00:00:00Z', availableAt: '2024-02-19T00:00:00Z',
+      provider: 'fixture-actions', providerRevision: 'actions-r1' } as const;
+    const result = await collectSnapshotDependenciesV3(input, dsaFixture({ corporateActions: { facts: [
+      { ...base, type: 'SPLIT', ratio: '2' }, { ...base, type: 'CASH_DIVIDEND', cashAmount: '0.1', currency: 'CNY' },
+    ] } }));
+    const padded: typeof result.artifacts = result.artifacts.map(a => a.key.startsWith('corporateActions/') ? { ...a,
+      rows: a.rows.map(row => ({ cashAmount: null, currency: null, ratio: null, ...row })) } : a);
+    expect(() => validateSnapshotDependencyArtifactsV3(input, padded)).not.toThrow();
+    const changed = padded.map(a => a.key.startsWith('corporateActions/') ? { ...a,
+      rows: a.rows.map(row => row.type === 'SPLIT' ? { ...row, ratio: '3' } : row) } : a);
+    expect(() => validateSnapshotDependencyArtifactsV3(input, changed)).toThrow(SnapshotDependencyV3Error);
   });
 
   it('freezes calendar, historical instrument facts, and a proven trusted-empty event response', async () => {
@@ -433,6 +450,7 @@ describe("标的身份、模型范围与依赖能力", () => {
         {
           id: 'close',
           asset: { symbol: 'FUND.CN', market: 'CN', assetType: 'fund' },
+          priceCoordinate: 'native-nav',
           timeframe: '1d',
           series: ['nav'],
         },

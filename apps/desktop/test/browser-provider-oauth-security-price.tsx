@@ -12,7 +12,7 @@ const client = new QueryClient({
 });
 client.setQueryData(['market-provider-oauth', 'current'], { session: null });
 const info = securityStaticInfoResponseSchema.parse({
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'controlled',
   symbol: 'SPY.US',

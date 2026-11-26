@@ -1,7 +1,7 @@
-import { navLocalDate, sourceSeriesKey, type BacktestSeries } from '@thesis-ledger/domain';
+import { navLocalDate, sourceSeriesKey, type BacktestSeries, finishBacktestComputation, mapBacktestComputationItems } from '@thesis-ledger/domain';
 import type { BacktestStrategy } from '@thesis-ledger/schemas';
 import { compareNavOfflineTime, type NavOfflineInputs } from './backtest-nav-offline-events.js';
-import { indicatorSeriesFor } from './backtest-v2-execution-shared.js';
+import { indicatorSeriesForSteps } from './backtest-v2-execution-shared.js';
 
 export const navOfflineHoldingPeriods = (
   input: NavOfflineInputs,
@@ -14,13 +14,12 @@ export const navOfflineHoldingPeriods = (
 };
 
 /** 先按微秒过滤可见事实，再交给指标与表达式内核，避免毫秒截断泄露未来净值。 */
-export const navOfflineSignalInputs = (
+export function* navOfflineSignalInputsSteps(
   input: NavOfflineInputs,
   strategy: BacktestStrategy,
   at: string,
-) => {
-  const visible = input.facts
-    .flatMap((fact) => {
+) {
+  const points = yield* mapBacktestComputationItems(input.facts, (fact) => {
       const point = input.pricingFactAt(fact.valuationDate, at);
       return point?.nav
         ? [
@@ -32,7 +31,8 @@ export const navOfflineSignalInputs = (
             },
           ]
         : [];
-    })
+    });
+  const visible = points.flat()
     .sort((a, b) => compareNavOfflineTime(a.occurredAt, b.occurredAt));
   const sourceSeries = new Map<string, BacktestSeries>();
   for (const source of strategy.signalSources) {
@@ -48,7 +48,9 @@ export const navOfflineSignalInputs = (
     });
   }
   const indicatorSeries = new Map<string, BacktestSeries>();
-  indicatorSeriesFor(strategy.entry, sourceSeries, indicatorSeries);
-  indicatorSeriesFor(strategy.exit, sourceSeries, indicatorSeries);
+  yield* indicatorSeriesForSteps(strategy.entry, sourceSeries, indicatorSeries);
+  yield* indicatorSeriesForSteps(strategy.exit, sourceSeries, indicatorSeries);
   return { latest: visible.at(-1), sourceSeries, indicatorSeries };
-};
+}
+
+export const navOfflineSignalInputs = (...input: Parameters<typeof navOfflineSignalInputsSteps>) => finishBacktestComputation(navOfflineSignalInputsSteps(...input));

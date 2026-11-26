@@ -1,10 +1,12 @@
+import { namedStrategyFixture } from './named-v1-strategy.fixture.js';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { runConfigSchemaV3, type BacktestStrategy } from '@thesis-ledger/schemas';
-import { planSnapshotInputsV3 } from '../../src/backtest/backtest-snapshot-v3-input-plan.js';
+import { planSnapshotInputsV3, snapshotExecutionRouteKeyV3 } from '../../src/backtest/backtest-snapshot-v3-input-plan.js';
+import { backtestResearchReadOptionsV3 } from '../../src/backtest/backtest-research-read-options-v3.js';
 
 const instrument = { symbol: '159516.SZ', market: 'CN', assetType: 'etf' } as const;
-const strategy: BacktestStrategy = {
+const legacyDefinition = {
   schemaVersion: '2',
   name: '同坐标输入',
   executionInstrument: instrument,
@@ -27,6 +29,7 @@ const strategy: BacktestStrategy = {
   },
   cost: { commissionRate: '0', slippageRate: '0' },
 };
+const strategy: BacktestStrategy = namedStrategyFixture(legacyDefinition);
 const protocol = JSON.parse(
   readFileSync(
     new URL(
@@ -38,7 +41,7 @@ const protocol = JSON.parse(
 );
 const config = () =>
   runConfigSchemaV3.parse({
-    schemaVersion: '3',
+    schemaVersion: 'backtest-trade-config-v1',
     startDate: '2026-05-16',
     endDate: '2026-08-09',
     dataAsOf: '2026-09-25T00:00:00Z',
@@ -58,6 +61,30 @@ const config = () =>
   });
 
 describe('V3 显式同坐标输入计划', () => {
+  it('历史定义显式升级沿用相同运行绑定，固定研究价格不得冒用原始价格', () => {
+    const original = JSON.stringify(strategy);
+    const upgraded = namedStrategyFixture(legacyDefinition);
+    expect(upgraded.signalSources[0]?.priceCoordinate).toBe('run');
+    const before = planSnapshotInputsV3({ strategy, runConfig: config() });
+    const after = planSnapshotInputsV3({ strategy: upgraded, runConfig: config() });
+    expect(after).toEqual(before);
+    expect(JSON.stringify(strategy)).toBe(original);
+    const fixed = structuredClone(upgraded);
+    fixed.signalSources[0]!.priceCoordinate = 'research';
+    expect(() => planSnapshotInputsV3({ strategy: fixed, runConfig: config() })).toThrow();
+    fixed.signalSources[0]!.priceCoordinate = 'actual';
+    expect(planSnapshotInputsV3({ strategy: fixed, runConfig: config() }).priceInputs).toEqual(before.priceInputs);
+  });
+  it.each(['1m', '5m', '60m'] as const)('盘中 %s 使用原始分钟物理来源，保留本地策略周期', (timeframe) => {
+    const intraday = { ...strategy, primaryTimeframe: timeframe,
+      signalSources: [{ ...strategy.signalSources[0]!, timeframe }] };
+    const runConfig = config();
+    const route = snapshotExecutionRouteKeyV3(intraday, runConfig);
+    expect(route).toMatchObject({ capability: 'MINUTE_BAR', timeframe: '1m' });
+    expect(planSnapshotInputsV3({ strategy: intraday, runConfig }).plan.signalSources[0]?.timeframe).toBe(timeframe);
+    expect(backtestResearchReadOptionsV3('CN', { ...runConfig.executionPriceProtocol,
+      history: { basis: 'fixed-provider-snapshot' } }, '1m').tradabilityMode).toBe('observed-bars-only');
+  });
   it('仅规划一份物理行情，保留用途、预热与 raw 事件要求', () => {
     const result = planSnapshotInputsV3({ strategy, runConfig: config() });
     expect(new Set(result.priceInputs.map((alias) => alias.artifactKey)).size).toBe(1);
@@ -86,7 +113,7 @@ describe('V3 显式同坐标输入计划', () => {
     }
   });
 
-  it('不把同名序列绑定扩展为跨标的或跨周期', () => {
+  it('不把同坐标绑定扩展为跨标的', () => {
     const differentAsset = {
       ...strategy,
       signalSources: [
@@ -94,7 +121,7 @@ describe('V3 显式同坐标输入计划', () => {
       ],
     };
     expect(() => planSnapshotInputsV3({ strategy: differentAsset, runConfig: config() })).toThrow(
-      '不同标的或周期',
+      '其他标的',
     );
     const differentBenchmark = { ...strategy, benchmark: { ...instrument, symbol: '510300.SH' } };
     expect(() =>

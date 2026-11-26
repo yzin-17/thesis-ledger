@@ -11,12 +11,12 @@ const key: MarketDataBarRouteKeyV3 = {
 };
 const targets = [{ providerId: 'efinance', upstreamSource: 'eastmoney' }, { providerId: 'yfinance', upstreamSource: 'yfinance' }];
 const setup = () => {
-  const desired = { contractVersion: 3, consumer: 'thesis-ledger', requestId: 'minute-fallback', revision: 192,
+  const desired = { contractVersion: 1, consumer: 'thesis-ledger', requestId: 'minute-fallback', revision: 192,
     enabled: true, routes: [{ key, targets }] };
   const effective = { ...desired, sourceDesiredRevision: 192, appliedAt: '2026-11-08T00:00:00Z',
     routes: [{ key, reason: null, targets: targets.map((target, routeIndex) => ({ ...target, routeIndex,
       eligible: routeIndex === 1, reason: routeIndex === 0 ? 'upstream_failure' : null })) }] };
-  const catalog = { contractVersion: 3 as const, consumer: 'thesis-ledger' as const, catalogRevision: 10,
+  const catalog = { contractVersion: 1 as const, consumer: 'thesis-ledger' as const, catalogRevision: 10,
     generatedAt: '2026-11-08T00:00:00Z', integrity: 'complete' as const,
     entries: targets.map((target) => ({ key, target, state: 'ready' as const })) };
   return { desired, effective, catalog };
@@ -49,7 +49,7 @@ describe('原生分钟交互图表整段备用', () => {
     const context = marketRouteContextV3({ desired, effective, catalog, routeKey: key });
     if (!context.ok) throw new Error(context.reason);
     const response = {
-      contractVersion: 3, purpose: 'interactive-chart', requestId: 'minute-fallback', symbol: '510300.SH', routeKey: key,
+      contractVersion: 1, purpose: 'interactive-chart', requestId: 'minute-fallback', symbol: '510300.SH', routeKey: key,
       bars: [{ timestamp: '2026-11-06T09:31:00+08:00', open: 4.1, high: 4.2, low: 4, close: 4.124,
         volume: null, amount: null, availableAt: '2026-11-06T09:32:00+08:00', completionStatus: 'unknown' }],
       coverage: { requestedStart: '2026-11-06', requestedEnd: '2026-11-06', actualStart: '2026-11-06T09:31:00+08:00',
@@ -64,7 +64,7 @@ describe('原生分钟交互图表整段备用', () => {
       return response;
     });
     const input = {
-      request: { contractVersion: 3 as const, purpose: 'interactive-chart' as const, requestId: 'minute-fallback',
+      request: { contractVersion: 1 as const, purpose: 'interactive-chart' as const, requestId: 'minute-fallback',
         symbol: '510300.SH', routeKey: key, start: '2026-11-06', end: '2026-11-06' },
       context: context.context, read,
     };

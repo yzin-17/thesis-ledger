@@ -55,7 +55,7 @@ try {
     if (child.exitCode !== null) throw new Error(`隔离服务启动失败: ${errors}`);
     try {
       const response = await fetch(
-        `${process.env.DSA_BASE_URL}/api/v3/thesis-ledger/control/providers`,
+        `${process.env.DSA_BASE_URL}/api/v1/thesis-ledger/control/providers`,
         { headers: { authorization: 'Bearer isolated-provider-token' } },
       );
       if (response.ok) {

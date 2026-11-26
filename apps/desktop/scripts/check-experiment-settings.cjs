@@ -7,7 +7,7 @@ const liveOnly = process.argv.includes('--live-readonly');
 fs.mkdirSync(output, { recursive: true });
 
 const blocked = (requestId) => ({
-  contractVersion: 3,
+  contractVersion: 1,
   requestId,
   checkedAt: new Date().toISOString(),
   scope: 'baseline-window',

@@ -39,9 +39,9 @@ describe('研究用途显式推理开关合同', () => {
       }),
     ).not.toHaveProperty('reasoningEnabled');
   });
-  it('拒绝 V1／其他用途和非布尔值', () => {
+  it('拒绝退役研究合同、其他用途和非布尔值', () => {
     for (const contract of [
-      aiGenerationContracts.research.ref,
+      { id: 'research', version: 'research-generation-v2' },
       aiGenerationContracts.authoringAnalysis.ref,
     ])
       expect(

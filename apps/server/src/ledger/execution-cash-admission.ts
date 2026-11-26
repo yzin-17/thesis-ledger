@@ -27,7 +27,7 @@ const prospectiveStoredEvent = (event: ExecutionEvent): StoredCashEvent => ({
   sourceTimezone: event.sourceTimezone,
   economicOrderKey: event.economicOrderKey,
   recordedAt: new Date(event.recordedAt),
-  envelopeVersion: 3,
+  envelopeVersion: 1,
   payloadVersion: event.payloadVersion,
   payload: event.payload,
   sourceCategory: event.source.category,

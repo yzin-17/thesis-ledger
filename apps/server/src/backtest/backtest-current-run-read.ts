@@ -10,7 +10,8 @@ import {
   type RunConfigV3,
 } from '@thesis-ledger/schemas';
 import { hashCanonicalManifest } from './backtest-snapshot.js';
-import { asRecord, persistedContractVersion } from './backtest-v3-run-lifecycle.js';
+import { asRecord, persistedRunContract } from './backtest-v3-run-lifecycle.js';
+import { readBacktestMaterialization, snapshotStorageAttempt } from './backtest-job-materialization-input.js';
 
 type RunReadRecord = {
   id: string;
@@ -25,6 +26,7 @@ type RunReadRecord = {
   errorCode?: string | null;
   runConfig?: unknown;
   snapshotManifest?: unknown;
+  executionAttempt?: number;
 };
 
 type CompleteRunReadRecord = RunReadRecord & {
@@ -100,7 +102,7 @@ const matchesFrozenRunIdentity = (
 
 /** A list row must not project metrics from an old or malformed result. */
 export const isCurrentRunSummaryRecord = (job: RunReadRecord): boolean => {
-  if (persistedContractVersion(job) !== 3) return false;
+  if (persistedRunContract(job) !== 'backtest-trade-run-v1') return false;
   const input = asRecord(job.input);
   if (input?.kind === 'preparation-failure') {
     return matchesPreparationFailure(job, input);
@@ -125,6 +127,8 @@ export const isCurrentRunSummaryRecord = (job: RunReadRecord): boolean => {
 export const assertCurrentRunForRead = (job: CompleteRunReadRecord): void => {
   if (!isCurrentRunSummaryRecord(job)) unsupported();
   const input = asRecord(job.input)!;
+  const materialization = readBacktestMaterialization(input);
+  if (input.snapshotStorageAttempt !== undefined) snapshotStorageAttempt(input, job.executionAttempt ?? -1);
   if (input.kind === 'preparation-failure') return;
   const storedConfig = runConfigSchemaV3.safeParse(job.runConfig);
   const inputConfig = runConfigSchemaV3.safeParse(input.runConfig);
@@ -141,6 +145,7 @@ export const assertCurrentRunForRead = (job: CompleteRunReadRecord): void => {
     ) {
       unsupported();
     }
+    if (materialization && (job.status === 'succeeded' || job.result != null || job.resultChecksum != null)) unsupported();
     return;
   }
   const parsed = backtestSnapshotManifestV3Schema.safeParse(job.snapshotManifest);

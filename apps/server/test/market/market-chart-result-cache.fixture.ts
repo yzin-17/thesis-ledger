@@ -4,7 +4,7 @@ import { marketChartBarsResponseV3Schema, type MarketChartBarsRequestV3 } from '
 import { MarketChartResultCache } from '../../src/market/market-chart-result-cache.js';
 
 export const request: MarketChartBarsRequestV3 = {
-  contractVersion: 3, purpose: 'interactive-chart', requestId: 'first', symbol: 'AAPL.US',
+  contractVersion: 1, purpose: 'interactive-chart', requestId: 'first', symbol: 'AAPL.US',
   routeKey: { kind: 'bar', market: 'US', assetType: 'STOCK', capability: 'MINUTE_BAR', timeframe: '1m', adjustment: 'none' },
   routeTarget: { providerId: 'futu', upstreamSource: 'futu', routeIndex: 0 },
   start: '2026-11-11', end: '2026-11-11',
@@ -17,7 +17,7 @@ export function response(input = request, close = 1.021, observed = Date.now()) 
   const minute = input.routeKey.timeframe !== '1d';
   const stamp = minute ? new Date(Math.floor(observed / 60_000) * 60_000).toISOString() : `${input.end}T12:00:00.000Z`;
   return marketChartBarsResponseV3Schema.parse({
-    contractVersion: 3, purpose: input.purpose, requestId: input.requestId, symbol: input.symbol, routeKey: input.routeKey,
+    contractVersion: 1, purpose: input.purpose, requestId: input.requestId, symbol: input.symbol, routeKey: input.routeKey,
     bars: [{ ...base.bars[0], close, timestamp: stamp, completionStatus: minute ? 'incomplete' : 'unknown', availableAt: observedAt }],
     coverage: { requestedStart: input.start, requestedEnd: input.end, actualStart: stamp, actualEnd: stamp,
       hasMoreBefore: false, latestCompleteTradingDate: null },

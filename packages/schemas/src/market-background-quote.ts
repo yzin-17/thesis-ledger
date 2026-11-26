@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const backgroundQuoteRequestSchema = z.strictObject({
-  contractVersion: z.literal(3),
+  contractVersion: z.literal(1),
   consumer: z.literal('thesis-ledger'),
   requestId: z.string().min(1),
   symbol: z.string().min(1),

@@ -70,7 +70,7 @@ export class MarketChartReaderV3 {
         identity.timeframe,
       );
     }
-    if (policy.contractVersion !== 3)
+    if (policy.contractVersion !== 1)
       return unavailableChartOptions(
         identity.symbol,
         'legacy',
@@ -184,7 +184,7 @@ export class MarketChartReaderV3 {
     let cacheMeta: { cached: boolean; freshUntil?: string } | undefined;
     const response = await selectChartWindowV3({
       request: {
-        contractVersion: 3,
+        contractVersion: 1,
         purpose: 'interactive-chart',
         requestId: randomUUID(),
         symbol: input.identity.symbol,
@@ -235,7 +235,7 @@ export class MarketChartReaderV3 {
       )
       .digest('hex');
     const series = barSeriesSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       identity: input.identity,
       points: response.bars,
       coverage: response.coverage,

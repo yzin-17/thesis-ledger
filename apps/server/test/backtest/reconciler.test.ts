@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { BacktestQueueReconciler } from '../../src/backtest/backtest-queue.reconciler.js';
 import { BacktestQueueService } from '../../src/backtest/backtest-queue.service.js';
 
-const createFixture = (executionAttempt: number, queueState: string | null, mode = 'V3') => {
+const createFixture = (executionAttempt: number, queueState: string | null, mode = 'frozen') => {
   let state: Record<string, unknown> = {
     id: '11111111-1111-4111-8111-111111111130',
     mode,
-    input: mode === 'V3' ? { contractVersion: 3, schemaVersion: '3' } : { schemaVersion: '2' },
+    input: mode === 'frozen' ? { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1' } : { schemaVersion: '2' },
     status: 'running',
     executionAttempt,
     createdAt: new Date('2026-09-09T00:00:00Z'),
@@ -69,7 +69,7 @@ describe('Backtest 队列协调器', () => {
       prisma: { backtestJob: { findMany: ReturnType<typeof vi.fn> } };
     };
     expect(query.prisma.backtestJob.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ mode: 'V3' }) }),
+      expect.objectContaining({ where: expect.objectContaining({ mode: 'frozen' }) }),
     );
     expect(fixture.queue.getState).not.toHaveBeenCalled();
     expect(fixture.queue.add).not.toHaveBeenCalled();
@@ -108,11 +108,21 @@ describe('Backtest 队列协调器', () => {
     expect(fixture.queue.add).not.toHaveBeenCalled();
   });
 
+  it('queued查询失败保持未知，不二次查询后补投，也不消耗attempt', async () => {
+    const fixture = createFixture(0, null);
+    fixture.state().status = 'queued';
+    fixture.queue.getState.mockRejectedValueOnce(new Error('unknown'));
+    await fixture.reconciler.reconcile();
+    expect(fixture.queue.getState).toHaveBeenCalledOnce();
+    expect(fixture.queue.add).not.toHaveBeenCalled();
+    expect(fixture.state()).toMatchObject({ status: 'queued', executionAttempt: 0 });
+  });
+
   it('分页处理超过 100 条非终态任务，不让后续任务长期饥饿', async () => {
     const states = Array.from({ length: 101 }, (_, index) => ({
       id: `11111111-1111-4111-8111-${String(index).padStart(12, '0')}`,
-      mode: 'V3',
-      input: { contractVersion: 3, schemaVersion: '3' },
+      mode: 'frozen',
+      input: { contractVersion: 1, schemaVersion: 'backtest-trade-run-v1' },
       status: 'queued',
       executionAttempt: 0,
       createdAt: new Date(

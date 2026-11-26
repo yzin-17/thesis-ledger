@@ -1,3 +1,4 @@
+import { namedStrategyFixture } from './named-v1-strategy.fixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -37,6 +38,19 @@ const request = (id: string, at: string, redeem = false): CnNavRequest => ({
 });
 
 describe('NAV 冻结纯离线执行', () => {
+  it('显式升级在非空申赎样本中保持请求、确认、份额、现金和重复回放一致', async () => {
+    const previous = runNavOfflineStrategyV3(frozen);
+    expect(previous.requests.length).toBeGreaterThan(0);
+    expect(previous.state.requests.some(item => item.confirmedShares)).toBe(true);
+    const fixture = navFreezeFixture();
+    fixture.context.strategy = namedStrategyFixture(fixture.context.strategy);
+    const upgradedStore = new LocalNavSnapshotStore(resolve(root, 'schema3'));
+    await upgradedStore.freeze(fixture);
+    const upgraded = await upgradedStore.replay('nav-run');
+    const after = runNavOfflineStrategyV3(upgraded);
+    for (const key of ['requests', 'state', 'events', 'valuation', 'benchmark'] as const) expect(after[key], key).toEqual(previous[key]);
+    expect(runNavOfflineStrategyV3(await upgradedStore.replay('nav-run'))).toEqual(after);
+  });
   it.each([1, 2])('研究 T+%s 可见性独立延后确认，保留假设披露', async (delay) => {
     const fixture = navResearchFixture(delay);
     await store.freeze(fixture);

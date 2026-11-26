@@ -15,7 +15,7 @@ import { fundCalibrationArguments, assertFundPrivatePath } from './fund-calibrat
 
 const accountId = '11111111-1111-4111-8111-111111111111';
 const initial = {
-  contractVersion: 3,
+  contractVersion: 1,
   consumer: 'thesis-ledger',
   requestId: 'fund-calibration-initial',
   revision: 156,

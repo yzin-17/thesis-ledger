@@ -1,6 +1,6 @@
 {
   "response": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "consumer": "thesis-ledger",
     "requestId": "controlled-lifecycle-fixture",
     "symbol": "000995.SZ",

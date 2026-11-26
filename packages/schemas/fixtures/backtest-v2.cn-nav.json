@@ -1,11 +1,12 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "strategy-definition-v1",
   "name": "CN NAV 日频策略",
   "signalSources": [
     {
       "id": "nav",
       "asset": { "symbol": "110011.OF", "market": "CN", "assetType": "fund" },
       "timeframe": "1d",
+      "priceCoordinate": "native-nav",
       "series": ["nav"]
     }
   ],

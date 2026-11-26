@@ -19,7 +19,7 @@
 
 实际挂载生成抽屉、共享导航保护和共享确认弹窗，使用 Microsoft Edge、现有 `http://127.0.0.1:5173` 开发服务。API 请求全部拦截，真实数据未提交。
 
-执行：`PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright RISK_RULE_QA_OUTPUT=/tmp/strategy-risk-close-qa node scripts/local-runtime/strategy-rule-notification-browser.mjs`。
+执行：`PLAYWRIGHT_MODULE=/tmp/codex-market-range-qa/node_modules/playwright RISK_RULE_QA_OUTPUT=/tmp/strategy-risk-close-qa node scripts/local-runtime/browser/risk/strategy-rule-notification.regression.mjs`。
 
 1440、1024、768、390 四种宽度，每种覆盖创建、编辑、未保存关闭确认、未修改直接关闭、切换路由确认，共 20 场景通过。关闭确认覆盖：继续编辑后输入保留、弹窗获得焦点后 Esc 取消、确认后返回来源页；路由确认覆盖取消留页和确认后前往指定目标。创建/编辑回归继续验证逐条通知设置、503 后保留输入及重试成功，保存成功没有再次确认。
 

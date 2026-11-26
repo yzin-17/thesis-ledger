@@ -144,21 +144,11 @@ export interface StatutoryCharge {
   currency: ExecutionInstrumentFact['currency'];
 }
 
-const factLocalDateTime = (value: Date | string, timezone: string) => {
+const factLocalDateTime = (value: Date | string, formatter: Intl.DateTimeFormat) => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) throw new Error('无效日期');
   const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hourCycle: 'h23',
-      weekday: 'short',
-    })
+    formatter
       .formatToParts(date)
       .filter((part) => part.type !== 'literal')
       .map((part) => [part.type, part.value]),
@@ -172,6 +162,17 @@ const factLocalDateTime = (value: Date | string, timezone: string) => {
 
 /** Adapts frozen DSA calendar facts without reaching back to a live provider. */
 export const tradingCalendarFromFact = (fact: ExecutionCalendarFact): TradingCalendar => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: fact.timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+    weekday: 'short',
+  });
   const sessions: readonly TradingSessionWindow[] = fact.sessions.map((session) => ({
     start: session.startMinute,
     end: session.endMinute,
@@ -188,7 +189,7 @@ export const tradingCalendarFromFact = (fact: ExecutionCalendarFact): TradingCal
   const sessionsForDate = (date: string) => sessionOverrides.get(date) ?? sessions;
   const holidays = new Set(fact.holidays);
   const status = (value: Date | string): TradingDayStatus => {
-    const local = factLocalDateTime(value, fact.timezone);
+    const local = factLocalDateTime(value, formatter);
     if (
       !fact.range.start ||
       !fact.range.end ||
@@ -208,7 +209,7 @@ export const tradingCalendarFromFact = (fact: ExecutionCalendarFact): TradingCal
   const sessionStatus = (value: Date | string): TradingSessionStatus => {
     const day = status(value);
     if (!day.open) return day;
-    const local = factLocalDateTime(value, fact.timezone);
+    const local = factLocalDateTime(value, formatter);
     const open = sessionsForDate(local.date).some(
       (session) => local.minute >= session.start && local.minute < session.end,
     );

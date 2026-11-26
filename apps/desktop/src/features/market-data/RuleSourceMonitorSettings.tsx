@@ -1,11 +1,7 @@
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { MultiSelect } from '@/components/ui/multi-select';
-import {
-  FieldGroup,
-  FieldLegend,
-  FieldSet,
-} from '@/components/ui/field';
+import { FieldGroup, FieldLegend, FieldSet } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
 import type { useRuleSourceMonitor } from './useRuleSourceMonitor';
 
@@ -25,14 +21,19 @@ export function RuleSourceMonitorSettings({
       <FieldSet aria-label="选择监测来源">
         <FieldLegend className="mb-0 text-xl font-semibold">检查范围</FieldLegend>
         <p className="text-sm text-muted-foreground">
-          选择需要检查的资料来源。已选 {selection.sourceIds.length} / {data.sources.length}{' '}
-          项。
+          选择需要检查的资料来源。已选 {selection.sourceIds.length} / {data.sources.length} 项。
         </p>
-        <MultiSelect label="选择监测来源"
-          options={data.sources.map((source) => ({ value: source.identity, label: source.name,
-            description: `${marketLabels[source.market]} · ${source.documentCount} 份公开资料` }))}
-          value={selection.sourceIds} disabled={monitor.create.isPending}
-          onValueChange={(sourceIds) => monitor.update({ sourceIds })} />
+        <MultiSelect
+          label="选择监测来源"
+          options={data.sources.map((source) => ({
+            value: source.identity,
+            label: source.name,
+            description: `${marketLabels[source.market]} · ${source.documentCount} 份公开资料`,
+          }))}
+          value={selection.sourceIds}
+          disabled={monitor.create.isPending}
+          onValueChange={(sourceIds) => monitor.update({ sourceIds })}
+        />
       </FieldSet>
       <div className="flex flex-wrap items-center gap-3">
         <Button
@@ -40,7 +41,6 @@ export function RuleSourceMonitorSettings({
           aria-busy={monitor.create.isPending}
           disabled={
             monitor.create.isPending ||
-            monitor.status.isError ||
             !selection.sourceIds.length ||
             (data.config.taskCreated && !monitor.dirty)
           }
@@ -63,17 +63,9 @@ export function RuleSourceMonitorSettings({
         <p className="text-xs text-muted-foreground">任务已创建，执行时间与启停在自动化中调整。</p>
       ) : null}
       {monitor.create.isError ? (
-        <div role="alert" className="flex flex-wrap items-center gap-3 text-sm">
-          <p className="text-destructive">任务保存失败，所选来源已保留。请重试或重新读取。</p>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={monitor.status.isFetching}
-            onClick={() => void monitor.reloadTask()}
-          >
-            重新读取任务
-          </Button>
-        </div>
+        <p role="alert" className="text-sm text-destructive">
+          任务保存失败，所选来源已保留。
+        </p>
       ) : null}
     </FieldGroup>
   );

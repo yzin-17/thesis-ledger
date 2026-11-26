@@ -25,7 +25,7 @@ describe('已知现金方案标准能力传输', () => {
   it('经现有Client发送一次鉴权请求，保留源绑定与未知覆盖', async () => {
     const { request, response } = fixture();
     const fetch = vi.fn(async (url: URL, init: RequestInit) => {
-      expect(url.pathname).toBe('/api/v3/thesis-ledger/market/events');
+      expect(url.pathname).toBe('/api/v1/thesis-ledger/market/events');
       expect(init.headers).toMatchObject({ authorization: 'Bearer test-token' });
       expect(JSON.parse(String(init.body))).toEqual(request);
       return { ok: true, status: 200, json: async () => response };
@@ -57,7 +57,7 @@ describe('已知现金方案标准能力传输', () => {
       ok: false,
       status: 503,
       json: async () => ({
-        contractVersion: 3,
+        contractVersion: 1,
         protocolVersion: 'known-cash-observations-v1',
         requestId: request.requestId,
         error: { code, reason, message: 'private raw response' },
@@ -79,7 +79,7 @@ describe('已知现金方案标准能力传输', () => {
         ok: false,
         status: 503,
         json: async () => ({
-          contractVersion: 3,
+          contractVersion: 1,
           protocolVersion: 'known-cash-observations-v1',
           requestId: 'other',
           error: { code: 'upstream_failure', reason: 'secret-body', message: 'private' },

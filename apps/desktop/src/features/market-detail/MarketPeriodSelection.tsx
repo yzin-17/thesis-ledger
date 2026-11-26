@@ -10,8 +10,15 @@ import { getDesktopApiClient } from '../../shared/api/client.js';
 export type ChartPeriod = MarketTimeframe;
 export const marketPeriodLabels: Record<ChartPeriod, string> = {
   '1m': '1 分钟',
-  '5m': '5 分钟', '15m': '15 分钟', '30m': '30 分钟', '60m': '60 分钟',
-  '1d': '日线', '5d': '5 日线', '1w': '周线', '1mo': '月线', '1y': '年线',
+  '5m': '5 分钟',
+  '15m': '15 分钟',
+  '30m': '30 分钟',
+  '60m': '60 分钟',
+  '1d': '日线',
+  '5d': '5 日线',
+  '1w': '周线',
+  '1mo': '月线',
+  '1y': '年线',
 };
 const periods = Object.keys(marketPeriodLabels) as ChartPeriod[];
 const quickPeriods: ChartPeriod[] = ['1m', '1d', '1w'];
@@ -19,14 +26,21 @@ export const marketPeriodPreferenceKey = 'thesis-ledger:market-period-preference
 const keyFor = (symbol: string) => `thesis-ledger:market-period:${symbol}`;
 export function readMarketPeriod(symbol: string): ChartPeriod {
   try {
-    const value = window.localStorage.getItem(marketPeriodPreferenceKey)
-      ?? window.localStorage.getItem(keyFor(symbol));
+    const value =
+      window.localStorage.getItem(marketPeriodPreferenceKey) ??
+      window.localStorage.getItem(keyFor(symbol));
     if (periods.includes(value as ChartPeriod)) return value as ChartPeriod;
-  } catch { /* 存储不可用时使用日线。 */ }
+  } catch {
+    /* 存储不可用时使用日线。 */
+  }
   return '1d';
 }
 function savePeriod(value: ChartPeriod) {
-  try { window.localStorage.setItem(marketPeriodPreferenceKey, value); } catch { /* 会话选择仍可用。 */ }
+  try {
+    window.localStorage.setItem(marketPeriodPreferenceKey, value);
+  } catch {
+    /* 会话选择仍可用。 */
+  }
 }
 const PeriodContext = createContext<ReactNode>(null);
 const PeriodNoticeContext = createContext<ReactNode>(null);
@@ -35,55 +49,50 @@ export const useMarketPeriodControls = () => useContext(PeriodContext);
 export const useMarketPeriodNotice = () => useContext(PeriodNoticeContext);
 export const useMarketPeriodDataReady = () => useContext(PeriodDataReadyContext);
 
-export function MarketPeriodSelection({ symbol, enabled, adjustment, children }: {
+export function MarketPeriodSelection(props: {
   symbol: string;
   enabled: boolean;
-  adjustment?: 'none' | 'qfq' | 'hfq';
+  adjustment?: 'none' | 'qfq' | 'hfq' | undefined;
+  children: (period: ChartPeriod) => ReactNode;
+}) {
+  const control = useMarketPeriodSelection(props);
+  const { controls, periodNotice, waitingMinute, children, period } = control;
+
+  return (
+    <PeriodContext.Provider value={controls}>
+      <PeriodNoticeContext.Provider value={periodNotice}>
+        <PeriodDataReadyContext.Provider value={!waitingMinute}>
+          {children(period)}
+        </PeriodDataReadyContext.Provider>
+      </PeriodNoticeContext.Provider>
+    </PeriodContext.Provider>
+  );
+}
+
+function useMarketPeriodSelection({
+  symbol,
+  enabled,
+  adjustment,
+  children,
+}: {
+  symbol: string;
+  enabled: boolean;
+  adjustment?: 'none' | 'qfq' | 'hfq' | undefined;
   children: (period: ChartPeriod) => ReactNode;
 }) {
   const [selection, setSelection] = useState(() => ({ symbol, value: readMarketPeriod(symbol) }));
   const [notice, setNotice] = useState<{ symbol: string; text: string } | null>(null);
   const selected = selection.symbol === symbol ? selection.value : readMarketPeriod(symbol);
-  const optionsQuery = (barsLimit: number) => ({
-    queryKey: ['desktop', 'market-period-options', symbol, adjustment ?? 'qfq', barsLimit],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      getDesktopApiClient().market.getPeriodOptions(symbol, {
-        adjustment: adjustment ?? 'qfq', barsLimit, signal,
-      }),
-    enabled: enabled && /\.(SH|SZ|BJ)$/.test(symbol),
-    staleTime: 60_000,
-    retry: false,
-  });
-  const standardQuery = useQuery(optionsQuery(90));
-  const annualQuery = useQuery(optionsQuery(2));
-  const minuteMarket = /\.(SH|SZ|BJ|HK|US)$/.test(symbol);
-  const minuteQuery = useQuery({
-    queryKey: ['desktop', 'market-minute-options', symbol, '1m'],
-    queryFn: ({ signal }) => getDesktopApiClient().market.getChartOptions(symbol, signal, undefined, '1m'),
-    enabled: enabled && minuteMarket,
-    staleTime: 15_000,
-    retry: false,
-  });
-  const derivedMinuteQuery = useQuery({
-    queryKey: ['desktop', 'market-derived-minute-options', symbol, 90],
-    queryFn: ({ signal }) => getDesktopApiClient().market.getMinuteOptions(symbol, { barsLimit: 90, signal }),
-    enabled: enabled && minuteMarket,
-    staleTime: 15_000,
-    retry: false,
-  });
+  const { standardQuery, annualQuery, minuteMarket, minuteQuery, derivedMinuteQuery } =
+    useMarketPeriodQueries({ symbol, enabled, adjustment });
   const query = selected === '1y' ? annualQuery : standardQuery;
-  const available = new Set<ChartPeriod>(['1d']);
-  if (minuteQuery.data?.symbol === symbol && minuteQuery.data.timeframe === '1m' &&
-      minuteQuery.data.options.some((option) => option.adjustment === 'none' && option.available)) available.add('1m');
-  if (derivedMinuteQuery.data?.version === 'market-minute-options-v1' && derivedMinuteQuery.data.symbol === symbol)
-    for (const option of derivedMinuteQuery.data.options)
-      if (option.available) available.add(option.timeframe);
-  for (const option of standardQuery.data?.options ?? []) {
-    if (option.timeframe !== '1y' && option.available) available.add(option.timeframe);
-  }
-  if (annualQuery.data?.options.some((option) => option.timeframe === '1y' && option.available)) {
-    available.add('1y');
-  }
+  const { available } = marketAvailablePeriods(
+    symbol,
+    standardQuery,
+    annualQuery,
+    minuteQuery,
+    derivedMinuteQuery,
+  );
   let ready = query.isSuccess;
   if (selected === '1m') ready = !minuteMarket || minuteQuery.isSuccess;
   else if (isMarketMinuteTimeframe(selected)) ready = !minuteMarket || derivedMinuteQuery.isSuccess;
@@ -104,24 +113,129 @@ export function MarketPeriodSelection({ symbol, enabled, adjustment, children }:
     savePeriod(value);
   };
   const controls = enabled ? (
-    <MarketChartChoiceControls label="行情周期" moreLabel="更多周期" value={period} quickValues={quickPeriods}
-      options={periods.filter((value) => available.has(value)).map((value) => ({ value, label: marketPeriodLabels[value] }))}
-      onValueChange={(value) => { if (periods.includes(value as ChartPeriod)) select(value as ChartPeriod); }} />
+    <MarketChartChoiceControls
+      label="行情周期"
+      moreLabel="更多周期"
+      value={period}
+      quickValues={quickPeriods}
+      options={periods
+        .filter((value) => available.has(value))
+        .map((value) => ({ value, label: marketPeriodLabels[value] }))}
+      onValueChange={(value) => {
+        if (periods.includes(value as ChartPeriod)) select(value as ChartPeriod);
+      }}
+    />
   ) : null;
+  const { periodNotice } = marketPeriodNotice(waitingMinute, minuteReadiness, notice, symbol);
+
+  return { controls, periodNotice, waitingMinute, children, period };
+}
+
+function useMarketPeriodQueries({
+  symbol,
+  enabled,
+  adjustment,
+}: {
+  symbol: string;
+  enabled: boolean;
+  adjustment?: 'none' | 'qfq' | 'hfq' | undefined;
+}) {
+  const optionsQuery = (barsLimit: number) => ({
+    queryKey: ['desktop', 'market-period-options', symbol, adjustment ?? 'qfq', barsLimit],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      getDesktopApiClient().market.getPeriodOptions(symbol, {
+        adjustment: adjustment ?? 'qfq',
+        barsLimit,
+        signal,
+      }),
+    enabled: enabled && /\.(SH|SZ|BJ)$/.test(symbol),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const standardQuery = useQuery(optionsQuery(90));
+  const annualQuery = useQuery(optionsQuery(2));
+  const minuteMarket = /\.(SH|SZ|BJ|HK|US)$/.test(symbol);
+  const minuteQuery = useQuery({
+    queryKey: ['desktop', 'market-minute-options', symbol, '1m'],
+    queryFn: ({ signal }) =>
+      getDesktopApiClient().market.getChartOptions(symbol, signal, undefined, '1m'),
+    enabled: enabled && minuteMarket,
+    staleTime: 15_000,
+    retry: false,
+  });
+  const derivedMinuteQuery = useQuery({
+    queryKey: ['desktop', 'market-derived-minute-options', symbol, 90],
+    queryFn: ({ signal }) =>
+      getDesktopApiClient().market.getMinuteOptions(symbol, { barsLimit: 90, signal }),
+    enabled: enabled && minuteMarket,
+    staleTime: 15_000,
+    retry: false,
+  });
+  return { standardQuery, annualQuery, minuteMarket, minuteQuery, derivedMinuteQuery };
+}
+
+function marketAvailablePeriods(
+  symbol: string,
+  standardQuery: ReturnType<typeof useMarketPeriodQueries>['standardQuery'],
+  annualQuery: ReturnType<typeof useMarketPeriodQueries>['annualQuery'],
+  minuteQuery: ReturnType<typeof useMarketPeriodQueries>['minuteQuery'],
+  derivedMinuteQuery: ReturnType<typeof useMarketPeriodQueries>['derivedMinuteQuery'],
+) {
+  const available = new Set<ChartPeriod>(['1d']);
+  if (
+    minuteQuery.data?.symbol === symbol &&
+    minuteQuery.data.timeframe === '1m' &&
+    minuteQuery.data.options.some((option) => option.adjustment === 'none' && option.available)
+  )
+    available.add('1m');
+  if (
+    derivedMinuteQuery.data?.version === 'market-minute-options-v1' &&
+    derivedMinuteQuery.data.symbol === symbol
+  )
+    for (const option of derivedMinuteQuery.data.options)
+      if (option.available) available.add(option.timeframe);
+  for (const option of standardQuery.data?.options ?? []) {
+    if (option.timeframe !== '1y' && option.available) available.add(option.timeframe);
+  }
+  if (annualQuery.data?.options.some((option) => option.timeframe === '1y' && option.available)) {
+    available.add('1y');
+  }
+  return { available };
+}
+
+function marketPeriodNotice(
+  waitingMinute: boolean,
+  minuteReadiness:
+    | ReturnType<typeof useMarketPeriodQueries>['minuteQuery']
+    | ReturnType<typeof useMarketPeriodQueries>['derivedMinuteQuery'],
+  notice: { symbol: string; text: string } | null,
+  symbol: string,
+) {
   let periodNotice: ReactNode = null;
   if (waitingMinute && minuteReadiness.isError) {
-    periodNotice = <Alert role="status"><AlertDescription>
-      分钟周期暂时无法确认，请重试或选择日线。
-      <Button size="sm" variant="outline" onClick={() => void minuteReadiness.refetch()}>重试周期能力</Button>
-    </AlertDescription></Alert>;
+    periodNotice = (
+      <Alert role="status">
+        <AlertDescription>
+          分钟周期暂时无法确认，请重试或选择日线。
+          <Button size="sm" variant="outline" onClick={() => void minuteReadiness.refetch()}>
+            重试周期能力
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
   } else if (waitingMinute) {
-    periodNotice = <Alert role="status"><Spinner aria-hidden="true" /><AlertDescription>正在确认分钟周期…</AlertDescription></Alert>;
+    periodNotice = (
+      <Alert role="status">
+        <Spinner aria-hidden="true" />
+        <AlertDescription>正在确认分钟周期…</AlertDescription>
+      </Alert>
+    );
   } else if (notice?.symbol === symbol) {
-    periodNotice = <Alert role="status"><AlertDescription>{notice.text}</AlertDescription></Alert>;
+    periodNotice = (
+      <Alert role="status">
+        <AlertDescription>{notice.text}</AlertDescription>
+      </Alert>
+    );
   }
-  return <PeriodContext.Provider value={controls}>
-    <PeriodNoticeContext.Provider value={periodNotice}>
-      <PeriodDataReadyContext.Provider value={!waitingMinute}>{children(period)}</PeriodDataReadyContext.Provider>
-    </PeriodNoticeContext.Provider>
-  </PeriodContext.Provider>;
+  return { periodNotice };
 }

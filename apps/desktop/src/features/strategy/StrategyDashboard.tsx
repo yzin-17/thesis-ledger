@@ -150,66 +150,26 @@ function NavBacktestSetupRoute({
 }
 
 export function StrategyDashboard() {
-  const accountMode = useOptionalPortfolioMode()?.mode ?? 'actual';
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const toastManager = useToastManager();
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const queueErrorToastId = useRef<string | null>(null);
-  const [backtestSelection, setBacktestSelection] = useState<BacktestSelection | null>(null);
-  const [versionTabState, setVersionTabState] = useState<StrategyVersionTabState>({
-    sourceKey: '',
-    value: 'definition',
-  });
-  const centerTab = strategyCenterTabForPath(location.pathname);
-  const { strategies: strategiesQuery, jobs: jobsQuery } = useStrategyQueries();
-  const { refreshing, refresh } = usePageRefresh([
-    { queryKey: strategyKeys.root },
-    { predicate: ({ queryKey }) => queryKey[0] === 'desktop' && typeof queryKey[1] === 'string' && queryKey[1].startsWith('authoring-') },
-    { predicate: ({ queryKey }) => queryKey[0] === 'desktop' && queryKey[3] === 'model-arenas' },
-  ]);
-  useBacktestJobEvents();
-  const createMutation = useCreateStrategyMutation();
-  const createVersionMutation = useCreateStrategyVersionMutation();
-  const queueMutation = useQueueBacktestMutation();
-  const runMutation = useRunBacktestMutation();
-  const cancelMutation = useCancelBacktestMutation();
-  const retryMutation = useRetryBacktestMutation();
-  const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
-  const jobs: BacktestJobSummary[] = jobsQuery.data ?? [];
-  let loadState: LoadState = 'loading';
-  if (strategiesQuery.isError || jobsQuery.isError)
-    loadState = strategies.length || jobs.length ? 'stale' : 'error';
-  else if (strategiesQuery.isSuccess && jobsQuery.isSuccess) loadState = 'ready';
-  const load = async () => {
-    await Promise.all([
-      strategiesQuery.refetch(),
-      jobsQuery.refetch(),
-      queryClient.refetchQueries({ queryKey: strategyKeys.groups(), type: 'active' }),
-    ]);
-  };
-  const actions = createStrategyActionHandlers({
-    name: '',
-    schemaText: '',
+  const control = useStrategyDashboard();
+  const {
+    centerTab,
+    refreshing,
+    refresh,
+    loadState,
+    strategiesQuery,
+    jobsQuery,
+    strategies,
+    jobs,
+    setBacktestSelection,
+    accountMode,
+    versionTabState,
+    setVersionTabState,
     busyAction,
-    setBusyAction,
-    toastManager,
-    createMutation,
-    createVersionMutation,
-    queueMutation,
-    runMutation,
-    cancelMutation,
-    retryMutation,
-    queueErrorToastId,
-    load,
-  });
-  const startBacktest = async (setup: BacktestSetupInput) => {
-    if (!backtestSelection) return false;
-    const succeeded = await actions.startBacktest(backtestSelection.version, setup);
-    if (succeeded) void navigate(strategyCenterPath.jobs);
-    return succeeded;
-  };
+    actions,
+    backtestSelection,
+    startBacktest,
+    navigate,
+  } = control;
 
   return (
     <StrategyCenterLayout
@@ -225,7 +185,11 @@ export function StrategyDashboard() {
       <StrategyCenterErrorBoundary>
         <DataStateBanner
           state={loadState}
-          description={strategiesQuery.isError ? '策略列表暂未更新。已成功保存的策略或新版本无需再次提交，请重新读取列表。' : undefined}
+          description={
+            strategiesQuery.isError
+              ? '策略列表暂未更新。已成功保存的策略或新版本无需再次提交，请重新读取列表。'
+              : undefined
+          }
           onRetry={() => void refresh()}
         />
         <Routes>
@@ -347,4 +311,93 @@ export function StrategyDashboard() {
       />
     </StrategyCenterLayout>
   );
+}
+
+function useStrategyDashboard() {
+  const accountMode = useOptionalPortfolioMode()?.mode ?? 'actual';
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const toastManager = useToastManager();
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const queueErrorToastId = useRef<string | null>(null);
+  const [backtestSelection, setBacktestSelection] = useState<BacktestSelection | null>(null);
+  const [versionTabState, setVersionTabState] = useState<StrategyVersionTabState>({
+    sourceKey: '',
+    value: 'definition',
+  });
+  const centerTab = strategyCenterTabForPath(location.pathname);
+  const { strategies: strategiesQuery, jobs: jobsQuery } = useStrategyQueries();
+  const { refreshing, refresh } = usePageRefresh([
+    { queryKey: strategyKeys.root },
+    {
+      predicate: ({ queryKey }) =>
+        queryKey[0] === 'desktop' &&
+        typeof queryKey[1] === 'string' &&
+        queryKey[1].startsWith('authoring-'),
+    },
+    { predicate: ({ queryKey }) => queryKey[0] === 'desktop' && queryKey[3] === 'model-arenas' },
+  ]);
+  useBacktestJobEvents();
+  const createMutation = useCreateStrategyMutation();
+  const createVersionMutation = useCreateStrategyVersionMutation();
+  const queueMutation = useQueueBacktestMutation();
+  const runMutation = useRunBacktestMutation();
+  const cancelMutation = useCancelBacktestMutation();
+  const retryMutation = useRetryBacktestMutation();
+  const strategies: StrategyRecord[] = strategiesQuery.data ?? [];
+  const jobs: BacktestJobSummary[] = jobsQuery.data ?? [];
+  let loadState: LoadState = 'loading';
+  if (strategiesQuery.isError || jobsQuery.isError)
+    loadState = strategies.length || jobs.length ? 'stale' : 'error';
+  else if (strategiesQuery.isSuccess && jobsQuery.isSuccess) loadState = 'ready';
+  const load = async () => {
+    await Promise.all([
+      strategiesQuery.refetch(),
+      jobsQuery.refetch(),
+      queryClient.refetchQueries({ queryKey: strategyKeys.groups(), type: 'active' }),
+    ]);
+  };
+  const actions = createStrategyActionHandlers({
+    name: '',
+    schemaText: '',
+    busyAction,
+    setBusyAction,
+    toastManager,
+    createMutation,
+    createVersionMutation,
+    queueMutation,
+    runMutation,
+    cancelMutation,
+    retryMutation,
+    queueErrorToastId,
+    onJobQueued: (job) => { void navigate(strategyCenterPath.job(job.id)); },
+    load,
+  });
+  const startBacktest = async (setup: BacktestSetupInput) => {
+    if (!backtestSelection) return false;
+    const succeeded = await actions.startBacktest(backtestSelection.version, setup);
+    if (succeeded) void navigate(strategyCenterPath.jobs);
+    return succeeded;
+  };
+
+  return {
+    centerTab,
+    refreshing,
+    refresh,
+    loadState,
+    strategiesQuery,
+    jobsQuery,
+    strategies,
+    jobs,
+    setBacktestSelection,
+    accountMode,
+    versionTabState,
+    setVersionTabState,
+    busyAction,
+    actions,
+    backtestSelection,
+    startBacktest,
+    navigate,
+  };
 }

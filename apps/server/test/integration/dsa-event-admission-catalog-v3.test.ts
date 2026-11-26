@@ -10,19 +10,19 @@ function client(raw: unknown) {
 describe('事件准入只读视图客户端', () => {
   it('通过原Control GET和显式版本参数读取，单次预算', async () => {
     const value = { protocolVersion: 'event-admission-catalog-v1', admissions: [], catalog: {
-      contractVersion: 3, consumer: 'thesis-ledger', catalogRevision: 1,
+      contractVersion: 1, consumer: 'thesis-ledger', catalogRevision: 1,
       generatedAt: '2026-10-12T10:00:00Z', integrity: 'complete', entries: [],
     } };
     const input = client(value);
     expect(await readDsaEventAdmissionCatalogV3(input.port)).toEqual(value);
     expect(input.control).toHaveBeenCalledOnce();
     expect(input.control.mock.calls[0]?.slice(0, 3)).toEqual([
-      '/api/v3/thesis-ledger/control/routes/capabilities?contractVersion=3&eventAdmissions=v1', undefined, 1,
+      '/api/v1/thesis-ledger/control/routes/capabilities?contractVersion=1&eventAdmissions=v1', undefined, 1,
     ]);
   });
 
   it('旧视图/敏感坏输入不作为精确证明，不重试且错误脱敏', async () => {
-    const input = client({ token: 'private-token-fixture', contractVersion: 3 });
+    const input = client({ token: 'private-token-fixture', contractVersion: 1 });
     await expect(readDsaEventAdmissionCatalogV3(input.port)).rejects.toMatchObject({ code: 'invalid-response' });
     await expect(readDsaEventAdmissionCatalogV3(input.port)).rejects.not.toThrow('private-token-fixture');
     expect(input.control).toHaveBeenCalledTimes(2);

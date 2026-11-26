@@ -1,5 +1,6 @@
 import { DecimalValue } from './decimal.js';
-import { calculateBacktestTradeMetrics, type BacktestTradeMetrics } from './backtest-trades.js';
+import { backtestTradeMetricsSteps, type BacktestTradeMetrics } from './backtest-trades.js';
+import { finishBacktestComputation } from './backtest-computation.js';
 import type {
   BacktestCurrency,
   BacktestMetric,
@@ -137,12 +138,13 @@ const comparePointsSafely = (
   }
 };
 
-const normalizedEquity = (
+function* normalizedEquity(
   input: BacktestAnalyticsInput,
   warnings: string[],
-): BacktestEquityPoint[] => {
+): Generator<void, BacktestEquityPoint[], void> {
   const result: BacktestEquityPoint[] = [];
   for (const point of [...input.equityCurve].sort(comparePointsSafely)) {
+    yield;
     try {
       parseTime(point.occurredAt);
       if (point.availableAt !== undefined) parseTime(point.availableAt);
@@ -167,15 +169,16 @@ const normalizedEquity = (
     }
   }
   return result;
-};
+}
 
-const drawdowns = (
+function* drawdowns(
   points: readonly BacktestEquityPoint[],
-): { curve: BacktestDrawdownPoint[]; max: string } => {
+): Generator<void, { curve: BacktestDrawdownPoint[]; max: string }, void> {
   let peak = DecimalValue.from('0');
   let max = DecimalValue.from('0');
   const curve: BacktestDrawdownPoint[] = [];
   for (const point of points) {
+    yield;
     const equity = DecimalValue.from(point.value.amount);
     if (equity.compareTo(peak) > 0) peak = equity;
     const drawdown = peak.isZero()
@@ -191,7 +194,7 @@ const drawdowns = (
     });
   }
   return { curve, max: max.toString() };
-};
+}
 
 const decimalMetric = (value: DecimalValue) => available(value.toString());
 
@@ -200,12 +203,13 @@ const numericMetric = (value: number, reason: string): BacktestMetric => {
   return available(DecimalValue.from(value.toFixed(20)).toString());
 };
 
-const returnMetrics = (
+type ReturnMetrics = Record<'totalReturn' | 'cagr' | 'maxDrawdown' | 'volatility' | 'sharpe' | 'basicPeriodReturn', BacktestMetric>;
+function* returnMetrics(
   points: readonly BacktestEquityPoint[],
   periodsPerYear: number,
   maxDrawdown: string,
   warnings: string[],
-) => {
+): Generator<void, ReturnMetrics, void> {
   const unavailableMetrics = {
     totalReturn: unavailable('INSUFFICIENT_EQUITY_POINTS'),
     cagr: unavailable('INSUFFICIENT_EQUITY_POINTS'),
@@ -228,6 +232,7 @@ const returnMetrics = (
   const total = last.dividedBy(first, 20).minus('1');
   const returns: number[] = [];
   for (let index = 1; index < points.length; index += 1) {
+    yield;
     const previous = DecimalValue.from(points[index - 1]!.value.amount);
     if (previous.isZero()) {
       warnings.push(`ZERO_EQUITY_AT:${points[index - 1]!.occurredAt}`);
@@ -265,7 +270,7 @@ const returnMetrics = (
     ),
     basicPeriodReturn: decimalMetric(total),
   };
-};
+}
 
 const pointAt = (
   points: readonly BacktestBenchmarkPoint[],
@@ -346,7 +351,7 @@ interface BacktestBenchmarkAnalysis {
   };
 }
 
-function collectAlignedBenchmarkValues(
+function* collectAlignedBenchmarkValues(
   input: BacktestAnalyticsInput,
   benchmark: BacktestBenchmarkInput,
   equity: readonly BacktestEquityPoint[],
@@ -357,6 +362,7 @@ function collectAlignedBenchmarkValues(
   let alignmentIncomplete = false;
   let fxUnavailable = false;
   for (const equityPoint of equity) {
+    yield;
     const source = pointAt(benchmark.points, equityPoint.occurredAt);
     if (source === undefined) {
       alignmentIncomplete = true;
@@ -386,12 +392,12 @@ function collectAlignedBenchmarkValues(
   return { values, matched, alignmentIncomplete, fxUnavailable };
 }
 
-const benchmarkMetrics = (
+function* benchmarkMetrics(
   input: BacktestAnalyticsInput,
   equity: readonly BacktestEquityPoint[],
   strategyTotalReturn: BacktestMetric,
   warnings: string[],
-): BacktestBenchmarkAnalysis | undefined => {
+): Generator<void, BacktestBenchmarkAnalysis | undefined, void> {
   const resolution = resolveBenchmark(input);
   const benchmarkIdentity =
     input.benchmarkComparison?.benchmark ??
@@ -434,7 +440,7 @@ const benchmarkMetrics = (
   }
   const benchmark = resolution.benchmark;
   if (benchmark === undefined) return undefined;
-  const { values, matched, alignmentIncomplete, fxUnavailable } = collectAlignedBenchmarkValues(input, benchmark, equity, warnings);
+  const { values, matched, alignmentIncomplete, fxUnavailable } = yield* collectAlignedBenchmarkValues(input, benchmark, equity, warnings);
   if (alignmentIncomplete) warnings.push(`BENCHMARK_ALIGNMENT_INCOMPLETE:${benchmark.symbol}`);
   if (fxUnavailable) return finish(unavailable('FX_UNAVAILABLE'));
   if (alignmentIncomplete || matched.size < 2 || values.length < 2) {
@@ -453,11 +459,11 @@ const benchmarkMetrics = (
       ? available(benchmarkReturn.value)
       : unavailable(benchmarkReturn.reason),
   );
-};
+}
 
-const tradeMetricRecord = (
+function* tradeMetricRecord(
   trades: readonly SimulationTrade[] | undefined,
-): BacktestTradeMetrics => {
+): Generator<void, BacktestTradeMetrics, void> {
   if (trades === undefined) {
     return {
       tradeCount: unavailable('TRADE_DATA_UNAVAILABLE'),
@@ -466,13 +472,13 @@ const tradeMetricRecord = (
       warnings: [],
     };
   }
-  return calculateBacktestTradeMetrics(trades);
-};
+  return yield* backtestTradeMetricsSteps(trades);
+}
 
-const turnoverMetric = (
+function* turnoverMetric(
   input: BacktestAnalyticsInput,
   trades: readonly SimulationTrade[] | undefined,
-): BacktestMetric => {
+): Generator<void, BacktestMetric, void> {
   if (input.turnover !== undefined) {
     try {
       return decimalMetric(decimal(input.turnover, 'Turnover'));
@@ -490,28 +496,26 @@ const turnoverMetric = (
   ) {
     return unavailable('TURNOVER_FX_UNAVAILABLE');
   }
-  const total = trades.reduce(
-    (sum, trade) => sum.plus(trade.entryValue.amount).plus(trade.exitValue.amount),
-    DecimalValue.from('0'),
-  );
+  let total = DecimalValue.from('0');
+  for (const trade of trades) { yield; total = total.plus(trade.entryValue.amount).plus(trade.exitValue.amount); }
   return decimalMetric(total);
-};
+}
 
-export const buildBacktestAnalytics = (input: BacktestAnalyticsInput): BacktestAnalyticsResult => {
+export function* buildBacktestAnalyticsSteps(input: BacktestAnalyticsInput): Generator<void, BacktestAnalyticsResult, void> {
   const warnings: string[] = [];
   warnings.push(...(input.unavailableReasons ?? []));
-  const equityCurve = normalizedEquity(input, warnings);
-  const drawdown = drawdowns(equityCurve);
-  const tradeMetrics = tradeMetricRecord(input.trades);
+  const equityCurve = yield* normalizedEquity(input, warnings);
+  const drawdown = yield* drawdowns(equityCurve);
+  const tradeMetrics = yield* tradeMetricRecord(input.trades);
   warnings.push(...tradeMetrics.warnings);
   const metrics = {
-    ...returnMetrics(equityCurve, input.periodsPerYear, drawdown.max, warnings),
+    ...(yield* returnMetrics(equityCurve, input.periodsPerYear, drawdown.max, warnings)),
     tradeCount: tradeMetrics.tradeCount,
     winRate: tradeMetrics.winRate,
     profitFactor: tradeMetrics.profitFactor,
-    turnover: turnoverMetric(input, input.trades),
+    turnover: yield* turnoverMetric(input, input.trades),
   };
-  const benchmarkAnalysis = benchmarkMetrics(input, equityCurve, metrics.totalReturn, warnings);
+  const benchmarkAnalysis = yield* benchmarkMetrics(input, equityCurve, metrics.totalReturn, warnings);
   const benchmark = benchmarkAnalysis?.metrics;
   if (
     benchmark !== undefined &&
@@ -568,6 +572,8 @@ export const buildBacktestAnalytics = (input: BacktestAnalyticsInput): BacktestA
     warnings,
     resultChecksum: deterministicResultChecksum(checksumPayload),
   };
-};
+}
+
+export const buildBacktestAnalytics = (input: BacktestAnalyticsInput) => finishBacktestComputation(buildBacktestAnalyticsSteps(input));
 
 export const createBacktestResultAnalytics = buildBacktestAnalytics;

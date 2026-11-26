@@ -18,8 +18,8 @@ export async function recordBacktestPreparationFailure(
   },
 ) {
   const input = backtestPreparationFailureInputSchema.parse({
-    contractVersion: 3,
-    schemaVersion: '3',
+    contractVersion: 1,
+    schemaVersion: 'backtest-trade-run-v1',
     kind: 'preparation-failure',
     submissionId: failure.submissionId,
     preparation: failure.preparation,
@@ -36,7 +36,7 @@ export async function recordBacktestPreparationFailure(
     create: {
       strategyVersionId: request.strategyVersionId,
       idempotencyKey: `strategy-submit:${failure.submissionId}`,
-      mode: 'V3',
+      mode: 'frozen',
       status: 'failed',
       stage: 'preparation-failed',
       progress: 100,

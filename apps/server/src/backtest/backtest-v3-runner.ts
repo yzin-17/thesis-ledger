@@ -1,3 +1,4 @@
+import { announcementAssumptionWarnings } from './backtest-announcement-events.js';
 import {
   backtestResultSchemaV3,
   runConfigSchemaV3,
@@ -8,15 +9,18 @@ import {
   type BacktestStrategy,
 } from '@thesis-ledger/schemas';
 import { deterministicResultChecksum } from '@thesis-ledger/domain';
+import { researchAnalyticsV3Steps } from './backtest-research-analytics-v3.js';
+import { advanceBacktestComputation } from '@thesis-ledger/domain';
 import type { ArtifactRef, ArtifactRow } from './backtest-artifact-store.js';
 import { canonicalizeManifest, hashCanonicalManifest } from './backtest-snapshot.js';
 import type { LocalSnapshotStore } from './backtest-snapshot.js';
 import type { ExchangeVerticalResult } from './backtest-v2-execution-shared.js';
 import { lifecycleExecutionWarningsV3 } from './backtest-lifecycle-execution-v3.js';
-import { runExchangeVertical } from './backtest-v2-execution-exchange.js';
+import { runExchangeVerticalCooperatively } from './backtest-v2-execution-exchange.js';
 import {
   skippedBacktestTradingDatesV3,
   zeroVolumeObservationWarningsV3,
+  priceOnlyObservationWarningsV3,
 } from './backtest-v3-tradability.js';
 import { buildBacktestV3Benchmark } from './backtest-v3-benchmark.js';
 import { backtestListingWarningsV3 } from './backtest-listing-disclosure-v3.js';
@@ -46,7 +50,12 @@ export interface BacktestV3RunnerInput {
 
 export interface BacktestV3Runner {
   readonly id: string;
-  run(input: BacktestV3RunnerInput, signal: AbortSignal): Promise<BacktestResultV3>;
+  run(input: BacktestV3RunnerInput, signal: AbortSignal, context?: BacktestV3RunnerContext): Promise<BacktestResultV3>;
+}
+
+export interface BacktestV3RunnerContext {
+  snapshots: LocalSnapshotStore;
+  onStage?: (stage: 'simulating' | 'analyzing') => Promise<void>;
 }
 
 export const BACKTEST_V3_RUNNER = Symbol('BACKTEST_V3_RUNNER');
@@ -196,17 +205,18 @@ const readStrictMetadata = (
 };
 
 export class LocalSnapshotV3Runner implements BacktestV3Runner {
-  readonly id = 'thesis-ledger-v3-local-runner-v4';
+  readonly id = 'thesis-ledger-v3-local-runner-v5';
 
   constructor(private readonly snapshots: LocalSnapshotStore) {}
 
-  async run(input: BacktestV3RunnerInput, signal: AbortSignal): Promise<BacktestResultV3> {
+  async run(input: BacktestV3RunnerInput, signal: AbortSignal, context?: BacktestV3RunnerContext): Promise<BacktestResultV3> {
+    const snapshots = context?.snapshots ?? this.snapshots;
     assertNotAborted(signal);
-    const manifest = await this.snapshots.v3.replay(input.runId);
+    const manifest = await snapshots.v3.replay(input.runId);
     assertNotAborted(signal);
     assertRunnerSnapshotInput(manifest, input);
 
-    const rowsByArtifact = await readArtifactRows(this.snapshots, manifest.artifacts, signal);
+    const rowsByArtifact = await readArtifactRows(snapshots, manifest.artifacts, signal);
     const metadataKey = `${manifest.runId}/metadata/snapshot-metadata-v3.parquet`;
     const { strategy, runConfig } = readStrictMetadata(
       manifest,
@@ -237,7 +247,8 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
         ),
       };
     }
-    const vertical = runExchangeVertical({
+    await context?.onStage?.('simulating');
+    const vertical = await runExchangeVerticalCooperatively({
       runId: manifest.runId,
       strategyVersionId: manifest.strategyVersionId,
       snapshotId: manifest.contentHash,
@@ -249,8 +260,9 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       marketRuleVersion: manifest.marketRuleVersion,
       calendarVersion: manifest.calendarVersion,
       aggregationVersion: manifest.aggregationVersion,
-    });
+    }, { signal });
     assertNotAborted(signal);
+    await context?.onStage?.('analyzing');
     const projectedRejects = projectV3SimulationRejects(
       vertical.rejects,
       strategy.executionInstrument.symbol,
@@ -275,14 +287,20 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
     }
 
     const disclosures = snapshotDisclosures(runConfig, manifest, vertical, rowsByArtifact);
+    const fills = priceResearchFills(manifest.runId, strategy, runConfig, rowsByArtifact, vertical.fills);
+    const researchAnalytics = await advanceBacktestComputation(researchAnalyticsV3Steps(
+      vertical.analytics, fills, runConfig,
+      { CN: 'CNY', HK: 'HKD', US: 'USD' }[strategy.executionInstrument.market] as RunConfigV3['baseCurrency'],
+      rowsByArtifact,
+    ), { signal });
     const resultPayload = {
       source: 'BACKTEST' as const,
       runId: manifest.runId,
       strategyVersionId: manifest.strategyVersionId,
       snapshotId: manifest.contentHash,
       engineVersion: this.id,
-      schemaVersion: '3' as const,
-      snapshotVersion: 'snapshot-manifest-v3' as const,
+      schemaVersion: 'backtest-trade-result-v1' as const,
+      snapshotVersion: 'backtest-trade-snapshot-manifest-v1' as const,
       ...disclosures.research,
       marketRuleVersion: manifest.marketRuleVersion,
       calendarVersion: manifest.calendarVersion,
@@ -299,10 +317,12 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
       warnings: [
         ...priceResearchInputWarnings(manifest.runId, strategy, runConfig, rowsByArtifact),
         ...zeroVolumeObservationWarningsV3(strategy, runConfig, rowsByArtifact, manifest.runId),
+        ...priceOnlyObservationWarningsV3(strategy, runConfig, rowsByArtifact, manifest.runId),
         ...backtestListingWarningsV3(
           rowsByArtifact.get(`${manifest.runId}/metadata/market-window-evidence-v3.parquet`)?.[0],
           tradingStatus.status?.disclosure,
         ),
+        ...announcementAssumptionWarnings(rowsByArtifact.get(`${manifest.runId}/${dependencyEvidenceKey}`)),
         ...publicFeesWarningsV3(publicFees?.disclosure),
         ...tradingStatusWarningsV3(tradingStatus.status?.disclosure),
         ...tradingStatus.compositionWarnings,
@@ -315,17 +335,13 @@ export class LocalSnapshotV3Runner implements BacktestV3Runner {
         ...benchmark.warnings,
       ],
       rejectedOrders: projectedRejects.rejectedOrders,
-      simulationFills: priceResearchFills(
-        manifest.runId,
-        strategy,
-        runConfig,
-        rowsByArtifact,
-        vertical.fills,
-      ),
+      ...(vertical.dailyOrders ? { dailyOrders: vertical.dailyOrders } : {}),
+      simulationFills: fills,
       trades: vertical.trades,
       equityCurve: vertical.analytics.equityCurve,
       drawdownCurve: vertical.analytics.drawdownCurve,
-      metrics: vertical.analytics.metrics,
+      ...researchAnalytics,
+      ...(vertical.ruleDiagnostics ? { ruleDiagnostics: vertical.ruleDiagnostics } : {}),
       benchmark: benchmark.benchmark,
       benchmarkCompatibility: benchmark.benchmarkCompatibility,
     };

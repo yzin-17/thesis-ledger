@@ -238,7 +238,7 @@ export class MarketPeriodDetailService {
       requestId,
     );
     return marketDisplayDetailResponseSchema.parse({
-      contractVersion: 3,
+      contractVersion: 1,
       symbol: identity.symbol,
       assetType: identity.assetType,
       identity: { source: identity.source, status: identity.status },

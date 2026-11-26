@@ -41,10 +41,10 @@ it.skipIf(!enabled)(
       },
     }) as DsaClient;
     const quote = await client.get<Record<string, unknown>>(
-      '/api/v3/thesis-ledger/market/quote?symbol=510300.SH',
+      '/api/v1/thesis-ledger/market/quote?symbol=510300.SH',
     );
     expect(quote).toMatchObject({
-      version: 3,
+      version: 1,
       symbol: '510300.SH',
       price: 100,
       provider: 'tencent',
@@ -69,7 +69,7 @@ it.skipIf(!enabled)(
     expect(['live', 'delayed'], JSON.stringify(marketQuote)).toContain(marketQuote.freshness);
     expect(marketQuote.units?.priceCurrency, JSON.stringify(marketQuote)).toBe('CNY');
     const news = await client.marketNewsV3({
-      version: 3,
+      version: 1,
       capability: 'NEWS_SEARCH',
       contractVersion: 'news-search-v1',
       requestId: randomUUID(),
@@ -132,7 +132,10 @@ describe.skipIf(!databaseUrl || !enabled)('G1：实际 Server、DSA、PostgreSQL
   beforeAll(async () => {
     prisma = new PrismaClient({ datasourceUrl: databaseUrl ?? '' });
     await assertIsolated(prisma);
-    harness = await createResearchSubmissionPostgresHarness(prisma, producer, 5_000);
+    harness = await createResearchSubmissionPostgresHarness(prisma, {
+      data: producer,
+      dsaTimeoutMs: 5_000,
+    });
   });
   beforeEach(async () => {
     await prisma.aiToolCall.deleteMany();
@@ -168,7 +171,7 @@ describe.skipIf(!databaseUrl || !enabled)('G1：实际 Server、DSA、PostgreSQL
     input = {
       ...harness.input((await harness.models.configureDefault()).revision),
       scope: { scope: 'instrument', instrumentId },
-      templateId: 'counter-evidence',
+      templateId: 'recent-changes',
     };
   });
   afterAll(async () => {
@@ -216,6 +219,10 @@ describe.skipIf(!databaseUrl || !enabled)('G1：实际 Server、DSA、PostgreSQL
       'quote',
       'news',
     ]);
+    expect(frozen.evidence.find((item) => item.audit.kind === 'quote')?.audit).toMatchObject({
+      providerId: 'tencent',
+      contractVersion: 'dsa-data-v1',
+    });
     expect(frozen.evidence.find((item) => item.audit.kind === 'news')?.audit).toMatchObject({
       providerId: 'searxng',
       upstreamSource: 'searxng-news-search',

@@ -1,7 +1,7 @@
 {
   "fixtureClock": "2026-11-06T00:00:00+00:00",
   "request": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "consumer": "thesis-ledger",
     "requestId": "etf-public-fees-fixture",
     "routeKey": {
@@ -22,7 +22,7 @@
     }
   },
   "response": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "consumer": "thesis-ledger",
     "requestId": "etf-public-fees-fixture",
     "routeKey": {

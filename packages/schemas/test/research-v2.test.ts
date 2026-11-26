@@ -18,7 +18,7 @@ import {
 } from '../src/index.js';
 import { researchV2Fixture } from './fixtures/research-v2.js';
 
-it('V2 提交、冻结、推断和最终绑定使用不同严格合同，现有 SDK 默认仍是 V1', () => {
+it('提交、冻结、推断和结果分别采用具名合同，SDK 默认使用研究生成合同', () => {
   const f = researchV2Fixture();
   expect(researchSubmissionV2Schema.parse(f.input)).toEqual(f.input);
   expect(aiFrozenResearchV2Schema.parse(f.frozen)).toEqual(f.frozen);
@@ -29,7 +29,7 @@ it('V2 提交、冻结、推断和最终绑定使用不同严格合同，现有 
   expect(aiGenerationContractRefSchema.parse(researchGenerationV2Contract.ref)).toEqual(
     researchGenerationV2Contract.ref,
   );
-  expect(aiGenerationContracts.research.ref.version).toBe('research-generation-v1');
+  expect(aiGenerationContracts.research.ref).toEqual(researchGenerationV2Contract.ref);
 });
 
 it('V1 保持原结构，未知版本不降级为 V1', () => {

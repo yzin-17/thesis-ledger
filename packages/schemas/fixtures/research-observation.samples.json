@@ -9,7 +9,7 @@
     "historicalScope": {
       "status": "known",
       "snapshot": {
-        "version": "research-scope-v2",
+        "version": "research-scope-snapshot-v1",
         "mode": "shadow",
         "confirmedAt": "2026-10-18T07:59:00Z",
         "scope": "instrument",
@@ -23,7 +23,7 @@
         }
       }
     },
-    "resultVersion": 2,
+    "resultVersion": "research-report-result-v1",
     "availability": "available",
     "summary": "材料有限，继续观察。",
     "quality": {
@@ -33,10 +33,10 @@
     "errorCode": null,
     "errorSummary": null,
     "result": {
-      "version": 2,
+      "version": "research-report-result-v1",
       "inputFingerprint": "8aaa37492eb270ff22a9aa291e0c703512681ed39a0742372640c836ce35b240",
       "scopeSnapshot": {
-        "version": "research-scope-v2",
+        "version": "research-scope-snapshot-v1",
         "mode": "shadow",
         "confirmedAt": "2026-10-18T07:59:00Z",
         "scope": "instrument",
@@ -58,7 +58,7 @@
         "researchSettingsRevision": "controlled-settings-1"
       },
       "inference": {
-        "version": 2,
+        "version": "research-report-generation-v1",
         "conclusion": "材料有限，继续观察。",
         "rationale": [
           "合成报价只支持当前数值核对。"
@@ -194,7 +194,7 @@
       }
     },
     "submission": {
-      "version": 2,
+      "version": "research-report-submission-v1",
       "submissionId": "98fd6289-7c36-4d6b-b5cb-7e395d41bc9c",
       "mode": "shadow",
       "scope": {
@@ -212,7 +212,7 @@
     "historicalScope": {
       "status": "known",
       "snapshot": {
-        "version": "research-scope-v2",
+        "version": "research-scope-snapshot-v1",
         "mode": "shadow",
         "confirmedAt": "2026-10-18T07:59:00Z",
         "scope": "instrument",
@@ -699,7 +699,7 @@
     "historicalScope": {
       "status": "known",
       "snapshot": {
-        "version": "research-scope-v2",
+        "version": "research-scope-snapshot-v1",
         "mode": "shadow",
         "confirmedAt": "2026-10-18T07:59:00Z",
         "scope": "instrument",
@@ -1167,7 +1167,7 @@
     "historicalScope": {
       "status": "known",
       "snapshot": {
-        "version": "research-scope-v2",
+        "version": "research-scope-snapshot-v1",
         "mode": "shadow",
         "confirmedAt": "2026-10-18T07:59:00Z",
         "scope": "instrument",

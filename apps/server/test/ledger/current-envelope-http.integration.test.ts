@@ -19,7 +19,6 @@ import {
   ledgerHttp,
   probeExecution,
   runCurrentLedgerHttpProbe,
-  runOldLedgerHttpProbe,
 } from './current-envelope-http-probe.js';
 
 const databaseUrl = process.env.LEDGER_CURRENT_TEST_DATABASE_URL;
@@ -141,7 +140,7 @@ function registerLedgerHttpEnvelopeCases(suiteScope: ReturnType<typeof ledgerHtt
     );
     expect(result.audit.events).toHaveLength(5);
     const rows = await suiteScope.prisma.ledgerEvent.findMany({ where: { accountId: account.id } });
-    expect(rows.every((row) => row.envelopeVersion === 3 && row.payloadVersion === 1)).toBe(true);
+    expect(rows.every((row) => row.envelopeVersion === 1 && row.payloadVersion === 1)).toBe(true);
     const position = await suiteScope.prisma.position.findFirstOrThrow({
       where: { accountId: account.id },
     });
@@ -155,39 +154,6 @@ function registerLedgerHttpEnvelopeCases(suiteScope: ReturnType<typeof ledgerHtt
       where: { accountId: account.id },
     });
     expect(state).toMatchObject({ ledgerRevision: 5n, projectionGeneration: 5n });
-  });
-  it('旧空版本通过生产 HTTP 明确拒绝读取与写入，原状态不变', async () => {
-    const account = await suiteScope.prisma.account.create({
-      data: { name: 'E03-d 旧记录 HTTP 夹具', type: 'securities' },
-    });
-    const row = await suiteScope.prisma.ledgerEvent.create({
-      data: {
-        accountId: account.id,
-        type: 'CASH_FLOW',
-        envelopeVersion: null,
-        payloadVersion: 1,
-        payload: { amount: '100' },
-        occurredAt: new Date('2026-09-29T02:00:00.000Z'),
-      },
-    });
-    const before = await suiteScope.prisma.ledgerEvent.findMany({
-      where: { accountId: account.id },
-    });
-    const rejected = await runOldLedgerHttpProbe(
-      ledgerHttp(suiteScope.origin),
-      account.id,
-      row.id,
-      '600519.SH',
-    );
-    expect(rejected.results).toHaveLength(5);
-    expect(
-      await suiteScope.prisma.ledgerEvent.findMany({ where: { accountId: account.id } }),
-    ).toEqual(before);
-    expect(
-      await suiteScope.prisma.accountLedgerState.findUnique({ where: { accountId: account.id } }),
-    ).toBeNull();
-    expect(await suiteScope.prisma.position.count({ where: { accountId: account.id } })).toBe(0);
-    expect(await suiteScope.prisma.cashBalance.count({ where: { accountId: account.id } })).toBe(0);
   });
 }
 function registerLedgerHttpVerificationCases(suiteScope: ReturnType<typeof ledgerHttpContext>) {
@@ -232,7 +198,7 @@ function registerLedgerHttpVerificationCases(suiteScope: ReturnType<typeof ledge
           ...eventFields,
           accountId: account.id,
           payload,
-          version: 3,
+          version: 1,
           eventId,
           factId: randomUUID(),
           type: 'BUY_EXECUTION',

@@ -6,7 +6,7 @@ export async function preparationFailureFixture() {
   const fixture = await completeSnapshotFixture();
   const c = fixture.input.runConfig;
   const preparation = backtestRunPreparationRequestV3Schema.parse({
-    contractVersion: 3, requestId: randomUUID(), strategyVersionId: randomUUID(),
+    contractVersion: 1, requestId: randomUUID(), strategyVersionId: randomUUID(),
     adjustment: 'qfq', accountingBasis: 'normalized-series',
     history: { basis: 'fixed-provider-snapshot' },
     runConfig: { startDate: c.startDate, endDate: c.endDate, dataAsOf: c.dataAsOf,
@@ -14,7 +14,7 @@ export async function preparationFailureFixture() {
       valuationPolicy: c.valuationPolicy, executionModel: c.executionModel },
   });
   const blocked = backtestRunPreparationResultV3Schema.parse({
-    status: 'blocked', contractVersion: 3, requestId: preparation.requestId,
+    status: 'blocked', contractVersion: 1, requestId: preparation.requestId,
     scope: 'execution-window', checkedAt: new Date().toISOString(),
     diagnostics: [{ category: 'data-unavailable', code: 'DATA_UNAVAILABLE', severity: 'error',
       purpose: 'execution', message: '主源未识别代码', capability: 'DAILY_BAR',

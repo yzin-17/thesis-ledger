@@ -88,7 +88,7 @@ async function main() {
     const [state, providers, catalog] = await Promise.all([
       api.get('/api/market-data/policy'),
       api.get('/api/market-data/providers'),
-      api.get('/api/market-data/routes/capabilities?contractVersion=3'),
+      api.get('/api/market-data/routes/capabilities?contractVersion=1'),
     ]);
     const baseline = readFundTarget();
     assert.equal(baseline.state.protection.database, 'thesis_ledger');

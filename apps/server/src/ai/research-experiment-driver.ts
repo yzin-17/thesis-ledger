@@ -85,7 +85,7 @@ function validateStage(
   now: number,
 ) {
   const result = researchResultV2Schema.parse({
-    version: 2,
+    version: 'research-report-result-v1',
     inputFingerprint: entry.frozen.inputFingerprint,
     scopeSnapshot: entry.frozen.scopeSnapshot,
     createdAt: new Date(now).toISOString(),

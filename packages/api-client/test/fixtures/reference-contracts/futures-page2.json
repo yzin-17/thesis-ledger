@@ -493,7 +493,7 @@
     "价格保留各合约来源报价单位，不按合约乘数折算为账户金额；成交量／持仓为手，成交额为万元。",
     "仅为所选来源交易日的官方文件，不声明完整历史可见性、实时可交易性或停牌判断；来源填零的缺报价保留为空。"
   ],
-  "contractVersion": 3,
+  "contractVersion": 1,
   "consumer": "thesis-ledger",
   "policyRevision": 189,
   "routeTarget": {

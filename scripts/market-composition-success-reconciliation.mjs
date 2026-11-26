@@ -16,7 +16,7 @@ assert(record.origin === origin && record.phase === 'restored' && record.owned =
 const api = createLocalApi(origin);
 const plan = createCompositionCase(await api.get('/api/market-data/policy'),
   (await api.get('/api/market-data/providers')).providers,
-  await api.get('/api/market-data/routes/capabilities?contractVersion=3'));
+  await api.get('/api/market-data/routes/capabilities?contractVersion=1'));
 assert.equal(plan.baseline.revision, record.restoredRevision);
 assert.equal(plan.baselineFingerprint, record.plan.baselineFingerprint);
 assert.deepEqual(plan.configVersions, record.plan.configVersions);

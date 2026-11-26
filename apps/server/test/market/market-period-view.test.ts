@@ -56,7 +56,7 @@ describe('原生日线到派生显示/计算视图', () => {
     expect(result.visible.series.coverage.hasMoreBefore).toBe(true);
     expect(
       marketPeriodIndicatorRequestSchema.safeParse({
-        contractVersion: 3,
+        contractVersion: 1,
         identity: result.calculation.series.identity,
         inputFingerprint: result.calculation.series.inputFingerprint,
         periodContext: result.calculation.periodContext,

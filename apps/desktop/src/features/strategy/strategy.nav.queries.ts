@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isBacktestRunUpdateOlder } from '@thesis-ledger/domain';
 import type {
   BacktestNavPreparationRequestV3,
   BacktestNavRunCreateV3,
@@ -53,14 +54,15 @@ export const useCreateNavBacktestMutation = () => {
 export const useNavBacktestRunsQuery = () =>
   useQuery<BacktestNavRunSummaryV3[]>({
     queryKey: navBacktestKeys.runs(),
-    queryFn: () => fetchNavBacktestRuns(),
+    queryFn: ({ signal }) => fetchNavBacktestRuns(undefined, signal),
     refetchInterval: (query) => navRunListRefetchInterval(query.state.data),
   });
 
 export const useNavBacktestRunQuery = (runId: string | null) =>
   useQuery({
     queryKey: navBacktestKeys.run(runId),
-    queryFn: () => fetchNavBacktestRun(runId ?? ''),
+    queryFn: ({ signal }) => fetchNavBacktestRun(runId ?? '', undefined, signal),
+    structuralSharing: (before, after) => isBacktestRunUpdateOlder(before, after) ? before : after,
     enabled: Boolean(runId),
     refetchInterval: (query) => navRunDetailRefetchInterval(query.state.data),
   });
@@ -69,6 +71,7 @@ export const useCancelNavBacktestMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (runId: string) => cancelNavBacktestRun(runId),
+    onMutate: async () => { await queryClient.cancelQueries({ queryKey: navBacktestKeys.root }); },
     onSuccess: (run) => {
       queryClient.setQueryData(navBacktestKeys.run(run.id), run);
       void queryClient.invalidateQueries({ queryKey: navBacktestKeys.root });
@@ -80,6 +83,7 @@ export const useRetryNavBacktestMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (runId: string) => retryNavBacktestRun(runId),
+    onMutate: async () => { await queryClient.cancelQueries({ queryKey: navBacktestKeys.root }); },
     onSuccess: (run) => {
       queryClient.setQueryData(navBacktestKeys.run(run.id), run);
       void queryClient.invalidateQueries({ queryKey: navBacktestKeys.root });

@@ -46,7 +46,115 @@ export const backtestPeriodPresets = (today = new Date()) => {
   ];
 };
 
-export function BacktestSetupDialog({
+export function BacktestSetupDialog(props: {
+  open: boolean;
+  strategy: StrategyRecord | null;
+  version: StrategyVersion | null;
+  busy: boolean;
+  initialSetup?: BacktestSetupInput | null;
+  intent?: 'new' | 'rerun';
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (setup: BacktestSetupInput) => Promise<boolean>;
+  onSubmitted?: () => void;
+}) {
+  const control = useBacktestSetupDialog(props);
+  const {
+    open,
+    requestOpenChange,
+    locked,
+    intent,
+    setPreparationDirty,
+    version,
+    currentStrategy,
+    strategy,
+    baseCurrency,
+    error,
+    setPeriod,
+    activePreset,
+    presets,
+  } = control;
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => void requestOpenChange(nextOpen)}>
+      <DialogContent
+        showCloseButton={!locked}
+        className="max-h-[calc(100dvh-32px)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-2xl"
+      >
+        <DialogHeader className="px-6 pt-6 pr-14 pb-4">
+          <DialogTitle>{intent === 'rerun' ? '基于本次配置再次运行' : '开始回测'}</DialogTitle>
+          <DialogDescription>
+            {intent === 'rerun'
+              ? '基于原策略与区间准备新的收益研究；请核对策略口径和本次来源版本。'
+              : '提交完成后自动前往回测任务列表查看进度。'}
+          </DialogDescription>
+        </DialogHeader>
+        <div
+          className="grid min-h-0 auto-rows-max grid-cols-1 content-start gap-5 overflow-y-auto px-6 pt-1 pb-6"
+          onChange={() => setPreparationDirty(true)}
+        >
+          <AuthoringRunIntents version={version} enabled={open} />
+          {version?.schema && currentStrategy && (
+            <StrategyV2Summary
+              schema={version.schema}
+              instrumentDirectory={version.instrumentDirectory}
+              version={version.version}
+              {...(strategy?.name ? { strategyName: strategy.name } : {})}
+            />
+          )}
+          {!currentStrategy && (
+            <Alert variant="destructive">
+              <AlertTitle>策略定义不可用</AlertTitle>
+              <AlertDescription>请先保存有效的当前策略版本，再创建回测。</AlertDescription>
+            </Alert>
+          )}
+          <div>
+            <p className="text-sm font-medium">回测参数</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              设置回测区间与初始资金，金额单位为 {baseCurrency}。
+            </p>
+          </div>
+          <BacktestSetupFields control={control} />
+          <ToggleGroup
+            disabled={locked}
+            value={activePreset ? [activePreset.label] : []}
+            onValueChange={(values) => {
+              const preset = presets.find((item) => item.label === values[0]);
+              if (preset) setPeriod(preset.period);
+              if (preset) setPreparationDirty(true);
+            }}
+            aria-label="常用回测区间"
+            className="w-fit"
+          >
+            {presets.map((preset) => (
+              <ToggleGroupItem key={preset.label} value={preset.label} aria-label={preset.label}>
+                {preset.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          {version?.schema && currentStrategy && (
+            <Field>
+              <FieldLabel>策略收益研究</FieldLabel>
+              <p className="text-sm">后复权计算指标与模拟收益；具体价格条件使用不复权行情。</p>
+            </Field>
+          )}
+          <BacktestResearchVersionChoice control={control} />
+          <BacktestResearchPreparation control={control} />
+          {error && (
+            <Field invalid>
+              <FieldError>{error}</FieldError>
+            </Field>
+          )}
+        </div>
+        <div>
+          <Separator />
+          <BacktestSetupActions control={control} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function useBacktestSetupDialog({
   open,
   strategy,
   version: initialVersion,
@@ -75,7 +183,7 @@ export function BacktestSetupDialog({
   const [adoptedVersion, setAdoptedVersion] = useState<StrategyVersion | null>(null);
   const [adopting, setAdopting] = useState(false);
   const version = adoptedVersion ?? initialVersion;
-  const researchVersion = version?.schema?.schemaVersion === '3';
+  const researchVersion = isPriceResearchStrategyDefinition(version?.schema);
   const [prepared, setPrepared] = useState<PreparedBacktest | null>(null);
   const [preparationDirty, setPreparationDirty] = useState(false);
   const [executionReady, setExecutionReady] = useState(false);
@@ -96,8 +204,10 @@ export function BacktestSetupDialog({
       setInitialCash(String(initialSetup?.initialCash ?? 100000));
       const definition = strategySchema.safeParse(initialVersion?.schema);
       let currency: 'CNY' | 'HKD' | 'USD' = 'CNY';
-      if (definition.success && definition.data.executionInstrument.market === 'HK') currency = 'HKD';
-      else if (definition.success && definition.data.executionInstrument.market === 'US') currency = 'USD';
+      if (definition.success && definition.data.executionInstrument.market === 'HK')
+        currency = 'HKD';
+      else if (definition.success && definition.data.executionInstrument.market === 'US')
+        currency = 'USD';
       setBaseCurrency(initialSetup?.baseCurrency ?? currency);
       setError(null);
       setAdjustment('hfq');
@@ -155,155 +265,183 @@ export function BacktestSetupDialog({
     if (!succeeded) return;
     onOpenChange(false);
   };
+
+  return {
+    open,
+    requestOpenChange,
+    locked,
+    intent,
+    setPreparationDirty,
+    version,
+    currentStrategy,
+    strategy,
+    baseCurrency,
+    error,
+    period,
+    setPeriod,
+    initialCash,
+    setInitialCash,
+    activePreset,
+    presets,
+    researchVersion,
+    setAdoptedVersion,
+    setPrepared,
+    setAdopting,
+    setExecutionReady,
+    setSubmitting,
+    adjustment,
+    initialSetup,
+    onOpenChange,
+    onSubmitted,
+    prepared,
+    executionReady,
+    submit,
+    submitLabel,
+  };
+}
+
+function BacktestSetupFields({ control }: { control: ReturnType<typeof useBacktestSetupDialog> }) {
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => void requestOpenChange(nextOpen)}>
-      <DialogContent showCloseButton={!locked} className="max-h-[calc(100dvh-32px)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="px-6 pt-6 pr-14 pb-4">
-          <DialogTitle>{intent === 'rerun' ? '基于本次配置再次运行' : '开始回测'}</DialogTitle>
-          <DialogDescription>
-            {intent === 'rerun'
-              ? '基于原策略与区间准备新的收益研究；请核对策略口径和本次来源版本。'
-              : '提交完成后自动前往回测任务列表查看进度。'}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid min-h-0 auto-rows-max grid-cols-1 content-start gap-5 overflow-y-auto px-6 pt-1 pb-6" onChange={() => setPreparationDirty(true)}>
-          <AuthoringRunIntents version={version} enabled={open} />
-          {version?.schema && currentStrategy && (
-            <StrategyV2Summary
-              schema={version.schema}
-              instrumentDirectory={version.instrumentDirectory}
-              version={version.version}
-              {...(strategy?.name ? { strategyName: strategy.name } : {})}
-            />
-          )}
-          {!currentStrategy && (
-            <Alert variant="destructive">
-              <AlertTitle>策略定义不可用</AlertTitle>
-              <AlertDescription>请先保存有效的当前策略版本，再创建回测。</AlertDescription>
-            </Alert>
-          )}
-          <div>
-            <p className="text-sm font-medium">回测参数</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              设置回测区间与初始资金，金额单位为 {baseCurrency}。
-            </p>
-          </div>
-          <FieldGroup className="grid gap-4 sm:grid-cols-3">
-            <Field invalid={Boolean(error && error.includes('日期'))}>
-              <FieldLabel htmlFor="backtest-start">开始日期</FieldLabel>
-              <DateInput
-                id="backtest-start"
-                type="date"
-                value={period.start}
-                disabled={locked}
-                onChange={(event) =>
-                  setPeriod((current) => ({ ...current, start: event.target.value }))
-                }
-              />
-            </Field>
-            <Field invalid={Boolean(error && error.includes('日期'))}>
-              <FieldLabel htmlFor="backtest-end">结束日期</FieldLabel>
-              <DateInput
-                id="backtest-end"
-                type="date"
-                value={period.end}
-                disabled={locked}
-                onChange={(event) =>
-                  setPeriod((current) => ({ ...current, end: event.target.value }))
-                }
-              />
-            </Field>
-            <Field invalid={Boolean(error && error.includes('资金'))}>
-              <FieldLabel htmlFor="backtest-cash">初始资金（{baseCurrency}）</FieldLabel>
-              <Input
-                id="backtest-cash"
-                type="number"
-                min="1"
-                step="1000"
-                value={initialCash}
-                disabled={locked}
-                onChange={(event) => setInitialCash(event.target.value)}
-              />
-            </Field>
-          </FieldGroup>
-          <ToggleGroup
-            disabled={locked}
-            value={activePreset ? [activePreset.label] : []}
-            onValueChange={(values) => {
-              const preset = presets.find((item) => item.label === values[0]);
-              if (preset) setPeriod(preset.period);
-              if (preset) setPreparationDirty(true);
-            }}
-            aria-label="常用回测区间"
-            className="w-fit"
-          >
-            {presets.map((preset) => (
-              <ToggleGroupItem key={preset.label} value={preset.label} aria-label={preset.label}>
-                {preset.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          {version?.schema && currentStrategy && (
-            <Field>
-              <FieldLabel>策略收益研究</FieldLabel>
-              <p className="text-sm">后复权计算指标与模拟收益；具体价格条件使用不复权行情。</p>
-            </Field>
-          )}
-          {open && version && strategy && currentStrategy && !researchVersion && (
-            <PriceResearchVersionPreview key={version.id} strategyId={strategy.id} version={version}
-              disabled={locked} onAdopt={(saved) => { setAdoptedVersion(saved); setPrepared(null); setPreparationDirty(true); }}
-              onBusyChange={setAdopting} />
-          )}
-          {open && version && currentStrategy && researchVersion && (
-            <BacktestPricePreparation
-              formId="saved-strategy-backtest"
-              onReadyChange={setExecutionReady}
-              onBusyChange={setSubmitting}
-              key={`${version.id}:${adjustment}`}
-              strategyVersionId={version.id}
-              priceResearch
-              adjustment={adjustment}
-              period={period}
-              initialCash={initialCash}
-              currency={baseCurrency}
-              {...(initialSetup?.executionModel && initialSetup.adjustment !== 'none'
-                ? { initialModel: initialSetup.executionModel }
-                : {})}
-              onPrepared={setPrepared}
-              onSubmitted={() => {
-                onOpenChange(false);
-                onSubmitted?.();
-              }}
-              onDirtyChange={setPreparationDirty}
-            />
-          )}
-          {error && <Field invalid><FieldError>{error}</FieldError></Field>}
-        </div>
-        <div>
-          <Separator />
-          <DialogFooter className="px-6 py-4">
-            <Button type="button" variant="outline" disabled={locked} onClick={() => void requestOpenChange(false)}>
-              取消
-            </Button>
-            <Button
-              type={prepared && !researchVersion ? 'button' : 'submit'}
-              form="saved-strategy-backtest"
-              aria-busy={locked}
-              disabled={locked || !version || !currentStrategy || !researchVersion || (!prepared && !executionReady)}
-              onClick={prepared && !researchVersion ? () => void submit() : undefined}
-            >
-              {locked && (
-                <LoaderCircle
-                  data-icon="inline-start"
-                  className="animate-spin"
-                  aria-hidden="true"
-                />
-              )}
-              {submitLabel}
-            </Button>
-          </DialogFooter>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <>
+      <FieldGroup className="grid gap-4 sm:grid-cols-3">
+        <Field invalid={Boolean(control.error && control.error.includes('日期'))}>
+          <FieldLabel htmlFor="backtest-start">开始日期</FieldLabel>
+          <DateInput
+            id="backtest-start"
+            type="date"
+            value={control.period.start}
+            disabled={control.locked}
+            onChange={(event) =>
+              control.setPeriod((current) => ({ ...current, start: event.target.value }))
+            }
+          />
+        </Field>
+        <Field invalid={Boolean(control.error && control.error.includes('日期'))}>
+          <FieldLabel htmlFor="backtest-end">结束日期</FieldLabel>
+          <DateInput
+            id="backtest-end"
+            type="date"
+            value={control.period.end}
+            disabled={control.locked}
+            onChange={(event) =>
+              control.setPeriod((current) => ({ ...current, end: event.target.value }))
+            }
+          />
+        </Field>
+        <Field invalid={Boolean(control.error && control.error.includes('资金'))}>
+          <FieldLabel htmlFor="backtest-cash">初始资金（{control.baseCurrency}）</FieldLabel>
+          <Input
+            id="backtest-cash"
+            type="number"
+            min="1"
+            step="1000"
+            value={control.initialCash}
+            disabled={control.locked}
+            onChange={(event) => control.setInitialCash(event.target.value)}
+          />
+        </Field>
+      </FieldGroup>
+    </>
   );
 }
+function BacktestSetupActions({ control }: { control: ReturnType<typeof useBacktestSetupDialog> }) {
+  return (
+    <>
+      <DialogFooter className="px-6 py-4">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={control.locked}
+          onClick={() => void control.requestOpenChange(false)}
+        >
+          取消
+        </Button>
+        <Button
+          type={control.prepared && !control.researchVersion ? 'button' : 'submit'}
+          form="saved-strategy-backtest"
+          aria-busy={control.locked}
+          disabled={
+            control.locked ||
+            !control.version ||
+            !control.currentStrategy ||
+            !control.researchVersion ||
+            (!control.prepared && !control.executionReady)
+          }
+          onClick={
+            control.prepared && !control.researchVersion ? () => void control.submit() : undefined
+          }
+        >
+          {control.locked && (
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+          )}
+          {control.submitLabel}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+function BacktestResearchVersionChoice({
+  control,
+}: {
+  control: ReturnType<typeof useBacktestSetupDialog>;
+}) {
+  return (
+    <>
+      {control.open &&
+        control.version &&
+        control.strategy &&
+        control.currentStrategy &&
+        !control.researchVersion && (
+          <PriceResearchVersionPreview
+            key={control.version.id}
+            strategyId={control.strategy.id}
+            version={control.version}
+            disabled={control.locked}
+            onAdopt={(saved) => {
+              control.setAdoptedVersion(saved);
+              control.setPrepared(null);
+              control.setPreparationDirty(true);
+            }}
+            onBusyChange={control.setAdopting}
+          />
+        )}
+    </>
+  );
+}
+function BacktestResearchPreparation({
+  control,
+}: {
+  control: ReturnType<typeof useBacktestSetupDialog>;
+}) {
+  return (
+    <>
+      {control.open && control.version && control.currentStrategy && control.researchVersion && (
+        <BacktestPricePreparation
+          formId="saved-strategy-backtest"
+          onReadyChange={control.setExecutionReady}
+          onBusyChange={control.setSubmitting}
+          key={`${control.version.id}:${control.adjustment}`}
+          strategyVersionId={control.version.id}
+          priceResearch
+          dailyOrders={strategyEditorVariant('execution', control.version.schema?.execution) === 'dailyBarOrders'}
+          adjustment={control.adjustment}
+          period={control.period}
+          initialCash={control.initialCash}
+          currency={control.baseCurrency}
+          {...(control.initialSetup?.executionModel && control.initialSetup.adjustment !== 'none'
+            ? { initialModel: control.initialSetup.executionModel }
+            : {})}
+          {...(control.initialSetup?.dailyOrderMatching && control.initialSetup.adjustment !== 'none' ? { initialDailyOrderMatching: control.initialSetup.dailyOrderMatching } : {})}
+          onPrepared={control.setPrepared}
+          onSubmitted={() => {
+            control.onOpenChange(false);
+            control.onSubmitted?.();
+          }}
+          onDirtyChange={control.setPreparationDirty}
+        />
+      )}
+    </>
+  );
+}
+import { isPriceResearchStrategyDefinition, strategyEditorVariant } from '@thesis-ledger/domain';

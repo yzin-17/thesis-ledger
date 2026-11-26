@@ -19,7 +19,7 @@ function response(): MarketEventResponseV3 {
   const sha256 = createHash('sha256').update(content).digest('hex');
   const revision = `official-cash-notices-sha256:${sha256}`;
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'notice-contract',
     symbol: '510300.SH',
     routeKey: { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'CASH_DISTRIBUTION' },

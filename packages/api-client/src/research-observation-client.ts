@@ -42,7 +42,6 @@ export function researchObservationClient(
       const reportId = researchReportIdSchema.parse(id),
         query = researchReportLocatorSchema.parse(input);
       const body = researchObservationSubmissionSchema.parse(raw);
-      if (query.view === 'legacy') throw new Error('旧报告缺少自动复核所需的范围字段');
       return request(
         `/research/reports/${reportId}/observations${queryString(query)}`,
         researchObservationSubmissionResultSchema.refine(

@@ -20,19 +20,23 @@ async function environment(overrides = {}) {
       dataToken: 'local-fixture-data',
       fetchImpl: async (url, init) => {
         calls.push({ url: url.pathname, ...init });
-        if (init.headers?.authorization?.startsWith('Bearer invalid-'))
-          return new Response('{}', { status: overrides.bypass ? 200 : 401 });
+        if (init.headers?.authorization?.startsWith('Bearer invalid-')) {
+          const requestId = init.headers['x-request-id'];
+          return Response.json({ detail: { contractVersion: overrides.authVersion ?? 1,
+            code: 'unauthorized', requestId, diagnosticId: requestId } },
+          { status: overrides.bypass ? 200 : 401 });
+        }
         if (overrides.httpFailure) return new Response('PRIVATE_PROVIDER_PAYLOAD', { status: 500 });
         if (url.pathname.endsWith('/market/bars')) {
           if (overrides.dataUnauthorized) return new Response('{}', { status: 401 });
-          return Response.json({ contractVersion: 3,
+          return Response.json({ contractVersion: 1,
             requestId: overrides.wrongDataId ? 'wrong' : JSON.parse(init.body).requestId,
             error: { code: 'unsupported_data_contract_version', message: '不支持请求的数据契约版本' },
           }, { status: 422 });
         }
-        if (url.pathname === '/api/v3/thesis-ledger/capabilities')
+        if (url.pathname === '/api/v1/thesis-ledger/capabilities')
           return Response.json(overrides.capabilities ?? capabilities);
-        if (url.pathname === '/api/v1/thesis-ledger/control/handshake')
+        if (url.pathname === '/api/v3/thesis-ledger/control/handshake')
           return Response.json({}, { status: overrides.oldHandshakeAvailable ? 200 : 404 });
         if (url.pathname.endsWith('/handshake'))
           return Response.json({
@@ -45,14 +49,19 @@ async function environment(overrides = {}) {
   };
 }
 
+test('拒绝旧版鉴权信封', async () => {
+  const f = await environment({ authVersion: 3 });
+  await assert.rejects(probeMarketV3Contract(f.options), /未返回现行鉴权信封/);
+});
+
 test('V3 协议探针只读取能力和目录并协商握手，不应用策略或获取行情', async () => {
   const f = await environment();
-  assert.equal((await probeMarketV3Contract(f.options)).scope, 'market-v3-protocol-only');
+  assert.equal((await probeMarketV3Contract(f.options)).scope, 'market-protocol-v1');
   assert.equal(f.calls.length, 8);
   const handshakeCalls = f.calls.filter((call) => call.url.endsWith('/handshake'));
   assert.equal(handshakeCalls.length, 3);
   assert.equal(
-    handshakeCalls.filter((call) => call.url === '/api/v3/thesis-ledger/control/handshake').length,
+    handshakeCalls.filter((call) => call.url === '/api/v1/thesis-ledger/control/handshake').length,
     2,
   );
   const dataCall = f.calls.find((call) => call.headers?.authorization === 'Bearer local-fixture-data');
@@ -73,7 +82,7 @@ test('V3 协议探针只读取能力和目录并协商握手，不应用策略�
 });
 test('旧版 Data 声明不能代替 V3', async () => {
   const f = await environment({ capabilities: { dataContractVersions: [1, 2] } });
-  await assert.rejects(probeMarketV3Contract(f.options), /Data Contract V3/);
+  await assert.rejects(probeMarketV3Contract(f.options), /dsa-data-v1/);
 });
 test('旧版 Control 握手仍可调用时协议探针失败', async () => {
   const f = await environment({ oldHandshakeAvailable: true });

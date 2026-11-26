@@ -135,7 +135,7 @@ describe('精确净值客户端与原文关联', () => {
   ])('HTTP %i 保留稳定错误且不重试', async (status, code) => {
     const { request } = navSourceFixture();
     const body = {
-      contractVersion: 3,
+      contractVersion: 1,
       requestId: request.requestId,
       error: {
         code: status === 503 ? 'upstream_failure' : 'insufficient_evidence',
@@ -155,7 +155,7 @@ describe('精确净值客户端与原文关联', () => {
         async () =>
           new Response(
             JSON.stringify({
-              contractVersion: 3,
+              contractVersion: 1,
               requestId: 'other',
               error: { code: 'upstream_failure', message: '无效' },
             }),

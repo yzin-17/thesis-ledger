@@ -11,7 +11,7 @@ describe('DSA 公共收费请求绑定', () => {
     });
     const reader = new DsaDataCapabilityReaderV3(post, (parse) => parse());
     expect(await reader.publicFees(request)).toEqual(fees);
-    expect(post.mock.calls[0]![0]).toBe('/api/v3/thesis-ledger/market/public-fees');
+    expect(post.mock.calls[0]![0]).toBe('/api/v1/thesis-ledger/market/public-fees');
     expect(post.mock.calls[0]![1]).toEqual(request);
   });
   it.each(['symbol', 'requestId', 'providerId'] as const)('拒绝 %s 错绑的响应', async (field) => {

@@ -8,8 +8,9 @@ import { tradingCalendarFromFact } from '@thesis-ledger/domain';
 import type { ArtifactRow } from './backtest-artifact-store.js';
 import type { SnapshotInputPlanV3 } from './backtest-snapshot-v3-input-plan.js';
 import { SnapshotV3InputPlanError } from './backtest-snapshot-v3-input-plan.js';
-import { calendarFact } from './backtest-v2-execution-shared.js';
+import { calendarFact, rowsAtTimeframe } from './backtest-v2-execution-shared.js';
 import { dailyBarSessionTimes } from './backtest-daily-bar-session.js';
+import { intradayBarSessionWindow } from './backtest-intraday-bar-session.js';
 import { canonicalizeManifest } from './backtest-snapshot.js';
 import { tradabilityExpectedBarDatesV3 } from './backtest-snapshot-v3-tradability.js';
 import { applicableInstrumentObservationV3 } from './backtest-identity-observation-clock-v3.js';
@@ -39,7 +40,8 @@ export const validateSnapshotCalendarAlignmentV3 = (
   if (!bars?.length) fail('V3 完整快照缺少执行行情');
   const dates = bars.map((bar) => {
     if (typeof bar.occurredAt !== 'string') fail('V3 行情缺少发生时间');
-    dailyBarSessionTimes(bar, calendar);
+    if (input.executionRouteKey.timeframe === '1d') dailyBarSessionTimes(bar, calendar);
+    else intradayBarSessionWindow(bar, calendar);
     return calendar.status(bar.occurredAt).date;
   });
   const instrumentFacts =
@@ -47,8 +49,10 @@ export const validateSnapshotCalendarAlignmentV3 = (
       `instrumentFacts/${input.executionRouteKey.market}-${proof.listing.symbol}.parquet`,
     ) ?? [];
   if (
-    canonicalizeManifest(dates) !==
-    canonicalizeManifest(tradabilityExpectedBarDatesV3(instrumentFacts, expectedDates))
+    canonicalizeManifest(input.executionRouteKey.timeframe === '1d' ? dates : [...new Set(dates)]) !==
+    canonicalizeManifest(tradabilityExpectedBarDatesV3(instrumentFacts, expectedDates,
+      settlementConfig?.priceResearch?.dailyObservationContract !== undefined &&
+        settlementConfig.executionPriceProtocol.accountingBasis === 'normalized-series'))
   ) {
     fail('V3 冻结日历与行情覆盖证明的交易日不一致');
   }
@@ -60,7 +64,9 @@ export const validateSnapshotCalendarAlignmentV3 = (
       bars.map((bar) => ({ timestamp: String(bar.occurredAt) })),
       input.plan.warmup.lookbackPeriods,
     );
-  const preceding = dates.filter((date) => date < analysisStart);
+  const preceding = rowsAtTimeframe(bars, input.plan.benchmark.timeframe, calendar,
+    settlementConfig?.priceResearch?.dailyObservationContract !== undefined)
+    .filter((bar) => calendar.status(String(bar.occurredAt)).date < analysisStart);
   if (preceding.length < input.plan.warmup.lookbackPeriods) {
     fail('V3 冻结行情不足以满足策略预热周期');
   }
@@ -107,7 +113,9 @@ function assertOpeningInstrumentFacts(
   settlementConfig: RunConfigV3 | undefined,
 ) {
   if (!firstBar) fail('V3 运行区间缺少首个交易日');
-  const openedAt = dailyBarSessionTimes(firstBar, calendar).openedAt;
+  const openedAt = input.executionRouteKey.timeframe === '1d'
+    ? dailyBarSessionTimes(firstBar, calendar).openedAt
+    : intradayBarSessionWindow(firstBar, calendar).openedAt;
   const facts = [...artifacts.entries()]
     .filter(([key]) => key.startsWith('instrumentFacts/'))
     .flatMap(([, value]) => value);

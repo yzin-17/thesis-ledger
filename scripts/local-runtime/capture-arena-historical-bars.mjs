@@ -20,7 +20,7 @@ const route = policy?.routes.find(r => JSON.stringify(r.key) === JSON.stringify(
 const target = route?.targets.find(t => t.eligible && t.providerId === 'hithink');
 if (!policy?.enabled || !target) throw new Error('现行不复权日线主源未启用，停止');
 const routeTarget = {providerId:target.providerId,upstreamSource:target.upstreamSource,routeIndex:target.routeIndex};
-const request = {contractVersion:3,requestId:crypto.randomUUID(),symbol,routeKey,routeTarget,tradabilityMode:'assume-untradable-no-bar',start:day,end:day};
+const request = {contractVersion:1,requestId:crypto.randomUUID(),symbol,routeKey,routeTarget,tradabilityMode:'assume-untradable-no-bar',start:day,end:day};
 const response = await dsa.dataCapabilities.bars(request);
 console.log(JSON.stringify({request,response,capturedAt:new Date().toISOString(),sourceFeeStatus:'unverified',modelCalls:0}));
 `;

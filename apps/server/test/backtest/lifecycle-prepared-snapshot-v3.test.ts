@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { statusExecutionFixture } from './trading-status-execution-fixtures.js';
-import { lifecycleResponseFixtureV3 } from '../market/lifecycle-response.fixture.js';
+import { lifecycleCapabilitiesFixture } from '../market/lifecycle-response.fixture.js';
 import { makeReaderResult } from './v3-snapshot-fixtures.js';
 import { tradabilityFixtureV3 } from './v3-tradability-fixtures.js';
 import { tradabilityWindowFromResponseV3 } from '../../src/backtest/backtest-snapshot-v3-tradability.js';
@@ -62,7 +62,7 @@ describe('准备生命周期版本绑定新快照，领域执行和旧身份保�
       identityFingerprint: selected.evidence.identityFingerprint,
       responseHash: selected.evidence.completeResponseHash!,
     };
-    const response = lifecycleResponseFixtureV3('000995.SZ', window.start, window.end, ipo, out);
+    const response = await lifecycleCapabilitiesFixture('000995.SZ', window.start, window.end, ipo, out).read();
     input.runConfig.lifecyclePreparation = deriveLifecyclePreparationV3({
       response,
       bars: selected.selection.response.bars,
@@ -103,9 +103,10 @@ describe('准备生命周期版本绑定新快照，领域执行和旧身份保�
       undefined,
       lifecycle,
     );
-    expect(built.manifest.tradingStatus?.freezeVersion).toBe('frozen-trading-status-v5');
+    expect(built.manifest.statusComposition?.freezeVersion).toBe('frozen-status-composition-v1');
+    expect(built.manifest.tradingStatus).toBeUndefined();
     lifecycle.read.mockRejectedValue(new Error('离线不得查最新生命周期'));
-    state.dsa.marketTradingStatusV3.mockRejectedValue(new Error('离线不得查最新状态'));
+    state.status.post.mockRejectedValue(new Error('离线不得查最新状态'));
     const run = {
       runId: input.runId,
       snapshotRef: built.snapshotRef,

@@ -34,7 +34,7 @@ export function createEpochCase(state, providers, catalog) {
 }
 
 export function epochRequests(plan) {
-  const base = { contractVersion: 3, capabilityVersion: 1, consumer: 'thesis-ledger', symbol: plan.symbol, range: plan.range };
+  const base = { contractVersion: 1, capabilityVersion: 1, consumer: 'thesis-ledger', symbol: plan.symbol, range: plan.range };
   return [
     { ...base, requestId: `${plan.caseId}:status`, routeKey: key('DAILY_TRADING_STATUS') },
     { ...base, requestId: `${plan.caseId}:risk`, routeKey: key('RISK_WARNING'), detail: { kind: 'coarseST' } },

@@ -92,7 +92,7 @@ function preparedPolicyChanged(
   return (
     policy.dataUpdatedAt >= preparedAt &&
     policy.data &&
-    (policy.data.contractVersion !== 3 ||
+    (policy.data.contractVersion !== 1 ||
       policy.data.revision !== stamp.desiredRevision ||
       policy.data.dsaRevision !== stamp.effectiveRevision ||
       policy.data.syncState !== 'applied' ||

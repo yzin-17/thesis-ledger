@@ -8,7 +8,6 @@ import {
 import type { Prisma } from '@prisma/client';
 import {
   aiContextSchema,
-  aiResearchStartInputSchema,
   researchResultSchema,
 } from '@thesis-ledger/schemas';
 import type { z } from 'zod';
@@ -25,15 +24,10 @@ import { claimAiRun } from './ai-run-claim.js';
 import type { AiToolCallAuditInput } from './tool-runtime.js';
 import { AiProviderRegistry } from './provider-registry.js';
 import { AiRoutingSettingsService } from './ai-routing-settings.service.js';
-import { AiResearchRetry } from './ai-research-retry.js';
 import type { AiRunPage, ResearchFinishRoute } from './ai-run.types.js';
-import { AiResearchSubmission } from './ai-research-submission.js';
 import { AiResearchSubmissionV2 } from './ai-research-submission-v2.js';
 import type { AiResearchSubmissionV2Access } from './ai-research-submission-v2.store.js';
 import type { AiFrozenResearchV2, ResearchSubmissionV2 } from '@thesis-ledger/schemas';
-import { readFrozenResearch, type AiFrozenResearch } from './ai-frozen-research.js';
-
-type AiResearchStartInput = z.infer<typeof aiResearchStartInputSchema>;
 
 const encodeCursor = (createdAt: Date | string, id: string) => {
   const date = createdAt instanceof Date ? createdAt : new Date(createdAt);
@@ -55,15 +49,9 @@ const decodeCursor = (cursor?: string) => {
   }
 };
 
-type ModelWithFindUnique = {
-  findUnique?: (args: unknown) => Promise<unknown>;
-};
-
 @Injectable()
 export class AiRunService {
   private readonly researchQuery: AiResearchQuery;
-  private readonly researchRetry: AiResearchRetry;
-  private readonly researchSubmission: AiResearchSubmission;
   private readonly researchSubmissionV2: AiResearchSubmissionV2;
 
   constructor(
@@ -73,8 +61,6 @@ export class AiRunService {
     @Optional() display: InstrumentDisplayService = new InstrumentDisplayService(prisma),
   ) {
     this.researchQuery = new AiResearchQuery(prisma, display);
-    this.researchRetry = new AiResearchRetry(prisma);
-    this.researchSubmission = new AiResearchSubmission(prisma, providers, routingSettings);
     this.researchSubmissionV2 = new AiResearchSubmissionV2(prisma, providers, routingSettings);
   }
 
@@ -116,67 +102,6 @@ export class AiRunService {
           : { modelMetadata: modelMetadata as Prisma.InputJsonValue }),
       },
     });
-  }
-
-  private async assertResearchContext(parsed: AiResearchStartInput) {
-    const models = this.prisma as unknown as {
-      account?: ModelWithFindUnique;
-      position?: ModelWithFindUnique;
-      strategyVersion?: ModelWithFindUnique;
-    };
-    const context = parsed.context;
-
-    if (context.accountId && models.account?.findUnique) {
-      const account = (await models.account.findUnique({
-        where: { id: context.accountId },
-        select: { id: true, active: true, mode: true },
-      })) as { id?: string; active?: boolean; mode?: string } | null;
-      if (!account) throw new NotFoundException(`账户不存在: ${context.accountId}`);
-      if (account.active === false) throw new BadRequestException('账户已停用，不能创建研究任务');
-      if (context.mode !== undefined && account.mode !== context.mode)
-        throw new BadRequestException('研究账户与提交时的账户模式不一致');
-    }
-
-    if (
-      context.scope === 'position' &&
-      context.accountId &&
-      context.symbol &&
-      models.position?.findUnique
-    ) {
-      const position = await models.position.findUnique({
-        where: { accountId_symbol: { accountId: context.accountId, symbol: context.symbol } },
-        select: { id: true },
-      });
-      if (!position)
-        throw new NotFoundException(`持仓不存在: ${context.accountId}/${context.symbol}`);
-    }
-
-    if (context.strategyVersionId && models.strategyVersion?.findUnique) {
-      const version = await models.strategyVersion.findUnique({
-        where: { id: context.strategyVersionId },
-        select: { id: true },
-      });
-      if (!version) throw new NotFoundException(`策略版本不存在: ${context.strategyVersionId}`);
-    }
-  }
-
-  async researchRetryPrefill(id: string) {
-    return this.researchRetry.prefill(id);
-  }
-
-
-  async startResearch(input: AiResearchStartInput, frozen?: AiFrozenResearch) {
-    const parsed = aiResearchStartInputSchema.parse(input);
-    await this.assertResearchContext(parsed);
-    await this.researchRetry.assertRetry(parsed);
-    return this.researchSubmission.start(parsed, frozen);
-  }
-
-  async frozenEvidence(id: string) {
-    const run = await this.prisma.aiRun.findUnique({ where: { id, researchOwnerId: null }, select: { modelMetadata: true, context: true } });
-    if (!run) return null;
-    await assertLegacyAiContextAccess(this.prisma, run.context);
-    return readFrozenResearch(run.modelMetadata);
   }
 
   checkpoint(id: string, checkpoint: object) {

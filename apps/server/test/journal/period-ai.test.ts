@@ -71,7 +71,7 @@ async function setup() {
             id,
             provider: 'selected-provider',
             model: 'selected-model',
-            promptVersion: 'journal-period-review-v5',
+            promptVersion: 'journal-period-review-prompt-v1',
             status: 'queued',
             errorCode: null,
             errorSummary: null,
@@ -86,7 +86,7 @@ async function setup() {
   };
   const runs = { startResearch: vi.fn(), resume: vi.fn().mockResolvedValue(null) };
   return {
-    service: new JournalPeriodReviewAi(analysis, runs as never, v2 as never),
+    service: new JournalPeriodReviewAi(analysis, v2 as never),
     request,
     cycle,
     runs,
@@ -102,13 +102,13 @@ describe('周期 AI 冻结结果迁移 V2', () => {
       start: request.start,
       end: request.end,
       objectFingerprints: request.objectFingerprints,
-      promptVersion: 'journal-period-review-v5',
+      promptVersion: 'journal-period-review-prompt-v1',
     });
     expect(v2.start).toHaveBeenCalledWith(
       principal,
       expect.objectContaining({
         scope: { accountId: request.accountId, mode: request.mode },
-        prompt: expect.objectContaining({ version: 'journal-period-review-v5' }),
+        prompt: expect.objectContaining({ version: 'journal-period-review-prompt-v1' }),
         data: expect.objectContaining({
           result: expect.objectContaining({
             tradeCycles: expect.objectContaining({ includedObjectIds: ['TRADE_CYCLE:trade-1'] }),

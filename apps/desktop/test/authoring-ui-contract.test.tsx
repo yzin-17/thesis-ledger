@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { authoringStrategySchema, type AuthoringContent } from '@thesis-ledger/schemas';
 import { AuthoringDefinition } from '../src/features/strategy-authoring/AuthoringDefinition.js';
+import { AuthoringPlanReview } from '../src/features/strategy-authoring/AuthoringPlanReview.js';
 import { editAuthoringDefinition } from '../src/features/strategy-authoring/authoring-definition-edit.model.js';
 import { AuthoringOperation } from '../src/features/strategy-authoring/AuthoringOperation.js';
 import { AuthoringSelect } from '../src/features/strategy-authoring/AuthoringSelect.js';
@@ -27,6 +28,18 @@ const definition = authoringStrategySchema.parse(
 );
 afterEach(() => setIdentitySession(null));
 describe('编写客户端合同与实际预览', () => {
+  it('V6同标的不同周期定义在实际预览和提案回读可读，旧生成合同仍拒绝', () => {
+    const multi = { ...definition, signalSources: [...definition.signalSources,
+      { ...definition.signalSources[0]!, id: 'hour', timeframe: '60m', series: ['close'] }],
+      entry: { type: 'compare', operator: 'gt', left: { type: 'series', sourceId: 'hour', field: 'close' },
+        right: { type: 'indicator', name: 'MA', input: { type: 'series', sourceId: 'hour', field: 'close' }, params: { period: 20 } } } };
+    expect(authoringStrategySchema.safeParse(multi).success).toBe(false);
+    const text = JSON.stringify(multi);
+    const html = renderToStaticMarkup(<AuthoringPlanReview beforeText={text} afterText={text} includeRules />);
+    expect(html).not.toContain('无法读取');
+    expect(html).toContain('hour');
+    expect(html).toContain('MA');
+  });
   it.each([
     ['discarded', '已放弃'],
     ['expired', '已过期'],
@@ -46,7 +59,7 @@ describe('编写客户端合同与实际预览', () => {
           id: 'proposal',
           revision: 1,
           status,
-          payload: { intent: '止损改为5%', differences: [] } as never,
+          payload: { intent: '止损改为5%', allowedPaths: [], differences: [] } as never,
         }}
         busy={false}
         stale={false}

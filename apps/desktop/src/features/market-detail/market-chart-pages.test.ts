@@ -15,7 +15,7 @@ const RECENT = ['2026-09-14', '2026-09-15'];
 const OLDER = ['2026-09-10', '2026-09-11'];
 
 const series = (dates: readonly string[], fingerprint: string): BarSeries => ({
-  contractVersion: 3,
+  contractVersion: 1,
   identity: { symbol: SYMBOL, assetType: 'ETF', timeframe: '1d', adjustment: 'qfq' },
   points: dates.map((date, index) => ({
     timestamp: `${date}T00:00:00.000Z`,
@@ -75,7 +75,7 @@ const page = (
   const maResult = indicator('MA', dates, fingerprint);
   const macdResult = indicator('MACD', dates, fingerprint);
   return {
-    contractVersion: 3,
+    contractVersion: 1,
     symbol: SYMBOL,
     assetType: 'ETF',
     identity: { source: 'asset', status: 'confirmed' },

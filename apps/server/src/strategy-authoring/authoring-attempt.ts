@@ -18,16 +18,18 @@ import type {
   AuthoringOperationRepository,
 } from './authoring-operation.repository.js';
 import {
-  authoringContract,
+  savedAuthoringContract,
   authoringCost,
   authoringPricingFingerprint,
   unknownAuthoringCost,
 } from './authoring-model-policy.js';
 import { authoringMessages } from './authoring-prompt.js';
+import { authoringOperationSchema } from './authoring-operation-schema.js';
 import { mergeAuthoringAnalysis } from './authoring-analysis.js';
 import { validateAuthoringGeneration } from './authoring-semantics.js';
 import { validateAuthoringModification } from './authoring-modification.js';
 import { authoringValidationIssues } from './authoring-diagnostics.js';
+import { StrategyCompilationError, compileBacktestStrategy } from '../backtest/backtest-strategy-compiler.js';
 
 type Dependencies = {
   operations: AuthoringOperationRepository;
@@ -42,6 +44,7 @@ type AttemptResult = {
   cost: AiCostFacts;
   outputText: string | null;
   errorCode: string | null;
+  compilation?: ReturnType<typeof compileBacktestStrategy>;
 };
 const fingerprint = (value: string) => createHash('sha256').update(value).digest('hex');
 export function authoringFailureCode(error: unknown, signalReason?: unknown): string {
@@ -120,7 +123,7 @@ export class AuthoringAttemptRunner {
     });
     this.prepared = true;
     await this.dependencies.providers.refreshRegistry();
-    const contract = authoringContract(selection.kind);
+    const contract = savedAuthoringContract(selection);
     const route = this.dependencies.registry.strictReadyContract({
       providerId: selection.providerId,
       model: selection.model,
@@ -137,10 +140,11 @@ export class AuthoringAttemptRunner {
     const runtime = route.provider.sdkRuntime?.();
     if (!runtime) throw new Error('AUTHORING_MODEL_UNAVAILABLE');
     const messages = authoringMessages(operation);
-    if (route.execution.mode === 'json_validated') assertGenerationSchemaPrompt(contract.schema, messages);
+    const schema = authoringOperationSchema(operation);
+    if (route.execution.mode === 'json_validated') assertGenerationSchemaPrompt(schema, messages);
     if (Buffer.byteLength(JSON.stringify(messages), 'utf8') > AUTHORING_LIMITS.snapshotBytes)
       throw new Error('AUTHORING_INPUT_TOO_LARGE');
-    return { contract, route, runtime, messages };
+    return { contract, route, runtime, messages, schema };
   }
   private async remainingLease() {
     const { operation } = this;
@@ -158,7 +162,7 @@ export class AuthoringAttemptRunner {
     return remaining;
   }
   private async generate() {
-    const { contract, route, runtime, messages } = await this.prepare();
+    const { contract, route, runtime, messages, schema } = await this.prepare();
     const selection = this.operation.input.selection;
     await this.remainingLease();
     await this.dependencies.audit.append(this.requestId, {
@@ -187,7 +191,7 @@ export class AuthoringAttemptRunner {
       authMode: runtime.authMode ?? 'api_key',
       messages,
       contract: contract.ref,
-      schema: contract.schema,
+      schema,
       mode: route.execution.mode,
       ...aiRouteReasoningFields(route.execution),
       ...(route.execution.requestOptions ? { requestOptions: route.execution.requestOptions } : {}),
@@ -213,7 +217,7 @@ export class AuthoringAttemptRunner {
       generated.providerCost,
       generated.providerCostCurrency,
     );
-    const text = JSON.stringify(generated.output);
+    const text = generated.rawOutputText ?? JSON.stringify(generated.output);
     await this.dependencies.audit.append(this.requestId, {
       eventKey: randomUUID(),
       kind: 'received',
@@ -235,10 +239,18 @@ export class AuthoringAttemptRunner {
   }
   private validate(output: unknown) {
     const { content, selection } = this.operation.input;
+    if (selection.kind !== 'analyze' && selection.modificationTarget !== 'entryOrderValidity') {
+      const wire = output as { proposal?: unknown };
+      this.result.compilation = compileBacktestStrategy(((wire?.proposal ?? output) as { definition?: unknown })?.definition);
+      if (!this.result.compilation.definition) throw new StrategyCompilationError(this.result.compilation);
+    }
     if (selection.kind === 'analyze')
       mergeAuthoringAnalysis(content, this.operation.revision, output);
-    else if (selection.kind === 'modify') validateAuthoringModification(content, selection, output);
-    else validateAuthoringGeneration(content, output);
+    else {
+      const validated = selection.kind === 'modify' ? validateAuthoringModification(content, selection, output)
+        : validateAuthoringGeneration(content, output);
+      if ('compilation' in validated && validated.compilation) this.result.compilation = validated.compilation;
+    }
   }
   private recordDiagnostic(error: unknown) {
     const issues = authoringValidationIssues(error);
@@ -257,9 +269,17 @@ export class AuthoringAttemptRunner {
       });
   }
   private async recordFailure(error: unknown) {
+    if (error instanceof StrategyCompilationError) this.result.compilation = error.compilation;
     this.result.errorCode = authoringFailureCode(error, this.dispatchSignal?.reason);
     this.recordDiagnostic(error);
     if (error instanceof AiSdkGenerationError) {
+      if (error.completion?.rawOutputText !== undefined) {
+        this.result.outputText = error.completion.rawOutputText;
+        let raw: unknown;
+        try { raw = JSON.parse(this.result.outputText); } catch { raw = undefined; }
+        const wire = raw as { proposal?: unknown } | undefined;
+        this.result.compilation = compileBacktestStrategy(((wire?.proposal ?? raw) as { definition?: unknown } | undefined)?.definition);
+      }
       if (error.fact.externalResult === 'not_sent') this.result.externalResult = 'not_sent';
       else if (error.fact.externalResult === 'complete') this.result.externalResult = 'received';
       else this.result.externalResult = 'unknown';
@@ -277,7 +297,8 @@ export class AuthoringAttemptRunner {
       await this.dependencies.audit.append(this.requestId, {
         eventKey: randomUUID(),
         kind: this.dispatched ? this.result.externalResult : 'not_sent',
-        actualModel: error instanceof AiSdkGenerationError ? error.completion?.actualModel ?? null : null,
+        actualModel:
+          error instanceof AiSdkGenerationError ? (error.completion?.actualModel ?? null) : null,
         usage: this.result.externalResult === 'not_sent' ? null : this.result.usage,
         cost: this.result.cost,
         errorCode: this.result.errorCode,

@@ -1,6 +1,6 @@
 {
   "input": {
-    "version": 2,
+    "version": "research-report-submission-v1",
     "submissionId": "00000000-0000-4000-8000-000000000004",
     "mode": "shadow",
     "scope": {
@@ -12,10 +12,10 @@
     "researchSettingsRevision": "controlled-settings-1"
   },
   "frozen": {
-    "version": "frozen-research-v2",
-    "resultVersion": 2,
+    "version": "research-frozen-input-v1",
+    "resultVersion": "research-report-result-v1",
     "request": {
-      "version": 2,
+      "version": "research-report-submission-v1",
       "submissionId": "00000000-0000-4000-8000-000000000004",
       "mode": "shadow",
       "scope": {
@@ -27,7 +27,7 @@
       "researchSettingsRevision": "controlled-settings-1"
     },
     "scopeSnapshot": {
-      "version": "research-scope-v2",
+      "version": "research-scope-snapshot-v1",
       "scope": "instrument",
       "mode": "shadow",
       "confirmedAt": "2026-10-18T07:59:00Z",
@@ -86,7 +86,7 @@
     }
   },
   "generation": {
-    "version": 2,
+    "version": "research-report-generation-v1",
     "conclusion": "材料有限，继续观察。",
     "rationale": [
       "合成报价只支持当前数值核对。"
@@ -192,10 +192,10 @@
     }
   },
   "result": {
-    "version": 2,
+    "version": "research-report-result-v1",
     "inputFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "scopeSnapshot": {
-      "version": "research-scope-v2",
+      "version": "research-scope-snapshot-v1",
       "scope": "instrument",
       "mode": "shadow",
       "confirmedAt": "2026-10-18T07:59:00Z",
@@ -217,7 +217,7 @@
       "researchSettingsRevision": "controlled-settings-1"
     },
     "inference": {
-      "version": 2,
+      "version": "research-report-generation-v1",
       "conclusion": "材料有限，继续观察。",
       "rationale": [
         "合成报价只支持当前数值核对。"

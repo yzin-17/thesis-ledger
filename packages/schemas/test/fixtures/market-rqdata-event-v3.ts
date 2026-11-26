@@ -31,7 +31,7 @@ export function rqdataEventFixture(
   const content = JSON.stringify(rqdataIdentityBundle());
   const digest = createHash('sha256').update(content).digest('hex');
   const request = {
-    contractVersion: 3,
+    contractVersion: 1,
     requestId: 'rqdata-event',
     symbol: '159516.SZ',
     routeKey: { kind: 'data', market: 'CN', assetType: 'ETF', capability },

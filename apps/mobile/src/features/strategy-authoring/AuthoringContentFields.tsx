@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { authoringContentSchema, type AuthoringContent } from '@thesis-ledger/schemas';
-import { Choices, Copy, Field, Section } from '../../components/MobilePrimitives';
+import { authoringContentSchema, authoringStrategyV6Schema, type AuthoringContent } from '@thesis-ledger/schemas';
+import { Action, Choices, Copy, Field, Section } from '../../components/MobilePrimitives';
 import { AuthoringConfirmationFields } from './AuthoringConfirmationFields';
 export function AuthoringContentFields({
   text,
@@ -19,6 +19,7 @@ export function AuthoringContentFields({
     /* 保留不完整内容供高级编辑。 */
   }
   const change = (value: AuthoringContent) => onChange(JSON.stringify(value, null, 2));
+  const definition = authoringStrategyV6Schema.safeParse(content?.definitionText ?? '');
   return (
     <>
       <Choices

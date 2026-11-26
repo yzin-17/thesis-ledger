@@ -32,6 +32,7 @@ export class LiveMatchesRepository {
   constructor(@Inject(PrismaService) private readonly db: PrismaService) {}
   async create(ownerId: string, raw: unknown) {
     const p = arenaLiveProtocolSchema.parse(raw);
+    p.simulationPolicy = 'sampled-v1';
     return this.db.$transaction(async (tx) => {
       const directory = await tx.instrument.findMany({
         where: { id: { in: p.instruments.map((i) => i.instrumentId) }, active: true },
@@ -171,7 +172,7 @@ export class LiveMatchesRepository {
     if (next === 'ended') {
       book.wakeups = [];
       for (const order of book.orders)
-        if (order.state === 'active') {
+        if (['active', 'waiting_parent', 'waiting_entry'].includes(order.state)) {
           order.state = 'cancelled';
           order.reason = 'arena_ended';
         }
