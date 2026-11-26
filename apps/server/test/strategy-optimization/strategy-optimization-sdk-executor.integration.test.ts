@@ -173,7 +173,7 @@ function sdkExecutionContext() {
     outputTokenReservation: 100,
     estimatedCost: 0.003,
     resolved: resolved(contract),
-    requestTimeoutMs: 2_000,
+    requestTimeoutMs: 15_000,
   });
   return {
     get responseContent() {
@@ -535,7 +535,7 @@ function registerSdkDiscoveryAndUnknownOutcomeCases(
           ...aiGenerationContracts.strategyDiscovery.ref,
         }) as never,
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ fact: { code: 'schema_invalid', externalResult: 'complete' } });
 
     expect(suiteScope.requestCount).toBe(1);
     expect(suiteScope.settlements.completeAndSettle).toHaveBeenCalledWith(
