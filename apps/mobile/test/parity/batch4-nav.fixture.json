@@ -54,7 +54,7 @@
     }
   },
   "navRequest": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "nav-client-test",
     "strategyVersionId": "11111111-1111-4111-8111-111111111111",
     "runConfig": {
@@ -165,7 +165,7 @@
     "domesticRuleDecisionRaw": "{\"applicableRange\":{\"endDate\":\"2026-09-30\",\"startDate\":\"2026-09-01\"},\"configuredAt\":\"2026-09-30T14:00:00Z\",\"decision\":\"用户选择普通 T+1 研究口径\",\"delayWorkdays\":1,\"fundType\":\"domestic\",\"schemaVersion\":\"nav-research-default-v1\",\"symbol\":\"161725.OF\"}"
   },
   "navPrepared": {
-    "contractVersion": 3,
+    "contractVersion": 1,
     "requestId": "nav-client-test",
     "checkedAt": "2026-09-30T15:02:00Z",
     "scope": "nav-input-plan",

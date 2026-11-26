@@ -29,6 +29,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
@@ -85,9 +87,7 @@ jobs:
           pnpm --filter @thesis-ledger/server exec node scripts/strategy-optimization-db-smoke.mjs
       - name: PostgreSQL service E2E
         run: |
-          pnpm --filter @thesis-ledger/schemas build
-          pnpm --filter @thesis-ledger/shared build
-          pnpm --filter @thesis-ledger/domain build
+          pnpm --filter '@thesis-ledger/server^...' build
           pnpm --filter @thesis-ledger/server exec vitest run \
             test/strategy-optimization/strategy-optimization-postgres.integration.test.ts \
             test/strategy-optimization/strategy-optimization-postgres-reconciler.integration.test.ts \
@@ -130,6 +130,7 @@ jobs:
       - name: Complexity guardrails
         run: pnpm guardrails:complexity
         env:
+          NODE_OPTIONS: --max-old-space-size=6144
           GUARDRAIL_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
       - name: Mobile import boundary regressions
         run: node --test scripts/test-mobile-boundaries.mjs

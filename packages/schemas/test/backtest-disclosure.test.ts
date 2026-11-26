@@ -23,11 +23,11 @@ const legacy = {
 describe('模型披露契约', () => {
   it('拒绝旧响应，当前失败响应保留具体原因且不补模型', () => {
     expect(backtestRunResponseSchemaV3.safeParse(legacy).success).toBe(false);
-    const current = { ...legacy, mode: 'V3' };
+    const current = { ...legacy, mode: 'frozen' };
     expect(backtestRunResponseSchemaV3.parse(current)).toEqual(current);
   });
   it('当前响应不接纳旧结果、旧 Snapshot 或旧 RunConfig', () => {
-    const current = { ...legacy, mode: 'V3' };
+    const current = { ...legacy, mode: 'frozen' };
     expect(backtestRunResponseSchemaV3.safeParse({
       ...current, result: { schemaVersion: '2' },
     }).success).toBe(false);
@@ -57,8 +57,8 @@ describe('模型披露契约', () => {
       strategyVersionId: 'version',
       snapshotId: 'snapshot',
       engineVersion: 'engine',
-      schemaVersion: '3',
-      snapshotVersion: 'snapshot-manifest-v3',
+      schemaVersion: 'backtest-trade-result-v1',
+      snapshotVersion: 'backtest-trade-snapshot-manifest-v1',
       marketRuleVersion: 'rules',
       calendarVersion: 'calendar',
       aggregationVersion: 'aggregation',
@@ -77,7 +77,7 @@ describe('模型披露契约', () => {
     };
     expect(backtestResultSchemaV3.parse(result)).not.toHaveProperty('executionModelDisclosure');
     expect(backtestRunResponseSchemaV3.safeParse({
-      ...legacy, mode: 'V3', status: 'succeeded', result,
+      ...legacy, mode: 'frozen', status: 'succeeded', result,
     }).success).toBe(true);
     expect(
       backtestResultSchemaV3.parse({

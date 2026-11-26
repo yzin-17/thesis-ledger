@@ -34,16 +34,16 @@ describe('策略目录标的身份', () => {
     expect(strategyInstrumentFromDirectory({ symbol: 'AAPL.US', market: 'US', instrumentType: 'STOCK', active: true, ...change }, 'exchange')).toBeNull();
   });
 
-  it('原子同步执行标的与 execution 信号源，保留独立信号源、精度和原定义', () => {
+  it('只修改执行标的，保留包括 execution 在内的全部独立来源、精度和原定义', () => {
     const identity = { symbol: '600519.SH', market: 'CN', assetType: 'stock' };
     const other = { id: 'benchmark', asset: { symbol: 'SPY.US', market: 'US', assetType: 'etf' }, timeframe: '1d' };
     const original = { executionInstrument: identity, signalSources: [{ id: 'execution', asset: identity, timeframe: '60m', series: ['open', 'close'] }, other], cost: { commissionRate: '0.00030000000000000001' } };
     const before = structuredClone(original);
     const selected = { symbol: '02800.HK', market: 'HK', assetType: 'etf' } as const;
     const result = withStrategyExecutionInstrument(original, selected);
-    expect(result).toMatchObject({ executionInstrument: selected, signalSources: [{ id: 'execution', asset: selected, timeframe: '60m', series: ['open', 'close'] }, other], cost: original.cost });
+    expect(result).toMatchObject({ executionInstrument: selected, signalSources: original.signalSources, cost: original.cost });
     expect(original).toEqual(before);
     expect((result.signalSources as unknown[])[1]).toBe(other);
-    expect(withStrategyExecutionInstrument(result, null)).toMatchObject({ executionInstrument: { symbol: '' }, signalSources: [{ asset: { symbol: '' } }, other] });
+    expect(withStrategyExecutionInstrument(result, null)).toMatchObject({ executionInstrument: { symbol: '' }, signalSources: original.signalSources });
   });
 });

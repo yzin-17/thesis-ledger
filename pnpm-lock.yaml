@@ -331,13 +331,12 @@ importers:
 
   packages/schemas:
     dependencies:
-      zod:
-        specifier: ^4.0.14
-        version: 4.4.3
-    devDependencies:
       '@thesis-ledger/domain':
         specifier: workspace:*
         version: link:../domain
+      zod:
+        specifier: ^4.0.14
+        version: 4.4.3
 
   packages/shared: {}
 

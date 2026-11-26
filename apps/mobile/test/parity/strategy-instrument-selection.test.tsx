@@ -24,14 +24,13 @@ beforeEach(() => {
 
 it.each([
   ['510300.SH', 'CN', 'etf'], ['02800.HK', 'HK', 'etf'], ['AAPL.US', 'US', 'stock'],
-])('移动端选择 %s 后只读身份与实际保存参数一致', async (symbol, market, assetType) => {
+])('移动端选择 %s 后显式复制来源，保存参数一致', async (symbol, market, assetType) => {
   await mount(<StrategyEditorScreen />);
-  expect(button('香港')).toBeUndefined();
-  expect(button('股票')).toBeUndefined();
   await input(field('执行标的'), '目录'); await click(button('搜索标的'));
   expect(button('选择 目录000001.OF')).toBeUndefined();
   await click(button(`选择 目录${symbol}`));
   expect(field('执行标的').value).toBe(`目录${symbol} · ${symbol}`);
+  await click(button('使用执行标的'));
   await click(button('高级 JSON'));
   await click(button('常用配置'));
   expect(field('执行标的').value).toBe(`目录${symbol} · ${symbol}`);

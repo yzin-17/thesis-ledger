@@ -1,3 +1,4 @@
+import { namedStrategyFixture } from './named-v1-strategy.fixture.js';
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
@@ -65,7 +66,7 @@ describe('NAV 准备服务与实际 HTTP', () => {
     f = navPreparationFixture();
     findUnique
       .mockReset()
-      .mockImplementation(async () => ({ schemaVersion: 2, schema: f.strategy }));
+      .mockImplementation(async () => ({ schemaVersion: 1, schema: f.strategy }));
     write.mockReset();
     persistPreparation.mockReset().mockImplementation(async ({ data }) => data);
   });
@@ -85,6 +86,18 @@ describe('NAV 准备服务与实际 HTTP', () => {
     return { status: response.status, body: (await response.json()) as Record<string, unknown> };
   }
 
+  it('具名 V1 基金使用净值坐标准备，并拒绝存储元数据与定义协议不一致', async () => {
+    Object.assign(f.strategy, namedStrategyFixture(f.strategy));
+    expect(f.strategy.signalSources[0]?.priceCoordinate).toBe('native-nav');
+    findUnique.mockImplementation(async () => ({ schemaVersion: 1, schema: f.strategy }));
+    const result = await post();
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ status: 'prepared', binding: { strategyContentHash: hashCanonicalManifest(f.strategy) } });
+    findUnique.mockImplementation(async () => ({ schemaVersion: 3, schema: f.strategy }));
+    f.read.mockClear();
+    expect((await post()).status).toBe(422);
+    expect(f.read).not.toHaveBeenCalled();
+  });
   it('实际模块注入持久保存证据后返回专属合同与创建引用，不暴露原文', async () => {
     const result = await post();
     expect(result.status).toBe(200);
@@ -154,19 +167,19 @@ describe('NAV 准备服务与实际 HTTP', () => {
   });
   it.each(['schema-version', 'schema-body'])('存储策略 %s 无效返回 422', async (mode) => {
     findUnique.mockResolvedValue({
-      schemaVersion: mode === 'schema-version' ? 1 : 2,
+      schemaVersion: mode === 'schema-version' ? 3 : 1,
       schema: mode === 'schema-body' ? {} : f.strategy,
     });
     expect((await post()).status).toBe(422);
     expect(f.read).not.toHaveBeenCalled();
   });
   it.each(['changed', 'deleted', 'invalid'])('采集期间版本 %s 阻断', async (mode) => {
-    findUnique.mockResolvedValueOnce({ schemaVersion: 2, schema: f.strategy });
+    findUnique.mockResolvedValueOnce({ schemaVersion: 1, schema: f.strategy });
     findUnique.mockResolvedValueOnce(
       mode === 'deleted'
         ? null
         : {
-            schemaVersion: 2,
+            schemaVersion: 1,
             schema: mode === 'invalid' ? {} : { ...f.strategy, name: '已变化的版本' },
           },
     );
@@ -222,7 +235,7 @@ describe('NAV 准备服务与实际 HTTP', () => {
       if (mode === 'database-before')
         findUnique.mockRejectedValueOnce(new Error('database probe-secret'));
       if (mode === 'database-after') {
-        findUnique.mockResolvedValueOnce({ schemaVersion: 2, schema: f.strategy });
+        findUnique.mockResolvedValueOnce({ schemaVersion: 1, schema: f.strategy });
         findUnique.mockRejectedValueOnce(new Error('database probe-secret'));
       }
       if (mode === 'receipt-write')

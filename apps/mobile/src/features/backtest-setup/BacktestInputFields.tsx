@@ -1,5 +1,6 @@
 import { Choices, Copy, Field, Section } from '../../components/MobilePrimitives';
 import type { BacktestForm } from './backtest-intent';
+import { BacktestDailyMatchingFields } from './BacktestDailyMatchingFields';
 export function BacktestInputFields({
   value,
   onChange,
@@ -7,6 +8,8 @@ export function BacktestInputFields({
   disabled,
   instrumentLabel,
   priceResearch = false,
+  dailyOrders = false,
+  allowDailyOrders = false,
 }: {
   value: BacktestForm;
   onChange: (v: BacktestForm) => void;
@@ -14,6 +17,8 @@ export function BacktestInputFields({
   disabled: boolean;
   instrumentLabel?: string | undefined;
   priceResearch?: boolean;
+  dailyOrders?: boolean;
+  allowDailyOrders?: boolean;
 }) {
   const patch = (part: Partial<BacktestForm>) => onChange({ ...value, ...part });
   const toggle = (field: 'calendarConfirmed' | 'domesticConfirmed', label: string) => (
@@ -70,8 +75,9 @@ export function BacktestInputFields({
       {!priceResearch && <Copy muted>填写与价格、数量、成本和交易时序匹配的完整执行模型。准备前请核对全部假设。</Copy>}
       {kind === 'ordinary' ? (
         <>
+          <BacktestDailyMatchingFields value={value} onChange={onChange} required={dailyOrders} optional={allowDailyOrders} disabled={disabled} />
           {priceResearch ? <>
-            <Copy>策略收益研究：后复权计算指标和模型收益，具体价格条件采用不复权行情。</Copy>
+            <Copy>策略收益研究：后复权计算指标和模型收益；需要实际价格条件时，另需本次冻结的不复权参考。</Copy>
             <Copy muted>研究资金、研究单位和所用价格版本随本次输入冻结。</Copy>
           </> : <>
             <Choices label="价格复权口径" value={value.adjustment} disabled={disabled}

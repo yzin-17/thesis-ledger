@@ -313,7 +313,7 @@ describe('研究模型净值与冻结兼容', () => {
     };
     expect(executionRuleSnapshotSchema.parse(legacy)).toEqual(legacy);
     const config = {
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       executionPriceProtocol: {
         protocolVersion: 'execution-price-v1',
         priceBasis: {
@@ -355,7 +355,7 @@ describe('研究模型净值与冻结兼容', () => {
     };
     expect(runConfigSchemaV3.parse(config)).toEqual(config);
     const selected = runConfigSchemaV3.parse({
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       executionPriceProtocol: {
         protocolVersion: 'execution-price-v1',
         priceBasis: {
@@ -439,7 +439,7 @@ describe('研究模型归一化记账', () => {
     expect(backtestExecutionModelSchema.safeParse(normalized).success).toBe(false);
     expect(backtestExecutionModelSchemaV3.safeParse(normalized).success).toBe(true);
     const config = {
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       startDate: '2024-01-02',
       endDate: '2024-03-29',
       dataAsOf: event.dataAsOf,

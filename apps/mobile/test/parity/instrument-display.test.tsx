@@ -69,14 +69,14 @@ describe('移动端主响应目录名称', () => {
       .mockResolvedValueOnce({
         items: [row('000001.OF')],
         instrumentDirectory: directory('000001.OF', '华夏成长混合'),
-        legacyItems: [],
+        unlinkedItems: [],
         nextCursor: 'next',
         total: 2,
       })
       .mockResolvedValueOnce({
         items: [row('999999.OF')],
         instrumentDirectory: { generation: 4, items: [], unresolvedSymbols: ['999999.OF'] },
-        legacyItems: [],
+        unlinkedItems: [],
         nextCursor: null,
         total: 2,
       });

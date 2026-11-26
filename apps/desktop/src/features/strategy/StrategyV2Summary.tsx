@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { isPriceResearchStrategyDefinition } from '@thesis-ledger/domain';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   strategyAssetTypeLabel,
@@ -36,7 +37,7 @@ export function StrategyV2Summary({
   const sources = Array.isArray(schema.signalSources) ? schema.signalSources : [];
   const risks = Array.isArray(schema.risk) ? schema.risk : [];
   const parsed = strategySchema.safeParse(schema);
-  const research = schema.schemaVersion === '3' && parsed.success
+  const research = isPriceResearchStrategyDefinition(schema) && parsed.success
     ? priceResearchStrategySummary(parsed.data as BacktestStrategy) : null;
   return (
     <Card size="sm" className="bg-muted/20">

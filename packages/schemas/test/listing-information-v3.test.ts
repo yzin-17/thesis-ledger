@@ -152,7 +152,7 @@ describe('上市信息的已知与未知合同', () => {
       listing: { symbol: response.symbol, status: 'unknown' as const },
     };
     const evidence = backtestDailyTradabilityEvidenceV3Schema.parse({
-      contract: 'market-daily-tradability-window-v1',
+      contract: 'market-daily-tradability-window-v1', priceOnlyAllowed: false,
       symbol: response.symbol,
       market: 'CN',
       instrumentType: 'ETF',

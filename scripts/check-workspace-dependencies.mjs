@@ -76,7 +76,7 @@ export function validateWorkspaceGraph(packages) {
   const allowedPackageDependencies = new Map([
     ['@thesis-ledger/shared', new Set()],
     ['@thesis-ledger/domain', new Set(['@thesis-ledger/shared'])],
-    ['@thesis-ledger/schemas', new Set()],
+    ['@thesis-ledger/schemas', new Set(['@thesis-ledger/domain'])],
     ['@thesis-ledger/api-client', new Set(['@thesis-ledger/schemas'])],
   ]);
   for (const [name, allowed] of allowedPackageDependencies) {
@@ -129,7 +129,7 @@ function runFixtureChecks() {
   const valid = [
     pkg('@thesis-ledger/shared', 'packages/shared'),
     pkg('@thesis-ledger/domain', 'packages/domain', { '@thesis-ledger/shared': 'workspace:*' }),
-    pkg('@thesis-ledger/schemas', 'packages/schemas', {}, { '@thesis-ledger/domain': 'workspace:*' }),
+    pkg('@thesis-ledger/schemas', 'packages/schemas', { '@thesis-ledger/domain': 'workspace:*' }),
     pkg('@thesis-ledger/api-client', 'packages/api-client', {
       '@thesis-ledger/schemas': 'workspace:*',
     }),

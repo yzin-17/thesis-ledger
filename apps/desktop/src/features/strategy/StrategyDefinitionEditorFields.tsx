@@ -55,7 +55,8 @@ function editorItemTitle(
   directory: InstrumentDirectory | undefined,
 ) {
   const row = strategyDraftRecord(item);
-  const prefix = `${fieldLabel} ${index + 1}${row.id ? ` · ${String(row.id)}` : ''}`;
+  const id = typeof row.id === 'string' && row.id ? ` · ${row.id}` : '';
+  const prefix = `${fieldLabel} ${index + 1}${id}`;
   if (context !== 'source') return prefix;
   const { symbol } = strategyDraftRecord(row.asset);
   if (typeof symbol !== 'string' || !symbol.trim()) return prefix;

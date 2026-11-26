@@ -136,7 +136,9 @@ describe('生命周期协议选择、结果和诊断披露', () => {
           })),
         },
         entries: samples.map(({ request, result }) => {
-          const { routeTarget, policyRevision, ...query } = request;
+          const query = Object.fromEntries(
+            Object.entries(request).filter(([key]) => key !== 'routeTarget' && key !== 'policyRevision'),
+          );
           return { query, requirement: 'optional', status: 'included', request, result };
         }),
       },

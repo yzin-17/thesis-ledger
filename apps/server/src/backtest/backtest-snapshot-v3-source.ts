@@ -56,8 +56,8 @@ export const createBacktestSnapshotV3Source = (
   plan: BacktestSnapshotV3SourcePlan,
   readResult: MarketBarWindowReadResultV3,
 ): BacktestSnapshotV3SourceArtifacts => {
-  if (plan.purpose !== 'execution') {
-    return fail('unsupported_purpose', '当前 Snapshot V3 来源 helper 仅支持 execution 用途。');
+  if (plan.purpose !== 'execution' && plan.purpose !== 'signal') {
+    return fail('unsupported_purpose', '当前 Snapshot V3 来源 helper 仅支持 execution 或 signal 用途。');
   }
   if (readResult.status !== 'selected') {
     return fail('window_unavailable', 'V3 行情窗口未 selected，不能冻结为 Snapshot 来源。');

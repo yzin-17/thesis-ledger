@@ -58,10 +58,11 @@ const runScenario = (
     };
   });
   const strategy = strategySchema.parse({
-    schemaVersion: '2',
+    schemaVersion: 'strategy-definition-v1',
     name: '公司行动复权指标',
     signalSources: [
       {
+        priceCoordinate: 'run',
         id: 'price',
         asset: { symbol: '600519.SH', market: 'CN', assetType: 'stock' },
         timeframe: '1d',
@@ -158,7 +159,7 @@ const runScenario = (
     snapshotId: 'snapshot-adjusted-indicator',
     strategy,
     runConfig: runConfigSchemaV3.parse({
-      schemaVersion: '3',
+      schemaVersion: 'backtest-trade-config-v1',
       executionPriceProtocol: {
         protocolVersion: 'execution-price-v1',
         priceBasis: {

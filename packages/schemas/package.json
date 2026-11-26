@@ -11,9 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@thesis-ledger/domain": "workspace:*",
     "zod": "^4.0.14"
-  },
-  "devDependencies": {
-    "@thesis-ledger/domain": "workspace:*"
   }
 }

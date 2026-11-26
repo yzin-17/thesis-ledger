@@ -1,3 +1,4 @@
+import { isPriceResearchStrategyDefinition } from '@thesis-ledger/domain';
 import { PriceResearchVersionPreview } from './PriceResearchVersionPreview.js';
 import type { ExperimentStrategyVersion } from './use-experiment-research-versions.js';
 import type { StrategyVersion } from './strategy.types.js';
@@ -13,7 +14,7 @@ export function ExperimentResearchVersionChoice({
   onAdopt: (version: StrategyVersion) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
-  if (!entry || entry.version.schema?.schemaVersion === '3') return null;
+  if (!entry || isPriceResearchStrategyDefinition(entry.version.schema)) return null;
   return (
     <PriceResearchVersionPreview
       key={entry.version.id}

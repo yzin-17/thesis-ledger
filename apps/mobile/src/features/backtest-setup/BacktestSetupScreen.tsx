@@ -6,6 +6,7 @@ import { randomUUID } from 'expo-crypto';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { isPriceResearchStrategyDefinition, strategyEditorVariant, backtestStrategyPlanReadback } from '@thesis-ledger/domain';
 import type {
   BacktestNavPreparationRequestV3,
   BacktestNavPreparationResultV3,
@@ -14,7 +15,7 @@ import type {
   StrategyVersionRead,
   BacktestStrategy,
 } from '@thesis-ledger/schemas';
-import { strategySchema, projectPriceResearchStrategy, priceResearchStrategySummary } from '@thesis-ledger/schemas';
+import { strategySchema, projectPriceResearchStrategy } from '@thesis-ledger/schemas';
 import { confirmAction, useDirtyForm, useMobileRuntime } from '../../app/MobileRuntime';
 import { useMobileCommand } from '../../app/query/mobile-queries';
 import type { StrategyStackParams } from '../../app/strategy-navigation';
@@ -48,12 +49,12 @@ type Intent =
 type Prepared = BacktestRunPreparationResultV3 | BacktestNavPreparationResultV3;
 function backtestVersionResearch(version: StrategyVersionRead | undefined, kind: 'ordinary' | 'nav', fallbackId: string) {
   const versionId = version?.id ?? fallbackId;
-  const researchReady = kind === 'nav' || version?.schema?.schemaVersion === '3';
+  const researchReady = kind === 'nav' || isPriceResearchStrategyDefinition(version?.schema);
   const parsed = strategySchema.safeParse(version?.schema);
-  const projection = parsed.success ? projectPriceResearchStrategy(parsed.data as BacktestStrategy) : null;
-  const projectionSummary = projection ? priceResearchStrategySummary(projection) : null;
+  const projection = kind === 'ordinary' && parsed.success && (parsed.data as BacktestStrategy).execution.mode === 'exchange' ? projectPriceResearchStrategy(parsed.data as BacktestStrategy) : null;
+  const projectionSummary = projection ? backtestStrategyPlanReadback(projection) : null;
   const instrument = version?.schema?.executionInstrument as { symbol?: string } | undefined;
-  return { versionId, researchReady, projection, projectionSummary, instrument };
+  return { versionId, researchReady, projection, projectionSummary, instrument, dailyOrders: strategyEditorVariant('execution', version?.schema?.execution) === 'dailyBarOrders' };
 }
 
 function useBacktestSetupController() {
@@ -66,7 +67,7 @@ function useBacktestSetupController() {
     ?.versions.find((v) => v.id === params.versionId);
   const [adoptedVersion, setAdoptedVersion] = useState<StrategyVersionRead | null>(null);
   const version = adoptedVersion ?? originalVersion;
-  const { versionId, researchReady, projection, projectionSummary, instrument } = backtestVersionResearch(version, params.kind, params.versionId);
+  const { versionId, researchReady, projection, projectionSummary, instrument, dailyOrders } = backtestVersionResearch(version, params.kind, params.versionId);
   const key = JSON.stringify(['mobile-backtest-submit-v1', baseUrl, params.kind, versionId]);
   const pendingQuery = useQuery({
     queryKey: [...scope, 'backtest-pending', key],
@@ -167,7 +168,7 @@ function useBacktestSetupController() {
         if (modelResolution.data?.status !== 'available') throw Error('研究执行设置尚未就绪，请核对日期和币种');
         model = JSON.stringify(modelResolution.data.model);
       }
-      const input = { ...form, model, priceResearch: params.kind === 'ordinary',
+      const input = { ...form, model, dailyOrders: dailyOrders || Boolean(form.dailyOrders), priceResearch: params.kind === 'ordinary',
         adjustment: 'hfq' as const, history: 'fixed-provider-snapshot' as const,
         symbol: instrument?.symbol ?? form.symbol };
       const body =
@@ -192,6 +193,7 @@ function useBacktestSetupController() {
   };
   const locked = continuous.isPending || command.isPending || adopt.isPending || !!pendingQuery.data || !!receipt;
   return {
+    dailyOrders,
     params,
     library,
     pendingQuery,
@@ -219,8 +221,7 @@ function BacktestResearchDisclosure({ state }: { state: Pick<ReturnType<typeof u
   return (
     <>
       {params.kind === 'ordinary' && projectionSummary && <Section title="策略收益研究口径">
-        <Copy>入场：{projectionSummary.entry}</Copy><Copy>退出：{projectionSummary.exit}</Copy>
-        <Copy>投入：{projectionSummary.sizing}，持仓以研究单位计算。</Copy>
+        {projectionSummary.map(line => <Copy key={line}>{line}</Copy>)}
         {!researchReady && <Action label="采用研究口径并保存新版本" primary disabled={locked}
           onPress={() => void adopt.mutateAsync(undefined).catch((e) => setMessage(failureMessage(e)))} />}
       </Section>}
@@ -283,6 +284,7 @@ export function BacktestSetupScreen() {
       <QueryStatus query={pendingQuery} retry={() => void pendingQuery.refetch()} />
       <BacktestResearchDisclosure state={state} />
       <BacktestInputFields
+        dailyOrders={state.dailyOrders}
         priceResearch={params.kind === 'ordinary'}
         instrumentLabel={strategyInstrumentLabel(version)}
         kind={params.kind}

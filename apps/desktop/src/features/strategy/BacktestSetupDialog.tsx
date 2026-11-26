@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
+import { isPriceResearchStrategyDefinition, strategyEditorVariant } from '@thesis-ledger/domain';
 import { strategySchema } from '@thesis-ledger/schemas';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -75,7 +76,7 @@ export function BacktestSetupDialog({
   const [adoptedVersion, setAdoptedVersion] = useState<StrategyVersion | null>(null);
   const [adopting, setAdopting] = useState(false);
   const version = adoptedVersion ?? initialVersion;
-  const researchVersion = version?.schema?.schemaVersion === '3';
+  const researchVersion = isPriceResearchStrategyDefinition(version?.schema);
   const [prepared, setPrepared] = useState<PreparedBacktest | null>(null);
   const [preparationDirty, setPreparationDirty] = useState(false);
   const [executionReady, setExecutionReady] = useState(false);
@@ -261,6 +262,7 @@ export function BacktestSetupDialog({
               onBusyChange={setSubmitting}
               key={`${version.id}:${adjustment}`}
               strategyVersionId={version.id}
+              dailyOrders={strategyEditorVariant('execution', version.schema?.execution) === 'dailyBarOrders'}
               priceResearch
               adjustment={adjustment}
               period={period}

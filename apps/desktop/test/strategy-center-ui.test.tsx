@@ -59,11 +59,11 @@ const editorSheetSource = readFileSync(
 const experimentCreateSource = readFileSync(
   new URL('../src/features/strategy/StrategyExperimentCreatePage.tsx', import.meta.url),
   'utf8',
-);
+) + readFileSync(new URL("../src/features/strategy/useExperimentCreatePage.ts", import.meta.url), "utf8");
 const experimentDetailSource = readFileSync(
   new URL('../src/features/strategy/StrategyExperimentDetailPage.tsx', import.meta.url),
   'utf8',
-);
+) + readFileSync(new URL("../src/features/strategy/useExperimentDetailPage.ts", import.meta.url), "utf8");
 const experimentDetailSectionsSource = readFileSync(
   new URL('../src/features/strategy/StrategyExperimentDetailSections.tsx', import.meta.url),
   'utf8',
@@ -101,7 +101,7 @@ describe('策略中心界面契约', () => {
     expect(strategyCenterLayout).not.toContain('onValueChange={(nextValue)');
     expect(dashboardSource).not.toContain('const [centerTab, setCenterTab]');
     expect(dashboardSource).toContain('strategyCenterTabForPath(location.pathname)');
-    expect(backtestDetail).toContain('to={sourcePath}');
+    expect(backtestDetail).toContain('to={control.sourcePath}');
     expect(backtestDetail).not.toContain('onSourceTabChange(');
     expect(strategyCenterLayout).not.toContain('data-icon="inline-start"');
   });

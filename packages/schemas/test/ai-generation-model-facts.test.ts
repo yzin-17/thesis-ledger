@@ -4,7 +4,7 @@ import { aiGenerationOutcomeSchema } from '../src/index.js';
 const completed = {
   status: 'complete',
   finishReason: 'stop',
-  contract: { id: 'research', version: 'research-generation-v2' },
+  contract: { id: 'research', version: 'research-report-generation-v1' },
   schemaAccepted: true,
 };
 

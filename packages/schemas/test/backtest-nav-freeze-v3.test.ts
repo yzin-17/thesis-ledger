@@ -73,7 +73,7 @@ const model = () => ({
 });
 
 const config = () => ({
-  schemaVersion: '3',
+  schemaVersion: 'backtest-nav-config-v1',
   startDate: '2025-01-02',
   endDate: '2025-01-03',
   dataAsOf: '2025-01-04T00:00:00.000Z',
@@ -109,7 +109,7 @@ const fact = (valuationDate: string, occurredAt: string, availableAt: string) =>
 });
 
 const manifest = () => ({
-  manifestVersion: 'snapshot-manifest-v3',
+  manifestVersion: 'backtest-nav-snapshot-manifest-v1',
   inputKind: 'nav',
   status: 'finalized',
   runId: 'run-1',

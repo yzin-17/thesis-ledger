@@ -31,7 +31,7 @@ describe('AI 生成与执行共享契约', () => {
     expect(aiGenerationContracts.parameterOptimization.ref.version).toBe(
       'optimization-parameter-v1',
     );
-    expect(aiGenerationContracts.strategyDiscovery.ref.version).toBe('strategy-discovery-v2');
+    expect(aiGenerationContracts.strategyDiscovery.ref.version).toBe('strategy-discovery-generation-v1');
     expect(aiGenerationContracts.research.ref.version).toBe(
       AI_RESEARCH_GENERATION_CONTRACT_VERSION,
     );

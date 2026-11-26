@@ -40,31 +40,22 @@ const respond = (v: unknown, status = 200) =>
     JSON.stringify(status >= 400 ? { error: 'controlled_failure', ...(v as object) } : v),
     { status },
   );
+const currentResult = researchResultV2Schema.parse(researchSample.result);
 const report = {
   id,
   status: 'succeeded',
   question: '受控报告',
   createdAt: '2026-10-24T00:00:00Z',
   updatedAt: '2026-10-24T00:00:00Z',
-  historicalScope: { status: 'unrecorded', snapshot: null, label: '历史范围未记录' },
-  resultVersion: 1,
-  availability: 'pending_verification',
+  historicalScope: { status: 'known', snapshot: currentResult.scopeSnapshot },
+  resultVersion: 'research-report-result-v1',
+  availability: 'available',
   summary: '保留正文',
-  quality: null,
+  quality: currentResult.quality,
   errorCode: null,
   errorSummary: null,
   submission: null,
-  result: {
-    version: 1,
-    provider: 'controlled',
-    conclusion: '已有正文完整保留',
-    evidence: [],
-    risks: [],
-    unknowns: [],
-    signals: [],
-    disclaimer: '受控验收',
-    createdAt: '2026-10-24T00:00:00Z',
-  },
+  result: { ...currentResult, inference: { ...currentResult.inference, conclusion: '已有正文完整保留' } },
 };
 beforeEach(() => {
   storage.clear();
@@ -120,7 +111,7 @@ describe('第 3 批手机异常保护', () => {
         const p = String(url);
         if (p.includes('/research/capabilities'))
           return respond({
-            version: 'research-capabilities-v2',
+            version: 'research-capabilities-v1',
             canCreate: true,
             scopes: ['portfolio'],
           });
@@ -257,7 +248,7 @@ describe('手机分析、材料与不确定提交恢复', () => {
     result.evidenceBindings.push({ ...binding, audit: { ...binding.audit, evidenceId: extraId } });
     const detail = researchReportDetailSchema.parse({
       ...report,
-      resultVersion: 2,
+      resultVersion: 'research-report-result-v1',
       availability: 'available',
       historicalScope: { status: 'known', snapshot: result.scopeSnapshot },
       result,
@@ -270,14 +261,14 @@ describe('手机分析、材料与不确定提交恢复', () => {
     expect(evidence).toHaveBeenCalledWith(extraId);
   });
   it('报告刷新失败保留已经读取的正文与来源范围', async () => {
-    view.params = { id, locator: { view: 'legacy' } };
+    view.params = { id, locator: { view: 'scoped', mode: currentResult.scopeSnapshot.mode, scope: 'all' } };
     let fail = false;
     setApi(
       vi.fn<typeof fetch>().mockImplementation(async (url) => {
         if (String(url).includes('/tool-calls')) {
           const endpoint = new URL(String(url));
           expect(endpoint.pathname).toBe(`/api/v1/research/reports/${id}/tool-calls`);
-          expect(endpoint.searchParams.get('view')).toBe('legacy');
+          expect(endpoint.searchParams.get('view')).toBe('scoped');
           return respond({ runId: id, items: [], nextCursor: null, hasMore: false });
         }
         if (fail) return respond({ message: '暂时断线' }, 503);
@@ -295,7 +286,7 @@ describe('手机分析、材料与不确定提交恢复', () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url) => {
       if (String(url).includes('/research/capabilities'))
         return respond({
-          version: 'research-capabilities-v2',
+          version: 'research-capabilities-v1',
           canCreate: false,
           scopes: ['portfolio'],
         });
@@ -313,7 +304,7 @@ describe('手机分析、材料与不确定提交恢复', () => {
   });
   it('不确定提交在重开后复用原输入和标识，找回不创建新请求', async () => {
     const pending = {
-      version: 2,
+      version: 'research-report-submission-v1',
       submissionId: id,
       mode: 'shadow',
       scope: { scope: 'portfolio' },
@@ -333,7 +324,7 @@ describe('手机分析、材料与不确定提交恢复', () => {
         }
         if (String(url).includes('/research/capabilities'))
           return respond({
-            version: 'research-capabilities-v2',
+            version: 'research-capabilities-v1',
             canCreate: false,
             scopes: ['portfolio'],
           });
