@@ -120,4 +120,20 @@
 
 ### 远端 CI
 
-三仓使用同名验收分支。此节将在远端运行结束后记录被测提交、构建结果与尚未验收的项目。
+三仓使用同名验收分支 `codex/named-v1-cutover-20261126`。主仓策略执行前置 `437aba8f`、DSA 行情窗口前置 `0dedd440` 各自提交，随后提交具名 V1 切换和对应的 CI 修复。
+
+| 仓库 | 被测提交 | 结果 |
+| --- | --- | --- |
+| ThesisLedger | `3bb0b2a822705a6d52cd80d0692cfbe428aaa3c9` | 质量、合同门禁、Android Debug 和 iOS 模拟器构建全部通过。 [主仓 CI](https://github.com/yzin-17/thesis-ledger/actions/runs/45795276830) |
+| DSA | `726048f9aa2cfb81177994c7d0c2f8156ce8a1d4` | 三个离线测试作业、后端门禁、AI 治理和镜像构建通过。 [DSA CI](https://github.com/yzin-17/daily_stock_analysis/actions/runs/45776349407) |
+| infra | `b83476eed23882cdace273d34b55af988ff2b5f9` | 使用表中主仓和 DSA 提交通过兼容检查。应用侧 97 项通过、1 项按配置跳过，DSA 侧 30 项通过。 [infra CI](https://github.com/yzin-17/thesis-ledger-infra/actions/runs/45795277129) |
+
+- 主仓 `quality` 在仓库根目录运行 `pnpm -r --workspace-concurrency=1 test`，通过 9,811 项，按配置跳过 523 项。lint、类型检查和 `pnpm build` 均通过。`node --test scripts/local-runtime/*.test.mjs scripts/deployment/*.test.mjs` 通过 110 项，`bash scripts/local-runtime/ai-deployment-contract.test.sh` 与 `bash scripts/local-runtime/database-role-contract.test.sh --check-only` 均退出 0。运行记录确认工具检查使用了表中的 DSA 和 infra 提交。手动触发参数 `package_desktop=false`，可选桌面安装包作业跳过。 [质量作业](https://github.com/yzin-17/thesis-ledger/actions/runs/45795276830/job/139824231326)
+- 主仓合同门禁完成 PostgreSQL 服务端到端 11 项、AI 配置隔离 106 项、基金定投 15 项、组合估值 16 项、收益与风险 12 项、复盘投影 8 项、策略编写来源 14 项，并通过行情读取、共享合同、离线研究轨迹及移动边界检查。 [合同作业](https://github.com/yzin-17/thesis-ledger/actions/runs/45795276830/job/139824230895)
+- DSA 三个测试作业检出了主仓 `e279d9c152f372d0802289a2aea5ddd2fd3fe060` 以构建共享 Schema。用于构建的 `packages/schemas`、`packages/domain`、锁文件和工作区构建配置在该提交与最终主仓候选之间一致。 [共享合同构建日志](https://github.com/yzin-17/daily_stock_analysis/actions/runs/45776349407/job/139760882607)
+
+首轮主仓发现移动端依赖和 PostgreSQL 测试的构建顺序问题。后续对齐回测、研究权限和策略编写来源的现行版本，并按远端日志调整测试并发和用例期限。最后的复验分别覆盖本地 HTTP 连接隔离，以及在无 `rg` 环境下执行数据库角色合同检查。 [主仓首轮](https://github.com/yzin-17/thesis-ledger/actions/runs/45769404178) · [本地 HTTP 失败回执](https://github.com/yzin-17/thesis-ledger/actions/runs/45786735057) · [权限检查失败回执](https://github.com/yzin-17/thesis-ledger/actions/runs/45790907769)
+
+DSA 补齐分片的共享合同构建和 SDK 依赖，保留历史摘要并按数值容差核对跨平台舍入。infra 首轮兼容检查中的失败来自 DSA 恢复提示的文本断言，随后纳入两个现行健康提示。 [DSA 首轮](https://github.com/yzin-17/daily_stock_analysis/actions/runs/45769381702) · [infra 首轮](https://github.com/yzin-17/thesis-ledger-infra/actions/runs/45769404327)
+
+远端验收使用离线数据、受控 HTTP 夹具和隔离 PostgreSQL。OpenAI 真实模型调用与目标开发栈的验收沿用前文各自的运行记录。
