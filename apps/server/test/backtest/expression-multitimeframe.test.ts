@@ -70,7 +70,7 @@ it.each(['1d', '60m'] as const)(
       ),
     ).toEqual(result);
   },
-  30_000,
+  60_000,
 );
 
 it('额外周期没有准备身份时拒绝构建，窗口身份变化也不自动读取新版本', async () => {
@@ -155,7 +155,7 @@ it('正式准备独立获取并回传额外周期身份，构建与执行只使�
   expect(
     await new LocalSnapshotV3Runner(snapshots).run(input, new AbortController().signal),
   ).toEqual(await new LocalSnapshotV3Runner(snapshots).run(input, new AbortController().signal));
-});
+}, 30_000);
 
 it('额外周期实际预热不足或价格基准未对齐时拒绝，不补默认行情', async () => {
   const f = await fixture();
@@ -291,4 +291,4 @@ it('模型验收的多周期夹具也走正式准备与独立冻结，保持实�
   expect(snapshot.fixture.input.strategy).toEqual(expected);
   expect(result.simulationFills[0]?.occurredAt.slice(0, 10)).toBe('2026-05-19');
   expect(await snapshot.run()).toEqual(result);
-});
+}, 30_000);

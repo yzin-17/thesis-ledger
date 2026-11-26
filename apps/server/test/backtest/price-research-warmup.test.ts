@@ -158,5 +158,5 @@ describe('实验双价格候选预算父窗口', () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });

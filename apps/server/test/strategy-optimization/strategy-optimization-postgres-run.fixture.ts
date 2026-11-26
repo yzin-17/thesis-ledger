@@ -111,7 +111,7 @@ export function completedOptimizationRun(input: {
   const job = {
     id,
     strategyVersionId: input.strategyVersionId,
-    mode: 'V3',
+    mode: 'frozen',
     status: 'succeeded',
     errorCode: null,
     errorSummary: null,
