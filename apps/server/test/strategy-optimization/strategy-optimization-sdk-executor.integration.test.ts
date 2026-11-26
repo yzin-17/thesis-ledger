@@ -6,7 +6,7 @@ import { prepareBacktestRunConfigV3 } from '../../src/backtest/backtest-run-prep
 import { buildGenerationSchemaPrompt } from '../../src/ai/ai-generation-schema-prompt.js';
 import { createServer, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiSdkGenerationAdapter } from '../../src/ai/ai-sdk-generation.adapter.js';
 import { createDiscoverySeed } from '../../src/strategy-optimization/strategy-optimization-discovery.js';
 import { StrategyOptimizationSdkExecutor } from '../../src/strategy-optimization/strategy-optimization-sdk-executor.js';
@@ -14,7 +14,7 @@ import { strategyOptimizationPrompt } from '../../src/strategy-optimization/stra
 import { completeSnapshotFixture } from '../backtest/v3-complete-snapshot-fixtures.js';
 
 const writeSse = (response: ServerResponse, content: string) => {
-  response.writeHead(200, { 'content-type': 'text/event-stream' });
+  response.writeHead(200, { 'content-type': 'text/event-stream', connection: 'close' });
   const common = {
     id: 'optimization-fixture',
     object: 'chat.completion.chunk',
@@ -108,20 +108,20 @@ function sdkExecutionContext() {
     completedAt: null,
     createdAt: new Date(),
   };
-  beforeAll(async () => {
+  beforeEach(async () => {
+    responseContent = '';
+    requestCount = 0;
+    receivedBody = '';
+    vi.clearAllMocks();
+    settlements.completeAndSettle.mockResolvedValue({ continuationBlockedReason: null });
+    // 每个用例使用独立监听端口，避免复用上一例正在关闭的连接。
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('本地 Provider fixture 启动失败');
     baseURL = `http://127.0.0.1:${address.port}`;
   });
-  beforeEach(() => {
-    requestCount = 0;
-    receivedBody = '';
-    vi.clearAllMocks();
-    settlements.completeAndSettle.mockResolvedValue({ continuationBlockedReason: null });
-  });
-  afterAll(async () => {
+  afterEach(async () => {
     server.close();
     await once(server, 'close');
   });
