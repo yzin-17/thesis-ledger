@@ -366,9 +366,9 @@ function registerAuthoringProposalAndPublicationCases() {
       const strategy = await tx.strategy.create({
         data: {
           name: '隔离来源样本',
-          schemaVersion: 2,
+          schemaVersion: 1,
           versions: {
-            create: { version: 1, schemaVersion: 2, schema: schema as Prisma.InputJsonValue },
+            create: { version: 1, schemaVersion: 1, schema: schema as Prisma.InputJsonValue },
           },
         },
         include: { versions: true },
@@ -401,11 +401,11 @@ function registerAuthoringProposalAndPublicationCases() {
       const strategy = await tx.strategy.create({
         data: {
           name: '终态竞态样本',
-          schemaVersion: 2,
+          schemaVersion: 1,
           versions: {
             create: {
               version: 1,
-              schemaVersion: 2,
+              schemaVersion: 1,
               schema: authoringStrategySchema.parse(definitionText) as Prisma.InputJsonValue,
             },
           },
@@ -435,9 +435,9 @@ function registerAuthoringProposalAndPublicationCases() {
         const strategy = await tx.strategy.create({
           data: {
             name: '应回滚',
-            schemaVersion: 2,
+            schemaVersion: 1,
             versions: {
-              create: { version: 1, schemaVersion: 2, schema: wrong as Prisma.InputJsonValue },
+              create: { version: 1, schemaVersion: 1, schema: wrong as Prisma.InputJsonValue },
             },
           },
           include: { versions: true },

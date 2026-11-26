@@ -136,7 +136,7 @@ export class AuthoringProvenanceRepository {
     const versions = await tx.$queryRaw<{ matches: boolean; schemaVersion: number }[]>(Prisma.sql`
       SELECT schema = ${JSON.stringify(finalDefinition)}::jsonb AS matches, "schemaVersion" FROM "StrategyVersion" WHERE id = ${versionId}::uuid`);
     const version = versions[0];
-    if (!version || version.schemaVersion !== Number(finalDefinition.schemaVersion) || !version.matches)
+    if (!version || version.schemaVersion !== 1 || !version.matches)
       return authoringConflict('AUTHORING_REVISION_CONFLICT', '来源定义必须与正式版本定义一致');
     const operations = await tx.$queryRaw<
       { id: string; status: string; kind: string; disposition: string }[]

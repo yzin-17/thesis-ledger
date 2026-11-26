@@ -107,6 +107,8 @@ jobs:
         run: node scripts/test-performance-correctness-postgres.mjs test/risk/valuation-postgres.integration.test.ts
       - name: 复盘投影隔离 PostgreSQL
         run: node scripts/test-journal-review-postgres.mjs
+      - name: 策略编写来源隔离 PostgreSQL
+        run: node scripts/test-journal-review-postgres.mjs test/strategy-authoring/authoring-postgres.integration.test.ts
       - name: Market reader review regressions
         run: |
           market_regression_tests=(
