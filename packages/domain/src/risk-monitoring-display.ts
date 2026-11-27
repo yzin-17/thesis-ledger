@@ -3,6 +3,8 @@ const sourceReasons: Record<string, string> = {
   not_selected: '尚未选择行情来源',
   not_eligible: '当前来源不可用',
   background_budget_unverified: '当前来源尚未确认后台调用预算',
+  background_permission_unverified: '当前账户尚未确认后台行情权限',
+  background_permission_denied: '当前账户缺少后台行情权限',
   identity_unverified: '标的分类尚未核实',
   official_nav_updates_required: '等待正式净值更新，尚未接入自动获取',
   outside_market_session: '当前不在交易时段，等待下次开市',

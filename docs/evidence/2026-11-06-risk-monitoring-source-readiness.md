@@ -82,3 +82,72 @@
 DSA生产镜像本身没有pytest；脚本通过只读挂载已有本地venv中的纯Python测试工具，生产依赖仍由既有镜像提供。首次缺pytest失败未安装依赖；首次策略全对象断言受动态appliedAt影响，改为比较路由与修订；首次新闭环误期望仅一个事件，已更正为实际/模拟两事件且仅一条通知入队。编译发现新增可选字段的exactOptionalPropertyTypes不匹配，已修复后重跑通过。所有失败与日志保留于本机 `/tmp/risk-source-*.log`，没有将失败写成通过。
 
 两个专用脚本只创建UUID隔离资源、复用本地镜像、不注入真实凭据或发送通知，不操作目标服务/volumes；DSA容器禁用网络，风险隔离环境仅使用受控DSA响应与通知mock；运行后均已清理。未执行目标sync/update，未构建生产镜像，真实上游时效、连接恢复和节假日仍无验收证据。当前目标有效规则0、旧任务0的只读事实不因代码完成而变化。
+
+## 2026-11-27 目标后台报价验收
+
+19:08 至 19:09（中国标准时间），在目标 Server `390afbd9878b` 和 DSA `71f05951ed19` 核对真实选源与后台资格，两个容器均为 `healthy`。通过 DSA 只读控制快照确认 Desired 与 Effective 均为修订 203，随后使用目标 `POST /api/v1/thesis-ledger/market/background-quote/plan` 验证每条现行报价路由。以下主备目标在普通报价路由均为 `eligible=true`；各计划返回 HTTP 200、`acquisition=blocked`、`reason=background_budget_unverified`，采集间隔与源更新周期均为空。
+
+| 报价范围 | 样本 | 主来源 | 备用来源 |
+| --- | --- | --- | --- |
+| 沪深 ETF | `510300.SH` | `hithink/fund-market-snapshot` | `akshare/eastmoney` |
+| 沪深股票 | `600519.SH` | `hithink/a-share-prices-snapshot` | `akshare/eastmoney` |
+| 港股 | `00700.HK` | `futu/futu` | `yfinance/yfinance` |
+| 香港 ETF | `02800.HK` | `futu/futu` | `yfinance/yfinance` |
+| 美股 | `AAPL.US` | `futu/futu` | `yfinance/yfinance` |
+| 美国 ETF | `SPY.US` | `futu/futu` | `yfinance/yfinance` |
+| 美国指数 | `^GSPC.US` | `yfinance/yfinance` | 无 |
+
+- HiThink 与富途均已配置凭证。目标来源注册未为这两个适配器提供逐功能账户报告，后台能力以实际计划返回为准，无法据普通快照资格推断常驻额度或订阅权。公开腾讯报价来源已启用，后台合同允许选中的腾讯沪深 ETF 进入公开快照采集，策略 203 未选腾讯。
+- 使用 `510300.SH` 当前计划及 `generation` 调用实际 `POST /api/v1/thesis-ledger/market/background-quote`。首轮返回 HTTP 503，诊断脚本读取顶层错误字段时未能提取稳定码。改按 `detail.code` 读取后，复验请求 `target-background-execution-20261127-510300-recheck` 用时 34 毫秒，返回 HTTP 503 `not_admitted`，无报价。执行入口在调用上游前拒绝，34 毫秒是拒绝响应时间。
+- Server 的 `GET /api/v1/risk/monitoring` 和 `GET /api/v1/risk/rules` 均返回 HTTP 200。风险处理与采集协调心跳正常。2 条生效规则均绑定策略应用，分别为成本止损与最长持有期，独立后台报价需求为 0。19:09:27 Redis DB 0 的采集状态 `sources=[]`，后台尝试键及最近样本键均未查到。没有 `sourceTime` 或 `fetchedAt` 可计算时效。
+- 当前目标 Server 的后台执行产物包含市场会话判断及 Redis `SET NX` 尝试窗口。600 秒是符合准入的腾讯公开快照计划的请求间隔；当前 DSA 的 `claim_provider_request_budget` 为兼容空操作。旧记录描述的 DSA SQLite 二次预算保护属于原实现。
+- 本轮已完成选源、准入与负向执行验收。后台实源请求 0 次，配置、规则与通知均未修改。正向实源时效仍由 R5 持有，须在已选来源获后台资格并有实际报价需求的交易时段，核对记入采集状态的来源时间和获取时间。
+
+## 2026-11-27 三家来源权限与配额
+
+- **HiThink**。19:16 使用目标保存凭证（配置版本 9、凭证版本 1）各读一次 `600519.SH` 股票快照及 `510300.SH` ETF 快照。两次均 HTTP 200、业务码 0、返回 1 条匹配记录。请求编号分别为 `80b6f0ac2fb644629db8fbc81864dcb7`、`53a28e63a2de43139d272a6c1eb9a3eb`。两次均返回 `X-RateLimit-Limit: 15`、`X-RateLimit-Remaining: 15`，未给出窗口单位、重置时间或额度共享范围。公开接口资料说明限流码 4001，未查到这两个快照的计量窗口，后台额度保持未验证。[同花顺接入文档](https://fuyao.aicubes.cn/docs/quickstart/)
+- **富途**。19:16 至 19:17 从目标 DSA 使用现有 OpenD（配置及凭证均为版本 1）读取权限及订阅用量。OpenD 10.12、SDK 10.8.6808，行情登录为 READY。港股 LV2、美股 LV3。OpenD 全连接普通行情订阅已用 0、剩余 300。本批采用现有快照接口，未占用订阅槽位。快照协议公布每 30 秒 60 次，每次最多 400 个标的。DSA 现有适配器继续单标读取，同一 DSA 进程内按 OpenD 端点对报价和市场状态快照共享 60 次滑动窗口。富途服务仍管理其他客户端的配额。[富途快照接口](https://openapi.futunn.com/futu-api-doc/en/quote/get-market-snapshot.html) · [富途权限及配额](https://openapi.futunn.com/futu-api-doc/en/intro/authority.html)
+- **Yahoo**。目标使用无账号凭证的 yfinance。Yahoo 服务条款要求使用自动化方式采集前取得明确许可。本轮未取得当前接入的自动化授权和对应配额，保持后台未准入。Yahoo 上游权限试探为 0 次。[Yahoo 服务条款](https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html)
+
+富途账户许可通过正常「检查功能权限」写入相同端点的账户报告。后台计划仅考虑当前选中且普通资格可用的富途港美股票和 ETF，查验对应的账户报告。实际快照前用同一 OpenD SDK 连接复核该市场的权限。股票／ETF 的 Server 共享请求窗口沿用 15／600 秒，上游更新频率保持未知。
+
+## 2026-11-27 富途目标接入
+
+- 本地 DSA 定向 153 项通过，覆盖已有富途普通报价、后台权限复核、滚动配额、账户报告和 TickFlow 权限回归。初次有两条富途旧报价测试把宿主平台初始化子进程计为 SDK 请求。通过未改动的 HEAD 独立复现，收窄测试替身到实际富途 worker 后重跑通过。主仓 Schema 3 项、Server 14 项通过，Schemas／Domain 构建与 Server 类型检查、构建通过。
+- 19:28 在 `/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra` 执行 `DSA_SOURCE_DIR=/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis THESIS_LEDGER_SOURCE_DIR=/Users/yzin/code/thesis-ledger-workspace/thesis-ledger ./scripts/sync-code.sh all`，退出 0。DSA、Server、Worker 均健康，镜像和外部卷保持。DSA 权限、额度、计划三份源码，以及目标 Server 的协调器和已安装 Schema 文件与宿主摘要一致。更新使用容器可写层。
+- 19:28:52 通过 `POST /api/market-data/providers/futu/test` 的 `account_access` 检查请求 `target-futu-background-entitlement-20261127`。HTTP 201、`persisted=true`，港股股票及 ETF、美股股票及 ETF 共四项均为 `allowed`。从目标编译版 Server 读取 7 类后台计划，核对策略修订 203 及主备来源和原顺序一致。前述四类为 `account-snapshot`，HiThink 两类和 Yahoo 指数仍为 `background_budget_unverified`。
+- 19:29:52 使用目标已部署的 Server 后台协调器、真实 DSA 计划与交易日历、隔离进程内状态验证四个样本。港股及美股均返回 `outside_market_session`，报价和额度预约调用均为 0。实际风险监控接口后续读取心跳正常，仍有 2 条生效规则，`sources=[]`。真实盘中报价样本及延迟尚未取得。
+- 目标交易日历显示美股下一常规会话为中国标准时间 11 月 27 日 22:30 至 11 月 28 日 02:00，港股下一常规会话从 11 月 30 日 09:30 开始。盘中验收沿用现行配置和已保存权限，用股票及 ETF 样本通过后台计划和执行入口，核对 `sourceTime`、`fetchedAt`、来源和共享缓存状态。[美股提前收市日历](https://www.nyse.com/trade/hours-calendars)
+
+## 2026-11-27 富途美股盘中时效验收
+
+北京时间 22:31，目标 Server 的 `MarketSessionReader` 确认处于美股常规会话。使用已部署的 `MarketBackgroundQuotesService`、`MarketQuoteReader` 和真实 DSA，隔离进程内缓存和请求窗口，依次读取 `AAPL.US` 与 `SPY.US` 各一次。两项均命中策略 203 首选 `futu/futu`，DSA 日志按请求编号确认各有一次成功的富途 Provider 调用。
+
+| 标的 | 来源时间（北京时间） | 获取时间（北京时间） | 来源至获取延迟 | Server 调用 DSA 用时 | DSA 请求编号 |
+| --- | --- | --- | ---: | ---: | --- |
+| `AAPL.US` | 22:31:00 | 22:31:01.538178 | 1,538 毫秒 | 1,349 毫秒 | `693c395e-3b80-4784-a09f-4b601ffc9d37` |
+| `SPY.US` | 22:31:02 | 22:31:03.002721 | 1,002 毫秒 | 1,274 毫秒 | `79ffb752-9096-497c-a0b4-2eefe5626c0c` |
+
+- 来源至获取延迟为 `fetchedAt - sourceTime`，按验收程序的毫秒精度记录。DSA 实际 Provider 调用分别用时 1,207 毫秒和 1,128 毫秒。两笔均为 `account-snapshot`、`sample_observed`、`freshness=live`、`servedFromCache=false`、`fallbackUsed=false`。
+- 开市前、执行前后核对有效策略内容及目标顺序一致。业务规则与共享采集状态未注入样本。目标风险监控接口实测返回 HTTP 200，两个心跳均正常，仍有 2 条生效规则，`sources=[]`。本次通过范围为两个美股标的的一轮目标后台实源采集，持续采集覆盖由 R5 继续跟踪。
+
+## 2026-11-27 HiThink 与 Yahoo 后台配额复核
+
+- **HiThink 官方口径**。维护者确认服务不限制累计调用次数，同时实施个人和全局限流。全局容量随实时负载变化。公开快照说明、归属主站的 API Key 管理公开页面及开发者仓库未给出当前个人额度的计量窗口，也未确认股票和 ETF 快照是否共享该额度。[官方累计请求说明](https://github.com/Hithink-Tech-Org/Financial-API/issues/10#issuecomment-5390206606) · [官方快照限流答复](https://github.com/Hithink-Tech-Org/Financial-API/issues/80#issuecomment-5661260611)
+- **HiThink 当前凭证复验**。23:17 至 23:18（中国标准时间），在目标 DSA 用配置版本 9、凭证版本 1 做两轮顺序小样本，分别以股票→股票→ETF→股票和 ETF→股票→ETF→股票读取，每轮 4 次。8 次均 HTTP 200、业务码 0。各响应的 `X-RateLimit-Limit=15`，余额依次为 `15 / 15 / 14.9 / 15` 及 `15 / 15 / 14.81 / 15`。两个余额下降回包的请求编号为 `db73712c68a44b329715a59cd6d30bab`、`350db2b08a6f476eb64d1b2730c8d107`，均为紧随股票请求的 ETF 请求。响应未携带单位、重置时间或共享组。该结果验证了余额会变化，个人额度的补充速率及跨接口共享边界继续等待官方证据。
+- **Yahoo**。目标 yfinance 无专用凭证。Yahoo 服务条款要求自动化采集事先获得明确许可。公开开发者 API 目录未列出 Finance 行情接入，Finance 订阅说明的历史数据导出适用于页面下载。当前接入仍缺自动化授权与对应上限，Yahoo 行情请求 0 次。[Yahoo 服务条款](https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html) · [开发者 API 目录](https://developer.yahoo.com/api/) · [Finance 订阅说明](https://help.yahoo.com/kb/finance-for-web/investment-insights-sln29276.html)
+- **目标回读**。策略修订仍为 203。沪深股票和 ETF 保留 HiThink／AkShare 顺序，美股指数仍为 Yahoo。三类后台计划均返回 `background_budget_unverified`。港股盘中验收按用户确认移出本批。
+
+## 2026-11-28 HiThink 动态限流接入
+
+- 同一 DSA 进程内，以有效 API Key 区分本地预算。股票和 ETF 的交互及后台精确快照都通过该预算，同一凭据同时只发一笔。根据响应中的 `X-RateLimit-Limit` 和 `X-RateLimit-Remaining` 处理额度，保留分数余额。HTTP 429 或业务码 4001 使用 `Retry-After`，支持秒数和 HTTP 日期。额度不足或被限流且无有效提示时，使用 1 至 60 秒的本地指数退避，到期放行一次探测。上游计量窗口、快照更新间隔及上游是否跨接口共享继续保持未知。
+- DSA 定向 154 项通过，含两端点共用余额、低余额成功回包、429 非 JSON、业务码 4001、两种 `Retry-After`、提示缺失时的恢复间隔、不同凭据隔离及后台选路代次固定。数据闭包语法、统一能力边界、运行时打包和测试登记检查通过。主仓 Schema 5 项、Server 14 项通过，完成 Schema 构建、Server 类型检查及 Server 构建。限流分支用受控回包验收，目标未主动触发真实限流。
+- 北京时间约 01:29，在 `/Users/yzin/code/thesis-ledger-workspace/thesis-ledger-infra` 执行 `DSA_SOURCE_DIR=/Users/yzin/code/thesis-ledger-workspace/daily-stock-analysis THESIS_LEDGER_SOURCE_DIR=/Users/yzin/code/thesis-ledger-workspace/thesis-ledger ./scripts/sync-code.sh all`，退出 0。DSA、Server 和 Worker 均健康。目标 HiThink 适配器、共享预算、后台计划和 Server 已安装 Schema 的 SHA-256 与宿主一致。更新位于容器可写层，容器重建将恢复镜像内代码。
+- 北京时间 01:29:10，从目标 Server 读回策略 203。前后股票和 ETF 均为 HiThink 首选、AkShare 备用；`^GSPC.US` 继续用 Yahoo，后台计划仍为 `background_budget_unverified`。使用已部署的后台协调器、真实 DSA 计划及交易日历、隔离进程内状态，核对以下结果。
+
+| 标的 | 后台计划 | 当前首选 | Server 请求间隔 | 本次采集 |
+| --- | --- | --- | --- | --- |
+| `600519.SH` | `account-snapshot` | `hithink/a-share-prices-snapshot` | 15 秒 | `outside_market_session` |
+| `510300.SH` | `account-snapshot` | `hithink/fund-market-snapshot` | 600 秒 | `outside_market_session` |
+
+协调器报价和请求额度预约均为 0 次，来源时间与获取时间为 null。按用户确认取消 A 股盘中时效验收，两笔盘中样本未采集。上一轮的 8 次 HiThink 探测保留为接口与额度回包证据。

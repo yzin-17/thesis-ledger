@@ -13,3 +13,26 @@ it('can report unavailable routes without inventing an upstream update frequency
   const blocked = { ...plan, acquisition: 'blocked', reason: 'not_selected', target: null, minIntervalSeconds: null };
   expect(correlateBackgroundQuotePlan(request, blocked).sourceUpdateIntervalSeconds).toBeNull();
 });
+
+it('accepts only the verified Futu account snapshot and its asset request interval', () => {
+  const liveRequest = { ...request, symbol: 'AAPL.US', assetType: 'STOCK' as const };
+  const account = {
+    ...plan, ...liveRequest, acquisition: 'account-snapshot', minIntervalSeconds: 15,
+    target: { providerId: 'futu', upstreamSource: 'futu', routeIndex: 0 },
+  };
+  expect(correlateBackgroundQuotePlan(liveRequest, account)).toEqual(account);
+  expect(() => correlateBackgroundQuotePlan(liveRequest, { ...account, minIntervalSeconds: 5 })).toThrow();
+  expect(() => correlateBackgroundQuotePlan(liveRequest, { ...account, target: plan.target })).toThrow();
+});
+
+it.each([
+  { assetType: 'STOCK', symbol: '600519.SH', upstreamSource: 'a-share-prices-snapshot', interval: 15 },
+  { assetType: 'ETF', symbol: '510300.SH', upstreamSource: 'fund-market-snapshot', interval: 600 },
+] as const)('checks the exact HiThink $assetType snapshot', ({ assetType, symbol, upstreamSource, interval }) => {
+  const exact = { ...request, assetType, symbol };
+  const target = { providerId: 'hithink', upstreamSource, routeIndex: 0 };
+  const live = { ...plan, ...exact, acquisition: 'account-snapshot', minIntervalSeconds: interval, target };
+  expect(correlateBackgroundQuotePlan(exact, live)).toEqual(live);
+  expect(() => correlateBackgroundQuotePlan(exact, { ...live, sourceUpdateIntervalSeconds: 15 })).toThrow();
+  expect(() => correlateBackgroundQuotePlan(exact, { ...live, target: { ...target, upstreamSource: 'futu' } })).toThrow();
+});

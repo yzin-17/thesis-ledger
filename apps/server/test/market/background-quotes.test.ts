@@ -121,6 +121,23 @@ describe('source-specific automatic quotes', () => {
     expect(h.post).toHaveBeenCalledTimes(1);
     expect(h.getQuote).not.toHaveBeenCalled();
   });
+  it('uses the selected Futu account snapshot through the normal market reader', async () => {
+    const h = harness();
+    h.post.mockImplementationOnce(async (_path, request) => ({
+      ...request, generation: 'a'.repeat(64), policyRevision: 1, acquisition: 'account-snapshot',
+      reason: null, target: { providerId: 'futu', upstreamSource: 'futu', routeIndex: 0 },
+      minIntervalSeconds: 15, sourceUpdateIntervalSeconds: null,
+    }));
+    h.getQuote.mockResolvedValueOnce({
+      symbol: '00700.HK', provider: 'futu', price: 120, marketTime: at.toISOString(),
+      fetchedAt: at.toISOString(), servedFromCache: false,
+    });
+    const [row] = await h.service.reconcile([{symbol: '00700.HK', assetType: 'STOCK'}], at);
+    expect(row).toMatchObject({ provider: 'futu', reason: 'sample_observed', minIntervalSeconds: 15 });
+    expect(h.getQuote).toHaveBeenCalledWith('00700.HK', expect.objectContaining({
+      background: expect.objectContaining({ acquisition: 'account-snapshot' }),
+    }));
+  });
   it('rejects mismatched plans and never calls the quote reader', async () => {
     const h = harness();
     h.post.mockImplementationOnce(async () => ({ symbol: 'wrong' }) as never);

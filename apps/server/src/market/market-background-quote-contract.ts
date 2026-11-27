@@ -35,7 +35,8 @@ export async function readBackgroundQuote(
   const actual = correlateBackgroundQuotePlan(request, envelope);
   if (
     actual.generation !== plan.generation ||
-    actual.acquisition !== 'public-snapshot' ||
+    actual.acquisition === 'blocked' ||
+    actual.acquisition !== plan.acquisition ||
     JSON.stringify(actual.target) !== JSON.stringify(plan.target)
   )
     throw new DsaError('后台来源控制已变化', 'control-rejected');

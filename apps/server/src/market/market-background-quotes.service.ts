@@ -87,7 +87,7 @@ export class MarketBackgroundQuotesService {
       row.reason = plan.reason ?? '';
       row.acquisition = plan.acquisition;
       row.minIntervalSeconds = plan.minIntervalSeconds;
-      if (plan.acquisition !== 'public-snapshot') return row;
+      if (plan.acquisition === 'blocked') return row;
       const tradingMarket = tradingMarketForAssetMarket(demand.symbol.split('.').at(-1) ?? '');
       if (!tradingMarket) return row;
       const session = await this.market.getSession(tradingMarket, now);
