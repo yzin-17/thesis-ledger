@@ -6,6 +6,7 @@ import type { BacktestStrategy, NumericExpression } from '@thesis-ledger/schemas
 import { planBacktestPriceInputs } from '../../src/backtest/backtest-dependency-price.js';
 import { practicalV6Input } from './practical-v6-input.fixture.js';
 
+// 准备多周期父窗并重复回放基线和候选，在共享 CI 运行器上可能超过一分钟。
 it('新范围的累计锚点由已冻结父窗核对，预算内已有数据可用，窗外仍拒绝且不补取', async () => {
   const root = await mkdtemp(join(tmpdir(), 'research-frozen-anchor-'));
   try {
@@ -34,7 +35,7 @@ it('新范围的累计锚点由已冻结父窗核对，预算内已有数据可�
     strategy.entry = entry('2024-01-02T07:00:00Z');
     await expect(f.freeze(join(root, 'outside'), strategy)).rejects.toThrow('冻结窗口未覆盖请求及预热范围');
   } finally { await rm(root, { recursive: true, force: true }); }
-}, 60_000);
+}, 120_000);
 
 const receipt = process.env.PRACTICAL_V6_WINDOW_RECEIPT;
 it.skipIf(!receipt)('原父窗不足仍拒绝；新准备上的原AST诊断重放不修补lag／阈值', async () => {
