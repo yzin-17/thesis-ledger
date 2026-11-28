@@ -35,9 +35,11 @@ describe('具名策略定义的原配置转换', () => {
       evaluation: 'barClose',
       stages: [],
       initialStop: { kind: 'percent', percent: '0.05', activateWhen: condition },
+      trailing: { drawdownPercent: '0.03', activateWhen: condition },
     } });
     expect(result).toMatchObject({ outcome: 'convert', definition: { tradePlan: {
       initialStop: { kind: 'percent', percent: '0.05', activation: { kind: 'condition', condition } },
+      trailing: { drawdownPercent: '0.03', activation: { kind: 'condition', condition } },
     } } });
   });
 

@@ -97,30 +97,12 @@ function setupPlan(
   return { r, select, accept };
 }
 
-describe.each([false, true])('每条保护条件在持仓周期内永久启用，显式方式=%s', (explicit) => {
-  const asFormat = (plan: BacktestTradePlan) => {
-    const copy = structuredClone(plan);
-    if (explicit)
-      for (const key of ['initialStop', 'trailing'] as const) {
-        const rule = copy[key];
-        if (!rule) continue;
-        rule.activation = rule.activateWhen
-          ? { kind: 'condition', condition: rule.activateWhen }
-          : { kind: 'immediate' };
-        delete rule.activateWhen;
-      }
-    return copy;
-  };
-  const setup = (
-    plan: BacktestTradePlan,
-    prices: string[],
-    flags: string[],
-    future = -1,
-    missingClose = -1,
-  ) => setupPlan(asFormat(plan), prices, flags, future, missingClose);
+describe('每条保护条件在持仓周期内永久启用', () => {
+  const activation = { kind: 'condition', condition } as const;
+
   it('本期缺有效收盘时不能借旧价格启用保护或触发交易', () => {
-    const { r, select } = setup(
-      base({ initialStop: { kind: 'percent', percent: '0.05', activateWhen: condition } }),
+    const { r, select } = setupPlan(
+      base({ initialStop: { kind: 'percent', percent: '0.05', activation } }),
       ['100', '90', '100'],
       ['0', '1', '0'],
       -1,
@@ -133,8 +115,8 @@ describe.each([false, true])('每条保护条件在持仓周期内永久启用�
     expect(r.snapshot().initialStopArmed).toBe(false);
   });
   it('启用前不止损；启用锚定首次成交，转假后仍保护，全部平仓再重置', () => {
-    const { r, select, accept } = setup(
-      base({ initialStop: { kind: 'percent', percent: '0.05', activateWhen: condition } }),
+    const { r, select, accept } = setupPlan(
+      base({ initialStop: { kind: 'percent', percent: '0.05', activation } }),
       ['100', '94', '110', '96', '94', '100', '90'],
       ['0', '0', '1', '0', '0', '0', '0'],
     );
@@ -152,10 +134,10 @@ describe.each([false, true])('每条保护条件在持仓周期内永久启用�
     expect(r.snapshot().stopLine).toBeUndefined();
   });
   it('条件不可见不启用追踪，也不阻断已有无条件初始保护', () => {
-    const { r, select } = setup(
+    const { r, select } = setupPlan(
       base({
         initialStop: { kind: 'percent', percent: '0.05' },
-        trailing: { drawdownPercent: '0.02', activateWhen: condition },
+        trailing: { drawdownPercent: '0.02', activation },
       }),
       ['100', '94'],
       ['0', '1'],
@@ -166,11 +148,11 @@ describe.each([false, true])('每条保护条件在持仓周期内永久启用�
     expect(r.snapshot().stopLine).toBe('95');
   });
   it('条件启用记忆与盈利门槛同时满足；持仓历史峰值不因启用而重置', () => {
-    const { r, select } = setup(
+    const { r, select } = setupPlan(
       base({
         trailing: {
           drawdownPercent: '0.05',
-          activateWhen: condition,
+          activation,
           activationGainPercent: '0.1',
         },
       }),
@@ -185,9 +167,9 @@ describe.each([false, true])('每条保护条件在持仓周期内永久启用�
     expect(select(3)?.kind).toBe('risk');
   });
   it('加仓待成交期间仍记住条件与峰值；拒单不会撤销，部分退出也不重置', () => {
-    const { r, select, accept } = setup(
+    const { r, select, accept } = setupPlan(
       base({
-        trailing: { drawdownPercent: '0.05', activateWhen: condition },
+        trailing: { drawdownPercent: '0.05', activation },
         stages: [
           {
             id: 'add',
@@ -212,14 +194,14 @@ describe.each([false, true])('每条保护条件在持仓周期内永久启用�
   });
   it('中文逐条回读条件、持仓内永久启用和无保护区间', () => {
     const plan = base({
-      initialStop: { kind: 'percent', percent: '0.05', activateWhen: condition },
+      initialStop: { kind: 'percent', percent: '0.05', activation },
     });
     const text = backtestStrategyPlanReadback({
       entry: condition,
       exit: condition,
       sizing: { type: 'percentOfEquity', percent: '0.25' },
       risk: [],
-      tradePlan: asFormat(plan),
+      tradePlan: plan,
     }).join('\n');
     expect(text).toContain('初始止损启用条件：收盘价高于0');
     expect(text).toContain('未启用前没有该条保护');

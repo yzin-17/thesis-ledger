@@ -12,6 +12,7 @@ import { restoreDatabase } from './restore-db.mjs';
 if (process.argv.length > 2) throw new Error('隔离恢复验收不接受业务目标参数');
 const name = `ledger-restore-test-${randomUUID().slice(0, 8)}`;
 const databaseName = 'restore_fixture', ownerName = 'fixture_owner';
+const fixturePassword = 'fixture';
 const directory = await mkdtemp(join(tmpdir(), name + '-'));
 let container;
 function docker(args, input) {
@@ -28,7 +29,7 @@ async function dump(filename) {
   return file;
 }
 const options = {
-  env: { DATABASE_URL: `postgresql://${ownerName}:fixture@localhost/${databaseName}?schema=public` },
+  env: { DATABASE_URL: `postgresql://${ownerName}:${fixturePassword}@localhost/${databaseName}?schema=public` },
   temporaryRoot: directory,
   run: (tool, args) => docker(['exec', '-i', container, tool, ...args.map((arg) => arg.startsWith(directory) ? arg.replace(directory, '/restore') : arg)]),
 };
@@ -37,11 +38,19 @@ try {
   docker(['image', 'inspect', 'postgres:17-alpine']);
   container = docker(['run', '-d', '--name', name, '--label', 'thesis-ledger.fixture=database-restore',
     '--tmpfs', '/var/lib/postgresql/data', '--mount', `type=bind,src=${directory},dst=/restore`,
-    '-e', `POSTGRES_USER=${ownerName}`, '-e', 'POSTGRES_PASSWORD=fixture', '-e', `POSTGRES_DB=${databaseName}`, 'postgres:17-alpine']);
+    '-e', `POSTGRES_USER=${ownerName}`, '-e', `POSTGRES_PASSWORD=${fixturePassword}`, '-e', `POSTGRES_DB=${databaseName}`, 'postgres:17-alpine']);
   let ready = false;
   for (let attempt = 0; attempt < 40; attempt++) {
-    const check = spawnSync('docker', ['exec', container, 'pg_isready', '-U', ownerName, '-d', databaseName], { stdio: 'ignore' });
-    if (check.status === 0) { ready = true; break; }
+    // 初始化阶段的临时实例监听本地套接字，正式实例才能通过 TCP 查询目标库。
+    const check = spawnSync('docker', [
+      'exec', '-e', `PGPASSWORD=${fixturePassword}`, '-e', 'PGCONNECT_TIMEOUT=2', container,
+      'psql', '-XwAt', '-h', '127.0.0.1', '-U', ownerName, '-d', databaseName,
+      '-c', 'SELECT current_database(), current_user',
+    ], { encoding: 'utf8', timeout: 5000 });
+    if (check.status === 0 && check.stdout.trim() === `${databaseName}|${ownerName}`) {
+      ready = true;
+      break;
+    }
     await delay(500);
   }
   assert(ready, '隔离 PostgreSQL 未就绪');

@@ -25,18 +25,13 @@ it('显式启用方式可编辑，切换为立即启用移除条件，距离切�
   expect(original).toEqual({ kind: 'percent', percent: '0.05', activation });
 });
 
-it('历史条件不附加默认方式，双填错误的两个字段均可见并修复', () => {
-  const original = { drawdownPercent: '0.05', activateWhen: condition };
-  const changed = changeStrategyEditorVariant('trailing', original, 'currentAtr');
-  expect(changed).toHaveProperty('activateWhen', condition);
-  expect(changed).not.toHaveProperty('activation');
-  expect(strategyEditorFields('trailing', original).map((field) => field.key)).toContain(
-    'activateWhen',
-  );
-  const both = strategyEditorFields('trailing', {
-    ...original,
-    activation: { kind: 'immediate' },
-  }).map((field) => field.key);
-  expect(both).toContain('activation');
-  expect(both).toContain('activateWhen');
+it('切换追踪距离类型保留显式启用条件', () => {
+  const activation = { kind: 'condition', condition };
+  const original = { activation, drawdownPercent: '0.05' };
+  const atr = changeStrategyEditorVariant('trailing', original, 'currentAtr');
+  expect(atr).toEqual({ activation, kind: 'currentAtr', sourceId: '', period: 14, multiple: '2' });
+  expect(strategyEditorFields('trailing', atr).map((field) => field.key)).toEqual([
+    'sourceId', 'period', 'multiple', 'activation', 'activationGainPercent', 'breakEvenGainPercent',
+  ]);
+  expect(changeStrategyEditorVariant('trailing', atr, 'percent')).toEqual(original);
 });
