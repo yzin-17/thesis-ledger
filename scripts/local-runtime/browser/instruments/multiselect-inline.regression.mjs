@@ -11,12 +11,13 @@ const browser = await launchRegressionBrowser();
 const errors = [];
 async function checkBounds(page) {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '页面不可横向溢出');
-  const popups = page.locator('[data-slot="combobox-content"]:visible');
-  for (const popup of await popups.all()) {
-    const b = await popup.boundingBox();
-    const size = page.viewportSize();
-    assert(b && b.x >= -1 && b.x + b.width <= size.width + 1 && b.y >= -1 && b.y + b.height <= size.height + 1, '选项面板应在视口内');
-  }
+  const outsideViewport = await page.locator('[data-slot="combobox-content"]:visible').evaluateAll(
+    (popups) => popups.some((popup) => {
+      const { left, right, top, bottom } = popup.getBoundingClientRect();
+      return left < -1 || right > innerWidth + 1 || top < -1 || bottom > innerHeight + 1;
+    }),
+  );
+  assert(!outsideViewport, '选项面板应在视口内');
 }
 async function chooseDesktop(page, label, text, option) {
   const input = page.getByRole('combobox', { name: label, exact: true });
