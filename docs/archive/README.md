@@ -1,5 +1,7 @@
 # 历史文档归档
 
+- [ThesisLedger 主分支 CI 修复](tasks/2026-11-28-thesis-ledger-main-ci-recovery.md)已结案。最终提交 `d10184ef` 的五个执行作业全部通过，见[修复与验收回执](evidence/2026-11-28-thesis-ledger-main-ci-recovery.md)。
+
 - [全产品具名 V1 合同与存量转换](tasks/2026-11-24-named-v1-cutover.md)已完成目标切换、OpenAI 五样本复验与三仓远端 CI。 [业务与 CI 验收](evidence/2026-11-25-named-v1-entrypoint-verification.md) · [历史行情路由修订验收](evidence/2026-11-25-market-policy-history-cutover.md)
 
 - [实验重试冻结校验修复](tasks/2026-11-12-experiment-retry-catalog-revalidation.md)已核对原实验候选生成、自动完成与冻结结果读回，保留完整失败历史。见[终态验收](../evidence/2026-11-12-experiment-retry-catalog-revalidation.md#2026-11-22-真实终态只读验收)。

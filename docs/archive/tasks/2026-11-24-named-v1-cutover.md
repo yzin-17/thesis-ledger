@@ -28,6 +28,8 @@
 
 2026 年 11 月 26 日按现行规格核对 AC1～AC6 与全部 15 项执行记录。存量映射、历史回滚修订、恢复演练和目标开发栈读回分别保留证据。OpenAI 五样本复验及三仓远端 CI 均已通过，CI 结论绑定 T14 所列代码提交。结案范围内的实施与验收已完成。 [业务入口与存量复核](../evidence/2026-11-25-named-v1-entrypoint-verification.md#业务入口与存量) · [远端 CI 回执](../evidence/2026-11-25-named-v1-entrypoint-verification.md#远端-ci)
 
+11 月 28 日合入后的 ThesisLedger 主分支门禁已独立修复并通过，提交 `d10184ef` 的验收及历次失败见[主分支 CI 修复任务](2026-11-28-thesis-ledger-main-ci-recovery.md)。
+
 ## 本地验证
 
 - DSA 六组市场合同、研报和多窗口测试通过 98 项。主仓协议探针通过 10 项，infra 兼容清单检查通过。这些检查使用本地配置和受控请求。
