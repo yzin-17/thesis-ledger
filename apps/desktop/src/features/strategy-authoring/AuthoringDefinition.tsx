@@ -1,5 +1,4 @@
 import { authoringStrategyV6Schema, type AuthoringContent } from '@thesis-ledger/schemas';
-import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';

@@ -8,7 +8,7 @@ import type {
   MonthlyOccurrence,
 } from '../features/recurring-plans/plan-api';
 import type { MobileInstrument } from '../features/market-detail/market-model';
-import type { ResearchReportLocatorInput } from '@thesis-ledger/schemas';
+import type { ResearchReportLocatorInput, ResearchSubmissionV2 } from '@thesis-ledger/schemas';
 import type { StrategyStackParams } from './strategy-navigation';
 import type { ArenaStackParams } from './ArenaNavigator';
 export type AccountStackParams = {
@@ -104,6 +104,6 @@ export type ResearchStackParams = {
   JournalEvidence: JournalScope & { kind: 'object' | 'period'; runId: string; toolCallId: string };
   ResearchReport: ReportScope;
   ResearchEvidence: ReportScope & { referenceId: string };
-  ResearchSubmit: { prefill?: Pick<import('@thesis-ledger/schemas').ResearchSubmissionV2, 'scope' | 'question' | 'templateId'>; instrumentId?: string } | undefined;
+  ResearchSubmit: { prefill?: Pick<ResearchSubmissionV2, 'scope' | 'question' | 'templateId'>; instrumentId?: string } | undefined;
   ResearchReview: ReportScope;
 };

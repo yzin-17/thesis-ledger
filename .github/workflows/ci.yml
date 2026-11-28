@@ -84,9 +84,7 @@ jobs:
           pnpm --filter @thesis-ledger/server exec node scripts/strategy-optimization-db-smoke.mjs
       - name: PostgreSQL service E2E
         run: |
-          pnpm --filter @thesis-ledger/schemas build
-          pnpm --filter @thesis-ledger/shared build
-          pnpm --filter @thesis-ledger/domain build
+          pnpm --filter '@thesis-ledger/server^...' build
           pnpm --filter @thesis-ledger/server exec vitest run \
             test/strategy-optimization/strategy-optimization-postgres.integration.test.ts \
             test/strategy-optimization/strategy-optimization-postgres-reconciler.integration.test.ts \
@@ -138,7 +136,7 @@ jobs:
         run: node --test scripts/mobile-release/*.test.mjs
 
   browser-regressions:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -202,7 +200,8 @@ jobs:
       - name: Install iOS pods from the committed lockfile
         working-directory: apps/mobile/ios
         run: |
-          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          export SDKROOT
           pod install --deployment
       - name: Build iOS Simulator app
         run: >-

@@ -54,13 +54,13 @@ function editorItemTitle(
   index: number,
   directory: InstrumentDirectory | undefined,
 ) {
-  const row = strategyDraftRecord(item);
-  const prefix = `${fieldLabel} ${index + 1}${row.id ? ` · ${String(row.id)}` : ''}`;
+  const { id, asset, timeframe } = strategyDraftRecord(item);
+  const prefix = `${fieldLabel} ${index + 1}${typeof id === 'string' && id ? ` · ${id}` : ''}`;
   if (context !== 'source') return prefix;
-  const { symbol } = strategyDraftRecord(row.asset);
+  const { symbol } = strategyDraftRecord(asset);
   if (typeof symbol !== 'string' || !symbol.trim()) return prefix;
   const instrument = strategyInstrumentLabel(directory, symbol);
-  const period = strategyTimeframeLabel(row.timeframe, '');
+  const period = strategyTimeframeLabel(timeframe, '');
   return `${prefix} · ${instrument}${period ? ` / ${period}` : ''}`;
 }
 
