@@ -32,12 +32,22 @@ jobs:
         run: pnpm test:database-tools
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: 准备采样归档跨仓测试
+        run: |
+          git clone --depth 1 --branch yzin https://github.com/yzin-17/daily_stock_analysis.git ../daily-stock-analysis
+          python -m venv ../daily-stock-analysis/.venv
+          ../daily-stock-analysis/.venv/bin/python -m pip install -r ../daily-stock-analysis/.github/requirements-ci.txt
+      - name: 执行全仓测试
+        run: pnpm -r --workspace-concurrency=1 test
+        env:
+          VITEST_MAX_FORKS: '2'
       - run: pnpm build
       - name: 验证本地运行业务工具
         run: |
           git clone --depth 1 https://github.com/yzin-17/thesis-ledger-infra.git ../thesis-ledger-infra
-          git clone --depth 1 --branch yzin https://github.com/yzin-17/daily_stock_analysis.git ../daily-stock-analysis
           node --test scripts/local-runtime/*.test.mjs scripts/deployment/*.test.mjs
           node --test scripts/archive/2026-11-12-strategy-cross-direction/strategy-cross-repair.test.mjs
           bash scripts/local-runtime/ai-deployment-contract.test.sh
