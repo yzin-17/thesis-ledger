@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit';
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,7 +34,7 @@ it.each(dailyModelCases)('固定成对样本 $id：正式冻结 Worker、完整�
 it.each(dailyModelCases)('生成合同 $id：编写与限定范围修改能原样接受固定配置', async sample => {
   const proposal = ({ signalSources, ...strategy }: BacktestStrategy) => ({
     ...strategy,
-    signalSources: signalSources.map(({ series: _series, ...source }) => source),
+    signalSources: signalSources.map(source => omit(source, ['series'])),
   });
   const expected = { ...await fixedDailyModelCase(sample), entryTrigger: 'while-flat' as const };
   const content = dailyModelContent(sample, expected, false);

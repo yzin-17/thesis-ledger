@@ -27,7 +27,8 @@ function failure(error: unknown) {
   if (!issues && error instanceof Error && error.message.startsWith('[')) {
     try {
       const parsed = JSON.parse(error.message) as unknown;
-      if (Array.isArray(parsed) && parsed.every((entry) => entry && typeof entry.code === 'string'))
+      if (Array.isArray(parsed) && parsed.every((entry: unknown) =>
+        entry !== null && typeof entry === 'object' && 'code' in entry && typeof entry.code === 'string'))
         issues = parsed as Issue[];
     } catch {
       // 文件或校验异常只显示简短原因。

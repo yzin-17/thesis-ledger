@@ -254,7 +254,11 @@ it('编写与修改均要求现行定义和价格坐标', () => {
   });
   expect(
     authoringGenerationOutputSchema.safeParse({
-      definition: { ...strategy, signalSources: strategy.signalSources.map(({ priceCoordinate, ...source }) => source) },
+      definition: {
+        ...strategy,
+        signalSources: strategy.signalSources.map(({ id, asset, timeframe, series }) =>
+          ({ id, asset, timeframe, series })),
+      },
       coverage: [],
     }).success,
   ).toBe(false);

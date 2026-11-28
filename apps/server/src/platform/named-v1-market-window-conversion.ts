@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { omit } from 'es-toolkit';
 import { marketDataBarSeriesResponseV3Schema } from '@thesis-ledger/schemas';
 import { canonicalizeManifest } from '../backtest/backtest-snapshot.js';
 import { marketFrozenWindowHashV3 } from '../market/market-frozen-window-v3.js';
@@ -22,8 +23,10 @@ export function convertPriceAcquisition(value: unknown, previousHash: string) {
     projection.historicalTradabilityWindows = raw.historicalTradabilityWindows.map(convertObservation);
   const normalized = marketDataBarSeriesResponseV3Schema.parse(projection);
   const originalObservation = (observation: NonNullable<typeof normalized.historicalTradabilityWindows>[number]) => {
-    const { contract, priceOnlyAllowed, ...facts } = observation;
-    return { contractVersion: priceOnlyAllowed ? 2 : 1, ...facts };
+    return {
+      contractVersion: observation.priceOnlyAllowed ? 2 : 1,
+      ...omit(observation, ['contract', 'priceOnlyAllowed']),
+    };
   };
   const original = {
     ...normalized,

@@ -23,7 +23,7 @@ export function authoringMessages(operation: AuthoringOperation) {
       content: JSON.stringify({
         revision: operation.revision,
         modificationTarget: 'execution',
-        baseline: JSON.parse(content.definitionText),
+        baseline: JSON.parse(content.definitionText) as unknown,
         requirementIds: content.requirements.filter((item) => item.state === 'understood').map((item) => item.id),
         intent: selection.intent,
       }),

@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit';
 import {
   backtestLifecyclePreparationV3Schema,
   lifecycleWarmupPolicyV3,
@@ -15,7 +16,7 @@ export function lifecycleInputHashV3(response: BacktestLifecycleEvidence) {
       if (entry.status !== 'included') return [];
       const { routeKey, routeTarget, provenance, evidence } = entry.result;
       return [{ routeKey, routeTarget, provenance,
-        evidence: evidence.map(({ observedAt: _sampleTime, ...identity }) => identity) }];
+        evidence: evidence.map(observation => omit(observation, ['observedAt'])) }];
     });
     return hashCanonicalManifest({ ...facts, sources });
   }

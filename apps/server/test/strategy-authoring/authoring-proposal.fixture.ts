@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit';
 import type { BacktestStrategy } from '@thesis-ledger/schemas';
 
 export function authoringProposal(
@@ -8,7 +9,7 @@ export function authoringProposal(
     proposal: {
       definition: {
         ...strategy,
-        signalSources: strategy.signalSources.map(({ series: _series, ...source }) => source),
+        signalSources: strategy.signalSources.map(source => omit(source, ['series'])),
       },
       coverage,
     },

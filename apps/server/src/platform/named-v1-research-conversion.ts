@@ -80,7 +80,7 @@ export function previewResearchConversion(run: Run, calls: readonly Call[]) {
     };
     const candidate = { ...run, researchScopeSnapshot: input.scopeSnapshot, modelMetadata: nextMetadata };
     step = '研究任务归属';
-    assertResearchRunBindingV2(candidate as Run, input);
+    assertResearchRunBindingV2(candidate, input);
     if (run.status !== 'succeeded')
       return run.result === null ? { outcome: 'convert' as const, row: candidate } :
         unable('未成功任务仍持有已生成报告');

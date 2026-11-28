@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit';
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import {
@@ -74,7 +75,7 @@ const output = (strategy: ReturnType<typeof definition>) => ({
   proposal: {
     definition: {
       ...strategy,
-      signalSources: strategy.signalSources.map(({ series: _series, ...source }) => source),
+      signalSources: strategy.signalSources.map(source => omit(source, ['series'])),
     },
     coverage: [{ requirementId: 'plan', definitionPaths: ['tradePlan'] }],
   },

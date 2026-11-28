@@ -93,7 +93,7 @@ isolated('基金定投隔离 PostgreSQL HTTP 与 Scheduler 最小闭环', () => 
       id: confirmed.ledgerEventId,
       factId: confirmed.ledgerFactId,
       type: 'BUY_EXECUTION',
-      envelopeVersion: 3,
+      envelopeVersion: 1,
     });
     const read = await fixture.queries.effectiveEvents(account.id);
     expect(read.events).toHaveLength(2);

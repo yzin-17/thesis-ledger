@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit';
 import { createRequire } from 'node:module';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -72,16 +73,16 @@ function setup(entry: Entry, strategy: BacktestStrategy, frozen = false) {
       { requirementId: 'rules', definitionPaths: [frozen ? 'tradePlan' : 'execution'] },
     ]);
     if (entry !== 'discovery') return result;
-    const {
-      schemaVersion: _schemaVersion, executionInstrument: _asset, primaryTimeframe: _period,
-      cost: _cost, signalSources, ...idea
-    } = result.proposal.definition;
+    const { signalSources } = result.proposal.definition;
+    const idea = omit(result.proposal.definition, [
+      'schemaVersion', 'executionInstrument', 'primaryTimeframe', 'cost', 'signalSources',
+    ]);
     return {
       reason: '离线构造输入',
       evidenceRefs: [],
       strategy: {
         ...idea,
-        signalSources: signalSources.map(({ asset: _asset, ...declaration }) => declaration),
+        signalSources: signalSources.map(declaration => omit(declaration, ['asset'])),
       },
     };
   };

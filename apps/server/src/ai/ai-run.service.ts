@@ -10,7 +10,6 @@ import {
   aiContextSchema,
   researchResultSchema,
 } from '@thesis-ledger/schemas';
-import type { z } from 'zod';
 import { PrismaService } from '../platform/prisma.service.js';
 import { AiResearchQuery } from './ai-research-query.js';
 import { assertLegacyAiContextAccess } from './ai-legacy-read-access.js';

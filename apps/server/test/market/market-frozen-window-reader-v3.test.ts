@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit';
 import 'reflect-metadata';
 import { readFileSync } from 'node:fs';
 import type { Prisma } from '@prisma/client';
@@ -138,7 +139,7 @@ describe('固定Market窗口与子窗读取', () => {
       expect(cropped.selection.response.historicalTradabilityWindows?.[0]?.priceOnlyAllowed).toBe(true);
       expect(cropped.selection.response.bars.every((bar) => bar.volume === null)).toBe(true);
     }
-    const { dailyObservationContract: _dailyObservationContract, ...priceAndVolumeInput } = f.input;
+    const priceAndVolumeInput = omit(f.input, ['dailyObservationContract']);
     expect((await f.reader.read(priceAndVolumeInput)).status).toBe('unavailable');
     expect((await f.reader.read({ ...f.input, priceResearch: false })).status).toBe('unavailable');
     expect(f.dsa.marketBarsV3).not.toHaveBeenCalled();

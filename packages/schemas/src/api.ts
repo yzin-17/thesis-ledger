@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { currencySchema, fxRateSchema, instrumentDirectorySchema } from './market.js';
+import { currencySchema, fxRateSchema } from './market.js';
 
 export const apiErrorResponseSchema = z
   .object({

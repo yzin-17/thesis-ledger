@@ -40,7 +40,8 @@ describe('策略编写独立用途合同', () => {
       ...compiled,
       schemaVersion: '3',
       entryTrigger: 'rising-edge',
-      signalSources: compiled.signalSources.map(({ series, ...source }) => source),
+      signalSources: compiled.signalSources.map(({ id, asset, timeframe, priceCoordinate }) =>
+        ({ id, asset, timeframe, priceCoordinate })),
     };
     for (const contract of [aiGenerationContracts.authoringGeneration, aiGenerationContracts.authoringModification])
       expect(contract.schema.safeParse({ definition, coverage: [] }).success).toBe(false);
