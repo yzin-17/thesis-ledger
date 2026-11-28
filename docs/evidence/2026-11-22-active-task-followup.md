@@ -60,4 +60,4 @@
 - 从主仓使用 `volta run --node 24.22.2 pnpm lint`，设置 `CI=true`、`NODE_OPTIONS=--max-old-space-size=4096` 及工作区 npm 镜像。退出 0，构建、导入边界、8 包依赖图均通过，ESLint 为 12 组、4,321 文件、零错误和零告警，耗时 133.7 秒。
 - 使用同一运行条件执行 `volta run --node 24.22.2 pnpm guardrails:complexity`，另指定 `GUARDRAIL_BASE_REF=HEAD`，实际基线为 `1ed418780d1970e8380955453667edc2fed4b126`。退出 0，11 组、4,312 文件、零错误、102 条复杂度类告警，文件尺寸无告警，耗时 91.2 秒。
 
-4 GiB 是复现与验收条件。正式脚本继续消费调用环境的 Node 配置。原失败及本地对照日志保存在本次私有临时目录内，最终回执为 `lint-node24-final.log` 和 `guardrails-complexity-node24-final.log`。本轮无模型请求、真实数据写入、部署、提交或推送，远端综合 CI 状态继续由[活动任务](../tasks/2026-11-14-unpinned-pnpm.md)跟踪。
+4 GiB 是复现与验收条件。正式脚本继续消费调用环境的 Node 配置。原失败及本地对照日志保存在本次私有临时目录内，最终回执为 `lint-node24-final.log` 和 `guardrails-complexity-node24-final.log`。本轮无模型请求、真实数据写入、部署、提交或推送。后续综合 CI 与结案见[归档任务](../archive/tasks/2026-11-14-unpinned-pnpm.md)。

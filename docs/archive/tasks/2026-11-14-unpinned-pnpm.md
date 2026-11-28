@@ -1,6 +1,6 @@
 # 三仓取消 pnpm 版本绑定任务
 
-规格：[三仓取消 pnpm 版本绑定](../specs/2026-11-14-unpinned-pnpm.md)。
+现行规格：[三仓取消 pnpm 版本绑定](../../specs/2026-11-14-unpinned-pnpm.md)。
 
 ## 写集与边界
 
@@ -17,8 +17,9 @@ ThesisLedger：根清单、四份 GitHub 工作流、Server Dockerfile、开发�
 
 - [x] GitHub Actions 已实际执行，主仓四个已执行任务的浮动 pnpm 安装和冻结依赖通过，infra 的浮动安装通过。
 - [x] 复用 11 月 19 日的正式镜像构建。infra `DEV_DATABASE_MODE=check ./scripts/update.sh thesis-ledger` 退出 0，构建使用浮动安装的 pnpm 12.21.0，当前 Server、Worker 均使用该镜像。
-- [x] 主仓 Lint 堆内存修复已通过本地验收。Server、Desktop 的源码与测试使用独立 ESLint 进程。Node 24 在 4 GiB 堆上限下执行正式 Lint 和复杂度、文件尺寸门禁均通过，文件清单逐路径一致。 [复现与验收](../evidence/2026-11-22-active-task-followup.md#主仓-ci-lint-堆内存复验)
-- [ ] 修复后的远端完整门禁回执待验。主仓策略优化集成夹具、infra 镜像复用测试和主仓 Lint 修复已有本地通过证据。原远端失败保留。 [原 CI 结果](../evidence/2026-11-22-active-task-followup.md#工程与外部条件)
+- [x] 主仓 Lint 堆内存修复已通过本地验收。Server、Desktop 的源码与测试使用独立 ESLint 进程。Node 24 在 4 GiB 堆上限下执行正式 Lint 和复杂度、文件尺寸门禁均通过，文件清单逐路径一致。[复现与验收](../../evidence/2026-11-22-active-task-followup.md#主仓-ci-lint-堆内存复验)
+- [x] 主仓修复后的远端完整门禁通过。ThesisLedger `main` 的 `d10184ef` 通过五个执行作业，含浮动 pnpm 安装、冻结依赖、Lint、策略优化 PostgreSQL 与全仓测试。[主仓修复与验收回执](../evidence/2026-11-28-thesis-ledger-main-ci-recovery.md)
+- [x] infra `main` 的完整兼容门禁通过。使用 infra `c44471ec`、ThesisLedger `602baee3`、DSA `01aa3099` 复跑。pnpm 浮动安装取得 `12.23.0`，冻结依赖安装、`pnpm check`、`pnpm test` 和应用侧快更与恢复通过。[三仓版本与验收回执](../evidence/2026-11-28-unpinned-pnpm-compatibility.md)
 
 ## 验证记录
 
@@ -29,3 +30,7 @@ ThesisLedger：根清单、四份 GitHub 工作流、Server Dockerfile、开发�
 - 三仓当前可执行配置复扫：无精确 pnpm 版本绑定；检查无新增 `_tmp_*` 残留。
 - 主仓 `git diff --check`：通过。DSA 未写入文件；infra 既有未提交修改保持原样。
 - 上述为 11 月 14 日本地验证记录。后续真实 CI 与镜像回执见上节。
+
+## 结案复核
+
+2026 年 11 月 28 日，逐项核对现行规格的四项验收、正式镜像历史证据和两仓远端门禁。原失败保留，完整兼容作业已复验通过。本任务无剩余验收，正式规格继续有效。

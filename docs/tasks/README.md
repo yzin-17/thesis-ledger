@@ -7,8 +7,6 @@
 
 - 竞技场逐次分档退出已[结案归档](../archive/tasks/2026-11-15-arena-staged-partial-exits.md)，现行组合合同见[规格](../specs/2026-11-15-arena-staged-partial-exits.md)。
 
-- [三仓取消 pnpm 版本绑定](2026-11-14-unpinned-pnpm.md)：本地使用已安装版本，CI 与镜像浮动安装，保留依赖锁文件。
-
 - 竞技场条件委托与成交保护已[结案归档](../archive/tasks/2026-11-13-arena-contingent-orders.md)，现行合同见[规格](../specs/2026-11-13-arena-contingent-orders.md)。
 
 

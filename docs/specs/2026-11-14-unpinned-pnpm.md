@@ -27,4 +27,4 @@
 - `pnpm lint` 和 `pnpm guardrails:complexity` 共用分组。沿用原 Git 与 ESLint 文件清单、配置、规则、告警上限及失败退出方式。所有文件各进入一组，规则依然能解析跨组依赖。
 - 用 Node 24 在旧 CI 的 4 GiB 堆限制下验证现行输入。对比分组前后的精确文件集，并执行正式 Lint 与复杂度门禁。真实 CI 的结果归属于实际运行记录。
 
-实施状态见[任务](../tasks/2026-11-14-unpinned-pnpm.md)。
+实施与验收见[归档任务](../archive/tasks/2026-11-14-unpinned-pnpm.md)。
