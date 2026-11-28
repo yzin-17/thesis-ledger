@@ -10,6 +10,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const work = resolve(root, '.recovery-artifacts/arena-v2-admission-deployment-20261116');
 export const KEY = { kind: 'data', market: 'CN', assetType: 'ETF', capability: 'HISTORICAL_EXECUTION_CONTEXT' };
 export const TARGET = { providerId: 'historical-execution-archive', upstreamSource: 'qualified-cn-execution' };
+const POLICY_CONTRACT_VERSION = 1;
 const sha = value => createHash('sha256').update(value).digest('hex');
 const run = (cmd, args, input) => {
   try {
@@ -21,7 +22,7 @@ const run = (cmd, args, input) => {
 const docker = (...args) => run('docker', args);
 
 export function appendRoute(policy) {
-  assert.equal(policy.contractVersion, 3);
+  assert.equal(policy.contractVersion, POLICY_CONTRACT_VERSION);
   assert.equal(policy.enabled, true);
   assert.equal(policy.syncState, 'applied');
   assert.equal(policy.effectiveStale, false);
@@ -161,7 +162,7 @@ export async function main(mode) {
     write('apply-permit-v2', { digest: collection.digest, at: new Date().toISOString() });
     const admission = dsa('apply', collection.digest);
     write('source-applied', admission);
-    const applied = await policy('PUT', { contractVersion: 1, consumer: 'thesis-ledger', requestId: randomUUID(),
+    const applied = await policy('PUT', { contractVersion: POLICY_CONTRACT_VERSION, consumer: 'thesis-ledger', requestId: randomUUID(),
       revision: current.revision + 1, expectedRevision: current.revision, enabled: current.enabled, routes: baseline.routes });
     assert.equal(applied.revision, current.revision + 1);
     write('policy-applied', applied);

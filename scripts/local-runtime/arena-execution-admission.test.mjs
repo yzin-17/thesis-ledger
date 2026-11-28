@@ -11,10 +11,11 @@ test('保留原路由顺序和取值，只追加精确 ETF 执行绑定', () => 
   assert.equal(policy.routes.length, 1);
 });
 
-test('拒绝覆盖已有执行绑定以及未稳定应用的策略', () => {
+test('拒绝覆盖已有执行绑定、旧版策略以及未稳定应用的策略', () => {
   const policy = { contractVersion: 1, enabled: true, syncState: 'applied', effectiveStale: false,
     routes: [{ key: KEY, enabled: false, targets: [] }] };
   assert.throws(() => appendRoute(policy), /已有执行路由/u);
+  assert.throws(() => appendRoute({ ...policy, routes: [], contractVersion: 3 }));
   assert.throws(() => appendRoute({ ...policy, routes: [], effectiveStale: true }));
   assert.throws(() => appendRoute({ ...policy, routes: [], enabled: false }));
 });

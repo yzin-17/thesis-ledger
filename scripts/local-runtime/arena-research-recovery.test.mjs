@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'vitest';
+import { test } from 'node:test';
 import { recoveryArguments, runRecovery, verifyResearchCompletion } from './arena-research-recovery.mjs';
 
 const match = '91d6e8f0-fcef-4801-ab09-f9c90110479f', agent = '72c317b0-7a36-431b-9237-a241ee30bcdb';

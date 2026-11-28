@@ -7,8 +7,9 @@ const price = { type: 'series', sourceId: 'price', field: 'close' };
 const ema = { type: 'indicator', name: 'EMA', input: price, params: { period: 20 } };
 const asset = { symbol: '00700.HK', market: 'HK', assetType: 'stock' };
 const strategy = () => ({
-  schemaVersion: '2', name: '方向核验', description: '价格上穿均线买入，下穿均线卖出。',
-  executionInstrument: asset, primaryTimeframe: '1d', signalSources: [{ id: 'price', asset, timeframe: '1d', series: ['close'] }],
+  schemaVersion: 'strategy-definition-v1', name: '方向核验', description: '价格上穿均线买入，下穿均线卖出。',
+  executionInstrument: asset, primaryTimeframe: '1d', entryTrigger: 'rising-edge',
+  signalSources: [{ id: 'price', asset, timeframe: '1d', priceCoordinate: 'run', series: ['close'] }],
   entry: { type: 'cross', direction: 'above', left: ema, right: price },
   exit: { type: 'cross', direction: 'below', left: ema, right: price },
   sizing: { type: 'percentOfEquity', percent: '0.5' }, risk: [{ type: 'fixedStop', percent: '0.03' }, { type: 'maxHoldingPeriod', periods: 10 }],
