@@ -14,6 +14,7 @@ const name = `ledger-restore-test-${randomUUID().slice(0, 8)}`;
 const databaseName = 'restore_fixture', ownerName = 'fixture_owner';
 const fixturePassword = 'fixture';
 const directory = await mkdtemp(join(tmpdir(), name + '-'));
+const mountUser = `${process.getuid()}:${process.getgid()}`;
 let container;
 function docker(args, input) {
   const result = spawnSync('docker', args, { input, encoding: 'utf8', timeout: 90000, maxBuffer: 8 * 1024 * 1024 });
@@ -21,9 +22,10 @@ function docker(args, input) {
   return result.stdout.trim();
 }
 const psql = (sql) => docker(['exec', '-i', container, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', ownerName, '-d', databaseName, '-At'], sql);
+const runMountedClient = (tool, args) => docker(['exec', '-i', '--user', mountUser, container, tool, ...args]);
 async function dump(filename) {
   const file = join(directory, filename);
-  docker(['exec', container, 'pg_dump', '-U', ownerName, '-d', databaseName, '--format=custom', '--no-owner', '--file', `/restore/${filename}`]);
+  runMountedClient('pg_dump', ['-U', ownerName, '-d', databaseName, '--format=custom', '--no-owner', '--file', `/restore/${filename}`]);
   const digest = createHash('sha256').update(await readFile(file)).digest('hex');
   await writeFile(file + '.sha256', `${digest}  ${filename}\n`);
   return file;
@@ -31,7 +33,7 @@ async function dump(filename) {
 const options = {
   env: { DATABASE_URL: `postgresql://${ownerName}:${fixturePassword}@localhost/${databaseName}?schema=public` },
   temporaryRoot: directory,
-  run: (tool, args) => docker(['exec', '-i', container, tool, ...args.map((arg) => arg.startsWith(directory) ? arg.replace(directory, '/restore') : arg)]),
+  run: (tool, args) => runMountedClient(tool, args.map((arg) => arg.startsWith(directory) ? arg.replace(directory, '/restore') : arg)),
 };
 const apply = (file) => [file, '--apply', '--confirm-database', databaseName, '--confirm-owner', ownerName];
 try {
