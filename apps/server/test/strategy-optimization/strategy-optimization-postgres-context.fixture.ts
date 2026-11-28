@@ -142,7 +142,7 @@ function optimizationPostgresContext() {
       data: {
         strategyId,
         version,
-        schemaVersion: Number(candidateSchema.schemaVersion),
+        schemaVersion: 1,
         schema: candidateSchema as Prisma.InputJsonValue,
       },
     });
@@ -305,7 +305,7 @@ async function initializeOptimizationPostgresFixture(
       id: lifecycleScope.strategyId,
       name: `Service E2E Strategy ${suffix}`,
       status: 'active',
-      schemaVersion: 3,
+      schemaVersion: 1,
     },
   });
   const [version1, version2] = await Promise.all([
@@ -313,7 +313,7 @@ async function initializeOptimizationPostgresFixture(
       data: {
         strategyId: createdStrategy.id,
         version: 1,
-        schemaVersion: 3,
+        schemaVersion: 1,
         schema: strategy('0.08') as Prisma.InputJsonValue,
       },
     }),
@@ -321,7 +321,7 @@ async function initializeOptimizationPostgresFixture(
       data: {
         strategyId: createdStrategy.id,
         version: 2,
-        schemaVersion: 3,
+        schemaVersion: 1,
         schema: strategy('0.06', '0.20') as Prisma.InputJsonValue,
       },
     }),
